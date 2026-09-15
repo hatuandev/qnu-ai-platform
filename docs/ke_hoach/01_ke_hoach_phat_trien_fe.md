@@ -121,32 +121,48 @@ Dựa trên danh sách các components và bộ thư viện của `qnu-ktx`, h�
 
 ---
 
-## 🗺️ 4. Bản Đồ Điều Hướng & Cấu Trúc Trang (Khớp 100% Chuẩn QNU.AI Core Studio)
+## 🗺️ 4. Bản Đồ Điều Hướng & Cấu Trúc Tính Năng Chi Tiết (In-depth Feature Architecture)
 
-Kế thừa chính xác cấu trúc 3 phân nhóm điều hướng từ [`qnu-ai-core/services/studio-ui`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-core/services/studio-ui/components/layout/StudioShell.tsx), được tổ chức lại theo chuẩn `NavGroup[]` của `qnu-ktx`:
+Bản đồ điều hướng được chuẩn hóa từ [`qnu-ai-core/services/studio-ui`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-core/services/studio-ui), trong đó làm rõ các cấu phần chuyên sâu của từng phân hệ (đặc biệt là **Kho Tri Thức** hợp nhất toàn bộ luồng bóc tách OCR, loại văn bản, bảng sự thật và playground):
 
 ```
 [ Khung Vỏ Quản Trị: AdminShell ]
-  ├── 1. Vận hành & Trợ lý:
-  │     ├── /                 : Tổng quan (Dashboard số liệu, thống kê token, chi phí)
-  │     ├── /assistants       : Trợ lý AI (Danh sách 05 Trợ lý QNU, tạo trợ lý mới)
-  │     ├── /chat             : Thử nghiệm Chat (Chatbot Studio trực tiếp với real-time SSE)
-  │     ├── /conversations    : Hội thoại & Handoff (Lịch sử chat, bàn giao tư vấn viên)
-  │     ├── /channels         : Kênh Phân phối & Mã Nhúng (Web widget, nhúng cổng thông tin)
-  │     └── /runs             : Lịch sử Thực thi (Trace các phiên chạy DAG workflow)
-  │
-  ├── 2. Tri thức & Quy trình:
-  │     ├── /knowledge        : Kho Tri thức (Collections, Ingest PDF/Word/Excel, Chunks, Facts)
-  │     ├── /document-types   : Quản lý Loại Văn bản (Cấu hình mẫu biểu, quy chuẩn Nghị định 30)
-  │     ├── /ocr              : Bóc tách & Thị giác Tài liệu (Document AI: PyMuPDF, PaddleOCR)
-  │     ├── /nodes            : Danh mục Node Manifest (Thư viện node cho DAG visual builder)
-  │     ├── /tools            : Công cụ & API Ngoài (Tra cứu UIS điểm chuẩn, xuất Word/Excel)
-  │     └── /evaluation       : Đánh giá Chất lượng (Hồ sơ nghiệm thu TM-08, 100 câu benchmark)
-  │
-  └── 3. Hệ thống & Quản trị:
-        ├── /models           : Mô hình & Provider (ModelOps, Circuit Breaker, Quotas, Usage Logs)
-        ├── /developer        : Cổng Developer & API (Quản lý API Keys, Webhooks, API Docs)
-        └── /design-system    : Hệ thống Thiết kế UI (Showcase tokens, typography, components test)
+│
+├── 1. VẬN HÀNH & TRỢ LÝ (Operations & Assistants):
+│     ├── /                    : Bảng điều khiển Tổng quan (Thống kê tokens, chi phí FinOps, trạng thái hệ thống)
+│     ├── /assistants          : Danh mục 05 Trợ lý AI Chuyên trách QNU
+│     │     ├── [id]           : Chi tiết & Cấu hình Trợ lý (Persona, System Prompt, Tri thức ràng buộc, Guardrails)
+│     │     ├── [id]/canvas    : Visual DAG Canvas (Trực quan hóa đồ thị quy trình xử lý của Trợ lý qua React Flow)
+│     │     └── [id]/chat      : Thử nghiệm Trò chuyện Chuyên biệt (Test riêng cho từng trợ lý)
+│     ├── /chat                : Khung Chatbot Studio Toàn năng (Hỏi đáp trực tiếp, SSE streaming, Citation Drawer)
+│     ├── /conversations       : Hội thoại & Handoff (Lịch sử chat đa kênh, Bàn giao trực tiếp cho Tư vấn viên - Live Human Handoff)
+│     ├── /channels            : Kênh Phân phối & Mã Nhúng (Cấu hình Web Widget nhúng, CDN script cho cổng thông tin trường)
+│     └── /runs                : Lịch sử Thực thi DAG (Trace chi tiết các bước chạy node, input/output và độ trễ)
+│
+├── 2. KHO TRI THỨC & QUY TRÌNH (Knowledge Hub & Pipelines):
+│     ├── /knowledge           : Trung tâm Quản trị Tri thức (Knowledge Collections theo 5 module)
+│     │     ├── [id]           : Chi tiết Collection gồm 3 tab chức năng hợp nhất:
+│     │     │     ├── Tab Documents  : Danh sách tài liệu (Upload PDF/Word/Excel, Trạng thái, Phân loại)
+│     │     │     ├── Tab Jobs       : Hàng đợi tác vụ ngầm Ingestion & Cửa sổ Live Terminal Logs
+│     │     │     └── Tab Playground : Sân chơi thử nghiệm truy xuất Hybrid RAG (Dense + Sparse FTS + Rerank)
+│     │     ├── [id]/documents/[docId] : Document Studio Viewer (Soi văn bản Markdown, Soi từng Chunk Điều/Khoản)
+│     │     └── [id]/ingest    : Wizard Nạp Tri Thức Nâng Cao (Upload -> Chọn OCR -> Preview -> Chunking -> Index)
+│     │
+│     ├── /ocr                 : Bóc tách & Thị giác Tài liệu (Document AI: Đa bộ máy PyMuPDF, PaddleOCR, Docling, RapidOCR)
+│     ├── /document-types      : Quản lý Loại Văn bản (Cấu hình mẫu biểu, mức độ ưu tiên pháp lý: Quyết định, Quy chế, Tờ trình...)
+│     ├── /nodes               : Danh mục Node Manifest (Đặc tả thư viện các loại Node của DAG Engine)
+│     ├── /tools               : Cổng Công cụ & API Ngoài (Builtin: UIS tra cứu điểm chuẩn, Xuất Word NĐ30, Excel Bloom; Custom Tools với Test Runner cURL)
+│     └── /evaluation          : Kiểm định Chất lượng Ragas TM-08 gồm 3 tab chức năng:
+│           ├── Tab Datasets   : Bộ dữ liệu kiểm thử vàng (Golden Dataset 100 câu hỏi tuyển sinh & quy chế)
+│           ├── Tab Scorecard  : Bảng điểm 3 chỉ số TM-08 (Faithfulness >= 0.90, Relevance >= 0.85, Precision >= 0.80)
+│           └── Tab Gap Inbox  : Hộp thư lỗ hổng tri thức (Gom câu hỏi bot chưa trả lời được để biên tập bổ sung)
+│
+└── 3. HỆ THỐNG & QUẢN TRỊ (System & ModelOps):
+      ├── /models              : Quản trị Mô hình & Provider (ModelOps) gồm 2 tab:
+      │     ├── Tab Providers  : Quản lý Cloud (OpenAI, Gemini), Local On-Premise (vLLM, Qwen2.5-7B), Custom Provider
+      │     └── Tab Profiles   : Hồ sơ mô hình (Routing, Fallback Cascade, Circuit Breaker 3 trạng thái, Hạn ngạch Quota & FinOps Logs)
+      ├── /developer           : Cổng Developer & API Keys (Quản lý khóa API các phòng ban, Webhooks, API Docs)
+      └── /design-system       : Hệ thống Thiết kế UI (Showcase kiểm thử tokens, bảng màu OKLCH, typography, components)
 ```
 
 ---
