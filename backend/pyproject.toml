@@ -54,3 +54,4 @@ ignore = ["BLE001", "S110", "LOG014", "RUF012", "B008"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--basetemp=.pytest_temp"

@@ -37,7 +37,7 @@ class PyMuPDFOCRAdapter(BaseOCRAdapter):
             pnum = i + 1
             text = page.get_text("text").strip()
             confidence = 0.95 if text else 0.60
-            lines = [l for l in text.splitlines() if l.strip()]
+            lines = [line for line in text.splitlines() if line.strip()]
             words = text.split()
             has_tables = False
             if "|" in text:

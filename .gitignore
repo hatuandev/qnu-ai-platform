@@ -66,6 +66,7 @@ backend/storage/backups/*
 
 # Testing & Coverage
 .pytest_cache/
+.pytest_temp/
 .coverage
 htmlcov/
 .ruff_cache/
