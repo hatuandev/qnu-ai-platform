@@ -1,0 +1,104 @@
+module_code: library
+name: Tra cứu, tư vấn khai thác tài nguyên thư viện
+conversation:
+  rewrite_enabled: true
+data_sensitivity: internal
+allowed_roles:
+- anonymous
+- student
+- teacher
+- researcher
+- admin
+parser_profile: docling
+chunking_strategy: library_chunker
+retrieval_strategy: hybrid_vector_fts_api_lookup
+require_citation: true
+structured_lookup:
+  field_aliases:
+    title:
+    - tên sách
+    - tên tài liệu
+    - nhan đề
+    - tiêu đề
+    - title
+    author:
+    - tác giả
+    - author
+    publisher:
+    - nhà xuất bản
+    - nxb
+    - publisher
+    year:
+    - năm xuất bản
+    - năm
+    - year
+    isbn:
+    - isbn
+    - mã isbn
+    call_number:
+    - ký hiệu xếp giá
+    - mã xếp giá
+    - call number
+    location:
+    - vị trí
+    - kho
+    - phòng đọc
+    - location
+    availability:
+    - tình trạng
+    - còn sách
+    - khả dụng
+    category:
+    - loại tài nguyên
+    - loại tài liệu
+    - category
+    subject:
+    - chủ đề
+    - từ khóa
+    - lĩnh vực
+    - subject
+    language:
+    - ngôn ngữ
+    - language
+    edition:
+    - lần xuất bản
+    - ấn bản
+    - edition
+    electronic_url:
+    - liên kết điện tử
+    - url
+    - đường dẫn
+    - electronic_url
+    file_format:
+    - định dạng
+    - file
+    - file_format
+  target_fields:
+  - title
+  - author
+  - isbn
+  - call_number
+  - subject
+  - category
+  value_aliases:
+    category:
+      sach_giao_trinh: Sách giáo trình
+      tap_chi: Tạp chí
+      luan_van: Luận văn
+      luan_an: Luận án
+      bao_chi: Báo chí
+      tai_lieu_tham_khao: Tài liệu tham khảo
+    language:
+      vi: Tiếng Việt
+      en: Tiếng Anh
+      fr: Tiếng Pháp
+      cn: Tiếng Trung
+    availability:
+      con: Còn sách
+      het: Hết sách
+      dat_truoc: Đặt trước
+hyde_prompt: Bạn là thư viện viên Đại học Quy Nhơn. Hãy viết một đoạn văn ngắn (3-5
+  câu) trả lời câu hỏi sau như thể đây là nội dung trong tài liệu thư viện.
+evaluation:
+  accuracy_threshold: 0.9
+  response_time_threshold_ms: 10000

@@ -1,0 +1,334 @@
+module_code: regulations
+name: Tư vấn quy chế - quy định
+conversation:
+  rewrite_enabled: true
+data_sensitivity: internal
+allowed_roles:
+- anonymous
+- student
+- teacher
+- admin
+parser_profile: pymupdf
+chunking_strategy: regulation_chunker
+retrieval_strategy: hybrid_vector_fts
+rerank_profile: bge_reranker
+# Note: pymupdf profile is PDF-only. DOCX uploads will fall back to Docling automatically.
+require_citation: true
+answer_policy:
+  max_context_tokens: 5000
+  generation_max_tokens: 1536
+  generation_retry_max_tokens: 4096
+  require_inline_citation: false
+structured_lookup:
+  value_aliases:
+    # P3-5: human-readable labels for the regulation document_type
+    # taxonomy. Match the keys used by the regulation chunker.
+    document_type:
+      quy_che: Quy chế
+      quy_dinh: Quy định
+      quyet_dinh: Quyết định
+      huong_dan: Hướng dẫn
+      thong_bao: Thông báo
+      chi_thi: Chỉ thị
+      nghi_quyet: Nghị quyết
+    status:
+      con_hieu_luc: Còn hiệu lực
+      het_hieu_luc: Hết hiệu lực
+      sua_doi_bo_sung: Sửa đổi bổ sung
+  fallback_to_untyped: true
+  field_aliases:
+    article:
+    - điều
+    - điều khoản
+    - dieu
+    clause:
+    - khoản
+    - mục
+    - khoan
+    - muc
+    document_number:
+    - số văn bản
+    - số quy định
+    - số quyết định
+    - số hiệu
+    - so_van_ban
+    issuer:
+    - cơ quan ban hành
+    - đơn vị ban hành
+    - người ban hành
+    - co_quan_ban_hanh
+    effective_date:
+    - ngày hiệu lực
+    - thời điểm hiệu lực
+    deadline:
+    - hạn
+    - thời hạn
+    - deadline
+    condition:
+    - điều kiện
+    - quy định
+    - yêu cầu
+    duration:
+    - thời gian đào tạo
+    - thời lượng đào tạo
+    - thời gian học
+    - bao lâu
+    - mấy năm
+    credits:
+    - tín chỉ
+    - số tín chỉ
+    - khối lượng chương trình
+    - khối lượng học tập
+    - credits
+hyde_expansion:
+  enabled: true
+  prompt_hint: 'Người đang hỏi về quy chế / quy định của Trường Đại học Quy Nhơn.
+    Hãy
+
+    viết một đoạn văn ngắn (3-5 câu) trả lời như thể đây là nội dung trong
+
+    quy định, quy chế chính thức.
+
+    '
+semantic_expansion:
+  concepts:
+    tuyen_dung_cong_chuc_vien_chuc:
+      aliases:
+      - tuyển dụng công chức
+      - tuyển dụng viên chức
+      - phương thức tuyển dụng
+      - kỳ tuyển dụng
+      - hồ sơ tuyển dụng
+      expand_to:
+      - thi tuyển
+      - xét tuyển
+      - tiếp nhận vào làm công chức hoặc viên chức
+      - kế hoạch tuyển dụng
+      - xác minh lý lịch hồ sơ văn bằng
+      preferred_fields:
+      - article
+      - clause
+    tiep_nhan_dieu_dong:
+      aliases:
+      - tiếp nhận
+      - điều động công chức
+      - điều động viên chức
+      - chuyển công tác
+      - hồ sơ đề xuất tiếp nhận điều động
+      expand_to:
+      - lấy ý kiến đơn vị đang công tác
+      - kiểm tra năng lực chuyên môn nghiệp vụ
+      - xác minh hồ sơ
+      - đơn xin chuyển công tác
+      - văn bản đề xuất
+      preferred_fields:
+      - article
+      - clause
+    biet_phai:
+      aliases:
+      - biệt phái công chức
+      - biệt phái viên chức
+      - biệt phái giữa các đơn vị
+      - biệt phái đột xuất cấp bách
+      expand_to:
+      - trao đổi thống nhất bằng văn bản
+      - gặp gỡ và lập biên bản
+      - quyết định biệt phái
+      - Vụ TCCB
+      preferred_fields:
+      - article
+      - clause
+    bao_cao_tuyen_dung:
+      aliases:
+      - báo cáo kết quả tuyển dụng
+      - báo cáo thống kê tuyển dụng
+      - báo cáo thống kê định kỳ
+      - sau mỗi kỳ tuyển dụng
+      expand_to:
+      - thời hạn 30 ngày
+      - trước ngày 31 tháng 01
+      - văn bản giấy
+      - văn bản điện tử
+      - biểu mẫu số 2
+      preferred_fields:
+      - article
+      - clause
+    ngoai_ngu_dau_vao:
+      aliases:
+      - ngoại ngữ
+      - tiếng anh
+      - trình độ ngoại ngữ
+      - chuẩn ngoại ngữ
+      - yêu cầu ngoại ngữ
+      - tiếng pháp
+      - tiếng trung
+      - tiếng nhật
+      - tiếng nga
+      - ielts
+      - toefl
+      - toeic
+      - bậc 3
+      - bậc 4
+      - bậc 5
+      - bậc 6
+      - khung 6 bậc
+      - khung năng lực ngoại ngữ
+      expand_to:
+      - ngoại ngữ
+      - chuẩn đầu vào
+      - trình độ ngoại ngữ
+      - khung năng lực ngoại ngữ 6 bậc
+      - IELTS
+      - TOEFL
+      - chứng chỉ ngoại ngữ
+      preferred_fields:
+      - article
+      - clause
+      - effective_date
+    hoc_phi:
+      aliases:
+      - học phí
+      - lệ phí
+      - lệ phí thi
+      - lệ phí xét tuyển
+      - đóng học phí
+      - miễn giảm học phí
+      - miễn học phí
+      - học bổng
+      - mức thu
+      expand_to:
+      - học phí
+      - lệ phí
+      - mức thu
+      - miễn giảm
+      - học bổng
+      preferred_fields:
+      - effective_date
+    hoat_dong_ngoai_truong:
+      aliases:
+      - hoạt động thực hành, thực tập và nghiên cứu ngoài trường
+      - thực hành, thực tập, nghiên cứu và trải nghiệm thực tế ngoài trường
+      - ngoài trường
+      - trải nghiệm thực tế
+      expand_to:
+      - hoạt động thực hành thực tập nghiên cứu trải nghiệm thực tế ngoài trường
+      - không vượt quá 20 phần trăm khối lượng chương trình
+      - khối lượng chương trình
+      preferred_fields:
+      - article
+      - clause
+    dieu_kien_nghien_cuu:
+      aliases:
+      - tốt nghiệp đại học loại trung bình có công bố khoa học
+      - công bố khoa học liên quan
+      - chương trình định hướng nghiên cứu
+      expand_to:
+      - tốt nghiệp đại học loại khá trở lên hoặc có công bố khoa học liên quan
+      - điều kiện dự tuyển định hướng nghiên cứu
+      - ngành phù hợp
+      preferred_fields:
+      - article
+      - clause
+    hoc_truoc_hoc_phan_thac_si:
+      aliases:
+      - hoàn thành 4 học kỳ đại học học trước học phần thạc sĩ
+      - học trước học phần thạc sĩ
+      - 4 học kỳ đại học
+      expand_to:
+      - sinh viên đã hoàn thành 04 học kỳ đại học học lực từ khá
+      - học trước không quá 06 tín chỉ mỗi kỳ và 15 tín chỉ tổng cộng
+      - học phần trình độ thạc sĩ
+      preferred_fields:
+      - article
+      - clause
+    dieu_kien_tot_nghiep:
+      aliases:
+      - điều kiện tốt nghiệp
+      - hoàn thành khóa học
+      - đủ điều kiện tốt nghiệp
+      - bảo vệ
+      - luận văn
+      - luận án
+      expand_to:
+      - điều kiện tốt nghiệp
+      - hoàn thành chương trình
+      - bảo vệ luận văn
+      - bảo vệ luận án
+      - học phần
+      - tín chỉ
+      preferred_fields:
+      - article
+      - clause
+    thoi_gian_dao_tao:
+      aliases:
+      - thời gian đào tạo
+      - bao lâu
+      - mấy năm
+      - số năm
+      - thời hạn
+      - kéo dài
+      - rút ngắn
+      expand_to:
+      - thời gian đào tạo
+      - khóa học
+      - học kỳ
+      - năm học
+      preferred_fields:
+      - article
+      - clause
+      - effective_date
+    hinh_thuc_dao_tao:
+      aliases:
+      - hình thức đào tạo
+      - các hình thức
+      - hình thức học
+      - chính quy
+      - vừa làm vừa học
+      - vừa học vừa làm
+      - từ xa
+      - học từ xa
+      - đào tạo trực tuyến
+      - đào tạo online
+      - liên thông
+      - bằng hai
+      - văn bằng 2
+      - văn bằng hai
+      expand_to:
+      - hình thức đào tạo
+      - chính quy
+      - vừa làm vừa học
+      - từ xa
+      - liên thông
+      preferred_fields:
+      - article
+      - clause
+    tuyen_sinh_sau_dai_hoc:
+      aliases:
+      - cao học
+      - nghiên cứu sinh
+      - ncs
+      - sau đại học
+      - tuyển sinh sau đại học
+      expand_to:
+      - đào tạo sau đại học
+      - cao học
+      - thạc sĩ
+      - nghiên cứu sinh
+      - tuyển sinh
+      preferred_fields:
+      - article
+      - clause
+document_priority:
+  default_source_priority: 55
+  official_boost: 20
+  signed_boost: 25
+  draft_penalty: -25
+  archived_penalty: -35
+  superseded_penalty: -40
+  signed_official_boost: 15
+  year_match_boost: 35
+  year_mismatch_penalty: 10
+collections:
+- qnu_regulations_v1
+- qnu_recruitment_policies_v1
+collection: qnu_recruitment_policies_v1

@@ -1,0 +1,284 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "WorkflowDefinition",
+  "metadata": {
+    "name": "admissions-assistant",
+    "display_name": "Trợ lý Tuyển sinh QNU",
+    "description": "Trợ lý thông minh giải đáp thông tin đề án tuyển sinh, chỉ tiêu, mã ngành, học phí và điểm chuẩn các năm.",
+    "scope": {
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_admissions"
+    },
+    "module_code": "admissions",
+    "labels": {
+      "template": "admissions",
+      "phase": "phase_2_production_template"
+    },
+    "annotations": {
+      "purpose": "qnu_university_admissions_qa"
+    }
+  },
+  "spec": {
+    "execution_mode": "conversational",
+    "entry_node_id": "chat_input",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "answer"],
+      "properties": {
+        "status": {
+          "enum": ["answered", "insufficient_context"]
+        },
+        "answer": {
+          "type": "string"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "nodes": [
+      {
+        "id": "chat_input",
+        "type": "input.chat",
+        "version": "1.0.0",
+        "display_name": "Câu hỏi thí sinh / phụ huynh",
+        "config": {
+          "trim": true,
+          "max_length": 10000
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "condition_route",
+        "type": "condition.route",
+        "version": "1.0.0",
+        "display_name": "Phân loại ý định (Chào hỏi / Tra cứu)",
+        "config": {
+          "rules": [
+            {
+              "id": "greeting_rule",
+              "match": {
+                "intent": "xin chào|hello|hi|chào|cm ơn|cảm ơn|tạm biệt|bye"
+              },
+              "to": "greeting_output"
+            }
+          ],
+          "default_node": "knowledge_answer"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "greeting_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Lời chào & Gợi ý câu hỏi",
+        "config": {
+          "include_citations": false,
+          "format": "markdown",
+          "output_template": "Chào bạn! Mình là Trợ lý Tuyển sinh Trường Đại học Quy Nhơn (QNU.AI). Mình rất vui được hỗ trợ bạn!\n\nBạn có thể hỏi mình nhanh về các chủ đề phổ biến dưới đây nhé:\n1. 🎯 **Điểm chuẩn**: Điểm chuẩn các ngành tuyển sinh năm 2024\n2. 💰 **Học phí**: Mức học phí và chính sách học bổng của trường\n3. 📚 **Ngành đào tạo**: Các ngành đào tạo và chỉ tiêu tuyển sinh năm 2025\n\nBạn đang quan tâm đến ngành học hoặc thông tin nào, hãy nhắn cho mình nha!"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "knowledge_answer",
+        "type": "core.knowledge.answer",
+        "version": "1.0.0",
+        "display_name": "Tra cứu đề án tuyển sinh & điểm chuẩn",
+        "config": {
+          "module_code": "admissions",
+          "profile": "rag_fast",
+          "retrieval_limit": 10,
+          "context_max_chars": 12000,
+          "require_citations": true,
+          "no_answer_policy": "insufficient_context",
+          "system_prompt": "Bạn là Trợ lý Tuyển sinh AI thân thiện của Trường Đại học Quy Nhơn (QNU.AI).\nPhong cách giao tiếp:\n- Luôn xưng hô 'mình' và gọi người dùng là 'bạn'. Giọng văn ấm áp, nhiệt tình, lịch sự, ngắn gọn và đi thẳng vào trọng tâm.\n- Trả lời câu hỏi người dùng một cách chính xác dựa vào ngữ cảnh tài liệu và lịch sử trao đổi được cung cấp.\n- Nếu câu hỏi yêu cầu các thông số, điều kiện, mốc thời gian, học phí, điểm chuẩn hoặc thông tin liên hệ, hãy trích xuất dưới dạng gạch đầu dòng rõ ràng.\n- Tuyệt đối KHÔNG chép lại toàn bộ tài liệu dài dòng và không suy diễn, bịa đặt số liệu ngoài tài liệu.\n- Quy tắc bắt buộc: Ở cuối mỗi câu trả lời, hãy gợi ý 2 câu hỏi tiếp theo mà bạn nghĩ người dùng sẽ quan tâm dưới dạng danh sách (ví dụ: 'Bạn có thể muốn tìm hiểu thêm:' kèm 2 gạch đầu dòng gợi ý chủ đề liên quan, không đưa số liệu cụ thể vào gợi ý)."
+        },
+        "connection_refs": ["conn_qnu_ai_core"],
+        "policy": {
+          "timeout_seconds": 30,
+          "max_attempts": 2,
+          "checkpoint_after": true,
+          "required_permissions": ["knowledge.read"]
+        }
+      },
+      {
+        "id": "citation_guard",
+        "type": "guard.citation_policy",
+        "version": "1.0.0",
+        "display_name": "Xác thực nguồn đề án chính quy",
+        "config": {
+          "require_citation_for_answer": true,
+          "accepted_statuses": ["answered", "success"],
+          "invalid_route": "ungrounded"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "chat_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Giải đáp tuyển sinh có trích dẫn",
+        "config": {
+          "include_citations": true,
+          "format": "markdown"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "no_answer_output",
+        "type": "output.no_answer",
+        "version": "1.0.0",
+        "display_name": "Từ chối / Hướng dẫn liên hệ Phòng Tuyển sinh",
+        "config": {
+          "status": "insufficient_context",
+          "message": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến dưới đây nhé:\n1. 🎯 **Điểm chuẩn**: \"Điểm chuẩn ngành Công nghệ thông tin năm 2024 là bao nhiêu?\"\n2. 💰 **Học phí**: \"Mức học phí năm học 2024 - 2025 của trường như thế nào?\"\n3. 📚 **Ngành học**: \"Trường Đại học Quy Nhơn có những ngành đào tạo nào?\"\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** để được thầy cô giải đáp chi tiết nha!",
+          "default_message": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến dưới đây nhé:\n1. 🎯 **Điểm chuẩn**: \"Điểm chuẩn ngành Công nghệ thông tin năm 2024 là bao nhiêu?\"\n2. 💰 **Học phí**: \"Mức học phí năm học 2024 - 2025 của trường như thế nào?\"\n3. 📚 **Ngành học**: \"Trường Đại học Quy Nhơn có những ngành đào tạo nào?\"\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** để được thầy cô giải đáp chi tiết nha!"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_input_to_route",
+        "source": {
+          "node_id": "chat_input",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "condition_route",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_route_to_greeting",
+        "source": {
+          "node_id": "condition_route",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "greeting_output",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_route_to_knowledge",
+        "source": {
+          "node_id": "condition_route",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "knowledge_answer",
+          "port": "question"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_knowledge_to_guard",
+        "source": {
+          "node_id": "knowledge_answer",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "citation_guard",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_grounded_to_output",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "grounded"
+        },
+        "target": {
+          "node_id": "chat_output",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_ungrounded_to_no_answer",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "ungrounded"
+        },
+        "target": {
+          "node_id": "no_answer_output",
+          "port": "reason"
+        },
+        "priority": 100
+      }
+    ],
+    "policies": {
+      "run_timeout_seconds": 60,
+      "max_steps": 12,
+      "max_parallel_nodes": 1,
+      "default_retry": {
+        "max_attempts": 1,
+        "initial_backoff_ms": 250,
+        "max_backoff_ms": 2000,
+        "retryable_error_codes": []
+      },
+      "data_classification": "public",
+      "allowed_connection_ids": ["conn_qnu_ai_core"],
+      "quality_gate_id": "gate_admissions_baseline"
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "node_resolution": "exact",
+      "features": ["citations", "no_answer", "conversation", "fact_lookup"]
+    }
+  }
+}

@@ -1,0 +1,282 @@
+module_code: admissions
+name: Tư vấn tuyển sinh
+collection: qnu_admissions_v1
+collections:
+- qnu_admissions_v1
+conversation:
+  rewrite_enabled: true
+data_sensitivity: internal
+allowed_roles:
+- anonymous
+- student
+- teacher
+- admin
+parser_profile: pymupdf
+chunking_strategy: admissions_chunker
+retrieval_strategy: hybrid_vector_fts
+rerank_profile: bge_reranker
+# Note: pymupdf profile is PDF-only. DOCX uploads will fall back to Docling automatically.
+require_citation: true
+intent_keywords:
+  semantic_expansion:
+  - ngành về
+  - ngành liên quan
+  - trường đào tạo
+  - chương trình đào tạo
+  - muốn học ngành
+  - muốn học ngành liên quan đến
+  fact_list:
+  - các phương thức
+  - các phương thức tuyển sinh
+  table_lookup:
+  - ngành
+  row_filter:
+  - có ngành
+  - ngành nào
+  entity_prefix:
+  - có ngành
+  - ngành nào
+  - xét
+  - ngành
+  - chương trình
+  - học phần
+  - môn
+  - lớp
+  - khóa
+  - khoa
+  entity_suffix:
+  - có ngành nào
+  - có ngành
+  - ngành nào
+  comparison_entity_prefix:
+  - ngành
+  - môn
+  - chương trình
+  - khoa
+structured_lookup:
+  field_aliases:
+    admission_code:
+    - mã xét tuyển
+    - mã tuyển sinh
+    - ma_xet_tuyen
+    - ma_tuyen_sinh
+    major_code:
+    - mã ngành
+    - mã số ngành
+    - ma_nganh
+    - ma_so_nganh
+    major_name:
+    - tên ngành
+    - tên ngành, chương trình xét tuyển
+    - ten_nganh
+    - ten_nganh_chuong_trinh_xet_tuyen
+    quota:
+    - chỉ tiêu
+    - số lượng tuyển sinh
+    - số lượng tuyển sinh dự kiến
+    - chi_tieu
+    method:
+    - phương thức tuyển sinh
+    - phương thức
+    - phuong_thuc_tuyen_sinh
+    combination:
+    - tổ hợp môn xét tuyển
+    - tổ hợp xét tuyển
+    - tổ hợp
+    - môn xét tuyển
+    - to_hop_mon_xet_tuyen
+    - to_hop
+    - mon_xet_tuyen
+    tuition:
+    - học phí
+    - hoc_phi
+    application_fee:
+    - lệ phí xét tuyển
+    - phí xét tuyển
+    - lệ phí đăng ký xét tuyển
+    - phí đăng ký xét tuyển
+    - le_phi_xet_tuyen
+    - phi_xet_tuyen
+    - le_phi_dang_ky_xet_tuyen
+    - phi_dang_ky_xet_tuyen
+    - application_fee
+    exam_fee:
+    - lệ phí thi tuyển
+    - lệ phí thi năng khiếu
+    - phí thi năng khiếu
+    - le_phi_thi_tuyen
+    - le_phi_thi_nang_khieu
+    - exam_fee
+    fee:
+    - lệ phí
+    - le_phi
+    - fee
+    year:
+    - năm
+    - nam
+    - year
+    condition:
+    - điều kiện
+    - điều kiện xét tuyển
+    - dieu_kien
+    institution_code:
+    - mã trường
+    - mã cơ sở đào tạo
+    - ma_truong
+    - ma_co_so_dao_tao
+    institution_name:
+    - tên trường
+    - tên cơ sở đào tạo
+    - ten_truong
+    training_level:
+    - trình độ đào tạo
+    - bậc đào tạo
+    - trinh_do_dao_tao
+    training_system:
+    - hệ đào tạo
+    - hình thức đào tạo
+    - loại hình đào tạo
+    - he_dao_tao
+    duration:
+    - thời gian đào tạo
+    - thời lượng đào tạo
+    - thoi_gian_dao_tao
+    degree:
+    - văn bằng
+    - bằng cấp
+    - degree
+    campus:
+    - cơ sở học
+    - địa điểm học
+    - campus
+    registration_deadline:
+    - hạn đăng ký
+    - thời hạn đăng ký
+    - hạn nộp hồ sơ
+    - registration_deadline
+  target_fields:
+  - major_name
+  - program_name
+  - institution_name
+  - training_level
+  - year
+  alias_policy:
+    auto_acronym: true
+    auto_no_diacritics: true
+    min_alias_length: 3
+    max_alias_length: 12
+  value_aliases:
+    phuong_thuc_tuyen_sinh:
+      '1': Xét tuyển thẳng
+      '2': Xét học bạ THPT
+      '3': Đánh giá năng lực
+      '4': Xét tuyển kết hợp
+      '5': Thi năng khiếu
+    training_system:
+      Chinh_quy: Chính quy
+      VLVH: Vừa làm vừa học
+      Tai_chuc: Tại chức
+      Lien_thong: Liên thông
+    training_level:
+      Dai_hoc: Đại học
+      Cao_dang: Cao đẳng
+      Thac_si: Thạc sĩ
+      Tien_si: Tiến sĩ
+answer_policy:
+  default_format: auto
+  allowed_formats:
+  - paragraph
+  - bullet_list
+  - numbered_list
+  - markdown_table
+  - checklist
+  - timeline
+  - comparison_table
+  table:
+    max_rows: 50
+    preferred_columns:
+    - admission_code
+    - major_name
+    - combination
+    - quota
+    - note
+    column_labels:
+      admission_code: Mã xét tuyển
+      major_name: Tên ngành
+      combination: Tổ hợp môn
+      quota: Chỉ tiêu
+      note: Ghi chú
+  clarification:
+    ask_when_missing_required_context: true
+hyde_prompt: Bạn là chuyên viên tuyển sinh Đại học Quy Nhơn. Hãy viết một đoạn văn
+  ngắn (3-5 câu) trả lời câu hỏi sau như thể đây là nội dung trong đề án tuyển sinh
+  chính thức.
+table_enrichment:
+  extractor: admissions_table_extractor
+evaluation:
+  accuracy_threshold: 0.9
+  response_time_threshold_ms: 10000
+query_expansion:
+  abbreviations:
+    CNTT: Công nghệ thông tin
+    QTKD: Quản trị kinh doanh
+    SP: Sư phạm
+    GD: Giáo dục
+  synonyms:
+    mã xét tuyển:
+    - mã ngành
+    - mã tuyển sinh
+    tổ hợp:
+    - tổ hợp môn
+    - môn xét tuyển
+retrieval:
+  list_query_min_top_k: 20
+  fact_weight: 1.3
+  structured_weight: 1.2
+  keyword_weight: 1.0
+  vector_weight: 1.0
+semantic_expansion:
+  concepts:
+    data_ai:
+      aliases:
+      - dữ liệu
+      - data
+      - AI
+      - trí tuệ nhân tạo
+      - machine learning
+      expand_to:
+      - Khoa học dữ liệu
+      - Trí tuệ nhân tạo
+      - Công nghệ thông tin
+      - Toán ứng dụng
+      preferred_fields:
+      - major_name
+      - admission_code
+      - combination
+      - quota
+    finance:
+      aliases:
+      - tài chính
+      - kế toán
+      - kiểm toán
+      expand_to:
+      - Kế toán
+      - Kiểm toán
+      - Tài chính - Ngân hàng
+      preferred_fields:
+      - major_name
+      - admission_code
+      - combination
+    education:
+      aliases:
+      - giáo dục
+      - sư phạm
+      - giảng dạy
+      expand_to:
+      - Sư phạm
+      - Quản lý giáo dục
+      - Giáo dục học
+      preferred_fields:
+      - major_name
+      - admission_code
+      - combination

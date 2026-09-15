@@ -1,0 +1,217 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "WorkflowDefinition",
+  "metadata": {
+    "name": "library-assistant",
+    "display_name": "Trợ lý Thư viện & NCKH QNU",
+    "description": "Trợ lý tra cứu danh mục giáo trình, sách chuyên khảo, luận văn tốt nghiệp và đề tài nghiên cứu khoa học các khoa.",
+    "scope": {
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_library"
+    },
+    "module_code": "library",
+    "labels": {
+      "template": "library",
+      "phase": "phase_2_production_template"
+    },
+    "annotations": {
+      "purpose": "qnu_library_and_research_catalog"
+    }
+  },
+  "spec": {
+    "execution_mode": "conversational",
+    "entry_node_id": "chat_input",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "answer"],
+      "properties": {
+        "status": {
+          "enum": ["answered", "insufficient_context"]
+        },
+        "answer": {
+          "type": "string"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "nodes": [
+      {
+        "id": "chat_input",
+        "type": "input.chat",
+        "version": "1.0.0",
+        "display_name": "Yêu cầu tìm tài liệu / sách / đề tài",
+        "config": {
+          "trim": true,
+          "max_length": 10000
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "knowledge_answer",
+        "type": "core.knowledge.answer",
+        "version": "1.0.0",
+        "display_name": "Tìm kiếm Semantic & Tra cứu danh mục Thư viện",
+        "config": {
+          "module_code": "library",
+          "profile": "rag_fast",
+          "retrieval_limit": 10,
+          "context_max_chars": 12000,
+          "require_citations": true,
+          "no_answer_policy": "insufficient_context"
+        },
+        "connection_refs": ["conn_qnu_ai_core"],
+        "policy": {
+          "timeout_seconds": 30,
+          "max_attempts": 2,
+          "checkpoint_after": true,
+          "required_permissions": ["knowledge.read"]
+        }
+      },
+      {
+        "id": "citation_guard",
+        "type": "guard.citation_policy",
+        "version": "1.0.0",
+        "display_name": "Kiểm tra mã tài liệu & vị trí kệ sách",
+        "config": {
+          "require_citation_for_answer": true,
+          "accepted_statuses": ["answered", "success"],
+          "invalid_route": "ungrounded"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "chat_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Danh sách tài liệu & bảng vị trí lưu trữ",
+        "config": {
+          "include_citations": true,
+          "format": "markdown"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "no_answer_output",
+        "type": "output.no_answer",
+        "version": "1.0.0",
+        "display_name": "Thông báo không tìm thấy tài liệu trong kho",
+        "config": {
+          "status": "insufficient_context",
+          "message": "Không tìm thấy giáo trình hoặc tài liệu tương ứng trong Thư viện số QNU. Bạn có thể gửi phiếu yêu cầu bổ sung tài liệu tại Quầy thông tin Thư viện."
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_input_to_knowledge",
+        "source": {
+          "node_id": "chat_input",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "knowledge_answer",
+          "port": "question"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_knowledge_to_guard",
+        "source": {
+          "node_id": "knowledge_answer",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "citation_guard",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_grounded_to_output",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "grounded"
+        },
+        "target": {
+          "node_id": "chat_output",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_ungrounded_to_no_answer",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "ungrounded"
+        },
+        "target": {
+          "node_id": "no_answer_output",
+          "port": "reason"
+        },
+        "priority": 100
+      }
+    ],
+    "policies": {
+      "run_timeout_seconds": 60,
+      "max_steps": 12,
+      "max_parallel_nodes": 1,
+      "default_retry": {
+        "max_attempts": 1,
+        "initial_backoff_ms": 250,
+        "max_backoff_ms": 2000,
+        "retryable_error_codes": []
+      },
+      "data_classification": "internal",
+      "allowed_connection_ids": ["conn_qnu_ai_core"],
+      "quality_gate_id": "gate_library_baseline"
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "node_resolution": "exact",
+      "features": ["citations", "no_answer", "conversation", "structured_table"]
+    }
+  }
+}

@@ -1,0 +1,117 @@
+"""Application Configuration Settings via Pydantic BaseSettings."""
+
+from __future__ import annotations
+
+import json
+from functools import lru_cache
+from typing import Any
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(".env", "../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # --- Application & Server ---
+    ENVIRONMENT: str = "development"
+    SERVICE_NAME: str = "qnu-ai-platform"
+    API_PREFIX: str = "/platform/v1alpha1"
+    PORT: int = 8001
+    HOST: str = "0.0.0.0"
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8001",
+    ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [x.strip() for x in v.split(",") if x.strip()]
+        if isinstance(v, list):
+            return v
+        return ["*"]
+
+    # --- PostgreSQL 16 ---
+    DATABASE_URL: str = "postgresql+asyncpg://qnu:qnu_password@localhost:5432/qnu_ai_platform"
+    DB_POOL_SIZE: int = 15
+    DB_MAX_OVERFLOW: int = 10
+    DB_TIMEOUT_SECONDS: float = 30.0
+
+    # --- Qdrant Vector DB ---
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: str | None = None
+    QDRANT_COLLECTION: str = "qnu_knowledge_chunks"
+    VECTOR_SIZE: int = 1024
+
+    # --- Redis ---
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # --- Storage Abstraction ---
+    STORAGE_DRIVER: str = "local"  # 'local' hoặc 's3'
+    LOCAL_STORAGE_PATH: str = "./storage"
+
+    # S3 / MinIO Settings
+    S3_ENDPOINT: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str = "qnu"
+    S3_SECRET_KEY: str = "qnu_password"
+    S3_BUCKET: str = "qnu-ai-documents"
+    S3_SECURE: bool = False
+    S3_REGION: str = "us-east-1"
+
+    # --- Embedding & Reranker ---
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    DEFAULT_TOP_K: int = 8
+    DEFAULT_RERANK_TOP_K: int = 5
+    MAX_CONTEXT_TOKENS: int = 6000
+
+    # --- LLM Providers ---
+    OPENAI_API_KEY: str | None = None
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
+    DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+
+    LOCAL_LLM_ENABLED: bool = False
+    LOCAL_LLM_BASE_URL: str | None = None
+    LOCAL_LLM_MODEL: str = "qwen2.5:7b"
+
+    DEFAULT_MONTHLY_TOKEN_QUOTA: int = 5_000_000
+    DEFAULT_MONTHLY_COST_QUOTA_USD: float = 100.0
+
+    # --- Security & Auth ---
+    SECRET_KEY: str = "qnu-ai-platform-super-secret-key-change-in-production-2026"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    INTERNAL_API_KEY: str = "qnu_internal_secret_key_2026"
+    DEV_AUTH_ENABLED: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 120
+
+    # --- Observability ---
+    LOG_LEVEL: str = "INFO"
+    JSON_LOGGING: bool = True
+    ENABLE_PROMETHEUS: bool = True
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Singleton getter for application settings."""
+    return Settings()
+
+
+settings = get_settings()

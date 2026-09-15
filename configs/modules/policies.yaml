@@ -1,0 +1,82 @@
+modules:
+  admissions:
+    display_name: "tư vấn tuyển sinh"
+    allowed_topics:
+      - tuyển sinh
+      - ngành học
+      - phương thức xét tuyển
+      - học phí
+      - lệ phí
+      - hồ sơ
+      - điều kiện
+      - chỉ tiêu
+      - thời hạn đăng ký
+      - điểm chuẩn
+    capabilities:
+      - summarize_document
+      - create_checklist
+    capability_keywords:
+      summarize_document: [tóm tắt, tóm lược]
+      create_checklist: [checklist, danh sách hồ sơ, các bước chuẩn bị]
+
+  regulations:
+    display_name: "tư vấn quy chế và quy định"
+    allowed_topics:
+      - quy chế
+      - quy định
+      - quyết định
+      - hướng dẫn
+      - điều kiện
+      - điều khoản
+      - hiệu lực
+      - thời hạn
+      - thủ tục
+    capabilities:
+      - summarize_document
+    capability_keywords:
+      summarize_document: [tóm tắt, tóm lược]
+
+  library:
+    display_name: "tra cứu và tư vấn tài nguyên thư viện"
+    allowed_topics:
+      - thư viện
+      - sách
+      - tài liệu
+      - tác giả
+      - nhà xuất bản
+      - giáo trình
+      - mượn sách
+      - trả sách
+      - isbn
+    capabilities:
+      - summarize_document
+    capability_keywords:
+      summarize_document: [tóm tắt, tóm lược]
+
+  question_bank:
+    display_name: "ngân hàng câu hỏi"
+    allowed_topics:
+      - ngân hàng câu hỏi
+      - câu hỏi
+      - môn học
+      - học phần
+      - chuẩn đầu ra
+      - clo
+      - bloom
+    capabilities: []
+    capability_keywords: {}
+
+  drafting:
+    display_name: "soạn thảo văn bản"
+    allowed_topics:
+      - văn bản
+      - công văn
+      - quyết định
+      - thông báo
+      - tờ trình
+      - biên bản
+      - dự thảo
+    capabilities:
+      - draft_document
+    capability_keywords:
+      draft_document: [soạn công văn, soạn văn bản, dự thảo, soạn quyết định, soạn thông báo]

@@ -1,0 +1,466 @@
+module_code: drafting
+name: "Tư vấn soạn thảo văn bản"
+conversation:
+  rewrite_enabled: true
+data_sensitivity: internal
+allowed_roles:
+  - teacher
+  - admin
+  - department_admin
+parser_profile: "docling"
+chunking_strategy: "drafting_chunker"
+retrieval_strategy: "hybrid_vector_fts_template"
+require_citation: true
+structured_lookup:
+  field_aliases:
+    document_type:
+      - "loại văn bản"
+      - "loai_van_ban"
+    document_number:
+      - "số văn bản"
+      - "số công văn"
+      - "số quyết định"
+      - "số hiệu"
+      - "so_van_ban"
+    issuer:
+      - "cơ quan ban hành"
+      - "đơn vị ban hành"
+      - "co_quan_ban_hanh"
+    recipient:
+      - "nơi nhận"
+      - "đơn vị nhận"
+      - "người nhận"
+      - "noi_nhan"
+    signer:
+      - "người ký"
+      - "ký bởi"
+      - "nguoi_ky"
+    position:
+      - "chức vụ"
+      - "chuc_vu"
+    department:
+      - "phòng"
+      - "khoa"
+      - "đơn vị"
+    title:
+      - "trích yếu"
+      - "tiêu đề"
+      - "nội dung chính"
+    template_code:
+      - "mã mẫu"
+      - "mã biểu mẫu"
+      - "template_code"
+    template_name:
+      - "tên mẫu"
+      - "tên biểu mẫu"
+      - "template_name"
+    effective_date:
+      - "ngày hiệu lực"
+      - "có hiệu lực"
+      - "thời điểm hiệu lực"
+    expiry_date:
+      - "ngày hết hiệu lực"
+      - "hết hiệu lực"
+    date:
+      - "ngày ban hành"
+      - "ngày ký"
+      - "ngày tháng"
+      - "ngay"
+      - "date"
+    subject:
+      - "chủ đề"
+      - "về việc"
+      - "trích yếu nội dung"
+      - "nội dung chính"
+      - "subject"
+    purpose:
+      - "về việc"
+      - "mục đích"
+      - "lý do"
+      - "nội dung soạn thảo"
+      - "purpose"
+    proposal:
+      - "nội dung đề xuất"
+      - "kiến nghị"
+      - "đề xuất"
+      - "kính trình"
+      - "tờ trình"
+      - "proposal"
+    references:
+      - "tài liệu tham khảo"
+      - "văn bản viện dẫn"
+      - "căn cứ tham chiếu"
+      - "references"
+    period:
+      - "kỳ báo cáo"
+      - "giai đoạn"
+      - "thời kỳ"
+      - "khoảng thời gian"
+      - "period"
+    meeting_title:
+      - "tên cuộc họp"
+      - "tiêu đề cuộc họp"
+      - "cuộc họp về"
+      - "meeting_title"
+    signers:
+      - "các thành viên ký tên"
+      - "chủ tọa và thư ký"
+      - "người ký biên bản"
+      - "signers"
+    meeting_time:
+      - "thời gian họp"
+      - "thời gian tổ chức"
+      - "thời gian"
+      - "gio_hop"
+      - "meeting_time"
+    meeting_place:
+      - "địa điểm họp"
+      - "địa điểm"
+      - "nơi họp"
+      - "phòng họp"
+      - "dia_diem"
+      - "meeting_place"
+    timeframe:
+      - "thời gian thực hiện"
+      - "tiến độ"
+      - "khung thời gian"
+      - "thời hạn"
+      - "thoi_gian_thuc_hien"
+      - "timeframe"
+    owner:
+      - "đơn vị chủ trì"
+      - "chủ trì"
+      - "người phụ trách"
+      - "chủ dự án"
+      - "don_vi_chu_tri"
+      - "owner"
+    budget:
+      - "kinh phí"
+      - "ngân sách"
+      - "dự toán"
+      - "tổng kinh phí"
+      - "kinh_phi"
+      - "budget"
+    legal_basis:
+      - "căn cứ pháp lý"
+      - "căn cứ"
+      - "can_cu"
+      - "legal_basis"
+    content:
+      - "nội dung"
+      - "nội dung ghi nhớ"
+      - "điều khoản"
+      - "noi_dung"
+      - "content"
+    attendees:
+      - "thành phần tham dự"
+      - "đại biểu"
+      - "người tham dự"
+      - "thành phần"
+      - "thanh_phan"
+      - "attendees"
+    resolution_content:
+      - "nội dung nghị quyết"
+      - "quy nghị"
+      - "nội dung quyết nghị"
+      - "quyết nghị"
+      - "resolution_content"
+    directive_content:
+      - "nội dung chỉ thị"
+      - "yêu cầu chỉ đạo"
+      - "nội dung chỉ đạo"
+      - "chỉ thị"
+      - "directive_content"
+    implementer:
+      - "đơn vị thực hiện"
+      - "người thi hành"
+      - "tổ chức thực hiện"
+      - "trách nhiệm thi hành"
+      - "implementer"
+    deadline:
+      - "thời hạn"
+      - "hạn chót"
+      - "thời hạn hoàn thành"
+      - "deadline"
+    cc_list:
+      - "nơi nhận khác"
+      - "kính gửi kèm"
+      - "cc"
+      - "cc_list"
+    effective_scope:
+      - "phạm vi áp dụng"
+      - "phạm vi hiệu lực"
+      - "đối tượng áp dụng"
+      - "effective_scope"
+    metrics:
+      - "chỉ số"
+      - "số liệu thống kê"
+      - "kết quả đạt được"
+      - "metrics"
+    findings:
+      - "đánh giá"
+      - "nhận xét"
+      - "tình hình thực tế"
+      - "findings"
+    recommendations:
+      - "kiến nghị"
+      - "đề xuất"
+      - "phương hướng"
+      - "recommendations"
+    attachment:
+      - "tệp đính kèm"
+      - "phụ lục"
+      - "attachment"
+    version:
+      - "phiên bản"
+      - "lần ban hành"
+      - "version"
+  target_fields:
+    - document_type
+    - document_number
+    - title
+    - issuer
+    - recipient
+    - department
+    - template_code
+    - template_name
+drafting:
+  enabled: true
+  # P11-19: when true, ``/v1/drafting/confirm`` records a pending
+  # approval and returns 202 instead of writing the DOCX. Admin must
+  # approve via ``/v1/drafting/approvals/{id}/approve`` before the
+  # artifact is built. Default false so the existing MVP flow keeps
+  # working without a config change.
+  approval_required: false
+  supported_document_types:
+    - cong_van
+    - quyet_dinh
+    - to_trinh
+    - thong_bao
+    - ke_hoach
+    - bao_cao
+    - bien_ban
+    - giay_moi
+    - du_an
+    - ban_ghi_nho
+    - nghi_quyet
+    - chi_thi
+  default_output_format: draft_document
+  templates_dir: templates/drafting
+  templates:
+    cong_van: templates/drafting/cong_van.docx
+    quyet_dinh: templates/drafting/quyet_dinh.docx
+    to_trinh: templates/drafting/to_trinh.docx
+    giay_moi: templates/drafting/giay_moi.docx
+    thong_bao: templates/drafting/thong_bao.docx  # TODO template file chưa có
+    ke_hoach: templates/drafting/ke_hoach.docx  # TODO template file chưa có
+    bao_cao: templates/drafting/bao_cao.docx  # TODO template file chưa có
+    bien_ban: templates/drafting/bien_ban.docx  # TODO template file chưa có
+    du_an: templates/drafting/du_an.docx  # TODO template file chưa có
+    ban_ghi_nho: templates/drafting/ban_ghi_nho.docx  # TODO template file chưa có
+    nghi_quyet: templates/drafting/nghi_quyet.docx  # TODO template file chưa có
+    chi_thi: templates/drafting/chi_thi.docx  # TODO template file chưa có
+  # Slot → Jinja placeholder name. Templates follow the QNU drafting
+  # convention by default; designers override per template when needed.
+  slot_bindings:
+    title: TITLE
+    document_type: DOC_TYPE
+    signer: SIGNER_NAME
+    signer_position: SIGNER_POSITION
+    recipients: RECIPIENTS
+    recipient: RECIPIENT
+    date: EFFECTIVE_DATE
+    purpose: PURPOSE
+    document_number: DOC_NUMBER
+    issuer: ISSUER
+    subject: SUBJECT
+    proposal: PROPOSAL
+    timeframe: TIMEFRAME
+    period: PERIOD
+    legal_basis: LEGAL_BASIS
+    attachment: ATTACHMENT
+    meeting_title: MEETING_TITLE
+    meeting_time: MEETING_TIME
+    meeting_place: MEETING_PLACE
+    attendees: ATTENDEES
+    content: CONTENT
+    signers: SIGNERS
+    owner: OWNER
+    budget: BUDGET
+    resolution_content: RESOLUTION_CONTENT
+    directive_content: DIRECTIVE_CONTENT
+    implementer: IMPLEMENTER
+    deadline: DEADLINE
+    cc_list: CC_LIST
+    effective_scope: EFFECTIVE_SCOPE
+    metrics: METRICS
+    findings: FINDINGS
+    recommendations: RECOMMENDATIONS
+    references: REFERENCES
+  ask_clarification_when_missing:
+    - signer
+    - recipient
+    - date
+    - purpose
+  document_number_policy:
+    # Regex khớp ``123/CV-ĐHQN`` / ``456/QĐ-ĐHQN``. Default ở
+    # ``document_number_guard._DEFAULT_VN_ADMIN_REGEX``; chỉ override khi
+    # đơn vị dùng format riêng.
+    regex: "^[0-9]{1,5}\\s*[/\\\\-]\\s*[A-ZĐ]{2,8}(?:\\s*[-/]\\s*[A-ZĐ0-9]{2,10})?$"
+    require_fact_match: false
+  # Per-document-type slot schemas. Planner reads these to decide which
+  # required slots to ask for and which optional slots to forward into
+  # the composer. Unknown ``document_type`` falls back to ``default``.
+  slot_schemas:
+    default:
+      required:
+        - signer
+        - recipient
+        - date
+        - purpose
+      optional:
+        - issuer
+        - references
+    cong_van:
+      required:
+        - signer
+        - recipient
+        - date
+        - purpose
+        - document_number
+      optional:
+        - issuer
+        - legal_basis
+        - cc_list
+        - attachment
+    quyet_dinh:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+      optional:
+        - issuer
+        - legal_basis
+        - implementer
+        - deadline
+    to_trinh:
+      required:
+        - signer
+        - recipient
+        - date
+        - purpose
+        - proposal
+      optional:
+        - issuer
+        - legal_basis
+        - deadline
+    thong_bao:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+      optional:
+        - issuer
+        - effective_scope
+        - attachment
+    ke_hoach:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+        - timeframe
+      optional:
+        - issuer
+        - owner
+        - budget
+        - attachment
+    bao_cao:
+      required:
+        - signer
+        - period
+        - subject
+      optional:
+        - issuer
+        - metrics
+        - findings
+        - recommendations
+    bien_ban:
+      required:
+        - meeting_title
+        - meeting_time
+        - meeting_place
+        - attendees
+        - content
+        - signers
+      optional:
+        - attachment
+    giay_moi:
+      required:
+        - signer
+        - recipient
+        - date
+        - meeting_time
+        - meeting_place
+        - subject
+      optional:
+        - issuer
+        - attachment
+    du_an:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+        - timeframe
+      optional:
+        - issuer
+        - owner
+        - budget
+        - legal_basis
+        - attachment
+    ban_ghi_nho:
+      required:
+        - signer
+        - date
+        - subject
+        - content
+      optional:
+        - attendees
+        - issuer
+        - attachment
+    nghi_quyet:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+        - resolution_content
+      optional:
+        - issuer
+        - legal_basis
+        - implementer
+    chi_thi:
+      required:
+        - signer
+        - document_number
+        - date
+        - subject
+        - directive_content
+      optional:
+        - issuer
+        - deadline
+
+answer_policy:
+  default_format: draft_document
+  allowed_formats:
+    - draft_document
+    - checklist
+    - paragraph
+  table:
+    max_rows: 50
+evaluation:
+  accuracy_threshold: 0.90
+  response_time_threshold_ms: 10000

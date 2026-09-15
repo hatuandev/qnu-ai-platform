@@ -1,0 +1,119 @@
+module_code: question_bank
+name: "Tạo câu hỏi, ngân hàng câu hỏi đáp ứng chuẩn đầu ra"
+conversation:
+  rewrite_enabled: true
+data_sensitivity: restricted
+allowed_roles:
+  - teacher
+  - admin
+rate_limit_per_minute: 20
+parser_profile: "docling"
+chunking_strategy: "course_clo_chunker"
+retrieval_strategy: "hybrid_vector_fts"
+require_citation: true
+intent_keywords:
+  entity_prefix:
+    - môn
+    - học phần
+    - môn học
+structured_lookup:
+  field_aliases:
+    course_code:
+      - "mã học phần"
+      - "mã môn học"
+      - "ma_hoc_phan"
+      - "ma_mon_hoc"
+    course_name:
+      - "tên học phần"
+      - "tên môn học"
+      - "ten_hoc_phan"
+      - "ten_mon_hoc"
+    clo:
+      - "chuẩn đầu ra"
+      - "clo"
+      - "cdr"
+    bloom_level:
+      - "mức bloom"
+      - "bloom"
+      - "mức độ nhận thức"
+    question:
+      - "câu hỏi"
+      - "de_bai"
+      - "đề bài"
+    answer:
+      - "đáp án"
+      - "câu trả lời"
+      - "answer"
+    chapter:
+      - "chương"
+      - "bài"
+      - "topic"
+      - "chủ đề"
+    credit:
+      - "số tín chỉ"
+      - "tín chỉ"
+      - "credit"
+      - "credits"
+    semester:
+      - "học kỳ"
+      - "kỳ học"
+      - "semester"
+    academic_year:
+      - "năm học"
+      - "khóa học"
+      - "academic_year"
+    training_level:
+      - "trình độ đào tạo"
+      - "bậc đào tạo"
+      - "training_level"
+    difficulty:
+      - "độ khó"
+      - "mức độ khó"
+      - "difficulty"
+    question_type:
+      - "dạng câu hỏi"
+      - "loại câu hỏi"
+      - "question_type"
+    exam_format:
+      - "hình thức thi"
+      - "dạng đề"
+      - "exam_format"
+  target_fields:
+    - course_code
+    - course_name
+    - clo
+    - chapter
+    - question
+    - academic_year
+    - semester
+  value_aliases:
+    # P3-5: human-readable labels for fact values that the answer
+    # composer renders in the question-bank UI.
+    bloom_level:
+      nho: Nhớ
+      hieu: Hiểu
+      van_dung: Vận dụng
+      phan_tich: Phân tích
+      danh_gia: Đánh giá
+      sang_tao: Sáng tạo
+    difficulty:
+      de: Dễ
+      trung_binh: Trung bình
+      kho: Khó
+    question_type:
+      trac_nghiem: Trắc nghiệm
+      tu_luan: Tự luận
+      bai_tap: Bài tập
+      thuc_hanh: Thực hành
+    training_level:
+      dai_hoc: Đại học
+      cao_dang: Cao đẳng
+      thac_si: Thạc sĩ
+      tien_si: Tiến sĩ
+output_schema:
+  fields: [question, options, answer, bloom_level, clo, explanation]
+hyde_prompt: "Bạn là giảng viên Đại học Quy Nhơn. Hãy viết một đoạn văn ngắn (3-5 câu) trả lời câu hỏi sau như thể đây là nội dung trong ngân hàng câu hỏi."
+
+evaluation:
+  accuracy_threshold: 0.90
+  response_time_threshold_ms: 10000

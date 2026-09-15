@@ -1,0 +1,211 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "WorkflowDefinition",
+  "metadata": {
+    "name": "question-bank-assistant",
+    "display_name": "Trợ lý Ngân hàng Câu hỏi & Đề thi QNU",
+    "description": "Trợ lý sinh và kiểm định câu hỏi thi theo chuẩn đầu ra (Bloom taxonomy), đối soát ma trận kiến thức và phê duyệt bởi giảng viên phụ trách môn.",
+    "scope": {
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_exam"
+    },
+    "module_code": "question_bank",
+    "labels": {
+      "template": "question_bank",
+      "phase": "phase_2_production_template"
+    },
+    "annotations": {
+      "purpose": "qnu_examination_and_question_bank_generation"
+    }
+  },
+  "spec": {
+    "execution_mode": "conversational",
+    "entry_node_id": "chat_input",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["completed", "approved", "rejected", "insufficient_context"]
+        },
+        "answer": {
+          "type": "string"
+        }
+      }
+    },
+    "nodes": [
+      {
+        "id": "chat_input",
+        "type": "input.chat",
+        "version": "1.0.0",
+        "display_name": "Yêu cầu tạo câu hỏi / đề thi",
+        "config": {
+          "trim": true,
+          "max_length": 10000
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "extract_matrix",
+        "type": "extract.fields",
+        "version": "1.0.0",
+        "display_name": "Trích xuất ma trận đề & CĐR",
+        "config": {
+          "preserve_user_text": true
+        },
+        "connection_refs": ["conn_qnu_ai_core"],
+        "policy": {
+          "timeout_seconds": 20,
+          "max_attempts": 2,
+          "checkpoint_after": true,
+          "required_permissions": ["drafting.plan"]
+        }
+      },
+      {
+        "id": "compose_questions",
+        "type": "core.drafting.compose",
+        "version": "1.0.0",
+        "display_name": "Sinh bộ câu hỏi & đáp án rubric",
+        "config": {
+          "module_code": "question_bank",
+          "document_type": "question_matrix",
+          "template_code": "qnu_question_item",
+          "output_format": "markdown",
+          "fabricate_missing_fields": false
+        },
+        "connection_refs": ["conn_qnu_ai_core"],
+        "policy": {
+          "timeout_seconds": 30,
+          "max_attempts": 2,
+          "checkpoint_after": true,
+          "required_permissions": ["drafting.compose"]
+        }
+      },
+      {
+        "id": "lecturer_approval",
+        "type": "human.approval",
+        "version": "1.0.0",
+        "display_name": "Phê duyệt của Giảng viên Phụ trách",
+        "config": {
+          "required_permission": "approval.decide",
+          "separation_of_duties": true,
+          "reason_required_on_reject": true,
+          "wait_timeout_seconds": 172800
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": ["approval.decide"]
+        }
+      },
+      {
+        "id": "chat_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Xuất bộ câu hỏi đã thẩm định",
+        "config": {
+          "include_citations": false,
+          "format": "markdown"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_input_to_extract",
+        "source": {
+          "node_id": "chat_input",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "extract_matrix",
+          "port": "text"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_extract_to_compose",
+        "source": {
+          "node_id": "extract_matrix",
+          "port": "fields"
+        },
+        "target": {
+          "node_id": "compose_questions",
+          "port": "fields"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_compose_to_approval",
+        "source": {
+          "node_id": "compose_questions",
+          "port": "draft"
+        },
+        "target": {
+          "node_id": "lecturer_approval",
+          "port": "subject"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_approval_to_output",
+        "source": {
+          "node_id": "lecturer_approval",
+          "port": "approved"
+        },
+        "target": {
+          "node_id": "chat_output",
+          "port": "response"
+        },
+        "priority": 100
+      }
+    ],
+    "policies": {
+      "run_timeout_seconds": 120,
+      "max_steps": 15,
+      "max_parallel_nodes": 1,
+      "default_retry": {
+        "max_attempts": 1,
+        "initial_backoff_ms": 250,
+        "max_backoff_ms": 2000,
+        "retryable_error_codes": []
+      },
+      "data_classification": "confidential",
+      "allowed_connection_ids": ["conn_qnu_ai_core"],
+      "quality_gate_id": "gate_question_bank_baseline"
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "node_resolution": "exact",
+      "features": ["bloom_matrix", "rubric", "human_approval", "conversation"]
+    }
+  }
+}
