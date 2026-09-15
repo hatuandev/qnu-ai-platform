@@ -140,15 +140,14 @@ Bản đồ điều hướng được chuẩn hóa từ [`qnu-ai-core/services/s
 │     └── /runs                : Lịch sử Thực thi DAG (Trace chi tiết các bước chạy node, input/output và độ trễ)
 │
 ├── 2. KHO TRI THỨC & QUY TRÌNH (Knowledge Hub & Pipelines):
-│     ├── /knowledge           : Trung tâm Quản trị Tri thức (Knowledge Collections theo 5 module)
-│     │     ├── [id]           : Chi tiết Collection gồm 3 tab chức năng hợp nhất:
-│     │     │     ├── Tab Documents  : Danh sách tài liệu (Upload PDF/Word/Excel, Trạng thái, Phân loại)
+│     ├── /knowledge           : Trung tâm Quản trị Tri thức (Collections theo 5 module)
+│     │     ├── [id]           : Chi tiết Collection gồm 3 tab chức năng:
+│     │     │     ├── Tab Documents  : Danh sách tài liệu (Upload kéo thả tích hợp chọn bộ máy OCR: PyMuPDF, PaddleOCR, Docling, RapidOCR; quản lý trạng thái, phân loại)
 │     │     │     ├── Tab Jobs       : Hàng đợi tác vụ ngầm Ingestion & Cửa sổ Live Terminal Logs
 │     │     │     └── Tab Playground : Sân chơi thử nghiệm truy xuất Hybrid RAG (Dense + Sparse FTS + Rerank)
 │     │     ├── [id]/documents/[docId] : Document Studio Viewer (Soi văn bản Markdown, Soi từng Chunk Điều/Khoản)
 │     │     └── [id]/ingest    : Wizard Nạp Tri Thức Nâng Cao (Upload -> Chọn OCR -> Preview -> Chunking -> Index)
 │     │
-│     ├── /ocr                 : Bóc tách & Thị giác Tài liệu (Document AI: Đa bộ máy PyMuPDF, PaddleOCR, Docling, RapidOCR)
 │     ├── /document-types      : Quản lý Loại Văn bản (Cấu hình mẫu biểu, mức độ ưu tiên pháp lý: Quyết định, Quy chế, Tờ trình...)
 │     ├── /nodes               : Danh mục Node Manifest (Đặc tả thư viện các loại Node của DAG Engine)
 │     ├── /tools               : Cổng Công cụ & API Ngoài (Builtin: UIS tra cứu điểm chuẩn, Xuất Word NĐ30, Excel Bloom; Custom Tools với Test Runner cURL)
@@ -198,7 +197,7 @@ Bản đồ điều hướng được chuẩn hóa từ [`qnu-ai-core/services/s
 ### Giai Đoạn 5: Thiết Lập Định Tuyến & Các Màn Hình Chức Năng
 - Cấu hình TanStack Router file-based:
   - Phân hệ 1 (Vận hành & Trợ lý): `/` (Tổng quan), `/assistants` (Trợ lý AI), `/chat` (Thử nghiệm Chat), `/conversations` (Hội thoại & Handoff), `/channels` (Kênh phân phối), `/runs` (Lịch sử thực thi).
-  - Phân hệ 2 (Tri thức & Quy trình): `/knowledge` (Kho tri thức), `/document-types` (Loại văn bản), `/ocr` (Bóc tách OCR), `/nodes` (Danh mục node), `/tools` (Công cụ & API ngoài), `/evaluation` (Đánh giá chất lượng TM-08).
+  - Phân hệ 2 (Tri thức & Quy trình): `/knowledge` (Kho tri thức - tích hợp wizard upload tài liệu chọn OCR profile), `/document-types` (Loại văn bản), `/nodes` (Danh mục node), `/tools` (Công cụ & API ngoài), `/evaluation` (Đánh giá chất lượng TM-08).
   - Phân hệ 3 (Hệ thống & Quản trị): `/models` (Mô hình & Provider), `/developer` (Cổng Developer & API keys), `/design-system` (Hệ thống thiết kế UI).
   - Tự động sinh `src/routeTree.gen.ts`.
 - Kết nối TanStack Query với các REST API endpoints của Backend FastAPI (`http://localhost:8001/platform/v1alpha1/...`).
