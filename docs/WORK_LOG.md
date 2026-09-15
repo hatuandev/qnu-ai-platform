@@ -22,7 +22,9 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
    - [Phân tích công nghệ hạ tầng](./trien_khai/01_cong_nghe_ha_tang.md)
    - [Quy trình 6 bước triển khai Dokploy](./trien_khai/02_quy_trinh_trien_khai_dokploy.md)
    - [An toàn dữ liệu & Sổ tay vận hành](./trien_khai/03_an_toan_du_lieu_va_van_hanh.md)
-2. **Quy trình Nghiệp vụ (SOPs)**:
+2. **Kế Hoạch & Quy Trình Nghiệp Vụ (SOPs)**:
+   - [Chuyên mục Kế hoạch Phát triển](./ke_hoach/README.md)
+   - [Kế hoạch Phát triển Frontend chuẩn Design System QLKTX](./ke_hoach/01_ke_hoach_phat_trien_fe.md)
    - [Thư mục 07 Quy trình cốt lõi](./quy_trinh/README.md)
 3. **Thuyết minh Kiến trúc**:
    - [Thuyết minh Kiến trúc tổng thể](./architecture.md)
