@@ -121,34 +121,32 @@ Dựa trên danh sách các components và bộ thư viện của `qnu-ktx`, h�
 
 ---
 
-## 🗺️ 4. Bản Đồ Điều Hướng & Cấu Trúc Trang (Navigation Map)
+## 🗺️ 4. Bản Đồ Điều Hướng & Cấu Trúc Trang (Khớp 100% Chuẩn QNU.AI Core Studio)
 
-Định nghĩa tại `src/navigation/config.ts` điều phối toàn bộ Sidebar, Breadcrumbs và Command Menu:
+Kế thừa chính xác cấu trúc 3 phân nhóm điều hướng từ [`qnu-ai-core/services/studio-ui`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-core/services/studio-ui/components/layout/StudioShell.tsx), được tổ chức lại theo chuẩn `NavGroup[]` của `qnu-ktx`:
 
 ```
 [ Khung Vỏ Quản Trị: AdminShell ]
-  ├── 1. Tổng quan:
-  │     └── /dashboard           : Thống kê Tokens, Chi phí FinOps, Trạng thái 5 Trợ lý
-  ├── 2. Trợ lý AI & Trò chuyện:
-  │     ├── /assistants          : Danh mục 05 Trợ lý QNU (Tuyển sinh, Quy chế, Thư viện, Soạn thảo, Đề thi)
-  │     ├── /chat                : Khung trò chuyện trực tiếp (Chatbot Studio với real-time SSE)
-  │     └── /conversations       : Lịch sử hội thoại & đánh giá phản hồi
-  ├── 3. Kho tri thức & RAG:
-  │     ├── /knowledge/documents : Quản lý tài liệu tải lên (PDF, Word, Excel), tiến trình bóc tách
-  │     ├── /knowledge/facts     : Bảng sự thật (Facts: Điểm chuẩn, Chỉ tiêu, Học phí)
-  │     └── /knowledge/chunks    : Soi cấu trúc đoạn văn Điều/Khoản và Vector Embeddings
-  ├── 4. Studio & Đồ thị DAG:
-  │     ├── /workflows           : Visual DAG Canvas kéo thả đồ thị 5 Trợ lý (@xyflow/react)
-  │     ├── /workflows/runs      : Theo dõi các phiên thực thi DAG & Trace chi tiết
-  │     └── /workflows/approvals : Phê duyệt tác vụ nhạy cảm (Human-in-the-loop)
-  ├── 5. ModelOps & Công cụ:
-  │     ├── /modelops            : Quản lý nhà cung cấp LLM, Circuit Breaker 3 trạng thái
-  │     ├── /modelops/usage      : Thống kê hạn ngạch Quota & Lịch sử chi phí USD
-  │     ├── /tools               : Cổng công cụ (Tra cứu UIS, Xuất Word NĐ 30, Xuất Excel Bloom)
-  │     └── /ocr                 : Đa bộ máy OCR (PaddleOCR, PyMuPDF)
-  └── 6. Kiểm định & Cấu hình:
-        ├── /evaluation          : Bộ kiểm định chất lượng Ragas TM-08 (100 câu benchmark)
-        └── /settings/api-keys   : Quản lý khóa API, phân quyền & bảo mật
+  ├── 1. Vận hành & Trợ lý:
+  │     ├── /                 : Tổng quan (Dashboard số liệu, thống kê token, chi phí)
+  │     ├── /assistants       : Trợ lý AI (Danh sách 05 Trợ lý QNU, tạo trợ lý mới)
+  │     ├── /chat             : Thử nghiệm Chat (Chatbot Studio trực tiếp với real-time SSE)
+  │     ├── /conversations    : Hội thoại & Handoff (Lịch sử chat, bàn giao tư vấn viên)
+  │     ├── /channels         : Kênh Phân phối & Mã Nhúng (Web widget, nhúng cổng thông tin)
+  │     └── /runs             : Lịch sử Thực thi (Trace các phiên chạy DAG workflow)
+  │
+  ├── 2. Tri thức & Quy trình:
+  │     ├── /knowledge        : Kho Tri thức (Collections, Ingest PDF/Word/Excel, Chunks, Facts)
+  │     ├── /document-types   : Quản lý Loại Văn bản (Cấu hình mẫu biểu, quy chuẩn Nghị định 30)
+  │     ├── /ocr              : Bóc tách & Thị giác Tài liệu (Document AI: PyMuPDF, PaddleOCR)
+  │     ├── /nodes            : Danh mục Node Manifest (Thư viện node cho DAG visual builder)
+  │     ├── /tools            : Công cụ & API Ngoài (Tra cứu UIS điểm chuẩn, xuất Word/Excel)
+  │     └── /evaluation       : Đánh giá Chất lượng (Hồ sơ nghiệm thu TM-08, 100 câu benchmark)
+  │
+  └── 3. Hệ thống & Quản trị:
+        ├── /models           : Mô hình & Provider (ModelOps, Circuit Breaker, Quotas, Usage Logs)
+        ├── /developer        : Cổng Developer & API (Quản lý API Keys, Webhooks, API Docs)
+        └── /design-system    : Hệ thống Thiết kế UI (Showcase tokens, typography, components test)
 ```
 
 ---
@@ -183,7 +181,9 @@ Dựa trên danh sách các components và bộ thư viện của `qnu-ktx`, h�
 
 ### Giai Đoạn 5: Thiết Lập Định Tuyến & Các Màn Hình Chức Năng
 - Cấu hình TanStack Router file-based:
-  - Tạo các route: `/dashboard`, `/assistants`, `/chat`, `/knowledge`, `/workflows`, `/modelops`, `/evaluation`.
+  - Phân hệ 1 (Vận hành & Trợ lý): `/` (Tổng quan), `/assistants` (Trợ lý AI), `/chat` (Thử nghiệm Chat), `/conversations` (Hội thoại & Handoff), `/channels` (Kênh phân phối), `/runs` (Lịch sử thực thi).
+  - Phân hệ 2 (Tri thức & Quy trình): `/knowledge` (Kho tri thức), `/document-types` (Loại văn bản), `/ocr` (Bóc tách OCR), `/nodes` (Danh mục node), `/tools` (Công cụ & API ngoài), `/evaluation` (Đánh giá chất lượng TM-08).
+  - Phân hệ 3 (Hệ thống & Quản trị): `/models` (Mô hình & Provider), `/developer` (Cổng Developer & API keys), `/design-system` (Hệ thống thiết kế UI).
   - Tự động sinh `src/routeTree.gen.ts`.
 - Kết nối TanStack Query với các REST API endpoints của Backend FastAPI (`http://localhost:8001/platform/v1alpha1/...`).
 - Kiểm thử và xác minh:
