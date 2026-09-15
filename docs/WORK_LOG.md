@@ -19,6 +19,8 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 | **2026-09-15 21:55** | AI Senior Backend Specialist | Hoàn thành Giai đoạn 5 Frontend: Tích hợp API Thực Tế & 9 Màn Hình Nghiệp Vụ | **Build & Lint 100% Pass**<br>Backend 68/68 Pass | [2026-09-15_hoan_thanh_giai_doan_5_tich_hop_api_man_hinh.md](./nhat_ky/2026-09-15_hoan_thanh_giai_doan_5_tich_hop_api_man_hinh.md) |
 | **2026-09-15 22:15** | AI Senior Full-Stack Specialist | Thiết lập Skill `qnu-frontend-architect` & Cập nhật UI Rules vào `AGENTS.md` | **Frontend & Backend 100% Pass**<br>Build ✓ \| Biome 0 \| 68/68 Tests | [2026-09-15_tao_skill_frontend_va_ui_rules.md](./nhat_ky/2026-09-15_tao_skill_frontend_va_ui_rules.md) |
 | **2026-09-15 22:35** | AI Senior Full-Stack Specialist | Thiết lập tài liệu hướng dẫn khởi chạy cục bộ (`HUONG_DAN_CHAY_LOCAL.md`) | **Tài liệu & Cấu hình 100% chuẩn** | [2026-09-15_huong_dan_chay_local.md](./nhat_ky/2026-09-15_huong_dan_chay_local.md) |
+| **2026-09-15 22:50** | AI Senior Full-Stack Specialist | Sửa lỗi `colorama` Windows logging & loại bỏ cảnh báo `fitz` | **Backend 68/68 Pass**<br>Lifespan OK \| Ruff: 0 | [2026-09-15_fix_colorama_logging_windows.md](./nhat_ky/2026-09-15_fix_colorama_logging_windows.md) |
+| **2026-09-15 23:38** | AI Senior Full-Stack Specialist | Tinh gọn `docker-compose.yml` (5 dịch vụ hạ tầng), lưu `docker-compose.prod.yml`, tích hợp Gotenberg 8 | **Backend & Frontend 100% Pass**<br>68/68 Tests \| Biome 0 \| TS 0 | [2026-09-15_tinh_gon_docker_ha_tang_gotenberg.md](./nhat_ky/2026-09-15_tinh_gon_docker_ha_tang_gotenberg.md) |
 
 ---
 

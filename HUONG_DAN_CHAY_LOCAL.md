@@ -13,10 +13,10 @@
 cp .env.example .env
 ```
 
-### 2. Khởi động 4 dịch vụ cơ sở dữ liệu nền (Postgres, Qdrant, Redis, MinIO)
-*(Chỉ cần mở Docker Desktop và chạy 1 dòng lệnh siêu nhẹ, không cần build ứng dụng)*:
+### 2. Khởi động cụm hạ tầng nền (Postgres, Qdrant, Redis, MinIO, Gotenberg)
+*(Chỉ cần mở Docker Desktop và chạy 1 dòng lệnh siêu nhẹ, mất ~3 giây)*:
 ```powershell
-docker compose up -d postgres qdrant redis minio
+docker compose up -d
 ```
 
 ### 3. Khởi động Backend API (Port 8001) & Frontend Studio (Port 3000)
@@ -48,6 +48,7 @@ npm run dev
 | **Swagger API Docs** | [http://localhost:8001/docs](http://localhost:8001/docs) | 30+ endpoints tương tác |
 | **MinIO S3 Console** | [http://localhost:9001](http://localhost:9001) | User: `qnu_minio_admin` / Pass: `qnu_minio_secret_2026` |
 | **Qdrant Vector DB** | [http://localhost:6333](http://localhost:6333) | Vector DB REST API |
+| **Gotenberg 8 PDF** | [http://localhost:3005](http://localhost:3005) | Chuyển đổi PDF Nghị định 30 (LibreOffice headless) |
 
 ---
 

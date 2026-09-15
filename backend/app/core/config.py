@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     S3_SECURE: bool = False
     S3_REGION: str = "us-east-1"
 
+    # --- Gotenberg PDF Converter ---
+    GOTENBERG_URL: str = "http://localhost:3005"
+
     # --- Embedding & Reranker ---
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"

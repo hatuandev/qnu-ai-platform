@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 
 from app.modules.knowledge.parsers.base import BaseDocumentParser, ExtractedTable, ParsedContent
 

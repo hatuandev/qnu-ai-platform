@@ -7,10 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-15 22:38 (UTC+7)
-- **Phiên số**: #11 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-16 00:04 (UTC+7)
+- **Phiên số**: #13 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
-- **Mục tiêu đã hoàn thành**: Thiết lập Hướng Dẫn Khởi Chạy Cục Bộ (`HUONG_DAN_CHAY_LOCAL.md`) & `docs/huong_dan_chay_local.md`
+- **Mục tiêu đã hoàn thành**: Tinh gọn `docker-compose.yml` chuyên trách 5 dịch vụ hạ tầng (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg 8), chuẩn hóa tag image khớp với Docker local (5/5 containers UP & healthy), và xử lý triệt để lỗi `httpx.InvalidURL` do biến môi trường `no_proxy` chứa `::1` trên Windows trực tiếp tại `app/__init__.py` và `app/main.py`.
 
 ---
 
@@ -168,6 +168,12 @@ src/
 ### Pytest Windows
 - Luôn chạy: `uv run --extra dev pytest` (có `--basetemp=.pytest_temp` trong pyproject.toml)
 - **Không** dùng `uv run pytest` thẳng (lỗi temp dir trên Windows)
+- Biến môi trường `no_proxy` trên Windows chứa `::1` khiến `httpx` crash (`Invalid port: ':1'`) -> đã tự động làm sạch trong `tests/conftest.py`.
+
+### Docker Compose Stack
+- `docker-compose.yml`: Dành riêng cho 5 dịch vụ hạ tầng (`postgres:16`, `qdrant:latest`, `redis:7-alpine`, `minio:RELEASE.2025-04-22T22-12-26Z`, `gotenberg:8`).
+- Khởi chạy chỉ cần: `docker compose up -d` (toàn bộ 5/5 containers đạt trạng thái `healthy` ngay lập tức).
+- Qdrant healthcheck dùng bash TCP socket test `bash -c ': >/dev/tcp/127.0.0.1/6333'` do image không có sẵn `curl`.
 
 ### API Client
 - Base URL: `/platform/v1alpha1/` (proxy qua Vite dev server)

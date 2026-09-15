@@ -37,7 +37,8 @@ Khi chạy cục bộ, hệ thống chia thành 3 phần rõ ràng:
        │         ├───► Port 5432 : PostgreSQL 16 (Facts, FTS tiếng Việt)
        │         ├───► Port 6333 : Qdrant Vector DB (Embeddings 1024D)
        │         ├───► Port 6379 : Redis 7 (Cache + ARQ Job Queue)
-       │         └───► Port 9000 : MinIO S3 (Tài liệu gốc & OCR processed)
+       │         ├───► Port 9000 : MinIO S3 (Tài liệu gốc & OCR processed)
+       │         └───► Port 3005 : Gotenberg 8 (Chuyển đổi Word NĐ 30 sang PDF)
        │
        └───► Port 9001 : MinIO Web Console (Quản trị bucket và tệp tin)
 ```
@@ -85,21 +86,21 @@ Mở tệp `.env` vừa tạo và cập nhật các thông số cần thiết:
 
 ---
 
-### Bước 2: Khởi động Cơ sở dữ liệu & Dịch vụ nền
+### Bước 2: Khởi động Cơ sở dữ liệu & Cụm hạ tầng nền
 
-Để không phải cài đặt thủ công PostgreSQL, Qdrant, Redis và MinIO lên máy tính, bạn chỉ cần mở **Docker Desktop** và chạy **1 dòng lệnh duy nhất** tại thư mục gốc dự án:
+Để không phải cài đặt thủ công PostgreSQL, Qdrant, Redis, MinIO và Gotenberg lên máy tính, bạn chỉ cần mở **Docker Desktop** và chạy **1 dòng lệnh duy nhất** tại thư mục gốc dự án:
 
 ```powershell
-docker compose up -d postgres qdrant redis minio
+docker compose up -d
 ```
 
-> **Ghi chú**: Lệnh trên chỉ khởi động 4 dịch vụ cơ sở dữ liệu hạ tầng rất nhẹ, không build ứng dụng nên mất chưa tới 5 giây để sẵn sàng.
+> **Ghi chú**: Tệp `docker-compose.yml` đã được tối ưu chỉ quản lý thuần túy 5 dịch vụ hạ tầng nền siêu nhẹ (không build ứng dụng) nên khởi động rất nhanh (~3–5 giây).
 
-Kiểm tra 4 container đang chạy:
+Kiểm tra 5 container đang chạy:
 ```powershell
 docker compose ps
 ```
-Kết quả hiển thị: `qnu_postgres`, `qnu_qdrant`, `qnu_redis`, `qnu_minio` đều ở trạng thái `healthy` hoặc `running`.
+Kết quả hiển thị: `qnu_postgres`, `qnu_qdrant`, `qnu_redis`, `qnu_minio`, `qnu_gotenberg` đều ở trạng thái `healthy` hoặc `running`.
 
 ---
 
@@ -184,6 +185,7 @@ Frontend đã sẵn sàng!
 | **Qdrant Vector DB REST** | [http://localhost:6333](http://localhost:6333) | Vector Search & Collections |
 | **PostgreSQL 16** | `localhost:5432` | User: `qnu`<br>Pass: `qnu_password_secure_2026`<br>DB: `qnu_ai_platform` |
 | **Redis Cache** | `localhost:6379` | Không yêu cầu mật khẩu |
+| **Gotenberg 8 PDF Converter** | [http://localhost:3005](http://localhost:3005) | Headless LibreOffice / Chromium PDF Engine (Nghị định 30) |
 
 ---
 

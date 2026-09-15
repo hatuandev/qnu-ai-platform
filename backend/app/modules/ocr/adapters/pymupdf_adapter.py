@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import fitz
+import pymupdf as fitz
 
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 

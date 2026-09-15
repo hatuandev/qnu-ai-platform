@@ -37,11 +37,18 @@ def configure_logging() -> None:
         )
     else:
         # Development: Human-friendly colorful console output
+        use_colors = True
+        if sys.platform == "win32":
+            try:
+                import colorama  # noqa: F401
+            except ImportError:
+                use_colors = False
+
         formatter = structlog.stdlib.ProcessorFormatter(
             foreign_pre_chain=shared_processors,
             processors=[
                 structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-                structlog.dev.ConsoleRenderer(colors=True),
+                structlog.dev.ConsoleRenderer(colors=use_colors),
             ],
         )
 
