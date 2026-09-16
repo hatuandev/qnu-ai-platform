@@ -17,9 +17,17 @@ cp .env.example .env
 *(Chỉ cần mở Docker Desktop và chạy 1 dòng lệnh siêu nhẹ, mất ~3 giây)*:
 ```powershell
 docker compose up -d
+# hoặc dùng: make infra-up / .\run.ps1 infra-up
 ```
 
 ### 3. Khởi động Backend API (Port 8001) & Frontend Studio (Port 3000)
+
+> 💡 **Cách nhanh nhất (Khuyên dùng)**:
+> - Sử dụng Makefile: `make dev` (hoặc `make be` / `make fe` từng phân hệ)
+> - Sử dụng PowerShell: `.\run.ps1 dev` (hoặc `.\run.ps1 be` / `.\run.ps1 fe`)
+> Lệnh này sẽ tự động mở 2 cửa sổ chạy song song cả Backend và Frontend!
+
+**Hoặc chạy thủ công trong 2 Terminal riêng biệt:**
 
 **Terminal 1 — Backend FastAPI**:
 ```powershell

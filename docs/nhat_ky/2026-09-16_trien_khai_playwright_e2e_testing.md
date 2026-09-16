@@ -36,6 +36,10 @@ Trước đây, nền tảng mới chỉ có 68 unit/integration test ở tầng
    - [`frontend/tests/e2e/02_chat_studio.spec.ts`](../../frontend/tests/e2e/02_chat_studio.spec.ts): Kiểm tra Chat Studio, chuyển đổi giữa 5 Trợ lý AI QNU, nhập tin nhắn, gửi gợi ý nhanh Quick Prompt.
    - [`frontend/tests/e2e/03_knowledge_tools.spec.ts`](../../frontend/tests/e2e/03_knowledge_tools.spec.ts): Quản trị tri thức (tabs, bộ sưu tập), kiểm tra 3 Tool ngoại vi QNU và thực thi Tool Playground hiển thị JSON.
 
+5. **Thiết Lập Bộ Điều Phối Lệnh Makefile & PowerShell Runner (`run.ps1`)**:
+   - [`Makefile`](../../Makefile): Bộ lệnh tự động hóa chuẩn POSIX/GNU Make cho toàn hệ thống (`make dev`, `make be`, `make fe`, `make test`, `make lint`).
+   - [`run.ps1`](../../run.ps1): Tập lệnh hỗ trợ trực tiếp môi trường Windows PowerShell (`.\run.ps1 dev`, `.\run.ps1 be`, `.\run.ps1 fe`).
+
 ---
 
 ## 3. Kết Quả Kiểm Thử Thực Tế
