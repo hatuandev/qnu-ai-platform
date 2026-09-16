@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminShell } from "@/layouts/admin-shell";
 import { queryClient } from "@/lib/query-client";
 import { ChannelsPage } from "@/pages/channels-page";
@@ -86,8 +87,28 @@ const OFFICIAL_ASSISTANTS = [
 ];
 
 function AppContent() {
-  const [currentPath, setCurrentPath] = useState<string>("/");
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== "undefined" && window.location.pathname) {
+      return window.location.pathname;
+    }
+    return "/";
+  });
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "idle" });
+
+  const handleNavigate = useCallback((path: string) => {
+    setCurrentPath(path);
+    if (typeof window !== "undefined" && window.location.pathname !== path) {
+      window.history.pushState(null, "", path);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname || "/");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const checkBackendHealth = useCallback(async () => {
     setBackendStatus({ status: "loading" });
@@ -122,7 +143,7 @@ function AppContent() {
   const renderContent = () => {
     // 1. Dashboard
     if (currentPath === "/") {
-      return <DashboardPage onNavigate={setCurrentPath} />;
+      return <DashboardPage onNavigate={handleNavigate} />;
     }
 
     // 2. 05 Assistants Catalog
@@ -140,11 +161,11 @@ function AppContent() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPath("/nodes")}>
+              <Button variant="outline" size="sm" onClick={() => handleNavigate("/nodes")}>
                 <Network className="size-3.5 mr-1" />
                 <span>Xem Sơ Đồ DAG</span>
               </Button>
-              <Button size="sm" onClick={() => setCurrentPath("/chat")}>
+              <Button size="sm" onClick={() => handleNavigate("/chat")}>
                 <MessageSquare className="size-3.5 mr-1" />
                 <span>Thử Nghiệm Chat</span>
               </Button>
@@ -272,7 +293,7 @@ function AppContent() {
             <h1 className="text-2xl font-bold tracking-tight">Phân Hệ</h1>
             <p className="text-xs text-muted-foreground mt-1">Đường dẫn: {currentPath}</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setCurrentPath("/")}>
+          <Button size="sm" variant="outline" onClick={() => handleNavigate("/")}>
             Về Trang Chủ
           </Button>
         </div>
@@ -282,7 +303,7 @@ function AppContent() {
             title={`Đang tải phân hệ: ${currentPath}`}
             description="Phân hệ này đã sẵn sàng trên QNU AI Platform."
             action={
-              <Button size="sm" onClick={() => setCurrentPath("/")}>
+              <Button size="sm" onClick={() => handleNavigate("/")}>
                 Quay lại Bảng Điều Khiển
               </Button>
             }
@@ -295,7 +316,7 @@ function AppContent() {
   return (
     <AdminShell
       currentPath={currentPath}
-      onNavigate={setCurrentPath}
+      onNavigate={handleNavigate}
       backendOnline={backendStatus.status === "online"}
     >
       {renderContent()}
@@ -307,7 +328,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
-        <AppContent />
+        <TooltipProvider delayDuration={0}>
+          <AppContent />
+        </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

@@ -7,10 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-16 00:04 (UTC+7)
-- **Phiên số**: #13 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-16 09:55 (UTC+7)
+- **Phiên số**: #14 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
-- **Mục tiêu đã hoàn thành**: Tinh gọn `docker-compose.yml` chuyên trách 5 dịch vụ hạ tầng (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg 8), chuẩn hóa tag image khớp với Docker local (5/5 containers UP & healthy), và xử lý triệt để lỗi `httpx.InvalidURL` do biến môi trường `no_proxy` chứa `::1` trên Windows trực tiếp tại `app/__init__.py` và `app/main.py`.
+- **Mục tiêu đã hoàn thành**: Thiết lập hoàn chỉnh hệ sinh thái Auto Testing chuẩn Enterprise: Tích hợp Playwright MCP Server, xây dựng bộ 3 test suite Playwright E2E (12/12 tests PASS 100%), khắc phục lỗi thiếu `TooltipProvider` khi thu gọn thanh bên và chuẩn hóa `h3` locators trong `03_knowledge_tools.spec.ts`. Bảo đảm 100% test suite toàn hệ thống xanh mướt (Pytest 68/68 + Playwright 12/12, 0 lỗi Biome, 0 lỗi TypeScript).
 
 ---
 
@@ -191,7 +191,7 @@ src/
 - [ ] **Real-time Notifications**: WebSocket hoặc SSE cho trạng thái ingestion
 - [ ] **Analytics Dashboard**: Biểu đồ thống kê nâng cao (Recharts / Victory)
 - [ ] **Mobile Responsive**: Tối ưu giao diện cho màn hình nhỏ
-- [ ] **E2E Testing**: Playwright test suite cho các luồng nghiệp vụ quan trọng
+- [x] **E2E Testing Setup**: Đã tích hợp Playwright MCP Server kết nối trực tiếp Chrome cho AI Auto Testing
 - [ ] **i18n**: Đa ngôn ngữ Tiếng Việt / Tiếng Anh
 - [ ] **Code Splitting**: Tách bundle theo route để tối ưu hiệu năng tải trang
 

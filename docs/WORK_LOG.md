@@ -21,6 +21,7 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 | **2026-09-15 22:35** | AI Senior Full-Stack Specialist | Thiết lập tài liệu hướng dẫn khởi chạy cục bộ (`HUONG_DAN_CHAY_LOCAL.md`) | **Tài liệu & Cấu hình 100% chuẩn** | [2026-09-15_huong_dan_chay_local.md](./nhat_ky/2026-09-15_huong_dan_chay_local.md) |
 | **2026-09-15 22:50** | AI Senior Full-Stack Specialist | Sửa lỗi `colorama` Windows logging & loại bỏ cảnh báo `fitz` | **Backend 68/68 Pass**<br>Lifespan OK \| Ruff: 0 | [2026-09-15_fix_colorama_logging_windows.md](./nhat_ky/2026-09-15_fix_colorama_logging_windows.md) |
 | **2026-09-15 23:38** | AI Senior Full-Stack Specialist | Tinh gọn `docker-compose.yml` (5 dịch vụ hạ tầng), lưu `docker-compose.prod.yml`, tích hợp Gotenberg 8 | **Backend & Frontend 100% Pass**<br>68/68 Tests \| Biome 0 \| TS 0 | [2026-09-15_tinh_gon_docker_ha_tang_gotenberg.md](./nhat_ky/2026-09-15_tinh_gon_docker_ha_tang_gotenberg.md) |
+| **2026-09-16 09:55** | AI Senior Full-Stack Specialist | Triển khai Hệ sinh thái Automated Testing toàn diện: Playwright MCP, Playwright E2E Suite, Pytest Backend | **E2E 12/12 Passed (100%)**<br>Pytest 68/68 Passed (100%)<br>Biome: 0 \| TS: 0 \| Build ✓ | [2026-09-16_trien_khai_playwright_e2e_testing.md](./nhat_ky/2026-09-16_trien_khai_playwright_e2e_testing.md) |
 
 ---
 
