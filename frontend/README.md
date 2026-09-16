@@ -26,7 +26,7 @@ Giao diện Quản trị và Điều phối Trợ lý AI Thông minh Trường �
 # 1. Cài đặt thư viện phụ thuộc
 npm install
 
-# 2. Khởi chạy máy chủ phát triển (cổng 3000, tự động reverse proxy API 8001)
+# 2. Khởi chạy máy chủ phát triển (cổng 3001, tự động reverse proxy API 8001)
 npm run dev
 
 # 3. Kiểm tra định dạng và lỗi cú pháp (Biome)
@@ -40,5 +40,5 @@ npm run typecheck
 npm run build
 ```
 
-Địa chỉ truy cập ứng dụng: `http://localhost:3000`
+Địa chỉ truy cập ứng dụng: `http://localhost:3001`
 Tài liệu REST API Backend: `http://localhost:8001/docs`

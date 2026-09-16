@@ -13,7 +13,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3001",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -29,11 +29,11 @@ export default defineConfig({
     },
   ],
 
-  /* Automatically start Vite dev server if not already running on port 3000 */
+  /* Automatically start Vite dev server if not already running on port 3001 */
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    url: "http://localhost:3001",
+    reuseExistingServer: true,
     timeout: 30000,
   },
 });

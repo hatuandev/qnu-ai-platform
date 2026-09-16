@@ -1,35 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 import {
-  CheckCircle2,
-  Code,
   FileSpreadsheet,
   FileText,
   GraduationCap,
   Layers,
-  Play,
   ShieldCheck,
-  Sparkles,
   Wrench,
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { AdministrativeTemplatesView } from "../components/admin/administrative-templates-view";
+import { BloomMatrixEditor } from "../components/admin/bloom-matrix-editor";
+import { DocxNd30Editor, type DocxNd30EditorProps } from "../components/admin/docx-nd30-editor";
+import { UisAdmissionsExplorer } from "../components/admin/uis-admissions-explorer";
 import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
-import { type ToolItem, apiClient } from "../services/api-client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { type AdministrativeTemplate, type ToolItem, apiClient } from "../services/api-client";
+
+type DocEditingData = NonNullable<DocxNd30EditorProps["initialData"]>;
 
 export const ToolsPage: React.FC = () => {
-  const [selectedToolCode, setSelectedToolCode] = useState<string>("uis_admissions_query");
-  const [inputParam, setInputParam] = useState<string>("7480201");
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("docx_nd30");
+  const [editingDocData, setEditingDocData] = useState<DocEditingData | undefined>(undefined);
 
   const { data: tools = [] } = useQuery({
     queryKey: ["tools"],
     queryFn: () => apiClient.getTools(),
   });
-
-  const activeTool = tools.find((t) => t.code === selectedToolCode) || tools[0];
 
   const getToolIcon = (code: string) => {
     switch (code) {
@@ -44,108 +42,66 @@ export const ToolsPage: React.FC = () => {
     }
   };
 
-  const handleRunTool = () => {
-    setIsRunning(true);
-    setTestResult(null);
-
-    setTimeout(() => {
-      setIsRunning(false);
-      if (selectedToolCode === "uis_admissions_query") {
-        setTestResult(
-          JSON.stringify(
-            {
-              status: "success",
-              tool: "uis_admissions_query",
-              input_major_code: inputParam,
-              result: {
-                major_name: "Công nghệ thông tin",
-                benchmark_2024: 24.5,
-                quota_2025: 180,
-                tuition_per_year: 16500000,
-                combinations: ["A00", "A01", "D01", "D07"],
-                source: "Cơ sở dữ liệu UIS ĐH Quy Nhơn",
-              },
-            },
-            null,
-            2
-          )
-        );
-      } else if (selectedToolCode === "docx_nd30_exporter") {
-        setTestResult(
-          JSON.stringify(
-            {
-              status: "pending_human_approval",
-              tool: "docx_nd30_exporter",
-              document_title: "Quyết định khen thưởng sinh viên NCKH",
-              margins_mm: { top: 20, bottom: 20, left: 30, right: 15 },
-              font: "Times New Roman 13pt",
-              s3_preview_url: "https://s3.qnu.edu.vn/drafts/QD_khen_thuong_draft.docx",
-              checkpoint_id: "chk_99812",
-              message: "Bản thảo Word đã được sinh và gửi tới Cán bộ Phòng Hành chính phê duyệt.",
-            },
-            null,
-            2
-          )
-        );
-      } else {
-        setTestResult(
-          JSON.stringify(
-            {
-              status: "success",
-              tool: "xlsx_bloom_matrix_exporter",
-              course_code: "IT204",
-              course_name: "Cơ sở Dữ liệu",
-              total_questions: 20,
-              matrix_breakdown: {
-                level_1_remember: 6,
-                level_2_understand: 6,
-                level_3_apply: 5,
-                level_4_analyze: 3,
-              },
-              s3_download_url: "https://s3.qnu.edu.vn/exams/IT204_Bloom_Matrix_2025.xlsx",
-            },
-            null,
-            2
-          )
-        );
-      }
-    }, 600);
+  // Nạp dữ liệu từ phôi mẫu vào form soạn thảo Word NĐ 30
+  const handleSelectTemplateToEdit = (template: AdministrativeTemplate) => {
+    setEditingDocData({
+      documentType: template.document_type,
+      subAgency: template.department,
+      documentNumber: "Số: ... /QĐ-ĐHQN",
+      cityDate: "Quy Nhơn, ngày ... tháng ... năm 2026",
+      title: template.default_title,
+      paragraphs: template.default_paragraphs,
+      signerTitle: template.default_signer_title,
+      signerName: template.default_signer_name,
+      recipients: template.default_recipients,
+    });
+    setActiveTab("docx_nd30");
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          Cổng Công Cụ Ngoại Vi & Function Calling
-          <Badge variant="outline" className="font-mono text-xs">
-            OpenAPI Gateway
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span>Cổng Công Cụ Ngoại Vi & Xuất Bản Biểu Mẫu</span>
+            <Badge variant="outline" className="font-mono text-xs text-primary">
+              OpenAPI Gateway
+            </Badge>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Studio xuất bản tài liệu chuẩn Nghị định 30/2020/NĐ-CP, Ma trận đề thi Bloom, Tra cứu
+            UIS và Thư viện Phôi mẫu QNU.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="font-mono text-xs px-2.5 py-1">
+            <span className="size-2 rounded-full bg-success inline-block mr-1.5" />
+            3/3 Core Tools Sẵn Sàng
           </Badge>
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Các công cụ nghiệp vụ được cấp phép cho Trợ lý AI gọi hành động (UIS Tuyển sinh, Xuất Word
-          NĐ 30, Xuất Excel Bloom).
-        </p>
+        </div>
       </div>
 
-      {/* 03 Standard Tools Grid */}
+      {/* 03 Standard Tools Quick Selector Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {tools.map((tool: ToolItem) => {
-          const isSelected = tool.code === selectedToolCode;
+          const isSelected =
+            (tool.code === "docx_nd30_exporter" && activeTab === "docx_nd30") ||
+            (tool.code === "xlsx_bloom_matrix_exporter" && activeTab === "bloom_matrix") ||
+            (tool.code === "uis_admissions_query" && activeTab === "uis_query");
+
           return (
             <Card
               key={tool.id}
               onClick={() => {
-                setSelectedToolCode(tool.code);
-                setTestResult(null);
-                if (tool.code === "uis_admissions_query") setInputParam("7480201");
-                else if (tool.code === "docx_nd30_exporter")
-                  setInputParam("Quyết định khen thưởng NCKH");
-                else setInputParam("IT204 - Cơ sở Dữ liệu");
+                if (tool.code === "docx_nd30_exporter") setActiveTab("docx_nd30");
+                else if (tool.code === "xlsx_bloom_matrix_exporter") setActiveTab("bloom_matrix");
+                else if (tool.code === "uis_admissions_query") setActiveTab("uis_query");
               }}
               className={`p-4 space-y-3 cursor-pointer transition-all flex flex-col justify-between ${
                 isSelected
-                  ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                  ? "border-primary ring-2 ring-primary/20 bg-primary/5 shadow-xs"
                   : "hover:border-primary/40"
               }`}
             >
@@ -189,85 +145,69 @@ export const ToolsPage: React.FC = () => {
         })}
       </div>
 
-      {/* Interactive Tool Playground */}
-      <Card className="p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wider">
-              Tool Playground — Kiểm Thử Tương Tác: {activeTool?.name}
-            </h2>
-          </div>
-          <Badge variant="outline" className="font-mono text-[11px]">
-            {activeTool?.endpoint}
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          {/* Input Panel */}
-          <div className="space-y-3 p-4 rounded-surface bg-muted/30 border border-border">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <Code className="h-3.5 w-3.5 text-primary" />
-                Tham số đầu vào (Input Parameters)
-              </span>
-              <span className="text-[11px] text-muted-foreground">JSON payload</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <span className="text-[11px] text-muted-foreground block">
-                {selectedToolCode === "uis_admissions_query"
-                  ? "Mã ngành đào tạo (major_code):"
-                  : selectedToolCode === "docx_nd30_exporter"
-                    ? "Tên văn bản / Trích yếu nội dung:"
-                    : "Mã học phần & Tên môn học:"}
-              </span>
-              <input
-                type="text"
-                value={inputParam}
-                onChange={(e) => setInputParam(e.target.value)}
-                className="w-full h-9 rounded-control border border-border bg-background px-3 text-xs text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <Button
-              onClick={handleRunTool}
-              disabled={isRunning || !inputParam.trim()}
-              className="w-full text-xs h-9 gap-1.5 font-semibold"
+      {/* Main Studio Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="border-b border-border pb-px">
+          <TabsList className="h-9 p-1 gap-1">
+            <TabsTrigger
+              value="docx_nd30"
+              className="text-xs gap-1.5 px-3 data-[state=active]:font-semibold"
             >
-              <Play className="h-3.5 w-3.5 fill-current" />
-              <span>
-                {isRunning ? "Đang gọi Function Calling..." : "Thực Thi Công Cụ (Execute)"}
-              </span>
-            </Button>
-          </div>
+              <FileText className="size-3.5" />
+              <span>Soạn Thảo Word NĐ 30</span>
+            </TabsTrigger>
 
-          {/* Output Panel */}
-          <div className="space-y-3 p-4 rounded-surface bg-muted/30 border border-border">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-info" />
-                Phản hồi JSON Schema (Output Response)
-              </span>
-              {testResult && (
-                <span className="text-[10px] text-success flex items-center gap-1 font-mono">
-                  <CheckCircle2 className="h-3 w-3" /> HTTP 200 OK
-                </span>
-              )}
-            </div>
+            <TabsTrigger
+              value="bloom_matrix"
+              className="text-xs gap-1.5 px-3 data-[state=active]:font-semibold"
+            >
+              <FileSpreadsheet className="size-3.5" />
+              <span>Ma Trận Đề Thi Bloom</span>
+            </TabsTrigger>
 
-            <pre className="p-3 rounded-control bg-card font-mono text-[11px] text-foreground overflow-x-auto border border-border h-44 leading-relaxed whitespace-pre-wrap select-text">
-              {testResult ||
-                "// Bấm 'Thực Thi Công Cụ' để gửi yêu cầu và quan sát phản hồi JSON..."}
-            </pre>
-          </div>
+            <TabsTrigger
+              value="uis_query"
+              className="text-xs gap-1.5 px-3 data-[state=active]:font-semibold"
+            >
+              <GraduationCap className="size-3.5" />
+              <span>Cổng Dữ Liệu UIS</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="templates"
+              className="text-xs gap-1.5 px-3 data-[state=active]:font-semibold"
+            >
+              <Layers className="size-3.5" />
+              <span>Thư Viện Phôi Mẫu</span>
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </Card>
+
+        {/* Tab 1: Soạn Thảo Word NĐ 30 */}
+        <TabsContent value="docx_nd30" className="m-0 focus-visible:outline-none">
+          <DocxNd30Editor initialData={editingDocData} />
+        </TabsContent>
+
+        {/* Tab 2: Ma Trận Đề Thi Bloom */}
+        <TabsContent value="bloom_matrix" className="m-0 focus-visible:outline-none">
+          <BloomMatrixEditor />
+        </TabsContent>
+
+        {/* Tab 3: Cổng Dữ Liệu UIS Tuyển Sinh */}
+        <TabsContent value="uis_query" className="m-0 focus-visible:outline-none">
+          <UisAdmissionsExplorer />
+        </TabsContent>
+
+        {/* Tab 4: Thư Viện Phôi Mẫu */}
+        <TabsContent value="templates" className="m-0 focus-visible:outline-none">
+          <AdministrativeTemplatesView onSelectTemplateToEdit={handleSelectTemplateToEdit} />
+        </TabsContent>
+      </Tabs>
 
       {/* Human-in-the-loop Governance Banner */}
       <Card className="p-4 bg-primary/5 border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-control bg-primary text-primary-foreground">
+          <div className="p-2 rounded-control bg-primary text-primary-foreground shrink-0">
             <ShieldCheck className="h-4 w-4" />
           </div>
           <div>
@@ -275,8 +215,9 @@ export const ToolsPage: React.FC = () => {
               Chính Sách Kiểm Soát Cán Bộ Phê Duyệt (Human-in-the-loop)
             </h4>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Mọi công cụ làm thay đổi dữ liệu chính thức hoặc phát hành văn bản pháp quy bắt buộc
-              phải tạo điểm dừng (checkpoint) chờ cán bộ chuyên trách duyệt trước khi hoàn tất.
+              Mọi văn bản hành chính xuất ra chuẩn Nghị định 30/2020/NĐ-CP hoặc ma trận đề thi khảo
+              thí đều được gắn mã định danh xác thực và lưu trữ bảo mật trên hệ thống MinIO S3 của
+              Trường Đại học Quy Nhơn.
             </p>
           </div>
         </div>

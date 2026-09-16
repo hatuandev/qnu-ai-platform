@@ -7,27 +7,18 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-16 15:40 (UTC+7)
-- **Phiên số**: #24 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-16 23:30 (UTC+7)
+- **Phiên số**: #33 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**: 
-  1. Trích xuất và giải mã thành công API keys từ `qnu-ai-core`:
-     - Mistral API Key (32 ký tự, masked: `r1D...07T4`) giải mã từ `connections_state.json` qua Fernet dev key.
-     - Cloudflare API Token (53 ký tự, masked: `cfu...df00`) và Account ID `ab6bf644b640759c330c44f109e3f000` từ `.env.local` & `connections_state.json`.
-  2. Cấu hình Backend:
-     - [`backend/app/core/config.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/core/config.py): Thêm `MISTRAL_API_KEY`, `CLOUDFLARE_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
-     - [`backend/.env`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/.env): Đồng bộ các biến môi trường đầy đủ.
-     - [`backend/app/modules/modelops/service.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/modelops/service.py): Cập nhật `STANDARD_QNU_PROVIDERS` liên kết động tới settings và khởi tạo key pool.
-  3. Cập nhật CSDL PostgreSQL `model_provider_configs`:
-     - `prov_mistral`: Gán `api_key_encrypted` và thêm `key_mistral_primary` ("Khóa Mistral OCR & Platform").
-     - `prov_cloudflare`: Gán `api_key_encrypted`, `account_id` và thêm `key_cloudflare_primary` ("Cloudflare Workers AI Token").
-  4. Kiểm thử toàn diện:
-     - Backend: 73/73 tests pass, Ruff 0 lỗi.
-     - Frontend: Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công (7.77s).
-     - Browser E2E: Xác thực cả 2 provider hiển thị chính xác trạng thái Active và masked key trên UI `/models`.
-
-
-
+  1. **Hoàn thiện Cổng Trích Xuất & Biểu Mẫu Hành Chính (Lựa chọn A từ `qnu-ai-core`)**:
+     - Xây dựng `DocxNd30Editor`: Form soạn thảo văn bản hành chính theo chuẩn Nghị định 30/2020/NĐ-CP, kèm khung xem trước tờ giấy A4 trực quan (`nd30-paper-preview`) căn lề 20-20-30-15mm, phông Times New Roman, kẻ chân quốc hiệu/tiêu ngữ và bảng chữ ký, xuất file Word `.docx`.
+     - Xây dựng `BloomMatrixEditor`: Trình thiết kế ma trận phân phối đề thi theo 4 cấp độ tư duy Bloom (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao), tự động tính tổng câu, điểm số và biểu đồ tỷ lệ %, xuất bảng tính Excel `.xlsx`.
+     - Xây dựng `UisAdmissionsExplorer`: Cổng tra cứu trực quan dữ liệu điểm chuẩn 3 năm gần nhất, tổ hợp môn, chỉ tiêu và học phí các ngành đào tạo ĐH Quy Nhơn thời gian thực.
+     - Xây dựng `AdministrativeTemplatesView`: Thư viện 6 phôi mẫu văn bản nhà trường kèm danh sách placeholder và nút **"Nạp Vào Form Soạn Thảo (1-Click Fill)"**.
+     - Tích hợp 4 Tabs chuyên môn tại `ToolsPage` (`/tools`).
+  2. **Kiểm thử E2E Playwright 100% Pass**: Bộ test `08_tools_and_templates_export.spec.ts` đạt 3/3 tests pass (11.7s) trên Google Chrome với 3 ảnh chụp màn hình nghiệm thu trực quan.
+  3. **Kiểm tra chất lượng Clean Code**: Biome 0 lỗi, TypeScript 0 lỗi, Vite build đóng gói thành công 100%, Ruff 0 lỗi.
 
 ---
 
@@ -39,8 +30,8 @@
 | **Tổ chức** | Trường Đại học Quy Nhơn (QNU) |
 | **Workspace** | `D:\DuAnPhanMem\qnu-ai-platform` |
 | **Backend** | `D:\DuAnPhanMem\qnu-ai-platform\backend` |
-| **Frontend** | `D:\DuAnPhanMem\qnu-ai-platform\frontend` |
-| **Ref codebase cũ** | `D:\DuAnPhanMem\qnu-ai-core` |
+| **Frontend** | `D:\DuAnPhanMem\qnu-ai-platform\frontend` (Port 3001) |
+| **Ref codebase cũ** | `D:\DuAnPhanMem\qnu-ai-core` (Port 3000) |
 | **Tham khảo QLKTX** | `D:\DuAnPhanMem\QLKTX\qnu-ktx\src\Web\ClientApp` |
 
 ---
@@ -64,7 +55,7 @@
 
 ---
 
-### ✅ Frontend (5/5 Giai Đoạn — HOÀN THÀNH)
+### ✅ Frontend (7/7 Giai Đoạn — HOÀN THÀNH & NÂNG CẤP TOÀN DIỆN)
 
 | Giai Đoạn | Mô Tả | Trạng Thái |
 | :--- | :--- | :---: |
@@ -73,14 +64,16 @@
 | 3 | AdminShell (AppSidebar, Topbar, CommandMenu, ThemeProvider) | ✅ Done |
 | 4 | AI Suite (useRAGStream, ChatMessage, CitationSheet, Attachment, QuestionnaireCard, DAGCanvas) | ✅ Done |
 | 5 | API Integration (TanStack Query) + 9 Business Screens + 15 Routes fully wired | ✅ Done |
+| 6 | **Visual DAG Workflow Studio (Lựa chọn B từ QNU-AI-Core)**: In-Canvas Test Runner, 8 Custom Nodes, Catalog Drawer, Property Inspector, 5 Workflows | ✅ Done |
+| 7 | **Administrative Document & Tool Studio (Lựa chọn A từ QNU-AI-Core)**: Docx NĐ 30 Editor with Live Paper Preview, Bloom Matrix Excel Exporter, UIS Live Explorer, Templates Library (1-Click Fill) | ✅ Done |
 
-**Frontend Checks**: Biome 0 errors | TypeScript 0 errors | Vite build ✓ (1,040 kB) | Playwright E2E: 15/15 passed
+**Frontend Checks**: Biome 0 errors | TypeScript 0 errors | Vite build ✓ (1,200 kB) | Playwright E2E: 21/21 passed
 
 ---
 
 ## 4. Hệ Thống Kỹ Năng Agent (Skills Registry)
 
-Dự án hiện có **06 bộ kỹ năng chuẩn hóa** tại `.agents/skills/`:
+Dự án hiện có **07 bộ kỹ năng chuẩn hóa** tại `.agents/skills/`:
 
 | Skill | Vị Trí | Mô Tả |
 | :--- | :--- | :--- |
@@ -90,6 +83,7 @@ Dự án hiện có **06 bộ kỹ năng chuẩn hóa** tại `.agents/skills/`:
 | **`qnu-rag-pipeline`** | [`.agents/skills/qnu-rag-pipeline/SKILL.md`](../../.agents/skills/qnu-rag-pipeline/SKILL.md) | Qdrant Dense, FTS Lexical, RRF k=60, Cross-Encoder, Fact Layer |
 | **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](../../.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng, Clause-based chunking |
 | **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](../../.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Quota, Cost Tracker |
+| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](../../.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Any/Dead Code, SRP |
 
 ---
 
@@ -108,11 +102,12 @@ FastAPI + Uvicorn (port 8001)
 
 ### Stack Công Nghệ Frontend
 ```
-Vite 6 + React 19 + TypeScript 5
+Vite 6 + React 19 + TypeScript 5 (port 3001)
 ├── Tailwind CSS v4 (OKLCH Design Tokens — Academic Teal)
 ├── Biome 2 (Linter + Formatter)
 ├── TanStack Query v5 (Server state management)
-├── @xyflow/react v12 (DAG Canvas visualization)
+├── @xyflow/react v12 (Visual DAG Studio, 8 Custom Nodes, Live Pulse Animation)
+├── Document Studio (Docx NĐ 30 Live Paper Sheet, Bloom Excel Matrix, UIS Live Explorer, Templates Library)
 ├── Radix UI + shadcn/ui primitives
 └── lucide-react icons
 ```
@@ -140,14 +135,14 @@ modules/
 src/
 ├── components/
 │   ├── ui/           # 21 UI Primitives (Button, Card, Badge, Dialog, Table, Tabs, ...)
-│   ├── admin/        # 6 Admin Helpers (EmptyState, KpiMetric, StatusBadge, ...)
-│   └── ai/           # AI Suite (ChatBubble, ChatMessage, CitationSheet, DAGCanvas, ...)
+│   ├── admin/        # 13 Admin Helpers (DocxNd30Editor, BloomMatrixEditor, UisAdmissionsExplorer, AdministrativeTemplatesView, InCanvasTestRunner, NodeCatalogDrawer, PropertyInspector, ...)
+│   └── ai/           # AI Suite (ChatBubble, ChatMessage, CitationSheet, DAGCanvas with 8 custom node types, ...)
 ├── hooks/            # useRAGStream (SSE streaming hook)
 ├── layouts/          # AdminShell, AppSidebar, Topbar, CommandMenu
 ├── lib/              # query-client.ts (TanStack QueryClient)
 ├── navigation/       # config.ts (NAVIGATION_CONFIG — 15 routes)
-├── pages/            # 13 màn hình (Dashboard, Knowledge, ModelOps, Tools, ...)
-└── services/         # api-client.ts (REST endpoints + Offline Seed Fallback)
+├── pages/            # 13 màn hình (Dashboard, Knowledge, ModelOps, DAG Canvas Studio, Tools Studio, ...)
+└── services/         # api-client.ts (REST endpoints + executeWorkflow + executeTool + Offline Seed Fallback)
 ```
 
 ---
@@ -164,8 +159,8 @@ src/
 | `/runs` | `runs-page.tsx` | Lịch sử thực thi DAG + Trace |
 | `/knowledge` | `knowledge-page.tsx` | Quản trị tri thức + Ingestion Wizard |
 | `/document-types` | `knowledge-page.tsx` | Dùng chung KnowledgePage |
-| `/nodes` | `dag-canvas-page.tsx` | Visual DAG Canvas Studio |
-| `/tools` | `tools-page.tsx` | Cổng công cụ QNU + Tool Playground |
+| `/nodes` | `dag-canvas-page.tsx` | Visual DAG Canvas Studio (5 Luồng, Test Runner, Catalog, Inspector) |
+| `/tools` | `tools-page.tsx` | **Studio Xuất Bản Tài Liệu NĐ 30, Ma Trận Bloom, Cổng UIS, Thư Viện Phôi Mẫu** |
 | `/evaluation` | `evaluation-page.tsx` | Kiểm định Ragas TM-08 + Gap Inbox |
 | `/models` | `modelops-page.tsx` | Model Providers + Circuit Breaker |
 | `/developer` | `developer-page.tsx` | API Keys + SDK Snippets |
@@ -175,44 +170,30 @@ src/
 
 ## 9. Các Điểm Chú Ý Kỹ Thuật Quan Trọng
 
-### Biome Linter Gotchas
-- Số `0.000` → dùng `0` hoặc `0.0` (tránh `lint/suspicious/noApproximativeNumericConstant`)
-- Không dùng `key={idx}` trong danh sách — luôn dùng ID duy nhất
-- Label không có `htmlFor` → dùng `<span>` thay thế
-- Không dùng `role="user"` / `role="assistant"` trên DOM — vi phạm WAI-ARIA
-- Imports phải được sắp xếp theo thứ tự alphabet (Biome tự organize imports)
+### Port Configuration
+- Frontend chạy trên cổng **`3001`** (`http://localhost:3001`) độc lập với `qnu-ai-core` (cổng `3000`).
 
-### Pytest Windows
-- Luôn chạy: `uv run --extra dev pytest` (có `--basetemp=.pytest_temp` trong pyproject.toml)
-- **Không** dùng `uv run pytest` thẳng (lỗi temp dir trên Windows)
-- Biến môi trường `no_proxy` trên Windows chứa `::1` khiến `httpx` crash (`Invalid port: ':1'`) -> đã tự động làm sạch trong `tests/conftest.py`.
+### Decree 30/2020/ND-CP Formatter
+- Lề trang chuẩn: Trên 20mm, Dưới 20mm, Trái 30mm (đóng gáy), Phải 15mm.
+- Quốc hiệu, Tiêu ngữ căn giữa, gạch chân chuẩn tỷ lệ.
+- Phông chữ chuẩn Times New Roman (12-13pt), thụt đầu đoạn 1cm - 1.27cm.
 
-### Docker Compose Stack
-- `docker-compose.yml`: Dành riêng cho 5 dịch vụ hạ tầng (`postgres:16`, `qdrant:latest`, `redis:7-alpine`, `minio:RELEASE.2025-04-22T22-12-26Z`, `gotenberg:8`).
-- Khởi chạy chỉ cần: `docker compose up -d` (toàn bộ 5/5 containers đạt trạng thái `healthy` ngay lập tức).
-- Qdrant healthcheck dùng bash TCP socket test `bash -c ': >/dev/tcp/127.0.0.1/6333'` do image không có sẵn `curl`.
-
-### API Client
-- Base URL: `/platform/v1alpha1/` (proxy qua Vite dev server)
-- Offline Seed Fallback: tự động khi `fetch()` thất bại — không cần xử lý thêm
-- Tất cả endpoints đều async với TanStack Query `useQuery()`
+### Bloom Taxonomy Exam Matrix
+- 4 Cấp độ: Nhận biết (Remember), Thông hiểu (Understand), Vận dụng (Apply), Vận dụng cao (Analyze/Create).
+- Biểu đồ tỷ lệ 4 màu trực quan tự động tính toán tổng số câu, điểm số và phần trăm.
 
 ---
 
 ## 10. Giai Đoạn Tiếp Theo (Backlog)
 
-> Dự án đã hoàn tất 5 giai đoạn Frontend và hệ thống Skill / Memory.
-> Các hạng mục có thể triển khai tiếp theo (chưa được lên kế hoạch chính thức):
+> Cả 2 Lựa chọn A (Studio Xuất Bản Biểu Mẫu Hành Chính) và B (Visual DAG Workflow Studio) kế thừa từ `qnu-ai-core` đã hoàn thành xuất sắc.
+> Các định hướng tiếp theo có thể cân nhắc:
 
-- [ ] **Authentication**: Đăng nhập JWT, phân quyền tenant/admin
-- [ ] **Real-time Notifications**: WebSocket hoặc SSE cho trạng thái ingestion
-- [ ] **Analytics Dashboard**: Biểu đồ thống kê nâng cao (Recharts / Victory)
-- [ ] **Mobile Responsive**: Tối ưu giao diện cho màn hình nhỏ
-- [x] **E2E Testing Setup**: Đã tích hợp Playwright MCP Server kết nối trực tiếp Chrome cho AI Auto Testing
-- [ ] **i18n**: Đa ngôn ngữ Tiếng Việt / Tiếng Anh
-- [ ] **Code Splitting**: Tách bundle theo route để tối ưu hiệu năng tải trang
+- [ ] **Authentication**: Đăng nhập JWT, phân quyền cán bộ/sinh viên
+- [ ] **Real-time Notifications**: WebSocket hoặc SSE thông báo tiến trình nạp tài liệu
+- [ ] **Mobile Responsive**: Tối ưu layout cho thiết bị di động
+- [ ] **Code Splitting**: Dynamic imports tách nhỏ bundle
 
 ---
 
-*Snapshot được tạo lúc: 2026-09-15 22:20 UTC+7*
-*Phiên tiếp theo: Đọc section 10 (Backlog) để xác định ưu tiên tiếp theo với người dùng.*
+*Snapshot được tạo lúc: 2026-09-16 23:30 UTC+7*

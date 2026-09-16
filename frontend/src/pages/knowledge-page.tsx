@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRight,
   BookOpen,
-  Check,
   CheckCircle2,
   Eye,
   FileText,
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { FileUpload } from "../components/admin/file-upload";
+import { IngestionProgressModal } from "../components/admin/ingestion-progress-modal";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -34,24 +36,79 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { type FileRecommendation, inspectFileAndRecommend } from "../lib/file-inspector";
 import { type KnowledgeDocument, type ModelProvider, apiClient } from "../services/api-client";
+import { CollectionDetailPage } from "./collection-detail-page";
 
-export const KnowledgePage: React.FC = () => {
+export interface KnowledgePageProps {
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
+}
+
+export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNavigate }) => {
+  const queryClient = useQueryClient();
+
+  // Extract selected collection ID from URL path (e.g., /knowledge/collections/col_admissions or /knowledge/col_admissions)
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(() => {
+    if (currentPath?.startsWith("/knowledge/collections/")) {
+      const id = currentPath.replace("/knowledge/collections/", "").trim();
+      return id || null;
+    }
+    if (
+      currentPath?.startsWith("/knowledge/") &&
+      !currentPath.startsWith("/knowledge/collections")
+    ) {
+      const id = currentPath.replace("/knowledge/", "").trim();
+      return id || null;
+    }
+    return null;
+  });
+
+  // Sync state with URL path changes
+  useEffect(() => {
+    if (currentPath?.startsWith("/knowledge/collections/")) {
+      const id = currentPath.replace("/knowledge/collections/", "").trim();
+      setSelectedCollectionId(id || null);
+    } else if (
+      currentPath?.startsWith("/knowledge/") &&
+      !currentPath.startsWith("/knowledge/collections")
+    ) {
+      const id = currentPath.replace("/knowledge/", "").trim();
+      setSelectedCollectionId(id || null);
+    } else if (currentPath === "/knowledge") {
+      setSelectedCollectionId(null);
+    }
+  }, [currentPath]);
+
   const [activeTab, setActiveTab] = useState<string>("collections");
+  const [collectionSearch, setCollectionSearch] = useState<string>("");
+  const [strategyFilter, setStrategyFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCollectionFilter, setSelectedCollectionFilter] = useState<string>("all");
   const [selectedDocForPreview, setSelectedDocForPreview] = useState<KnowledgeDocument | null>(
     null
   );
 
-  // Ingestion form state
+  // Ingestion form state for global tab
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileRecommendation, setFileRecommendation] = useState<FileRecommendation | null>(null);
   const [uploadTitle, setUploadTitle] = useState<string>("");
   const [targetCollection, setTargetCollection] = useState<string>("col_admissions");
   const [selectedOcrOption, setSelectedOcrOption] = useState<string>("");
   const [selectedEmbeddingOption, setSelectedEmbeddingOption] = useState<string>("");
   const [chunkingStrategy, setChunkingStrategy] = useState<string>("ClauseBasedChunker");
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-  const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
+
+  // Live Pipeline Progress Modal State for Global Wizard
+  const [isProgressModalOpen, setIsProgressModalOpen] = useState<boolean>(false);
+  const [lastIngestedDocMeta, setLastIngestedDocMeta] = useState<{
+    title: string;
+    fileName: string;
+    fileSize: number;
+    ocr: string;
+    chunking: string;
+    colName: string;
+    colCode: string;
+  } | null>(null);
 
   const { data: collections = [] } = useQuery({
     queryKey: ["collections"],
@@ -143,6 +200,40 @@ export const KnowledgePage: React.FC = () => {
     }
   }, [availableEmbeddingOptions, selectedEmbeddingOption]);
 
+  // Navigation handlers
+  const handleSelectCollection = (colId: string) => {
+    setSelectedCollectionId(colId);
+    const targetUrl = `/knowledge/collections/${colId}`;
+    if (onNavigate) {
+      onNavigate(targetUrl);
+    } else {
+      window.history.pushState({}, "", targetUrl);
+    }
+  };
+
+  const handleBackToList = () => {
+    setSelectedCollectionId(null);
+    const targetUrl = "/knowledge";
+    if (onNavigate) {
+      onNavigate(targetUrl);
+    } else {
+      window.history.pushState({}, "", targetUrl);
+    }
+  };
+
+  // Filtered collections for Master view
+  const filteredCollections = useMemo(() => {
+    return collections.filter((c) => {
+      const matchSearch =
+        !collectionSearch.trim() ||
+        c.name.toLowerCase().includes(collectionSearch.toLowerCase()) ||
+        c.code.toLowerCase().includes(collectionSearch.toLowerCase()) ||
+        c.description.toLowerCase().includes(collectionSearch.toLowerCase());
+      const matchStrategy = strategyFilter === "all" || c.chunking_strategy === strategyFilter;
+      return matchSearch && matchStrategy;
+    });
+  }, [collections, collectionSearch, strategyFilter]);
+
   const filteredDocuments = useMemo(() => {
     return (documents || []).filter((doc) => {
       const title = doc?.title || "";
@@ -160,20 +251,51 @@ export const KnowledgePage: React.FC = () => {
     return (collections || []).reduce((acc, c) => acc + (c?.chunk_count ?? 0), 0);
   }, [collections]);
 
-  const handleSimulatedUpload = (e: React.FormEvent) => {
+  const handleSimulatedUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadTitle.trim()) return;
+    if (!selectedFile && !uploadTitle.trim()) return;
 
-    setIsUploading(true);
-    setTimeout(() => {
-      setIsUploading(false);
-      setUploadSuccess(true);
-      setTimeout(() => {
-        setUploadSuccess(false);
-        setUploadTitle("");
-        setActiveTab("documents");
-      }, 1500);
-    }, 1200);
+    const titleToUse =
+      uploadTitle.trim() || selectedFile?.name?.replace(/\.[^/.]+$/, "") || "Tài liệu nạp mới";
+    const effectiveFile =
+      selectedFile ||
+      new File(["QNU Knowledge Content"], `${titleToUse}.pdf`, {
+        type: "application/pdf",
+      });
+
+    const targetCol = collections.find(
+      (c) => c.id === targetCollection || c.code === targetCollection
+    );
+
+    setLastIngestedDocMeta({
+      title: titleToUse,
+      fileName: effectiveFile.name,
+      fileSize: effectiveFile.size,
+      ocr:
+        availableOcrOptions.find((o) => o.id === selectedOcrOption)?.label ||
+        selectedOcrOption ||
+        "Docling Local",
+      chunking: chunkingStrategy,
+      colName: targetCol?.name || "Bộ Sưu Tập QNU",
+      colCode: targetCol?.code || targetCollection,
+    });
+
+    setIsProgressModalOpen(true);
+
+    try {
+      await apiClient.uploadDocument(targetCollection, effectiveFile, titleToUse);
+    } catch {
+      // safe fallback
+    }
+  };
+
+  const handleGlobalPipelineFinished = () => {
+    queryClient.invalidateQueries({ queryKey: ["documents"] });
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
+    setUploadTitle("");
+    setSelectedFile(null);
+    setFileRecommendation(null);
+    setActiveTab("documents");
   };
 
   const formatFileSize = (bytes: number) => {
@@ -181,6 +303,18 @@ export const KnowledgePage: React.FC = () => {
     return `${(val / 1024 / 1024).toFixed(1)} MB`;
   };
 
+  // MASTER-DETAIL: If a collection is selected, render dedicated detail page
+  if (selectedCollectionId) {
+    return (
+      <CollectionDetailPage
+        collectionId={selectedCollectionId}
+        onBack={handleBackToList}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+
+  // Otherwise render Master / List Overview Page
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -236,83 +370,114 @@ export const KnowledgePage: React.FC = () => {
             Bộ Sưu Tập ({collections.length})
           </TabsTrigger>
           <TabsTrigger value="documents" className="text-xs px-3 py-1.5">
-            Danh Mục Tài Liệu ({documents.length})
+            Tất Cả Văn Bản Toàn Hệ Thống ({documents.length})
           </TabsTrigger>
           <TabsTrigger value="ingest" className="text-xs px-3 py-1.5">
             Wizard Nạp Tri Thức (OCR & MinIO)
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Collections Grid */}
+        {/* Tab 1: Collections Master Grid */}
         {activeTab === "collections" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {collections.map((col) => (
-              <Card
-                key={col.id}
-                className="hover:border-primary/50 transition-all flex flex-col justify-between"
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 rounded-control bg-primary/10 text-primary">
-                        <BookOpen className="h-4 w-4" />
+          <div className="space-y-4">
+            {/* Search & Filter Bar for Collections */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-surface border border-border">
+              <div className="flex items-center gap-2 w-full sm:w-80">
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  placeholder="Tìm kiếm bộ sưu tập theo tên, mã..."
+                  value={collectionSearch}
+                  onChange={(e) => setCollectionSearch(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <select
+                  value={strategyFilter}
+                  onChange={(e) => setStrategyFilter(e.target.value)}
+                  className="h-8 rounded-control border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="all">Tất cả thuật toán</option>
+                  <option value="ClauseBasedChunker">ClauseBasedChunker (Điều/Khoản)</option>
+                  <option value="SemanticChunker">SemanticChunker (Ngữ nghĩa)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Collections Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCollections.map((col) => (
+                <Card
+                  key={col.id}
+                  onClick={() => handleSelectCollection(col.id)}
+                  className="hover:border-primary/60 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-control bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-xs text-foreground group-hover:text-primary transition-colors">
+                            {col.name}
+                          </h3>
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {col.code}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                        {col.document_count} tệp
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                      {col.description}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-border/60 pt-2.5">
+                      <div>
+                        <span className="text-muted-foreground block text-[10px] uppercase">
+                          Tổng Chunks:
+                        </span>
+                        <span className="font-bold text-primary font-mono">{col.chunk_count}</span>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-xs text-foreground">{col.name}</h3>
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          {col.code}
+                        <span className="text-muted-foreground block text-[10px] uppercase">
+                          OCR Engine:
                         </span>
+                        <Badge variant="secondary" className="text-[10px] mt-0.5">
+                          {col.ocr_profile}
+                        </Badge>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground block text-[10px] uppercase">
+                          Thuật toán phân mảnh:
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-mono mt-0.5">
+                          {col.chunking_strategy}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
 
-                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                    {col.description}
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-border/60 pt-2.5">
-                    <div>
-                      <span className="text-muted-foreground block">Tài liệu:</span>
-                      <span className="font-bold text-foreground">{col.document_count} tệp</span>
+                    <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-primary font-medium group-hover:translate-x-0.5 transition-transform">
+                      <span className="text-[11px] text-muted-foreground">Nhấp để mở chi tiết</span>
+                      <div className="flex items-center gap-1">
+                        <span>Chi tiết</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground block">Tổng Chunks:</span>
-                      <span className="font-bold text-primary font-mono">{col.chunk_count}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block">Thuật toán:</span>
-                      <Badge variant="outline" className="text-[10px] font-mono mt-0.5">
-                        {col.chunking_strategy}
-                      </Badge>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block">OCR Profile:</span>
-                      <Badge variant="secondary" className="text-[10px] mt-0.5">
-                        {col.ocr_profile}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-border/40 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedCollectionFilter(col.id);
-                        setActiveTab("documents");
-                      }}
-                      className="text-xs h-7 text-primary hover:text-primary/80"
-                    >
-                      Xem tài liệu ({col.document_count}) →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Tab 2: Documents Data Table */}
+        {/* Tab 2: All Documents Data Table */}
         {activeTab === "documents" && (
           <div className="space-y-4">
             {/* Filter Bar */}
@@ -375,7 +540,13 @@ export const KnowledgePage: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {doc.collection_name}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectCollection(doc.collection_id)}
+                          className="hover:underline text-primary text-left"
+                        >
+                          {doc.collection_name}
+                        </button>
                       </TableCell>
                       <TableCell className="text-xs font-mono">
                         {doc.page_count} trang • {formatFileSize(doc.file_size)}
@@ -413,7 +584,7 @@ export const KnowledgePage: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 3: Ingestion Wizard */}
+        {/* Tab 3: Global Ingestion Wizard */}
         {activeTab === "ingest" && (
           <div className="max-w-2xl mx-auto space-y-5 bg-card p-6 rounded-surface border border-border shadow-xs">
             <div>
@@ -539,6 +710,7 @@ export const KnowledgePage: React.FC = () => {
                     <input
                       type="radio"
                       name="chunking"
+                      value="ClauseBasedChunker"
                       checked={chunkingStrategy === "ClauseBasedChunker"}
                       onChange={() => setChunkingStrategy("ClauseBasedChunker")}
                       className="mt-0.5"
@@ -561,6 +733,7 @@ export const KnowledgePage: React.FC = () => {
                     <input
                       type="radio"
                       name="chunking"
+                      value="SemanticChunker"
                       checked={chunkingStrategy === "SemanticChunker"}
                       onChange={() => setChunkingStrategy("SemanticChunker")}
                       className="mt-0.5"
@@ -575,16 +748,89 @@ export const KnowledgePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Upload Dropzone */}
-              <div className="border-2 border-dashed border-border/80 hover:border-primary/60 rounded-surface p-6 text-center space-y-2 bg-muted/20 transition-colors">
-                <UploadCloud className="h-8 w-8 text-primary mx-auto" />
-                <p className="font-semibold text-foreground text-xs">
-                  Kéo thả tệp PDF, Word (.docx) vào đây hoặc bấm để chọn tệp
+              {/* Upload File Control with Drag and Drop & Native File Picker */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground block">
+                    Tệp văn bản nguồn (PDF, Word, TXT) *
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">MinIO S3</span>
+                </div>
+                <FileUpload
+                  selectedFile={selectedFile}
+                  onFileSelect={(file) => {
+                    setSelectedFile(file);
+                    if (file) {
+                      if (!uploadTitle.trim()) {
+                        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+                        setUploadTitle(cleanName);
+                      }
+                      const targetCol = collections.find(
+                        (c) => c.id === targetCollection || c.code === targetCollection
+                      );
+                      const rec = inspectFileAndRecommend(
+                        file,
+                        targetCol?.chunking_strategy as
+                          | "ClauseBasedChunker"
+                          | "SemanticChunker"
+                          | undefined
+                      );
+                      setFileRecommendation(rec);
+                      const matchedOcr = availableOcrOptions.find(
+                        (opt) =>
+                          opt.label.toLowerCase().includes(rec.targetOcrKeyword) ||
+                          opt.id.toLowerCase().includes(rec.targetOcrKeyword)
+                      );
+                      if (matchedOcr) {
+                        setSelectedOcrOption(matchedOcr.id);
+                      }
+                      setChunkingStrategy(rec.recommendedChunking);
+                    } else {
+                      setFileRecommendation(null);
+                    }
+                  }}
+                  accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt"
+                  maxSizeBytes={50 * 1024 * 1024}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Tệp gốc sẽ được lưu trữ an toàn trên MinIO bucket `qnu-knowledge-raw`.
                 </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Hỗ trợ tệp lên đến 50MB. File gốc được đẩy trực tiếp lên MinIO bucket
-                  `qnu-knowledge-raw`.
-                </p>
+
+                {/* Banner Đề Xuất Bóc Tách Thông Minh (QNU AI Core Standard) */}
+                {fileRecommendation && (
+                  <div className="rounded-control border border-primary/30 bg-primary/5 p-3.5 space-y-2 text-xs transition-all animate-in fade-in">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-primary font-bold">
+                        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                        <span>{fileRecommendation.title}</span>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-medium border-primary/40 text-primary bg-primary/10"
+                      >
+                        {fileRecommendation.badgeText}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-foreground font-medium">
+                      {fileRecommendation.reason}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {fileRecommendation.technicalDetails}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 pt-1.5 text-[10px] text-muted-foreground border-t border-primary/15">
+                      <span>
+                        ✓ OCR Engine đề xuất:{" "}
+                        <strong className="text-foreground">
+                          {availableOcrOptions.find((o) => o.id === selectedOcrOption)?.label ||
+                            selectedOcrOption}
+                        </strong>
+                      </span>
+                      <span>
+                        ✓ Phân mảnh: <strong className="text-foreground">{chunkingStrategy}</strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-2">
@@ -595,24 +841,33 @@ export const KnowledgePage: React.FC = () => {
 
                 <Button
                   type="submit"
-                  disabled={isUploading || uploadSuccess || !uploadTitle.trim()}
+                  disabled={!selectedFile && !uploadTitle.trim()}
                   className="h-9 px-4 text-xs font-semibold gap-1.5"
                 >
-                  {isUploading ? (
-                    <span>Đang đẩy lên MinIO & bóc tách...</span>
-                  ) : uploadSuccess ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="h-3.5 w-3.5" /> Nạp thành công!
-                    </span>
-                  ) : (
-                    <span>Khởi Động Pipeline Nạp Tri Thức</span>
-                  )}
+                  <UploadCloud className="h-3.5 w-3.5" />
+                  <span>Khởi Động Pipeline Nạp Tri Thức</span>
                 </Button>
               </div>
             </form>
           </div>
         )}
       </Tabs>
+
+      {/* Live Pipeline Progress Modal for Global Ingest Wizard */}
+      {lastIngestedDocMeta && (
+        <IngestionProgressModal
+          isOpen={isProgressModalOpen}
+          onClose={() => setIsProgressModalOpen(false)}
+          documentTitle={lastIngestedDocMeta.title}
+          collectionName={lastIngestedDocMeta.colName}
+          collectionCode={lastIngestedDocMeta.colCode}
+          fileName={lastIngestedDocMeta.fileName}
+          fileSize={lastIngestedDocMeta.fileSize}
+          ocrEngine={lastIngestedDocMeta.ocr}
+          chunkingStrategy={lastIngestedDocMeta.chunking}
+          onFinished={handleGlobalPipelineFinished}
+        />
+      )}
 
       {/* Document Detail Preview Dialog */}
       <Dialog

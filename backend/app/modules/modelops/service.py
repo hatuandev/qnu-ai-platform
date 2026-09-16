@@ -31,6 +31,21 @@ logger = logging.getLogger(__name__)
 _DEFAULT_PROVIDER_KEYS: dict[str, list[dict[str, Any]]] = {}
 
 
+def mask_api_key(key: str | None) -> str:
+    """Format key into a readable, clear masked string with longer prefix & suffix for easy identification."""
+    if not key:
+        return "******"
+    cleaned = key.strip()
+    length = len(cleaned)
+    if length <= 8:
+        return "******"
+    if length <= 16:
+        return f"{cleaned[:4]}...{cleaned[-4:]}"
+    if length <= 28:
+        return f"{cleaned[:8]}...{cleaned[-6:]}"
+    return f"{cleaned[:10]}...{cleaned[-8:]}"
+
+
 def _init_default_keys() -> None:
     if _DEFAULT_PROVIDER_KEYS:
         return
@@ -42,7 +57,7 @@ def _init_default_keys() -> None:
             "id": "key_openai_primary",
             "name": "Khóa Chính (Primary)",
             "api_key": openai_key,
-            "api_key_masked": f"{openai_key[:3]}...{openai_key[-4:]}" if len(openai_key) > 7 else "sk-...9abc",
+            "api_key_masked": mask_api_key(openai_key),
             "priority": 1,
             "is_active": True,
             "status": "active",
@@ -73,7 +88,7 @@ def _init_default_keys() -> None:
             "id": "key_gemini_primary",
             "name": "Google AI Studio Key #1",
             "api_key": gemini_key,
-            "api_key_masked": f"{gemini_key[:3]}...{gemini_key[-4:]}" if len(gemini_key) > 7 else "AIz...gem1",
+            "api_key_masked": mask_api_key(gemini_key),
             "priority": 1,
             "is_active": True,
             "status": "active",
@@ -219,9 +234,9 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "id": "key_mistral_primary",
                     "name": "Khóa Mistral OCR & Platform",
                     "api_key": settings.MISTRAL_API_KEY or "",
-                    "api_key_masked": f"{settings.MISTRAL_API_KEY[:3]}...{settings.MISTRAL_API_KEY[-4:]}"
-                    if settings.MISTRAL_API_KEY and len(settings.MISTRAL_API_KEY) > 7
-                    else "r1D...07T4",
+                    "api_key_masked": mask_api_key(settings.MISTRAL_API_KEY)
+                    if settings.MISTRAL_API_KEY
+                    else "r1DvDSpxJv...aMJk07T4",
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
@@ -255,10 +270,9 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "id": "key_cloudflare_primary",
                     "name": "Cloudflare Workers AI Token",
                     "api_key": settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN or "",
-                    "api_key_masked": f"{(settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN)[:3]}...{(settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN)[-4:]}"
+                    "api_key_masked": mask_api_key(settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN)
                     if (settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN)
-                    and len(settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN) > 7
-                    else "cfu...df00",
+                    else "cfut_kXXG7...610cdf00",
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
@@ -476,7 +490,7 @@ class ModelOpsService:
                     # Create initial key if empty but provider has api_key_encrypted
                     if not keys_raw and c.api_key_encrypted:
                         k = c.api_key_encrypted
-                        masked = f"{k[:3]}...{k[-4:]}" if len(k) > 7 else "******"
+                        masked = mask_api_key(k)
                         keys_raw = [
                             {
                                 "id": f"key_{uuid.uuid4().hex[:8]}",
@@ -494,10 +508,15 @@ class ModelOpsService:
                             }
                         ]
 
+                    # Ensure existing keys in pool have clear, longer masked format
+                    for ki in keys_raw:
+                        if ki.get("api_key") and (not ki.get("api_key_masked") or len(ki.get("api_key_masked", "")) <= 12):
+                            ki["api_key_masked"] = mask_api_key(ki["api_key"])
+
                     masked_key = None
                     if c.api_key_encrypted:
                         k = c.api_key_encrypted
-                        masked_key = f"{k[:3]}...{k[-4:]}" if len(k) > 7 else "******"
+                        masked_key = mask_api_key(k)
                     elif keys_raw:
                         masked_key = keys_raw[0].get("api_key_masked")
 
@@ -652,7 +671,7 @@ class ModelOpsService:
         if data.api_key is not None and data.api_key.strip():
             k = data.api_key.strip()
             config.api_key_encrypted = k
-            masked = f"{k[:3]}...{k[-4:]}" if len(k) > 7 else "******"
+            masked = mask_api_key(k)
             keys_pool = extra.get("api_keys", [])
             if keys_pool:
                 keys_pool[0]["api_key"] = k
@@ -683,7 +702,7 @@ class ModelOpsService:
         masked_key = None
         if config.api_key_encrypted:
             k = config.api_key_encrypted
-            masked_key = f"{k[:3]}...{k[-4:]}" if len(k) > 7 else "******"
+            masked_key = mask_api_key(k)
 
         keys_out = extra.get("api_keys", [])
         return {
@@ -762,12 +781,18 @@ class ModelOpsService:
         if config:
             extra = dict(config.extra_config or {})
             keys = extra.get("api_keys", [])
+            for ki in keys:
+                if ki.get("api_key") and (not ki.get("api_key_masked") or len(ki.get("api_key_masked", "")) <= 12):
+                    ki["api_key_masked"] = mask_api_key(ki["api_key"])
             _auto_recover_cooldown(keys)
             return [_sanitize_key_for_output(k) for k in keys]
 
         # Check default providers
         if provider_id in _DEFAULT_PROVIDER_KEYS:
             keys = _DEFAULT_PROVIDER_KEYS[provider_id]
+            for ki in keys:
+                if ki.get("api_key") and (not ki.get("api_key_masked") or len(ki.get("api_key_masked", "")) <= 12):
+                    ki["api_key_masked"] = mask_api_key(ki["api_key"])
             _auto_recover_cooldown(keys)
             return [_sanitize_key_for_output(k) for k in keys]
 
@@ -778,7 +803,7 @@ class ModelOpsService:
     ) -> dict[str, Any]:
         """Add a new API key to the provider's Key Pool."""
         k_str = data.api_key.strip()
-        masked = f"{k_str[:3]}...{k_str[-4:]}" if len(k_str) > 7 else "******"
+        masked = mask_api_key(k_str)
         new_key = {
             "id": f"key_{uuid.uuid4().hex[:8]}",
             "name": data.name,

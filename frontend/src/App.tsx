@@ -251,8 +251,12 @@ function AppContent() {
     }
 
     // 7. Quản Trị Tri Thức & Loại Văn Bản
-    if (currentPath === "/knowledge" || currentPath === "/document-types") {
-      return <KnowledgePage />;
+    if (
+      currentPath === "/knowledge" ||
+      currentPath.startsWith("/knowledge/") ||
+      currentPath === "/document-types"
+    ) {
+      return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
     }
 
     // 8. DAG Canvas Studio & Thư Viện Nodes

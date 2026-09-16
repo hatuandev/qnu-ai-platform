@@ -517,11 +517,21 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     });
   };
 
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+
   const copyToClipboard = (text: string) => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
+
+  const handleCopyKey = (keyId: string, text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKeyId(keyId);
+      setTimeout(() => setCopiedKeyId(null), 2000);
     }
   };
 
@@ -1184,19 +1194,33 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             {/* Key Identity */}
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
                               <span
                                 className="font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-muted border border-border text-foreground"
                                 title="Độ ưu tiên sử dụng"
                               >
                                 #{keyItem.priority}
                               </span>
-                              <span className="font-semibold text-xs text-foreground truncate">
+                              <span className="font-semibold text-xs text-foreground">
                                 {keyItem.name}
                               </span>
-                              <code className="text-xs font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
-                                {keyItem.api_key_masked}
-                              </code>
+                              <div className="flex items-center gap-1.5 bg-muted/60 px-2 py-0.5 rounded border border-border/70">
+                                <code className="text-xs font-mono font-medium text-foreground tracking-wide select-all">
+                                  {keyItem.api_key_masked}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyKey(keyItem.id, keyItem.api_key_masked)}
+                                  className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                                  title="Sao chép mã khóa"
+                                >
+                                  {copiedKeyId === keyItem.id ? (
+                                    <Check className="h-3 w-3 text-success" />
+                                  ) : (
+                                    <Copy className="h-3 w-3" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
 
                             {/* Status Badge & Actions */}

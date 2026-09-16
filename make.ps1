@@ -6,7 +6,7 @@ param (
 )
 
 if ($Command -eq "dev") {
-    Write-Host "Dang khoi chay Backend (Port 8001) va Frontend (Port 3000)..." -ForegroundColor Green
+    Write-Host "Dang khoi chay Backend (Port 8001) va Frontend (Port 3001)..." -ForegroundColor Green
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
 } elseif ($Command -eq "test") {

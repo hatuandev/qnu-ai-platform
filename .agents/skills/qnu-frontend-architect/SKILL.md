@@ -122,15 +122,47 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 ---
 
-## 5. Quản Lý State & Tích Hợp API (TanStack Query v5)
+## 5. Tư Duy UI Mở & Kiến Trúc Master-Detail Deep Routing
+
+### 5.1. Tôn Chỉ "Mở Rộng Không Gian" Thay Vì "Gò Bó Một Trang"
+1. **Chống Anti-pattern "Monolithic Tabbed Page"**:
+   - ❌ **Sai lầm phổ biến**: Gộp tất cả chức năng (Danh sách, Chi tiết, Wizard nạp tệp, Cấu hình sâu, Nhật ký) vào chung 1 file page duy nhất và chia bằng các thẻ `<Tabs>`. Khi người dùng bấm vào một Card/Row, hệ thống chỉ đổi tab hoặc mở một modal popup chật chội.
+   - ✅ **Tư duy UI mở chuẩn mực**: Mỗi đối tượng dữ liệu trọng tâm (Bộ sưu tập Tri thức, Trợ lý AI, Provider, Workflow DAG, Đợt đánh giá TM-08) phải có **Trang Chi Tiết Độc Lập (Dedicated Detail Page)** với URL route riêng, không gian rộng rãi để trình bày đa cột và thao tác chuyên sâu.
+
+2. **Mô Hình Phân Cấp 2 Tầng (Master - Detail Separation)**:
+   - **Tầng 1: Master / List View (Trang Tổng Quan)**:
+     - Tập trung vào: Search bar, Filter badges, Thẻ chỉ số tổng quan (KPIs), và Danh sách Cards hoặc Table trực quan, thoáng đãng.
+     - Click vào bất kỳ Card/Hàng nào: **Bắt buộc chuyển hướng (Navigate) sang Trang Chi Tiết**.
+   - **Tầng 2: Dedicated Detail View (Trang Chi Tiết Chuyên Sâu)**:
+     - URL có path parameter rõ ràng: `/:domain/:id` (ví dụ: `/knowledge/collections/:id`, `/models/:id`, `/assistants/:id`, `/workflows/:id`).
+     - Có thanh **Breadcrumb** phân cấp (`Kho Tri Thức / Tuyển Sinh 2026`) kèm nút quay lại (`ArrowLeft` - Về danh sách).
+     - **Header & Action Toolbar**: Tên đối tượng to rõ, biểu tượng, badge trạng thái, và bộ nút hành động đặc thù (Chỉnh sửa, Xóa, Test kết nối, Bật/Tắt, Đồng bộ).
+     - **Bố cục đa cột (Multi-column Deep Space)**: Tận dụng toàn bộ màn hình (ví dụ 2/3 cho nội dung chính, 1/3 cho thông số/metadata/models).
+
+3. **Quy Tắc Tách Tệp Mã Nguồn Độc Lập**:
+   - Tuyệt đối không viết code trang chi tiết thành khối component phụ hàng nghìn dòng trong cùng file trang danh sách.
+   - Phải tách thành các file trang riêng biệt trong `src/pages/`:
+     - `knowledge-page.tsx` (Danh sách Collections) ➔ `collection-detail-page.tsx` (Chi tiết 1 Collection).
+     - `assistants-page.tsx` (Danh sách Trợ lý) ➔ `assistant-detail-page.tsx` (Chi tiết cấu hình 1 Trợ lý).
+     - `modelops-page.tsx` (Danh sách Providers) ➔ `provider-detail-page.tsx` (Chi tiết cấu hình 1 Provider).
+     - `workflows-page.tsx` (Danh sách Workflows) ➔ `dag-canvas-page.tsx` (Không gian vẽ đồ thị DAG).
+
+4. **Bảo Đảm Deep Linking & URL State**:
+   - Khi người dùng F5 hoặc gửi link cho đồng nghiệp (`http://.../knowledge/collections/coll_123`), hệ thống phải đọc ID từ URL và tự động render trực tiếp trang chi tiết tương ứng, không bị reset về trang chủ.
+
+---
+
+## 6. Quản Lý State & Tích Hợp API (TanStack Query v5)
 
 1. **Query Key Chuẩn Hóa**:
    - Sử dụng mảng phân cấp rõ ràng:
      - `['assistants']` (danh sách)
      - `['assistants', assistantId]` (chi tiết)
      - `['knowledge', 'collections']`
+     - `['knowledge', 'collections', collectionId]` (chi tiết collection)
      - `['knowledge', 'documents', collectionId]`
      - `['modelops', 'providers']`
+     - `['modelops', 'providers', providerId]`
 2. **Cơ Chế Offline Seed Fallback**:
    - Khi Backend chưa bật hoặc ngắt kết nối, `api-client.ts` tự động nạp dữ liệu mẫu chất lượng cao (Seed Data).
    - Component không được sập (`crash`) khi dữ liệu trả về rỗng; luôn hiển thị `EmptyState` hoặc `Skeleton` khi `isLoading`.
@@ -140,7 +172,7 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 ---
 
-## 6. Quy Chuẩn AI UX & Streaming Nâng Cao
+## 7. Quy Chuẩn AI UX & Streaming Nâng Cao
 
 1. **Server-Sent Events (SSE) Streaming qua `useRAGStream`**:
    - Phải xử lý đầy đủ các event types: `token`, `fact`, `citation`, `tool_call`, `error`, `done`.
@@ -157,7 +189,7 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 ---
 
-## 7. Quy Trình Kiểm Thử & Nghiệm Thu Giao Diện Bắt Buộc
+## 8. Quy Trình Kiểm Thử & Nghiệm Thu Giao Diện Bắt Buộc
 
 Mọi thay đổi trên Frontend trước khi kết thúc phiên làm việc bắt buộc phải vượt qua toàn bộ 3 bước kiểm tra:
 

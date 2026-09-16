@@ -82,11 +82,22 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    - Thẻ `<label>` bắt buộc có `htmlFor` hoặc dùng `<span>` / Radix Label.
    - Không gán tùy tiện `role="user"` hay `role="assistant"` trên thẻ HTML.
    - Imports sắp xếp theo alphabet.
-5. **Trải Nghiệm AI Streaming & Anti-Hallucination**:
+5. **Tư Duy UI Mở & Kiến Trúc Điều Hướng Sâu (Master-Detail Deep Routing Pattern)**:
+   - **Tuyệt đối không nhồi nhét "Monolithic Tabbed Page"**: Không gộp toàn bộ tính năng danh sách, chi tiết, chỉnh sửa chuyên sâu và quy trình wizard vào một file trang duy nhất bằng các thẻ Tab gò bó hay Dialog chật hẹp.
+   - **Quy chuẩn 1 Domain = List Page + Dedicated Detail Pages**:
+     - *Trang Danh Sách (Master/List View)*: Tập trung vào tổng quan thực thể (Kho tri thức, Trợ lý AI, Provider, Workflows), bộ lọc tìm kiếm, chỉ số KPI và danh sách Card/Bảng tối giản, thoáng đãng.
+     - *Trang Chi Tiết Độc Lập (Dedicated Detail View)*: Khi người dùng click vào bất kỳ Card/Hàng bảng nào, **BẮT BUỘC PHẢI chuyển hướng sang trang chi tiết riêng biệt** với URL phân cấp rõ ràng (ví dụ: `/knowledge/collections/:id`, `/assistants/:id`, `/models/:id`, `/workflows/:id`).
+     - *Tách File Độc Lập*: Trang chi tiết phải là một component/file riêng (ví dụ `collection-detail-page.tsx`, `assistant-detail-page.tsx`), không viết chung thành khối nghìn dòng trong trang danh sách.
+   - **Tiêu chuẩn bắt buộc trên Trang Chi Tiết**:
+     - *Thanh điều hướng quay lại & Breadcrumb*: Có nút quay lại (`ArrowLeft`) và breadcrumb phân cấp rõ ràng (`Kho Tri Thức / [Tên Bộ Sưu Tập]`).
+     - *Header & Action Toolbar*: Tên đối tượng, huy hiệu trạng thái và các nút thao tác đặc thù (Chỉnh sửa, Xóa, Đồng bộ, Test,...).
+     - *Không gian hiển thị sâu*: Tận dụng toàn bộ màn hình để bố trí 2-3 cột dữ liệu sâu (tài liệu con, chunks, vector embedding, facts số hóa, lịch sử hoạt động) mà không bị gò bó.
+     - *Deep Linking*: Người dùng có thể F5, bookmark hoặc chia sẻ URL trực tiếp tới đúng đối tượng.
+6. **Trải Nghiệm AI Streaming & Anti-Hallucination**:
    - Kết nối SSE qua `useRAGStream` hiển thị token mượt mà, kèm hiệu ứng *Thinking Indicator*.
    - Khối cuộn `MessageScroller` có cơ chế tự động ghim đáy và tạm dừng thông minh khi người dùng cuộn lên đọc lại tài liệu cũ.
    - Mọi câu trả lời có dữ liệu RAG phải hiển thị nhãn trích dẫn dẫn tới `CitationSheet` đối soát văn bản gốc.
-6. **Bảo Đảm Kiểm Thử Frontend 100%**: Mọi thay đổi mã nguồn Frontend trước khi hoàn tất phải pass toàn bộ kiểm tra:
+7. **Bảo Đảm Kiểm Thử Frontend 100%**: Mọi thay đổi mã nguồn Frontend trước khi hoàn tất phải pass toàn bộ kiểm tra:
    ```bash
    npm run lint       # Biome check 0 lỗi
    npm run typecheck  # TypeScript tsc --noEmit 0 lỗi
@@ -107,6 +118,7 @@ Agent có thể kích hoạt và tuân thủ các hướng dẫn chuyên sâu t�
 | **`qnu-rag-pipeline`** | [`.agents/skills/qnu-rag-pipeline/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-rag-pipeline/SKILL.md) | Qdrant Dense, PostgreSQL FTS, RRF k=60, Cross-Encoder Reranking, Facts |
 | **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng (PyMuPDF, Docling, EasyOCR), Chunking |
 | **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Dynamic Fallback, Quota |
+| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Dead Code/Any, Guard Clauses, SRP |
 
 ---
 
@@ -179,3 +191,77 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - ❌ Bắt đầu phiên mà chưa đọc `PROJECT_CONTEXT.md`
 - ❌ Kết thúc phiên mà chưa cập nhật `PROJECT_CONTEXT.md` và tạo snapshot
 - ❌ Xóa các file snapshot cũ trong `docs/memory/snapshots/`
+
+---
+
+## 8. Quy Chuẩn Clean Code Bắt Buộc Khi Vibe Coding (Vibe Coding Clean Code Standards)
+
+"Vibe Coding" là phong cách lập trình tốc độ cao dựa trên trí tuệ nhân tạo, nhưng **tuyệt đối không được đánh đổi chất lượng mã nguồn lấy tốc độ**. Mọi AI Agent tham gia dự án QNU AI Platform phải tuân thủ nghiêm ngặt 8 điều răn Clean Code sau:
+
+### 8.1. Quy Tắc Hướng Đạo Sinh (The Boy Scout Rule)
+> *"Luôn để codebase sạch hơn lúc bạn tìm thấy nó."*
+- Khi mở bất kỳ file nào để sửa lỗi hoặc thêm tính năng, Agent **phải tự động dọn dẹp**: xóa bỏ các `import` không dùng, loại bỏ các biến chết (dead variables), và sửa các cảnh báo linter tiềm ẩn trong file đó.
+- Không để lại "rác kỹ thuật" (technical debt) với lý do "đó là code của người trước viết".
+
+### 8.2. Triệt Tiêu Mã Chết & Rác Debug (Zero Dead Code & Zero Debug Junk)
+- **Cấm tuyệt đối comment-out code cũ**: Không bao giờ để lại các khối lệnh bị comment `// const oldData = ...` hay `# def old_method():`. Nếu code không còn dùng, **XÓA THẲNG TAY** — Git lưu lại toàn bộ lịch sử.
+- **Cấm để lại rác debug**: Tuyệt đối dọn sạch toàn bộ `console.log(...)`, `console.debug(...)`, `print(...)` debug tạm thời trước khi kết thúc turn. Chỉ giữ lại các structured log (`logger.info`, `logger.error`) có cấu trúc chuẩn.
+- **Không dùng placeholder cẩu thả**: Cấm để lại `// TODO: implement later`, `pass` trống rỗng hay mock giả tạm bợ mà không có fallback an toàn hoặc logic xử lý hoàn chỉnh.
+
+### 8.3. An Toàn Kiểu Dữ Liệu Tuyệt Đối (Type Safety & Zero `any`)
+- **Frontend (TypeScript)**:
+  - Cấm sử dụng kiểu `any` hoặc ép kiểu mù quáng `as any` để qua mặt compiler.
+  - Luôn định nghĩa explicit interfaces / types cho Component Props, API DTOs, và State.
+  - Sử dụng Generic Types và Discriminated Unions khi làm việc với dữ liệu đa hình.
+- **Backend (Python)**:
+  - 100% hàm phải có Type Hints đầy đủ (`def foo(x: int) -> str:`).
+  - Sử dụng Pydantic v2 Models (`BaseModel`) cho toàn bộ request/response DTOs, cấm dùng `dict` không định hình.
+
+### 8.4. Đặt Tên Tự Giải Thích (Self-Documenting Naming)
+- Tên biến, hàm, component phải nói lên chính xác mục đích và nghiệp vụ ĐH Quy Nhơn:
+  - **Boolean**: Bắt buộc bắt đầu bằng tiền tố: `is...`, `has...`, `should...`, `can...` (ví dụ: `isUploading`, `hasPermission`, `shouldFallback`).
+  - **Functions / Methods**: Bắt đầu bằng động từ hành động rõ ràng (`fetchDocuments`, `handleFileSelect`, `calculateElapsedMs`, `formatFactTable`).
+  - **Constants**: Viết hoa phân tách bằng gạch dưới (`UPPER_SNAKE_CASE`, ví dụ `MAX_CHUNK_SIZE`, `DEFAULT_RETRY_ATTEMPTS`).
+  - **Cấm viết tắt vô nghĩa**: Tuyệt đối không đặt tên kiểu `d`, `temp`, `res1`, `item2`, `val`, `x`, `arr`.
+
+### 8.5. Đơn Trách Nhiệm & Hàm Nhỏ Gọn (Single Responsibility & Small Functions)
+- Mỗi hàm hoặc component chỉ giải quyết **MỘT** nhiệm vụ duy nhất và làm thật tốt nhiệm vụ đó.
+- Hàm không nên dài quá 40 dòng. Nếu một hàm vượt quá phạm vi đó, hãy tách thành các private helper functions hoặc pure utilities.
+- Trong React: Không nhồi logic tính toán, parsing chuỗi hoặc format dữ liệu phức tạp vào thân JSX. Hãy tách ra `useMemo`, custom hooks hoặc utility functions riêng ngoài render scope.
+
+### 8.6. Mẫu Trả Về Sớm (Early Return / Guard Clauses Pattern)
+- Luôn kiểm tra điều kiện biên, lỗi đầu vào và `return` sớm nhất có thể (Fail-Fast):
+  ```typescript
+  // ❌ Xấu (Pyramid of Doom - Lồng ghép sâu):
+  if (user) {
+    if (user.isActive) {
+      if (hasPermission) {
+        doAction();
+      }
+    }
+  }
+
+  // ✅ Đẹp (Early Return / Guard Clauses):
+  if (!user || !user.isActive || !hasPermission) return;
+  doAction();
+  ```
+
+### 8.7. Không Nuốt Lỗi Âm Thầm (No Swallowed Exceptions)
+- Tuyệt đối cấm khối lệnh rỗng: `catch (e) {}` hay `except Exception: pass` nuốt trôi lỗi mà không có bất kỳ phản hồi nào.
+- Mọi khối bắt lỗi phải:
+  1. Ghi log có ngữ cảnh (`logger.warning` / `logger.error` kèm lý do), HOẶC
+  2. Kích hoạt graceful fallback an toàn (trả mock data, chuyển hướng sang provider dự phòng), HOẶC
+  3. Hiển thị thông báo thân thiện (Toast / Alert) để người dùng nắm được nguyên nhân sự cố.
+
+### 8.8. Vòng Lặp Tự Làm Sạch Tự Động (Clean-As-You-Go Loop)
+- Trước khi kết thúc bất kỳ lượt xử lý (turn) nào hoặc bàn giao code cho người dùng, Agent **BẮT BUỘC** phải tự chạy kiểm tra tĩnh và format:
+  ```bash
+  # Frontend:
+  npm run lint       # Biome tự động rà soát & format
+  npm run typecheck  # TypeScript kiểm tra 0 lỗi type
+
+  # Backend:
+  uv run ruff check .  # Ruff kiểm tra & dọn imports
+  ```
+- **Không bao giờ bàn giao code khi còn bất kỳ lỗi lint hay typecheck nào!**
+
