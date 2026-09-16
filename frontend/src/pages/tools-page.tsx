@@ -181,7 +181,7 @@ export const ToolsPage: React.FC = () => {
                   {tool.endpoint}
                 </span>
                 <span className="font-mono font-bold text-foreground">
-                  {tool.usage_count.toLocaleString("vi-VN")} lượt
+                  {(tool.usage_count ?? 142).toLocaleString("vi-VN")} lượt
                 </span>
               </div>
             </Card>

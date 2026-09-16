@@ -138,12 +138,12 @@ export const NAVIGATION_CONFIG: NavSection[] = [
     items: [
       {
         id: "models",
-        title: "Mô Hình & Providers",
+        title: "Quản Lý Provider",
         path: "/models",
         icon: Cpu,
-        badge: "Circuit Breaker",
+        badge: "Providers",
         badgeVariant: "default",
-        description: "OpenAI, Gemini, Local vLLM/Ollama, Quota tháng và phục hồi sự cố",
+        description: "OpenAI, Gemini, Claude, Local vLLM/Ollama, DeepSeek và cấu hình mô hình",
       },
       {
         id: "developer",

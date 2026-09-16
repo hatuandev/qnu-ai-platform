@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * Suite 01: Navigation, Breadcrumbs, Theme Toggle & Smoke Verification.
@@ -51,7 +51,9 @@ test.describe("01. Navigation & Smoke Tests", () => {
     expect(criticalErrors).toEqual([]);
   });
 
-  test("TC-NAV-02: Theme toggle switches between Dark and Light mode properly", async ({ page }) => {
+  test("TC-NAV-02: Theme toggle switches between Dark and Light mode properly", async ({
+    page,
+  }) => {
     await page.goto("/");
     await page.waitForLoadState("domcontentloaded");
 

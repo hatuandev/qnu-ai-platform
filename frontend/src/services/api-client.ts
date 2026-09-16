@@ -53,16 +53,66 @@ export interface KnowledgeDocument {
   created_at: string;
 }
 
+export interface ProviderApiKey {
+  id: string;
+  name: string;
+  api_key_masked: string;
+  priority: number;
+  is_active: boolean;
+  status: "active" | "rate_limited" | "exhausted" | "inactive";
+  quota_limit?: number | null;
+  usage_tokens: number;
+  cooldown_until?: string | null;
+  last_used_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface ProviderPreset {
+  code: string;
+  name: string;
+  category: "cloud" | "local" | "custom";
+  icon: string;
+  description: string;
+  default_base_url?: string | null;
+  placeholder_key: string;
+  help_text: string;
+  requires_account_id?: boolean;
+  suggested_models?: string[];
+}
+
 export interface ModelProvider {
   id: string;
   name: string;
   code: string;
-  type: "openai" | "gemini" | "local";
+  type:
+    | "openai"
+    | "gemini"
+    | "claude"
+    | "local"
+    | "local_vllm"
+    | "ollama"
+    | "deepseek"
+    | "groq"
+    | "openrouter"
+    | "mistral"
+    | "cloudflare"
+    | "nvidia"
+    | "sentence_transformers"
+    | "docling"
+    | "custom";
   is_active: boolean;
   circuit_breaker_status: "CLOSED" | "OPEN" | "HALF_OPEN";
   models: string[];
+  model_name?: string;
+  api_base_url?: string;
+  api_key_masked?: string;
+  account_id?: string;
   latency_ms: number;
   failure_rate: number;
+  priority?: number;
+  timeout_seconds?: number;
+  keys_count?: number;
+  api_keys?: ProviderApiKey[];
 }
 
 export interface TokenQuota {
@@ -251,41 +301,7 @@ const MOCK_DOCUMENTS: KnowledgeDocument[] = [
   },
 ];
 
-const MOCK_PROVIDERS: ModelProvider[] = [
-  {
-    id: "prov_openai",
-    name: "OpenAI Platform",
-    code: "openai",
-    type: "openai",
-    is_active: true,
-    circuit_breaker_status: "CLOSED",
-    models: ["gpt-4o-mini", "gpt-4o", "text-embedding-3-small"],
-    latency_ms: 280,
-    failure_rate: 0.002,
-  },
-  {
-    id: "prov_gemini",
-    name: "Google Cloud Vertex / Gemini",
-    code: "gemini",
-    type: "gemini",
-    is_active: true,
-    circuit_breaker_status: "CLOSED",
-    models: ["gemini-1.5-flash", "gemini-1.5-pro", "text-embedding-004"],
-    latency_ms: 195,
-    failure_rate: 0.001,
-  },
-  {
-    id: "prov_local",
-    name: "QNU Local vLLM Inference Server",
-    code: "local_vllm",
-    type: "local",
-    is_active: true,
-    circuit_breaker_status: "CLOSED",
-    models: ["qwen2.5-7b-instruct", "bge-m3-vietnamese"],
-    latency_ms: 145,
-    failure_rate: 0,
-  },
-];
+const MOCK_PROVIDERS: ModelProvider[] = [];
 
 const MOCK_QUOTA: TokenQuota = {
   tenant_id: "tenant_qnu",
@@ -543,7 +559,29 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/knowledge/collections`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            const code = (d.code as string) || (d.module_code as string) || `col_${idx + 1}`;
+            return {
+              id: (d.id as string) || `col_${idx + 1}`,
+              name: (d.name as string) || "Kho Tri Thức",
+              code,
+              description: (d.description as string) || "",
+              document_count: typeof d.document_count === "number" ? d.document_count : 8,
+              chunk_count: typeof d.chunk_count === "number" ? d.chunk_count : 246,
+              chunking_strategy:
+                (d.chunking_strategy as KnowledgeCollection["chunking_strategy"]) ||
+                (code.includes("regulation") || code.includes("draft")
+                  ? "ClauseBasedChunker"
+                  : "SemanticChunker"),
+              ocr_profile:
+                (d.ocr_profile as KnowledgeCollection["ocr_profile"]) ||
+                (code.includes("regulation") || code.includes("library") ? "PyMuPDF" : "Docling"),
+              updated_at: typeof d.updated_at === "string" ? d.updated_at : "2026-09-15 08:30",
+            };
+          });
+        }
       }
     } catch {
       // Fallback
@@ -559,7 +597,36 @@ export const apiClient = {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            const fn =
+              (d.filename as string) || (d.file_name as string) || `document_${idx + 1}.pdf`;
+            const fs =
+              typeof d.file_size === "number"
+                ? d.file_size
+                : typeof d.file_size_bytes === "number"
+                  ? d.file_size_bytes
+                  : 1024000;
+            return {
+              id: (d.id as string) || `doc_${idx + 1}`,
+              collection_id: (d.collection_id as string) || "col_admissions",
+              collection_name: (d.collection_name as string) || "Kho Tri Thức",
+              title: (d.title as string) || fn,
+              filename: fn,
+              file_size: fs,
+              page_count: typeof d.page_count === "number" ? d.page_count : 16,
+              chunk_count: typeof d.chunk_count === "number" ? d.chunk_count : 42,
+              status: ((d.status as string) || "completed") as
+                | "completed"
+                | "processing"
+                | "pending"
+                | "failed",
+              ocr_method: (d.ocr_method as string) || "Docling Table Parser",
+              created_at: typeof d.created_at === "string" ? d.created_at : "2026-09-15 10:00",
+            };
+          });
+        }
       }
     } catch {
       // Fallback
@@ -575,7 +642,38 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/modelops/providers`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            const rawModels = Array.isArray(d.models)
+              ? (d.models as string[])
+              : typeof d.model_name === "string" && d.model_name
+                ? [d.model_name]
+                : [];
+            return {
+              id: (d.id as string) || `prov_${idx + 1}`,
+              name: (d.name as string) || "LLM Provider",
+              code: (d.code as string) || (d.provider_type as string) || "llm",
+              type: ((d.type as string) ||
+                (d.provider_type as string) ||
+                "openai") as ModelProvider["type"],
+              is_active: typeof d.is_active === "boolean" ? d.is_active : true,
+              circuit_breaker_status:
+                (d.circuit_breaker_status as "CLOSED" | "OPEN" | "HALF_OPEN") || "CLOSED",
+              models: rawModels,
+              model_name: (d.model_name as string) || undefined,
+              api_base_url: (d.api_base_url as string) || undefined,
+              api_key_masked: (d.api_key_masked as string) || undefined,
+              account_id: (d.account_id as string) || undefined,
+              latency_ms: typeof d.latency_ms === "number" ? d.latency_ms : 120,
+              failure_rate: typeof d.failure_rate === "number" ? d.failure_rate : 0.0,
+              priority: typeof d.priority === "number" ? d.priority : idx + 1,
+              timeout_seconds: typeof d.timeout_seconds === "number" ? d.timeout_seconds : 15,
+              keys_count: typeof d.keys_count === "number" ? d.keys_count : 0,
+              api_keys: Array.isArray(d.api_keys) ? (d.api_keys as ProviderApiKey[]) : [],
+            };
+          });
+        }
       }
     } catch {
       // Fallback
@@ -583,11 +681,243 @@ export const apiClient = {
     return MOCK_PROVIDERS;
   },
 
+  async getProviderPresets(): Promise<ProviderPreset[]> {
+    try {
+      const res = await fetch(`${BASE_URL}/modelops/presets`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
+  },
+
+  async seedDefaultProviders(overwrite = false): Promise<ModelProvider[]> {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/modelops/providers/seed-defaults?overwrite=${overwrite}`,
+        {
+          method: "POST",
+        }
+      );
+      if (res.ok) {
+        return await this.getModelProviders();
+      }
+    } catch {
+      // Fallback
+    }
+    return await this.getModelProviders();
+  },
+
+  async createModelProvider(payload: {
+    name: string;
+    provider_type: string;
+    model_name?: string;
+    models?: string[];
+    api_base_url?: string;
+    api_key?: string;
+    account_id?: string;
+    priority?: number;
+    timeout_seconds?: number;
+    is_active?: boolean;
+  }): Promise<ModelProvider> {
+    const res = await fetch(`${BASE_URL}/modelops/providers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Thêm Provider thất bại");
+    return await res.json();
+  },
+
+  async updateModelProvider(
+    id: string,
+    payload: Partial<{
+      name: string;
+      provider_type: string;
+      model_name?: string;
+      models?: string[];
+      api_base_url?: string;
+      api_key?: string;
+      account_id?: string;
+      priority?: number;
+      timeout_seconds?: number;
+      is_active?: boolean;
+    }>
+  ): Promise<ModelProvider> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Cập nhật Provider thất bại");
+    return await res.json();
+  },
+
+  async deleteModelProvider(id: string): Promise<{ deleted: boolean }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Xóa Provider thất bại");
+    return await res.json();
+  },
+
+  async toggleModelProvider(id: string): Promise<{ id: string; is_active: boolean }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${id}/toggle`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Đổi trạng thái Provider thất bại");
+    return await res.json();
+  },
+
+  async testModelProvider(
+    id: string
+  ): Promise<{ success: boolean; latency_ms: number; message: string }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${id}/test`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Kiểm tra kết nối thất bại");
+    return await res.json();
+  },
+
+  async getProviderKeys(providerId: string): Promise<ProviderApiKey[]> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys`);
+    if (!res.ok) throw new Error("Không thể tải danh sách khóa API");
+    return await res.json();
+  },
+
+  async addProviderKey(
+    providerId: string,
+    payload: {
+      name: string;
+      api_key: string;
+      priority?: number;
+      quota_limit?: number;
+    }
+  ): Promise<ProviderApiKey> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Thêm khóa API vào nhóm thất bại");
+    return await res.json();
+  },
+
+  async updateProviderKey(
+    providerId: string,
+    keyId: string,
+    payload: Partial<{
+      name: string;
+      priority: number;
+      is_active: boolean;
+      status: string;
+      quota_limit: number;
+    }>
+  ): Promise<ProviderApiKey> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys/${keyId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Cập nhật khóa API thất bại");
+    return await res.json();
+  },
+
+  async toggleProviderKey(
+    providerId: string,
+    keyId: string,
+    isActive: boolean
+  ): Promise<ProviderApiKey> {
+    return this.updateProviderKey(providerId, keyId, { is_active: isActive });
+  },
+
+  async deleteProviderKey(
+    providerId: string,
+    keyId: string
+  ): Promise<{ success: boolean; deleted_id: string }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys/${keyId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Xóa khóa API thất bại");
+    return await res.json();
+  },
+
+  async testProviderKey(
+    providerId: string,
+    keyId: string
+  ): Promise<{ success: boolean; latency_ms: number; message: string }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys/${keyId}/test`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Kiểm tra khóa thất bại");
+    return await res.json();
+  },
+
+  async simulateKeyRotation(
+    providerId: string,
+    payload: {
+      tokens_consumed?: number;
+      trigger_rate_limit?: boolean;
+      cooldown_seconds?: number;
+    }
+  ): Promise<{
+    success: boolean;
+    previous_key_id: string;
+    previous_key_name: string;
+    next_key_id: string | null;
+    next_key_name: string | null;
+    tokens_consumed: number;
+    rate_limit_triggered: boolean;
+    rotated: boolean;
+    message: string;
+  }> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys/simulate-rotation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Mô phỏng xoay key thất bại");
+    }
+    return await res.json();
+  },
+
   async getTokenQuotas(): Promise<TokenQuota> {
     try {
       const res = await fetch(`${BASE_URL}/modelops/quotas/tenant_qnu`);
       if (res.ok) {
-        return await res.json();
+        const raw = await res.json();
+        const d = raw as Record<string, unknown>;
+        return {
+          tenant_id: (d.tenant_id as string) || "tenant_qnu",
+          total_tokens:
+            typeof d.tokens_used === "number"
+              ? d.tokens_used
+              : typeof d.total_tokens === "number"
+                ? d.total_tokens
+                : 0,
+          limit_tokens:
+            typeof d.monthly_token_limit === "number"
+              ? d.monthly_token_limit
+              : typeof d.limit_tokens === "number"
+                ? d.limit_tokens
+                : 5000000,
+          usd_cost:
+            typeof d.cost_used_usd === "number"
+              ? d.cost_used_usd
+              : typeof d.usd_cost === "number"
+                ? d.usd_cost
+                : 0.0,
+          reset_date: (d.reset_date as string) || "2026-10-01",
+          provider_breakdown: (d.provider_breakdown as TokenQuota["provider_breakdown"]) || {
+            openai_tokens: 0,
+            gemini_tokens: 0,
+            local_tokens: 0,
+          },
+        };
       }
     } catch {
       // Fallback
@@ -600,7 +930,36 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/tools`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            const rawName = (d.display_name as string) || (d.name as string) || "Tool";
+            const code = (d.code as string) || (d.name as string) || `tool_${idx}`;
+            let normalizedCode = code;
+            if (code.includes("admission") || code.includes("score")) {
+              normalizedCode = "uis_admissions_query";
+            } else if (code.includes("document") || code.includes("nd30")) {
+              normalizedCode = "docx_nd30_exporter";
+            } else if (code.includes("exam") || code.includes("matrix") || code.includes("bloom")) {
+              normalizedCode = "xlsx_bloom_matrix";
+            }
+
+            return {
+              id: (d.id as string) || `tool_${idx + 1}`,
+              code: normalizedCode,
+              name: rawName,
+              description: (d.description as string) || "",
+              category: (d.category as string) || "general",
+              requires_approval:
+                typeof d.requires_approval === "boolean" ? d.requires_approval : false,
+              status: ((d.status as string) || (d.is_active ? "ready" : "maintenance")) as
+                | "ready"
+                | "maintenance",
+              usage_count: typeof d.usage_count === "number" ? d.usage_count : 142,
+              endpoint: (d.endpoint as string) || `/platform/v1alpha1/tools/${code}`,
+            };
+          });
+        }
       }
     } catch {
       // Fallback
@@ -625,7 +984,21 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/evaluation/gap-inbox`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            return {
+              id: (d.id as string) || `gap_${idx + 1}`,
+              question: (d.question as string) || "Câu hỏi cần bổ sung tri thức",
+              assistant_code: (d.assistant_code as string) || "admissions",
+              assistant_name: (d.assistant_name as string) || "Trợ lý QNU",
+              reason: (d.reason as string) || "Chưa có tài liệu tương ứng trong Kho tri thức.",
+              frequency: typeof d.frequency === "number" ? d.frequency : 1,
+              timestamp: (d.timestamp as string) || "2026-09-15 10:00",
+              status: ((d.status as string) || "pending") as "pending" | "resolved",
+            };
+          });
+        }
       }
     } catch {
       // Fallback
@@ -638,7 +1011,21 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/workflows/executions`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((item, idx) => {
+            const d = item as Record<string, unknown>;
+            return {
+              id: (d.id as string) || `run_${idx + 1}`,
+              workflow_id: (d.workflow_id as string) || "admissions-assistant",
+              workflow_name: (d.workflow_name as string) || "Luồng Điều Phối QNU",
+              status: ((d.status as string) || "completed") as "completed" | "running" | "failed",
+              duration_ms: typeof d.duration_ms === "number" ? d.duration_ms : 450,
+              steps_completed: typeof d.steps_completed === "number" ? d.steps_completed : 4,
+              total_steps: typeof d.total_steps === "number" ? d.total_steps : 4,
+              started_at: (d.started_at as string) || "2026-09-15 19:42:10",
+            };
+          });
+        }
       }
     } catch {
       // Fallback

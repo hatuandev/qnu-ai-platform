@@ -50,3 +50,14 @@ async def get_workflow_definition(
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowDagSpec:
     return await workflow_service.get_workflow_spec(db, workflow_id)
+
+
+@router.get(
+    "/executions",
+    summary="Lịch sử các phiên thực thi luồng DAG (Audit Execution Trails)",
+)
+async def list_executions(
+    db: AsyncSession = Depends(get_db),
+):
+    return await workflow_service.list_executions(db)
+

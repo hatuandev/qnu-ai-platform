@@ -27,7 +27,7 @@ class ModelProviderConfig(Base):
     provider_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
     )  # openai, gemini, local_vllm
-    model_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     api_base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     api_key_encrypted: Mapped[str | None] = mapped_column(String(500), nullable=True)
     priority: Mapped[int] = mapped_column(Integer, default=1, index=True)  # 1 = primary, 2 = secondary

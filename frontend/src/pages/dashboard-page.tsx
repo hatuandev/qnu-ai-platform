@@ -59,9 +59,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     queryFn: () => apiClient.getAssistants(),
   });
 
-  const totalTokensFormatted = quota?.total_tokens.toLocaleString("vi-VN") || "1,458,200";
-  const costFormatted = quota ? `$${quota.usd_cost.toFixed(4)}` : "$0.4374";
-  const faithfulnessScore = evaluation ? `${(evaluation.faithfulness * 100).toFixed(1)}%` : "94.2%";
+  const totalTokensFormatted = (quota?.total_tokens ?? 1458200).toLocaleString("vi-VN");
+  const costFormatted = `$${(quota?.usd_cost ?? 0.4374).toFixed(4)}`;
+  const faithfulnessScore = `${((evaluation?.faithfulness ?? 0.942) * 100).toFixed(1)}%`;
   const totalCollectionsCount = collections?.length || 5;
 
   const getAssistantIcon = (code: string) => {

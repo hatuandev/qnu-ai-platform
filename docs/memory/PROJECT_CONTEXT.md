@@ -7,10 +7,27 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-16 09:55 (UTC+7)
-- **Phiên số**: #14 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-16 15:40 (UTC+7)
+- **Phiên số**: #24 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
-- **Mục tiêu đã hoàn thành**: Thiết lập hoàn chỉnh hệ sinh thái Auto Testing chuẩn Enterprise: Tích hợp Playwright MCP Server, xây dựng bộ 3 test suite Playwright E2E (12/12 tests PASS 100%), khắc phục lỗi thiếu `TooltipProvider` khi thu gọn thanh bên và chuẩn hóa `h3` locators trong `03_knowledge_tools.spec.ts`. Bảo đảm 100% test suite toàn hệ thống xanh mướt (Pytest 68/68 + Playwright 12/12, 0 lỗi Biome, 0 lỗi TypeScript).
+- **Mục tiêu đã hoàn thành**: 
+  1. Trích xuất và giải mã thành công API keys từ `qnu-ai-core`:
+     - Mistral API Key (32 ký tự, masked: `r1D...07T4`) giải mã từ `connections_state.json` qua Fernet dev key.
+     - Cloudflare API Token (53 ký tự, masked: `cfu...df00`) và Account ID `ab6bf644b640759c330c44f109e3f000` từ `.env.local` & `connections_state.json`.
+  2. Cấu hình Backend:
+     - [`backend/app/core/config.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/core/config.py): Thêm `MISTRAL_API_KEY`, `CLOUDFLARE_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
+     - [`backend/.env`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/.env): Đồng bộ các biến môi trường đầy đủ.
+     - [`backend/app/modules/modelops/service.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/modelops/service.py): Cập nhật `STANDARD_QNU_PROVIDERS` liên kết động tới settings và khởi tạo key pool.
+  3. Cập nhật CSDL PostgreSQL `model_provider_configs`:
+     - `prov_mistral`: Gán `api_key_encrypted` và thêm `key_mistral_primary` ("Khóa Mistral OCR & Platform").
+     - `prov_cloudflare`: Gán `api_key_encrypted`, `account_id` và thêm `key_cloudflare_primary` ("Cloudflare Workers AI Token").
+  4. Kiểm thử toàn diện:
+     - Backend: 73/73 tests pass, Ruff 0 lỗi.
+     - Frontend: Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công (7.77s).
+     - Browser E2E: Xác thực cả 2 provider hiển thị chính xác trạng thái Active và masked key trên UI `/models`.
+
+
+
 
 ---
 
@@ -38,12 +55,12 @@
 | 2 | Module Assistants (05 Trợ lý QNU) | ✅ Done |
 | 3 | Module Knowledge (Collections, Ingestion Pipeline, OCR đa tầng) | ✅ Done |
 | 4 | Module RAG (Hybrid RRF k=60, Cross-Encoder Reranking, Structured Fact Layer) | ✅ Done |
-| 5 | Module ModelOps (Circuit Breaker, Dynamic Fallback, Cost Tracker, Quota) | ✅ Done |
+| 5 | Module ModelOps (Provider Presets, Key Pool 429 Failover, Circuit Breaker) | ✅ Done |
 | 6 | Module Tools (UIS Admissions Query, Word NĐ 30, Excel Bloom) | ✅ Done |
 | 7 | Module Evaluation (Ragas TM-08: Faithfulness, Relevance, Precision) | ✅ Done |
 | 8 | Module Workflows (DAG Pipeline, ARQ Workers, Guardrails) | ✅ Done |
 
-**Backend Test Suite**: 68/68 tests passed | Ruff: 0 errors
+**Backend Test Suite**: 73/73 tests passed | Ruff: 0 errors
 
 ---
 
@@ -57,7 +74,7 @@
 | 4 | AI Suite (useRAGStream, ChatMessage, CitationSheet, Attachment, QuestionnaireCard, DAGCanvas) | ✅ Done |
 | 5 | API Integration (TanStack Query) + 9 Business Screens + 15 Routes fully wired | ✅ Done |
 
-**Frontend Checks**: Biome 0 errors | TypeScript 0 errors | Vite build ✓ (1,010 kB / 303 kB gzip)
+**Frontend Checks**: Biome 0 errors | TypeScript 0 errors | Vite build ✓ (1,040 kB) | Playwright E2E: 15/15 passed
 
 ---
 

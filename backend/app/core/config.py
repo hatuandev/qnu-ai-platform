@@ -45,7 +45,7 @@ class Settings(BaseSettings):
         return ["*"]
 
     # --- PostgreSQL 16 ---
-    DATABASE_URL: str = "postgresql+asyncpg://qnu:qnu_password@localhost:5432/qnu_ai_platform"
+    DATABASE_URL: str = "postgresql+asyncpg://qnu:qnu_password_secure_2026@localhost:5432/qnu_ai_platform"
     DB_POOL_SIZE: int = 15
     DB_MAX_OVERFLOW: int = 10
     DB_TIMEOUT_SECONDS: float = 30.0
@@ -60,13 +60,13 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # --- Storage Abstraction ---
-    STORAGE_DRIVER: str = "local"  # 'local' hoặc 's3'
+    STORAGE_DRIVER: str = "s3"  # 's3' (MinIO S3 Object Storage) hoặc 'local'
     LOCAL_STORAGE_PATH: str = "./storage"
 
     # S3 / MinIO Settings
     S3_ENDPOINT: str = "http://localhost:9000"
-    S3_ACCESS_KEY: str = "qnu"
-    S3_SECRET_KEY: str = "qnu_password"
+    S3_ACCESS_KEY: str = "qnu_minio_admin"
+    S3_SECRET_KEY: str = "qnu_minio_secret_2026"
     S3_BUCKET: str = "qnu-ai-documents"
     S3_SECURE: bool = False
     S3_REGION: str = "us-east-1"
@@ -89,6 +89,12 @@ class Settings(BaseSettings):
 
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+
+    # --- Mistral & Cloudflare ---
+    MISTRAL_API_KEY: str | None = None
+    CLOUDFLARE_API_KEY: str | None = None
+    CLOUDFLARE_API_TOKEN: str | None = None
+    CLOUDFLARE_ACCOUNT_ID: str | None = None
 
     LOCAL_LLM_ENABLED: bool = False
     LOCAL_LLM_BASE_URL: str | None = None

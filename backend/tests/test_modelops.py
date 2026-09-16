@@ -11,8 +11,10 @@ from app.main import app
 from app.modules.modelops.circuit_breaker import CircuitBreaker, CircuitBreakerState
 from app.modules.modelops.models import TenantQuota
 from app.modules.modelops.providers import (
+    CloudflareAdapter,
     GeminiAdapter,
     LocalVLLMAdapter,
+    MistralAdapter,
     OpenAIAdapter,
     get_llm_adapter,
 )
@@ -66,6 +68,17 @@ def test_llm_adapter_factory():
     assert isinstance(adapter_local, LocalVLLMAdapter)
     assert adapter_local.provider_type == "local_vllm"
 
+    adapter_mistral = get_llm_adapter("mistral", "mistral-large-latest", api_key="mock")
+    assert isinstance(adapter_mistral, MistralAdapter)
+    assert adapter_mistral.provider_type == "mistral"
+
+    adapter_cloudflare = get_llm_adapter(
+        "cloudflare", "@cf/meta/llama-3.3-70b-instruct", api_key="mock", account_id="acc-qnu-test"
+    )
+    assert isinstance(adapter_cloudflare, CloudflareAdapter)
+    assert adapter_cloudflare.provider_type == "cloudflare"
+    assert adapter_cloudflare.account_id == "acc-qnu-test"
+
 
 @pytest.mark.asyncio
 async def test_openai_adapter_mock_generation():
@@ -79,6 +92,37 @@ async def test_openai_adapter_mock_generation():
     assert resp.model == "gpt-4o-mini"
     assert len(resp.content) > 0
     assert resp.total_tokens > 0
+
+
+@pytest.mark.asyncio
+async def test_mistral_adapter_mock_generation():
+    """Verify Mistral AI adapter returns valid LLMResponse in mock mode."""
+    adapter = MistralAdapter(model_name="mistral-large-latest", api_key="mock")
+    messages = [
+        ChatMessage(role="user", content="Hãy giới thiệu về trường Đại học Quy Nhơn")
+    ]
+    resp = await adapter.generate(messages)
+    assert resp.provider == "mistral"
+    assert resp.model == "mistral-large-latest"
+    assert "Mistral AI" in resp.content
+    assert resp.total_tokens > 0
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_adapter_mock_generation():
+    """Verify Cloudflare Workers AI adapter returns valid LLMResponse in mock mode."""
+    adapter = CloudflareAdapter(
+        model_name="@cf/meta/llama-3.3-70b-instruct", api_key="mock", account_id="acc-qnu-test"
+    )
+    messages = [
+        ChatMessage(role="user", content="Thông tin học phí ĐH Quy Nhơn")
+    ]
+    resp = await adapter.generate(messages)
+    assert resp.provider == "cloudflare"
+    assert resp.model == "@cf/meta/llama-3.3-70b-instruct"
+    assert "Cloudflare Workers AI" in resp.content
+    assert resp.total_tokens > 0
+
 
 
 @pytest.mark.asyncio
@@ -101,13 +145,48 @@ async def test_dynamic_fallback_when_primary_fails():
         tokens_used=100,
     )
 
+    mock_active = [
+        {
+            "id": "prov_openai",
+            "name": "OpenAI Primary",
+            "provider_type": "openai",
+            "model_name": "gpt-4o",
+            "models": ["gpt-4o"],
+            "is_active": True,
+            "priority": 1,
+            "timeout_seconds": 15,
+            "api_base_url": None,
+            "api_key": "mock",
+            "api_key_masked": "sk-mock",
+            "keys_count": 1,
+            "api_keys": [{"id": "k1", "api_key": "mock", "is_active": True, "status": "active"}],
+        },
+        {
+            "id": "prov_gemini",
+            "name": "Gemini Secondary",
+            "provider_type": "gemini",
+            "model_name": "gemini-1.5-flash",
+            "models": ["gemini-1.5-flash"],
+            "is_active": True,
+            "priority": 2,
+            "timeout_seconds": 15,
+            "api_base_url": None,
+            "api_key": "mock",
+            "api_key_masked": "gem-mock",
+            "keys_count": 1,
+            "api_keys": [{"id": "k2", "api_key": "mock", "is_active": True, "status": "active"}],
+        },
+    ]
+
     with (
         patch.object(modelops_service, "check_quota_available", new_callable=AsyncMock) as mock_chk,
+        patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_prov,
         patch(
             "app.modules.modelops.service.get_llm_adapter"
         ) as mock_factory,
     ):
         mock_chk.return_value = mock_quota
+        mock_prov.return_value = mock_active
 
         # 1st call (Primary) fails, 2nd call (Secondary) succeeds
         primary_adapter = AsyncMock()
@@ -160,27 +239,117 @@ async def test_quota_exceeded_blocking():
 @pytest.mark.asyncio
 async def test_api_list_providers():
     """Verify GET /platform/v1alpha1/modelops/providers returns active provider cascade."""
+    mock_providers = [
+        {
+            "id": "prov_openai",
+            "name": "OpenAI",
+            "provider_type": "openai",
+            "model_name": "gpt-4o-mini",
+            "models": ["gpt-4o-mini"],
+            "circuit_breaker_status": "CLOSED",
+            "latency_ms": 110,
+            "failure_rate": 0.0,
+            "is_active": True,
+            "api_base_url": "https://api.openai.com/v1",
+            "timeout_seconds": 15,
+            "priority": 1,
+            "keys_count": 1,
+            "api_keys": [],
+        },
+        {
+            "id": "prov_gemini",
+            "name": "Google Gemini",
+            "provider_type": "gemini",
+            "model_name": "gemini-1.5-flash",
+            "models": ["gemini-1.5-flash"],
+            "circuit_breaker_status": "CLOSED",
+            "latency_ms": 110,
+            "failure_rate": 0.0,
+            "is_active": True,
+            "api_base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "timeout_seconds": 15,
+            "priority": 2,
+            "keys_count": 1,
+            "api_keys": [],
+        },
+        {
+            "id": "prov_mistral",
+            "name": "Mistral AI",
+            "provider_type": "mistral",
+            "model_name": "mistral-large-latest",
+            "models": ["mistral-large-latest"],
+            "circuit_breaker_status": "CLOSED",
+            "latency_ms": 110,
+            "failure_rate": 0.0,
+            "is_active": True,
+            "api_base_url": "https://api.mistral.ai/v1",
+            "timeout_seconds": 20,
+            "priority": 3,
+            "keys_count": 0,
+            "api_keys": [],
+        },
+        {
+            "id": "prov_cloudflare",
+            "name": "Cloudflare Workers AI",
+            "provider_type": "cloudflare",
+            "model_name": "@cf/meta/llama-3.3-70b-instruct",
+            "models": ["@cf/meta/llama-3.3-70b-instruct"],
+            "circuit_breaker_status": "CLOSED",
+            "latency_ms": 110,
+            "failure_rate": 0.0,
+            "is_active": True,
+            "api_base_url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run",
+            "timeout_seconds": 25,
+            "priority": 4,
+            "keys_count": 0,
+            "api_keys": [],
+        },
+    ]
+
     mock_db = AsyncMock()
-    mock_db.execute = AsyncMock(
-        return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[]))))
-    )
 
     async def override_get_db():
         yield mock_db
 
     app.dependency_overrides[get_db] = override_get_db
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            response = await ac.get("/platform/v1alpha1/modelops/providers")
+        with patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_providers
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+                response = await ac.get("/platform/v1alpha1/modelops/providers")
     finally:
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
     providers = response.json()
-    assert len(providers) >= 3
+    assert len(providers) >= 4
     assert providers[0]["provider_type"] == "openai"
     assert providers[1]["provider_type"] == "gemini"
-    assert providers[2]["provider_type"] == "local_vllm"
+    assert providers[2]["provider_type"] == "mistral"
+    assert providers[3]["provider_type"] == "cloudflare"
+
+
+@pytest.mark.asyncio
+async def test_api_seed_default_providers():
+    """Verify POST /platform/v1alpha1/modelops/providers/seed-defaults seeds QNU standard presets."""
+    mock_db = AsyncMock()
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with patch.object(modelops_service, "seed_default_providers", new_callable=AsyncMock) as mock_seed:
+            mock_seed.return_value = [{"id": "prov_mistral", "provider_type": "mistral"}]
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+                response = await ac.post("/platform/v1alpha1/modelops/providers/seed-defaults")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+
 
 
 @pytest.mark.asyncio
@@ -202,8 +371,31 @@ async def test_api_modelops_generate():
             monthly_token_limit=1_000_000,
             tokens_used=0,
         )
-        with patch.object(modelops_service, "get_or_create_quota", new_callable=AsyncMock) as mock_q:
+        mock_active = [
+            {
+                "id": "prov_openai",
+                "name": "OpenAI",
+                "provider_type": "openai",
+                "model_name": "gpt-4o-mini",
+                "models": ["gpt-4o-mini"],
+                "circuit_breaker_status": "CLOSED",
+                "latency_ms": 110,
+                "failure_rate": 0.0,
+                "is_active": True,
+                "api_base_url": "https://api.openai.com/v1",
+                "api_key": "mock",
+                "timeout_seconds": 15,
+                "priority": 1,
+                "keys_count": 1,
+                "api_keys": [{"id": "k1", "api_key": "mock", "is_active": True, "status": "active"}],
+            }
+        ]
+        with (
+            patch.object(modelops_service, "get_or_create_quota", new_callable=AsyncMock) as mock_q,
+            patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_prov,
+        ):
             mock_q.return_value = mock_quota
+            mock_prov.return_value = mock_active
 
             payload = {
                 "messages": [{"role": "user", "content": "Xin chào Trợ lý AI QNU!"}],
@@ -222,3 +414,94 @@ async def test_api_modelops_generate():
     assert data["provider"] in ("openai", "gemini", "local_vllm")
     assert len(data["content"]) > 0
     assert data["total_tokens"] > 0
+
+
+@pytest.mark.asyncio
+async def test_api_get_provider_presets():
+    """Verify GET /platform/v1alpha1/modelops/presets returns provider templates."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get("/platform/v1alpha1/modelops/presets")
+
+    assert response.status_code == 200
+    presets = response.json()
+    codes = [p["code"] for p in presets]
+    assert "openai" in codes
+    assert "gemini" in codes
+    assert "deepseek" in codes
+    assert "groq" in codes
+    assert "cloudflare" in codes
+    assert "nvidia" in codes
+    assert "custom" in codes
+
+
+@pytest.mark.asyncio
+async def test_api_key_pool_crud_and_rotation():
+    """Verify Key Pool management: list, add, update, test, and simulate 429 rotation."""
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # 1. List keys for default provider
+            res_list = await ac.get("/platform/v1alpha1/modelops/providers/prov_openai/keys")
+            assert res_list.status_code == 200
+            keys = res_list.json()
+            assert len(keys) >= 2
+
+            # 2. Add new key to pool
+            new_key_payload = {
+                "name": "Key Khoa CNTT Test",
+                "api_key": "sk-proj-test-cntt-987654321",
+                "priority": 3,
+                "quota_limit": 5000000,
+            }
+            res_add = await ac.post(
+                "/platform/v1alpha1/modelops/providers/prov_openai/keys",
+                json=new_key_payload,
+            )
+            assert res_add.status_code == 201
+            added_key = res_add.json()
+            assert added_key["name"] == "Key Khoa CNTT Test"
+            assert "sk-" in added_key["api_key_masked"]
+
+            # 3. Test single key
+            key_id = added_key["id"]
+            res_test = await ac.post(
+                f"/platform/v1alpha1/modelops/providers/prov_openai/keys/{key_id}/test"
+            )
+            assert res_test.status_code == 200
+            assert res_test.json()["success"] is True
+
+            # 4. Simulate Key Rotation on Rate Limit 429
+            sim_payload = {
+                "tokens_consumed": 2500,
+                "trigger_rate_limit": True,
+                "cooldown_seconds": 30,
+            }
+            res_sim = await ac.post(
+                "/platform/v1alpha1/modelops/providers/prov_openai/keys/simulate-rotation",
+                json=sim_payload,
+            )
+            assert res_sim.status_code == 200
+            sim_data = res_sim.json()
+            assert sim_data["success"] is True
+            assert sim_data["rate_limit_triggered"] is True
+            assert sim_data["rotated"] is True
+            assert sim_data["next_key_id"] is not None
+            assert "Rate Limit (429)" in sim_data["message"]
+
+            # 5. Delete key
+            res_del = await ac.delete(
+                f"/platform/v1alpha1/modelops/providers/prov_openai/keys/{key_id}"
+            )
+            assert res_del.status_code == 200
+            assert res_del.json()["success"] is True
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+

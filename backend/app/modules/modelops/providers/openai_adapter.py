@@ -30,7 +30,11 @@ class OpenAIAdapter(BaseLLMAdapter):
         endpoint = f"{base_url.rstrip('/')}/chat/completions"
 
         # Safe offline mock mode when API key is not configured or dummy
-        if not self.api_key or self.api_key in ("mock", "test", "demo"):
+        if (
+            not self.api_key
+            or self.api_key in ("mock", "test", "demo", "placeholder")
+            or self.api_key.startswith(("mock", "test", "sk-proj-mock", "dummy"))
+        ):
             user_msg = messages[-1].content if messages else ""
             mock_text = (
                 f"[OpenAI {self.model_name}] Dựa trên thông tin của Trường Đại học Quy Nhơn:\n"

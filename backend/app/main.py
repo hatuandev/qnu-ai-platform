@@ -39,6 +39,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service=settings.SERVICE_NAME,
         port=settings.PORT,
     )
+
+    # Automatically ensure PostgreSQL schema exists on startup
+    try:
+        import app.modules.assistants.models
+        import app.modules.evaluation.models
+        import app.modules.knowledge.models
+        import app.modules.modelops.models
+        import app.modules.ocr.models
+        import app.modules.tools.models
+        import app.modules.workflows.models  # noqa: F401
+        from app.core.database import Base
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema initialized and verified.")
+    except Exception as exc:
+        logger.warning("Database schema check warning: %s", exc)
+
     yield
     # Graceful Shutdown
     logger.info("Shutting down QNU.AI Platform Backend...")

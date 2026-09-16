@@ -45,9 +45,9 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
     setResolvedGaps((prev) => [...prev, id]);
   };
 
-  const faithfulnessPct = metrics ? (metrics.faithfulness * 100).toFixed(1) : "94.2";
-  const relevancePct = metrics ? (metrics.answer_relevance * 100).toFixed(1) : "89.5";
-  const precisionPct = metrics ? (metrics.context_precision * 100).toFixed(1) : "88.4";
+  const faithfulnessPct = ((metrics?.faithfulness ?? 0.942) * 100).toFixed(1);
+  const relevancePct = ((metrics?.answer_relevance ?? 0.895) * 100).toFixed(1);
+  const precisionPct = ((metrics?.context_precision ?? 0.884) * 100).toFixed(1);
 
   return (
     <div className="space-y-6">

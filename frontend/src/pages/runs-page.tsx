@@ -93,7 +93,7 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
             </TableRow>
           </TableHeader>
           <TableBody>
-            {runs.map((run) => (
+            {(runs || []).map((run) => (
               <TableRow key={run.id}>
                 <TableCell className="font-mono text-xs font-bold text-foreground">
                   {run.id}

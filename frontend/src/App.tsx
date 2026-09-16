@@ -271,8 +271,8 @@ function AppContent() {
     }
 
     // 11. Quản Trị Mô Hình & Circuit Breaker
-    if (currentPath === "/models") {
-      return <ModelOpsPage />;
+    if (currentPath === "/models" || currentPath.startsWith("/models/")) {
+      return <ModelOpsPage currentPath={currentPath} onNavigate={handleNavigate} />;
     }
 
     // 12. Cổng Developer & API Key

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * Suite 03: Knowledge Base & External Tools Gateway E2E Tests.
@@ -39,10 +39,10 @@ test.describe("03. Knowledge Base & Tools Gateway", () => {
     const heading = page.locator("h1").filter({ hasText: "Cổng Công Cụ Ngoại Vi" });
     await expect(heading).toBeVisible();
 
-    // 3 Tools
-    const uisTool = page.locator("h3").filter({ hasText: "Cổng Tra Cứu UIS Tuyển Sinh" });
-    const docxTool = page.locator("h3").filter({ hasText: "Trình Xuất Word (.docx) Chuẩn NĐ 30" });
-    const xlsxTool = page.locator("h3").filter({ hasText: "Trình Xuất Excel (.xlsx) Ma Trận Bloom" });
+    // 3 Tools (resilient across backend and mock titles)
+    const uisTool = page.locator("h3").filter({ hasText: /Tuyển Sinh/i });
+    const docxTool = page.locator("h3").filter({ hasText: /Word.*NĐ 30/i });
+    const xlsxTool = page.locator("h3").filter({ hasText: /Excel.*Bloom/i });
 
     await expect(uisTool).toBeVisible();
     await expect(docxTool).toBeVisible();

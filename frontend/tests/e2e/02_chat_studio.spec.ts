@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 /**
  * Suite 02: Chat Studio & AI Assistants E2E Tests.
@@ -11,9 +11,14 @@ test.describe("02. Chat Studio & AI Suite", () => {
     await page.waitForLoadState("domcontentloaded");
   });
 
-  test("TC-CHAT-01: Chat Studio renders default Admissions assistant and input area", async ({ page }) => {
+  test("TC-CHAT-01: Chat Studio renders default Admissions assistant and input area", async ({
+    page,
+  }) => {
     // Check header info
-    const heading = page.locator("h1, h2, span").filter({ hasText: "Trợ lý Tuyển sinh QNU" }).first();
+    const heading = page
+      .locator("h1, h2, span")
+      .filter({ hasText: "Trợ lý Tuyển sinh QNU" })
+      .first();
     await expect(heading).toBeVisible();
 
     // Textarea input should be ready
@@ -25,9 +30,14 @@ test.describe("02. Chat Studio & AI Suite", () => {
     await expect(quickPrompts.first()).toBeVisible();
   });
 
-  test("TC-CHAT-02: Switching between 5 Assistants updates the active assistant", async ({ page }) => {
+  test("TC-CHAT-02: Switching between 5 Assistants updates the active assistant", async ({
+    page,
+  }) => {
     // Click Regulations assistant button in the left list
-    const regulationsButton = page.locator("button").filter({ hasText: "Trợ lý Quy chế Học vụ" }).first();
+    const regulationsButton = page
+      .locator("button")
+      .filter({ hasText: "Trợ lý Quy chế Học vụ" })
+      .first();
     await regulationsButton.click();
 
     // Check textarea placeholder updated
@@ -40,7 +50,9 @@ test.describe("02. Chat Studio & AI Suite", () => {
     await expect(page.locator('textarea[placeholder*="Thư viện"]')).toBeVisible();
   });
 
-  test("TC-CHAT-03: Typing a question enables the Send button and clicking sends message", async ({ page }) => {
+  test("TC-CHAT-03: Typing a question enables the Send button and clicking sends message", async ({
+    page,
+  }) => {
     const textarea = page.locator('textarea[placeholder*="Nhắn tin với"]');
     const sendButton = page.locator("button").filter({ hasText: "Gửi" });
 
@@ -60,7 +72,10 @@ test.describe("02. Chat Studio & AI Suite", () => {
   });
 
   test("TC-CHAT-04: Clicking a quick prompt automatically sends the question", async ({ page }) => {
-    const quickPrompt = page.locator("button").filter({ hasText: "Điểm chuẩn ngành Công nghệ thông tin" }).first();
+    const quickPrompt = page
+      .locator("button")
+      .filter({ hasText: "Điểm chuẩn ngành Công nghệ thông tin" })
+      .first();
     await expect(quickPrompt).toBeVisible();
 
     await quickPrompt.click();

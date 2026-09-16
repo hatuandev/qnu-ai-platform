@@ -13,7 +13,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { type KnowledgeDocument, apiClient } from "../services/api-client";
+import { type KnowledgeDocument, type ModelProvider, apiClient } from "../services/api-client";
 
 export const KnowledgePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("collections");
@@ -47,7 +47,8 @@ export const KnowledgePage: React.FC = () => {
   // Ingestion form state
   const [uploadTitle, setUploadTitle] = useState<string>("");
   const [targetCollection, setTargetCollection] = useState<string>("col_admissions");
-  const [ocrProfile, setOcrProfile] = useState<string>("Docling");
+  const [selectedOcrOption, setSelectedOcrOption] = useState<string>("");
+  const [selectedEmbeddingOption, setSelectedEmbeddingOption] = useState<string>("");
   const [chunkingStrategy, setChunkingStrategy] = useState<string>("ClauseBasedChunker");
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadSuccess, setUploadSuccess] = useState<boolean>(false);
@@ -62,11 +63,93 @@ export const KnowledgePage: React.FC = () => {
     queryFn: () => apiClient.getDocuments(),
   });
 
+  const { data: providers = [] } = useQuery({
+    queryKey: ["model-providers"],
+    queryFn: () => apiClient.getModelProviders(),
+  });
+
+  // Chỉ lọc các Provider đang BẬT (is_active === true)
+  const activeProviders = useMemo(() => {
+    return (providers || []).filter((p: ModelProvider) => p.is_active);
+  }, [providers]);
+
+  // Danh mục mô hình OCR từ các Provider đang BẬT
+  const availableOcrOptions = useMemo(() => {
+    const options: { id: string; label: string; providerName: string; modelName: string }[] = [];
+    for (const p of activeProviders) {
+      for (const m of p.models || []) {
+        const lower = m.toLowerCase();
+        if (
+          lower.includes("ocr") ||
+          lower.includes("docling") ||
+          lower.includes("tableformer") ||
+          lower.includes("rapid") ||
+          p.type === "mistral" ||
+          p.type === "docling"
+        ) {
+          options.push({
+            id: `${p.id}:${m}`,
+            label: `${p.name} — ${m}`,
+            providerName: p.name,
+            modelName: m,
+          });
+        }
+      }
+    }
+    return options;
+  }, [activeProviders]);
+
+  // Danh mục mô hình Vector Embedding từ các Provider đang BẬT
+  const availableEmbeddingOptions = useMemo(() => {
+    const options: { id: string; label: string; providerName: string; modelName: string }[] = [];
+    for (const p of activeProviders) {
+      for (const m of p.models || []) {
+        const lower = m.toLowerCase();
+        if (
+          lower.includes("bge") ||
+          lower.includes("embed") ||
+          p.type === "sentence_transformers" ||
+          (p.type === "cloudflare" && !lower.includes("rerank") && !lower.includes("llama"))
+        ) {
+          options.push({
+            id: `${p.id}:${m}`,
+            label: `${p.name} — ${m}`,
+            providerName: p.name,
+            modelName: m,
+          });
+        }
+      }
+    }
+    return options;
+  }, [activeProviders]);
+
+  // Tự động gán giá trị mặc định cho mô hình OCR và Embedding khi có dữ liệu
+  useEffect(() => {
+    if (
+      availableOcrOptions.length > 0 &&
+      (!selectedOcrOption || !availableOcrOptions.some((o) => o.id === selectedOcrOption))
+    ) {
+      setSelectedOcrOption(availableOcrOptions[0].id);
+    }
+  }, [availableOcrOptions, selectedOcrOption]);
+
+  useEffect(() => {
+    if (
+      availableEmbeddingOptions.length > 0 &&
+      (!selectedEmbeddingOption ||
+        !availableEmbeddingOptions.some((e) => e.id === selectedEmbeddingOption))
+    ) {
+      setSelectedEmbeddingOption(availableEmbeddingOptions[0].id);
+    }
+  }, [availableEmbeddingOptions, selectedEmbeddingOption]);
+
   const filteredDocuments = useMemo(() => {
-    return documents.filter((doc) => {
+    return (documents || []).filter((doc) => {
+      const title = doc?.title || "";
+      const filename = doc?.filename || "";
       const matchSearch =
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.filename.toLowerCase().includes(searchQuery.toLowerCase());
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        filename.toLowerCase().includes(searchQuery.toLowerCase());
       const matchCollection =
         selectedCollectionFilter === "all" || doc.collection_id === selectedCollectionFilter;
       return matchSearch && matchCollection;
@@ -74,7 +157,7 @@ export const KnowledgePage: React.FC = () => {
   }, [documents, searchQuery, selectedCollectionFilter]);
 
   const totalChunks = useMemo(() => {
-    return collections.reduce((acc, c) => acc + c.chunk_count, 0);
+    return (collections || []).reduce((acc, c) => acc + (c?.chunk_count ?? 0), 0);
   }, [collections]);
 
   const handleSimulatedUpload = (e: React.FormEvent) => {
@@ -94,7 +177,8 @@ export const KnowledgePage: React.FC = () => {
   };
 
   const formatFileSize = (bytes: number) => {
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    const val = typeof bytes === "number" ? bytes : 0;
+    return `${(val / 1024 / 1024).toFixed(1)} MB`;
   };
 
   return (
@@ -357,7 +441,7 @@ export const KnowledgePage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <span className="font-semibold text-foreground block">Bộ sưu tập đích *</span>
                   <select
@@ -374,18 +458,69 @@ export const KnowledgePage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <span className="font-semibold text-foreground block">
-                    Hồ sơ OCR bóc tách (OCR Profile) *
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground block">
+                      Mô hình OCR (Provider BẬT) *
+                    </span>
+                    <span className="text-[10px] text-primary font-medium font-mono">Active</span>
+                  </div>
                   <select
-                    value={ocrProfile}
-                    onChange={(e) => setOcrProfile(e.target.value)}
+                    value={selectedOcrOption}
+                    onChange={(e) => setSelectedOcrOption(e.target.value)}
                     className="w-full h-9 rounded-control border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <option value="Docling">Docling (Bóc tách cấu trúc bảng & công thức)</option>
-                    <option value="PyMuPDF">PyMuPDF Fast (Bóc tách chữ tốc độ cao)</option>
-                    <option value="EasyOCR">EasyOCR (Quét ảnh scan, chữ viết tay)</option>
+                    {availableOcrOptions.length > 0 ? (
+                      availableOcrOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        (Không có provider OCR nào đang bật)
+                      </option>
+                    )}
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground block">
+                      Mô hình Embedding (Provider BẬT) *
+                    </span>
+                    <span className="text-[10px] text-primary font-medium font-mono">Active</span>
+                  </div>
+                  <select
+                    value={selectedEmbeddingOption}
+                    onChange={(e) => setSelectedEmbeddingOption(e.target.value)}
+                    className="w-full h-9 rounded-control border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {availableEmbeddingOptions.length > 0 ? (
+                      availableEmbeddingOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="" disabled>
+                        (Không có provider Embedding nào đang bật)
+                      </option>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Thông báo phân nhánh PDF Inspector vs OCR */}
+              <div className="rounded-control border border-primary/20 bg-primary/5 p-3 text-[11px] text-muted-foreground flex items-start gap-2.5">
+                <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-foreground">Cơ chế PDF Inspector tự động:</p>
+                  <p>
+                    Đối với tệp PDF, các trang có văn bản kỹ thuật số sẽ được trích xuất trực tiếp
+                    siêu tốc (10-30ms) qua engine native để bảo toàn cấu trúc bảng. Mô hình OCR đã
+                    chọn ở trên chỉ tự động kích hoạt đối với các trang scan dạng ảnh hoặc không có
+                    lớp text số hóa.
+                  </p>
                 </div>
               </div>
 

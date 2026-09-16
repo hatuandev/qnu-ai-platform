@@ -103,6 +103,19 @@ async def parse_preview(
 
 
 @router.get(
+    "/documents",
+    response_model=list[DocumentResponse],
+    summary="Danh sách Tài liệu Tri thức",
+)
+async def list_documents(
+    collection_id: str | None = Query(None, description="Lọc theo mã bộ sưu tập"),
+    db: AsyncSession = Depends(get_db),
+) -> list[DocumentResponse]:
+    docs = await knowledge_service.list_documents(db, collection_id=collection_id)
+    return [DocumentResponse.model_validate(d) for d in docs]
+
+
+@router.get(
     "/documents/{document_id}",
     response_model=DocumentDetailResponse,
     summary="Chi tiết Tài liệu & Danh sách Chunks",
