@@ -110,7 +110,10 @@ test.describe("07. Visual DAG Workflow Studio", () => {
     await expect(runnerTitle).toBeVisible();
 
     // Click a quick prompt
-    const quickPrompt = page.locator("button").filter({ hasText: /Điểm chuẩn ngành Công nghệ thông tin/i }).first();
+    const quickPrompt = page
+      .locator("button")
+      .filter({ hasText: /Điểm chuẩn ngành Công nghệ thông tin/i })
+      .first();
     await expect(quickPrompt).toBeVisible();
     await quickPrompt.click();
 

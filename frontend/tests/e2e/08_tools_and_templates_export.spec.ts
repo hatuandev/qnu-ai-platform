@@ -60,9 +60,7 @@ test.describe("08. Administrative Document & Tool Studio", () => {
     await expect(
       page.locator("text=Thiết Kế Ma Trận Đề Thi Chuẩn Tư Duy Bloom (4 Cấp Độ)")
     ).toBeVisible();
-    await expect(
-      page.locator("text=Biểu Đồ Phân Bổ Tỷ Lệ Cấp Độ Nhận Thức Bloom")
-    ).toBeVisible();
+    await expect(page.locator("text=Biểu Đồ Phân Bổ Tỷ Lệ Cấp Độ Nhận Thức Bloom")).toBeVisible();
     await expect(page.locator("text=Nhận Biết").first()).toBeVisible();
     await expect(page.locator("text=Thông Hiểu").first()).toBeVisible();
     await expect(page.locator("text=Vận Dụng").first()).toBeVisible();
@@ -136,9 +134,7 @@ test.describe("08. Administrative Document & Tool Studio", () => {
     await expect(
       page.locator("text=Thư Viện Phôi Mẫu Văn Bản Hành Chính & Đề Thi Chuẩn QNU")
     ).toBeVisible();
-    await expect(
-      page.locator("text=Quyết định Khen thưởng Sinh viên Đạt giải NCKH")
-    ).toBeVisible();
+    await expect(page.locator("text=Quyết định Khen thưởng Sinh viên Đạt giải NCKH")).toBeVisible();
 
     // Take screenshot of Templates Library
     await page.screenshot({

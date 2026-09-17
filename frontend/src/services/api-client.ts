@@ -3,6 +3,8 @@
  * Connects to FastAPI Backend (/platform/v1alpha1/*) with high-fidelity fallback mock data
  */
 
+import { MOCK_VERIFICATION_DOCUMENT } from "./verification-data";
+
 const BASE_URL = "/platform/v1alpha1";
 
 export interface BackendHealth {
@@ -36,6 +38,8 @@ export interface KnowledgeCollection {
   chunk_count: number;
   chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
   ocr_profile: "PyMuPDF" | "Docling" | "EasyOCR";
+  embedding_model?: string;
+  status?: "ready" | "indexing" | "maintenance";
   updated_at: string;
 }
 
@@ -50,7 +54,68 @@ export interface KnowledgeDocument {
   chunk_count: number;
   status: "completed" | "processing" | "pending" | "failed";
   ocr_method: string;
+  document_type?: string;
+  priority_level?: "core" | "high" | "normal";
+  version?: string;
   created_at: string;
+}
+
+export interface IngestionTask {
+  id: string;
+  task_name: string;
+  collection_id: string;
+  collection_code: string;
+  source_file: string;
+  file_size_mb: number;
+  worker_name: string;
+  duration_seconds: number;
+  category: "ingestion" | "ocr" | "reindex";
+  progress_percent: number;
+  status: "completed" | "processing" | "failed";
+  created_at: string;
+  log_output?: string;
+}
+
+export interface DocumentBoundingBox {
+  id: string;
+  page_number: number;
+  type: "text" | "table" | "stamp" | "header";
+  coordinates: { x: number; y: number; width: number; height: number }; // percentages 0-100
+  label: string;
+  confidence: number;
+  content_snippet: string;
+}
+
+export interface DocumentRegion {
+  id: string;
+  page_number: number;
+  title: string;
+  type: "text" | "table" | "stamp" | "header" | "footer";
+  confidence: number;
+  reading_order: number;
+  details: string;
+}
+
+export interface DocumentVerificationData {
+  document_id: string;
+  collection_id: string;
+  title: string;
+  filename: string;
+  file_size_mb: number;
+  total_pages: number;
+  engine: string;
+  total_chars: number;
+  estimated_chunks: number;
+  pages: {
+    page_number: number;
+    word_count: number;
+    line_count: number;
+    image_url?: string;
+    markdown_content: string;
+    raw_text: string;
+    bounding_boxes: DocumentBoundingBox[];
+    regions: DocumentRegion[];
+  }[];
 }
 
 export interface ProviderApiKey {
@@ -243,125 +308,215 @@ const MOCK_COLLECTIONS: KnowledgeCollection[] = [
   {
     id: "col_admissions",
     code: "admissions",
-    name: "Kho Tri Thức Đề Án Tuyển Sinh",
-    description: "Đề án tuyển sinh chính quy, bảng chỉ tiêu, điểm chuẩn và thông tin học phí.",
-    document_count: 8,
-    chunk_count: 246,
+    name: "Kho Tri thức Tuyển sinh Đại học",
+    description:
+      "Lưu trữ đề án tuyển sinh, điểm chuẩn, tổ hợp xét tuyển và chỉ tiêu hàng năm của Đại học Quy Nhơn.",
+    document_count: 1,
+    chunk_count: 10,
     chunking_strategy: "SemanticChunker",
     ocr_profile: "Docling",
-    updated_at: "2026-09-15 08:30",
-  },
-  {
-    id: "col_regulations",
-    code: "regulations",
-    name: "Kho Quy Chế Đào Tạo & Học Vụ",
-    description: "Quy chế tín chỉ, đăng ký học phần, tiêu chuẩn học bổng, chuẩn đầu ra B1.",
-    document_count: 14,
-    chunk_count: 512,
-    chunking_strategy: "ClauseBasedChunker",
-    ocr_profile: "PyMuPDF",
-    updated_at: "2026-09-14 16:45",
-  },
-  {
-    id: "col_library",
-    code: "library",
-    name: "Kho Mục Lục & Học Liệu Thư Viện",
-    description: "Danh mục sách giáo trình, luận án, kết nối cơ sở dữ liệu Scopus/ScienceDirect.",
-    document_count: 32,
-    chunk_count: 1040,
-    chunking_strategy: "SemanticChunker",
-    ocr_profile: "PyMuPDF",
-    updated_at: "2026-09-15 11:20",
+    embedding_model: "BAAI/bge-m3 (1024-dim)",
+    status: "ready",
+    updated_at: "19:48 12/09/2026",
   },
   {
     id: "col_drafting",
     code: "drafting",
-    name: "Kho Thể Thức Văn Bản Nghị Định 30",
-    description: "Quy chuẩn trình bày văn bản hành chính, mẫu quyết định, tờ trình của trường.",
-    document_count: 6,
-    chunk_count: 180,
+    name: "Kho Mẫu Văn bản & Hành chính",
+    description:
+      "Khung mẫu tờ trình, thông báo, quyết định và công văn chuẩn theo Nghị định 30/2020/NĐ-CP.",
+    document_count: 5,
+    chunk_count: 10,
     chunking_strategy: "ClauseBasedChunker",
     ocr_profile: "Docling",
-    updated_at: "2026-09-13 14:10",
+    embedding_model: "BAAI/bge-m3 (1024-dim)",
+    status: "ready",
+    updated_at: "14:10 13/09/2026",
+  },
+  {
+    id: "col_library",
+    code: "library",
+    name: "Kho Tra cứu Tài nguyên Thư viện",
+    description:
+      "Mục lục giáo trình, sách chuyên khảo, luận văn thạc sĩ và tài nguyên số của Thư viện QNU.",
+    document_count: 0,
+    chunk_count: 0,
+    chunking_strategy: "SemanticChunker",
+    ocr_profile: "PyMuPDF",
+    embedding_model: "BAAI/bge-m3 (1024-dim)",
+    status: "ready",
+    updated_at: "11:20 15/09/2026",
   },
   {
     id: "col_question_bank",
     code: "question_bank",
-    name: "Kho Ngân Hàng Đề Thi & Đề Cương",
-    description: "Đề cương chi tiết học phần, chuẩn đầu ra CLO, ma trận câu hỏi chuẩn Bloom.",
-    document_count: 18,
-    chunk_count: 620,
+    name: "Kho Ngân hàng Câu hỏi & Đề thi",
+    description:
+      "Lưu trữ ma trận đề thi, ngân hàng câu hỏi tự luận - trắc nghiệm, đáp án và barem điểm chuẩn của các học phần.",
+    document_count: 0,
+    chunk_count: 0,
     chunking_strategy: "ClauseBasedChunker",
     ocr_profile: "Docling",
-    updated_at: "2026-09-15 09:00",
+    embedding_model: "BAAI/bge-m3 (1024-dim)",
+    status: "ready",
+    updated_at: "09:00 15/09/2026",
+  },
+  {
+    id: "col_regulations",
+    code: "regulations",
+    name: "Kho Quy chế & Quy định Đào tạo",
+    description:
+      "Văn bản quy chế đào tạo tín chỉ, chuẩn đầu ra ngoại ngữ - tin học, quy định khen thưởng, kỷ luật sinh viên.",
+    document_count: 1,
+    chunk_count: 56,
+    chunking_strategy: "ClauseBasedChunker",
+    ocr_profile: "PyMuPDF",
+    embedding_model: "BAAI/bge-m3 (1024-dim)",
+    status: "ready",
+    updated_at: "16:45 14/09/2026",
   },
 ];
 
 const MOCK_DOCUMENTS: KnowledgeDocument[] = [
   {
-    id: "doc_01",
+    id: "doc_ts_2026",
     collection_id: "col_admissions",
-    collection_name: "Đề Án Tuyển Sinh",
-    title: "Đề án Tuyển sinh Đại học Chính quy năm 2025",
-    filename: "De_an_Tuyen_sinh_QNU_2025.pdf",
-    file_size: 2450000,
-    page_count: 48,
-    chunk_count: 124,
+    collection_name: "Kho Tri thức Tuyển sinh Đại học",
+    title: "Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)",
+    filename: "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1).docx",
+    file_size: 61440,
+    page_count: 14,
+    chunk_count: 10,
     status: "completed",
-    ocr_method: "Docling Table Parser",
-    created_at: "2026-09-12 10:20",
+    ocr_method: "docling-tableformer-local",
+    document_type: "Quy chế",
+    priority_level: "core",
+    version: "v1.0",
+    created_at: "19:48 12/09/2026",
   },
   {
     id: "doc_02",
     collection_id: "col_regulations",
-    collection_name: "Quy Chế Đào Tạo",
+    collection_name: "Kho Quy chế & Quy định Đào tạo",
     title: "Quyết định 1234/QĐ-ĐHQN Ban hành Quy chế Đào tạo Tín chỉ",
     filename: "Quy_che_Dao_tao_Dai_hoc_QNU_Quyet_Dinh_1234.pdf",
     file_size: 4120000,
     page_count: 64,
-    chunk_count: 218,
+    chunk_count: 56,
     status: "completed",
     ocr_method: "PyMuPDF Fast",
+    document_type: "Quy chế",
+    priority_level: "high",
+    version: "v1.0",
     created_at: "2026-09-10 14:00",
-  },
-  {
-    id: "doc_03",
-    collection_id: "col_regulations",
-    collection_name: "Quy Chế Đào Tạo",
-    title: "Quy định Chuẩn đầu ra Ngoại ngữ & Tin học 2024",
-    filename: "Chuan_Dau_Ra_Ngoai_Ngu_QNU.pdf",
-    file_size: 980000,
-    page_count: 12,
-    chunk_count: 36,
-    status: "completed",
-    ocr_method: "PyMuPDF Fast",
-    created_at: "2026-09-11 09:15",
   },
   {
     id: "doc_04",
     collection_id: "col_drafting",
-    collection_name: "Thể Thức Văn Bản",
+    collection_name: "Kho Mẫu Văn bản & Hành chính",
     title: "Nghị định 30/2020/NĐ-CP của Chính phủ về Công tác văn thư",
     filename: "Nghi_dinh_30_2020_ND_CP_Van_thu.pdf",
     file_size: 1850000,
     page_count: 32,
-    chunk_count: 88,
+    chunk_count: 10,
     status: "completed",
     ocr_method: "Docling Table Parser",
+    document_type: "Nghị định",
+    priority_level: "core",
+    version: "v1.0",
     created_at: "2026-09-08 11:30",
   },
+];
+
+const MOCK_INGESTION_TASKS: IngestionTask[] = [
   {
-    id: "doc_05",
-    collection_id: "col_question_bank",
-    collection_name: "Ngân Hàng Đề Thi",
-    title: "Đề cương Chi tiết Học phần Cơ sở Dữ liệu (IT204)",
-    filename: "De_cuong_Co_so_du_lieu_IT204_QNU.pdf",
-    file_size: 1420000,
-    page_count: 22,
-    chunk_count: 64,
+    id: "task_ingest_01",
+    task_name: "Ingestion Đề án Tuyển sinh Đại học Chính quy 2026",
+    collection_id: "col_admissions",
+    collection_code: "admissions",
+    source_file: "De_an_tuyen_sinh_2026_QNU.pdf",
+    file_size_mb: 2.4,
+    worker_name: "celery_worker_gpu_01",
+    duration_seconds: 135,
+    category: "ingestion",
+    progress_percent: 100,
     status: "completed",
-    ocr_method: "Docling Table Parser",
-    created_at: "2026-09-14 15:45",
+    created_at: "15:00 31/08/2026",
+    log_output:
+      "[INFO] Initialized Docling TableFormer parser on celery_worker_gpu_01\n[INFO] Extracted 14 pages with 2 tables\n[INFO] Vectorized 10 chunks via BAAI/bge-m3 (1024-dim)\n[SUCCESS] Ingestion completed with 0 errors.",
+  },
+  {
+    id: "task_ingest_02",
+    task_name: "OCR & Phân đoạn Quy chế Đào tạo Tín chỉ 2026",
+    collection_id: "col_regulations",
+    collection_code: "regulations",
+    source_file: "Quy_che_Dao_tao_Tin_chi_2026.pdf",
+    file_size_mb: 4.1,
+    worker_name: "celery_worker_gpu_02",
+    duration_seconds: 198,
+    category: "ocr",
+    progress_percent: 100,
+    status: "completed",
+    created_at: "09:30 02/09/2026",
+    log_output:
+      "[INFO] Loaded PyMuPDF fast OCR pipeline\n[INFO] Extracted 56 chunks with clause detection\n[SUCCESS] Completed indexing in Qdrant.",
+  },
+  {
+    id: "task_ingest_03",
+    task_name: "Bóc tách Phôi Mẫu Nghị định 30/2020/NĐ-CP",
+    collection_id: "col_drafting",
+    collection_code: "drafting",
+    source_file: "Mau_Nghi_Dinh_30_Chinh_Phu.docx",
+    file_size_mb: 1.8,
+    worker_name: "celery_worker_cpu_01",
+    duration_seconds: 42,
+    category: "ingestion",
+    progress_percent: 100,
+    status: "completed",
+    created_at: "11:15 10/09/2026",
+    log_output: "[INFO] Structured table & paragraph parsing finished.",
+  },
+  {
+    id: "task_ingest_04",
+    task_name: "Tái lập chỉ mục Vector Kho Thư viện Số",
+    collection_id: "col_library",
+    collection_code: "library",
+    source_file: "Giao_trinh_Toan_Tin_Dai_Cuong.pdf",
+    file_size_mb: 8.5,
+    worker_name: "celery_worker_gpu_01",
+    duration_seconds: 240,
+    category: "reindex",
+    progress_percent: 100,
+    status: "completed",
+    created_at: "16:20 12/09/2026",
+  },
+  {
+    id: "task_ingest_05",
+    task_name: "Bóc tách Ma trận Ngân hàng Đề thi Học kỳ I",
+    collection_id: "col_question_bank",
+    collection_code: "question_bank",
+    source_file: "Ma_Tran_De_Thi_Bloom_2026.xlsx",
+    file_size_mb: 0.9,
+    worker_name: "celery_worker_cpu_02",
+    duration_seconds: 28,
+    category: "ingestion",
+    progress_percent: 100,
+    status: "completed",
+    created_at: "14:10 14/09/2026",
+  },
+  {
+    id: "task_ingest_06",
+    task_name: "Tự động nhận diện Scans Thông báo Tuyển sinh Bổ sung",
+    collection_id: "col_admissions",
+    collection_code: "admissions",
+    source_file: "Thong_bao_Tuyen_sinh_Bo_sung_Scan.pdf",
+    file_size_mb: 3.2,
+    worker_name: "celery_worker_gpu_02",
+    duration_seconds: 110,
+    category: "ocr",
+    progress_percent: 100,
+    status: "completed",
+    created_at: "08:45 15/09/2026",
   },
 ];
 
@@ -1723,5 +1878,55 @@ export const apiClient = {
       },
       latency_ms: Date.now() - startTs + 85,
     };
+  },
+
+  /**
+   * Lấy danh sách hàng đợi tác vụ bóc tách / ingestion ngầm (Celery/ARQ Worker).
+   */
+  async getIngestionTasks(collectionId?: string): Promise<IngestionTask[]> {
+    if (collectionId) {
+      return Promise.resolve(
+        MOCK_INGESTION_TASKS.filter(
+          (t) => t.collection_id === collectionId || t.collection_code === collectionId
+        )
+      );
+    }
+    return Promise.resolve(MOCK_INGESTION_TASKS);
+  },
+
+  /**
+   * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
+   */
+  async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
+    if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
+      return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
+    }
+    // Return clone with custom docId if matching another doc
+    return Promise.resolve({
+      ...MOCK_VERIFICATION_DOCUMENT,
+      document_id: docId,
+    });
+  },
+
+  /**
+   * Lưu trữ Markdown đã sửa tay bởi cán bộ và chuyển sang trạng thái sẵn sàng nạp Vector DB.
+   */
+  async saveDocumentVerification(
+    _docId: string,
+    payload: { pages: { page_number: number; markdown_content: string }[] }
+  ): Promise<{ success: boolean; vector_status: string; total_chunks: number }> {
+    for (const p of payload.pages) {
+      const targetPage = MOCK_VERIFICATION_DOCUMENT.pages.find(
+        (mp) => mp.page_number === p.page_number
+      );
+      if (targetPage) {
+        targetPage.markdown_content = p.markdown_content;
+      }
+    }
+    return Promise.resolve({
+      success: true,
+      vector_status: "ready_for_indexing",
+      total_chunks: MOCK_VERIFICATION_DOCUMENT.estimated_chunks,
+    });
   },
 };

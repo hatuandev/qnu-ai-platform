@@ -21,14 +21,18 @@ test.describe("04. Provider Management, Detail Screen & LobeHub SVG Icons", () =
       await page.waitForTimeout(400);
 
       // Verify Detail View breadcrumb and header
-      await expect(page.getByRole("button", { name: "Quay lại danh sách Nhà cung cấp" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Quay lại danh sách Nhà cung cấp" })
+      ).toBeVisible();
       await expect(page.getByText("Chi Tiết Provider")).toBeVisible();
       await expect(page.getByText("Nhóm Khóa API (Key Pool)")).toBeVisible();
       await expect(page.getByText("Mô Hình Khả Dụng")).toBeVisible();
     }
   });
 
-  test("TC-PROV-02: Create Provider modal displays catalog presets with LobeHub icons", async ({ page }) => {
+  test("TC-PROV-02: Create Provider modal displays catalog presets with LobeHub icons", async ({
+    page,
+  }) => {
     await page.goto("/models");
     await page.waitForLoadState("networkidle");
 

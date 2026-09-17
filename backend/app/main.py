@@ -2,17 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
-# Sanitize no_proxy on Windows: httpx crashes when parsing IPv6 '::1'
-for _env_var in ("no_proxy", "NO_PROXY"):
-    _val = os.environ.get(_env_var)
-    if _val:
-        _cleaned = [item.strip() for item in _val.split(",") if not item.strip().startswith("::")]
-        os.environ[_env_var] = ",".join(_cleaned)
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import os
 from typing import Any
 
 from fastapi import FastAPI, Response, status
@@ -23,6 +15,13 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import setup_middlewares
 from app.core.redis import check_redis_health
+
+# Sanitize no_proxy on Windows: httpx crashes when parsing IPv6 '::1'
+for _env_var in ("no_proxy", "NO_PROXY"):
+    _val = os.environ.get(_env_var)
+    if _val:
+        _cleaned = [item.strip() for item in _val.split(",") if not item.strip().startswith("::")]
+        os.environ[_env_var] = ",".join(_cleaned)
 
 settings = get_settings()
 logger = get_logger(__name__)
