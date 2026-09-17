@@ -1,21 +1,58 @@
-# QNU AI Platform - Task Runner
+﻿# QNU AI Platform - Task Runner
 param (
     [Parameter(Position = 0)]
-    [ValidateSet("dev", "test")]
+    [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "dev", "be", "fe", "test", "help")]
     [string]$Command = "dev"
 )
 
-if ($Command -eq "dev") {
-    Write-Host "Dang khoi chay Backend (Port 8001) va Frontend (Port 3001)..." -ForegroundColor Green
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
-} elseif ($Command -eq "test") {
-    Write-Host "[1/2] Dang chay kiem thu Backend Pytest (68 tests)..." -ForegroundColor Cyan
-    Set-Location "$PSScriptRoot\backend"
-    uv run --extra dev pytest
+switch ($Command) {
+    "infra-up" {
+        Write-Host "Dang khoi dong ha tang Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)..." -ForegroundColor Green
+        docker compose up -d
+    }
+    "infra-down" {
+        Write-Host "Dang dung ha tang Docker..." -ForegroundColor Yellow
+        docker compose down
+    }
+    "infra-status" {
+        Write-Host "Trang thai cum ha tang Docker:" -ForegroundColor Cyan
+        docker compose ps
+    }
+    "infra-logs" {
+        docker compose logs -f
+    }
+    "dev" {
+        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend (Port 3001)..." -ForegroundColor Green
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+    }
+    "be" {
+        Write-Host "Dang khoi chay Backend API (Port 8001)..." -ForegroundColor Green
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
+    }
+    "fe" {
+        Write-Host "Dang khoi chay Frontend Studio (Port 3001)..." -ForegroundColor Green
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+    }
+    "test" {
+        Write-Host "[1/2] Dang chay kiem thu Backend Pytest (68 tests)..." -ForegroundColor Cyan
+        Set-Location "$PSScriptRoot\backend"
+        uv run --extra dev pytest
 
-    Write-Host "[2/2] Dang chay kiem thu Frontend Playwright E2E (12 tests)..." -ForegroundColor Cyan
-    Set-Location "$PSScriptRoot\frontend"
-    npm run test:e2e
-    Set-Location $PSScriptRoot
+        Write-Host "[2/2] Dang chay kiem thu Frontend Playwright E2E (12 tests)..." -ForegroundColor Cyan
+        Set-Location "$PSScriptRoot\frontend"
+        npm run test:e2e
+        Set-Location $PSScriptRoot
+    }
+    "help" {
+        Write-Host "Huong dan su dung Task Runner:" -ForegroundColor Cyan
+        Write-Host "  .\run.ps1 infra-up     : Khoi dong cum ha tang Docker"
+        Write-Host "  .\run.ps1 infra-down   : Dung cum ha tang Docker"
+        Write-Host "  .\run.ps1 infra-status : Kiem tra trang thai cac container"
+        Write-Host "  .\run.ps1 infra-logs   : Xem logs cua cum Docker"
+        Write-Host "  .\run.ps1 dev          : Khoi chay ca Backend 8001 va Frontend 3001"
+        Write-Host "  .\run.ps1 be           : Khoi chay rieng Backend API 8001"
+        Write-Host "  .\run.ps1 fe           : Khoi chay rieng Frontend Studio 3001"
+        Write-Host "  .\run.ps1 test         : Chay toan bo test Pytest va Playwright"
+    }
 }

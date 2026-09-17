@@ -76,19 +76,22 @@
 - Biome Linter: 0 errors
 - TypeScript: 0 errors
 - Vite Build: 100% passed
-- Playwright E2E Suites: 9 suites passed (Bao gồm Suite 09 Studio)
+- Playwright E2E Suites: 9 suites passed (Bao gồm Suite 09 Studio - 4/4 tests passed)
 
 ---
 
 ## 4. Danh Mục Gotchas Kỹ Thuật (Kinh Nghiệm Thực Tế)
 
 1. **Strict Mode trong Playwright**:
-   - Khi có text xuất hiện ở cả thanh Breadcrumb/Header và trong thân trang (ví dụ `Trang 1 / 14`), bắt buộc phải dùng `page.getByText('Trang 1 / 14', { exact: true })` hoặc `.first()` để tránh lỗi `strict mode violation`.
+   - Khi có text xuất hiện ở cả thanh Breadcrumb/Header và trong thân trang (ví dụ `Trang 1 / 14`, filename), bắt buộc phải dùng `page.getByText('...', { exact: true })` hoặc `.first()` để tránh lỗi `strict mode violation`.
 2. **Hiển thị Ảnh Scan Tài Liệu Bóc Tách**:
-   - Không được dùng text/HTML mock để giả lập trang scan. Bắt buộc phải phục vụ ảnh scan thật từ thư mục tĩnh `frontend/public/ocr-cache/doc_ts_2026/page_N.jpg` với tỉ lệ khung hình chuẩn A4 và zoom container.
+   - Không được dùng text/HTML mock để giả lập trang scan. Bắt buộc phải phục vụ ảnh scan thật từ thư mục tĩnh `frontend/public/ocr-cache/doc_ts_2026/page_N.jpg` với tỉ lệ khung hình chuẩn A4 và zoom container. Với tệp mới không có scan cache, hiển thị khung canvas tài liệu số hóa sạch.
 3. **Render Bảng Biểu Markdown**:
    - Markdown thô (`whitespace-pre-wrap`) không hiển thị được bảng. Bắt buộc dùng `ReactMarkdown` với plugin `remarkGfm` và custom `components={{ table, thead, th, td, tr }}` có styling viền ô rõ ràng.
-4. **PEP 8 E402 trong Backend**:
+4. **Chuẩn Hóa Encoding UTF-8 trên Windows (Tránh Mojibake)**:
+   - Mọi script Python chạy console trên Windows phải thiết lập `sys.stdout.reconfigure(encoding="utf-8")` để không bị lỗi `UnicodeEncodeError` với bảng mã `cp1252`.
+   - File đọc/ghi bắt buộc chỉ định rõ `encoding="utf-8"`.
+5. **PEP 8 E402 trong Backend**:
    - Khi xử lý đoạn mã sửa lỗi Windows IPv6 `no_proxy`, đặt đoạn sanitize sau toàn bộ module imports chuẩn để ruff check 0 lỗi.
 
 ---
@@ -98,5 +101,7 @@
 - [x] Đồng bộ ảnh scan thực tế 14 trang từ `qnu-ai-core` vào Studio đối soát.
 - [x] Render Markdown bảng biểu và cấu trúc phân cấp chuẩn GitHub Flavored Markdown.
 - [x] Thêm chế độ xem trước (Preview) khi hiệu đính văn bản trong chế độ Sửa tay (Human-in-the-loop).
+- [x] Sửa dứt điểm lỗi hardcode upload file và bổ sung kiểm thử tự động chống tái diễn.
+- [x] Xây dựng bộ quét tự động Zero Mojibake (`scripts/check_mojibake.py`).
 - [ ] Tích hợp API backend thực tế cho endpoint bóc tách đa tầng qua Docling microservice.
 - [ ] Mở rộng cơ chế kéo thả trực tiếp khung Bounding Box trên ảnh scan để cập nhật tọa độ ROI cho người dùng cán bộ.
