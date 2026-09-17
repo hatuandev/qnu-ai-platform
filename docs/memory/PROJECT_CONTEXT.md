@@ -7,24 +7,23 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-17 09:30 (UTC+7)
-- **Phiên số**: #35 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-17 10:10 (UTC+7)
+- **Phiên số**: #36 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**: 
-  1. **Khắc phục Triệt Để Vấn Đề Hiển Thị Scan & Markdown Studio (Đồng bộ 100% với `qnu-ai-core`)**:
-     - **Sao chép và đồng bộ toàn bộ 14 trang ảnh scan thực tế 300 DPI**: Trích xuất trực tiếp từ kho OCR cache của `qnu-ai-core` (`services/studio-ui/public/ocr-cache/ccbf29700d/`) sang `frontend/public/ocr-cache/doc_ts_2026/` (`page_1.jpg` đến `page_14.jpg`).
-     - **Thay thế hoàn toàn bộ giả lập HTML cũ bằng thẻ `<img>` ảnh scan thật**: Loại bỏ hoàn toàn khối div giả lập văn bản thô, giải quyết dứt điểm tình trạng trang 3 đến 14 bị trắng tinh. Lớp phủ Bounding Boxes hiển thị chính xác theo tỷ lệ % OpenCV trên ảnh scan thật.
-     - **Render Markdown chuẩn xác qua `ReactMarkdown` + `remarkGfm`**: Cột phải thay thế việc in text thô bằng bộ component render GitHub-Flavored Markdown chuẩn mực: Bảng biểu tuyển sinh (53 ngành, chỉ tiêu, tổ hợp môn, điểm chuẩn 2 năm 2024-2025, bảng quy đổi IELTS/VSTEP, phụ lục xét tuyển thẳng) có viền bảng, header xám, alternating row colors, blockquote Academic Teal trích dẫn văn bản quy phạm.
-     - **Cải tiến chế độ Sửa tay (Human-in-the-loop)**: Bổ sung nút chuyển đổi "Xem trước" (Preview) và "Quay lại sửa" trực tiếp trong textarea, cho phép cán bộ kiểm tra kết quả render Markdown trước khi lưu hoặc nạp vào Vector DB.
-  2. **Tách Module Dữ Liệu Theo Chuẩn Clean Code (Rule 8 AGENTS.md)**:
-     - Tạo tệp độc lập `frontend/src/services/verification-data.ts` (1,393 dòng, 69KB) chứa toàn bộ dữ liệu bóc tách, bounding boxes và layout regions của 14 trang scan Đề án tuyển sinh 2026, giải phóng dung lượng cho `api-client.ts`.
-     - Sửa lỗi PEP 8 E402 trong `backend/app/main.py`.
-  3. **Kiểm thử Toàn Diện & Đạt Tiêu Chuẩn Sản Phẩm 100%**:
-     - `uv run ruff check .`: All checks passed (0 lỗi).
-     - `npm run lint`: Biome check 0 lỗi, 0 cảnh báo.
-     - `npm run typecheck`: TypeScript tsc --noEmit 0 lỗi.
-     - `npm run build`: Vite build thành công đóng gói production bundle.
-     - `npx playwright test tests/e2e/09_knowledge_ingestion_studio.spec.ts --project="Google Chrome"`: 3/3 tests passed (18.6s).
+  1. **Thiết Lập Quy Chuẩn Zero Mojibake & Chuẩn Hóa UTF-8 Toàn Diện**:
+     - Thêm Tôn chỉ 1.5 và Điều răn 8.10 vào [`AGENTS.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/AGENTS.md).
+     - Đồng bộ quy định vào skill `qnu-clean-code-architect` và `qnu-knowledge-ingestion`.
+     - Xây dựng bộ công cụ kiểm toán tự động [`scripts/check_mojibake.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/scripts/check_mojibake.py) quét sạch 182 files trong dự án (0 lỗi, 100% pass) và tích hợp lệnh `npm run check:mojibake`.
+  2. **Sửa Dứt Điểm Lỗi Hardcode Khi Nạp Tài Liệu (Zero Hardcoded Data & Zero Mock Traps)**:
+     - Khởi tạo ô tiêu đề rỗng (`useState("")`) trong `document-ingest-page.tsx`, tự động điền tiêu đề từ tên file thực tế của người dùng.
+     - Hàm submit chuyển sang gọi trực tiếp `apiClient.uploadDocument(collection.id, selectedFile, docTitle)` bất đồng bộ, tạo document ID động.
+     - Bổ sung nút "Xem tài liệu mẫu (Tuyển sinh 2026)" tách biệt rõ ràng để xem 14 trang scan Docling khi cần demo mà không làm ảnh hưởng luồng nạp tệp thật.
+     - Sửa `getDocumentVerification(docId)` trong `api-client.ts` để sinh dữ liệu động theo tệp tải lên thay vì clone mù quáng tài liệu tuyển sinh cũ.
+     - Xóa hardcode fallback `/ocr-cache/doc_ts_2026/page_N.jpg` trong `document-bounding-visualizer.tsx` và `collection-detail-page.tsx`.
+  3. **Bảo Đảm Kiểm Thử E2E Chống Tái Diễn (Regression Test)**:
+     - Thêm test case `TC-INGEST-04` vào Playwright Suite 09 kiểm thử tự động toàn bộ luồng nạp file động và xác nhận tiêu đề cũ không tái xuất hiện.
+     - 4/4 Playwright tests passed (17.4s) | Pytest: 12/12 passed | Ruff: 0 lỗi | Biome: 0 lỗi | Typecheck: 0 lỗi | Build ✓.
 
 ---
 

@@ -59,7 +59,7 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
   const handleResetZoom = () => setZoomLevel(96);
   const handleFitPage = () => setZoomLevel(70);
 
-  const currentImageSrc = imageUrl || `/ocr-cache/doc_ts_2026/page_${currentPage}.jpg`;
+  const currentImageSrc = imageUrl;
 
   return (
     <div className="flex flex-col h-full bg-muted/20 border-r border-border select-none">
@@ -200,7 +200,7 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
           }}
         >
           {/* Real High-Fidelity Scanned Document Page Image */}
-          {!imageError ? (
+          {currentImageSrc && !imageError ? (
             <img
               src={currentImageSrc}
               alt={`Trang scan ${currentPage}`}

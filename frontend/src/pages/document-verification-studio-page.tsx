@@ -306,7 +306,10 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
             activeBoxId={activeBoxId}
             onSelectBox={setActiveBoxId}
             imageUrl={
-              currentPageData?.image_url || `/ocr-cache/doc_ts_2026/page_${currentPage}.jpg`
+              currentPageData?.image_url ||
+              (documentId === "doc_ts_2026"
+                ? `/ocr-cache/doc_ts_2026/page_${currentPage}.jpg`
+                : undefined)
             }
           />
         </div>

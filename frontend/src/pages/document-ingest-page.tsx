@@ -1,11 +1,19 @@
-import { ArrowLeft, ArrowRight, FileCheck2, ShieldCheck, UploadCloud } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  FileCheck2,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import type { KnowledgeCollection } from "../services/api-client";
+import { type KnowledgeCollection, apiClient } from "../services/api-client";
 
 export interface DocumentIngestPageProps {
   collection: KnowledgeCollection;
@@ -18,30 +26,60 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
   onBack,
   onStartVerification,
 }) => {
-  const [docTitle, setDocTitle] = useState<string>("Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)");
+  // Khởi tạo form rỗng động — tuyệt đối không gán cứng tên tài liệu mẫu
+  const [docTitle, setDocTitle] = useState<string>("");
   const [docType, setDocType] = useState<string>("quy_che");
   const [year, setYear] = useState<string>("2026");
   const [ocrEngine, setOcrEngine] = useState<string>("auto");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const f = e.target.files[0];
       setSelectedFile(f);
-      if (!docTitle.trim() || docTitle === "Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)") {
-        setDocTitle(f.name.replace(/\.[^/.]+$/, ""));
+      setUploadError(null);
+      // Tự động điền tiêu đề từ tên tệp tin thực tế nếu ô tiêu đề đang rỗng
+      if (!docTitle.trim()) {
+        setDocTitle(f.name.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
       }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile && !docTitle.trim()) {
+      setUploadError("Vui lòng chọn một tệp tài liệu để tiếp nhận và bóc tách.");
+      return;
+    }
+
     setIsProcessing(true);
-    setTimeout(() => {
+    setUploadError(null);
+
+    try {
+      if (selectedFile) {
+        // Tải lên tệp thực tế và tiếp nhận document ID động từ hệ thống
+        const newDoc = await apiClient.uploadDocument(collection.id, selectedFile, docTitle);
+        setIsProcessing(false);
+        onStartVerification(newDoc.id);
+      } else if (docTitle.trim()) {
+        // Tạo tài liệu văn bản mới từ tiêu đề đã nhập
+        const textBlob = new File(
+          [`# ${docTitle}\n\n*Khởi tạo ngày ${new Date().toLocaleDateString("vi-VN")}*`],
+          `${docTitle}.txt`,
+          { type: "text/plain;charset=utf-8" }
+        );
+        const newDoc = await apiClient.uploadDocument(collection.id, textBlob, docTitle);
+        setIsProcessing(false);
+        onStartVerification(newDoc.id);
+      }
+    } catch (err: unknown) {
       setIsProcessing(false);
-      onStartVerification("doc_ts_2026");
-    }, 600);
+      const msg =
+        err instanceof Error ? err.message : "Có lỗi xảy ra khi tải lên và bóc tách tài liệu.";
+      setUploadError(msg);
+    }
   };
 
   return (
@@ -238,26 +276,47 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
             </p>
           </div>
 
+          {/* Error Banner nếu upload thất bại */}
+          {uploadError && (
+            <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{uploadError}</span>
+            </div>
+          )}
+
           {/* Form Actions Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-border/70">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onBack}
-              className="h-9 text-xs px-4 text-muted-foreground hover:text-foreground"
-            >
-              Hủy & Quay lại
-            </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border/70">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onBack}
+                className="h-9 text-xs px-4 text-muted-foreground hover:text-foreground"
+              >
+                Hủy & Quay lại
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onStartVerification("doc_ts_2026")}
+                className="h-9 text-xs px-3 text-muted-foreground hover:text-primary gap-1.5 border border-dashed border-border hover:border-primary/40"
+                title="Mở tài liệu mẫu Đề án Tuyển sinh 2026 với 14 trang scan Docling thực tế"
+              >
+                <Sparkles className="size-3.5 text-amber-500" />
+                <span>Xem tài liệu mẫu (Tuyển sinh 2026)</span>
+              </Button>
+            </div>
 
             <Button
               type="submit"
-              disabled={isProcessing}
-              className="h-9 text-xs px-5 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+              disabled={isProcessing || (!selectedFile && !docTitle.trim())}
+              className="h-9 text-xs px-5 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm w-full sm:w-auto cursor-pointer disabled:opacity-50"
             >
               {isProcessing ? (
                 <>
                   <div className="size-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Đang bóc tách...</span>
+                  <span>Đang tải lên & bóc tách...</span>
                 </>
               ) : (
                 <>

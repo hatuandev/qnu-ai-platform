@@ -200,4 +200,54 @@ test.describe("09. Knowledge Master-Detail & Full-Screen Ingestion Studio", () =
     // Verify Success Banner
     await expect(page.locator("text=Đã nạp Vector DB thành công!")).toBeVisible({ timeout: 5000 });
   });
+
+  test("TC-INGEST-04: Verifies Dynamic File Ingestion and Zero-Hardcoded Title", async ({
+    page,
+  }) => {
+    // 1. Go to Ingestion form for regulations collection
+    await page.goto("/knowledge/collections/col_regulations");
+    await page.waitForLoadState("domcontentloaded");
+
+    const ingestBtn = page.getByRole("button", { name: /\+ Nạp tài liệu/i });
+    await expect(ingestBtn).toBeVisible();
+    await ingestBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Verify Title input is empty by default (Zero Hardcoded Data)
+    const titleInput = page.locator("#document-title-input");
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue("");
+
+    // 3. Simulate file upload with custom dynamic file
+    const fileInput = page.locator("#file-upload-input");
+    await fileInput.setInputFiles({
+      name: "Quy_dinh_Cong_tac_Hoc_sinh_Sinh_vien_2026.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 Mock PDF Content for QNU Platform Testing"),
+    });
+
+    // 4. Verify title auto-populated from filename
+    await expect(titleInput).toHaveValue("Quy dinh Cong tac Hoc sinh Sinh vien 2026");
+
+    // 5. Submit form
+    const submitBtn = page.getByRole("button", { name: /Bóc tách & Mở Studio/i });
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+
+    // 6. Verify Studio opens with DYNAMIC title, NOT the old admissions hardcode
+    await expect(
+      page.locator("h1:has-text('Quy dinh Cong tac Hoc sinh Sinh vien 2026')")
+    ).toBeVisible({ timeout: 6000 });
+
+    // Verify filename on Studio topbar
+    await expect(
+      page.locator("text=Quy_dinh_Cong_tac_Hoc_sinh_Sinh_vien_2026.pdf").first()
+    ).toBeVisible();
+
+    // Verify fallback canvas is displayed instead of admissions scan image
+    await expect(page.locator("text=Tài liệu số hóa — Trang 1 /")).toBeVisible();
+    await expect(
+      page.locator("text=Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)")
+    ).not.toBeVisible();
+  });
 });

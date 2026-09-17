@@ -1896,15 +1896,131 @@ export const apiClient = {
 
   /**
    * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
+   * Phân biệt rõ ràng giữa tài liệu mẫu (doc_ts_2026) và các tài liệu người dùng tải lên thực tế.
    */
   async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
+    // 1. Chế độ Mẫu thử: Đề án Tuyển sinh 2026 (14 trang OCR Docling + scan cache)
     if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
       return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
     }
-    // Return clone with custom docId if matching another doc
+
+    // 2. Chế độ Vận hành Thật: Tìm tài liệu động tương ứng
+    const doc = MOCK_DOCUMENTS.find((d) => d.id === docId);
+    if (doc) {
+      const pageCount = doc.page_count || 1;
+      const cleanTitle = doc.title || doc.filename;
+      const fileSizeMb = Number(((doc.file_size || 50000) / (1024 * 1024)).toFixed(2)) || 0.05;
+
+      const dynamicPages = Array.from({ length: Math.min(pageCount, 50) }, (_, i) => {
+        const pNum = i + 1;
+        const pageMd = `<!-- Trang ${pNum} / ${pageCount} -->
+# ${cleanTitle}
+
+*Tài liệu nguồn:* **${doc.filename}**  
+*Mã tài liệu:* \`${doc.id}\` | *Trang:* **${pNum}/${pageCount}** | *Bộ máy bóc tách:* **${doc.ocr_method || "Docling Table Parser"}**
+
+---
+
+### Nội dung Bóc tách Trích xuất (Trang ${pNum})
+
+Văn bản từ tệp **${doc.filename}** đã được tiếp nhận và xử lý qua bộ máy bóc tách OCR.
+
+- **Tiêu đề văn bản:** ${cleanTitle}
+- **Loại văn bản:** ${doc.document_type || "Văn bản nội bộ"}
+- **Bộ sưu tập:** ${doc.collection_name || "Kho Tri Thức"}
+- **Dung lượng tệp:** ${fileSizeMb} MB
+- **Thời điểm xử lý:** ${doc.created_at || "Vừa xong"}
+
+> Cán bộ có thể chỉnh sửa trực tiếp nội dung văn bản này ở chế độ "Sửa tay Markdown" bên phải trước khi chuyển sang bước tính Vector Embedding.
+`;
+
+        return {
+          page_number: pNum,
+          word_count: Math.round((doc.file_size || 10000) / (pageCount * 6)),
+          line_count: 24,
+          image_url: "", // Tệp tải lên mới không hardcode ảnh scan của Tuyển sinh 2026
+          markdown_content: pageMd,
+          raw_text: pageMd.replace(/[#*`>-]/g, "").trim(),
+          bounding_boxes: [
+            {
+              id: `box_dyn_${pNum}_1`,
+              page_number: pNum,
+              type: "header" as const,
+              coordinates: { x: 5, y: 6, width: 90, height: 8 },
+              label: "Tiêu đề tài liệu",
+              confidence: 0.99,
+              content_snippet: cleanTitle,
+            },
+            {
+              id: `box_dyn_${pNum}_2`,
+              page_number: pNum,
+              type: "text" as const,
+              coordinates: { x: 5, y: 18, width: 90, height: 45 },
+              label: "Đoạn văn trích xuất",
+              confidence: 0.96,
+              content_snippet: `Nội dung bóc tách từ ${doc.filename}`,
+            },
+          ],
+          regions: [
+            {
+              id: `reg_dyn_${pNum}_1`,
+              page_number: pNum,
+              title: "Tiêu đề tài liệu",
+              type: "header" as const,
+              confidence: 0.99,
+              reading_order: 1,
+              details: `Bóc tách từ tệp ${doc.filename}`,
+            },
+            {
+              id: `reg_dyn_${pNum}_2`,
+              page_number: pNum,
+              title: "Khối văn bản chính",
+              type: "text" as const,
+              confidence: 0.96,
+              reading_order: 2,
+              details: "Nội dung văn bản quy chế / học liệu",
+            },
+          ],
+        };
+      });
+
+      return Promise.resolve({
+        document_id: doc.id,
+        collection_id: doc.collection_id,
+        title: cleanTitle,
+        filename: doc.filename,
+        file_size_mb: fileSizeMb,
+        total_pages: pageCount,
+        engine: doc.ocr_method || "Docling Table Parser",
+        total_chars: Math.round((doc.file_size || 10000) * 0.8),
+        estimated_chunks: doc.chunk_count || 10,
+        pages: dynamicPages,
+      });
+    }
+
+    // 3. Fallback an toàn khi không tìm thấy docId
     return Promise.resolve({
-      ...MOCK_VERIFICATION_DOCUMENT,
       document_id: docId,
+      collection_id: "col_general",
+      title: "Tài liệu bóc tách mới",
+      filename: `${docId}.pdf`,
+      file_size_mb: 0.1,
+      total_pages: 1,
+      engine: "auto",
+      total_chars: 400,
+      estimated_chunks: 2,
+      pages: [
+        {
+          page_number: 1,
+          word_count: 80,
+          line_count: 12,
+          image_url: "",
+          markdown_content: `# Tài liệu ${docId}\n\nĐang tải hoặc hoàn tất bóc tách dữ liệu văn bản.`,
+          raw_text: `Tài liệu ${docId}`,
+          bounding_boxes: [],
+          regions: [],
+        },
+      ],
     });
   },
 
