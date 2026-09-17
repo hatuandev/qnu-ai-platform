@@ -110,6 +110,52 @@ async def test_plain_text_parser():
 
 
 @pytest.mark.asyncio
+async def test_parse_preview_blank_scan_returns_empty_honestly():
+    """Scanned PDF with no text layer must preview empty, never hallucinated."""
+    doc = fitz.open()
+    doc.new_page()
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    files = {"file": ("blank_scan.pdf", pdf_bytes, "application/pdf")}
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post(
+            "/platform/v1alpha1/knowledge/collections/col_demo/parse-preview?strategy=semantic",
+            files=files,
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["raw_markdown"] == ""
+    assert data["chunk_count"] == 0
+    assert data["ocr_method"] == "PyMuPdfParser"
+
+
+@pytest.mark.asyncio
+async def test_approve_archived_document_is_rejected():
+    """Approving an archived document must fail loudly with 409."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from app.core.exceptions import AppException
+    from app.modules.knowledge.service import knowledge_service
+
+    archived_doc = MagicMock()
+    archived_doc.is_active = False
+    archived_doc.status = "archived"
+
+    with (
+        patch.object(
+            knowledge_service, "get_document", new=AsyncMock(return_value=archived_doc)
+        ),
+        pytest.raises(AppException) as exc_info,
+    ):
+        await knowledge_service.approve_document(
+            db=AsyncMock(), document_id="doc_archived", pages=None
+        )
+    assert exc_info.value.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_api_parse_preview():
     """Verify POST /platform/v1alpha1/knowledge/collections/{id}/parse-preview endpoint."""
     sample_txt = (

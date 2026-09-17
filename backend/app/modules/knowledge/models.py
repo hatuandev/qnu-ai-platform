@@ -109,6 +109,12 @@ class KnowledgeDocument(Base):
         "KnowledgeChunk", back_populates="document", cascade="all, delete-orphan"
     )
 
+    @property
+    def ocr_method(self) -> str | None:
+        """OCR/parser engine recorded in metadata (read-only convenience)."""
+        metadata = self.doc_metadata or {}
+        return metadata.get("ocr_method")
+
 
 class KnowledgeChunk(Base):
     """Individual chunk extracted from document, stored for retrieval and citation."""

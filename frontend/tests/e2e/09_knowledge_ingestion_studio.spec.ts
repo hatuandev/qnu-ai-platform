@@ -23,10 +23,10 @@ test.describe("09. Knowledge Master-Detail & Full-Screen Ingestion Studio", () =
     await expect(page.locator("text=Kho Tri thức & Vector Collections")).toBeVisible();
     await expect(page.getByText(/5 Kho.*Văn bản.*Chunks/)).toBeVisible();
 
-    // 2. Verify 3-column Card Grid items
-    await expect(page.locator("text=Kho Tri Thức Đề Án Tuyển Sinh")).toBeVisible();
-    await expect(page.locator("text=Kho Mẫu Văn Bản Chuẩn NĐ 30")).toBeVisible();
-    await expect(page.locator("text=Kho Tri Thức Quy Chế Học Vụ")).toBeVisible();
+    // 2. Verify 3-column Card Grid items (offline seed catalog names)
+    await expect(page.locator("text=Kho Tri thức Tuyển sinh Đại học")).toBeVisible();
+    await expect(page.locator("text=Kho Mẫu Văn bản & Hành chính")).toBeVisible();
+    await expect(page.locator("text=Kho Quy chế & Quy định Đào tạo")).toBeVisible();
     await expect(page.locator("text=BAAI/bge-m3 (1024-dim)").first()).toBeVisible();
 
     // Take screenshot of Master Overview

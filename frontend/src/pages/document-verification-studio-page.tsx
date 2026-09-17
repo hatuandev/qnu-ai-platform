@@ -52,6 +52,7 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isCommitting, setIsCommitting] = useState<boolean>(false);
   const [commitSuccessBanner, setCommitSuccessBanner] = useState<boolean>(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
   const markdownComponents = useMemo(
     () => ({
@@ -178,19 +179,22 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
 
   const handleCommitToVectorDb = async () => {
     setIsCommitting(true);
+    setCommitError(null);
     try {
-      await apiClient.saveDocumentVerification(documentId, {
-        pages: [
-          {
-            page_number: currentPage,
-            markdown_content: editableMarkdown,
-          },
-        ],
-      });
+      // Sync the open page edit, then commit every page so manual fixes persist.
+      const allPages = (verificationData?.pages || []).map((p) => ({
+        page_number: p.page_number,
+        markdown_content: p.page_number === currentPage ? editableMarkdown : p.markdown_content,
+      }));
+      await apiClient.saveDocumentVerification(documentId, { pages: allPages });
       setCommitSuccessBanner(true);
       setTimeout(() => {
         onCommitSuccess();
       }, 1500);
+    } catch (err) {
+      setCommitError(
+        err instanceof Error ? err.message : "Nạp Vector DB thất bại. Vui lòng thử lại."
+      );
     } finally {
       setIsCommitting(false);
     }
@@ -290,6 +294,13 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
         </div>
       </div>
 
+      {/* Commit Error Banner */}
+      {commitError && (
+        <div className="px-4 py-2 bg-destructive/10 border-b border-destructive/30 text-xs text-destructive">
+          {commitError}
+        </div>
+      )}
+
       {/* Main Split-Pane Workspace: 50% Left / 50% Right */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-hidden">
         {/* LEFT PANE: Document Bounding Box Visualizer */}
@@ -305,9 +316,7 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
             onToggleShowBoxes={setShowBoxes}
             activeBoxId={activeBoxId}
             onSelectBox={setActiveBoxId}
-            imageUrl={
-              currentPageData?.image_url || `/ocr-cache/doc_ts_2026/page_${currentPage}.jpg`
-            }
+            imageUrl={currentPageData?.image_url}
           />
         </div>
 

@@ -60,6 +60,7 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    uv run ruff check .
    uv run --extra dev pytest -v
    ```
+   - **Cấm test giả (Anti-Mock-Test)**: Test không được pass nhờ đường fallback/mock (ví dụ service trả catalog seed khi DB lỗi, embedding giả khi Qdrant offline). Mỗi suite phải có ít nhất 1 ca phủ đường lỗi (DB down, API lỗi, RAG trống kết quả) để hành vi fallback lộ rõ và tuân thủ No-Answer Policy.
 
 ---
 
@@ -103,6 +104,7 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    npm run typecheck  # TypeScript tsc --noEmit 0 lỗi
    npm run build      # Vite build đóng gói bundle thành công
    ```
+   - **Cấm test/assert trên mock che lỗi**: E2E và unit test phải phân biệt rõ trạng thái "Backend thật" và "Offline Seed Fallback"; tuyệt đối không assert số liệu nghiệp vụ (điểm chuẩn, quota, metrics, citations) khi đang ở chế độ fallback.
 
 ---
 
@@ -112,25 +114,25 @@ Agent có thể kích hoạt và tuân thủ các hướng dẫn chuyên sâu t�
 
 | Skill | Đường Dẫn | Phạm Vi Áp Dụng |
 | :--- | :--- | :--- |
-| **`qnu-frontend-architect`** | [`.agents/skills/qnu-frontend-architect/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-frontend-architect/SKILL.md) | Kiến trúc React 19 + Vite, UI Rules, OKLCH Tokens, Biome, AI Suite |
-| **`qnu-backend-architect`** | [`.agents/skills/qnu-backend-architect/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-backend-architect/SKILL.md) | FastAPI, Modular Monolith 4 files, Strategy/Pipeline/Adapter, RFC 7807 |
-| **`qnu-chatbot-builder`** | [`.agents/skills/qnu-chatbot-builder/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-chatbot-builder/SKILL.md) | Quy trình 7 bước tạo lập Trợ lý AI QNU, Persona, Scope, Fallback |
-| **`qnu-rag-pipeline`** | [`.agents/skills/qnu-rag-pipeline/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-rag-pipeline/SKILL.md) | Qdrant Dense, PostgreSQL FTS, RRF k=60, Cross-Encoder Reranking, Facts |
-| **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng (PyMuPDF, Docling, EasyOCR), Chunking |
-| **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Dynamic Fallback, Quota |
-| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Dead Code/Any, Guard Clauses, SRP |
+| **`qnu-frontend-architect`** | [`.agents/skills/qnu-frontend-architect/SKILL.md`](.agents/skills/qnu-frontend-architect/SKILL.md) | Kiến trúc React 19 + Vite, UI Rules, OKLCH Tokens, Biome, AI Suite |
+| **`qnu-backend-architect`** | [`.agents/skills/qnu-backend-architect/SKILL.md`](.agents/skills/qnu-backend-architect/SKILL.md) | FastAPI, Modular Monolith 4 files, Strategy/Pipeline/Adapter, RFC 7807 |
+| **`qnu-chatbot-builder`** | [`.agents/skills/qnu-chatbot-builder/SKILL.md`](.agents/skills/qnu-chatbot-builder/SKILL.md) | Quy trình 7 bước tạo lập Trợ lý AI QNU, Persona, Scope, Fallback |
+| **`qnu-rag-pipeline`** | [`.agents/skills/qnu-rag-pipeline/SKILL.md`](.agents/skills/qnu-rag-pipeline/SKILL.md) | Qdrant Dense, PostgreSQL FTS, RRF k=60, Cross-Encoder Reranking, Facts |
+| **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng (PyMuPDF, Docling, EasyOCR), Chunking |
+| **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Dynamic Fallback, Quota |
+| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Dead Code/Any, Guard Clauses, SRP |
 
 ---
 
 ## 6. Quy Tắc Bắt Buộc Cập Nhật Nhật Ký Làm Việc (Vibe Coding Work Log Policy)
 
-Mỗi lần thực hiện phiên làm việc ("Vibe Coding") — bao gồm: phát triển tính năng mới, refactor mã nguồn, sửa lỗi, cập nhật cấu hình hạ tầng hay kiểm thử — **AI Agent BẮT BUỘC phải tuân thủ hệ thống quy trình tại [`docs/quy_trinh/`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/docs/quy_trinh/) và cập nhật tiến trình vào thư mục [`docs/nhat_ky/`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/docs/nhat_ky/) (đồng bộ tại [`docs/WORK_LOG.md`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/docs/WORK_LOG.md))**:
+Mỗi lần thực hiện phiên làm việc ("Vibe Coding") — bao gồm: phát triển tính năng mới, refactor mã nguồn, sửa lỗi, cập nhật cấu hình hạ tầng hay kiểm thử — **AI Agent BẮT BUỘC phải tuân thủ hệ thống quy trình tại [`docs/quy_trinh/`](docs/quy_trinh/) và cập nhật tiến trình vào thư mục [`docs/nhat_ky/`](docs/nhat_ky/) (đồng bộ tại [`docs/WORK_LOG.md`](docs/WORK_LOG.md))**:
 1. **Thời gian & Tiêu đề**: Ghi rõ ngày giờ và mục tiêu chính của phiên làm việc.
 2. **Thay đổi kỹ thuật (Key Changes)**: Liệt kê chi tiết các tệp tin đã chỉnh sửa hoặc tạo mới, gắn link markdown trực tiếp và nêu rõ lý do kỹ thuật.
 3. **Kết quả kiểm thử (Verification)**: Chạy và ghi nhận kết quả kiểm thử tương ứng:
    - Thay đổi Backend: `uv run ruff check .` (0 lỗi) và `uv run --extra dev pytest -v` (100% pass).
    - Thay đổi Frontend: `npm run lint` (0 lỗi), `npm run typecheck` (0 lỗi), và `npm run build` (thành công).
-4. **MinIO Object Storage Compliance**: Luôn bảo đảm các luồng lưu trữ file upload gốc và file thành phẩm (Word NĐ 30, Excel Bloom) được đẩy trực tiếp lên MinIO trước khi chuyển tầng bóc tách (tuân thủ [`docs/quy_trinh/02_nap_tri_thuc_minio.md`](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/docs/quy_trinh/02_nap_tri_thuc_minio.md)).
+4. **MinIO Object Storage Compliance**: Luôn bảo đảm các luồng lưu trữ file upload gốc và file thành phẩm (Word NĐ 30, Excel Bloom) được đẩy trực tiếp lên MinIO trước khi chuyển tầng bóc tách (tuân thủ [`docs/quy_trinh/02_nap_tri_thuc_minio.md`](docs/quy_trinh/02_nap_tri_thuc_minio.md)).
 5. **Không bỏ sót**: Tuyệt đối không kết thúc phiên làm việc khi chưa cập nhật nhật ký làm việc trong thư mục `docs/nhat_ky/`.
 
 ---
@@ -250,8 +252,9 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - Tuyệt đối cấm khối lệnh rỗng: `catch (e) {}` hay `except Exception: pass` nuốt trôi lỗi mà không có bất kỳ phản hồi nào.
 - Mọi khối bắt lỗi phải:
   1. Ghi log có ngữ cảnh (`logger.warning` / `logger.error` kèm lý do), HOẶC
-  2. Kích hoạt graceful fallback an toàn (trả mock data, chuyển hướng sang provider dự phòng), HOẶC
+  2. Kích hoạt graceful fallback **được phép**: retry với backoff, chuyển sang provider dự phòng, hoặc dùng cache hợp lệ gần nhất **có gắn nhãn thời điểm dữ liệu**, HOẶC
   3. Hiển thị thông báo thân thiện (Toast / Alert) để người dùng nắm được nguyên nhân sự cố.
+- **CẤM fallback bằng mock data bịa đặt cho dữ liệu nghiệp vụ**: Tuyệt đối không trả số liệu giả (điểm chuẩn, học phí, chỉ tiêu, nội dung quy chế, trích dẫn văn bản,...) khi backend/RAG thất bại. Khi thiếu dữ liệu thật, Frontend phải hiển thị trạng thái lỗi/trống rõ ràng và Backend phải kích hoạt No-Answer Policy (điều hướng tới phòng ban phụ trách) — không bao giờ hiển thị số liệu giả như số liệu thật.
 
 ### 8.8. Vòng Lặp Tự Làm Sạch Tự Động (Clean-As-You-Go Loop)
 - Trước khi kết thúc bất kỳ lượt xử lý (turn) nào hoặc bàn giao code cho người dùng, Agent **BẮT BUỘC** phải tự chạy kiểm tra tĩnh và format:
@@ -264,4 +267,25 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
   uv run ruff check .  # Ruff kiểm tra & dọn imports
   ```
 - **Không bao giờ bàn giao code khi còn bất kỳ lỗi lint hay typecheck nào!**
+
+---
+
+## 9. Quy Tắc Bắt Buộc Về Git, Encoding & Bảo Mật Secrets
+
+Ba sự cố đã từng xảy ra thật trong dự án (commit ảnh nhị phân 9MB, double-encoding mojibake, hardcode `SECRET_KEY`) — các quy tắc dưới đây là biện pháp ngăn tái diễn.
+
+### 9.1. Không Commit File Nhị Phân & Dung Lượng Lớn Vào Git
+- **Cấm** commit ảnh scan, PDF/DOCX mẫu, video, model weights, datasets, thư mục cache (`ocr-cache`, `node_modules`, `.venv`, `dist`, `test-results`) vào repository.
+- Tài liệu gốc và ảnh scan dung lượng lớn phải lưu trên **MinIO/S3 Object Storage** (tuân thủ mục 6.4) hoặc **Git LFS** nếu bắt buộc version cùng code.
+- Thư mục `frontend/public/` chỉ giữ assets nhẹ phục vụ UI (icons, placeholder); trước mỗi commit, Agent phải kiểm tra `git status` và từ chối stage file `> 500KB` khi chưa được người dùng xác nhận.
+
+### 9.2. Bắt Buộc UTF-8 Cho Mọi File Text
+- Mọi file `.md`, `.py`, `.ts/.tsx`, `.json`, `.yml/.yaml`, `.toml` phải được đọc/ghi ở encoding **UTF-8** (khuyến nghị giữ BOM cho markdown tiếng Việt, LF cho line endings).
+- Dấu hiệu double-encoding (file hỏng): xuất hiện `Ã`, `â€`, `á»` khi mở file. Khi phát hiện, Agent phải **khôi phục bằng cách đảo ngược** (map từng ký tự về byte gốc cp1252 rồi decode UTF-8) và đối chiếu với bản cha trên git — tuyệt đối không commit đè file hỏng.
+- Sau khi ghi file tiếng Việt, Agent phải đọc lại kiểm chứng trước khi kết thúc phiên.
+
+### 9.3. Cấm Hardcode Secrets Trong Code
+- Tuyệt đối không hardcode `SECRET_KEY`, API key, password, connection string vào mã nguồn. Mọi secret phải đọc từ biến môi trường / file `.env` (và `.env` **không bao giờ** được commit).
+- Giá trị mặc định trong `app/core/config.py` chỉ được là placeholder rỗng hoặc giá trị dev vô hại; `DEV_AUTH_ENABLED` bắt buộc là `False` ở môi trường production.
+- Trước mỗi commit, Agent phải rà soát diff để bảo đảm không lọt secret mới (API key, token, private key) vào lịch sử git.
 

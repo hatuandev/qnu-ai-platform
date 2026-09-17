@@ -1,11 +1,18 @@
-import { ArrowLeft, ArrowRight, FileCheck2, ShieldCheck, UploadCloud } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleAlert, FileCheck2, ShieldCheck, UploadCloud } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import type { KnowledgeCollection } from "../services/api-client";
+import { type KnowledgeCollection, apiClient } from "../services/api-client";
+
+const OCR_ENGINE_PARAM: Record<string, string | undefined> = {
+  auto: undefined,
+  docling: "docling",
+  pymupdf: "pymupdf_ocr",
+  easyocr: "easyocr",
+};
 
 export interface DocumentIngestPageProps {
   collection: KnowledgeCollection;
@@ -24,6 +31,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
   const [ocrEngine, setOcrEngine] = useState<string>("auto");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -35,13 +43,29 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedFile) {
+      setSubmitError("Vui lòng chọn tệp tài liệu trước khi bóc tách.");
+      return;
+    }
     setIsProcessing(true);
-    setTimeout(() => {
+    setSubmitError(null);
+    try {
+      const uploaded = await apiClient.uploadDocument(
+        collection.id,
+        selectedFile,
+        docTitle.trim() || undefined,
+        OCR_ENGINE_PARAM[ocrEngine]
+      );
+      onStartVerification(uploaded.id);
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Tải lên thất bại. Vui lòng thử lại."
+      );
+    } finally {
       setIsProcessing(false);
-      onStartVerification("doc_ts_2026");
-    }, 600);
+    }
   };
 
   return (
@@ -237,6 +261,14 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
               chiếu trước khi tính vector.
             </p>
           </div>
+
+          {/* Submission Error Banner */}
+          {submitError && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
+              <CircleAlert className="size-4 shrink-0 mt-0.5" />
+              <span>{submitError}</span>
+            </div>
+          )}
 
           {/* Form Actions Footer */}
           <div className="flex items-center justify-between pt-4 border-t border-border/70">

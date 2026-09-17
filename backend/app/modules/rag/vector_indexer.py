@@ -68,6 +68,9 @@ class VectorIndexer:
 
         for c in chunks:
             chunk_id = str(c["id"])
+            # Qdrant point IDs must be UUID/uint: use explicit point_id when given
+            # (e.g. deterministic uuid5), keep business chunk_id in the payload.
+            point_id: Any = c.get("point_id") or chunk_id
             content = str(c["content"])
             vector = c.get("vector") or self.generate_embedding(content, self.vector_size)
 
@@ -85,7 +88,7 @@ class VectorIndexer:
 
             points.append(
                 qmodels.PointStruct(
-                    id=chunk_id,
+                    id=point_id,
                     vector=vector,
                     payload=payload,
                 )

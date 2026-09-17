@@ -6,11 +6,11 @@ import hashlib
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import EntityAlreadyExistsError, EntityNotFoundError
+from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.core.storage import storage_service
 from app.modules.knowledge.chunker import get_chunker
 from app.modules.knowledge.cleaner import clean_markdown_text
@@ -21,6 +21,7 @@ from app.modules.knowledge.models import (
     KnowledgeFact,
 )
 from app.modules.knowledge.parsers import get_document_parser
+from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.schemas import (
     CollectionCreateRequest,
     ParsePreviewResponse,
@@ -147,6 +148,33 @@ class KnowledgeService:
     def compute_file_hash(data: bytes) -> str:
         return hashlib.sha256(data).hexdigest()
 
+    async def _run_ocr_rescue(
+        self,
+        db: AsyncSession,
+        file_bytes: bytes,
+        file_name: str,
+        ocr_engine: str | None,
+    ) -> tuple[str, str, int, bool]:
+        """Rescue blank parses (scanned PDFs/images) via OCR auto-routing.
+
+        Returns (markdown_text, engine_used, page_count, rescued). Never raises:
+        OCR failure only means the document stays pending for manual handling.
+        """
+        try:
+            from app.modules.ocr.service import OCRService
+
+            ocr_result = await OCRService().extract_document(
+                session=db,
+                content=file_bytes,
+                filename=file_name,
+                engine_name=ocr_engine or "auto",
+            )
+        except Exception as exc:
+            logger.warning("OCR rescue failed for file='%s': %s", file_name, exc)
+            return "", "none", 0, False
+        rescued = bool((ocr_result.raw_text or "").strip())
+        return ocr_result.raw_text, ocr_result.engine_used, ocr_result.total_pages, rescued
+
     async def ingest_document(
         self,
         db: AsyncSession,
@@ -154,6 +182,7 @@ class KnowledgeService:
         file_bytes: bytes,
         file_name: str,
         title: str | None = None,
+        ocr_engine: str | None = None,
     ) -> KnowledgeDocument:
         col = await self.get_collection(db, collection_id)
         file_hash = self.compute_file_hash(file_bytes)
@@ -180,6 +209,31 @@ class KnowledgeService:
         # 2. Parse document strategy
         parser = get_document_parser(ext)
         parsed = await parser.parse(file_bytes, file_name)
+        ocr_method = parser.__class__.__name__
+        ocr_fallback = False
+
+        # 2b. Scanned-document rescue: blank text -> OCR auto-routing
+        if not (parsed.raw_text or "").strip() and ext in (
+            "pdf",
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "bmp",
+        ):
+            ocr_text, ocr_engine_used, ocr_pages, rescued = await self._run_ocr_rescue(
+                db, file_bytes, file_name, ocr_engine
+            )
+            if rescued:
+                parsed = ParsedContent(
+                    raw_text=ocr_text,
+                    page_count=ocr_pages,
+                    tables=[],
+                    metadata={"ocr_engine": ocr_engine_used},
+                )
+                ocr_method = ocr_engine_used
+                ocr_fallback = True
+                logger.info("OCR rescue succeeded for file='%s' via %s", file_name, ocr_method)
 
         # 3. Clean and normalize text
         cleaned_text = clean_markdown_text(parsed.raw_text)
@@ -189,7 +243,7 @@ class KnowledgeService:
         chunker = get_chunker(chunk_strategy)
         chunk_drafts = chunker.chunk(cleaned_text)
 
-        # 5. Persist Document entity
+        # 5. Persist Document entity (pending review -> approve indexes to Qdrant)
         doc = KnowledgeDocument(
             collection_id=collection_id,
             title=title or file_name.rsplit(".", 1)[0],
@@ -203,8 +257,10 @@ class KnowledgeService:
                 "table_count": len(parsed.tables),
                 "chunk_count": len(chunk_drafts),
                 "parser": parser.__class__.__name__,
+                "ocr_method": ocr_method,
+                "ocr_fallback": ocr_fallback,
             },
-            status="approved",
+            status="pending",
             is_active=True,
         )
         db.add(doc)
@@ -251,11 +307,31 @@ class KnowledgeService:
         file_bytes: bytes,
         file_name: str,
         strategy: str = "semantic",
+        db: AsyncSession | None = None,
+        ocr_engine: str | None = None,
     ) -> ParsePreviewResponse:
         """Parse preview without persisting to database."""
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
         parser = get_document_parser(ext)
         parsed = await parser.parse(file_bytes, file_name)
+        ocr_method = parser.__class__.__name__
+
+        if (
+            db is not None
+            and not (parsed.raw_text or "").strip()
+            and ext in ("pdf", "png", "jpg", "jpeg", "webp", "bmp")
+        ):
+            ocr_text, ocr_engine_used, ocr_pages, rescued = await self._run_ocr_rescue(
+                db, file_bytes, file_name, ocr_engine
+            )
+            if rescued:
+                parsed = ParsedContent(
+                    raw_text=ocr_text,
+                    page_count=ocr_pages,
+                    tables=[],
+                    metadata={"ocr_engine": ocr_engine_used},
+                )
+                ocr_method = ocr_engine_used
         cleaned_text = clean_markdown_text(parsed.raw_text)
 
         chunker = get_chunker(strategy)
@@ -282,6 +358,7 @@ class KnowledgeService:
             estimated_tokens=total_tokens,
             extracted_tables_count=len(parsed.tables),
             preview_chunks=preview_chunks,
+            ocr_method=ocr_method,
         )
 
     # ==========================================================================
@@ -315,6 +392,102 @@ class KnowledgeService:
         await db.delete(doc)
         await db.commit()
         logger.info("Permanently deleted document id=%s", document_id)
+
+    async def approve_document(
+        self,
+        db: AsyncSession,
+        document_id: str,
+        pages: list[dict] | None = None,
+    ) -> dict:
+        """Approve a pending document and index its chunks to Qdrant.
+
+        When ``pages`` (human-verified per-page markdown) is provided, existing
+        chunks are replaced by re-chunked edited pages first. Returns summary
+        with the number of chunks actually indexed to the vector store.
+        """
+        from app.modules.rag.vector_indexer import vector_indexer
+
+        doc = await self.get_document(db, document_id)
+        if not doc.is_active or doc.status == "archived":
+            raise AppException(
+                f"Tài liệu '{document_id}' đã lưu trữ, không thể phê duyệt.",
+                code="document_archived",
+                status_code=409,
+            )
+
+        if pages:
+            await db.execute(
+                delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
+            )
+            await db.flush()
+            col = await self.get_collection(db, doc.collection_id)
+            chunk_strategy = "clause" if col.module_code == "regulations" else "semantic"
+            chunker = get_chunker(chunk_strategy)
+            chunk_index = 0
+            for page in pages:
+                page_number = int(page.get("page_number", 1))
+                cleaned = clean_markdown_text(str(page.get("markdown_content", "")))
+                if not cleaned:
+                    continue
+                for draft in chunker.chunk(cleaned):
+                    db.add(
+                        KnowledgeChunk(
+                            document_id=doc.id,
+                            collection_id=doc.collection_id,
+                            chunk_index=chunk_index,
+                            content=draft.content,
+                            chunk_hash=draft.chunk_hash,
+                            token_count=draft.token_count,
+                            section=draft.section,
+                            page_number=page_number,
+                            chunk_metadata={**(draft.metadata or {}), "human_verified": True},
+                        )
+                    )
+                    chunk_index += 1
+            metadata = dict(doc.doc_metadata or {})
+            metadata["human_verified"] = True
+            doc.doc_metadata = metadata
+
+        doc.status = "approved"
+        await db.commit()
+        await db.refresh(doc)
+
+        chunks = list(
+            (
+                await db.execute(
+                    select(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        indexed = await vector_indexer.index_chunks(
+            collection_id=doc.collection_id,
+            chunks=[
+                {
+                    "id": c.id,
+                    "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.collection_id}:{c.id}")),
+                    "content": c.content,
+                    "document_id": c.document_id,
+                    "section": c.section,
+                    "page_number": c.page_number,
+                    "metadata": c.chunk_metadata or {},
+                }
+                for c in chunks
+            ],
+        )
+        metadata = dict(doc.doc_metadata or {})
+        metadata["indexed_chunks"] = indexed
+        doc.doc_metadata = metadata
+        await db.commit()
+
+        logger.info("Approved document id=%s, chunks=%d, indexed=%d", doc.id, len(chunks), indexed)
+        return {
+            "document_id": doc.id,
+            "status": doc.status,
+            "total_chunks": len(chunks),
+            "indexed_chunks": indexed,
+        }
 
 
 knowledge_service = KnowledgeService()

@@ -59,7 +59,20 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
   const handleResetZoom = () => setZoomLevel(96);
   const handleFitPage = () => setZoomLevel(70);
 
-  const currentImageSrc = imageUrl || `/ocr-cache/doc_ts_2026/page_${currentPage}.jpg`;
+  // Honest image source: real scan URL only. Documents without a rendered
+  // page image show the placeholder panel instead of another doc's image.
+  const currentImageSrc = imageUrl;
+
+  // Reset a stale image error whenever the viewed page/source changes
+  // (React-endorsed adjust-state-during-render pattern, no effect needed).
+  const visualKey = `${currentPage}|${imageUrl ?? ""}`;
+  const [lastVisualKey, setLastVisualKey] = useState<string>(visualKey);
+  if (visualKey !== lastVisualKey) {
+    setLastVisualKey(visualKey);
+    if (imageError) {
+      setImageError(false);
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-muted/20 border-r border-border select-none">
@@ -200,7 +213,7 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
           }}
         >
           {/* Real High-Fidelity Scanned Document Page Image */}
-          {!imageError ? (
+          {currentImageSrc && !imageError ? (
             <img
               src={currentImageSrc}
               alt={`Trang scan ${currentPage}`}

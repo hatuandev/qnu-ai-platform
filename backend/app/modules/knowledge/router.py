@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.knowledge.schemas import (
+    ApproveDocumentRequest,
+    ApproveDocumentResponse,
     CollectionCreateRequest,
     CollectionResponse,
     DocumentDetailResponse,
@@ -71,6 +73,9 @@ async def upload_document(
     collection_id: str,
     file: UploadFile = File(..., description="Tệp tài liệu (PDF, Word, Excel, Text)"),
     title: str | None = Form(None, description="Tiêu đề hiển thị của tài liệu"),
+    ocr_engine: str | None = Form(
+        None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentResponse:
     content = await file.read()
@@ -80,6 +85,7 @@ async def upload_document(
         file_bytes=content,
         file_name=file.filename or "unknown_file.txt",
         title=title,
+        ocr_engine=ocr_engine,
     )
     return DocumentResponse.model_validate(doc)
 
@@ -93,12 +99,18 @@ async def parse_preview(
     collection_id: str,
     file: UploadFile = File(...),
     strategy: str = Query("semantic", description="Chiến lược chia đoạn: semantic hoặc clause"),
+    ocr_engine: str | None = Query(
+        None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
+    ),
+    db: AsyncSession = Depends(get_db),
 ) -> ParsePreviewResponse:
     content = await file.read()
     return await knowledge_service.parse_preview(
         file_bytes=content,
         file_name=file.filename or "sample.txt",
         strategy=strategy,
+        db=db,
+        ocr_engine=ocr_engine,
     )
 
 
@@ -126,6 +138,24 @@ async def get_document(
 ) -> DocumentDetailResponse:
     doc = await knowledge_service.get_document(db, document_id)
     return DocumentDetailResponse.model_validate(doc)
+
+
+@router.post(
+    "/documents/{document_id}/approve",
+    response_model=ApproveDocumentResponse,
+    summary="Phê duyệt & Nạp Tài liệu vào Vector DB (kèm bản sửa tay)",
+)
+async def approve_document(
+    document_id: str,
+    body: ApproveDocumentRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ApproveDocumentResponse:
+    result = await knowledge_service.approve_document(
+        db=db,
+        document_id=document_id,
+        pages=[p.model_dump() for p in body.pages] if body.pages else None,
+    )
+    return ApproveDocumentResponse.model_validate(result)
 
 
 @router.post(

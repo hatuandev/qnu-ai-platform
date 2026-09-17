@@ -91,8 +91,27 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     chunk_count: int | None = 0
+    ocr_method: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ApprovePageEdit(BaseModel):
+    page_number: int = Field(..., ge=1, description="Số thứ tự trang được sửa tay")
+    markdown_content: str = Field(..., description="Nội dung Markdown đã hiệu đính của trang")
+
+
+class ApproveDocumentRequest(BaseModel):
+    pages: list[ApprovePageEdit] | None = Field(
+        None, description="Các trang đã sửa tay; bỏ trống để duyệt nguyên bản bóc tách"
+    )
+
+
+class ApproveDocumentResponse(BaseModel):
+    document_id: str
+    status: str
+    total_chunks: int
+    indexed_chunks: int
 
 
 class DocumentDetailResponse(DocumentResponse):
@@ -109,3 +128,4 @@ class ParsePreviewResponse(BaseModel):
     estimated_tokens: int
     extracted_tables_count: int
     preview_chunks: list[dict[str, Any]]
+    ocr_method: str = "PyMuPdfParser"

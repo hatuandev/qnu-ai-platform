@@ -52,7 +52,7 @@ export interface KnowledgeDocument {
   file_size: number;
   page_count: number;
   chunk_count: number;
-  status: "completed" | "processing" | "pending" | "failed";
+  status: "completed" | "processing" | "pending" | "failed" | "approved" | "archived";
   ocr_method: string;
   document_type?: string;
   priority_level?: "core" | "high" | "normal";
@@ -94,6 +94,46 @@ export interface DocumentRegion {
   confidence: number;
   reading_order: number;
   details: string;
+}
+
+export interface ParsePreviewResult {
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  raw_markdown: string;
+  chunk_count: number;
+  estimated_tokens: number;
+  extracted_tables_count: number;
+  ocr_method: string;
+  preview_chunks: {
+    index: number;
+    token_count: number;
+    section: string | null;
+    preview: string;
+  }[];
+}
+
+export interface DocumentChunkItem {
+  id: string;
+  document_id: string;
+  chunk_index: number;
+  content: string;
+  token_count: number;
+  section: string | null;
+  page_number: number | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface KnowledgeDocumentDetail extends KnowledgeDocument {
+  chunks: DocumentChunkItem[];
+  doc_metadata: Record<string, unknown>;
+}
+
+export interface ApproveDocumentResult {
+  document_id: string;
+  status: string;
+  total_chunks: number;
+  indexed_chunks: number;
 }
 
 export interface DocumentVerificationData {
@@ -1223,63 +1263,112 @@ export const apiClient = {
   async uploadDocument(
     collectionId: string,
     file: File,
-    title?: string
+    title?: string,
+    ocrEngine?: string
   ): Promise<KnowledgeDocument> {
     const formData = new FormData();
     formData.append("file", file);
     if (title) {
       formData.append("title", title);
     }
-    try {
-      const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      if (res.ok) {
-        const d = await res.json();
-        const fn = (d.filename as string) || (d.file_name as string) || file.name;
-        const newDoc: KnowledgeDocument = {
-          id: (d.id as string) || `doc_${Date.now()}`,
-          collection_id: (d.collection_id as string) || collectionId,
-          collection_name: (d.collection_name as string) || "Kho Tri Thức",
-          title: (d.title as string) || fn,
-          filename: fn,
-          file_size: typeof d.file_size === "number" ? d.file_size : file.size,
-          page_count:
-            typeof d.page_count === "number"
-              ? d.page_count
-              : Math.max(1, Math.round(file.size / 50000)),
-          chunk_count:
-            typeof d.chunk_count === "number"
-              ? d.chunk_count
-              : Math.max(4, Math.round(file.size / 20000)),
-          status: "completed",
-          ocr_method: (d.ocr_method as string) || "Docling Table Parser",
-          created_at: new Date().toISOString().replace("T", " ").substring(0, 16),
-        };
-        MOCK_DOCUMENTS.unshift(newDoc);
-        return newDoc;
-      }
-    } catch {
-      // Fallback
+    if (ocrEngine) {
+      formData.append("ocr_engine", ocrEngine);
     }
-
-    const cleanTitle = title || file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    // Honest upload: backend failures surface to the caller, never a fake doc.
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      throw new Error(`Tải lên thất bại (HTTP ${res.status}). Vui lòng thử lại.`);
+    }
+    const d = (await res.json()) as Record<string, unknown>;
+    const fn = (d.filename as string) || (d.file_name as string) || file.name;
     const newDoc: KnowledgeDocument = {
-      id: `doc_${Date.now()}`,
-      collection_id: collectionId,
+      id: d.id as string,
+      collection_id: (d.collection_id as string) || collectionId,
       collection_name: "Kho Tri Thức",
-      title: cleanTitle,
-      filename: file.name,
-      file_size: file.size,
-      page_count: Math.max(1, Math.round(file.size / 50000)),
-      chunk_count: Math.max(4, Math.round(file.size / 20000)),
-      status: "completed",
-      ocr_method: "Docling Table Parser",
+      title: (d.title as string) || fn,
+      filename: fn,
+      file_size: typeof d.file_size_bytes === "number" ? d.file_size_bytes : file.size,
+      page_count: 1,
+      chunk_count: 0,
+      status: (d.status as KnowledgeDocument["status"]) || "pending",
+      ocr_method: (d.ocr_method as string) || "PyMuPdfParser",
       created_at: new Date().toISOString().replace("T", " ").substring(0, 16),
     };
     MOCK_DOCUMENTS.unshift(newDoc);
     return newDoc;
+  },
+
+  async parsePreviewDocument(
+    collectionId: string,
+    file: File,
+    strategy = "semantic",
+    ocrEngine?: string
+  ): Promise<ParsePreviewResult> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const params = new URLSearchParams({ strategy });
+    if (ocrEngine) {
+      params.append("ocr_engine", ocrEngine);
+    }
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/parse-preview?${params.toString()}`,
+      { method: "POST", body: formData }
+    );
+    if (!res.ok) {
+      throw new Error(`Bóc tách xem trước thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as ParsePreviewResult;
+  },
+
+  async getDocumentDetail(documentId: string): Promise<KnowledgeDocumentDetail> {
+    const res = await fetch(`${BASE_URL}/knowledge/documents/${documentId}`);
+    if (!res.ok) {
+      throw new Error(`Không tải được tài liệu (HTTP ${res.status}).`);
+    }
+    const d = (await res.json()) as Record<string, unknown>;
+    const chunks = (d.chunks as Record<string, unknown>[] | undefined) || [];
+    return {
+      id: d.id as string,
+      collection_id: d.collection_id as string,
+      collection_name: "Kho Tri Thức",
+      title: d.title as string,
+      filename: (d.file_name as string) || "",
+      file_size: (d.file_size_bytes as number) || 0,
+      page_count: 1,
+      chunk_count: chunks.length,
+      status: (d.status as KnowledgeDocument["status"]) || "pending",
+      ocr_method: (d.ocr_method as string) || "PyMuPdfParser",
+      created_at: (d.created_at as string) || "",
+      chunks: chunks.map((c) => ({
+        id: c.id as string,
+        document_id: c.document_id as string,
+        chunk_index: (c.chunk_index as number) || 0,
+        content: (c.content as string) || "",
+        token_count: (c.token_count as number) || 0,
+        section: (c.section as string) || null,
+        page_number: typeof c.page_number === "number" ? c.page_number : null,
+        metadata: (c.metadata as Record<string, unknown>) || {},
+      })),
+      doc_metadata: (d.doc_metadata as Record<string, unknown>) || {},
+    };
+  },
+
+  async approveDocument(
+    documentId: string,
+    pages?: { page_number: number; markdown_content: string }[]
+  ): Promise<ApproveDocumentResult> {
+    const res = await fetch(`${BASE_URL}/knowledge/documents/${documentId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages: pages || null }),
+    });
+    if (!res.ok) {
+      throw new Error(`Phê duyệt tài liệu thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as ApproveDocumentResult;
   },
 
   async getModelProviders(): Promise<ModelProvider[]> {
@@ -1898,35 +1987,80 @@ export const apiClient = {
    * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
    */
   async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
+    // Legacy demo document keeps its hand-written studio fixture.
     if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
       return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
     }
-    // Return clone with custom docId if matching another doc
-    return Promise.resolve({
-      ...MOCK_VERIFICATION_DOCUMENT,
-      document_id: docId,
-    });
+    // Real documents: build the studio view from backend chunks (no invention).
+    const detail = await apiClient.getDocumentDetail(docId);
+    const byPage = new Map<number, DocumentChunkItem[]>();
+    for (const chunk of detail.chunks) {
+      const pageNumber = chunk.page_number && chunk.page_number > 0 ? chunk.page_number : 1;
+      const group = byPage.get(pageNumber) || [];
+      group.push(chunk);
+      byPage.set(pageNumber, group);
+    }
+    const pageNumbers = [...byPage.keys()].sort((a, b) => a - b);
+    const totalChars = detail.chunks.reduce((sum, c) => sum + c.content.length, 0);
+    const engine =
+      (detail.doc_metadata.ocr_method as string) || detail.ocr_method || "PyMuPdfParser";
+    return {
+      document_id: detail.id,
+      collection_id: detail.collection_id,
+      title: detail.title,
+      filename: detail.filename,
+      file_size_mb: Math.round((detail.file_size / 1048576) * 100) / 100,
+      total_pages: Math.max(pageNumbers.length, 1),
+      engine,
+      total_chars: totalChars,
+      estimated_chunks: detail.chunks.length,
+      pages: (pageNumbers.length > 0 ? pageNumbers : [1]).map((pageNumber) => {
+        const group = (byPage.get(pageNumber) || []).sort(
+          (a, b) => a.chunk_index - b.chunk_index
+        );
+        const markdown = group.map((c) => c.content).join("\n\n");
+        return {
+          page_number: pageNumber,
+          word_count: markdown.trim() ? markdown.trim().split(/\s+/).length : 0,
+          line_count: markdown ? markdown.split("\n").length : 0,
+          image_url: undefined,
+          markdown_content: markdown,
+          raw_text: markdown,
+          bounding_boxes: [],
+          regions: [],
+        };
+      }),
+    };
   },
 
   /**
-   * Lưu trữ Markdown đã sửa tay bởi cán bộ và chuyển sang trạng thái sẵn sàng nạp Vector DB.
+   * Phê duyệt tài liệu: gửi bản sửa tay lên backend để nạp Vector DB thật.
    */
   async saveDocumentVerification(
-    _docId: string,
+    docId: string,
     payload: { pages: { page_number: number; markdown_content: string }[] }
   ): Promise<{ success: boolean; vector_status: string; total_chunks: number }> {
-    for (const p of payload.pages) {
-      const targetPage = MOCK_VERIFICATION_DOCUMENT.pages.find(
-        (mp) => mp.page_number === p.page_number
-      );
-      if (targetPage) {
-        targetPage.markdown_content = p.markdown_content;
+    // Legacy demo document keeps its in-memory fixture behavior.
+    if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
+      for (const p of payload.pages) {
+        const targetPage = MOCK_VERIFICATION_DOCUMENT.pages.find(
+          (mp) => mp.page_number === p.page_number
+        );
+        if (targetPage) {
+          targetPage.markdown_content = p.markdown_content;
+        }
       }
+      return Promise.resolve({
+        success: true,
+        vector_status: "ready_for_indexing",
+        total_chunks: MOCK_VERIFICATION_DOCUMENT.estimated_chunks,
+      });
     }
+    const result = await apiClient.approveDocument(docId, payload.pages);
     return Promise.resolve({
       success: true,
-      vector_status: "ready_for_indexing",
-      total_chunks: MOCK_VERIFICATION_DOCUMENT.estimated_chunks,
+      vector_status: result.indexed_chunks > 0 ? "indexed" : "approved_pending_index",
+      total_chunks: result.total_chunks,
     });
   },
 };
