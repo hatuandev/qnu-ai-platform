@@ -13,6 +13,13 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { type KnowledgeCollection, apiClient } from "../services/api-client";
 
 const OCR_ENGINE_PARAM: Record<string, string | undefined> = {
@@ -156,18 +163,18 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
               >
                 Loại văn bản
               </label>
-              <select
-                id="document-type-select"
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-                className="w-full h-10 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="quy_che">Quy chế (Văn bản Quy phạm & Nội bộ)</option>
-                <option value="de_an">Đề án & Kế hoạch Tuyển sinh</option>
-                <option value="quyet_dinh">Quyết định Ban hành</option>
-                <option value="thong_bao">Thông báo Hướng dẫn</option>
-                <option value="giao_trinh">Giáo trình & Học liệu số</option>
-              </select>
+              <Select value={docType} onValueChange={setDocType}>
+                <SelectTrigger id="document-type-select" className="w-full h-10 text-xs">
+                  <SelectValue placeholder="Chọn loại văn bản" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quy_che">Quy chế (Văn bản Quy phạm & Nội bộ)</SelectItem>
+                  <SelectItem value="de_an">Đề án & Kế hoạch Tuyển sinh</SelectItem>
+                  <SelectItem value="quyet_dinh">Quyết định Ban hành</SelectItem>
+                  <SelectItem value="thong_bao">Thông báo Hướng dẫn</SelectItem>
+                  <SelectItem value="giao_trinh">Giáo trình & Học liệu số</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
@@ -194,23 +201,25 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
               <label htmlFor="ocr-engine-select" className="text-xs font-semibold text-foreground">
                 Cấu hình Bộ máy OCR
               </label>
-              <select
-                id="ocr-engine-select"
-                value={ocrEngine}
-                onChange={(e) => setOcrEngine(e.target.value)}
-                className="w-full h-10 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="auto">✨ Tự động nhận diện tối ưu theo tệp (Khuyên dùng...)</option>
-                <option value="docling">
-                  IBM Docling TableFormer (Bóc tách ma trận bảng biểu tuyển sinh)
-                </option>
-                <option value="pymupdf">
-                  PyMuPDF Fast (Bóc tách văn bản số nhanh & nguyên vẹn)
-                </option>
-                <option value="easyocr">
-                  EasyOCR Local (Nhận diện tài liệu scan ảnh & dấu mộc đỏ)
-                </option>
-              </select>
+              <Select value={ocrEngine} onValueChange={setOcrEngine}>
+                <SelectTrigger id="ocr-engine-select" className="w-full h-10 text-xs">
+                  <SelectValue placeholder="Chọn bộ máy OCR" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    ✨ Tự động nhận diện tối ưu theo tệp (Khuyên dùng...)
+                  </SelectItem>
+                  <SelectItem value="docling">
+                    IBM Docling TableFormer (Bóc tách ma trận bảng biểu tuyển sinh)
+                  </SelectItem>
+                  <SelectItem value="pymupdf">
+                    PyMuPDF Fast (Bóc tách văn bản số nhanh & nguyên vẹn)
+                  </SelectItem>
+                  <SelectItem value="easyocr">
+                    EasyOCR Local (Nhận diện tài liệu scan ảnh & dấu mộc đỏ)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">

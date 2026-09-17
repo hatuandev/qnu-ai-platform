@@ -10,6 +10,7 @@ import {
   MessagesSquare,
   Network,
   Palette,
+  Scan,
   Share2,
   ShieldCheck,
   Wrench,
@@ -97,6 +98,16 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         badge: "RAG",
         badgeVariant: "success",
         description: "Collections tài liệu, Ingestion wizard, OCR đa tầng và Hybrid Playground",
+      },
+      {
+        id: "scan-studio",
+        title: "Scan & OCR Studio",
+        path: "/ocr",
+        icon: Scan,
+        badge: "Studio",
+        badgeVariant: "success",
+        description:
+          "Bóc tách văn bản scan, nhận diện bảng biểu, con dấu và xem trước Split-Screen",
       },
       {
         id: "document-types",

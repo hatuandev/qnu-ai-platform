@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -116,6 +116,8 @@ class JobsService:
 
     async def cancel_job(self, db: AsyncSession, job_id: str) -> JobRecord:
         job = await self.get_job(db, job_id)
+        if job.status == "cancelled":
+            return job
         if job.status in TERMINAL_STATUSES:
             raise AppException(
                 f"Job '{job_id}' đã kết thúc ({job.status}), không thể hủy.",
@@ -127,6 +129,36 @@ class JobsService:
         await db.commit()
         await db.refresh(job)
         return job
+
+    async def delete_job(self, db: AsyncSession, job_id: str) -> bool:
+        """Xóa vĩnh viễn bản ghi job khỏi CSDL."""
+        job = await self.get_job(db, job_id)
+        await db.delete(job)
+        await db.commit()
+        logger.info("Deleted job id=%s", job_id)
+        return True
+
+    async def cleanup_jobs(
+        self,
+        db: AsyncSession,
+        collection_id: str | None = None,
+        statuses: list[str] | None = None,
+    ) -> int:
+        """Dọn dẹp hàng loạt các jobs đã kết thúc (terminal: completed, cancelled, failed)."""
+        target_statuses = statuses or ["completed", "cancelled", "failed"]
+        stmt = delete(JobRecord).where(JobRecord.status.in_(target_statuses))
+        if collection_id:
+            stmt = stmt.where(JobRecord.collection_id == collection_id)
+        res = await db.execute(stmt)
+        await db.commit()
+        count = int(res.rowcount or 0)
+        logger.info(
+            "Cleaned up %d jobs (collection=%s, statuses=%s)",
+            count,
+            collection_id,
+            target_statuses,
+        )
+        return count
 
     async def retry_job(self, db: AsyncSession, job_id: str) -> JobRecord:
         job = await self.get_job(db, job_id)

@@ -87,6 +87,39 @@ async def test_cancel_running_job():
 
 
 @pytest.mark.asyncio
+async def test_cancel_already_cancelled_is_idempotent():
+    job = SimpleNamespace(id="job_cancelled", status="cancelled", error="cancelled previously")
+    session = _fresh_session()
+    session.execute = AsyncMock(return_value=_execute_result(scalar=job))
+    cancelled = await jobs_service.cancel_job(session, "job_cancelled")
+    assert cancelled.status == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_delete_job_success():
+    job = SimpleNamespace(id="job_to_delete", status="completed")
+    session = _fresh_session()
+    session.execute = AsyncMock(return_value=_execute_result(scalar=job))
+    session.delete = AsyncMock()
+    success = await jobs_service.delete_job(session, "job_to_delete")
+    assert success is True
+    session.delete.assert_called_once_with(job)
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_jobs_success():
+    session = _fresh_session()
+    mock_cursor = MagicMock()
+    mock_cursor.rowcount = 5
+    session.execute = AsyncMock(return_value=mock_cursor)
+    count = await jobs_service.cleanup_jobs(session, collection_id="col_1")
+    assert count == 5
+    session.commit.assert_awaited_once()
+
+
+
+@pytest.mark.asyncio
 async def test_retry_non_failed_job_rejected():
     job = SimpleNamespace(id="job_3", status="running")
     session = _fresh_session()
@@ -160,3 +193,50 @@ async def test_api_enqueue_and_list_jobs():
     assert data["job_type"] == "reindex"
     assert data["status"] == "queued"
     assert data["arq_job_id"] == "arq-9"
+
+
+@pytest.mark.asyncio
+async def test_api_delete_job():
+    job = SimpleNamespace(id="job_del_1", status="completed")
+    mock_session = _fresh_session()
+    mock_session.execute = AsyncMock(return_value=_execute_result(scalar=job))
+    mock_session.delete = AsyncMock()
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.delete("/platform/v1alpha1/jobs/job_del_1")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["deleted_id"] == "job_del_1"
+
+
+@pytest.mark.asyncio
+async def test_api_cleanup_jobs():
+    mock_session = _fresh_session()
+    mock_cursor = MagicMock()
+    mock_cursor.rowcount = 3
+    mock_session.execute = AsyncMock(return_value=mock_cursor)
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.delete("/platform/v1alpha1/jobs/cleanup?collection_id=col_ts")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert data["deleted_count"] == 3
+

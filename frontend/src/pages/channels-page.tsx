@@ -14,6 +14,13 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 
 export const ChannelsPage: React.FC = () => {
   const [selectedAssistant, setSelectedAssistant] = useState("admissions");
@@ -74,25 +81,36 @@ export const ChannelsPage: React.FC = () => {
           <div className="space-y-3 text-xs">
             <div className="space-y-1.5">
               <span className="font-semibold text-foreground block">Trợ lý AI mặc định</span>
-              <select
+              <Select
                 value={selectedAssistant}
-                onChange={(e) => {
-                  setSelectedAssistant(e.target.value);
-                  if (e.target.value === "admissions") setWidgetTitle("Trợ lý Tuyển sinh QNU");
-                  else if (e.target.value === "regulations")
-                    setWidgetTitle("Trợ lý Quy chế Học vụ");
-                  else if (e.target.value === "library") setWidgetTitle("Trợ lý Thư viện Số");
-                  else if (e.target.value === "drafting") setWidgetTitle("Trợ lý Soạn thảo NĐ 30");
+                onValueChange={(val) => {
+                  setSelectedAssistant(val);
+                  if (val === "admissions") setWidgetTitle("Trợ lý Tuyển sinh QNU");
+                  else if (val === "regulations") setWidgetTitle("Trợ lý Quy chế Học vụ");
+                  else if (val === "library") setWidgetTitle("Trợ lý Thư viện Số");
+                  else if (val === "drafting") setWidgetTitle("Trợ lý Soạn thảo NĐ 30");
                   else setWidgetTitle("Trợ lý Ngân hàng Đề thi");
                 }}
-                className="w-full h-9 rounded-control border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               >
-                <option value="admissions">Trợ lý Tuyển sinh (tuyensinh.qnu.edu.vn)</option>
-                <option value="regulations">Trợ lý Quy chế Học vụ (daotao.qnu.edu.vn)</option>
-                <option value="library">Trợ lý Thư viện Số (lib.qnu.edu.vn)</option>
-                <option value="drafting">Trợ lý Soạn thảo NĐ 30 (hanhchinh.qnu.edu.vn)</option>
-                <option value="question-bank">Trợ lý Ngân hàng Đề thi (khaothi.qnu.edu.vn)</option>
-              </select>
+                <SelectTrigger className="w-full h-9 text-xs">
+                  <SelectValue placeholder="Chọn Trợ lý AI" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admissions">
+                    Trợ lý Tuyển sinh (tuyensinh.qnu.edu.vn)
+                  </SelectItem>
+                  <SelectItem value="regulations">
+                    Trợ lý Quy chế Học vụ (daotao.qnu.edu.vn)
+                  </SelectItem>
+                  <SelectItem value="library">Trợ lý Thư viện Số (lib.qnu.edu.vn)</SelectItem>
+                  <SelectItem value="drafting">
+                    Trợ lý Soạn thảo NĐ 30 (hanhchinh.qnu.edu.vn)
+                  </SelectItem>
+                  <SelectItem value="question-bank">
+                    Trợ lý Ngân hàng Đề thi (khaothi.qnu.edu.vn)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">

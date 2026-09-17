@@ -14,6 +14,7 @@ import { useCallback, useState } from "react";
 import { type ToolExecuteResponse, apiClient } from "../../services/api-client";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 export interface DocxParagraphItem {
   id: string;
@@ -261,20 +262,21 @@ export const DocxNd30Editor: React.FC<DocxNd30EditorProps> = ({
                 >
                   Loại văn bản:
                 </label>
-                <select
-                  id="input-doc-type"
+                <Select
                   value={formData.documentType}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, documentType: e.target.value }))
-                  }
-                  className="w-full h-8 px-2.5 rounded-control border border-border bg-background text-foreground text-xs focus:ring-1 focus:ring-primary"
+                  onValueChange={(val) => setFormData((prev) => ({ ...prev, documentType: val }))}
                 >
-                  <option value="TỜ TRÌNH">TỜ TRÌNH</option>
-                  <option value="QUYẾT ĐỊNH">QUYẾT ĐỊNH</option>
-                  <option value="THÔNG BÁO">THÔNG BÁO</option>
-                  <option value="KẾ HOẠCH">KẾ HOẠCH</option>
-                  <option value="CÔNG VĂN">CÔNG VĂN</option>
-                </select>
+                  <SelectTrigger id="input-doc-type" sizeVariant="sm" className="w-full">
+                    <SelectValue placeholder="Chọn loại văn bản" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TỜ TRÌNH">TỜ TRÌNH</SelectItem>
+                    <SelectItem value="QUYẾT ĐỊNH">QUYẾT ĐỊNH</SelectItem>
+                    <SelectItem value="THÔNG BÁO">THÔNG BÁO</SelectItem>
+                    <SelectItem value="KẾ HOẠCH">KẾ HOẠCH</SelectItem>
+                    <SelectItem value="CÔNG VĂN">CÔNG VĂN</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

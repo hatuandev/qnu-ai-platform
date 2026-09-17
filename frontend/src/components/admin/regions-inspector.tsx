@@ -1,4 +1,13 @@
-import { CheckCircle2, FileCheck2, Heading, Layers, Sparkles, Stamp, Table } from "lucide-react";
+import {
+  CheckCircle2,
+  FileCheck2,
+  Heading,
+  Layers,
+  ListOrdered,
+  Sparkles,
+  Stamp,
+  Table,
+} from "lucide-react";
 import type React from "react";
 import type { DocumentRegion } from "../../services/api-client";
 import { Badge } from "../ui/badge";
@@ -22,9 +31,14 @@ export const RegionsInspector: React.FC<RegionsInspectorProps> = ({
     switch (type) {
       case "header":
         return <Heading className="size-3.5 text-blue-500" />;
+      case "title":
+        return <Sparkles className="size-3.5 text-purple-500" />;
       case "table":
         return <Table className="size-3.5 text-amber-500" />;
+      case "list":
+        return <ListOrdered className="size-3.5 text-emerald-500" />;
       case "stamp":
+      case "signature":
         return <Stamp className="size-3.5 text-rose-500" />;
       default:
         return <FileCheck2 className="size-3.5 text-purple-500" />;
@@ -36,6 +50,12 @@ export const RegionsInspector: React.FC<RegionsInspectorProps> = ({
       case "header":
         return (
           <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
+            Tiêu đề đầu
+          </Badge>
+        );
+      case "title":
+        return (
+          <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
             Tiêu đề
           </Badge>
         );
@@ -45,7 +65,14 @@ export const RegionsInspector: React.FC<RegionsInspectorProps> = ({
             Bảng biểu
           </Badge>
         );
+      case "list":
+        return (
+          <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-200">
+            Danh sách
+          </Badge>
+        );
       case "stamp":
+      case "signature":
         return (
           <Badge variant="outline" className="text-[10px] text-rose-600 border-rose-200">
             Dấu & Ký

@@ -17,6 +17,7 @@ import { EvaluationPage } from "@/pages/evaluation-page";
 import { KnowledgePage } from "@/pages/knowledge-page";
 import { ModelOpsPage } from "@/pages/modelops-page";
 import { RunsPage } from "@/pages/runs-page";
+import { ScanStudioPage } from "@/pages/scan-studio-page";
 import { ToolsPage } from "@/pages/tools-page";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -257,6 +258,11 @@ function AppContent() {
       currentPath === "/document-types"
     ) {
       return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
+    }
+
+    // 7b. Scan & OCR Document Intelligence Studio
+    if (currentPath === "/ocr" || currentPath.startsWith("/ocr/")) {
+      return <ScanStudioPage />;
     }
 
     // 8. DAG Canvas Studio & Thư Viện Nodes

@@ -203,3 +203,73 @@ async def test_api_execute_workflow_greeting():
     assert data["status"] == "completed"
     assert len(data["executed_nodes"]) >= 2
     assert "Chào bạn" in data["outputs"]["answer"]
+
+
+@pytest.mark.asyncio
+async def test_all_5_official_workflows_load_without_fallback():
+    """Verify all 5 official workflow DAGs load their true specifications without falling back."""
+    from app.modules.workflows.service import workflow_service
+
+    expected_min_nodes = {
+        "admissions-assistant": 7,
+        "regulations-assistant": 5,
+        "drafting-assistant": 9,
+        "library-assistant": 5,
+        "question-bank-assistant": 5,
+    }
+
+    for wf_id, min_count in expected_min_nodes.items():
+        spec = await workflow_service.get_workflow_spec(None, wf_id)
+        assert len(spec.nodes) >= min_count, f"{wf_id} fell back to dummy DAG ({len(spec.nodes)} nodes)"
+        assert len(spec.edges) >= 4, f"{wf_id} has insufficient edges ({len(spec.edges)} edges)"
+
+
+@pytest.mark.asyncio
+async def test_citation_guard_branches_grounded_vs_ungrounded():
+    """Verify CitationGuardNodeHandler branches to chat_output or no_answer_output."""
+    from unittest.mock import patch
+
+    from app.modules.rag.schemas import AskResponse, Citation
+    from app.modules.workflows.schemas import WorkflowExecuteRequest
+    from app.modules.workflows.service import workflow_service
+
+    # Case 1: Grounded with citations -> goes to chat_output
+    mock_grounded = AskResponse(
+        answer="Học phí ngành Sư phạm được miễn 100% theo Nghị định 116.",
+        status="answered",
+        citations=[Citation(source_id="ND116.pdf", title="Nghị định 116/2020", page_number=1, quote="Miễn 100%")]
+    )
+    with patch("app.modules.workflows.nodes.rag_answer_node.rag_service.ask", new_callable=AsyncMock) as mock_ask:
+        mock_ask.return_value = mock_grounded
+        mock_db = AsyncMock()
+        req = WorkflowExecuteRequest(
+            workflow_id="admissions-assistant",
+            inputs={"message": "Học phí Sư phạm?"},
+            tenant_id="tenant_qnu",
+        )
+        res = await workflow_service.execute(mock_db, req)
+        assert res.status == "completed"
+        assert "chat_output" in res.executed_nodes
+        assert "no_answer_output" not in res.executed_nodes
+        assert res.outputs["status"] == "answered"
+
+    # Case 2: Ungrounded without citations -> goes to no_answer_output
+    mock_ungrounded = AskResponse(
+        answer="Không tìm thấy thông tin điểm chuẩn năm 2030.",
+        status="insufficient_context",
+        citations=[]
+    )
+    with patch("app.modules.workflows.nodes.rag_answer_node.rag_service.ask", new_callable=AsyncMock) as mock_ask:
+        mock_ask.return_value = mock_ungrounded
+        mock_db = AsyncMock()
+        req = WorkflowExecuteRequest(
+            workflow_id="admissions-assistant",
+            inputs={"message": "Điểm chuẩn năm 2030?"},
+            tenant_id="tenant_qnu",
+        )
+        res = await workflow_service.execute(mock_db, req)
+        assert res.status == "completed"
+        assert "no_answer_output" in res.executed_nodes
+        assert "chat_output" not in res.executed_nodes
+        assert res.outputs["status"] == "insufficient_context"
+        assert "0256.3846.156" in res.outputs["answer"]

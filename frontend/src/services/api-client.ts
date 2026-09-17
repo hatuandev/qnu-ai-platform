@@ -71,7 +71,7 @@ export interface IngestionTask {
   duration_seconds: number;
   category: "ingestion" | "ocr" | "reindex";
   progress_percent: number;
-  status: "completed" | "processing" | "failed";
+  status: "completed" | "processing" | "failed" | "cancelled";
   created_at: string;
   log_output?: string;
 }
@@ -79,7 +79,7 @@ export interface IngestionTask {
 export interface DocumentBoundingBox {
   id: string;
   page_number: number;
-  type: "text" | "table" | "stamp" | "header";
+  type: "text" | "table" | "stamp" | "header" | "title" | "signature" | "list";
   coordinates: { x: number; y: number; width: number; height: number }; // percentages 0-100
   label: string;
   confidence: number;
@@ -90,7 +90,7 @@ export interface DocumentRegion {
   id: string;
   page_number: number;
   title: string;
-  type: "text" | "table" | "stamp" | "header" | "footer";
+  type: "text" | "table" | "stamp" | "header" | "footer" | "title" | "signature" | "list";
   confidence: number;
   reading_order: number;
   details: string;
@@ -1096,7 +1096,14 @@ function mapJobToIngestionTask(j: Record<string, unknown>): IngestionTask {
     duration_seconds: durationSeconds,
     category: meta.category,
     progress_percent: typeof j.progress === "number" ? Math.round(j.progress as number) : 0,
-    status: status === "completed" ? "completed" : status === "failed" ? "failed" : "processing",
+    status:
+      status === "completed"
+        ? "completed"
+        : status === "failed"
+          ? "failed"
+          : status === "cancelled"
+            ? "cancelled"
+            : "processing",
     created_at: created,
     log_output:
       (j.error as string) ||
@@ -1221,7 +1228,7 @@ export const apiClient = {
       const res = await fetch(`${BASE_URL}/knowledge/collections`);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           return data.map((item, idx) => {
             const d = item as Record<string, unknown>;
             const code = (d.code as string) || (d.module_code as string) || `col_${idx + 1}`;
@@ -1230,8 +1237,8 @@ export const apiClient = {
               name: (d.name as string) || "Kho Tri Thức",
               code,
               description: (d.description as string) || "",
-              document_count: typeof d.document_count === "number" ? d.document_count : 8,
-              chunk_count: typeof d.chunk_count === "number" ? d.chunk_count : 246,
+              document_count: typeof d.document_count === "number" ? d.document_count : 0,
+              chunk_count: typeof d.chunk_count === "number" ? d.chunk_count : 0,
               chunking_strategy:
                 (d.chunking_strategy as KnowledgeCollection["chunking_strategy"]) ||
                 (code.includes("regulation") || code.includes("draft")
@@ -1259,7 +1266,7 @@ export const apiClient = {
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           return data.map((item, idx) => {
             const d = item as Record<string, unknown>;
             const fn =
@@ -1413,6 +1420,164 @@ export const apiClient = {
       throw new Error(`Phê duyệt tài liệu thất bại (HTTP ${res.status}).`);
     }
     return (await res.json()) as ApproveDocumentResult;
+  },
+
+  async downloadDocument(documentId: string, filename: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/documents/${documentId}/download`);
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Tải tệp gốc thất bại (HTTP ${res.status}).`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async deleteDocument(documentId: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/documents/${documentId}`, {
+        method: "DELETE",
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    // 204 No Content, 200 OK, or 404 (already deleted/not present in DB) -> idempotent success
+    if (res.status === 204 || res.status === 404 || res.ok) {
+      return;
+    }
+    throw new Error(`Xóa tài liệu thất bại (HTTP ${res.status}).`);
+  },
+
+  async reindexCollection(collectionId: string): Promise<{ job_id: string; status: string }> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/reindex`, {
+        method: "POST",
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Tạo job reindex thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as { job_id: string; status: string };
+  },
+
+  async testCollection(
+    collectionId: string,
+    query: string,
+    topK = 5
+  ): Promise<
+    {
+      chunk_id: string;
+      document_id: string;
+      content: string;
+      score: number;
+      section: string | null;
+      page_number: number | null;
+    }[]
+  > {
+    let res: Response;
+    try {
+      const params = new URLSearchParams({ query, top_k: String(topK) });
+      res = await fetch(
+        `${BASE_URL}/knowledge/collections/${collectionId}/test?${params.toString()}`,
+        { method: "POST" }
+      );
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Truy vấn thử thất bại (HTTP ${res.status}).`);
+    }
+    const data = (await res.json()) as {
+      items: {
+        chunk_id: string;
+        document_id: string;
+        content: string;
+        score: number;
+        section: string | null;
+        page_number: number | null;
+      }[];
+    };
+    return data.items || [];
+  },
+
+  async updateCollection(
+    collectionId: string,
+    payload: { name?: string; description?: string }
+  ): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Cập nhật kho tri thức thất bại (HTTP ${res.status}).`);
+    }
+  },
+
+  async retryJob(jobId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}/retry`, { method: "POST" });
+    if (!res.ok) {
+      throw new Error(`Chạy lại job thất bại (HTTP ${res.status}).`);
+    }
+  },
+
+  async cancelJob(jobId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}/cancel`, { method: "POST" });
+    if (!res.ok) {
+      throw new Error(`Hủy job thất bại (HTTP ${res.status}).`);
+    }
+  },
+
+  async deleteJob(jobId: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/jobs/${jobId}`, {
+        method: "DELETE",
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (res.status === 404) {
+      return;
+    }
+    if (!res.ok) {
+      throw new Error(`Xóa tác vụ thất bại (HTTP ${res.status}).`);
+    }
+  },
+
+  async cleanupJobs(collectionId?: string): Promise<{ deleted_count: number }> {
+    let res: Response;
+    try {
+      const url = collectionId
+        ? `${BASE_URL}/jobs/cleanup?collection_id=${encodeURIComponent(collectionId)}`
+        : `${BASE_URL}/jobs/cleanup`;
+      res = await fetch(url, {
+        method: "DELETE",
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Dọn dẹp tác vụ thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as { deleted_count: number };
   },
 
   async getModelProviders(): Promise<ModelProvider[]> {
@@ -2023,10 +2188,9 @@ export const apiClient = {
       if (res.ok) {
         const data = (await res.json()) as Record<string, unknown>[];
         if (Array.isArray(data)) {
-          const mapped = data
+          return data
             .filter((j) => !collectionId || (j.collection_id as string) === collectionId)
             .map((j) => mapJobToIngestionTask(j));
-          if (mapped.length > 0) return mapped;
         }
       }
     } catch {
@@ -2046,8 +2210,11 @@ export const apiClient = {
    * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
    * Phân biệt rõ ràng giữa tài liệu mẫu (doc_ts_2026) và các tài liệu người dùng tải lên thực tế.
    */
-  async getStudioView(docId: string): Promise<DocumentVerificationData> {
-    const res = await fetch(`${BASE_URL}/knowledge/documents/${docId}/studio-view`);
+  async getStudioView(docId: string, refreshLayout = false): Promise<DocumentVerificationData> {
+    const url = refreshLayout
+      ? `${BASE_URL}/knowledge/documents/${docId}/studio-view?refresh_layout=true`
+      : `${BASE_URL}/knowledge/documents/${docId}/studio-view`;
+    const res = await fetch(url);
     if (!res.ok) {
       throw new Error(`Không tải được studio-view (HTTP ${res.status}).`);
     }
@@ -2096,7 +2263,10 @@ export const apiClient = {
     };
   },
 
-  async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
+  async getDocumentVerification(
+    docId: string,
+    refreshLayout = false
+  ): Promise<DocumentVerificationData> {
     // Legacy demo document keeps its hand-written studio fixture.
     if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
       return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
@@ -2104,7 +2274,7 @@ export const apiClient = {
     // Real documents: prefer studio-view (markdown + real boxes + page images),
     // fall back to chunk mapping when the backend lacks stored geometry.
     try {
-      return await apiClient.getStudioView(docId);
+      return await apiClient.getStudioView(docId, refreshLayout);
     } catch {
       // Fall through to chunk mapping below.
     }
@@ -2179,4 +2349,83 @@ export const apiClient = {
       total_chunks: result.total_chunks,
     });
   },
+
+  /**
+   * Bóc tách tức thì tệp scan trên Studio OCR Sandbox.
+   */
+  async parseStudioOcr(file: File | null, engineId?: string): Promise<StudioOCRDocument> {
+    const formData = new FormData();
+    if (file) {
+      formData.append("file", file);
+    }
+    if (engineId) {
+      formData.append("engine_id", engineId);
+    }
+    const res = await fetch(`${BASE_URL}/ocr/studio/parse`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Lỗi bóc tách OCR Studio (HTTP ${res.status})`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy dữ liệu 14 trang tài liệu scan tuyển sinh mẫu để kiểm thử ngay lập tức.
+   */
+  async getStudioSampleDocument(): Promise<StudioOCRDocument> {
+    const res = await fetch(`${BASE_URL}/ocr/studio/sample`);
+    if (!res.ok) {
+      throw new Error(`Không tải được tài liệu mẫu (HTTP ${res.status})`);
+    }
+    return res.json();
+  },
 };
+
+export interface StudioOCRRegion {
+  type: string;
+  label: string;
+  text: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+export interface StudioOCRPage {
+  pageNumber: number;
+  title: string;
+  isSigned: boolean;
+  hasTable: boolean;
+  imageUrl: string;
+  markdown: string;
+  rawText: string;
+  regions: StudioOCRRegion[];
+  dimensions: { width: number; height: number };
+  wordCount: number;
+  lineCount: number;
+  sheetData?: {
+    name: string;
+    rows: string[][];
+    total_rows?: number;
+    total_cols?: number;
+  };
+}
+
+export interface StudioOCRDocument {
+  filename: string;
+  totalPages: number;
+  size: string;
+  provider: string;
+  model: string;
+  latencyMs: number;
+  pages: StudioOCRPage[];
+  sheetsData?: {
+    name: string;
+    rows: string[][];
+    total_rows?: number;
+    total_cols?: number;
+  }[];
+}

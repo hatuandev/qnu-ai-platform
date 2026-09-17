@@ -19,6 +19,8 @@ class WorkflowNodeSpec(BaseModel):
 class WorkflowEdgeSpec(BaseModel):
     source: str = Field(..., description="Node ID nguồn")
     target: str = Field(..., description="Node ID đích")
+    source_port: str | None = Field(None, description="Cổng nguồn (ví dụ: grounded, ungrounded, response)")
+    target_port: str | None = Field(None, description="Cổng đích (ví dụ: message, question, reason)")
     condition: str | None = None
     label: str | None = None
 

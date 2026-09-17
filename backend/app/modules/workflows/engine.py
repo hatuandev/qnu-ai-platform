@@ -9,6 +9,7 @@ from app.modules.workflows.nodes.base import WorkflowContext
 from app.modules.workflows.registry import node_registry
 from app.modules.workflows.schemas import (
     WorkflowDagSpec,
+    WorkflowEdgeSpec,
     WorkflowExecuteResponse,
     WorkflowNodeSpec,
 )
@@ -29,9 +30,9 @@ class WorkflowDAGEngine:
 
         # Build lookup tables for nodes and edges
         nodes_by_id: dict[str, WorkflowNodeSpec] = {n.id: n for n in dag_spec.nodes}
-        edges_by_source: dict[str, list[str]] = {}
+        edges_by_source: dict[str, list[WorkflowEdgeSpec]] = {}
         for edge in dag_spec.edges:
-            edges_by_source.setdefault(edge.source, []).append(edge.target)
+            edges_by_source.setdefault(edge.source, []).append(edge)
 
         current_node_id: str | None = dag_spec.entry_node_id
         executed_nodes: list[str] = []
@@ -80,16 +81,32 @@ class WorkflowDAGEngine:
                     error_message=result.error or f"Node {current_node_id} execution failed",
                 )
 
+            # Terminal condition: Output node reached
+            terminal_types = (
+                "output.chat",
+                "chat_output",
+                "output.no_answer",
+                "no_answer_output",
+                "output.file",
+                "output.artifact",
+                "artifact.export",
+            )
+            if node_spec.type in terminal_types:
+                break
+
             # Determine next node in DAG
             if result.next_node_override:
                 current_node_id = result.next_node_override
+            elif result.selected_port:
+                outgoing_edges = edges_by_source.get(current_node_id, [])
+                matching = [e for e in outgoing_edges if e.source_port == result.selected_port]
+                if matching:
+                    current_node_id = matching[0].target
+                else:
+                    current_node_id = outgoing_edges[0].target if outgoing_edges else None
             else:
-                next_targets = edges_by_source.get(current_node_id, [])
-                current_node_id = next_targets[0] if next_targets else None
-
-            # Terminal condition: Output node reached
-            if node_spec.type in ("output.chat", "chat_output", "output.file"):
-                break
+                outgoing_edges = edges_by_source.get(current_node_id, [])
+                current_node_id = outgoing_edges[0].target if outgoing_edges else None
 
         elapsed = (time.perf_counter() - start_time) * 1000
         return WorkflowExecuteResponse(

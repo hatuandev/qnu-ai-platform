@@ -233,3 +233,47 @@ async def test_ocr_service_graceful_fallback():
         assert resp.engine_used == "mock_ocr"
         assert resp.total_pages >= 1
         assert resp.overall_confidence > 0.90
+
+
+@pytest.mark.asyncio
+async def test_studio_ocr_parse_document_and_page_image():
+    service = OCRService()
+
+    # Create dummy PDF
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((50, 50), "TRUONG DAI HOC QUY NHON\n\nThong bao tuyen sinh 2026", fontsize=14)
+    page.insert_text((50, 150), "| Ma | Nganh | Chi tieu |\n|---|---|---|\n| 7480201 | CNTT | 150 |", fontsize=10)
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    res = await service.parse_studio_document(
+        content=pdf_bytes,
+        filename="tb_tuyen_sinh.pdf",
+        engine_name="pymupdf_ocr",
+    )
+
+    assert res.total_pages == 1
+    assert len(res.pages) == 1
+    assert res.filename == "tb_tuyen_sinh.pdf"
+    assert "page_1.jpg" in res.pages[0].image_url
+    assert res.pages[0].word_count > 0
+
+    # Test image retrieval
+    file_hash = res.pages[0].image_url.split("/")[-2]
+    img_bytes = await service.get_studio_page_image(file_hash, "page_1.jpg")
+    assert len(img_bytes) > 0
+
+
+@pytest.mark.asyncio
+async def test_studio_sample_document():
+    service = OCRService()
+    sample = await service.get_sample_document()
+
+    assert sample.total_pages == 14
+    assert len(sample.pages) == 14
+    assert sample.pages[0].page_number == 1
+    assert len(sample.pages[0].regions) > 0
+    assert any(p.has_table for p in sample.pages)
+    assert any(p.is_signed for p in sample.pages)
+

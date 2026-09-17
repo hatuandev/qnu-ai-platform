@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,3 +69,27 @@ async def retry_job(
 ) -> JobResponse:
     job = await jobs_service.retry_job(db, job_id)
     return JobResponse.model_validate(job)
+
+
+@router.delete("/cleanup", summary="Dọn dẹp các Jobs đã kết thúc (completed/cancelled/failed)")
+async def cleanup_jobs(
+    collection_id: str | None = Query(None, description="Lọc theo collection_id"),
+    statuses: str = Query(
+        "completed,cancelled,failed",
+        description="Danh sách trạng thái cần dọn dẹp, phân tách bằng dấu phẩy",
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    status_list = [s.strip() for s in statuses.split(",") if s.strip()]
+    count = await jobs_service.cleanup_jobs(db, collection_id=collection_id, statuses=status_list)
+    return {"success": True, "deleted_count": count}
+
+
+@router.delete("/{job_id}", summary="Xóa vĩnh viễn Job khỏi danh sách")
+async def delete_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    await jobs_service.delete_job(db, job_id)
+    return {"success": True, "deleted_id": job_id}
+

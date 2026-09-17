@@ -4,25 +4,36 @@ import {
   ArrowLeft,
   Bot,
   CheckCircle2,
+  CircleAlert,
   Cpu,
   Download,
   Eye,
   FileText,
   RefreshCw,
+  RotateCcw,
   Scan,
   Search,
   Settings,
   Terminal,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { ConfirmDialog } from "../components/admin/confirm-dialog";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   Table,
   TableBody,
@@ -80,7 +91,73 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
   // Reindex state
   const [isReindexing, setIsReindexing] = useState<boolean>(false);
-  const [reindexSuccess, setReindexSuccess] = useState<boolean>(false);
+  const [reindexJobId, setReindexJobId] = useState<string | null>(null);
+
+  // Row-level + header action states
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeDocument | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [taskActionId, setTaskActionId] = useState<string | null>(null);
+
+  // Task delete & cleanup states
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<IngestionTask | null>(null);
+  const [isDeletingTask, setIsDeletingTask] = useState<boolean>(false);
+  const [isCleaningTasks, setIsCleaningTasks] = useState<boolean>(false);
+  const [isConfirmCleanupOpen, setIsConfirmCleanupOpen] = useState<boolean>(false);
+  const [taskSuccessMessage, setTaskSuccessMessage] = useState<string | null>(null);
+
+  // Collection config dialog state
+  const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [configName, setConfigName] = useState<string>("");
+  const [configDescription, setConfigDescription] = useState<string>("");
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+
+  const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+    approved: {
+      label: "Hiệu lực",
+      className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200",
+    },
+    completed: {
+      label: "Hiệu lực",
+      className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200",
+    },
+    pending: {
+      label: "Chờ duyệt",
+      className: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    },
+    processing: {
+      label: "Đang xử lý",
+      className: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+    },
+    archived: {
+      label: "Lưu trữ",
+      className: "bg-muted text-muted-foreground border-border",
+    },
+    failed: {
+      label: "Lỗi",
+      className: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+    },
+  };
+
+  const TASK_STATUS_BADGE: Record<string, { label: string; className: string }> = {
+    completed: {
+      label: "Hoàn tất",
+      className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-300",
+    },
+    processing: {
+      label: "Đang xử lý",
+      className: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+    },
+    failed: {
+      label: "Thất bại",
+      className: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+    },
+    cancelled: {
+      label: "Đã hủy",
+      className: "bg-muted text-muted-foreground border-border",
+    },
+  };
 
   // Playground state
   const [sandboxQuery, setSandboxQuery] = useState<string>("");
@@ -163,40 +240,159 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     });
   }, [allTasks, taskSearchQuery, taskStatusFilter]);
 
-  const handleReindex = () => {
-    setIsReindexing(true);
-    setTimeout(() => {
-      setIsReindexing(false);
-      setReindexSuccess(true);
-      setTimeout(() => setReindexSuccess(false), 3000);
-    }, 1200);
+  const refreshDocuments = () => {
+    queryClient.invalidateQueries({ queryKey: ["documents"] });
+    queryClient.invalidateQueries({ queryKey: ["collections"] });
   };
 
-  const handleSandboxSearch = (e: React.FormEvent) => {
+  const refreshTasks = () => {
+    queryClient.invalidateQueries({ queryKey: ["ingestion-tasks"] });
+  };
+
+  const handleReindex = async () => {
+    setIsReindexing(true);
+    setActionError(null);
+    try {
+      const job = await apiClient.reindexCollection(currentCollection.id);
+      setReindexJobId(job.job_id);
+      refreshTasks();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Tạo job reindex thất bại.");
+    } finally {
+      setIsReindexing(false);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: KnowledgeDocument) => {
+    setDownloadingId(doc.id);
+    setActionError(null);
+    try {
+      await apiClient.downloadDocument(doc.id, doc.filename);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Tải tệp gốc thất bại.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setActionError(null);
+    try {
+      await apiClient.deleteDocument(deleteTarget.id);
+      setDeleteTarget(null);
+      refreshDocuments();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Xóa tài liệu thất bại.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleTaskAction = async (taskId: string, action: "retry" | "cancel") => {
+    setTaskActionId(taskId);
+    setActionError(null);
+    try {
+      if (action === "retry") {
+        await apiClient.retryJob(taskId);
+      } else {
+        await apiClient.cancelJob(taskId);
+      }
+      refreshTasks();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Thao tác job thất bại.");
+    } finally {
+      setTaskActionId(null);
+    }
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!deleteTaskTarget) return;
+    setIsDeletingTask(true);
+    setActionError(null);
+    try {
+      await apiClient.deleteJob(deleteTaskTarget.id);
+      setDeleteTaskTarget(null);
+      refreshTasks();
+      setTaskSuccessMessage("Đã xóa tác vụ thành công.");
+      setTimeout(() => setTaskSuccessMessage(null), 3000);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Xóa tác vụ thất bại.");
+    } finally {
+      setIsDeletingTask(false);
+    }
+  };
+
+  const handleCleanupTasks = async () => {
+    setIsCleaningTasks(true);
+    setActionError(null);
+    try {
+      const res = await apiClient.cleanupJobs(currentCollection.id);
+      setIsConfirmCleanupOpen(false);
+      refreshTasks();
+      setTaskSuccessMessage(`Đã dọn dẹp ${res.deleted_count} tác vụ đã kết thúc.`);
+      setTimeout(() => setTaskSuccessMessage(null), 4000);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Dọn dẹp tác vụ thất bại.");
+    } finally {
+      setIsCleaningTasks(false);
+    }
+  };
+
+  const openConfigDialog = () => {
+    setConfigName(currentCollection.name);
+    setConfigDescription(currentCollection.description || "");
+    setIsConfigOpen(true);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!configName.trim()) {
+      setActionError("Tên kho tri thức không được để trống.");
+      return;
+    }
+    setIsSavingConfig(true);
+    setActionError(null);
+    try {
+      await apiClient.updateCollection(currentCollection.id, {
+        name: configName.trim(),
+        description: configDescription.trim(),
+      });
+      setIsConfigOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Cập nhật kho tri thức thất bại.");
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleSandboxSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sandboxQuery.trim()) return;
     setIsSearchingSandbox(true);
-    setTimeout(() => {
-      setIsSearchingSandbox(false);
-      setSandboxResults([
-        {
-          id: "chunk_01",
+    setActionError(null);
+    try {
+      const items = await apiClient.testCollection(currentCollection.id, sandboxQuery.trim(), 5);
+      setSandboxResults(
+        items.map((item) => ({
+          id: item.chunk_id,
           title: currentCollection.name,
-          clause: "Mục II, Khoản 2 (Phương thức tuyển sinh)",
-          text: "Phương thức 1 (PT1 - mã 100): Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026. Phương thức 2 (PT2 - mã 200): Xét kết quả học tập 3 năm THPT. Phương thức 3 & 4: Xét ĐGNL ĐHQG TP.HCM và ĐH Sư phạm Hà Nội.",
-          score: 0.962,
+          clause: item.section || `Tài liệu ${item.document_id}`,
+          text: item.content,
+          score: item.score,
           method: "Hybrid RRF (Dense BGE-M3 + Postgres FTS)",
-        },
-        {
-          id: "chunk_02",
-          title: currentCollection.name,
-          clause: "Phụ lục 01, Bảng mã ngành",
-          text: "Ngành Quản lý giáo dục (Mã ngành: 7140114): Chỉ tiêu 60 sinh viên. Tổ hợp xét tuyển: (Văn, Sử, Địa), (Văn, Sử, GD KT&PL), (Văn, Địa, GD KT&PL), (Văn, Toán, GD KT&PL).",
-          score: 0.915,
-          method: "TableFormer Structured Cell Search",
-        },
-      ]);
-    }, 500);
+        }))
+      );
+      if (items.length === 0) {
+        setActionError("Không tìm thấy chunk phù hợp trong kho này.");
+      }
+    } catch (err) {
+      setSandboxResults(null);
+      setActionError(err instanceof Error ? err.message : "Truy vấn thử thất bại.");
+    } finally {
+      setIsSearchingSandbox(false);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -284,7 +480,12 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               <span>{isReindexing ? "Đang Reindex..." : "Reindex Kho"}</span>
             </Button>
 
-            <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={openConfigDialog}
+            >
               <Settings className="size-3.5" />
               <span>Cấu hình</span>
             </Button>
@@ -312,12 +513,19 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           <span className="text-[11px] font-medium text-foreground">
             {allDocuments.length} văn bản ({currentCollection.chunk_count} chunks)
           </span>
-          {reindexSuccess && (
+          {reindexJobId && (
             <span className="text-[11px] text-emerald-600 font-semibold ml-auto flex items-center gap-1">
-              <CheckCircle2 className="size-3.5" /> Đã đồng bộ Vector Qdrant thành công!
+              <CheckCircle2 className="size-3.5" /> Đã tạo job reindex ({reindexJobId}) — theo dõi ở
+              tab Tác vụ!
             </span>
           )}
         </div>
+        {actionError && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
+            <CircleAlert className="size-4 shrink-0 mt-0.5" />
+            <span>{actionError}</span>
+          </div>
+        )}
       </div>
 
       {/* 3 Main Sub-Tabs */}
@@ -352,36 +560,43 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
-              <select
-                value={selectedTypeFilter}
-                onChange={(e) => setSelectedTypeFilter(e.target.value)}
-                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="all">Tất cả loại văn bản</option>
-                <option value="Quy chế">Quy chế</option>
-                <option value="Đề án">Đề án</option>
-                <option value="Nghị định">Nghị định</option>
-              </select>
+              <Select value={selectedTypeFilter} onValueChange={setSelectedTypeFilter}>
+                <SelectTrigger sizeVariant="sm" className="w-[160px]">
+                  <SelectValue placeholder="Tất cả loại văn bản" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả loại văn bản</SelectItem>
+                  <SelectItem value="Quy chế">Quy chế</SelectItem>
+                  <SelectItem value="Đề án">Đề án</SelectItem>
+                  <SelectItem value="Nghị định">Nghị định</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <select
-                value={selectedStatusFilter}
-                onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="completed">Hiệu lực</option>
-                <option value="processing">Đang xử lý</option>
-              </select>
+              <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
+                <SelectTrigger sizeVariant="sm" className="w-[165px]">
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="pending">Chờ duyệt</SelectItem>
+                  <SelectItem value="approved">Đã duyệt (Hiệu lực)</SelectItem>
+                  <SelectItem value="completed">Hiệu lực</SelectItem>
+                  <SelectItem value="processing">Đang xử lý</SelectItem>
+                  <SelectItem value="archived">Lưu trữ</SelectItem>
+                  <SelectItem value="failed">Lỗi</SelectItem>
+                </SelectContent>
+              </Select>
 
-              <select
-                value={selectedPriorityFilter}
-                onChange={(e) => setSelectedPriorityFilter(e.target.value)}
-                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="all">Tất cả mức ưu tiên</option>
-                <option value="core">Ưu tiên Cao (Cốt lõi)</option>
-                <option value="high">Ưu tiên Trung bình</option>
-              </select>
+              <Select value={selectedPriorityFilter} onValueChange={setSelectedPriorityFilter}>
+                <SelectTrigger sizeVariant="sm" className="w-[170px]">
+                  <SelectValue placeholder="Tất cả mức ưu tiên" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả mức ưu tiên</SelectItem>
+                  <SelectItem value="core">Ưu tiên Cao (Cốt lõi)</SelectItem>
+                  <SelectItem value="high">Ưu tiên Trung bình</SelectItem>
+                </SelectContent>
+              </Select>
 
               <span className="text-xs text-muted-foreground ml-2">
                 Hiển thị {filteredDocuments.length} / {allDocuments.length} tài liệu
@@ -462,9 +677,11 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className="text-[11px] bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200"
+                          className={`text-[11px] ${
+                            STATUS_BADGE[doc.status]?.className || STATUS_BADGE.pending.className
+                          }`}
                         >
-                          Hiệu lực
+                          {STATUS_BADGE[doc.status]?.label || doc.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -493,6 +710,8 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleDownloadDocument(doc)}
+                            disabled={downloadingId === doc.id}
                             className="size-7 text-muted-foreground hover:text-foreground"
                             title="Tải tệp gốc"
                           >
@@ -501,6 +720,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setDeleteTarget(doc)}
                             className="size-7 text-rose-500 hover:text-rose-600"
                             title="Xóa tài liệu"
                           >
@@ -529,8 +749,18 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-8 text-xs text-muted-foreground">
-                Dọn dẹp đã xong
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsConfirmCleanupOpen(true)}
+                disabled={
+                  isCleaningTasks || allTasks.filter((t) => t.status !== "processing").length === 0
+                }
+                className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                title="Dọn dẹp các tác vụ đã hoàn tất, thất bại hoặc đã hủy"
+              >
+                <Trash2 className="size-3.5" />
+                <span>{isCleaningTasks ? "Đang dọn..." : "Dọn dẹp đã xong"}</span>
               </Button>
               <Button
                 variant="outline"
@@ -543,6 +773,13 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               </Button>
             </div>
           </div>
+
+          {taskSuccessMessage && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600">
+              <CheckCircle2 className="size-4 shrink-0" />
+              <span>{taskSuccessMessage}</span>
+            </div>
+          )}
 
           {/* Filter Bar for Tasks */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-lg border border-border">
@@ -557,15 +794,18 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <select
-                value={taskStatusFilter}
-                onChange={(e) => setTaskStatusFilter(e.target.value)}
-                className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="completed">Hoàn tất</option>
-                <option value="processing">Đang xử lý</option>
-              </select>
+              <Select value={taskStatusFilter} onValueChange={setTaskStatusFilter}>
+                <SelectTrigger sizeVariant="sm" className="w-[155px]">
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="completed">Hoàn tất</SelectItem>
+                  <SelectItem value="processing">Đang xử lý</SelectItem>
+                  <SelectItem value="cancelled">Đã hủy</SelectItem>
+                  <SelectItem value="failed">Thất bại</SelectItem>
+                </SelectContent>
+              </Select>
               <span className="text-xs text-muted-foreground ml-2">
                 Hiển thị {filteredTasks.length} / {allTasks.length} tác vụ
               </span>
@@ -643,10 +883,21 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-300 text-[11px] gap-1"
+                          className={`text-[11px] gap-1 ${
+                            TASK_STATUS_BADGE[t.status]?.className ||
+                            TASK_STATUS_BADGE.processing.className
+                          }`}
                         >
-                          <CheckCircle2 className="size-3" />
-                          <span>Hoàn tất</span>
+                          {t.status === "completed" ? (
+                            <CheckCircle2 className="size-3" />
+                          ) : t.status === "processing" ? (
+                            <RefreshCw className="size-3 animate-spin" />
+                          ) : t.status === "cancelled" ? (
+                            <X className="size-3" />
+                          ) : (
+                            <CircleAlert className="size-3" />
+                          )}
+                          <span>{TASK_STATUS_BADGE[t.status]?.label || t.status}</span>
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -665,11 +916,37 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                           >
                             <Terminal className="size-3.5" />
                           </Button>
+                          {(t.status === "failed" || t.status === "cancelled") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleTaskAction(t.id, "retry")}
+                              disabled={taskActionId === t.id}
+                              className="size-7 text-emerald-600 hover:text-emerald-700"
+                              title="Chạy lại job"
+                            >
+                              <RotateCcw className="size-3.5" />
+                            </Button>
+                          )}
+                          {t.status === "processing" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleTaskAction(t.id, "cancel")}
+                              disabled={taskActionId === t.id}
+                              className="size-7 text-amber-600 hover:text-amber-700"
+                              title="Hủy job"
+                            >
+                              <X className="size-3.5" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setDeleteTaskTarget(t)}
+                            disabled={taskActionId === t.id}
                             className="size-7 text-rose-500 hover:text-rose-600"
-                            title="Xóa bản ghi"
+                            title="Xóa tác vụ khỏi danh sách"
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
@@ -753,6 +1030,93 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             {selectedTaskLog?.log_output ||
               "[INFO] Tác vụ đã thực thi thành công không có cảnh báo."}
           </pre>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Document Confirm */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Xóa tài liệu?"
+        description={`Tài liệu "${deleteTarget?.title}" sẽ bị xóa vĩnh viễn khỏi kho, storage và vector index. Hành động này không thể hoàn tác.`}
+        confirmText="Xóa vĩnh viễn"
+        onConfirm={handleConfirmDelete}
+        isPending={isDeleting}
+      />
+
+      {/* Delete Task Confirm */}
+      <ConfirmDialog
+        open={!!deleteTaskTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTaskTarget(null);
+        }}
+        title="Xóa bản ghi tác vụ?"
+        description={`Tác vụ "${deleteTaskTarget?.task_name}" (${deleteTaskTarget?.id}) sẽ bị xóa khỏi danh sách lịch sử. Hành động này không thể hoàn tác.`}
+        confirmText="Xóa tác vụ"
+        onConfirm={handleConfirmDeleteTask}
+        isPending={isDeletingTask}
+      />
+
+      {/* Cleanup Finished Tasks Confirm */}
+      <ConfirmDialog
+        open={isConfirmCleanupOpen}
+        onOpenChange={setIsConfirmCleanupOpen}
+        title="Dọn dẹp các tác vụ đã kết thúc?"
+        description={`Toàn bộ tác vụ đã hoàn tất, thất bại hoặc đã hủy trong kho "${currentCollection.name}" sẽ được dọn dẹp khỏi danh sách.`}
+        confirmText="Xác nhận dọn dẹp"
+        onConfirm={handleCleanupTasks}
+        isPending={isCleaningTasks}
+      />
+
+      {/* Collection Config Dialog */}
+      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <DialogContent className="max-w-md text-xs">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <Settings className="size-4 text-primary" />
+              <span>Cấu hình kho tri thức</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-foreground block">Tên kho</span>
+              <Input
+                value={configName}
+                onChange={(e) => setConfigName(e.target.value)}
+                className="h-9 text-xs"
+                placeholder="Tên bộ sưu tập tri thức"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-foreground block">Mô tả</span>
+              <Input
+                value={configDescription}
+                onChange={(e) => setConfigDescription(e.target.value)}
+                className="h-9 text-xs"
+                placeholder="Mô tả ngắn về kho tri thức"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setIsConfigOpen(false)}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={handleSaveConfig}
+                disabled={isSavingConfig}
+              >
+                {isSavingConfig ? "Đang lưu..." : "Lưu cấu hình"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

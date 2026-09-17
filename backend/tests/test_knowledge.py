@@ -394,6 +394,138 @@ async def test_batch_approve_partial_failure():
 
 
 @pytest.mark.asyncio
+async def test_download_document_happy_path():
+    """Download must return original bytes with attachment disposition."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.knowledge.service import knowledge_service
+
+    fake_doc = SimpleNamespace(
+        id="doc_dl", file_name="ke_hoach.docx", file_type="docx", storage_path="u/k.docx"
+    )
+    with (
+        patch.object(knowledge_service, "get_document", new=AsyncMock(return_value=fake_doc)),
+        patch(
+            "app.modules.knowledge.service.storage_service",
+            get=AsyncMock(return_value=b"PK-fake-docx"),
+        ),
+    ):
+        content, filename, media_type = await knowledge_service.download_document(
+            AsyncMock(), "doc_dl"
+        )
+    assert content == b"PK-fake-docx"
+    assert filename == "ke_hoach.docx"
+    assert "wordprocessingml" in media_type
+
+
+@pytest.mark.asyncio
+async def test_download_missing_original_returns_404():
+    """Missing stored bytes must 404 honestly instead of empty download."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    import pytest
+
+    from app.core.exceptions import EntityNotFoundError
+    from app.modules.knowledge.service import knowledge_service
+
+    fake_doc = SimpleNamespace(
+        id="doc_gone", file_name="a.pdf", file_type="pdf", storage_path="u/a.pdf"
+    )
+    with (
+        patch.object(knowledge_service, "get_document", new=AsyncMock(return_value=fake_doc)),
+        patch(
+            "app.modules.knowledge.service.storage_service",
+            get=AsyncMock(return_value=None),
+        ),pytest.raises(EntityNotFoundError)
+    ):
+        await knowledge_service.download_document(AsyncMock(), "doc_gone")
+
+
+@pytest.mark.asyncio
+async def test_api_reindex_enqueues_job():
+    """POST reindex must enqueue a tracked job instead of faking success."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.core.database import get_db
+    from app.modules.knowledge.service import knowledge_service
+
+    fake_col = SimpleNamespace(id="col_1", module_code="admissions")
+
+    async def override_get_db():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with (
+            patch.object(
+                knowledge_service, "get_collection", new=AsyncMock(return_value=fake_col)
+            ),
+            patch(
+                "app.modules.jobs.service.enqueue_arq_job", new=AsyncMock(return_value="arq-1")
+            ),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as ac:
+                response = await ac.post("/platform/v1alpha1/knowledge/collections/col_1/reindex")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_api_collection_test_searches_for_real():
+    """POST test must run hybrid retrieval, not return canned chunks."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.core.database import get_db
+    from app.modules.knowledge.service import knowledge_service
+    from app.modules.rag.fusion import FusionCandidate
+
+    fake_col = SimpleNamespace(id="col_1", module_code="admissions")
+    candidate = FusionCandidate(
+        chunk_id="chk_1", document_id="doc_1", content="Điểm chuẩn 24.5", rrf_score=0.09,
+        section="Điều 1", page_number=2,
+    )
+
+    async def override_get_db():
+        yield AsyncMock()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with (
+            patch.object(
+                knowledge_service, "get_collection", new=AsyncMock(return_value=fake_col)
+            ),
+            patch(
+                "app.modules.rag.retriever.hybrid_retriever.retrieve",
+                new=AsyncMock(return_value=[candidate]),
+            ),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as ac:
+                response = await ac.post(
+                    "/platform/v1alpha1/knowledge/collections/col_1/test",
+                    params={"query": "điểm chuẩn", "top_k": 5},
+                )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_found"] == 1
+    assert data["items"][0]["chunk_id"] == "chk_1"
+    assert data["items"][0]["page_number"] == 2
+
+
+@pytest.mark.asyncio
 async def test_api_parse_preview():
     """Verify POST /platform/v1alpha1/knowledge/collections/{id}/parse-preview endpoint."""
     sample_txt = (

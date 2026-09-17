@@ -56,15 +56,29 @@ class WorkflowService:
             for n in raw_nodes
         ]
 
-        edges = [
-            WorkflowEdgeSpec(
-                source=e.get("source"),
-                target=e.get("target"),
-                condition=e.get("condition"),
-                label=e.get("label"),
+        parsed_edges: list[WorkflowEdgeSpec] = []
+        for e in raw_edges:
+            src = e.get("source")
+            tgt = e.get("target")
+
+            source_id = src.get("node_id") if isinstance(src, dict) else str(src or "")
+            source_port = src.get("port") if isinstance(src, dict) else None
+
+            target_id = tgt.get("node_id") if isinstance(tgt, dict) else str(tgt or "")
+            target_port = tgt.get("port") if isinstance(tgt, dict) else None
+
+            parsed_edges.append(
+                WorkflowEdgeSpec(
+                    source=source_id,
+                    target=target_id,
+                    source_port=source_port,
+                    target_port=target_port,
+                    condition=e.get("condition"),
+                    label=e.get("label"),
+                )
             )
-            for e in raw_edges
-        ]
+
+        edges = parsed_edges
 
         return WorkflowDagSpec(
             execution_mode=spec_data.get("execution_mode", "conversational"),

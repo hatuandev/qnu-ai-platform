@@ -5,6 +5,7 @@ import {
   Minus,
   Plus,
   RotateCcw,
+  Sparkles,
   Square,
   ZoomIn,
 } from "lucide-react";
@@ -25,6 +26,31 @@ export interface DocumentBoundingVisualizerProps {
   activeBoxId?: string | null;
   onSelectBox?: (boxId: string | null) => void;
   imageUrl?: string;
+  isRescanning?: boolean;
+  onRescanLayout?: () => void;
+}
+
+const REGION_COLORS: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+  header: { bg: "rgba(59, 130, 246, 0.12)", border: "#3b82f6", text: "#1d4ed8", badge: "#2563eb" },
+  title: { bg: "rgba(139, 92, 246, 0.14)", border: "#8b5cf6", text: "#6d28d9", badge: "#7c3aed" },
+  text: { bg: "rgba(168, 85, 247, 0.10)", border: "#a855f7", text: "#7e22ce", badge: "#9333ea" },
+  list: { bg: "rgba(16, 185, 129, 0.12)", border: "#10b981", text: "#047857", badge: "#059669" },
+  table: { bg: "rgba(245, 158, 11, 0.14)", border: "#f59e0b", text: "#b45309", badge: "#d97706" },
+  signature: {
+    bg: "rgba(244, 63, 94, 0.16)",
+    border: "#f43f5e",
+    text: "#be123c",
+    badge: "#e11d48",
+  },
+  stamp: { bg: "rgba(244, 63, 94, 0.16)", border: "#f43f5e", text: "#be123c", badge: "#e11d48" },
+};
+
+function getEffectiveType(box: DocumentBoundingBox): string {
+  const lbl = (box.label || "").toLowerCase();
+  if (["table", "title", "header", "text", "list", "signature", "stamp"].includes(lbl)) {
+    return lbl;
+  }
+  return box.type;
 }
 
 export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProps> = ({
@@ -39,6 +65,8 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
   activeBoxId,
   onSelectBox,
   imageUrl,
+  isRescanning,
+  onRescanLayout,
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(96);
   const [imageError, setImageError] = useState<boolean>(false);
@@ -47,9 +75,11 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
     return boundingBoxes.filter((box) => {
       if (box.page_number !== currentPage) return false;
       if (selectedFilter === "all") return true;
-      if (selectedFilter === "table") return box.type === "table";
-      if (selectedFilter === "text") return box.type === "text" || box.type === "header";
-      if (selectedFilter === "stamp") return box.type === "stamp";
+      const effectiveType = getEffectiveType(box);
+      if (selectedFilter === "table") return effectiveType === "table";
+      if (selectedFilter === "text")
+        return ["text", "header", "title", "list"].includes(effectiveType);
+      if (selectedFilter === "stamp") return ["stamp", "signature"].includes(effectiveType);
       return true;
     });
   }, [boundingBoxes, currentPage, selectedFilter]);
@@ -145,6 +175,20 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
             <span>Khung</span>
           </button>
 
+          {/* Smart Re-scan Button */}
+          {onRescanLayout && (
+            <button
+              type="button"
+              onClick={onRescanLayout}
+              disabled={isRescanning}
+              className="flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer px-2 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+              title="Quét lại bố cục thông minh bằng OpenCV (nhận diện con dấu đỏ, chữ ký, bảng biểu)"
+            >
+              <Sparkles className={`size-3.5 ${isRescanning ? "animate-spin text-primary" : ""}`} />
+              <span>{isRescanning ? "Đang quét..." : "Quét lại"}</span>
+            </button>
+          )}
+
           <div className="h-3 w-px bg-border/80 mx-1" />
 
           <div className="flex items-center gap-1 bg-muted/60 rounded px-1 py-0.5">
@@ -221,7 +265,7 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-card min-h-[500px]">
+            <div className="p-12 text-center flex flex-col items-center justify-center gap-3 bg-card min-h-[640px] aspect-[1/1.414] w-full">
               <FileText className="size-12 text-primary/60" />
               <p className="text-sm font-semibold text-foreground">
                 Tài liệu số hóa — Trang {currentPage} / {totalPages}
@@ -237,19 +281,8 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
           {showBoxes &&
             filteredBoxes.map((box) => {
               const isActive = activeBoxId === box.id;
-              const isTable = box.type === "table";
-              const isStamp = box.type === "stamp";
-
-              let borderColor = "border-purple-600 bg-purple-500/10 text-purple-700";
-              let badgeBg = "bg-purple-600 text-white";
-
-              if (isTable) {
-                borderColor = "border-amber-500 bg-amber-500/15 text-amber-800";
-                badgeBg = "bg-amber-600 text-white";
-              } else if (isStamp) {
-                borderColor = "border-rose-600 bg-rose-500/15 text-rose-800";
-                badgeBg = "bg-rose-600 text-white";
-              }
+              const effectiveType = getEffectiveType(box);
+              const styleColor = REGION_COLORS[effectiveType] || REGION_COLORS.text;
 
               return (
                 <button
@@ -257,18 +290,34 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
                   key={box.id}
                   onClick={() => onSelectBox?.(isActive ? null : box.id)}
                   title={`${box.label.toUpperCase()}: ${box.content_snippet || ""}`}
-                  className={`absolute border-2 transition-all cursor-pointer group p-0 text-left ${borderColor} ${
-                    isActive ? "ring-2 ring-primary ring-offset-1 z-20" : "z-10"
-                  }`}
+                  className="absolute transition-all cursor-pointer group p-0 text-left"
                   style={{
                     left: `${box.coordinates.x}%`,
                     top: `${box.coordinates.y}%`,
                     width: `${box.coordinates.width}%`,
                     height: `${box.coordinates.height}%`,
+                    border: `${isActive ? "2px" : "1.5px"} solid ${isActive ? "#ec4899" : styleColor.border}`,
+                    backgroundColor: isActive ? "rgba(236, 72, 153, 0.18)" : styleColor.bg,
+                    zIndex: isActive ? 20 : 10,
+                    borderRadius: "2px",
                   }}
                 >
                   <span
-                    className={`absolute -top-3 left-1 px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-xs uppercase tracking-wider shadow-sm ${badgeBg}`}
+                    style={{
+                      position: "absolute",
+                      top: "-10px",
+                      left: "4px",
+                      background: isActive ? "#ec4899" : styleColor.badge,
+                      color: "#ffffff",
+                      fontSize: "8px",
+                      fontWeight: 700,
+                      padding: "1px 5px",
+                      borderRadius: "2px",
+                      textTransform: "lowercase",
+                      lineHeight: 1.15,
+                      fontFamily: "Inter, sans-serif",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                    }}
                   >
                     {box.label}
                   </span>

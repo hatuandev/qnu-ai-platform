@@ -1,4 +1,4 @@
-"""Pydantic Schemas for OCR Document Recognition."""
+"""Pydantic Schemas for OCR Document Recognition & Studio Intelligence."""
 
 from __future__ import annotations
 
@@ -41,3 +41,43 @@ class OCRExtractResponse(BaseModel):
     latency_ms: float
     raw_text: str
     pages: list[OCRPageResult] = Field(default_factory=list)
+
+
+class StudioOCRRegion(BaseModel):
+    type: str
+    label: str
+    text: str
+    top: float
+    left: float
+    width: float
+    height: float
+
+
+class StudioOCRPageResponse(BaseModel):
+    page_number: int = Field(alias="pageNumber")
+    title: str
+    is_signed: bool = Field(default=False, alias="isSigned")
+    has_table: bool = Field(default=False, alias="hasTable")
+    image_url: str = Field(alias="imageUrl")
+    markdown: str
+    raw_text: str = Field(alias="rawText")
+    regions: list[StudioOCRRegion] = Field(default_factory=list)
+    dimensions: dict[str, int] = Field(default_factory=lambda: {"width": 1240, "height": 1754})
+    word_count: int = Field(default=0, alias="wordCount")
+    line_count: int = Field(default=0, alias="lineCount")
+    sheet_data: dict[str, Any] | None = Field(default=None, alias="sheetData")
+
+    model_config = {"populate_by_name": True}
+
+
+class StudioOCRParseResponse(BaseModel):
+    filename: str
+    total_pages: int = Field(alias="totalPages")
+    size: str
+    provider: str
+    model: str
+    latency_ms: float = Field(alias="latencyMs")
+    pages: list[StudioOCRPageResponse] = Field(default_factory=list)
+    sheets_data: list[dict[str, Any]] | None = Field(default=None, alias="sheetsData")
+
+    model_config = {"populate_by_name": True}

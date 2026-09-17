@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
@@ -51,8 +51,22 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
   const [editableMarkdown, setEditableMarkdown] = useState<string>("");
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isCommitting, setIsCommitting] = useState<boolean>(false);
+  const [isRescanning, setIsRescanning] = useState<boolean>(false);
   const [commitSuccessBanner, setCommitSuccessBanner] = useState<boolean>(false);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const handleRescanLayout = async () => {
+    try {
+      setIsRescanning(true);
+      await apiClient.getDocumentVerification(documentId, true);
+      await queryClient.invalidateQueries({ queryKey: ["document-verification", documentId] });
+    } catch {
+      // Graceful fallback per AGENTS.md 8.7
+    } finally {
+      setIsRescanning(false);
+    }
+  };
 
   const markdownComponents = useMemo(
     () => ({
@@ -317,6 +331,8 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
             activeBoxId={activeBoxId}
             onSelectBox={setActiveBoxId}
             imageUrl={currentPageData?.image_url}
+            isRescanning={isRescanning}
+            onRescanLayout={handleRescanLayout}
           />
         </div>
 

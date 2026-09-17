@@ -36,6 +36,13 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import {
   type ModelProvider,
@@ -603,24 +610,28 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
 
             <div className="space-y-1.5">
               <span className="font-semibold text-foreground block">Loại Provider *</span>
-              <select
+              <Select
                 value={providerType}
-                onChange={(e) => setProviderType(e.target.value as ModelProvider["type"])}
-                className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                onValueChange={(val) => setProviderType(val as ModelProvider["type"])}
               >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Google Gemini</option>
-                <option value="claude">Anthropic Claude</option>
-                <option value="deepseek">DeepSeek AI</option>
-                <option value="groq">Groq Cloud (LPU)</option>
-                <option value="openrouter">OpenRouter Gateway</option>
-                <option value="mistral">Mistral AI</option>
-                <option value="cloudflare">Cloudflare Workers AI</option>
-                <option value="nvidia">NVIDIA NIM</option>
-                <option value="ollama">Ollama (On-Premise)</option>
-                <option value="local_vllm">Local vLLM Server</option>
-                <option value="custom">Tùy Chỉnh (OpenAI Compatible)</option>
-              </select>
+                <SelectTrigger className="w-full h-9 text-xs">
+                  <SelectValue placeholder="Chọn loại Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="gemini">Google Gemini</SelectItem>
+                  <SelectItem value="claude">Anthropic Claude</SelectItem>
+                  <SelectItem value="deepseek">DeepSeek AI</SelectItem>
+                  <SelectItem value="groq">Groq Cloud (LPU)</SelectItem>
+                  <SelectItem value="openrouter">OpenRouter Gateway</SelectItem>
+                  <SelectItem value="mistral">Mistral AI</SelectItem>
+                  <SelectItem value="cloudflare">Cloudflare Workers AI</SelectItem>
+                  <SelectItem value="nvidia">NVIDIA NIM</SelectItem>
+                  <SelectItem value="ollama">Ollama (On-Premise)</SelectItem>
+                  <SelectItem value="local_vllm">Local vLLM Server</SelectItem>
+                  <SelectItem value="custom">Tùy Chỉnh (OpenAI Compatible)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

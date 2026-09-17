@@ -161,6 +161,29 @@ class VectorIndexer:
                 logger.error("Failed to upsert points into Qdrant %s: %s", cname, exc)
         return 0
 
+    async def delete_by_document(self, collection_id: str, document_id: str) -> int:
+        """Delete all Qdrant points of a document (prevents ghost citations)."""
+        cname = self._get_collection_name(collection_id)
+        try:
+            await self.client.delete(
+                collection_name=cname,
+                points_selector=qmodels.FilterSelector(
+                    filter=qmodels.Filter(
+                        must=[
+                            qmodels.FieldCondition(
+                                key="document_id",
+                                match=qmodels.MatchValue(value=document_id),
+                            )
+                        ]
+                    )
+                ),
+            )
+            logger.info("Deleted Qdrant points of document %s", document_id)
+            return 1
+        except Exception as exc:
+            logger.warning("Qdrant delete failed for document %s: %s", document_id, exc)
+            return 0
+
     async def search_dense(
         self,
         collection_id: str,

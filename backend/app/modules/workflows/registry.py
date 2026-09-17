@@ -7,10 +7,13 @@ import logging
 from app.modules.workflows.nodes import (
     BaseNodeHandler,
     ChatInputNodeHandler,
+    CitationGuardNodeHandler,
     ConditionRouteNodeHandler,
+    ExtractFieldsNodeHandler,
     HumanApprovalNodeHandler,
     LLMGenerateNodeHandler,
     OutputChatNodeHandler,
+    OutputNoAnswerNodeHandler,
     RAGAnswerNodeHandler,
 )
 
@@ -28,6 +31,7 @@ class NodeHandlerRegistry:
         chat_input = ChatInputNodeHandler()
         self.register("input.chat", chat_input)
         self.register("chat_input", chat_input)
+        self.register("interaction.clarify", chat_input)
 
         condition_route = ConditionRouteNodeHandler()
         self.register("condition.route", condition_route)
@@ -43,15 +47,31 @@ class NodeHandlerRegistry:
         self.register("llm.generate", llm_gen)
         self.register("modelops.generate", llm_gen)
         self.register("drafting.generate", llm_gen)
+        self.register("core.drafting.compose", llm_gen)
         self.register("question_bank.generate", llm_gen)
 
         output_chat = OutputChatNodeHandler()
         self.register("output.chat", output_chat)
         self.register("chat_output", output_chat)
+        self.register("output.artifact", output_chat)
+        self.register("artifact.export", output_chat)
 
         human_app = HumanApprovalNodeHandler()
         self.register("tool.human_approval", human_app)
         self.register("human.approval", human_app)
+
+        citation_guard = CitationGuardNodeHandler()
+        self.register("guard.citation_policy", citation_guard)
+        self.register("guard.citation", citation_guard)
+        self.register("citation_guard", citation_guard)
+
+        output_no_answer = OutputNoAnswerNodeHandler()
+        self.register("output.no_answer", output_no_answer)
+        self.register("no_answer_output", output_no_answer)
+
+        extract_fields = ExtractFieldsNodeHandler()
+        self.register("extract.fields", extract_fields)
+        self.register("extract_fields", extract_fields)
 
     def register(self, node_type: str, handler: BaseNodeHandler) -> None:
         self._handlers[node_type.lower().strip()] = handler

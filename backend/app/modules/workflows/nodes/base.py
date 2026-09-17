@@ -32,6 +32,7 @@ class NodeExecutionResult:
     status: str = "completed"  # completed, failed, paused_for_approval
     output: dict[str, Any] = field(default_factory=dict)
     next_node_override: str | None = None
+    selected_port: str | None = None
     error: str | None = None
 
 

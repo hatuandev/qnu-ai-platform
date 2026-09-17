@@ -246,9 +246,12 @@ async def approve_document(
 )
 async def studio_view(
     document_id: str,
+    refresh_layout: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> StudioViewResponse:
-    view = await knowledge_service.get_studio_view(db, document_id)
+    view = await knowledge_service.get_studio_view(
+        db, document_id, refresh_layout=refresh_layout
+    )
     for page in view["pages"]:
         page["image_url"] = (
             f"/platform/v1alpha1/knowledge/documents/{document_id}"
@@ -282,6 +285,23 @@ async def batch_approve_documents(
 ) -> BatchApproveResponse:
     result = await knowledge_service.batch_approve_documents(db, body.document_ids)
     return BatchApproveResponse.model_validate(result)
+
+
+@router.get(
+    "/documents/{document_id}/download",
+    summary="Tải tệp gốc của tài liệu",
+    response_class=Response,
+)
+async def download_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    content, filename, media_type = await knowledge_service.download_document(db, document_id)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post(

@@ -124,7 +124,7 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
         "chat_input",
         "condition_route",
         "knowledge_answer",
-        "final_output",
+        "chat_output",
       ];
 
       const currentStates: Record<string, NodeExecutionState> = {};
