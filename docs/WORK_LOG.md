@@ -1,4 +1,4 @@
-﻿# BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
+# BẢNG TỔNG HỢP TIẾN TRÌNH & NHẬT KÝ LÀM VIỆC (WORK LOG MASTER INDEX)
 
 Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn bộ các phiên làm việc ("Vibe Coding Sessions") của dự án **`qnu-ai-platform`**, tuân thủ nghiêm ngặt theo quy định tại [**`AGENTS.md`**](../AGENTS.md).
 
@@ -44,10 +44,9 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 | **2026-09-16 23:30** | AI Senior Full-Stack Specialist | Kế thừa & Hoàn thiện Cổng Trích Xuất & Biểu Mẫu Hành Chính (Lựa chọn A từ QNU-AI-Core): Docx NĐ 30 Live Paper Sheet, Ma Trận Bloom Excel, Tra Cứu UIS & Thư Viện Phôi Mẫu | **Playwright E2E: 3/3 Pass (100%)**<br>**Biome: 0 \| TS: 0 \| Build ✓**<br>Ruff: 0 error | [2026-09-16_administrative_document_and_tool_studio.md](./nhat_ky/2026-09-16_administrative_document_and_tool_studio.md) |
 | **2026-09-17 08:30** | AI Senior Full-Stack Specialist | Đồng bộ Toàn Diện UI/UX Kho Tri Thức & Hệ Thống Bóc Tách Tài Liệu từ QNU-AI-Core: Master View Lưới 3 Cột, Celery Tasks, Dedicated Ingest Form, Split-Pane Studio (Bounding Boxes, Regions Scan Inspector, Sửa tay Markdown) | **Playwright E2E: 3/3 Pass (100%)**<br>**Biome: 0 \| TS: 0 \| Build ✓**<br>Total E2E: 24/24 Pass | [2026-09-17_dong_bo_ui_ux_knowledge_ingestion_studio.md](./nhat_ky/2026-09-17_dong_bo_ui_ux_knowledge_ingestion_studio.md) |
 | **2026-09-17 09:30** | AI Senior Full-Stack Specialist | Khắc phục triệt để hiển thị Scan thật 14 trang & Render Markdown Bảng biểu chuẩn QNU-AI-Core: 14 ảnh scan 300 DPI, BBoxes OpenCV, ReactMarkdown + remarkGfm (53 ngành tuyển sinh & điểm chuẩn), chế độ xem trước khi sửa tay | **Playwright E2E: 3/3 Pass (100%)**<br>**Biome: 0 \| TS: 0 \| Build ✓**<br>Ruff: 0 error | [2026-09-17_fix_scan_images_va_markdown_tables_studio.md](./nhat_ky/2026-09-17_fix_scan_images_va_markdown_tables_studio.md) |
+| **2026-09-17 10:10** | AI Senior Full-Stack Specialist | Phòng chống Lỗi Mojibake Tiếng Việt Toàn Diện (`check_mojibake.py`, 182 files quét sạch) & Sửa Dứt Điểm Hardcode Upload File (Form rỗng động, tải tệp thật qua API, Studio sinh dữ liệu động, nút xem mẫu thử tách biệt) | **Playwright E2E: 4/4 Pass (100%)**<br>**Pytest: 12/12 Pass (100%)**<br>Mojibake: 0 \| Biome: 0 \| TS: 0 \| Build ✓ | [2026-09-17_zero_mojibake_va_fix_hardcode_upload_file.md](./nhat_ky/2026-09-17_zero_mojibake_va_fix_hardcode_upload_file.md) |
 | **2026-09-17 11:00** | AI Senior Full-Stack Specialist | Nối FE vào BE thật cho Kho Tri Thức: OCR Auto-Routing (Docling/EasyOCR lazy), ingest pending + endpoint approve/index Qdrant thật, form nạp & studio hết mock, bổ sung src/lib còn thiếu | **Pytest: 80/80 Pass (100%)**<br>Ruff: 0 error<br>**Playwright Suite 09: 3/3 Pass**<br>TS: 0 \| Build ✓ \| Biome lint: 0 | [2026-09-17_noi_fe_be_that_ocr_auto_docling_approve.md](./nhat_ky/2026-09-17_noi_fe_be_that_ocr_auto_docling_approve.md) |
-
-
-
+| **2026-09-17 12:30** | AI Senior Full-Stack Specialist | Cài đặt Docling 2.128 thật (torch CPU + rapidocr kèm theo) & kiểm chứng bóc Đề án 2026: 48.050 ký tự markdown, bảng biểu đầy đủ, confidence 0.97; tests chuyển sang assertions theo môi trường thực | **Pytest: 80/80 Pass (100%)**<br>Ruff: 0 error | [2026-09-17_cai_docling_ocr_that.md](./nhat_ky/2026-09-17_cai_docling_ocr_that.md) |
 
 ---
 

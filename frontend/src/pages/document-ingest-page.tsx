@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CircleAlert, FileCheck2, ShieldCheck, UploadCloud } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleAlert, FileCheck2, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Badge } from "../components/ui/badge";
@@ -25,7 +25,8 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
   onBack,
   onStartVerification,
 }) => {
-  const [docTitle, setDocTitle] = useState<string>("Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)");
+  // Khởi tạo form rỗng động — tuyệt đối không gán cứng tên tài liệu mẫu
+  const [docTitle, setDocTitle] = useState<string>("");
   const [docType, setDocType] = useState<string>("quy_che");
   const [year, setYear] = useState<string>("2026");
   const [ocrEngine, setOcrEngine] = useState<string>("auto");
@@ -37,36 +38,51 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
     if (e.target.files?.[0]) {
       const f = e.target.files[0];
       setSelectedFile(f);
-      if (!docTitle.trim() || docTitle === "Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)") {
-        setDocTitle(f.name.replace(/\.[^/.]+$/, ""));
+      setSubmitError(null);
+      // Tự động điền tiêu đề từ tên tệp tin thực tế nếu ô tiêu đề đang rỗng
+      if (!docTitle.trim()) {
+        setDocTitle(f.name.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
       }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setSubmitError("Vui lòng chọn tệp tài liệu trước khi bóc tách.");
+    if (!selectedFile && !docTitle.trim()) {
+      setSubmitError("Vui lòng chọn tệp tài liệu hoặc nhập tiêu đề trước khi bóc tách.");
       return;
     }
     setIsProcessing(true);
     setSubmitError(null);
     try {
-      const uploaded = await apiClient.uploadDocument(
-        collection.id,
-        selectedFile,
-        docTitle.trim() || undefined,
-        OCR_ENGINE_PARAM[ocrEngine]
-      );
-      onStartVerification(uploaded.id);
+      if (selectedFile) {
+        // Tải lên tệp thực tế kèm bộ máy OCR đã chọn, nhận document ID động
+        const uploaded = await apiClient.uploadDocument(
+          collection.id,
+          selectedFile,
+          docTitle.trim() || undefined,
+          OCR_ENGINE_PARAM[ocrEngine]
+        );
+        onStartVerification(uploaded.id);
+      } else {
+        // Tạo tài liệu văn bản mới từ tiêu đề đã nhập (upload thật qua API)
+        const title = docTitle.trim();
+        const textBlob = new File(
+          [`# ${title}\n\n*Khởi tạo ngày ${new Date().toLocaleDateString("vi-VN")}*`],
+          `${title}.txt`,
+          { type: "text/plain;charset=utf-8" }
+        );
+        const created = await apiClient.uploadDocument(collection.id, textBlob, title);
+        onStartVerification(created.id);
+      }
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : "Tải lên thất bại. Vui lòng thử lại."
       );
     } finally {
       setIsProcessing(false);
-    }
-  };
+      }
+    };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
@@ -271,25 +287,38 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           )}
 
           {/* Form Actions Footer */}
-          <div className="flex items-center justify-between pt-4 border-t border-border/70">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onBack}
-              className="h-9 text-xs px-4 text-muted-foreground hover:text-foreground"
-            >
-              Hủy & Quay lại
-            </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border/70">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onBack}
+                className="h-9 text-xs px-4 text-muted-foreground hover:text-foreground"
+              >
+                Hủy & Quay lại
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onStartVerification("doc_ts_2026")}
+                className="h-9 text-xs px-3 text-muted-foreground hover:text-primary gap-1.5 border border-dashed border-border hover:border-primary/40"
+                title="Mở tài liệu mẫu Đề án Tuyển sinh 2026 với 14 trang scan Docling thực tế"
+              >
+                <Sparkles className="size-3.5 text-amber-500" />
+                <span>Xem tài liệu mẫu (Tuyển sinh 2026)</span>
+              </Button>
+            </div>
 
             <Button
               type="submit"
-              disabled={isProcessing}
-              className="h-9 text-xs px-5 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+              disabled={isProcessing || (!selectedFile && !docTitle.trim())}
+              className="h-9 text-xs px-5 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm w-full sm:w-auto cursor-pointer disabled:opacity-50"
             >
               {isProcessing ? (
                 <>
                   <div className="size-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Đang bóc tách...</span>
+                  <span>Đang tải lên & bóc tách...</span>
                 </>
               ) : (
                 <>

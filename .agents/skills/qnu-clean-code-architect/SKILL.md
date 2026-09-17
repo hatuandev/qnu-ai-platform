@@ -15,11 +15,11 @@ Tài liệu này là cẩm nang bắt buộc dành cho mọi AI Agent và lập 
 
 ---
 
-## 1. Tám Điều Răn Clean Code Bắt Buộc (The 8 Commandments)
+## 1. Mười Điều Răn Clean Code Bắt Buộc (The 10 Commandments)
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
-│               8 ĐIỀU RĂN CLEAN CODE KHI VIBE CODING                    │
+│               10 ĐIỀU RĂN CLEAN CODE KHI VIBE CODING                   │
 ├────────────────────────────────────────────────────────────────────────┤
 │ 1. The Boy Scout Rule      │ Để lại file sạch hơn lúc tìm thấy        │
 │ 2. Zero Dead Code & Junk   │ Xóa thẳng tay code cũ & console.log rác   │
@@ -29,6 +29,8 @@ Tài liệu này là cẩm nang bắt buộc dành cho mọi AI Agent và lập 
 │ 6. Early Return Pattern    │ Triệt tiêu lồng ghép if/else đa tầng      │
 │ 7. No Swallowed Exceptions │ Cấm catch rỗng, luôn fallback/toast/log   │
 │ 8. Clean-As-You-Go Loop    │ Lint & Typecheck 0 lỗi trước khi trả lời  │
+│ 9. Zero Hardcoded Data     │ Cấm fake submit, cấm gán chết mock cũ     │
+│ 10. Zero Mojibake          │ 100% UTF-8 NFC, triệt tiêu vỡ font tiếng Việt│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -179,14 +181,19 @@ except S3StorageError as exc:
 | Hardcode màu `bg-blue-600` | Gãy nhận diện Teal, lỗi Dark Mode | Dùng `bg-primary`, `text-primary`, `border-border` |
 | `key={idx}` trên danh sách | Render sai vị trí khi sort/filter | Dùng ID duy nhất (`key={item.id}`) |
 | Hàm dài > 80 dòng | Khó đọc, khó test, vi phạm SRP | Tách nhỏ hàm, tách sub-components |
+| Hardcode giá trị form / Mock cũ | Up file mới nhưng luôn ra file cũ | Khởi tạo rỗng, truyền động `file` & `docId` |
+| `setTimeout` rồi gọi cứng ID cũ | Bẫy Fake Submit, liệt tính năng | Gọi API thật hoặc tạo state động từ tệp mới |
+| Mojibake / Vỡ font tiếng Việt | Xuất hiện ký tự rác `?`, `\ufffd`, vỡ chữ | Luôn mã hóa UTF-8 NFC, open(..., encoding="utf-8"), charset trong Blob |
 
 ---
 
 ## 5. Checklist Tự Kiểm Toán Clean Code (Self-Audit Checklist)
 
-Mỗi lần AI Agent chuẩn bị trả kết quả cho người dùng, hãy rà soát danh sách 5 câu hỏi:
+Mỗi lần AI Agent chuẩn bị trả kết quả cho người dùng, hãy rà soát danh sách 7 câu hỏi:
 - [ ] 1. Tôi đã xóa toàn bộ code comment thừa và `console.log` debug chưa?
 - [ ] 2. Tôi đã xóa các `import` và biến khai báo nhưng không dùng chưa?
 - [ ] 3. Mã nguồn có sử dụng `any` không? Có hardcode màu sắc thô không?
 - [ ] 4. Đã chạy `npm run lint` và `npm run typecheck` đạt 0 lỗi chưa?
-- [ ] 5. File này có sạch sẽ, dễ đọc hơn lúc tôi bắt đầu chạm vào không?
+- [ ] 5. Tôi có đang **hardcode dữ liệu mẫu vào form, fake submit bằng `setTimeout` trỏ ID cũ, hay clone đè dữ liệu cũ lên file mới của người dùng** không?
+- [ ] 6. Mã nguồn và dữ liệu có bị **lỗi vỡ font tiếng Việt (Mojibake, ký tự rác `\ufffd`, `?`, thiếu UTF-8)** không?
+- [ ] 7. File này có sạch sẽ, dễ đọc hơn lúc tôi bắt đầu chạm vào không?

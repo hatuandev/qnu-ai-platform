@@ -57,7 +57,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
         return {
           collectionId: colId,
           subView: "verify" as const,
-          docId: parts[2] || "doc_ts_2026",
+          docId: parts[2] || undefined,
         };
       }
       return { collectionId: colId, subView: "list" as const, docId: undefined };

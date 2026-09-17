@@ -80,14 +80,16 @@ async def test_ocr_service_successful_extraction():
 
 
 @pytest.mark.asyncio
-async def test_heavy_adapters_report_unavailable_without_deps():
-    """Docling/EasyOCR adapters must report unavailable (not crash) when uninstalled."""
+async def test_heavy_adapters_report_availability_honestly():
+    """Docling/EasyOCR adapters must mirror real package presence (never crash)."""
+    import importlib.util
+
     docling = DoclingOCRAdapter()
     easyocr = EasyOCRAdapter()
     assert docling.name == "docling"
     assert easyocr.name == "easyocr"
-    assert docling.is_available() is False
-    assert easyocr.is_available() is False
+    assert docling.is_available() is (importlib.util.find_spec("docling") is not None)
+    assert easyocr.is_available() is (importlib.util.find_spec("easyocr") is not None)
 
 
 @pytest.mark.asyncio
@@ -98,8 +100,8 @@ async def test_list_engines_reflects_real_availability():
     by_name = {e.name: e for e in engines}
     assert set(by_name) == {"pymupdf_ocr", "docling", "easyocr", "mock_ocr"}
     assert by_name["pymupdf_ocr"].is_active is True
-    assert by_name["docling"].is_active is False
-    assert by_name["easyocr"].is_active is False
+    assert by_name["docling"].is_active is service._adapters["docling"].is_available()
+    assert by_name["easyocr"].is_active is service._adapters["easyocr"].is_available()
 
 
 @pytest.mark.asyncio
@@ -107,13 +109,30 @@ async def test_explicit_unavailable_engine_raises_clear_error():
     """Requesting an uninstalled engine must fail loudly, never silently mock."""
     service = OCRService()
     mock_session = AsyncMock()
-    with pytest.raises(AppException) as exc_info:
-        await service.extract_document(
-            session=mock_session,
-            content=b"%PDF-1.4 dummy",
-            filename="scan.pdf",
-            engine_name="docling",
-        )
+    target = next(
+        (name for name in ("docling", "easyocr") if not service._adapters[name].is_available()),
+        None,
+    )
+    if target is None:  # all heavy engines installed: simulate a missing one
+        target = "docling"
+        with (
+            patch.object(service._adapters[target], "is_available", return_value=False),
+            pytest.raises(AppException) as exc_info,
+        ):
+            await service.extract_document(
+                session=mock_session,
+                content=b"%PDF-1.4 dummy",
+                filename="scan.pdf",
+                engine_name=target,
+            )
+    else:
+        with pytest.raises(AppException) as exc_info:
+            await service.extract_document(
+                session=mock_session,
+                content=b"%PDF-1.4 dummy",
+                filename="scan.pdf",
+                engine_name=target,
+            )
     assert exc_info.value.code == "ocr_engine_unavailable"
     assert exc_info.value.status_code == 400
 

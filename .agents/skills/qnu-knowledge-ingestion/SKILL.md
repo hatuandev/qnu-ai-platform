@@ -25,6 +25,7 @@ Quy trình ingestion diễn ra qua 7 bước nghiêm ngặt:
    - File Excel XLSX: `ExcelParser` chuyển đổi mỗi bảng tính thành Bảng Markdown.
    - File Plain Text/CSV: `PlainTextParser`.
 4. **Làm sạch văn bản chuyên biệt tiếng Việt ([cleaner.py](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/backend/app/modules/knowledge/cleaner.py))**:
+   - **Khử Mojibake & Chuẩn hóa Unicode NFC**: Sử dụng `unicodedata.normalize("NFC", text)` để đồng nhất bảng mã tiếng Việt dựng sẵn, loại bỏ hoàn toàn ký tự lỗi thay thế `\ufffd` hoặc chuỗi rác do sai encoding.
    - Xóa ngắt dòng giữa câu do scan/OCR (`\n` không cần thiết).
    - Xóa các dòng số trang lẻ loi, header/footer lặp lại.
    - Căn chỉnh lại các cột bảng Markdown bị lệch hoặc rách hàng.

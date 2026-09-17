@@ -1,4 +1,4 @@
-﻿# PROJECT_CONTEXT.md — Snapshot Ngữ Cảnh Dự Án QNU AI Platform
+# PROJECT_CONTEXT.md — Snapshot Ngữ Cảnh Dự Án QNU AI Platform
 
 > **⚠️ QUAN TRỌNG**: AI Agent phải đọc file này NGAY ĐẦU mỗi phiên làm việc và cập nhật lại CUỐI mỗi phiên.
 > Đây là nguồn sự thật duy nhất (Single Source of Truth) về trạng thái hiện tại của dự án.
@@ -7,29 +7,23 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-17 11:00 (UTC+7)
-- **Phiên số**: #36 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-17 12:30 (UTC+7)
+- **Phiên số**: #37 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Nối FE Vào BE Thật Cho Kho Tri Thức (Xóa Bỏ Mock Luồng Nạp/Đối Soát)**:
+  1. **Cài Docling Thật & Kiểm Chứng Đề Án 2026 (phiên #37)**:
+     - `uv add docling` → docling 2.128.0 + torch CPU (+ rapidocr kèm theo); auto-routing `auto` trên scan thật nay nâng lên Docling.
+     - Kiểm chứng file Đề án 2026: 48.050 ký tự markdown, bảng biểu đầy đủ, confidence 0.97.
+  2. **Nối FE Vào BE Thật Cho Kho Tri Thức (phiên #36 — Xóa Bỏ Mock Luồng Nạp/Đối Soát)**:
      - **OCR Auto-Routing đa tầng**: Thêm `DoclingOCRAdapter` + `EasyOCRAdapter` (lazy import, báo availability trung thực); chế độ `auto` chạy PyMuPDF trước, text rỗng mới nâng lên Docling/EasyOCR; engine chưa cài đặt trả lỗi 400 rõ ràng thay vì mock im lặng.
      - **Ingest pending/approve thật**: Upload chuyển sang `pending` + ghi `ocr_method`; endpoint mới `POST /documents/{id}/approve` nhận bản sửa tay theo trang, chunk lại, approve và **index Qdrant thật** (point-id uuid5).
      - **FE hết giả**: Form nạp upload thật và mở studio bằng ID thật; studio dựng từ chunks BE (mock chỉ còn cho tài liệu demo); commit gọi approve thật có banner lỗi; visualizer hết fallback ảnh demo.
-     - **Sửa hỏng có sẵn**: Bổ sung `src/lib/utils.ts` + `src/lib/query-client.ts` còn thiếu (typecheck/build hỏng ở HEAD); sửa test E2E TC-INGEST-01 kỳ vọng sai tên catalog; sửa ruff I001 ở `backend/app/main.py`.
-  2. **Khắc phục Triệt Để Vấn Đề Hiển Thị Scan & Markdown Studio (phiên #35, lưu trữ — Đồng bộ 100% với `qnu-ai-core`)**:
-     - **Sao chép và đồng bộ toàn bộ 14 trang ảnh scan thực tế 300 DPI**: Trích xuất trực tiếp từ kho OCR cache của `qnu-ai-core` (`services/studio-ui/public/ocr-cache/ccbf29700d/`) sang `frontend/public/ocr-cache/doc_ts_2026/` (`page_1.jpg` đến `page_14.jpg`).
-     - **Thay thế hoàn toàn bộ giả lập HTML cũ bằng thẻ `<img>` ảnh scan thật**: Loại bỏ hoàn toàn khối div giả lập văn bản thô, giải quyết dứt điểm tình trạng trang 3 đến 14 bị trắng tinh. Lớp phủ Bounding Boxes hiển thị chính xác theo tỷ lệ % OpenCV trên ảnh scan thật.
-     - **Render Markdown chuẩn xác qua `ReactMarkdown` + `remarkGfm`**: Cột phải thay thế việc in text thô bằng bộ component render GitHub-Flavored Markdown chuẩn mực: Bảng biểu tuyển sinh (53 ngành, chỉ tiêu, tổ hợp môn, điểm chuẩn 2 năm 2024-2025, bảng quy đổi IELTS/VSTEP, phụ lục xét tuyển thẳng) có viền bảng, header xám, alternating row colors, blockquote Academic Teal trích dẫn văn bản quy phạm.
-     - **Cải tiến chế độ Sửa tay (Human-in-the-loop)**: Bổ sung nút chuyển đổi "Xem trước" (Preview) và "Quay lại sửa" trực tiếp trong textarea, cho phép cán bộ kiểm tra kết quả render Markdown trước khi lưu hoặc nạp vào Vector DB.
-  2. **Tách Module Dữ Liệu Theo Chuẩn Clean Code (Rule 8 AGENTS.md)**:
-     - Tạo tệp độc lập `frontend/src/services/verification-data.ts` (1,393 dòng, 69KB) chứa toàn bộ dữ liệu bóc tách, bounding boxes và layout regions của 14 trang scan Đề án tuyển sinh 2026, giải phóng dung lượng cho `api-client.ts`.
-     - Sửa lỗi PEP 8 E402 trong `backend/app/main.py`.
-  3. **Kiểm thử Toàn Diện & Đạt Tiêu Chuẩn Sản Phẩm 100%**:
-     - `uv run ruff check .`: All checks passed (0 lỗi).
-     - `npm run lint`: Biome check 0 lỗi, 0 cảnh báo.
-     - `npm run typecheck`: TypeScript tsc --noEmit 0 lỗi.
-     - `npm run build`: Vite build thành công đóng gói production bundle.
-     - `npx playwright test tests/e2e/09_knowledge_ingestion_studio.spec.ts --project="Google Chrome"`: 3/3 tests passed (18.6s).
+     - **Sửa hỏng có sẵn**: Bổ sung `src/lib/utils.ts` + `src/lib/query-client.ts` còn thiếu (typecheck/build hỏng ở HEAD); sửa test E2E TC-INGEST-01 kỳ vọng sai tên catalog; sửa ruff I001 ở `backend/app/main.py`; thu hẹp rule `lib/` trong `.gitignore` thành `/lib/` để không nuốt `frontend/src/lib/`.
+  3. **Zero Mojibake + Fix Hardcode Upload (song song từ nhánh remote)**:
+     - Thiết lập quy chuẩn Zero Mojibake & UTF-8 (mục 8.10 `AGENTS.md`, đồng bộ 2 skills, script `scripts/check_mojibake.py` + lệnh `npm run check:mojibake`).
+     - Sửa hardcode form nạp (ô tiêu đề rỗng động, submit upload thật, nút "Xem tài liệu mẫu" tách biệt, xóa fallback ảnh demo) + test chống tái diễn `TC-INGEST-04` trong Suite 09.
+  4. **Khắc phục Hiển Thị Scan & Markdown Studio (phiên #35, lưu trữ)**:
+     - Đồng bộ 14 trang ảnh scan 300 DPI, BBoxes OpenCV, `ReactMarkdown` + `remarkGfm`, chế độ xem trước khi sửa tay; tách `verification-data.ts` (1.393 dòng).
 
 ---
 
@@ -80,20 +74,23 @@
 
 **Frontend Quality**:
 - Biome Lint (logic): 0 errors | TypeScript: 0 errors | Vite Build: 100% passed
-- Playwright E2E Suite 09: 3/3 passed
-- Lưu ý: `npm run lint` (biome check) còn lỗi format CRLF→LF toàn repo — có sẵn ở HEAD, không do phiên này; `src/lib/{utils,query-client}.ts` đã được bổ sung để cứu typecheck/build
+- Playwright E2E: Suite 09 có TC-INGEST-01→04 (bao gồm TC-INGEST-04 chống tái diễn hardcode)
+- Lưu ý: `npm run lint` (biome check) còn lỗi format CRLF→LF toàn repo — có sẵn, không do phiên nào gần đây; `src/lib/{utils,query-client}.ts` đã được bổ sung để cứu typecheck/build; rule `lib/` trong `.gitignore` đã thu hẹp thành `/lib/`
 
 ---
 
 ## 4. Danh Mục Gotchas Kỹ Thuật (Kinh Nghiệm Thực Tế)
 
 1. **Strict Mode trong Playwright**:
-   - Khi có text xuất hiện ở cả thanh Breadcrumb/Header và trong thân trang (ví dụ `Trang 1 / 14`), bắt buộc phải dùng `page.getByText('Trang 1 / 14', { exact: true })` hoặc `.first()` để tránh lỗi `strict mode violation`.
+   - Khi có text xuất hiện ở cả thanh Breadcrumb/Header và trong thân trang (ví dụ `Trang 1 / 14`, filename), bắt buộc phải dùng `page.getByText('...', { exact: true })` hoặc `.first()` để tránh lỗi `strict mode violation`.
 2. **Hiển thị Ảnh Scan Tài Liệu Bóc Tách**:
-   - Không được dùng text/HTML mock để giả lập trang scan. Bắt buộc phải phục vụ ảnh scan thật từ thư mục tĩnh `frontend/public/ocr-cache/doc_ts_2026/page_N.jpg` với tỉ lệ khung hình chuẩn A4 và zoom container.
+   - Không được dùng text/HTML mock để giả lập trang scan. Bắt buộc phải phục vụ ảnh scan thật từ thư mục tĩnh `frontend/public/ocr-cache/doc_ts_2026/page_N.jpg` với tỉ lệ khung hình chuẩn A4 và zoom container. Với tệp mới không có scan cache, hiển thị khung canvas tài liệu số hóa sạch.
 3. **Render Bảng Biểu Markdown**:
    - Markdown thô (`whitespace-pre-wrap`) không hiển thị được bảng. Bắt buộc dùng `ReactMarkdown` với plugin `remarkGfm` và custom `components={{ table, thead, th, td, tr }}` có styling viền ô rõ ràng.
-4. **PEP 8 E402 trong Backend**:
+4. **Chuẩn Hóa Encoding UTF-8 trên Windows (Tránh Mojibake)**:
+   - Mọi script Python chạy console trên Windows phải thiết lập `sys.stdout.reconfigure(encoding="utf-8")` để không bị lỗi `UnicodeEncodeError` với bảng mã `cp1252`.
+   - File đọc/ghi bắt buộc chỉ định rõ `encoding="utf-8"`.
+5. **PEP 8 E402 trong Backend**:
    - Khi xử lý đoạn mã sửa lỗi Windows IPv6 `no_proxy`, đặt đoạn sanitize sau toàn bộ module imports chuẩn để ruff check 0 lỗi.
 
 ---
@@ -104,7 +101,9 @@
 - [x] Render Markdown bảng biểu và cấu trúc phân cấp chuẩn GitHub Flavored Markdown.
 - [x] Thêm chế độ xem trước (Preview) khi hiệu đính văn bản trong chế độ Sửa tay (Human-in-the-loop).
 - [x] Nối FE vào BE thật cho luồng nạp/đối soát (upload pending, approve + index Qdrant, OCR auto-routing Docling/EasyOCR lazy).
-- [ ] Cài đặt Docling/EasyOCR thật trên môi trường có GPU/dung lượng (`uv add docling`) để bật OCR scan hoàn chỉnh.
+- [x] Cài Docling 2.128 thật + kiểm chứng Đề án 2026 (48.050 ký tự markdown, bảng đầy đủ, conf 0.97).
+- [x] Sửa dứt điểm lỗi hardcode upload file và bổ sung kiểm thử tự động chống tái diễn (TC-INGEST-04).
+- [x] Xây dựng bộ quét tự động Zero Mojibake (`scripts/check_mojibake.py`).
 - [ ] Endpoint render page-image từ backend + xóa `frontend/public/ocr-cache` (~9MB) khỏi git (dùng MinIO/LFS).
 - [ ] BBoxes/regions thật từ engine (thay mock viết tay) + kéo thả ROI trên ảnh scan.
 - [ ] Chuẩn hóa CRLF→LF + `.gitattributes` để `npm run lint` (biome check) xanh toàn repo.

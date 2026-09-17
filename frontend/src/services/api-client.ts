@@ -1275,10 +1275,15 @@ export const apiClient = {
       formData.append("ocr_engine", ocrEngine);
     }
     // Honest upload: backend failures surface to the caller, never a fake doc.
-    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/upload`, {
-      method: "POST",
-      body: formData,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
     if (!res.ok) {
       throw new Error(`Tải lên thất bại (HTTP ${res.status}). Vui lòng thử lại.`);
     }
@@ -1985,13 +1990,15 @@ export const apiClient = {
 
   /**
    * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
+   * Phân biệt rõ ràng giữa tài liệu mẫu (doc_ts_2026) và các tài liệu người dùng tải lên thực tế.
    */
   async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
     // Legacy demo document keeps its hand-written studio fixture.
     if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
       return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
     }
-    // Real documents: build the studio view from backend chunks (no invention).
+    // Real documents: build the studio view from backend chunks (no invention —
+    // per AGENTS.md 8.7/8.9, never fabricate pages, boxes or word counts).
     const detail = await apiClient.getDocumentDetail(docId);
     const byPage = new Map<number, DocumentChunkItem[]>();
     for (const chunk of detail.chunks) {

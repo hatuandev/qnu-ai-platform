@@ -200,4 +200,52 @@ test.describe("09. Knowledge Master-Detail & Full-Screen Ingestion Studio", () =
     // Verify Success Banner
     await expect(page.locator("text=Đã nạp Vector DB thành công!")).toBeVisible({ timeout: 5000 });
   });
+
+  test("TC-INGEST-04: Verifies Dynamic File Ingestion and Zero-Hardcoded Title", async ({
+    page,
+  }) => {
+    // 1. Go to Ingestion form for regulations collection
+    await page.goto("/knowledge/collections/col_regulations");
+    await page.waitForLoadState("domcontentloaded");
+
+    const ingestBtn = page.getByRole("button", { name: /\+ Nạp tài liệu/i });
+    await expect(ingestBtn).toBeVisible();
+    await ingestBtn.click();
+    await page.waitForTimeout(300);
+
+    // 2. Verify Title input is empty by default (Zero Hardcoded Data)
+    const titleInput = page.locator("#document-title-input");
+    await expect(titleInput).toBeVisible();
+    await expect(titleInput).toHaveValue("");
+
+    // 3. Simulate file upload with custom dynamic file
+    const fileInput = page.locator("#file-upload-input");
+    await fileInput.setInputFiles({
+      name: "Quy_dinh_Cong_tac_Hoc_sinh_Sinh_vien_2026.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 Mock PDF Content for QNU Platform Testing"),
+    });
+
+    // 4. Verify title auto-populated from filename
+    await expect(titleInput).toHaveValue("Quy dinh Cong tac Hoc sinh Sinh vien 2026");
+
+    // 5. Submit form (no backend in E2E: must fail HONESTLY, never open fake studio)
+    const submitBtn = page.getByRole("button", { name: /Bóc tách & Mở Studio/i });
+    await expect(submitBtn).toBeEnabled();
+    await submitBtn.click();
+
+    // 6. Honest failure: error banner visible, form stays, no fabricated studio.
+    // Per AGENTS.md 8.7/8.9 the app must surface backend errors, never mock data.
+    await expect(
+      page.locator("text=/Không kết nối được máy chủ Backend|Tải lên thất bại/")
+    ).toBeVisible({ timeout: 8000 });
+
+    // Old admissions hardcode must never reappear anywhere on the form
+    await expect(
+      page.locator("text=Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)")
+    ).not.toBeVisible();
+
+    // Full studio path (upload -> pending -> approve -> index) requires a live
+    // backend + database and is covered by backend pytest, not offline E2E.
+  });
 });

@@ -60,7 +60,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
   // Subview navigation: "list" | "ingest" | "verify"
   const [subView, setSubView] = useState<"list" | "ingest" | "verify">(initialSubView);
-  const [verifyDocId, setVerifyDocId] = useState<string>(initialVerifyDocId || "doc_ts_2026");
+  const [verifyDocId, setVerifyDocId] = useState<string>(initialVerifyDocId || "");
 
   // Tabs on List view: "documents" | "tasks" | "playground"
   const [detailTab, setDetailTab] = useState<string>("documents");
@@ -222,7 +222,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     return (
       <DocumentVerificationStudioPage
         collectionId={currentCollection.id}
-        documentId={verifyDocId}
+        documentId={verifyDocId || allDocuments[0]?.id || "doc_ts_2026"}
         onBackToConfig={() => setSubView("ingest")}
         onCommitSuccess={() => {
           setSubView("list");
