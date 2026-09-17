@@ -12,6 +12,7 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
   2. **Zero Big-Ball-of-Mud**: Tuyệt đối không tạo file "quái vật" nghìn dòng. Mỗi module Backend tuân thủ chuẩn 4 file (`models.py`, `schemas.py`, `service.py`, `router.py`). Mỗi component Frontend tuân thủ kiến trúc 3 tầng rõ ràng.
   3. **Zero Hallucination (Chống bịa đặt)**: Dữ liệu câu trả lời của Trợ lý AI phải bám sát 100% tài liệu chính thức của Trường Đại học Quy Nhơn; nếu thiếu căn cứ, bắt buộc phải kích hoạt No-Answer Policy để hướng dẫn tới phòng ban phụ trách.
   4. **UI/UX Gold Standard & Zero Lint Errors**: Đồng bộ 100% nhận diện ĐH Quy Nhơn (Academic Teal `oklch(0.46 0.13 160)`), thiết kế cao cấp, chuyển đổi Dark/Light mode mượt mà; 0 lỗi Biome linter, 0 lỗi TypeScript typecheck.
+  5. **Zero Mojibake & Chuẩn Hóa UTF-8 Tiếng Việt**: 100% tệp mã nguồn, dữ liệu bóc tách, template, API responses và UI hiển thị phải sử dụng chuẩn mã hóa UTF-8 sạch. Tuyệt đối cấm lỗi vỡ font, lỗi mã hóa ký tự rác (Mojibake, dấu hỏi chấm `?`, ký tự thay thế `\ufffd`, chuỗi rác như `Quyt `<nh...`, `B~ GIA?O D C...`, `?oAn ?cc TA1ng...`). Mọi luồng OCR và trích xuất tài liệu phải qua tầng chuẩn hóa Unicode NFC.
 
 ---
 
@@ -196,7 +197,7 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 
 ## 8. Quy Chuẩn Clean Code Bắt Buộc Khi Vibe Coding (Vibe Coding Clean Code Standards)
 
-"Vibe Coding" là phong cách lập trình tốc độ cao dựa trên trí tuệ nhân tạo, nhưng **tuyệt đối không được đánh đổi chất lượng mã nguồn lấy tốc độ**. Mọi AI Agent tham gia dự án QNU AI Platform phải tuân thủ nghiêm ngặt 8 điều răn Clean Code sau:
+"Vibe Coding" là phong cách lập trình tốc độ cao dựa trên trí tuệ nhân tạo, nhưng **tuyệt đối không được đánh đổi chất lượng mã nguồn lấy tốc độ**. Mọi AI Agent tham gia dự án QNU AI Platform phải tuân thủ nghiêm ngặt 10 điều răn Clean Code sau:
 
 ### 8.1. Quy Tắc Hướng Đạo Sinh (The Boy Scout Rule)
 > *"Luôn để codebase sạch hơn lúc bạn tìm thấy nó."*
@@ -257,11 +258,45 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - Trước khi kết thúc bất kỳ lượt xử lý (turn) nào hoặc bàn giao code cho người dùng, Agent **BẮT BUỘC** phải tự chạy kiểm tra tĩnh và format:
   ```bash
   # Frontend:
-  npm run lint       # Biome tự động rà soát & format
-  npm run typecheck  # TypeScript kiểm tra 0 lỗi type
+  npm run lint       # Biome tự động rà soát & format (0 lỗi)
+  npm run typecheck  # TypeScript kiểm tra 0 lỗi type (0 lỗi)
+  npm run build      # Đóng gói bundle thành công
 
   # Backend:
-  uv run ruff check .  # Ruff kiểm tra & dọn imports
+  uv run ruff check .           # Ruff kiểm tra & dọn imports (0 lỗi)
+  uv run --extra dev pytest -v  # Pass 100% test suite
   ```
 - **Không bao giờ bàn giao code khi còn bất kỳ lỗi lint hay typecheck nào!**
+
+### 8.9. Tuyệt Đối Không Hardcode Logic & Dữ Liệu Khi Vibe Coding (Zero Hardcoded Data & Zero Mock Traps)
+> *"Vibe Coding là tăng tốc độ phát triển, KHÔNG PHẢI lừa dối người dùng bằng dữ liệu giả lập bị gán chết."*
+- **Cấm gán cứng giá trị mẫu vào `useState` của Form Inputs**:
+  - Các ô input (tiêu đề, tên tệp, năm hiệu lực, mã số) phải khởi tạo rỗng (`""`) hoặc sinh động từ tệp tin người dùng tải lên (`file.name`).
+  - Tuyệt đối **không được gán sẵn tên của một tài liệu cụ thể** (ví dụ: `useState("Thong tin tuyen sinh dai hoc 2026 Lan2 1 (1)")`).
+- **Cấm giả lập luồng xử lý bằng `setTimeout` rồi gọi cứng ID mặc định (Fake Submit)**:
+  - Khi người dùng bấm submit form (upload tệp, bắt đầu bóc tách, tạo mới, lưu cấu hình), bắt buộc phải tiếp nhận tệp tin và dữ liệu thực tế gửi lên API Backend hoặc cập nhật state động của tệp vừa chọn.
+  - Nghiêm cấm tuyệt đối việc dùng `setTimeout(() => onStart("doc_ts_2026"), 600)` giả vờ xử lý rồi điều hướng về ID tài liệu cũ!
+- **Cấm Clone-Overwriting (Không đánh tráo khái niệm dữ liệu trong Service/API Client)**:
+  - Khi Service xử lý nhiều tài liệu hoặc thực thể, phải trả về dữ liệu tương ứng của thực thể đó.
+  - Tuyệt đối không được clone nguyên xi dữ liệu mẫu của một văn bản cũ để đắp vào ID mới (ví dụ: `return { ...MOCK_VERIFICATION_DOCUMENT, document_id: docId }`). Điều này khiến người dùng upload file mới nhưng màn hình đối soát luôn bị kẹt ở nội dung file cũ.
+  - Nếu tài liệu mới chưa có dữ liệu bóc tách, phải hiển thị rõ trạng thái đang xử lý (`processing`), tệp rỗng (`empty`), hoặc kết quả bóc tách động thực tế từ Backend.
+- **Tách bạch rõ ràng giữa Chế độ Mẫu (Demo/Sample Mode) và Chế độ Vận hành Thật (Live Ingestion)**:
+  - Dữ liệu mẫu (ví dụ: Đề án tuyển sinh 2026, Quyết định 2699) chỉ được phép sử dụng khi người dùng chủ động click nút mẫu thử (ví dụ: *"Xem tài liệu mẫu"*).
+  - Không bao giờ được dùng dữ liệu mẫu để đè lên hoặc thay thế luồng người dùng tải tệp thật từ máy tính.
+
+### 8.10. Triệt Tiêu Lỗi Mã Hóa Ký Tự & Vỡ Font Tiếng Việt (Zero Mojibake & Strict UTF-8 Enforcement)
+> *"Mojibake là sự cẩu thả về mã hóa. Một nền tảng AI phục vụ Đại học Quy Nhơn không bao giờ được phép hiển thị văn bản vỡ font trước mặt cán bộ và sinh viên."*
+- **Chuẩn hóa UTF-8 Không BOM toàn diện**:
+  - 100% tệp mã nguồn (Python, TypeScript, TSX, JSON, Markdown, YAML, SQL) phải lưu ở định dạng UTF-8 không BOM.
+  - Python Backend: Mọi hàm đọc/ghi tệp `open()` bắt buộc phải chỉ định `encoding="utf-8"` (cấm để mặc định hệ điều hành Windows `cp1252` gây lỗi).
+- **Chuẩn hóa Unicode tiếng Việt (Unicode Normalization NFC)**:
+  - Tất cả dữ liệu chuỗi tiếp nhận từ PDF, Word, OCR (Docling, PyMuPDF, EasyOCR), web scraping hoặc người dùng nhập phải đi qua tầng chuẩn hóa `unicodedata.normalize("NFC", text)`.
+  - Triệt tiêu hoàn toàn sự pha trộn giữa Unicode tổ hợp (NFD) và Unicode dựng sẵn (NFC).
+- **Cấm Tuyệt Đối Đưa Chuỗi Lỗi Font (Mojibake) Vào Codebase**:
+  - Nghiêm cấm copy-paste các đoạn văn bản bị lỗi font từ terminal Windows hoặc decode hỏng vào source code (ví dụ: cấm các chuỗi như `Quyt `<nh`, `B~ GIA?O D C`, `?oAn ?cc TA1ng`, `?i?u 1`, ký tự thay thế `\ufffd` hoặc ``).
+  - Mọi dữ liệu mẫu hoặc mock data tiếng Việt phải được viết bằng tiếng Việt có dấu chuẩn chỉnh (`Quyết định 2699/QĐ-ĐHQN`, `PGS.TS. Đoàn Đức Tùng`, `Bộ Giáo dục và Đào tạo`).
+- **Bảo toàn Bảng Mã Khi Export & Download**:
+  - Frontend: Khi tạo Blob tải xuống (Markdown, CSV, TXT, JSON), bắt buộc phải khai báo charset rõ ràng: `new Blob([content], { type: "text/markdown;charset=utf-8" })`.
+  - Riêng với tệp CSV xuất cho Microsoft Excel trên Windows: Bắt buộc chèn thêm tiền tố BOM UTF-8 (`\uFEFF`) ở đầu chuỗi để Excel tự động nhận diện đúng font tiếng Việt có dấu mà không bị vỡ font.
+
 
