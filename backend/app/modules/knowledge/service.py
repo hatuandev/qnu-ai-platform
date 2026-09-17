@@ -14,6 +14,7 @@ from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNo
 from app.core.storage import storage_service
 from app.modules.knowledge.chunker import get_chunker
 from app.modules.knowledge.cleaner import clean_markdown_text
+from app.modules.knowledge.facts import fact_extractor
 from app.modules.knowledge.models import (
     KnowledgeChunk,
     KnowledgeCollection,
@@ -24,6 +25,7 @@ from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.schemas import (
     CollectionCreateRequest,
+    CollectionUpdateRequest,
     ParsePreviewResponse,
 )
 
@@ -154,11 +156,11 @@ class KnowledgeService:
         file_bytes: bytes,
         file_name: str,
         ocr_engine: str | None,
-    ) -> tuple[str, str, int, bool]:
+    ) -> tuple[str, str, int, bool, dict[int, list[dict]]]:
         """Rescue blank parses (scanned PDFs/images) via OCR auto-routing.
 
-        Returns (markdown_text, engine_used, page_count, rescued). Never raises:
-        OCR failure only means the document stays pending for manual handling.
+        Returns (markdown_text, engine_used, page_count, rescued, page_blocks).
+        Never raises: OCR failure only means the document stays pending.
         """
         try:
             from app.modules.ocr.service import OCRService
@@ -171,9 +173,185 @@ class KnowledgeService:
             )
         except Exception as exc:
             logger.warning("OCR rescue failed for file='%s': %s", file_name, exc)
-            return "", "none", 0, False
+            return "", "none", 0, False, {}
         rescued = bool((ocr_result.raw_text or "").strip())
-        return ocr_result.raw_text, ocr_result.engine_used, ocr_result.total_pages, rescued
+        page_blocks: dict[int, list[dict]] = {}
+        for page in ocr_result.pages:
+            if page.blocks:
+                page_blocks[page.page_number] = [dict(b) for b in page.blocks]
+        return (
+            ocr_result.raw_text,
+            ocr_result.engine_used,
+            ocr_result.total_pages,
+            rescued,
+            page_blocks,
+        )
+
+    @staticmethod
+    def _group_blocks_by_page(blocks: list[dict]) -> dict[int, list[dict]]:
+        """Group flat parser blocks {page_number, ...} per page."""
+        grouped: dict[int, list[dict]] = {}
+        for block in blocks:
+            try:
+                page_number = int(block.get("page_number", 1))
+            except (TypeError, ValueError):
+                page_number = 1
+            item = {k: v for k, v in block.items() if k != "page_number"}
+            grouped.setdefault(page_number, []).append(item)
+        return grouped
+
+    @staticmethod
+    def chunk_strategy_for(module_code: str) -> str:
+        """Clause-based chunking for regulations, semantic otherwise."""
+        return "clause" if module_code == "regulations" else "semantic"
+
+    async def prepare_ingestion(
+        self,
+        db: AsyncSession,
+        module_code: str,
+        file_bytes: bytes,
+        file_name: str,
+        ocr_engine: str | None = None,
+    ) -> dict:
+        """Parse (+OCR rescue), clean and chunk a file without persisting.
+
+        Shared by the sync upload path and background reprocessing tasks so
+        both produce identical chunks, facts metadata and geometry.
+        """
+        ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
+
+        # 2. Parse document strategy
+        parser = get_document_parser(ext)
+        parsed = await parser.parse(file_bytes, file_name)
+        ocr_method = parser.__class__.__name__
+        ocr_fallback = False
+
+        # 2b. Scanned-document rescue: blank text -> OCR auto-routing
+        if not (parsed.raw_text or "").strip() and ext in (
+            "pdf",
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "bmp",
+        ):
+            ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
+                db, file_bytes, file_name, ocr_engine
+            )
+            if rescued:
+                parsed = ParsedContent(
+                    raw_text=ocr_text,
+                    page_count=ocr_pages,
+                    tables=[],
+                    metadata={"ocr_engine": ocr_engine_used},
+                )
+                parsed.blocks = [
+                    {"page_number": page_number, **block}
+                    for page_number, items in ocr_blocks.items()
+                    for block in items
+                ]
+                ocr_method = ocr_engine_used
+                ocr_fallback = True
+                logger.info("OCR rescue succeeded for file='%s' via %s", file_name, ocr_method)
+
+        # 3. Clean and normalize text
+        cleaned_text = clean_markdown_text(parsed.raw_text)
+
+        # 4. Chunking strategy
+        chunker = get_chunker(self.chunk_strategy_for(module_code))
+        chunk_drafts = chunker.chunk(cleaned_text)
+        return {
+            "ext": ext,
+            "parsed": parsed,
+            "cleaned_text": cleaned_text,
+            "chunk_drafts": chunk_drafts,
+            "ocr_method": ocr_method,
+            "ocr_fallback": ocr_fallback,
+        }
+
+    async def persist_chunks_facts(
+        self,
+        db: AsyncSession,
+        doc: KnowledgeDocument,
+        collection_id: str,
+        prepared: dict,
+    ) -> int:
+        """Persist chunks + facts for a document (no commit; caller commits)."""
+        parsed = prepared["parsed"]
+        chunk_drafts = prepared["chunk_drafts"]
+        for draft in chunk_drafts:
+            db.add(
+                KnowledgeChunk(
+                    document_id=doc.id,
+                    collection_id=collection_id,
+                    chunk_index=draft.index,
+                    content=draft.content,
+                    chunk_hash=draft.chunk_hash,
+                    token_count=draft.token_count,
+                    section=draft.section,
+                    page_number=draft.page_number,
+                    chunk_metadata=draft.metadata,
+                )
+            )
+        for fact_data in fact_extractor.extract(
+            tables=parsed.tables,
+            collection_id=collection_id,
+            document_id=doc.id,
+        ):
+            db.add(KnowledgeFact(**fact_data))
+        return len(chunk_drafts)
+
+    async def replace_document_content(
+        self,
+        db: AsyncSession,
+        doc: KnowledgeDocument,
+        collection_id: str,
+        module_code: str,
+        prepared: dict,
+    ) -> int:
+        """Replace chunks/facts/metadata of a document (background reprocessing)."""
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id))
+        await db.execute(delete(KnowledgeFact).where(KnowledgeFact.document_id == doc.id))
+        await db.flush()
+        count = await self.persist_chunks_facts(db, doc, collection_id, prepared)
+        metadata = dict(doc.doc_metadata or {})
+        metadata.update(
+            {
+                "page_count": prepared["parsed"].page_count,
+                "table_count": len(prepared["parsed"].tables),
+                "chunk_count": count,
+                "ocr_method": prepared["ocr_method"],
+                "ocr_fallback": prepared["ocr_fallback"],
+                "page_blocks": self._group_blocks_by_page(prepared["parsed"].blocks),
+            }
+        )
+        doc.doc_metadata = metadata
+        doc.status = "pending"
+        await db.commit()
+        await db.refresh(doc)
+        return count
+
+    async def update_collection(
+        self, db: AsyncSession, collection_id: str, req: CollectionUpdateRequest
+    ) -> KnowledgeCollection:
+        col = await self.get_collection(db, collection_id)
+        updates = req.model_dump(exclude_unset=True)
+        if "metadata" in updates:
+            merged = dict(col.collection_metadata or {})
+            merged.update(updates.pop("metadata") or {})
+            col.collection_metadata = merged
+        for field, value in updates.items():
+            if hasattr(col, field):
+                setattr(col, field, value)
+        await db.commit()
+        await db.refresh(col)
+        return col
+
+    async def delete_collection(self, db: AsyncSession, collection_id: str) -> None:
+        col = await self.get_collection(db, collection_id)
+        await db.delete(col)
+        await db.commit()
+        logger.info("Permanently deleted collection id=%s", collection_id)
 
     async def ingest_document(
         self,
@@ -187,7 +365,6 @@ class KnowledgeService:
         col = await self.get_collection(db, collection_id)
         file_hash = self.compute_file_hash(file_bytes)
         file_size = len(file_bytes)
-        ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
 
         # Check duplicate file (Idempotency)
         dup_query = select(KnowledgeDocument).where(
@@ -206,49 +383,22 @@ class KnowledgeService:
         storage_rel_path = f"uploads/{collection_id}/{uuid.uuid4().hex[:8]}_{file_name}"
         await storage_service.save(storage_rel_path, file_bytes)
 
-        # 2. Parse document strategy
-        parser = get_document_parser(ext)
-        parsed = await parser.parse(file_bytes, file_name)
-        ocr_method = parser.__class__.__name__
-        ocr_fallback = False
-
-        # 2b. Scanned-document rescue: blank text -> OCR auto-routing
-        if not (parsed.raw_text or "").strip() and ext in (
-            "pdf",
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "bmp",
-        ):
-            ocr_text, ocr_engine_used, ocr_pages, rescued = await self._run_ocr_rescue(
-                db, file_bytes, file_name, ocr_engine
-            )
-            if rescued:
-                parsed = ParsedContent(
-                    raw_text=ocr_text,
-                    page_count=ocr_pages,
-                    tables=[],
-                    metadata={"ocr_engine": ocr_engine_used},
-                )
-                ocr_method = ocr_engine_used
-                ocr_fallback = True
-                logger.info("OCR rescue succeeded for file='%s' via %s", file_name, ocr_method)
-
-        # 3. Clean and normalize text
-        cleaned_text = clean_markdown_text(parsed.raw_text)
-
-        # 4. Chunking strategy (Clause-based for regulations, Semantic for others)
-        chunk_strategy = "clause" if col.module_code == "regulations" else "semantic"
-        chunker = get_chunker(chunk_strategy)
-        chunk_drafts = chunker.chunk(cleaned_text)
-
+        # 2-4. Parse (+OCR rescue), clean and chunk via shared preparation
+        prepared = await self.prepare_ingestion(
+            db=db,
+            module_code=col.module_code,
+            file_bytes=file_bytes,
+            file_name=file_name,
+            ocr_engine=ocr_engine,
+        )
         # 5. Persist Document entity (pending review -> approve indexes to Qdrant)
+        parsed = prepared["parsed"]
+        chunk_drafts = prepared["chunk_drafts"]
         doc = KnowledgeDocument(
             collection_id=collection_id,
             title=title or file_name.rsplit(".", 1)[0],
             file_name=file_name,
-            file_type=ext,
+            file_type=prepared["ext"],
             file_size_bytes=file_size,
             file_hash=file_hash,
             storage_path=storage_rel_path,
@@ -256,9 +406,9 @@ class KnowledgeService:
                 "page_count": parsed.page_count,
                 "table_count": len(parsed.tables),
                 "chunk_count": len(chunk_drafts),
-                "parser": parser.__class__.__name__,
-                "ocr_method": ocr_method,
-                "ocr_fallback": ocr_fallback,
+                "ocr_method": prepared["ocr_method"],
+                "ocr_fallback": prepared["ocr_fallback"],
+                "page_blocks": self._group_blocks_by_page(parsed.blocks),
             },
             status="pending",
             is_active=True,
@@ -266,36 +416,8 @@ class KnowledgeService:
         db.add(doc)
         await db.flush()  # populate doc.id
 
-        # 6. Persist Chunks
-        for draft in chunk_drafts:
-            chunk = KnowledgeChunk(
-                document_id=doc.id,
-                collection_id=collection_id,
-                chunk_index=draft.index,
-                content=draft.content,
-                chunk_hash=draft.chunk_hash,
-                token_count=draft.token_count,
-                section=draft.section,
-                page_number=draft.page_number,
-                chunk_metadata=draft.metadata,
-            )
-            db.add(chunk)
-
-        # 7. Extract structured facts from tables
-        for tab in parsed.tables:
-            if len(tab.headers) >= 2:
-                # Store table metadata as structured fact
-                fact = KnowledgeFact(
-                    collection_id=collection_id,
-                    document_id=doc.id,
-                    entity_name=tab.headers[0],
-                    entity_type="table",
-                    attribute_name="headers",
-                    attribute_value=", ".join(tab.headers),
-                    confidence=1.0,
-                    raw_data={"rows_sample": tab.rows[:5]},
-                )
-                db.add(fact)
+        # 6-7. Persist chunks + structured facts (shared helper)
+        await self.persist_chunks_facts(db, doc, collection_id, prepared)
 
         await db.commit()
         await db.refresh(doc)
@@ -321,8 +443,8 @@ class KnowledgeService:
             and not (parsed.raw_text or "").strip()
             and ext in ("pdf", "png", "jpg", "jpeg", "webp", "bmp")
         ):
-            ocr_text, ocr_engine_used, ocr_pages, rescued = await self._run_ocr_rescue(
-                db, file_bytes, file_name, ocr_engine
+            ocr_text, ocr_engine_used, ocr_pages, rescued, _ocr_blocks = (
+                await self._run_ocr_rescue(db, file_bytes, file_name, ocr_engine)
             )
             if rescued:
                 parsed = ParsedContent(
@@ -384,6 +506,242 @@ class KnowledgeService:
         await db.refresh(doc)
         logger.info("Archived document id=%s", doc.id)
         return doc
+
+    # Default box confidence per engine block type (documented engine default:
+    # neither PyMuPDF geometry nor this Docling API version exposes per-block
+    # confidence, so boxes never invent precision — see StudioBox contract).
+    DEFAULT_BOX_CONFIDENCE: dict[str, float] = {
+        "table": 0.95,
+        "header": 0.92,
+        "text": 0.90,
+        "stamp": 0.88,
+    }
+
+    def build_studio_pages(
+        self,
+        chunks: list[dict],
+        page_blocks: dict,
+        document_id: str,
+    ) -> list[dict]:
+        """Pure builder: chunks + stored geometry -> per-page studio views."""
+        by_page: dict[int, list[dict]] = {}
+        for chunk in chunks:
+            try:
+                page_number = int(chunk.get("page_number") or 1)
+            except (TypeError, ValueError):
+                page_number = 1
+            by_page.setdefault(page_number, []).append(chunk)
+        for group in by_page.values():
+            group.sort(key=lambda c: int(c.get("chunk_index", 0)))
+
+        blocks_by_page: dict[int, list[dict]] = {}
+        for raw_key, items in (page_blocks or {}).items():
+            try:
+                page_number = int(raw_key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(items, list):
+                blocks_by_page[page_number] = items
+
+        page_numbers = sorted(set(by_page) | set(blocks_by_page)) or [1]
+        pages: list[dict] = []
+        for page_number in page_numbers:
+            group = by_page.get(page_number, [])
+            markdown = "\n\n".join(str(c.get("content", "")) for c in group).strip()
+            boxes: list[dict] = []
+            for idx, block in enumerate(blocks_by_page.get(page_number, []), start=1):
+                box_type = str(block.get("type", "text"))
+                coords = block.get("coordinates") or {}
+                boxes.append(
+                    {
+                        "id": f"box_{document_id}_p{page_number}_{idx}",
+                        "page_number": page_number,
+                        "type": box_type,
+                        "coordinates": {
+                            "x": float(coords.get("x", 0)),
+                            "y": float(coords.get("y", 0)),
+                            "width": float(coords.get("width", 0)),
+                            "height": float(coords.get("height", 0)),
+                        },
+                        "label": str(block.get("label", f"Khối {idx}")),
+                        "confidence": float(
+                            block.get(
+                                "confidence",
+                                self.DEFAULT_BOX_CONFIDENCE.get(box_type, 0.90),
+                            )
+                        ),
+                        "content_snippet": str(block.get("content_snippet", ""))[:160],
+                    }
+                )
+            regions = [
+                {
+                    "id": f"reg_{document_id}_p{page_number}_{idx}",
+                    "page_number": page_number,
+                    "title": box["label"],
+                    "type": box["type"],
+                    "confidence": box["confidence"],
+                    "reading_order": idx,
+                    "details": box["content_snippet"] or f"Khối {box['type']} #{idx}",
+                }
+                for idx, box in enumerate(boxes, start=1)
+            ]
+            words = markdown.split() if markdown else []
+            pages.append(
+                {
+                    "page_number": page_number,
+                    "markdown_content": markdown,
+                    "raw_text": markdown,
+                    "word_count": len(words),
+                    "line_count": markdown.count("\n") + 1 if markdown else 0,
+                    "image_url": None,  # filled by the router (page-image endpoint)
+                    "bounding_boxes": boxes,
+                    "regions": regions,
+                }
+            )
+        return pages
+
+    async def get_studio_view(self, db: AsyncSession, document_id: str) -> dict:
+        """Assemble the verification studio view from stored chunks + geometry."""
+        doc = await self.get_document(db, document_id)
+        chunks = [
+            {
+                "content": c.content,
+                "chunk_index": c.chunk_index,
+                "page_number": c.page_number,
+            }
+            for c in sorted(
+                doc.chunks, key=lambda c: ((c.page_number or 1), c.chunk_index)
+            )
+        ]
+        pages = self.build_studio_pages(
+            chunks=chunks,
+            page_blocks=(doc.doc_metadata or {}).get("page_blocks", {}),
+            document_id=doc.id,
+        )
+        metadata = doc.doc_metadata or {}
+        total_pages = max(
+            [p["page_number"] for p in pages] + [int(metadata.get("page_count", 0) or 0), 1]
+        )
+        return {
+            "document_id": doc.id,
+            "collection_id": doc.collection_id,
+            "title": doc.title,
+            "filename": doc.file_name,
+            "engine": str(metadata.get("ocr_method", "PyMuPdfParser")),
+            "total_pages": total_pages,
+            "file_size_bytes": doc.file_size_bytes or 0,
+            "total_chunks": len(chunks),
+            "pages": pages,
+        }
+
+    # Office formats convertible to PDF via Gotenberg (LibreOffice) for preview.
+    OFFICE_CONVERTIBLE = ("doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf")
+    RENDERABLE_DIRECT = ("pdf", "png", "jpg", "jpeg", "webp", "bmp")
+
+    async def _convert_office_to_pdf(self, file_bytes: bytes, file_name: str) -> bytes:
+        """Convert an office document to PDF bytes via Gotenberg LibreOffice."""
+        import httpx
+
+        from app.core.config import get_settings
+
+        gotenberg_url = get_settings().GOTENBERG_URL.rstrip("/")
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{gotenberg_url}/forms/libreoffice/convert",
+                    files={"files": (file_name, file_bytes)},
+                )
+        except Exception as exc:
+            raise AppException(
+                f"Không kết nối được dịch vụ chuyển đổi tài liệu (Gotenberg): {exc}",
+                code="gotenberg_unreachable",
+                status_code=503,
+            ) from exc
+        if response.status_code != 200:
+            raise AppException(
+                f"Chuyển đổi '{file_name}' sang PDF thất bại (HTTP {response.status_code}).",
+                code="office_convert_failed",
+                status_code=422,
+            )
+        return response.content
+
+    async def render_page_image(
+        self, db: AsyncSession, document_id: str, page_number: int
+    ) -> bytes:
+        """Render a document page to PNG (cached in storage).
+
+        PDFs/images render directly; office docs (Word/Excel/PowerPoint) are
+        converted via Gotenberg LibreOffice first. Anything else -> honest 404.
+        """
+        import pymupdf as fitz
+
+        doc = await self.get_document(db, document_id)
+        if doc.file_type not in self.RENDERABLE_DIRECT + self.OFFICE_CONVERTIBLE:
+            raise AppException(
+                f"Tài liệu '{doc.file_name}' không hỗ trợ xem trước ảnh trang.",
+                code="page_preview_unsupported",
+                status_code=404,
+            )
+        cache_key = f"previews/{doc.id}/page_{page_number}.png"
+        cached = await storage_service.get(cache_key)
+        if cached:
+            return cached
+
+        original = await storage_service.get(doc.storage_path)
+        if not original:
+            raise EntityNotFoundError(
+                f"Không tìm thấy tệp gốc của tài liệu '{document_id}'.",
+                details={"document_id": document_id},
+            )
+        if doc.file_type in self.OFFICE_CONVERTIBLE:
+            pdf_bytes = await self._convert_office_to_pdf(original, doc.file_name)
+            filetype = "pdf"
+        else:
+            pdf_bytes = original
+            filetype = doc.file_type if doc.file_type != "bmp" else "png"
+        try:
+            pdf = fitz.open(stream=pdf_bytes, filetype=filetype)
+        except Exception as exc:
+            raise AppException(
+                f"Không đọc được tệp gốc của tài liệu '{document_id}'.",
+                code="page_render_failed",
+                status_code=422,
+                details={"reason": str(exc)},
+            ) from exc
+        if page_number < 1 or page_number > len(pdf):
+            raise EntityNotFoundError(
+                f"Trang {page_number} không tồn tại (tài liệu có {len(pdf)} trang).",
+                details={"document_id": document_id, "page_number": page_number},
+            )
+        try:
+            png_bytes = pdf[page_number - 1].get_pixmap(dpi=150).tobytes("png")
+        finally:
+            pdf.close()
+        try:
+            await storage_service.save(cache_key, png_bytes)
+        except Exception as exc:
+            logger.warning("Could not cache page preview %s: %s", cache_key, exc)
+        return png_bytes
+
+    async def batch_approve_documents(
+        self,
+        db: AsyncSession,
+        document_ids: list[str],
+    ) -> dict:
+        """Approve many documents; per-item failures never abort the batch."""
+        approved: list[str] = []
+        failed: list[dict] = []
+        indexed_chunks = 0
+        for document_id in dict.fromkeys(document_ids):
+            try:
+                result = await self.approve_document(db, document_id, pages=None)
+            except Exception as exc:
+                logger.warning("Batch approve failed for %s: %s", document_id, exc)
+                failed.append({"document_id": document_id, "error": str(exc)[:500]})
+                continue
+            approved.append(result["document_id"])
+            indexed_chunks += int(result.get("indexed_chunks", 0))
+        return {"approved": approved, "failed": failed, "indexed_chunks": indexed_chunks}
 
     async def delete_document(self, db: AsyncSession, document_id: str) -> None:
         doc = await self.get_document(db, document_id)

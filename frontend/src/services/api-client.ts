@@ -1067,6 +1067,45 @@ const MOCK_RUNS: WorkflowRun[] = [
 
 // ---------------- API Methods with Smart Fallback ----------------
 
+const JOB_TYPE_LABEL: Record<string, { task_name: string; category: IngestionTask["category"] }> = {
+  ingestion: { task_name: "Nạp & bóc tách tài liệu", category: "ingestion" },
+  reindex: { task_name: "Nạp lại vector collection", category: "reindex" },
+  export: { task_name: "Xuất tài liệu", category: "ingestion" },
+};
+
+function mapJobToIngestionTask(j: Record<string, unknown>): IngestionTask {
+  const jobType = (j.job_type as string) || "ingestion";
+  const status = (j.status as string) || "queued";
+  const meta = JOB_TYPE_LABEL[jobType] || JOB_TYPE_LABEL.ingestion;
+  const created = (j.created_at as string) || "";
+  const updated = (j.updated_at as string) || created;
+  const payload = (j.payload as Record<string, unknown>) || {};
+  const result = (j.result as Record<string, unknown>) || {};
+  const durationSeconds = Math.max(
+    0,
+    Math.round((Date.parse(updated) - Date.parse(created)) / 1000) || 0
+  );
+  return {
+    id: (j.id as string) || `job_${Date.now()}`,
+    task_name: meta.task_name,
+    collection_id: (j.collection_id as string) || "",
+    collection_code: (j.collection_id as string) || "",
+    source_file: (payload.filename as string) || (payload.source_file as string) || "",
+    file_size_mb: typeof payload.file_size_mb === "number" ? payload.file_size_mb : 0,
+    worker_name: "arq-worker",
+    duration_seconds: durationSeconds,
+    category: meta.category,
+    progress_percent: typeof j.progress === "number" ? Math.round(j.progress as number) : 0,
+    status: status === "completed" ? "completed" : status === "failed" ? "failed" : "processing",
+    created_at: created,
+    log_output:
+      (j.error as string) ||
+      (typeof result.points_reindexed === "number"
+        ? `Indexed ${result.points_reindexed}/${result.total_chunks || "?"} chunks`
+        : undefined),
+  };
+}
+
 export const apiClient = {
   async getHealth(): Promise<BackendHealth> {
     try {
@@ -1978,6 +2017,21 @@ export const apiClient = {
    * Lấy danh sách hàng đợi tác vụ bóc tách / ingestion ngầm (Celery/ARQ Worker).
    */
   async getIngestionTasks(collectionId?: string): Promise<IngestionTask[]> {
+    // Real backend jobs first; offline seed fallback only when unreachable.
+    try {
+      const res = await fetch(`${BASE_URL}/jobs?limit=50`);
+      if (res.ok) {
+        const data = (await res.json()) as Record<string, unknown>[];
+        if (Array.isArray(data)) {
+          const mapped = data
+            .filter((j) => !collectionId || (j.collection_id as string) === collectionId)
+            .map((j) => mapJobToIngestionTask(j));
+          if (mapped.length > 0) return mapped;
+        }
+      }
+    } catch {
+      // Fallback below
+    }
     if (collectionId) {
       return Promise.resolve(
         MOCK_INGESTION_TASKS.filter(
@@ -1992,13 +2046,70 @@ export const apiClient = {
    * Lấy dữ liệu đối soát tài liệu bóc tách (Bounding Boxes, Regions, Pages, Markdown).
    * Phân biệt rõ ràng giữa tài liệu mẫu (doc_ts_2026) và các tài liệu người dùng tải lên thực tế.
    */
+  async getStudioView(docId: string): Promise<DocumentVerificationData> {
+    const res = await fetch(`${BASE_URL}/knowledge/documents/${docId}/studio-view`);
+    if (!res.ok) {
+      throw new Error(`Không tải được studio-view (HTTP ${res.status}).`);
+    }
+    const v = (await res.json()) as {
+      document_id: string;
+      collection_id: string;
+      title: string;
+      filename: string;
+      engine: string;
+      total_pages: number;
+      file_size_bytes?: number;
+      total_chunks?: number;
+      pages: {
+        page_number: number;
+        markdown_content: string;
+        raw_text: string;
+        word_count: number;
+        line_count: number;
+        image_url: string | null;
+        bounding_boxes: DocumentBoundingBox[];
+        regions: DocumentRegion[];
+      }[];
+    };
+    const totalChars = v.pages.reduce((sum, p) => sum + p.markdown_content.length, 0);
+    const sizeBytes = typeof v.file_size_bytes === "number" ? v.file_size_bytes : 0;
+    return {
+      document_id: v.document_id,
+      collection_id: v.collection_id,
+      title: v.title,
+      filename: v.filename,
+      file_size_mb: Math.round((sizeBytes / 1048576) * 100) / 100,
+      total_pages: v.total_pages,
+      engine: v.engine,
+      total_chars: totalChars,
+      estimated_chunks: typeof v.total_chunks === "number" ? v.total_chunks : 0,
+      pages: v.pages.map((p) => ({
+        page_number: p.page_number,
+        word_count: p.word_count,
+        line_count: p.line_count,
+        image_url: p.image_url || undefined,
+        markdown_content: p.markdown_content,
+        raw_text: p.raw_text,
+        bounding_boxes: p.bounding_boxes || [],
+        regions: p.regions || [],
+      })),
+    };
+  },
+
   async getDocumentVerification(docId: string): Promise<DocumentVerificationData> {
     // Legacy demo document keeps its hand-written studio fixture.
     if (docId === MOCK_VERIFICATION_DOCUMENT.document_id) {
       return Promise.resolve(MOCK_VERIFICATION_DOCUMENT);
     }
-    // Real documents: build the studio view from backend chunks (no invention —
-    // per AGENTS.md 8.7/8.9, never fabricate pages, boxes or word counts).
+    // Real documents: prefer studio-view (markdown + real boxes + page images),
+    // fall back to chunk mapping when the backend lacks stored geometry.
+    try {
+      return await apiClient.getStudioView(docId);
+    } catch {
+      // Fall through to chunk mapping below.
+    }
+    // Chunk mapping fallback (no invention — per AGENTS.md 8.7/8.9,
+    // never fabricate pages, boxes or word counts).
     const detail = await apiClient.getDocumentDetail(docId);
     const byPage = new Map<number, DocumentChunkItem[]>();
     for (const chunk of detail.chunks) {
@@ -2022,9 +2133,7 @@ export const apiClient = {
       total_chars: totalChars,
       estimated_chunks: detail.chunks.length,
       pages: (pageNumbers.length > 0 ? pageNumbers : [1]).map((pageNumber) => {
-        const group = (byPage.get(pageNumber) || []).sort(
-          (a, b) => a.chunk_index - b.chunk_index
-        );
+        const group = (byPage.get(pageNumber) || []).sort((a, b) => a.chunk_index - b.chunk_index);
         const markdown = group.map((c) => c.content).join("\n\n");
         return {
           page_number: pageNumber,

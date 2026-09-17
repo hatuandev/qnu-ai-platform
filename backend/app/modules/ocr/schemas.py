@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -26,6 +28,7 @@ class OCRPageResult(BaseModel):
     word_count: int
     line_count: int
     has_tables: bool = False
+    blocks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class OCRExtractResponse(BaseModel):

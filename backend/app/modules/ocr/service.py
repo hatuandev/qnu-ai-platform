@@ -219,6 +219,7 @@ class OCRService:
                 word_count=p["word_count"],
                 line_count=p["line_count"],
                 has_tables=p.get("has_tables", False),
+                blocks=p.get("blocks", []) or [],
             )
             for p in result_dict.get("pages", [])
         ]

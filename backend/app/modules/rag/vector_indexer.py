@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import importlib.util
 import logging
 import math
 from typing import Any
@@ -14,6 +16,32 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+_embedding_model: Any = None
+_embedding_model_failed = False
+
+
+def is_embedding_model_installed() -> bool:
+    """Check sentence-transformers availability without importing torch."""
+    return importlib.util.find_spec("sentence_transformers") is not None
+
+
+def _get_embedding_model() -> Any | None:
+    """Lazily load the shared BGE-M3 encoder (None when unavailable)."""
+    global _embedding_model, _embedding_model_failed
+    if _embedding_model is not None:
+        return _embedding_model
+    if _embedding_model_failed or not is_embedding_model_installed():
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        _embedding_model = SentenceTransformer(settings.EMBEDDING_MODEL)
+        logger.info("Loaded embedding model: %s", settings.EMBEDDING_MODEL)
+    except Exception as exc:
+        _embedding_model_failed = True
+        logger.warning("Embedding model unavailable, using mock vectors: %s", exc)
+    return _embedding_model
 
 
 class VectorIndexer:
@@ -49,13 +77,39 @@ class VectorIndexer:
         return cname
 
     @staticmethod
-    def generate_embedding(text: str, dim: int = 1024) -> list[float]:
-        """Generate normalized dense vector. In production this calls BGE-M3 model service."""
-        # Deterministic vector simulation for testing & offline mode
+    def mock_embedding(text: str, dim: int = 1024) -> list[float]:
+        """Deterministic vector simulation for testing & offline mode."""
         seed = int(hashlib.md5(text.encode("utf-8")).hexdigest()[:8], 16)
         vec = [math.sin(seed + i) for i in range(dim)]
         norm = math.sqrt(sum(x * x for x in vec)) or 1.0
         return [round(x / norm, 6) for x in vec]
+
+    @staticmethod
+    def generate_embedding(text: str, dim: int = 1024) -> list[float]:
+        """Legacy sync entrypoint: deterministic mock vector (tests/offline)."""
+        return VectorIndexer.mock_embedding(text, dim)
+
+    def _fit_dim(self, vec: list[float]) -> list[float]:
+        """Pad/truncate a model vector to the configured Qdrant dimension."""
+        if len(vec) == self.vector_size:
+            return [round(float(x), 6) for x in vec]
+        if len(vec) > self.vector_size:
+            return [round(float(x), 6) for x in vec[: self.vector_size]]
+        return [round(float(x), 6) for x in vec] + [0.0] * (self.vector_size - len(vec))
+
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        """Batch-encode texts with BGE-M3; honest mock fallback when unavailable."""
+        model = _get_embedding_model()
+        if model is None:
+            return [self.mock_embedding(t, self.vector_size) for t in texts]
+        try:
+            vectors = await asyncio.to_thread(
+                model.encode, texts, normalize_embeddings=True, show_progress_bar=False
+            )
+            return [self._fit_dim([float(x) for x in row]) for row in vectors]
+        except Exception as exc:
+            logger.warning("Embedding inference failed, using mock vectors: %s", exc)
+            return [self.mock_embedding(t, self.vector_size) for t in texts]
 
     async def index_chunks(
         self,
@@ -66,13 +120,17 @@ class VectorIndexer:
         cname = await self.ensure_collection(collection_id)
         points: list[qmodels.PointStruct] = []
 
+        missing = [str(c["content"]) for c in chunks if not c.get("vector")]
+        encoded = await self.embed_texts(missing) if missing else []
+        encoded_iter = iter(encoded)
+
         for c in chunks:
             chunk_id = str(c["id"])
             # Qdrant point IDs must be UUID/uint: use explicit point_id when given
             # (e.g. deterministic uuid5), keep business chunk_id in the payload.
             point_id: Any = c.get("point_id") or chunk_id
             content = str(c["content"])
-            vector = c.get("vector") or self.generate_embedding(content, self.vector_size)
+            vector = c.get("vector") or next(encoded_iter)
 
             payload = {
                 "chunk_id": chunk_id,
@@ -112,7 +170,10 @@ class VectorIndexer:
     ) -> list[dict[str, Any]]:
         """Perform dense cosine similarity search in Qdrant."""
         cname = self._get_collection_name(collection_id)
-        vec = query_vector or self.generate_embedding(query, self.vector_size)
+        if query_vector is not None:
+            vec = query_vector
+        else:
+            vec = (await self.embed_texts([query]))[0]
 
         try:
             hits = await self.client.search(

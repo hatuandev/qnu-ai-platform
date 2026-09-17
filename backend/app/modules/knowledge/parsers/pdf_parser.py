@@ -7,6 +7,7 @@ import logging
 import pymupdf as fitz
 
 from app.modules.knowledge.parsers.base import BaseDocumentParser, ExtractedTable, ParsedContent
+from app.modules.knowledge.parsers.blocks import extract_page_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,15 @@ class PyMuPdfParser(BaseDocumentParser):
         page_count = len(doc)
         full_text_parts: list[str] = []
         extracted_tables: list[ExtractedTable] = []
+        geometry_blocks: list[dict] = []
 
         for page_idx in range(page_count):
             page = doc[page_idx]
             page_num = page_idx + 1
+
+            # 0. Real geometry blocks (text + tables, percent coordinates)
+            for block in extract_page_blocks(page):
+                geometry_blocks.append({"page_number": page_num, **block})
 
             # 1. Extract tables from page using PyMuPDF native table finder
             page_tables = page.find_tables()
@@ -74,4 +80,5 @@ class PyMuPdfParser(BaseDocumentParser):
             page_count=page_count,
             tables=extracted_tables,
             metadata=metadata,
+            blocks=geometry_blocks,
         )

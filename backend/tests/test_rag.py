@@ -85,6 +85,43 @@ def test_answer_format_planner():
     assert answer_format_planner.plan_format("Giới thiệu ngành Kỹ thuật phần mềm") == "bullet_list"
 
 
+def test_mock_embedding_deterministic():
+    """Mock vectors must be deterministic, normalized and correctly sized."""
+    import math
+
+    from app.modules.rag.vector_indexer import VectorIndexer
+
+    vec_a = VectorIndexer.generate_embedding("Điểm chuẩn Công nghệ thông tin", 1024)
+    vec_b = VectorIndexer.generate_embedding("Điểm chuẩn Công nghệ thông tin", 1024)
+    assert len(vec_a) == 1024
+    assert vec_a == vec_b
+    assert math.isclose(sum(x * x for x in vec_a), 1.0, rel_tol=1e-6)
+
+
+@pytest.mark.asyncio
+async def test_embed_texts_falls_back_without_model():
+    """embed_texts must return mock vectors (never crash) when ST is missing."""
+    from unittest.mock import patch
+
+    from app.modules.rag.vector_indexer import VectorIndexer
+
+    indexer = VectorIndexer()
+    with patch("app.modules.rag.vector_indexer._get_embedding_model", return_value=None):
+        vectors = await indexer.embed_texts(["hoc phi", "chi tieu"])
+    assert len(vectors) == 2
+    assert all(len(v) == indexer.vector_size for v in vectors)
+    assert vectors[0] != vectors[1]
+
+
+def test_fit_dim_pads_and_truncates():
+    """Model vectors must be fitted exactly to the Qdrant dimension."""
+    from app.modules.rag.vector_indexer import VectorIndexer
+
+    indexer = VectorIndexer()
+    assert len(indexer._fit_dim([0.5] * 2048)) == indexer.vector_size
+    assert len(indexer._fit_dim([0.5] * 10)) == indexer.vector_size
+
+
 def test_citation_guard_no_answer():
     """Verify CitationGuard returns polite rejection policy when context is insufficient."""
     msg_admissions = citation_guard.get_no_answer_response("admissions")

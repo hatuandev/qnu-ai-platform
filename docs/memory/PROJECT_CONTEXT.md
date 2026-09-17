@@ -7,8 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-17 12:30 (UTC+7)
-- **Phiên số**: #37 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-17 18:30 (UTC+7)
+- **Phiên số**: #43 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
   1. **Cài Docling Thật & Kiểm Chứng Đề Án 2026 (phiên #37)**:
@@ -55,7 +55,8 @@
 | 7 | Module Evaluation (Ragas TM-08: Faithfulness, Relevance, Precision) | ✅ Done |
 | 8 | Module Workflows (DAG Pipeline, ARQ Workers, Guardrails) | ✅ Done |
 
-**Backend Quality**: 80/80 tests passed | Ruff: 0 errors
+**Backend Quality**: 109/109 tests passed | Ruff: 0 errors
+(OCR: pymupdf + docling 2.128 + easyocr 1.7.2 thật | Embedding: BGE-M3 1024 thật | Studio: studio-view + page-image + bboxes engine thật | Facts: entity/attribute/value đúng nghĩa | Jobs: ARQ thật + cancel/retry/stats, reindex/test, collection PUT/DELETE | Preview: office→PDF qua Gotenberg | Batch-approve | Lint exit 0 lần đầu)
 
 ---
 
@@ -104,6 +105,6 @@
 - [x] Cài Docling 2.128 thật + kiểm chứng Đề án 2026 (48.050 ký tự markdown, bảng đầy đủ, conf 0.97).
 - [x] Sửa dứt điểm lỗi hardcode upload file và bổ sung kiểm thử tự động chống tái diễn (TC-INGEST-04).
 - [x] Xây dựng bộ quét tự động Zero Mojibake (`scripts/check_mojibake.py`).
-- [ ] Endpoint render page-image từ backend + xóa `frontend/public/ocr-cache` (~9MB) khỏi git (dùng MinIO/LFS).
-- [ ] BBoxes/regions thật từ engine (thay mock viết tay) + kéo thả ROI trên ảnh scan.
+- [x] Endpoint studio-view + render page-image từ backend (cache storage) + bboxes/regions thật từ engine; xóa 29 ảnh qd2699 (~6MB) khỏi git (giữ 14 ảnh demo theo AGENTS 8.9).
+- [ ] Kéo thả ROI trên ảnh scan (mở rộng studio-view).
 - [ ] Chuẩn hóa CRLF→LF + `.gitattributes` để `npm run lint` (biome check) xanh toàn repo.

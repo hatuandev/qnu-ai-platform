@@ -1,4 +1,12 @@
-import { ArrowLeft, ArrowRight, CircleAlert, FileCheck2, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CircleAlert,
+  FileCheck2,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+} from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Badge } from "../components/ui/badge";
@@ -76,13 +84,11 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
         onStartVerification(created.id);
       }
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Tải lên thất bại. Vui lòng thử lại."
-      );
+      setSubmitError(err instanceof Error ? err.message : "Tải lên thất bại. Vui lòng thử lại.");
     } finally {
       setIsProcessing(false);
-      }
-    };
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">

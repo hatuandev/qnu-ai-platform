@@ -25,6 +25,8 @@ class ParsedContent:
     page_count: int = 1
     tables: list[ExtractedTable] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Real geometry blocks: {page_number, type, coordinates(%), label, content_snippet}
+    blocks: list[dict[str, Any]] = field(default_factory=list)
 
 
 class BaseDocumentParser(ABC):

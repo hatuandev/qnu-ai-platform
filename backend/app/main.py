@@ -135,6 +135,7 @@ def create_app() -> FastAPI:
     # 6. Mount Feature Modules Routers
     from app.modules.assistants import assistants_router
     from app.modules.evaluation import evaluation_router
+    from app.modules.jobs import jobs_router
     from app.modules.knowledge import knowledge_router
     from app.modules.modelops import modelops_router
     from app.modules.ocr import ocr_router
@@ -142,6 +143,7 @@ def create_app() -> FastAPI:
     from app.modules.tools import tools_router
     from app.modules.workflows import workflow_router
 
+    app.include_router(jobs_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_router, prefix=settings.API_PREFIX)
     app.include_router(rag_router, prefix=settings.API_PREFIX)
     app.include_router(modelops_router, prefix=settings.API_PREFIX)

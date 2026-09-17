@@ -7,6 +7,7 @@ from typing import Any
 
 import pymupdf as fitz
 
+from app.modules.knowledge.parsers.blocks import extract_page_blocks
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 
 
@@ -49,6 +50,10 @@ class PyMuPDFOCRAdapter(BaseOCRAdapter):
                 except Exception:
                     has_tables = False
 
+            try:
+                geometry = extract_page_blocks(page)
+            except Exception:
+                geometry = []
             pages_out.append({
                 "page_number": pnum,
                 "extracted_text": text,
@@ -56,6 +61,7 @@ class PyMuPDFOCRAdapter(BaseOCRAdapter):
                 "word_count": len(words),
                 "line_count": len(lines),
                 "has_tables": has_tables,
+                "blocks": geometry,
             })
             if text:
                 all_text.append(text)

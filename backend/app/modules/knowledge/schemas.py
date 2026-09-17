@@ -114,6 +114,64 @@ class ApproveDocumentResponse(BaseModel):
     indexed_chunks: int
 
 
+class BatchApproveRequest(BaseModel):
+    document_ids: list[str] = Field(..., min_length=1, max_length=50)
+
+
+class BatchApproveFailure(BaseModel):
+    document_id: str
+    error: str
+
+
+class BatchApproveResponse(BaseModel):
+    approved: list[str] = Field(default_factory=list)
+    failed: list[BatchApproveFailure] = Field(default_factory=list)
+    indexed_chunks: int = 0
+
+
+class StudioBox(BaseModel):
+    id: str
+    page_number: int
+    type: str
+    coordinates: dict[str, float]
+    label: str
+    confidence: float
+    content_snippet: str = ""
+
+
+class StudioRegion(BaseModel):
+    id: str
+    page_number: int
+    title: str
+    type: str
+    confidence: float
+    reading_order: int
+    details: str = ""
+
+
+class StudioPageView(BaseModel):
+    page_number: int
+    markdown_content: str
+    raw_text: str
+    word_count: int
+    line_count: int
+    image_url: str | None = None
+    bounding_boxes: list[StudioBox] = Field(default_factory=list)
+    regions: list[StudioRegion] = Field(default_factory=list)
+
+
+class StudioViewResponse(BaseModel):
+    document_id: str
+    collection_id: str
+    title: str
+    filename: str
+    engine: str
+    total_pages: int
+    file_size_bytes: int = 0
+    total_chunks: int = 0
+    pages: list[StudioPageView] = Field(default_factory=list)
+
+
 class DocumentDetailResponse(DocumentResponse):
     chunks: list[ChunkItem] = Field(default_factory=list)
     doc_metadata: dict[str, Any] = Field(default_factory=dict)

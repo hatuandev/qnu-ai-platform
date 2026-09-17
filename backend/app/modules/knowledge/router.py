@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.knowledge.schemas import (
     ApproveDocumentRequest,
     ApproveDocumentResponse,
+    BatchApproveRequest,
+    BatchApproveResponse,
     CollectionCreateRequest,
     CollectionResponse,
+    CollectionUpdateRequest,
     DocumentDetailResponse,
     DocumentResponse,
     ParsePreviewResponse,
+    StudioViewResponse,
 )
 from app.modules.knowledge.service import knowledge_service
 
@@ -61,6 +65,83 @@ async def get_collection(
 ) -> CollectionResponse:
     col = await knowledge_service.get_collection(db, collection_id)
     return CollectionResponse.model_validate(col)
+
+
+@router.put(
+    "/collections/{collection_id}",
+    response_model=CollectionResponse,
+    summary="Cập nhật Bộ sưu tập Tri thức",
+)
+async def update_collection(
+    collection_id: str,
+    body: CollectionUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> CollectionResponse:
+    col = await knowledge_service.update_collection(db, collection_id, body)
+    return CollectionResponse.model_validate(col)
+
+
+@router.delete(
+    "/collections/{collection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Xóa Bộ sưu tập Tri thức (kèm tài liệu, chunks, facts)",
+)
+async def delete_collection(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await knowledge_service.delete_collection(db, collection_id)
+
+
+@router.post(
+    "/collections/{collection_id}/reindex",
+    summary="Nạp lại toàn bộ chunks vào Qdrant qua job nền",
+)
+async def reindex_collection(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from app.modules.jobs.service import jobs_service
+
+    await knowledge_service.get_collection(db, collection_id)
+    job = await jobs_service.enqueue_job(
+        db, job_type="reindex", collection_id=collection_id
+    )
+    return {"job_id": job.id, "status": job.status, "collection_id": collection_id}
+
+
+@router.post(
+    "/collections/{collection_id}/test",
+    summary="Thử truy xuất Hybrid RAG trên collection (không ghi DB)",
+)
+async def test_collection_retrieval(
+    collection_id: str,
+    query: str = Query(..., min_length=2, description="Câu truy vấn thử"),
+    top_k: int = Query(5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from app.modules.rag.retriever import hybrid_retriever
+
+    await knowledge_service.get_collection(db, collection_id)
+    candidates = await hybrid_retriever.retrieve(
+        db=db, collection_id=collection_id, query=query, top_k=top_k, rerank_top_k=top_k
+    )
+    return {
+        "query": query,
+        "collection_id": collection_id,
+        "total_found": len(candidates),
+        "items": [
+            {
+                "chunk_id": c.chunk_id,
+                "document_id": c.document_id,
+                "content": c.content[:500],
+                "score": round(c.rrf_score, 4),
+                "section": c.section,
+                "page_number": c.page_number,
+            }
+            for c in candidates
+        ],
+    }
 
 
 @router.post(
@@ -156,6 +237,51 @@ async def approve_document(
         pages=[p.model_dump() for p in body.pages] if body.pages else None,
     )
     return ApproveDocumentResponse.model_validate(result)
+
+
+@router.get(
+    "/documents/{document_id}/studio-view",
+    response_model=StudioViewResponse,
+    summary="Chế độ Studio: Markdown + BBoxes + Regions theo trang (dữ liệu thật)",
+)
+async def studio_view(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> StudioViewResponse:
+    view = await knowledge_service.get_studio_view(db, document_id)
+    for page in view["pages"]:
+        page["image_url"] = (
+            f"/platform/v1alpha1/knowledge/documents/{document_id}"
+            f"/pages/{page['page_number']}/image"
+        )
+    return StudioViewResponse.model_validate(view)
+
+
+@router.get(
+    "/documents/{document_id}/pages/{page_number}/image",
+    summary="Render ảnh PNG của trang tài liệu (cache trong storage)",
+    response_class=Response,
+)
+async def page_image(
+    document_id: str,
+    page_number: int,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    png_bytes = await knowledge_service.render_page_image(db, document_id, page_number)
+    return Response(content=png_bytes, media_type="image/png")
+
+
+@router.post(
+    "/documents/batch-approve",
+    response_model=BatchApproveResponse,
+    summary="Phê duyệt hàng loạt tài liệu (lỗi từng file không chặn cả lô)",
+)
+async def batch_approve_documents(
+    body: BatchApproveRequest,
+    db: AsyncSession = Depends(get_db),
+) -> BatchApproveResponse:
+    result = await knowledge_service.batch_approve_documents(db, body.document_ids)
+    return BatchApproveResponse.model_validate(result)
 
 
 @router.post(
