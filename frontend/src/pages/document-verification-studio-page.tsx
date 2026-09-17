@@ -3,13 +3,13 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  Code,
   Copy,
   Download,
   Edit3,
   Eye,
   FileCode,
   FileText,
-  Layers,
   Maximize2,
   Save,
   Sparkles,
@@ -20,7 +20,6 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DocumentBoundingVisualizer } from "../components/admin/document-bounding-visualizer";
-import { RegionsInspector } from "../components/admin/regions-inspector";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
@@ -43,7 +42,8 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
   const [selectedFilter, setSelectedFilter] = useState<"all" | "table" | "text" | "stamp">("all");
   const [showBoxes, setShowBoxes] = useState<boolean>(true);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
-  const [rightTabMode, setRightTabMode] = useState<"markdown" | "raw" | "regions">("markdown");
+  const [markdownScope, setMarkdownScope] = useState<"page" | "all">("all");
+  const [showRawMarkdownSource, setShowRawMarkdownSource] = useState<boolean>(false);
 
   // In-place manual edit state
   const [isEditingMarkdown, setIsEditingMarkdown] = useState<boolean>(false);
@@ -155,35 +155,63 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
     }
   }, [currentPageData]);
 
+  // Auto-scroll to active page section when viewing full document
+  useEffect(() => {
+    if (markdownScope === "all") {
+      const el = document.getElementById(`page-section-${currentPage}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+  }, [currentPage, markdownScope]);
+
   const allBoundingBoxes = useMemo(() => {
     if (!verificationData?.pages) return [];
     return verificationData.pages.flatMap((p) => p.bounding_boxes);
   }, [verificationData]);
 
-  const allRegions = useMemo(() => {
-    if (!verificationData?.pages) return [];
-    return verificationData.pages.flatMap((p) => p.regions);
-  }, [verificationData]);
+  const fullDocumentMarkdown = useMemo(() => {
+    if (!verificationData?.pages || verificationData.pages.length === 0) return "";
+    return verificationData.pages
+      .map((p) => {
+        const content = p.page_number === currentPage ? editableMarkdown : p.markdown_content;
+        return `<!-- Trang ${p.page_number} / ${verificationData.total_pages} -->\n\n${(content || "").trim()}`;
+      })
+      .filter((s) => s.trim().length > 0)
+      .join("\n\n---\n\n");
+  }, [verificationData, currentPage, editableMarkdown]);
 
-  const handleCopyMarkdown = () => {
-    navigator.clipboard.writeText(editableMarkdown);
+  const handleCopyContent = () => {
+    const textToCopy = markdownScope === "all" ? fullDocumentMarkdown : editableMarkdown;
+    navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const handleDownloadMarkdown = () => {
-    const blob = new Blob([editableMarkdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${verificationData?.filename || "document"}_Trang_${currentPage}.md`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handleDownloadContent = () => {
+    if (markdownScope === "all") {
+      const blob = new Blob([fullDocumentMarkdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${verificationData?.filename || "document"}_Toan_Bo.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const blob = new Blob([editableMarkdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${verificationData?.filename || "document"}_Trang_${currentPage}.md`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleSaveManualEdit = () => {
     if (currentPageData) {
       currentPageData.markdown_content = editableMarkdown;
+      currentPageData.raw_text = editableMarkdown;
       // Re-estimate words
       currentPageData.word_count = editableMarkdown.trim().split(/\s+/).length;
       currentPageData.line_count = editableMarkdown.split("\n").length;
@@ -336,88 +364,105 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
           />
         </div>
 
-        {/* RIGHT PANE: Extracted Markdown / Text / Regions Workspace */}
+        {/* RIGHT PANE: Extracted Clean Markdown Workspace */}
         <div className="h-full flex flex-col bg-background border-l border-border overflow-hidden">
           {/* Right Toolbar */}
           <div className="flex items-center justify-between px-3 py-2 bg-card border-b border-border/70">
-            {/* View Tabs */}
+            {/* Scope Switcher: Trang hiện tại (page) vs Toàn bộ file (all) */}
             <Tabs
-              value={rightTabMode}
-              onValueChange={(val) => setRightTabMode(val as "markdown" | "raw" | "regions")}
+              value={markdownScope}
+              onValueChange={(val) => setMarkdownScope(val as "page" | "all")}
               className="w-auto"
             >
               <TabsList className="h-7 bg-muted/60 p-0.5 rounded-sm">
-                <TabsTrigger value="markdown" className="text-[11px] h-6 px-2.5 gap-1">
-                  <FileCode className="size-3" />
-                  <span>Markdown</span>
+                <TabsTrigger value="all" className="text-[11px] h-6 px-2.5 gap-1.5 font-medium">
+                  <FileCode className="size-3 text-primary" />
+                  <span>Toàn bộ file ({verificationData.total_pages} trang)</span>
                 </TabsTrigger>
-                <TabsTrigger value="raw" className="text-[11px] h-6 px-2.5 gap-1">
-                  <FileText className="size-3" />
-                  <span>Văn bản</span>
-                </TabsTrigger>
-                <TabsTrigger value="regions" className="text-[11px] h-6 px-2.5 gap-1">
-                  <Layers className="size-3" />
-                  <span>Bố cục & Khối</span>
+                <TabsTrigger value="page" className="text-[11px] h-6 px-2.5 gap-1.5 font-medium">
+                  <FileText className="size-3 text-muted-foreground" />
+                  <span>Trang {currentPage}</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
 
-            {/* Action Tools: Sửa tay, Copy, Download */}
+            {/* Action Tools: Sửa tay (theo trang), Toggle Mã nguồn .md / Xem render, Copy, Download */}
             <div className="flex items-center gap-1">
-              {rightTabMode === "markdown" &&
-                (isEditingMarkdown ? (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsPreviewEdit((prev) => !prev)}
-                      className="h-6 px-2 text-[11px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
-                    >
-                      <Eye className="size-3" />
-                      <span>{isPreviewEdit ? "Sửa tiếp" : "Xem trước"}</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={handleSaveManualEdit}
-                      className="h-6 px-2 text-[11px] gap-1 bg-primary text-primary-foreground"
-                    >
-                      <Save className="size-3" />
-                      <span>Lưu sửa</span>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setIsEditingMarkdown(false);
-                        setIsPreviewEdit(false);
-                      }}
-                      className="h-6 px-1.5 text-[11px]"
-                    >
-                      <X className="size-3" />
-                    </Button>
-                  </div>
-                ) : (
+              {/* Button Sửa tay */}
+              {isEditingMarkdown ? (
+                <div className="flex items-center gap-1">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setIsEditingMarkdown(true);
-                      setIsPreviewEdit(false);
-                    }}
+                    onClick={() => setIsPreviewEdit((prev) => !prev)}
                     className="h-6 px-2 text-[11px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
                   >
-                    <Edit3 className="size-3" />
-                    <span>Sửa tay</span>
+                    <Eye className="size-3" />
+                    <span>{isPreviewEdit ? "Sửa tiếp" : "Xem trước"}</span>
                   </Button>
-                ))}
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleSaveManualEdit}
+                    className="h-6 px-2 text-[11px] gap-1 bg-primary text-primary-foreground"
+                  >
+                    <Save className="size-3" />
+                    <span>Lưu sửa</span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setIsEditingMarkdown(false);
+                      setIsPreviewEdit(false);
+                    }}
+                    className="h-6 px-1.5 text-[11px]"
+                    title="Hủy sửa"
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setMarkdownScope("page");
+                    setIsEditingMarkdown(true);
+                    setIsPreviewEdit(false);
+                  }}
+                  className="h-6 px-2 text-[11px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                  title={`Sửa tay Markdown của Trang ${currentPage}`}
+                >
+                  <Edit3 className="size-3" />
+                  <span>Sửa Trang {currentPage}</span>
+                </Button>
+              )}
+
+              {/* Button Toggle: Mã nguồn .md vs Xem render (khi không sửa tay) */}
+              {!isEditingMarkdown && (
+                <Button
+                  size="sm"
+                  variant={showRawMarkdownSource ? "secondary" : "ghost"}
+                  onClick={() => setShowRawMarkdownSource((prev) => !prev)}
+                  className="h-6 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
+                  title="Chuyển đổi giữa xem render và mã nguồn Markdown"
+                >
+                  {showRawMarkdownSource ? <Eye className="size-3" /> : <Code className="size-3" />}
+                  <span>{showRawMarkdownSource ? "Xem render" : "Mã nguồn .md"}</span>
+                </Button>
+              )}
 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleCopyMarkdown}
+                onClick={handleCopyContent}
                 className="size-6 h-6 w-6 p-0"
-                title="Sao chép Markdown"
+                title={
+                  markdownScope === "all"
+                    ? `Sao chép toàn bộ Markdown (${verificationData.total_pages} trang)`
+                    : `Sao chép Markdown Trang ${currentPage}`
+                }
               >
                 {isCopied ? (
                   <Check className="size-3.5 text-emerald-600" />
@@ -429,9 +474,13 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleDownloadMarkdown}
+                onClick={handleDownloadContent}
                 className="size-6 h-6 w-6 p-0"
-                title="Tải tệp Markdown"
+                title={
+                  markdownScope === "all"
+                    ? "Tải tệp Markdown toàn bộ tài liệu (.md)"
+                    : `Tải Markdown Trang ${currentPage} (.md)`
+                }
               >
                 <Download className="size-3.5 text-muted-foreground" />
               </Button>
@@ -444,16 +493,17 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
 
           {/* Right Content Body */}
           <div className="flex-1 overflow-auto p-4 select-text">
-            {rightTabMode === "markdown" &&
+            {/* VIEW 1: TRANG HIỆN TẠI (Scope: page) */}
+            {markdownScope === "page" &&
               (isEditingMarkdown ? (
                 <div className="h-full flex flex-col space-y-2">
                   <div className="p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded text-amber-800 dark:text-amber-300 text-[11px] flex items-center justify-between">
                     <span>
-                      ✏️ <strong>Chế độ Sửa tay (Human-in-the-loop)</strong>: Bạn có thể sửa trực
-                      tiếp nội dung Markdown bóc tách dưới đây trước khi nhúng vector vào Qdrant.
+                      ✏️ <strong>Chế độ Sửa tay (Trang {currentPage})</strong>: Bạn có thể sửa trực
+                      tiếp nội dung Markdown của trang này trước khi nạp vào Vector DB.
                     </span>
                     <span className="text-[10px] opacity-75">
-                      {isPreviewEdit ? "Đang xem kết quả render" : "Đang sửa text thô"}
+                      {isPreviewEdit ? "Đang xem kết quả render" : "Đang sửa text Markdown thô"}
                     </span>
                   </div>
                   {isPreviewEdit ? (
@@ -472,6 +522,21 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
                     />
                   )}
                 </div>
+              ) : showRawMarkdownSource ? (
+                <div className="space-y-3 font-mono text-xs leading-relaxed select-text">
+                  <div className="text-[11px] text-muted-foreground pb-2 border-b border-border flex items-center justify-between">
+                    <span>
+                      &lt;!-- Mã nguồn Markdown Trang {currentPage} / {verificationData.total_pages}{" "}
+                      --&gt;
+                    </span>
+                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded">
+                      Raw Markdown Source
+                    </span>
+                  </div>
+                  <pre className="font-mono text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed bg-muted/20 p-3 rounded-md border border-border">
+                    {editableMarkdown}
+                  </pre>
+                </div>
               ) : (
                 <div className="space-y-3 font-sans text-xs leading-relaxed select-text">
                   <div className="font-mono text-[11px] text-muted-foreground pb-2 border-b border-border flex items-center justify-between">
@@ -479,7 +544,7 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
                       &lt;!-- Trang {currentPage} / {verificationData.total_pages} --&gt;
                     </span>
                     <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-mono">
-                      GFM Markdown Render
+                      Markdown Trang {currentPage}
                     </span>
                   </div>
                   <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -490,20 +555,70 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
                 </div>
               ))}
 
-            {rightTabMode === "raw" && (
-              <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                {currentPageData?.raw_text || "Không có dữ liệu text thô."}
-              </pre>
-            )}
+            {/* VIEW 2: TOÀN BỘ TÀI LIỆU (Scope: all) */}
+            {markdownScope === "all" && (
+              <div className="space-y-4 font-sans text-xs leading-relaxed select-text">
+                <div className="font-mono text-[11px] text-muted-foreground pb-2 border-b border-border flex items-center justify-between">
+                  <span>
+                    &lt;!-- Toàn bộ tài liệu ({verificationData.total_pages} trang) --&gt;
+                  </span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-mono">
+                    {showRawMarkdownSource
+                      ? "Mã nguồn Markdown Toàn Bộ File"
+                      : "GFM Markdown Render • Toàn bộ file"}
+                  </span>
+                </div>
 
-            {rightTabMode === "regions" && (
-              <div className="h-full -m-4">
-                <RegionsInspector
-                  currentPage={currentPage}
-                  regions={allRegions}
-                  activeRegionId={activeBoxId}
-                  onSelectRegion={setActiveBoxId}
-                />
+                {showRawMarkdownSource ? (
+                  <pre className="font-mono text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed bg-muted/20 p-3 rounded-md border border-border">
+                    {fullDocumentMarkdown}
+                  </pre>
+                ) : (
+                  <div className="space-y-6">
+                    {verificationData.pages.map((p) => {
+                      const pageContent =
+                        p.page_number === currentPage ? editableMarkdown : p.markdown_content;
+                      const isCurrentPage = p.page_number === currentPage;
+                      return (
+                        <div
+                          key={p.page_number}
+                          id={`page-section-${p.page_number}`}
+                          className={`space-y-2 pb-5 border-b border-border/60 last:border-b-0 rounded-md transition-all ${
+                            isCurrentPage
+                              ? "bg-primary/[0.03] p-3 border border-primary/20 ring-1 ring-primary/20"
+                              : ""
+                          }`}
+                        >
+                          <div className="font-mono text-[10px] text-muted-foreground/80 py-1 px-2.5 bg-muted/40 rounded flex items-center justify-between">
+                            <span className="font-semibold text-foreground/70 flex items-center gap-1.5">
+                              Trang {p.page_number} / {verificationData.total_pages}
+                              {isCurrentPage && (
+                                <span className="text-[9px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded font-sans font-normal">
+                                  Đang xem ở trang gốc
+                                </span>
+                              )}
+                            </span>
+                            <span>
+                              {p.word_count ||
+                                (pageContent.trim()
+                                  ? pageContent.trim().split(/\s+/).length
+                                  : 0)}{" "}
+                              từ
+                            </span>
+                          </div>
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={markdownComponents}
+                            >
+                              {pageContent}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -511,10 +626,14 @@ export const DocumentVerificationStudioPage: React.FC<DocumentVerificationStudio
           {/* Right Footer Stats */}
           <div className="flex items-center justify-between px-4 py-2 bg-card border-t border-border text-xs text-muted-foreground font-mono">
             <span className="text-[11px]">
-              {currentPageData?.word_count || 0} từ • {currentPageData?.line_count || 0} dòng
+              {markdownScope === "all"
+                ? `${verificationData.total_chars.toLocaleString("vi-VN")} ký tự • ${verificationData.total_pages} trang`
+                : `${currentPageData?.word_count || 0} từ • ${currentPageData?.line_count || 0} dòng`}
             </span>
             <span className="text-[11px] font-medium text-foreground">
-              Trang {currentPage}/{verificationData.total_pages}
+              {markdownScope === "all"
+                ? `Toàn bộ ${verificationData.total_pages} trang`
+                : `Trang ${currentPage}/${verificationData.total_pages}`}
             </span>
           </div>
         </div>

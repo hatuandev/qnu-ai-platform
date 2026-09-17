@@ -20,13 +20,55 @@ from app.modules.modelops.schemas import (
     ProviderKeyUpdate,
     ProviderPresetItem,
     ProviderTestResponse,
+    SetDefaultModelRequest,
     SimulateKeyRotationRequest,
     SimulateKeyRotationResponse,
+    SystemModelDefaultsResponse,
+    SystemModelDefaultsUpdate,
     TenantQuotaResponse,
 )
 from app.modules.modelops.service import modelops_service
 
 router = APIRouter(prefix="/modelops", tags=["ModelOps & Multi-LLM Routing"])
+
+
+@router.get(
+    "/defaults",
+    response_model=SystemModelDefaultsResponse,
+    summary="Lấy cấu hình mô hình mặc định hệ thống cho Embedding, Reranker, OCR kèm danh sách model khả dụng",
+)
+async def get_system_model_defaults(
+    db: AsyncSession = Depends(get_db),
+) -> SystemModelDefaultsResponse:
+    return await modelops_service.get_system_model_defaults(db)
+
+
+@router.put(
+    "/defaults",
+    response_model=SystemModelDefaultsResponse,
+    summary="Cập nhật cấu hình mô hình mặc định hệ thống cho Embedding, Reranker, OCR",
+)
+async def update_system_model_defaults(
+    body: SystemModelDefaultsUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> SystemModelDefaultsResponse:
+    return await modelops_service.update_system_model_defaults(db, body)
+
+
+@router.post(
+    "/providers/{provider_id}/set-default",
+    response_model=SystemModelDefaultsResponse,
+    summary="Đặt nhanh một mô hình của Provider làm mặc định cho Embedding, Reranker hoặc OCR",
+)
+async def set_provider_model_as_default(
+    provider_id: str,
+    body: SetDefaultModelRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SystemModelDefaultsResponse:
+    return await modelops_service.set_provider_model_as_default(
+        db, provider_id=provider_id, role=body.role, model_name=body.model_name
+    )
+
 
 
 @router.post(

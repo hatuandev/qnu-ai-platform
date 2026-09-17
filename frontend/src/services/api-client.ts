@@ -17,16 +17,102 @@ export interface BackendHealth {
   };
 }
 
+export interface NodeManifest {
+  api_version: string;
+  type: string;
+  version: string;
+  display_name: string;
+  description: string;
+  category: string;
+  status: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  config_schema: Record<string, unknown>;
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNodeManifest(value: unknown): value is NodeManifest {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+
+  const stringFields = [
+    "api_version",
+    "type",
+    "version",
+    "display_name",
+    "description",
+    "category",
+    "status",
+  ];
+  return (
+    stringFields.every((field) => typeof value[field] === "string") &&
+    isJsonObject(value.input_schema) &&
+    isJsonObject(value.output_schema) &&
+    isJsonObject(value.config_schema)
+  );
+}
+
 export interface AssistantItem {
   id: string;
   code: string;
   name: string;
   description: string;
+  avatar_url?: string | null;
   category: string;
+  system_prompt: string;
   workflow_id: string;
   collection_id: string;
   is_active: boolean;
+  tenant_id: string;
   sample_questions: string[];
+  config: AssistantLifecycleConfig;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssistantLifecycleConfig {
+  sample_questions: string[];
+  persona_scope: {
+    persona: string;
+    allowed_topics: string[];
+    out_of_scope_policy: string;
+  };
+  knowledge_policy: {
+    chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
+    require_structured_facts: boolean;
+    retrieval_limit: number;
+  };
+  model_policy: {
+    primary_model: string;
+    fallback_model: string;
+    temperature: number;
+    max_tokens: number;
+  };
+  guardrails: {
+    block_prompt_injection: boolean;
+    mask_pii: boolean;
+    require_grounded_answer: boolean;
+    protect_system_prompt: boolean;
+    no_answer_message: string;
+  };
+  tools: {
+    enabled_tools: string[];
+    human_approval_required: boolean;
+  };
+  output_policy: {
+    formats: Array<"markdown" | "table" | "checklist" | "timeline">;
+    require_citations: boolean;
+    citation_format: string;
+  };
+  evaluation_policy: {
+    faithfulness_threshold: number;
+    answer_relevance_threshold: number;
+    context_precision_threshold: number;
+  };
 }
 
 export interface KnowledgeCollection {
@@ -55,6 +141,7 @@ export interface KnowledgeDocument {
   status: "completed" | "processing" | "pending" | "failed" | "approved" | "archived";
   ocr_method: string;
   document_type?: string;
+  document_type_code?: string;
   priority_level?: "core" | "high" | "normal";
   version?: string;
   created_at: string;
@@ -220,6 +307,31 @@ export interface ModelProvider {
   api_keys?: ProviderApiKey[];
 }
 
+export interface ModelOption {
+  provider_id: string;
+  provider_name: string;
+  provider_type: string;
+  model_name: string;
+  category: "cloud" | "local" | "custom";
+  description?: string;
+}
+
+export interface SystemModelDefaults {
+  default_embedding_provider_id: string;
+  default_embedding_model: string;
+  default_reranker_provider_id: string;
+  default_reranker_model: string;
+  default_ocr_provider_id: string;
+  default_ocr_model: string;
+}
+
+export interface SystemModelDefaultsResponse {
+  defaults: SystemModelDefaults;
+  available_embeddings: ModelOption[];
+  available_rerankers: ModelOption[];
+  available_ocrs: ModelOption[];
+}
+
 export interface TokenQuota {
   tenant_id: string;
   total_tokens: number;
@@ -271,11 +383,12 @@ export interface WorkflowRun {
   id: string;
   workflow_id: string;
   workflow_name: string;
-  status: "completed" | "running" | "failed";
+  status: "completed" | "running" | "failed" | "paused_for_approval";
   duration_ms: number;
   steps_completed: number;
   total_steps: number;
   started_at: string;
+  executed_nodes: string[];
 }
 
 export interface WorkflowExecuteRequest {
@@ -1022,49 +1135,6 @@ const MOCK_GAP_INBOX: GapInboxItem[] = [
   },
 ];
 
-const MOCK_RUNS: WorkflowRun[] = [
-  {
-    id: "run_8819",
-    workflow_id: "admissions-assistant",
-    workflow_name: "Luồng Trợ lý Tuyển sinh QNU",
-    status: "completed",
-    duration_ms: 385,
-    steps_completed: 4,
-    total_steps: 4,
-    started_at: "2026-09-15 19:42:10",
-  },
-  {
-    id: "run_8818",
-    workflow_id: "regulations-assistant",
-    workflow_name: "Luồng Trợ lý Quy chế Học vụ",
-    status: "completed",
-    duration_ms: 412,
-    steps_completed: 4,
-    total_steps: 4,
-    started_at: "2026-09-15 19:40:05",
-  },
-  {
-    id: "run_8817",
-    workflow_id: "drafting-assistant",
-    workflow_name: "Luồng Soạn thảo NĐ 30",
-    status: "completed",
-    duration_ms: 1250,
-    steps_completed: 3,
-    total_steps: 3,
-    started_at: "2026-09-15 19:35:12",
-  },
-  {
-    id: "run_8816",
-    workflow_id: "question-bank-assistant",
-    workflow_name: "Luồng Ngân hàng Câu hỏi Bloom",
-    status: "completed",
-    duration_ms: 540,
-    steps_completed: 3,
-    total_steps: 3,
-    started_at: "2026-09-15 19:28:44",
-  },
-];
-
 // ---------------- API Methods with Smart Fallback ----------------
 
 const JOB_TYPE_LABEL: Record<string, { task_name: string; category: IngestionTask["category"] }> = {
@@ -1136,91 +1206,30 @@ export const apiClient = {
     };
   },
 
-  async getAssistants(): Promise<AssistantItem[]> {
-    try {
-      const res = await fetch(`${BASE_URL}/assistants`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Fallback
+  async getNodeCatalog(): Promise<NodeManifest[]> {
+    const res = await fetch(`${BASE_URL}/nodes`);
+    if (!res.ok) {
+      throw new Error(`Không tải được danh mục Node (HTTP ${res.status}).`);
     }
-    return [
-      {
-        id: "ast_01",
-        code: "admissions",
-        name: "Trợ lý Tuyển sinh QNU",
-        description: "Giải đáp chỉ tiêu, điểm chuẩn, phương thức xét tuyển & học phí năm 2025.",
-        category: "admissions",
-        workflow_id: "admissions-assistant",
-        collection_id: "col_admissions",
-        is_active: true,
-        sample_questions: [
-          "Điểm chuẩn ngành Công nghệ thông tin năm 2024?",
-          "Học phí ngành Sư phạm Toán và chính sách NĐ 116?",
-        ],
-      },
-      {
-        id: "ast_02",
-        code: "regulations",
-        name: "Trợ lý Quy chế Học vụ",
-        description:
-          "Tra cứu quy chế tín chỉ, đăng ký học phần, cảnh báo học vụ và chuẩn đầu ra B1.",
-        category: "regulations",
-        workflow_id: "regulations-assistant",
-        collection_id: "col_regulations",
-        is_active: true,
-        sample_questions: [
-          "Số tín chỉ tối thiểu sinh viên cần đăng ký một học kỳ?",
-          "Điều kiện nhận học bổng khuyến khích loại Xuất sắc?",
-        ],
-      },
-      {
-        id: "ast_03",
-        code: "library",
-        name: "Trợ lý Thư viện Số QNU",
-        description:
-          "Tra cứu giáo trình, luận văn tốt nghiệp, cơ sở dữ liệu Scopus & ScienceDirect.",
-        category: "library",
-        workflow_id: "library-assistant",
-        collection_id: "col_library",
-        is_active: true,
-        sample_questions: [
-          "Thời hạn mượn và số lượng sách tối đa của sinh viên?",
-          "Cách truy cập cơ sở dữ liệu ScienceDirect từ xa?",
-        ],
-      },
-      {
-        id: "ast_04",
-        code: "drafting",
-        name: "Trợ lý Soạn thảo Văn bản NĐ 30",
-        description:
-          "Hỗ trợ soạn thảo tờ trình, quyết định, công văn chuẩn thể thức văn bản hành chính.",
-        category: "drafting",
-        workflow_id: "drafting-assistant",
-        collection_id: "col_drafting",
-        is_active: true,
-        sample_questions: [
-          "Quy cách căn lề theo Nghị định 30/2020/NĐ-CP?",
-          "Mẫu quyết định khen thưởng sinh viên đạt thành tích?",
-        ],
-      },
-      {
-        id: "ast_05",
-        code: "question-bank",
-        name: "Trợ lý Ngân hàng Đề thi Bloom",
-        description:
-          "Biên soạn câu hỏi trắc nghiệm theo 4 mức Bloom, ma trận CLO và kết xuất Excel.",
-        category: "question_bank",
-        workflow_id: "question-bank-assistant",
-        collection_id: "col_question_bank",
-        is_active: true,
-        sample_questions: [
-          "Biên soạn 1 câu hỏi trắc nghiệm Bloom mức Vận dụng?",
-          "Giải thích ma trận tương quan giữa chuẩn đầu ra CLO và Bloom?",
-        ],
-      },
-    ];
+
+    const data: unknown = await res.json();
+    if (!isJsonObject(data) || !Array.isArray(data.items)) {
+      throw new Error("Backend trả về danh mục Node không đúng định dạng.");
+    }
+
+    const manifests = data.items.filter(isNodeManifest);
+    if (manifests.length !== data.items.length) {
+      throw new Error("Backend trả về NodeManifest không hợp lệ.");
+    }
+    return manifests;
+  },
+
+  async getAssistants(): Promise<AssistantItem[]> {
+    const res = await fetch(`${BASE_URL}/assistants`);
+    if (!res.ok) {
+      throw new Error(`Không tải được danh sách trợ lý (HTTP ${res.status}).`);
+    }
+    return await res.json();
   },
 
   async getCollections(): Promise<KnowledgeCollection[]> {
@@ -1258,10 +1267,21 @@ export const apiClient = {
     return MOCK_COLLECTIONS;
   },
 
-  async getDocuments(collectionId?: string): Promise<KnowledgeDocument[]> {
+  async getDocuments(
+    collectionId?: string,
+    documentTypeCode?: string
+  ): Promise<KnowledgeDocument[]> {
     try {
-      const url = collectionId
-        ? `${BASE_URL}/knowledge/documents?collection_id=${collectionId}`
+      const params = new URLSearchParams();
+      if (collectionId) {
+        params.set("collection_id", collectionId);
+      }
+      if (documentTypeCode) {
+        params.set("document_type_code", documentTypeCode);
+      }
+      const query = params.toString();
+      const url = query
+        ? `${BASE_URL}/knowledge/documents?${query}`
         : `${BASE_URL}/knowledge/documents`;
       const res = await fetch(url);
       if (res.ok) {
@@ -1292,6 +1312,8 @@ export const apiClient = {
                 | "pending"
                 | "failed",
               ocr_method: (d.ocr_method as string) || "Docling Table Parser",
+              document_type_code: (d.document_type_code as string) || undefined,
+              document_type: (d.document_type_code as string) || undefined,
               created_at: typeof d.created_at === "string" ? d.created_at : "2026-09-15 10:00",
             };
           });
@@ -1310,7 +1332,8 @@ export const apiClient = {
     collectionId: string,
     file: File,
     title?: string,
-    ocrEngine?: string
+    ocrEngine?: string,
+    documentTypeCode?: string
   ): Promise<KnowledgeDocument> {
     const formData = new FormData();
     formData.append("file", file);
@@ -1319,6 +1342,9 @@ export const apiClient = {
     }
     if (ocrEngine) {
       formData.append("ocr_engine", ocrEngine);
+    }
+    if (documentTypeCode) {
+      formData.append("document_type_code", documentTypeCode);
     }
     // Honest upload: backend failures surface to the caller, never a fake doc.
     let res: Response;
@@ -1346,6 +1372,8 @@ export const apiClient = {
       chunk_count: 0,
       status: (d.status as KnowledgeDocument["status"]) || "pending",
       ocr_method: (d.ocr_method as string) || "PyMuPdfParser",
+      document_type_code: (d.document_type_code as string) || undefined,
+      document_type: (d.document_type_code as string) || undefined,
       created_at: new Date().toISOString().replace("T", " ").substring(0, 16),
     };
     MOCK_DOCUMENTS.unshift(newDoc);
@@ -1392,6 +1420,8 @@ export const apiClient = {
       chunk_count: chunks.length,
       status: (d.status as KnowledgeDocument["status"]) || "pending",
       ocr_method: (d.ocr_method as string) || "PyMuPdfParser",
+      document_type_code: (d.document_type_code as string) || undefined,
+      document_type: (d.document_type_code as string) || undefined,
       created_at: (d.created_at as string) || "",
       chunks: chunks.map((c) => ({
         id: c.id as string,
@@ -1448,11 +1478,34 @@ export const apiClient = {
         method: "DELETE",
       });
     } catch {
+      const mockIdx = MOCK_DOCUMENTS.findIndex((d) => d.id === documentId);
+      if (mockIdx >= 0) {
+        MOCK_DOCUMENTS.splice(mockIdx, 1);
+        return;
+      }
       throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
     }
     // 204 No Content, 200 OK, or 404 (already deleted/not present in DB) -> idempotent success
     if (res.status === 204 || res.status === 404 || res.ok) {
+      const mockIdx = MOCK_DOCUMENTS.findIndex((d) => d.id === documentId);
+      if (mockIdx >= 0) {
+        MOCK_DOCUMENTS.splice(mockIdx, 1);
+      }
       return;
+    }
+    if (res.status === 500) {
+      const text = await res.text().catch(() => "");
+      if (!text || text.includes("ECONNREFUSED") || text.includes("proxy error")) {
+        const mockIdx = MOCK_DOCUMENTS.findIndex((d) => d.id === documentId);
+        if (mockIdx >= 0) {
+          MOCK_DOCUMENTS.splice(mockIdx, 1);
+          return;
+        }
+        throw new Error(
+          "Không kết nối được máy chủ Backend (Port 8001 đang tắt). Vui lòng khởi động backend bằng lệnh 'make be' hoặc 'make dev'."
+        );
+      }
+      throw new Error(`Xóa tài liệu thất bại (HTTP 500): ${text.slice(0, 100)}`);
     }
     throw new Error(`Xóa tài liệu thất bại (HTTP ${res.status}).`);
   },
@@ -1828,6 +1881,38 @@ export const apiClient = {
     return await res.json();
   },
 
+  async getSystemModelDefaults(): Promise<SystemModelDefaultsResponse> {
+    const res = await fetch(`${BASE_URL}/modelops/defaults`);
+    if (!res.ok) throw new Error("Không thể tải cấu hình mô hình mặc định");
+    return await res.json();
+  },
+
+  async updateSystemModelDefaults(
+    payload: Partial<SystemModelDefaults>
+  ): Promise<SystemModelDefaultsResponse> {
+    const res = await fetch(`${BASE_URL}/modelops/defaults`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Cập nhật cấu hình mô hình mặc định thất bại");
+    return await res.json();
+  },
+
+  async setProviderModelAsDefault(
+    providerId: string,
+    role: "embedding" | "reranker" | "ocr",
+    modelName: string
+  ): Promise<SystemModelDefaultsResponse> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/set-default`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, model_name: modelName }),
+    });
+    if (!res.ok) throw new Error("Đặt mô hình mặc định thất bại");
+    return await res.json();
+  },
+
   async getTokenQuotas(): Promise<TokenQuota> {
     try {
       const res = await fetch(`${BASE_URL}/modelops/quotas/tenant_qnu`);
@@ -1950,119 +2035,66 @@ export const apiClient = {
   },
 
   async getWorkflowRuns(): Promise<WorkflowRun[]> {
-    try {
-      const res = await fetch(`${BASE_URL}/workflows/executions`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          return data.map((item, idx) => {
-            const d = item as Record<string, unknown>;
-            return {
-              id: (d.id as string) || `run_${idx + 1}`,
-              workflow_id: (d.workflow_id as string) || "admissions-assistant",
-              workflow_name: (d.workflow_name as string) || "Luồng Điều Phối QNU",
-              status: ((d.status as string) || "completed") as "completed" | "running" | "failed",
-              duration_ms: typeof d.duration_ms === "number" ? d.duration_ms : 450,
-              steps_completed: typeof d.steps_completed === "number" ? d.steps_completed : 4,
-              total_steps: typeof d.total_steps === "number" ? d.total_steps : 4,
-              started_at: (d.started_at as string) || "2026-09-15 19:42:10",
-            };
-          });
-        }
-      }
-    } catch {
-      // Fallback
+    const res = await fetch(`${BASE_URL}/workflows/executions`);
+    if (!res.ok) {
+      throw new Error(`Không tải được lịch sử workflow (HTTP ${res.status}).`);
     }
-    return MOCK_RUNS;
+    const data: unknown = await res.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Backend trả về lịch sử workflow không đúng định dạng.");
+    }
+    return data.map((item, index) => {
+      if (!isJsonObject(item)) {
+        throw new Error(`Bản ghi workflow thứ ${index + 1} không đúng định dạng.`);
+      }
+      const status = item.status;
+      if (
+        status !== "completed" &&
+        status !== "running" &&
+        status !== "failed" &&
+        status !== "paused_for_approval"
+      ) {
+        throw new Error(`Bản ghi workflow thứ ${index + 1} có trạng thái không hợp lệ.`);
+      }
+      const requiredStringFields = ["id", "workflow_id", "workflow_name", "started_at"];
+      if (!requiredStringFields.every((field) => typeof item[field] === "string")) {
+        throw new Error(`Bản ghi workflow thứ ${index + 1} thiếu trường bắt buộc.`);
+      }
+      const numericFields = ["duration_ms", "steps_completed", "total_steps"];
+      if (!numericFields.every((field) => typeof item[field] === "number")) {
+        throw new Error(`Bản ghi workflow thứ ${index + 1} thiếu số liệu thực thi.`);
+      }
+      return {
+        id: item.id as string,
+        workflow_id: item.workflow_id as string,
+        workflow_name: item.workflow_name as string,
+        status,
+        duration_ms: item.duration_ms as number,
+        steps_completed: item.steps_completed as number,
+        total_steps: item.total_steps as number,
+        started_at: item.started_at as string,
+        executed_nodes: Array.isArray(item.executed_nodes)
+          ? item.executed_nodes.filter((nodeId): nodeId is string => typeof nodeId === "string")
+          : [],
+      };
+    });
   },
 
   async executeWorkflow(payload: WorkflowExecuteRequest): Promise<WorkflowExecuteResponse> {
-    try {
-      const res = await fetch(`${BASE_URL}/workflows/execute`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workflow_id: payload.workflow_id,
-          inputs: payload.inputs,
-          tenant_id: payload.tenant_id || "tenant_qnu",
-          conversation_id: payload.conversation_id,
-        }),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Smart Fallback Simulation
+    const res = await fetch(`${BASE_URL}/workflows/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workflow_id: payload.workflow_id,
+        inputs: payload.inputs,
+        tenant_id: payload.tenant_id || "tenant_qnu",
+        conversation_id: payload.conversation_id,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Thực thi workflow thất bại (HTTP ${res.status}).`);
     }
-
-    const msg = String(payload.inputs.message || payload.inputs.text || "");
-    const lower = msg.toLowerCase();
-    const isGreeting =
-      lower.includes("chào") ||
-      lower.includes("hello") ||
-      lower.includes("hi") ||
-      lower.includes("xin chào");
-
-    let executed: string[] = [];
-    let answerText = "";
-
-    if (payload.workflow_id.includes("admissions")) {
-      if (isGreeting) {
-        executed = ["chat_input", "condition_route", "greeting_output"];
-        answerText =
-          "Xin chào bạn! Tôi là Trợ lý Tuyển sinh Trường Đại học Quy Nhơn. Tôi có thể giải đáp thông tin về phương thức xét tuyển, điểm chuẩn 2024, học phí các ngành đào tạo và chỉ tiêu tuyển sinh.";
-      } else {
-        executed = [
-          "chat_input",
-          "condition_route",
-          "knowledge_answer",
-          "citation_guard",
-          "final_output",
-        ];
-        answerText =
-          "Dựa trên Đề án Tuyển sinh chính quy năm 2024 của Trường Đại học Quy Nhơn:\n\n- **Ngành Công nghệ thông tin** (Mã ngành: 7480201):\n  - Điểm chuẩn thi THPT: **25.50 điểm** (Tổ hợp A00, A01, D01).\n  - Chỉ tiêu: **150 sinh viên**.\n  - Học phí: Khoảng **18.500.000 VNĐ/năm học**.\n\n*(Trích dẫn: Đề án Tuyển sinh 2024, Phụ lục 01, Trang 14)*";
-      }
-    } else if (payload.workflow_id.includes("drafting")) {
-      executed = [
-        "chat_input",
-        "condition_route",
-        "nd30_formatter",
-        "human_approval",
-        "final_output",
-      ];
-      answerText =
-        "Đã khởi tạo văn bản Quyết định khen thưởng sinh viên chuẩn thể thức Nghị định 30/2020/NĐ-CP. Bản thảo đã chuyển tới Cán bộ Phòng Hành chính - Tổng hợp để phê duyệt (Human Approval Checkpoint).";
-    } else if (payload.workflow_id.includes("regulations")) {
-      executed = [
-        "chat_input",
-        "condition_route",
-        "regulations_rag",
-        "citation_check",
-        "final_output",
-      ];
-      answerText =
-        "Theo Quy chế Đào tạo tín chỉ Trường Đại học Quy Nhơn (Quyết định số 1284/QĐ-ĐHQN):\n\n- Số tín chỉ tối thiểu sinh viên cần đăng ký trong một học kỳ chính là **14 tín chỉ** (đối với sinh viên xếp hạng học lực bình thường) và tối đa là **24 tín chỉ**.";
-    } else if (payload.workflow_id.includes("question-bank")) {
-      executed = ["chat_input", "condition_route", "bloom_generator", "clo_matrix", "final_output"];
-      answerText =
-        "Đã biên soạn câu hỏi trắc nghiệm mức Vận dụng (Bloom Level 3) cho học phần Cơ sở Dữ liệu (IT204):\n\n**Câu 1**: Cho lược đồ quan hệ R(A,B,C,D) với tập phụ thuộc hàm F = {A->B, B->C, C->D}. Khóa chính của R là gì?\n- A. A\n- B. B\n- C. C\n- D. AB\n\n*Đáp án đúng*: **A**. Chuẩn đầu ra CLO 2: Vận dụng thuật toán tìm khóa của lược đồ quan hệ.";
-    } else {
-      executed = ["chat_input", "condition_route", "knowledge_answer", "final_output"];
-      answerText = `Phản hồi cho câu hỏi "${msg}": Dữ liệu đã được truy xuất thành công từ cơ sở dữ liệu tri thức QNU.`;
-    }
-
-    return {
-      execution_id: `exec_${Date.now()}`,
-      workflow_id: payload.workflow_id,
-      status: "completed",
-      outputs: {
-        text: answerText,
-        message: answerText,
-        intent: isGreeting ? "greeting" : "knowledge_query",
-      },
-      executed_nodes: executed,
-      latency_ms: 385,
-    };
+    return (await res.json()) as WorkflowExecuteResponse;
   },
 
   /**

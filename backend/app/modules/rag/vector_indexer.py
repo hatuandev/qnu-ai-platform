@@ -26,21 +26,45 @@ def is_embedding_model_installed() -> bool:
     return importlib.util.find_spec("sentence_transformers") is not None
 
 
+def _load_model_sync() -> Any:
+    """Load SentenceTransformer with local_files_only preference to avoid remote delays."""
+    from sentence_transformers import SentenceTransformer
+
+    try:
+        return SentenceTransformer(settings.EMBEDDING_MODEL, local_files_only=True)
+    except Exception:
+        return SentenceTransformer(settings.EMBEDDING_MODEL)
+
+
 def _get_embedding_model() -> Any | None:
-    """Lazily load the shared BGE-M3 encoder (None when unavailable)."""
+    """Lazily load the shared BGE-M3 encoder (sync entrypoint for tests/callers)."""
     global _embedding_model, _embedding_model_failed
     if _embedding_model is not None:
         return _embedding_model
     if _embedding_model_failed or not is_embedding_model_installed():
         return None
     try:
-        from sentence_transformers import SentenceTransformer
-
-        _embedding_model = SentenceTransformer(settings.EMBEDDING_MODEL)
+        _embedding_model = _load_model_sync()
         logger.info("Loaded embedding model: %s", settings.EMBEDDING_MODEL)
     except Exception as exc:
         _embedding_model_failed = True
         logger.warning("Embedding model unavailable, using mock vectors: %s", exc)
+    return _embedding_model
+
+
+async def _get_embedding_model_async() -> Any | None:
+    """Asynchronously load model offloaded to thread so event loop never freezes."""
+    global _embedding_model, _embedding_model_failed
+    if _embedding_model is not None:
+        return _embedding_model
+    if _embedding_model_failed or not is_embedding_model_installed():
+        return None
+    try:
+        _embedding_model = await asyncio.to_thread(_load_model_sync)
+        logger.info("Loaded embedding model asynchronously: %s", settings.EMBEDDING_MODEL)
+    except Exception as exc:
+        _embedding_model_failed = True
+        logger.warning("Embedding model async load failed, using mock vectors: %s", exc)
     return _embedding_model
 
 
@@ -54,6 +78,8 @@ class VectorIndexer:
 
     def _get_collection_name(self, collection_id: str) -> str:
         clean_id = collection_id.replace("-", "_").lower()
+        if clean_id.startswith("col_"):
+            return clean_id
         return f"col_{clean_id}"
 
     async def ensure_collection(self, collection_id: str) -> str:
@@ -97,18 +123,79 @@ class VectorIndexer:
             return [round(float(x), 6) for x in vec[: self.vector_size]]
         return [round(float(x), 6) for x in vec] + [0.0] * (self.vector_size - len(vec))
 
+    async def _embed_texts_cloudflare(self, texts: list[str]) -> list[list[float]]:
+        """Batch encode texts using Cloudflare Workers AI @cf/baai/bge-m3."""
+        import httpx
+
+        account_id = settings.CLOUDFLARE_ACCOUNT_ID
+        token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
+        if not account_id or not token:
+            raise ValueError("Cloudflare credentials not configured.")
+
+        model = settings.EMBEDDING_MODEL if "@cf/" in settings.EMBEDDING_MODEL else "@cf/baai/bge-m3"
+        url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
+        all_vectors: list[list[float]] = []
+        batch_size = 16
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i : i + batch_size]
+                resp = await client.post(url, headers=headers, json={"text": batch})
+                if resp.status_code != 200:
+                    raise RuntimeError(
+                        f"Cloudflare embedding error (HTTP {resp.status_code}): {resp.text[:200]}"
+                    )
+                data = resp.json().get("result", {})
+                vecs = data.get("data") if isinstance(data, dict) else data
+                if not vecs:
+                    raise RuntimeError(f"No vector data returned from Cloudflare: {resp.text[:200]}")
+                all_vectors.extend([[float(x) for x in v] for v in vecs])
+
+        return all_vectors
+
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Batch-encode texts with BGE-M3; honest mock fallback when unavailable."""
-        model = _get_embedding_model()
+        """Batch-encode texts with BGE-M3 (Cloudflare Workers AI preferred, local fallback)."""
+        if not texts:
+            return []
+
+        # 1. Cloudflare Workers AI Edge Embedding (ultra-fast serverless GPU)
+        if (
+            getattr(settings, "EMBEDDING_PROVIDER", "").lower() == "cloudflare"
+            and (settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY)
+            and settings.CLOUDFLARE_ACCOUNT_ID
+        ):
+            try:
+                vectors = await self._embed_texts_cloudflare(texts)
+                if len(vectors) == len(texts):
+                    return [self._fit_dim(v) for v in vectors]
+            except Exception as exc:
+                logger.warning(
+                    "Cloudflare embedding unavailable (%s), falling back to local model.", exc
+                )
+
+        # 2. Local SentenceTransformer BGE-M3 (with timeout & thread offload)
+        model = await _get_embedding_model_async()
         if model is None:
             return [self.mock_embedding(t, self.vector_size) for t in texts]
         try:
-            vectors = await asyncio.to_thread(
-                model.encode, texts, normalize_embeddings=True, show_progress_bar=False
+            # Protect event loop with thread offload and timeout guard (30s)
+            vectors = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.encode,
+                    texts,
+                    batch_size=8,
+                    normalize_embeddings=True,
+                    show_progress_bar=False,
+                ),
+                timeout=30.0,
             )
             return [self._fit_dim([float(x) for x in row]) for row in vectors]
         except Exception as exc:
-            logger.warning("Embedding inference failed, using mock vectors: %s", exc)
+            logger.warning("Embedding inference failed or timed out, using mock vectors: %s", exc)
             return [self.mock_embedding(t, self.vector_size) for t in texts]
 
     async def index_chunks(

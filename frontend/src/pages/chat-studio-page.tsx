@@ -82,7 +82,7 @@ const ASSISTANTS: AssistantInfo[] = [
     ],
   },
   {
-    code: "question-bank",
+    code: "question_bank",
     name: "Trợ lý Ngân hàng Đề thi",
     category: "Khảo thí & Đảm bảo chất lượng",
     icon: <HelpCircle className="h-4 w-4" />,
@@ -96,7 +96,12 @@ const ASSISTANTS: AssistantInfo[] = [
 ];
 
 export const ChatStudioPage: React.FC = () => {
-  const [selectedCode, setSelectedCode] = useState<string>("admissions");
+  const [selectedCode, setSelectedCode] = useState<string>(() => {
+    const requestedCode = new URLSearchParams(window.location.search).get("assistant");
+    return ASSISTANTS.some((assistant) => assistant.code === requestedCode)
+      ? (requestedCode as string)
+      : "admissions";
+  });
   const [inputPrompt, setInputPrompt] = useState<string>("");
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [showQuestionnaireDemo, setShowQuestionnaireDemo] = useState<boolean>(false);

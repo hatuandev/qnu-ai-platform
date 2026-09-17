@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 
+from app.modules.document_types.catalog import DOCUMENT_TYPE_CATALOG, normalize_document_type_code
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
     NodeExecutionResult,
@@ -31,17 +33,20 @@ class ExtractFieldsNodeHandler(BaseNodeHandler):
         }
 
         # Heuristic detection for common drafting types
-        lower_msg = user_message.lower()
-        if "quyết định" in lower_msg:
-            extracted_fields["doc_type"] = "decision"
-        elif "tờ trình" in lower_msg:
-            extracted_fields["doc_type"] = "submission"
-        elif "thông báo" in lower_msg:
-            extracted_fields["doc_type"] = "notice"
-        elif "công văn" in lower_msg:
-            extracted_fields["doc_type"] = "official_dispatch"
-        else:
-            extracted_fields["doc_type"] = "general_draft"
+        lower_msg = unicodedata.normalize("NFC", str(user_message)).casefold()
+        detected_code = next(
+            (
+                definition["code"]
+                for definition in sorted(
+                    DOCUMENT_TYPE_CATALOG, key=lambda definition: len(definition["name"]), reverse=True
+                )
+                if definition["name"].casefold() in lower_msg
+            ),
+            None,
+        )
+        extracted_fields["doc_type"] = detected_code
+        extracted_fields["document_type_code"] = normalize_document_type_code(detected_code)
+        extracted_fields["document_type_status"] = "classified" if detected_code else "unclassified"
 
         context.node_data["extracted_fields"] = extracted_fields
 

@@ -37,11 +37,16 @@ def test_reciprocal_rank_fusion():
 @pytest.mark.asyncio
 async def test_reranker_fallback():
     """Verify Reranker falls back to RRF ordering when external service is offline."""
+    from unittest.mock import patch
+
     candidates = [
         FusionCandidate(chunk_id="c1", document_id="d1", content="Nội dung 1", rrf_score=0.03),
         FusionCandidate(chunk_id="c2", document_id="d1", content="Nội dung 2", rrf_score=0.02),
     ]
-    reranked = await reranker_client.rerank("câu hỏi", candidates, top_k=1)
+    with patch.object(
+        reranker_client, "_rerank_cloudflare", side_effect=RuntimeError("Cloudflare API offline")
+    ):
+        reranked = await reranker_client.rerank("câu hỏi", candidates, top_k=1)
     assert len(reranked) == 1
     assert reranked[0].chunk_id == "c1"
 

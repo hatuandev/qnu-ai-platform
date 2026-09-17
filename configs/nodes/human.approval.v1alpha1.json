@@ -1,0 +1,96 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "human.approval",
+    "version": "1.0.0",
+    "display_name": "Phê duyệt Thủ công (Con người)",
+    "description": "Tạm dừng quy trình để gửi yêu cầu phê duyệt đến cán bộ/giảng viên có thẩm quyền trước khi thực hiện bước tiếp theo.",
+    "category": "control",
+    "labels": {
+      "stateful": "true"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "control",
+      "operation": "approval.wait"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_permission", "separation_of_duties", "wait_timeout_seconds"],
+      "properties": {
+        "required_permission": {
+          "type": "string",
+          "const": "approval.decide"
+        },
+        "separation_of_duties": {
+          "type": "boolean",
+          "default": true
+        },
+        "reason_required_on_reject": {
+          "type": "boolean",
+          "default": true
+        },
+        "wait_timeout_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 604800
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject"],
+      "properties": {
+        "subject": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "approved": {
+          "type": "object"
+        },
+        "rejected": {
+          "type": "object"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["approved"]
+        },
+        {
+          "required": ["rejected"]
+        }
+      ]
+    },
+    "capabilities": ["approval.write"],
+    "required_permissions": ["approval.decide"],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 5,
+      "max_timeout_seconds": 30,
+      "default_max_attempts": 1,
+      "side_effects": "write",
+      "idempotency": "runtime_key",
+      "checkpoint": "always",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": true
+    },
+    "observability": {
+      "safe_trace_fields": ["approval_id", "decision", "reviewed_by", "reviewed_at"],
+      "redacted_fields": ["subject", "review_reason"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

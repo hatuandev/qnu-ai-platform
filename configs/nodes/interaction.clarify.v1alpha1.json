@@ -1,0 +1,107 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "interaction.clarify",
+    "version": "1.0.0",
+    "display_name": "Tương tác Hỏi lại / Làm rõ",
+    "description": "Tương tác với người dùng để hỏi thêm thông tin hoặc làm rõ câu hỏi khi dữ liệu đầu vào còn thiếu hoặc chưa rõ ràng.",
+    "category": "interaction",
+    "labels": {
+      "stateful": "true"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "control",
+      "operation": "interaction.clarify"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "max_rounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 4,
+          "description": "Số lượt tương tác hỏi lại bổ sung tối đa để tránh lặp vô tận."
+        },
+        "wait_timeout_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 604800,
+          "default": 86400,
+          "description": "Thời hạn chờ người dùng phản hồi (giây, mặc định 86400 = 24h)."
+        },
+        "pass_through_when_complete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Tự động chuyển tiếp sang node kế tiếp khi người dùng đã cung cấp đủ dữ liệu."
+        },
+        "required_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Danh sách các trường thông tin bắt buộc cần làm rõ."
+        },
+        "defaults": {
+          "type": "object",
+          "description": "Giá trị mặc định cho các trường nếu người dùng chưa cung cấp."
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {
+        "fields": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "complete_fields": {
+          "type": "object"
+        },
+        "missing_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "capabilities": ["run.resume"],
+    "required_permissions": ["run.resume"],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 5,
+      "max_timeout_seconds": 30,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "runtime_key",
+      "checkpoint": "always",
+      "can_wait_for_input": true,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["round", "missing_fields_count", "status"],
+      "redacted_fields": ["fields", "complete_fields"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

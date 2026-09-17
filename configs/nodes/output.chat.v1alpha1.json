@@ -1,0 +1,83 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "output.chat",
+    "version": "1.0.0",
+    "display_name": "Phản hồi Tin nhắn Trò chuyện",
+    "description": "Định dạng và gửi câu trả lời hoàn chỉnh cuối cùng đến người dùng qua kênh trò chuyện (Web, Zalo, Portal).",
+    "category": "output",
+    "labels": {
+      "channel": "chat"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "builtin",
+      "operation": "output.chat"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_citations": {
+          "type": "boolean",
+          "default": true
+        },
+        "format": {
+          "enum": ["markdown", "plain_text", "json"],
+          "default": "markdown"
+        },
+        "output_template": {
+          "type": "string",
+          "description": "Mẫu định dạng hoặc nội dung câu trả lời tùy chỉnh"
+        },
+        "template": {
+          "type": "string",
+          "description": "Mẫu phản hồi tùy chỉnh"
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["response"],
+      "properties": {
+        "response": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["chat.write"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 2,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "not_required",
+      "checkpoint": "never",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["format", "status"],
+      "redacted_fields": ["response", "result"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

@@ -7,8 +7,9 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_db
 from app.main import app
+from app.modules.workflows.compiler import workflow_compiler
 from app.modules.workflows.engine import dag_engine
-from app.modules.workflows.nodes.base import WorkflowContext
+from app.modules.workflows.nodes.base import BaseNodeHandler, NodeExecutionResult, WorkflowContext
 from app.modules.workflows.nodes.chat_input_node import ChatInputNodeHandler
 from app.modules.workflows.nodes.condition_route_node import ConditionRouteNodeHandler
 from app.modules.workflows.nodes.human_approval_node import HumanApprovalNodeHandler
@@ -17,6 +18,14 @@ from app.modules.workflows.schemas import (
     WorkflowEdgeSpec,
     WorkflowNodeSpec,
 )
+
+
+class _PassThroughNodeHandler(BaseNodeHandler):
+    """Test-only handler that records execution order without relying on external services."""
+
+    async def execute(self, node_spec: WorkflowNodeSpec, context: WorkflowContext) -> NodeExecutionResult:
+        context.node_data.setdefault("execution_order", []).append(node_spec.id)
+        return NodeExecutionResult(node_id=node_spec.id, output={"node_id": node_spec.id})
 
 
 @pytest.mark.asyncio
@@ -150,6 +159,70 @@ async def test_dag_engine_branching_execution():
 
 
 @pytest.mark.asyncio
+async def test_dag_engine_runs_fan_out_paths_before_a_fan_in_join():
+    """A join must not run after only one active predecessor has completed."""
+    from app.modules.workflows.registry import node_registry
+
+    node_registry.register("test.pass_through", _PassThroughNodeHandler())
+    dag_spec = WorkflowDagSpec(
+        entry_node_id="split",
+        nodes=[
+            WorkflowNodeSpec(id="split", type="test.pass_through"),
+            WorkflowNodeSpec(id="left", type="test.pass_through"),
+            WorkflowNodeSpec(id="right", type="test.pass_through"),
+            WorkflowNodeSpec(id="join", type="test.pass_through"),
+            WorkflowNodeSpec(id="output", type="output.chat", config={"output_template": "Đã hợp nhất."}),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="split", target="left"),
+            WorkflowEdgeSpec(source="split", target="right"),
+            WorkflowEdgeSpec(source="left", target="join"),
+            WorkflowEdgeSpec(source="right", target="join"),
+            WorkflowEdgeSpec(source="join", target="output"),
+        ],
+    )
+    context = WorkflowContext(
+        workflow_id="wf_fan_out",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={},
+    )
+
+    response = await dag_engine.execute(dag_spec, context)
+
+    assert response.status == "completed"
+    assert set(response.executed_nodes) == {"split", "left", "right", "join", "output"}
+    execution_order = context.node_data["execution_order"]
+    assert execution_order.index("left") < execution_order.index("join")
+    assert execution_order.index("right") < execution_order.index("join")
+
+
+def test_workflow_compiler_rejects_cycles_and_unknown_node_types():
+    """Publication validation must fail closed for an invalid control-plane draft."""
+    invalid_spec = WorkflowDagSpec(
+        entry_node_id="input",
+        nodes=[
+            WorkflowNodeSpec(id="input", type="input.chat"),
+            WorkflowNodeSpec(id="unsupported", type="tool.unknown"),
+            WorkflowNodeSpec(id="output", type="output.chat"),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="input", target="unsupported"),
+            WorkflowEdgeSpec(source="unsupported", target="output"),
+            WorkflowEdgeSpec(source="output", target="input"),
+        ],
+    )
+
+    report = workflow_compiler.validate(invalid_spec)
+
+    assert report.is_valid is False
+    assert {issue.code for issue in report.issues} >= {
+        "workflow_cycle_detected",
+        "workflow_node_type_unsupported",
+    }
+
+
+@pytest.mark.asyncio
 async def test_api_list_workflow_definitions():
     """Verify GET /platform/v1alpha1/workflows/definitions lists all available DAGs."""
     mock_db = AsyncMock()
@@ -181,7 +254,9 @@ async def test_api_execute_workflow_greeting():
     mock_db = AsyncMock()
     mock_res = MagicMock()
     mock_res.scalars.return_value.all.return_value = []
+    mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
+    mock_db.add = MagicMock()
 
     async def override_get_db():
         yield mock_db
@@ -225,6 +300,26 @@ async def test_all_5_official_workflows_load_without_fallback():
 
 
 @pytest.mark.asyncio
+async def test_all_official_workflows_pass_publication_validation():
+    """Checked-in official workflows must remain publishable by the active runtime registry."""
+    from app.modules.workflows.service import workflow_service
+
+    workflow_ids = [
+        "admissions-assistant",
+        "regulations-assistant",
+        "drafting-assistant",
+        "library-assistant",
+        "question-bank-assistant",
+    ]
+
+    for workflow_id in workflow_ids:
+        report = workflow_compiler.validate(
+            await workflow_service.get_workflow_spec(None, workflow_id)
+        )
+        assert report.is_valid, f"{workflow_id} has issues: {report.issues}"
+
+
+@pytest.mark.asyncio
 async def test_citation_guard_branches_grounded_vs_ungrounded():
     """Verify CitationGuardNodeHandler branches to chat_output or no_answer_output."""
     from unittest.mock import patch
@@ -242,6 +337,10 @@ async def test_citation_guard_branches_grounded_vs_ungrounded():
     with patch("app.modules.workflows.nodes.rag_answer_node.rag_service.ask", new_callable=AsyncMock) as mock_ask:
         mock_ask.return_value = mock_grounded
         mock_db = AsyncMock()
+        mock_definition_result = MagicMock()
+        mock_definition_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_definition_result
+        mock_db.add = MagicMock()
         req = WorkflowExecuteRequest(
             workflow_id="admissions-assistant",
             inputs={"message": "Học phí Sư phạm?"},
@@ -262,6 +361,10 @@ async def test_citation_guard_branches_grounded_vs_ungrounded():
     with patch("app.modules.workflows.nodes.rag_answer_node.rag_service.ask", new_callable=AsyncMock) as mock_ask:
         mock_ask.return_value = mock_ungrounded
         mock_db = AsyncMock()
+        mock_definition_result = MagicMock()
+        mock_definition_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_definition_result
+        mock_db.add = MagicMock()
         req = WorkflowExecuteRequest(
             workflow_id="admissions-assistant",
             inputs={"message": "Điểm chuẩn năm 2030?"},

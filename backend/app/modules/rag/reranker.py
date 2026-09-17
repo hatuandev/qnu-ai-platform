@@ -1,12 +1,14 @@
-"""Reranker Adapter & Resilience Client (BGE-Reranker-v2-m3)."""
+"""Reranker Adapter & Resilience Client (Cloudflare BGE-Reranker & BGE-Reranker-v2-m3)."""
 
 from __future__ import annotations
 
 import logging
 
+from app.core.config import get_settings
 from app.modules.rag.fusion import FusionCandidate
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class RerankerClient:
@@ -15,6 +17,59 @@ class RerankerClient:
     def __init__(self, endpoint_url: str | None = None, api_key: str | None = None):
         self.endpoint_url = endpoint_url
         self.api_key = api_key
+
+    async def _rerank_cloudflare(
+        self,
+        query: str,
+        candidates: list[FusionCandidate],
+        top_k: int = 5,
+    ) -> list[FusionCandidate]:
+        """Rerank candidates using Cloudflare Workers AI @cf/baai/bge-reranker-base."""
+        import httpx
+
+        account_id = settings.CLOUDFLARE_ACCOUNT_ID
+        token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
+        if not account_id or not token:
+            return candidates[:top_k]
+
+        model = (
+            settings.RERANKER_MODEL
+            if "@cf/" in settings.RERANKER_MODEL
+            else "@cf/baai/bge-reranker-base"
+        )
+        url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "query": query,
+            "contexts": [{"text": c.content} for c in candidates],
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                data = resp.json().get("result", {})
+                response_items = data.get("response", [])
+                score_map = {
+                    item["id"]: float(item["score"])
+                    for item in response_items
+                    if "id" in item and "score" in item
+                }
+                scored_candidates = []
+                for idx, cand in enumerate(candidates):
+                    if idx in score_map:
+                        cand.rrf_score = score_map[idx]
+                    scored_candidates.append(cand)
+                scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
+                return scored_candidates[:top_k]
+            else:
+                logger.warning(
+                    "Cloudflare rerank returned HTTP %d: %s", resp.status_code, resp.text[:200]
+                )
+
+        return candidates[:top_k]
 
     async def rerank(
         self,
@@ -30,37 +85,47 @@ class RerankerClient:
         if not candidates:
             return []
 
-        # If reranker endpoint is not configured, return top_k candidates by RRF score
-        if not self.endpoint_url:
-            return candidates[:top_k]
-
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                payload = {
-                    "query": query,
-                    "documents": [c.content for c in candidates],
-                }
-                headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-                resp = await client.post(
-                    f"{self.endpoint_url}/rerank", json=payload, headers=headers
+        # 1. Try Cloudflare Workers AI Cross-Encoder if configured
+        if (
+            getattr(settings, "RERANKER_PROVIDER", "").lower() == "cloudflare"
+            and (settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY)
+            and settings.CLOUDFLARE_ACCOUNT_ID
+        ):
+            try:
+                return await self._rerank_cloudflare(query, candidates, top_k)
+            except Exception as exc:
+                logger.warning(
+                    "Cloudflare reranker failed or timed out: %s. Falling back to RRF score.", exc
                 )
-                if resp.status_code == 200:
-                    scores = resp.json().get("scores", [])
-                    # Pair candidates with their rerank scores
-                    scored_candidates = []
-                    for idx, score in enumerate(scores):
-                        if idx < len(candidates):
-                            cand = candidates[idx]
-                            cand.rrf_score = float(score)  # Update with cross-encoder score
-                            scored_candidates.append(cand)
-                    scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
-                    return scored_candidates[:top_k]
-        except Exception as exc:
-            logger.warning(
-                "Reranker invocation failed or timed out: %s. Falling back to RRF score.", exc
-            )
+
+        # 2. Custom external HTTP reranker endpoint (if configured)
+        if self.endpoint_url:
+            try:
+                import httpx
+
+                async with httpx.AsyncClient(timeout=3.0) as client:
+                    payload = {
+                        "query": query,
+                        "documents": [c.content for c in candidates],
+                    }
+                    headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+                    resp = await client.post(
+                        f"{self.endpoint_url}/rerank", json=payload, headers=headers
+                    )
+                    if resp.status_code == 200:
+                        scores = resp.json().get("scores", [])
+                        scored_candidates = []
+                        for idx, score in enumerate(scores):
+                            if idx < len(candidates):
+                                cand = candidates[idx]
+                                cand.rrf_score = float(score)
+                                scored_candidates.append(cand)
+                        scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
+                        return scored_candidates[:top_k]
+            except Exception as exc:
+                logger.warning(
+                    "Custom reranker invocation failed: %s. Falling back to RRF score.", exc
+                )
 
         # Fallback to top_k by initial RRF score
         return candidates[:top_k]

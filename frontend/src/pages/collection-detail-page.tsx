@@ -18,6 +18,7 @@ import {
   Trash2,
   Upload,
   X,
+  Zap,
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -172,6 +173,14 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     queryKey: ["collections"],
     queryFn: () => apiClient.getCollections(),
   });
+
+  // Fetch system-wide model defaults (Embedding, Reranker, OCR)
+  const { data: systemDefaultsResponse } = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+    staleTime: 30000,
+  });
+  const systemDefaults = systemDefaultsResponse?.defaults;
 
   const currentCollection = useMemo<KnowledgeCollection>(() => {
     const found = collections.find((c) => c.id === collectionId || c.code === collectionId);
@@ -503,9 +512,29 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
         {/* Sub Meta Info Line */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t border-border/60 flex-wrap">
-          <span className="flex items-center gap-1 font-mono text-[11px] text-primary">
-            <Cpu className="size-3.5" />
-            {currentCollection.embedding_model || "BAAI/bge-m3 (1024-dim)"}
+          <span className="flex items-center gap-1.5 font-mono text-[11px] text-primary">
+            {(
+              currentCollection.embedding_model ||
+              systemDefaults?.default_embedding_model ||
+              ""
+            ).includes("@cf/") ? (
+              <Zap className="size-3.5 text-amber-500 shrink-0" />
+            ) : (
+              <Cpu className="size-3.5 shrink-0" />
+            )}
+            <span>
+              {currentCollection.embedding_model ||
+                systemDefaults?.default_embedding_model ||
+                "BAAI/bge-m3 (1024-dim)"}
+            </span>
+            {!currentCollection.embedding_model && systemDefaults?.default_embedding_model && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 border-primary/30 text-primary bg-primary/5 font-sans font-normal"
+              >
+                Mặc định hệ thống
+              </Badge>
+            )}
           </span>
           <span>•</span>
           <span className="text-[11px]">Cập nhật: {currentCollection.updated_at}</span>

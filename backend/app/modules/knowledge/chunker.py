@@ -45,6 +45,9 @@ class ClauseBasedChunker(BaseChunker):
     _RE_ARTICLE = re.compile(
         r"(?=^(?:Điều|Chương|Phần)\s+\d+[\.:]?\s+)", re.MULTILINE | re.IGNORECASE
     )
+    _RE_PAGE_MARKER = re.compile(
+        r"<!--\s*(?:Trang|Page)\s+(\d+)\s*-->", re.IGNORECASE
+    )
 
     def chunk(self, text: str, **kwargs: Any) -> list[ChunkDraft]:
         if not text:
@@ -54,11 +57,38 @@ class ClauseBasedChunker(BaseChunker):
         raw_sections = self._RE_ARTICLE.split(text)
         chunks: list[ChunkDraft] = []
         chunk_idx = 0
+        current_page: int | None = None
 
         for raw_sec in raw_sections:
             clean_sec = raw_sec.strip()
             if not clean_sec or len(clean_sec) < 20:
+                page_matches = list(self._RE_PAGE_MARKER.finditer(raw_sec))
+                if page_matches:
+                    try:
+                        current_page = int(page_matches[-1].group(1))
+                    except (TypeError, ValueError):
+                        pass
                 continue
+
+            sec_matches = list(self._RE_PAGE_MARKER.finditer(raw_sec))
+            sec_start_page = current_page
+            if sec_matches and sec_matches[0].start() < 60:
+                try:
+                    sec_start_page = int(sec_matches[0].group(1))
+                except (TypeError, ValueError):
+                    pass
+            elif sec_start_page is None and sec_matches:
+                try:
+                    sec_start_page = int(sec_matches[0].group(1))
+                except (TypeError, ValueError):
+                    pass
+
+            # Update current_page for subsequent sections
+            if sec_matches:
+                try:
+                    current_page = int(sec_matches[-1].group(1))
+                except (TypeError, ValueError):
+                    pass
 
             # Extract title of the article from first line
             first_line = clean_sec.split("\n", 1)[0].strip()
@@ -68,7 +98,14 @@ class ClauseBasedChunker(BaseChunker):
             if len(clean_sec) > 2000:
                 sub_parts = clean_sec.split("\n\n")
                 buffer = ""
+                sub_page = sec_start_page
                 for part in sub_parts:
+                    p_match = self._RE_PAGE_MARKER.search(part)
+                    if p_match:
+                        try:
+                            sub_page = int(p_match.group(1))
+                        except (TypeError, ValueError):
+                            pass
                     if len(buffer) + len(part) < 1800:
                         buffer += "\n\n" + part if buffer else part
                     else:
@@ -80,6 +117,7 @@ class ClauseBasedChunker(BaseChunker):
                                     token_count=self.estimate_tokens(buffer),
                                     chunk_hash=self.compute_hash(buffer),
                                     section=section_title,
+                                    page_number=sub_page,
                                 )
                             )
                             chunk_idx += 1
@@ -92,6 +130,7 @@ class ClauseBasedChunker(BaseChunker):
                             token_count=self.estimate_tokens(buffer),
                             chunk_hash=self.compute_hash(buffer),
                             section=section_title,
+                            page_number=sub_page,
                         )
                     )
                     chunk_idx += 1
@@ -103,6 +142,7 @@ class ClauseBasedChunker(BaseChunker):
                         token_count=self.estimate_tokens(clean_sec),
                         chunk_hash=self.compute_hash(clean_sec),
                         section=section_title,
+                        page_number=sec_start_page,
                     )
                 )
                 chunk_idx += 1
@@ -117,6 +157,10 @@ class ClauseBasedChunker(BaseChunker):
 class SemanticChunker(BaseChunker):
     """General-purpose paragraph chunker with token limit and overlap."""
 
+    _RE_PAGE_MARKER = re.compile(
+        r"<!--\s*(?:Trang|Page)\s+(\d+)\s*-->", re.IGNORECASE
+    )
+
     def __init__(self, max_tokens: int = 512, overlap_tokens: int = 64):
         self.max_tokens = max_tokens
         self.overlap_tokens = overlap_tokens
@@ -130,8 +174,16 @@ class SemanticChunker(BaseChunker):
         current_chunk_parts: list[str] = []
         current_tokens = 0
         chunk_idx = 0
+        current_page: int | None = None
 
         for para in paragraphs:
+            p_match = self._RE_PAGE_MARKER.search(para)
+            if p_match:
+                try:
+                    current_page = int(p_match.group(1))
+                except (TypeError, ValueError):
+                    pass
+
             para_clean = para.strip()
             if not para_clean:
                 continue
@@ -140,12 +192,20 @@ class SemanticChunker(BaseChunker):
 
             if current_tokens + para_tokens > self.max_tokens and current_chunk_parts:
                 full_content = "\n\n".join(current_chunk_parts).strip()
+                chunk_page = current_page
+                content_match = self._RE_PAGE_MARKER.search(full_content)
+                if content_match:
+                    try:
+                        chunk_page = int(content_match.group(1))
+                    except (TypeError, ValueError):
+                        pass
                 chunks.append(
                     ChunkDraft(
                         index=chunk_idx,
                         content=full_content,
                         token_count=self.estimate_tokens(full_content),
                         chunk_hash=self.compute_hash(full_content),
+                        page_number=chunk_page,
                     )
                 )
                 chunk_idx += 1
@@ -162,12 +222,20 @@ class SemanticChunker(BaseChunker):
 
         if current_chunk_parts:
             full_content = "\n\n".join(current_chunk_parts).strip()
+            chunk_page = current_page
+            content_match = self._RE_PAGE_MARKER.search(full_content)
+            if content_match:
+                try:
+                    chunk_page = int(content_match.group(1))
+                except (TypeError, ValueError):
+                    pass
             chunks.append(
                 ChunkDraft(
                     index=chunk_idx,
                     content=full_content,
                     token_count=self.estimate_tokens(full_content),
                     chunk_hash=self.compute_hash(full_content),
+                    page_number=chunk_page,
                 )
             )
 

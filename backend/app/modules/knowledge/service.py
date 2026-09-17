@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import uuid
 
 from sqlalchemy import delete, func, select
@@ -12,6 +13,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.core.storage import storage_service
+from app.modules.document_types.service import document_types_service
+from app.modules.jobs.models import JobRecord
 from app.modules.knowledge.chunker import get_chunker
 from app.modules.knowledge.cleaner import clean_markdown_text
 from app.modules.knowledge.facts import fact_extractor
@@ -163,11 +166,16 @@ class KnowledgeService:
             col.chunk_count = chunk_res.scalar() or 0
 
     async def list_documents(
-        self, db: AsyncSession, collection_id: str | None = None
+        self,
+        db: AsyncSession,
+        collection_id: str | None = None,
+        document_type_code: str | None = None,
     ) -> list[KnowledgeDocument]:
         query = select(KnowledgeDocument).order_by(KnowledgeDocument.created_at.desc())
         if collection_id:
             query = query.where(KnowledgeDocument.collection_id == collection_id)
+        if document_type_code:
+            query = query.where(KnowledgeDocument.document_type_code == document_type_code)
         res = await db.execute(query)
         docs = list(res.scalars().all())
         counts = await self._chunk_counts_by_document(db, [d.id for d in docs])
@@ -261,28 +269,17 @@ class KnowledgeService:
         """
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
 
-        # 2. Parse document strategy
-        parser = get_document_parser(ext)
-        parsed = await parser.parse(file_bytes, file_name)
-        ocr_method = parser.__class__.__name__
-        ocr_fallback = False
+        is_image = ext in ("png", "jpg", "jpeg", "webp", "bmp", "tiff")
+        user_wants_explicit_ocr = bool(ocr_engine and ocr_engine not in ("auto", "none"))
 
-        # 2b. Scanned-document rescue: blank text -> OCR auto-routing
-        if not (parsed.raw_text or "").strip() and ext in (
-            "pdf",
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "bmp",
-        ):
+        if is_image or user_wants_explicit_ocr:
             ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
                 db, file_bytes, file_name, ocr_engine
             )
             if rescued:
                 parsed = ParsedContent(
                     raw_text=ocr_text,
-                    page_count=ocr_pages,
+                    page_count=ocr_pages or 1,
                     tables=[],
                     metadata={"ocr_engine": ocr_engine_used},
                 )
@@ -293,10 +290,57 @@ class KnowledgeService:
                 ]
                 ocr_method = ocr_engine_used
                 ocr_fallback = True
-                logger.info("OCR rescue succeeded for file='%s' via %s", file_name, ocr_method)
+            else:
+                parser = get_document_parser(ext)
+                parsed = await parser.parse(file_bytes, file_name)
+                ocr_method = parser.__class__.__name__
+                ocr_fallback = False
+        else:
+            # Fast-path text extraction (PyMuPDF for PDF, DocxParser for Word, XlsxParser for Excel)
+            parser = get_document_parser(ext)
+            parsed = await parser.parse(file_bytes, file_name)
+            ocr_method = parser.__class__.__name__
+            ocr_fallback = False
+
+            # Scanned-document rescue for PDF: blank or minimal text triggers OCR routing (Mistral OCR -> Local OCR)
+            if ext == "pdf" and (not (parsed.raw_text or "").strip() or len(parsed.raw_text.strip()) < 40):
+                ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
+                    db, file_bytes, file_name, ocr_engine
+                )
+                if rescued:
+                    parsed = ParsedContent(
+                        raw_text=ocr_text,
+                        page_count=ocr_pages or 1,
+                        tables=[],
+                        metadata={"ocr_engine": ocr_engine_used},
+                    )
+                    parsed.blocks = [
+                        {"page_number": page_number, **block}
+                        for page_number, items in ocr_blocks.items()
+                        for block in items
+                    ]
+                    ocr_method = ocr_engine_used
+                    ocr_fallback = True
+                    logger.info("OCR rescue succeeded for file='%s' via %s", file_name, ocr_method)
 
         # 3. Clean and normalize text
         cleaned_text = clean_markdown_text(parsed.raw_text)
+
+        # 3.5. Extract per-page markdowns from page markers
+        page_markdowns: dict[int, str] = {}
+        marker_pattern = re.compile(r"<!--\s*(?:Trang|Page)\s+(\d+)\s*-->", re.IGNORECASE)
+        splits = marker_pattern.split(cleaned_text)
+        if len(splits) > 1:
+            for i in range(1, len(splits), 2):
+                try:
+                    p_num = int(splits[i])
+                    p_content = splits[i + 1].strip()
+                    p_content = re.sub(r"\n*---\s*$", "", p_content).strip()
+                    page_markdowns[p_num] = p_content
+                except (IndexError, ValueError):
+                    continue
+        elif parsed.page_count == 1:
+            page_markdowns[1] = cleaned_text.strip()
 
         # 4. Chunking strategy
         chunker = get_chunker(self.chunk_strategy_for(module_code))
@@ -306,6 +350,7 @@ class KnowledgeService:
             "parsed": parsed,
             "cleaned_text": cleaned_text,
             "chunk_drafts": chunk_drafts,
+            "page_markdowns": page_markdowns,
             "ocr_method": ocr_method,
             "ocr_fallback": ocr_fallback,
         }
@@ -364,6 +409,7 @@ class KnowledgeService:
                 "ocr_method": prepared["ocr_method"],
                 "ocr_fallback": prepared["ocr_fallback"],
                 "page_blocks": self._group_blocks_by_page(prepared["parsed"].blocks),
+                "page_markdowns": prepared.get("page_markdowns") or {},
             }
         )
         doc.doc_metadata = metadata
@@ -402,8 +448,12 @@ class KnowledgeService:
         file_name: str,
         title: str | None = None,
         ocr_engine: str | None = None,
+        document_type_code: str | None = None,
     ) -> KnowledgeDocument:
         col = await self.get_collection(db, collection_id)
+        normalized_document_type_code = await document_types_service.validate_active_code(
+            db, document_type_code
+        )
         file_hash = self.compute_file_hash(file_bytes)
         file_size = len(file_bytes)
 
@@ -437,6 +487,7 @@ class KnowledgeService:
         chunk_drafts = prepared["chunk_drafts"]
         doc = KnowledgeDocument(
             collection_id=collection_id,
+            document_type_code=normalized_document_type_code,
             title=title or file_name.rsplit(".", 1)[0],
             file_name=file_name,
             file_type=prepared["ext"],
@@ -449,7 +500,9 @@ class KnowledgeService:
                 "chunk_count": len(chunk_drafts),
                 "ocr_method": prepared["ocr_method"],
                 "ocr_fallback": prepared["ocr_fallback"],
+                "document_type_source": "user" if normalized_document_type_code else "unknown",
                 "page_blocks": self._group_blocks_by_page(parsed.blocks),
+                "page_markdowns": prepared.get("page_markdowns") or {},
             },
             status="pending",
             is_active=True,
@@ -459,6 +512,28 @@ class KnowledgeService:
 
         # 6-7. Persist chunks + structured facts (shared helper)
         await self.persist_chunks_facts(db, doc, collection_id, prepared)
+
+        # 8. Record audit job in job_records so Ingestion Tasks history tracks this upload
+        job = JobRecord(
+            job_type="ingestion",
+            status="completed",
+            progress=100.0,
+            collection_id=collection_id,
+            document_id=doc.id,
+            payload={
+                "filename": file_name,
+                "file_size_mb": round(file_size / (1024 * 1024), 2),
+                "source_file": file_name,
+                "ocr_engine": prepared["ocr_method"],
+                "channel": "studio_upload",
+            },
+            result={
+                "points_reindexed": len(chunk_drafts),
+                "total_chunks": len(chunk_drafts),
+                "ocr_engine": prepared["ocr_method"],
+            },
+        )
+        db.add(job)
 
         await db.commit()
         await db.refresh(doc)
@@ -475,26 +550,46 @@ class KnowledgeService:
     ) -> ParsePreviewResponse:
         """Parse preview without persisting to database."""
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
-        parser = get_document_parser(ext)
-        parsed = await parser.parse(file_bytes, file_name)
-        ocr_method = parser.__class__.__name__
+        is_image = ext in ("png", "jpg", "jpeg", "webp", "bmp", "tiff")
+        user_wants_explicit_ocr = bool(ocr_engine and ocr_engine not in ("auto", "none"))
 
-        if (
-            db is not None
-            and not (parsed.raw_text or "").strip()
-            and ext in ("pdf", "png", "jpg", "jpeg", "webp", "bmp")
-        ):
+        if db is not None and (is_image or user_wants_explicit_ocr):
             ocr_text, ocr_engine_used, ocr_pages, rescued, _ocr_blocks = (
                 await self._run_ocr_rescue(db, file_bytes, file_name, ocr_engine)
             )
             if rescued:
                 parsed = ParsedContent(
                     raw_text=ocr_text,
-                    page_count=ocr_pages,
+                    page_count=ocr_pages or 1,
                     tables=[],
                     metadata={"ocr_engine": ocr_engine_used},
                 )
                 ocr_method = ocr_engine_used
+            else:
+                parser = get_document_parser(ext)
+                parsed = await parser.parse(file_bytes, file_name)
+                ocr_method = parser.__class__.__name__
+        else:
+            parser = get_document_parser(ext)
+            parsed = await parser.parse(file_bytes, file_name)
+            ocr_method = parser.__class__.__name__
+
+            if (
+                db is not None
+                and ext == "pdf"
+                and (not (parsed.raw_text or "").strip() or len(parsed.raw_text.strip()) < 40)
+            ):
+                ocr_text, ocr_engine_used, ocr_pages, rescued, _ocr_blocks = (
+                    await self._run_ocr_rescue(db, file_bytes, file_name, ocr_engine)
+                )
+                if rescued:
+                    parsed = ParsedContent(
+                        raw_text=ocr_text,
+                        page_count=ocr_pages or 1,
+                        tables=[],
+                        metadata={"ocr_engine": ocr_engine_used},
+                    )
+                    ocr_method = ocr_engine_used
         cleaned_text = clean_markdown_text(parsed.raw_text)
 
         chunker = get_chunker(strategy)
@@ -561,11 +656,51 @@ class KnowledgeService:
         "stamp": 0.88,
     }
 
+    _SYNTHESIS_PLACEHOLDERS = {
+        "đoạn văn bản quy định",
+        "tiêu đề đầu trang",
+        "tên loại văn bản / trích yếu nội dung",
+        "tiêu đề phân đoạn",
+        "nơi nhận / danh sách đơn vị phối hợp",
+        "bảng biểu số liệu",
+        "con dấu & chữ ký xác thực",
+        "cơ quan ban hành / số hiệu",
+        "quốc hiệu / tiêu ngữ / ngày tháng",
+    }
+
+    @classmethod
+    def _synthesize_page_markdown_from_blocks(cls, blocks: list[dict]) -> str:
+        """Synthesize clean markdown for a page from its layout blocks when chunks are missing or clumped."""
+        lines: list[str] = []
+        for b in blocks:
+            text = (b.get("text") or b.get("content_snippet") or "").strip()
+            if not text or text.lower().strip() in cls._SYNTHESIS_PLACEHOLDERS:
+                continue
+            b_type = str(b.get("type", "text")).lower()
+            if b_type == "list":
+                if not text.startswith(("- ", "* ")):
+                    lines.append(f"- {text}")
+                else:
+                    lines.append(text)
+            elif b_type in ("title", "header"):
+                if not text.startswith("#"):
+                    prefix = "##" if b_type == "title" else "###"
+                    lines.append(f"{prefix} {text}")
+                else:
+                    lines.append(text)
+            elif b_type == "table":
+                # Giữ nguyên bảng Markdown hoàn chỉnh
+                lines.append(text)
+            else:
+                lines.append(text)
+        return "\n\n".join(lines).strip()
+
     def build_studio_pages(
         self,
         chunks: list[dict],
         page_blocks: dict,
         document_id: str,
+        page_markdowns: dict[int, str] | None = None,
     ) -> list[dict]:
         """Pure builder: chunks + stored geometry -> per-page studio views."""
         by_page: dict[int, list[dict]] = {}
@@ -588,10 +723,24 @@ class KnowledgeService:
                 blocks_by_page[page_number] = items
 
         page_numbers = sorted(set(by_page) | set(blocks_by_page)) or [1]
+        is_clumped = len(page_numbers) > 1 and set(by_page.keys()) <= {1}
         pages: list[dict] = []
         for page_number in page_numbers:
-            group = by_page.get(page_number, [])
-            markdown = "\n\n".join(str(c.get("content", "")) for c in group).strip()
+            if page_markdowns and page_number in page_markdowns:
+                markdown = page_markdowns[page_number] or ""
+            elif is_clumped and page_number in blocks_by_page:
+                synth = self._synthesize_page_markdown_from_blocks(blocks_by_page[page_number])
+                if synth:
+                    markdown = synth
+                else:
+                    group = by_page.get(page_number, [])
+                    markdown = "\n\n".join(str(c.get("content", "")) for c in group).strip()
+            else:
+                group = by_page.get(page_number, [])
+                markdown = "\n\n".join(str(c.get("content", "")) for c in group).strip()
+                if not markdown and page_number in blocks_by_page:
+                    markdown = self._synthesize_page_markdown_from_blocks(blocks_by_page[page_number])
+
             boxes: list[dict] = []
             for idx, block in enumerate(blocks_by_page.get(page_number, []), start=1):
                 box_type = str(block.get("type", "text"))
@@ -614,7 +763,7 @@ class KnowledgeService:
                                 self.DEFAULT_BOX_CONFIDENCE.get(box_type, 0.90),
                             )
                         ),
-                        "content_snippet": str(block.get("content_snippet", ""))[:160],
+                        "content_snippet": str(block.get("content_snippet") or block.get("text") or "")[:160],
                     }
                 )
             regions = [
@@ -646,7 +795,7 @@ class KnowledgeService:
 
     @staticmethod
     def _is_stale_raw_blocks(page_blocks: dict) -> bool:
-        """Return True if stored page_blocks only contain raw unclassified text blocks."""
+        """Return True if stored page_blocks only contain raw unclassified text blocks or synthetic stripes."""
         if not page_blocks or not isinstance(page_blocks, dict) or not any(page_blocks.values()):
             return True
         all_blocks = [
@@ -658,6 +807,30 @@ class KnowledgeService:
         ]
         if not all_blocks:
             return True
+
+        # Check if blocks are legacy synthetic stripes (fixed x=8.0, width=84.0 or raw markdown in label)
+        is_synthetic = any(
+            (
+                isinstance(b.get("coordinates"), dict)
+                and abs(float(b["coordinates"].get("x", 0.0)) - 8.0) < 0.05
+                and abs(float(b["coordinates"].get("width", 0.0)) - 84.0) < 0.05
+            )
+            or "**" in str(b.get("label", ""))
+            or str(b.get("label", "")).startswith("#")
+            for b in all_blocks
+        )
+        if is_synthetic:
+            return True
+
+        # Check if blocks contain stale placeholder text "Bảng biểu dữ liệu số hóa"
+        has_placeholder = any(
+            "Bảng biểu dữ liệu số hóa" in str(b.get("content_snippet", ""))
+            or "Bảng biểu dữ liệu số hóa" in str(b.get("text", ""))
+            for b in all_blocks
+        )
+        if has_placeholder:
+            return True
+
         has_semantic = any(
             str(b.get("type", "")).lower() in ("signature", "table", "title", "header", "list")
             for b in all_blocks
@@ -754,7 +927,8 @@ class KnowledgeService:
                                             "height": float(reg.get("height", 0.0)),
                                         },
                                         "label": str(reg.get("label") or r_type),
-                                        "content_snippet": str(reg.get("text") or "")[:160],
+                                        "text": str(reg.get("text") or ""),
+                                        "content_snippet": str(reg.get("content_snippet") or reg.get("text") or "")[:160],
                                         "confidence": 0.98 if r_type in ("table", "signature") else 0.92,
                                     }
                                 )
@@ -900,6 +1074,35 @@ class KnowledgeService:
     ) -> dict:
         """Assemble the verification studio view from stored chunks + geometry."""
         doc = await self.get_document(db, document_id)
+
+        # Auto-rescue if document has 0 chunks or user requested full layout refresh
+        needs_rescue = (not doc.chunks or len(doc.chunks) == 0 or refresh_layout)
+        if needs_rescue and doc.storage_path:
+            file_bytes = await storage_service.get(doc.storage_path)
+            if file_bytes:
+                try:
+                    col = await self.get_collection(db, doc.collection_id)
+                    prepared = await self.prepare_ingestion(
+                        db=db,
+                        module_code=col.module_code,
+                        file_bytes=file_bytes,
+                        file_name=doc.file_name,
+                        ocr_engine=None,
+                    )
+                    if prepared.get("chunk_drafts"):
+                        await self.replace_document_content(
+                            db=db,
+                            doc=doc,
+                            collection_id=doc.collection_id,
+                            module_code=col.module_code,
+                            prepared=prepared,
+                        )
+                        await db.commit()
+                        doc = await self.get_document(db, document_id)
+                        logger.info("Auto-rescue succeeded for document '%s' with %d chunks", doc.id, len(doc.chunks))
+                except Exception as rescue_err:
+                    logger.warning("Auto-rescue in get_studio_view failed: %s", rescue_err)
+
         chunks = [
             {
                 "content": c.content,
@@ -913,12 +1116,14 @@ class KnowledgeService:
         page_blocks = await self._ensure_page_blocks(
             db, doc, refresh_layout=refresh_layout
         )
+        metadata = doc.doc_metadata or {}
+        page_markdowns = metadata.get("page_markdowns") or None
         pages = self.build_studio_pages(
             chunks=chunks,
             page_blocks=page_blocks,
             document_id=doc.id,
+            page_markdowns=page_markdowns,
         )
-        metadata = doc.doc_metadata or {}
         total_pages = max(
             [p["page_number"] for p in pages] + [int(metadata.get("page_count", 0) or 0), 1]
         )
@@ -1171,6 +1376,47 @@ class KnowledgeService:
         metadata = dict(doc.doc_metadata or {})
         metadata["indexed_chunks"] = indexed
         doc.doc_metadata = metadata
+
+        job_stmt = (
+            select(JobRecord)
+            .where(
+                JobRecord.document_id == doc.id,
+                JobRecord.job_type == "ingestion",
+            )
+            .order_by(JobRecord.created_at.desc())
+        )
+        existing_job = (await db.execute(job_stmt)).scalars().first()
+        if existing_job:
+            existing_job.status = "completed"
+            existing_job.progress = 100.0
+            existing_job.result = {
+                "points_reindexed": indexed,
+                "total_chunks": len(chunks),
+                "status": "approved",
+            }
+        else:
+            db.add(
+                JobRecord(
+                    job_type="ingestion",
+                    status="completed",
+                    progress=100.0,
+                    collection_id=doc.collection_id,
+                    document_id=doc.id,
+                    payload={
+                        "filename": doc.file_name,
+                        "source_file": doc.file_name,
+                        "file_size_mb": round((doc.file_size_bytes or 0) / (1024 * 1024), 2),
+                        "ocr_engine": (doc.doc_metadata or {}).get("ocr_method") or "IBM Docling TableFormer",
+                        "channel": "studio_upload",
+                    },
+                    result={
+                        "points_reindexed": indexed,
+                        "total_chunks": len(chunks),
+                        "status": "approved",
+                    },
+                )
+            )
+
         await db.commit()
 
         logger.info("Approved document id=%s, chunks=%d, indexed=%d", doc.id, len(chunks), indexed)
@@ -1180,6 +1426,45 @@ class KnowledgeService:
             "total_chunks": len(chunks),
             "indexed_chunks": indexed,
         }
+
+    async def sync_ingestion_job_records(self, db: AsyncSession) -> int:
+        """Backfill JobRecord entries for any active documents missing in job_records."""
+        stmt = select(KnowledgeDocument).where(KnowledgeDocument.is_active.is_(True))
+        docs = (await db.execute(stmt)).scalars().all()
+        created_count = 0
+        for doc in docs:
+            exists_stmt = select(JobRecord.id).where(
+                JobRecord.document_id == doc.id,
+                JobRecord.job_type == "ingestion",
+            )
+            if (await db.execute(exists_stmt)).first() is None:
+                chunk_count = (doc.doc_metadata or {}).get("chunk_count") or 0
+                db.add(
+                    JobRecord(
+                        job_type="ingestion",
+                        status="completed",
+                        progress=100.0,
+                        collection_id=doc.collection_id,
+                        document_id=doc.id,
+                        payload={
+                            "filename": doc.file_name,
+                            "source_file": doc.file_name,
+                            "file_size_mb": round((doc.file_size_bytes or 0) / (1024 * 1024), 2),
+                            "ocr_engine": (doc.doc_metadata or {}).get("ocr_method") or "IBM Docling TableFormer",
+                            "channel": "studio_upload",
+                        },
+                        result={
+                            "points_reindexed": chunk_count,
+                            "total_chunks": chunk_count,
+                            "status": doc.status,
+                        },
+                    )
+                )
+                created_count += 1
+        if created_count > 0:
+            await db.commit()
+            logger.info("Backfilled %d ingestion job records for active documents", created_count)
+        return created_count
 
 
 knowledge_service = KnowledgeService()

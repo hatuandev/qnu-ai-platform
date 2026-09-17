@@ -1,0 +1,86 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "guard.citation_policy",
+    "version": "1.0.0",
+    "display_name": "Kiểm soát Căn cứ & Trích dẫn",
+    "description": "Đánh giá tính tin cậy và căn cứ trích dẫn của câu trả lời; điều hướng sang từ chối lịch sự hoặc làm rõ nếu thiếu dữ liệu ngữ cảnh nhằm chống ảo giác.",
+    "category": "guard",
+    "labels": {
+      "guardrail": "citations"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "builtin",
+      "operation": "guard.citation_policy"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["require_citation_for_answer"],
+      "properties": {
+        "require_citation_for_answer": {
+          "type": "boolean",
+          "default": true
+        },
+        "accepted_statuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["answered", "success"]
+        },
+        "invalid_route": {
+          "type": "string",
+          "default": "ungrounded"
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["response"],
+      "properties": {
+        "response": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "grounded": {
+          "type": "object"
+        },
+        "ungrounded": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["guard.evaluate"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 2,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "not_required",
+      "checkpoint": "never",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["evaluation_result", "citation_count", "status"],
+      "redacted_fields": []
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

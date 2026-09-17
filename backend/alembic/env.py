@@ -5,13 +5,13 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-import app.modules.rag.models
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import all module models to register on Base.metadata for autogenerate
 import app.modules.assistants.models
+import app.modules.document_types.models
 import app.modules.evaluation.models
 import app.modules.knowledge.models
 import app.modules.modelops.models

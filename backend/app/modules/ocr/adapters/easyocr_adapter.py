@@ -74,10 +74,7 @@ class EasyOCRAdapter(BaseOCRAdapter):
         all_text: list[str] = []
         for page_number, image_bytes in page_images:
             try:
-                import numpy as np
-
-                image_array = np.frombuffer(image_bytes, dtype="uint8")
-                segments: list[str] = reader.readtext(image_array, detail=0)
+                segments: list[str] = reader.readtext(image_bytes, detail=0)
             except Exception as exc:
                 logger.warning("EasyOCR page %d failed: %s", page_number, exc)
                 segments = []

@@ -31,7 +31,12 @@ class OutputNoAnswerNodeHandler(BaseNodeHandler):
     ) -> NodeExecutionResult:
         config = node_spec.config or {}
         message = (
-            config.get("message")
+            (
+                context.assistant_profile.guardrails.no_answer_message
+                if context.assistant_profile
+                else None
+            )
+            or config.get("message")
             or config.get("default_message")
             or DEFAULT_NO_ANSWER_MESSAGE
         )

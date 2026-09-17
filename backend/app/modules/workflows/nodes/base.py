@@ -8,6 +8,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.assistants.schemas import AssistantRuntimeProfile
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 
@@ -22,6 +23,22 @@ class WorkflowContext:
     outputs: dict[str, Any] = field(default_factory=dict)
     node_data: dict[str, Any] = field(default_factory=dict)
     db: AsyncSession | None = None
+    assistant_profile: AssistantRuntimeProfile | None = None
+    correlation_id: str | None = None
+    execution_id: str | None = None
+    node_traces: list[NodeExecutionTrace] = field(default_factory=list)
+
+
+@dataclass
+class NodeExecutionTrace:
+    """Structured trace captured by the engine and persisted after the run ends."""
+
+    node_id: str
+    node_type: str
+    status: str
+    input_data: dict[str, Any]
+    output_data: dict[str, Any]
+    latency_ms: float
 
 
 @dataclass

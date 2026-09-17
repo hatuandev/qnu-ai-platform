@@ -16,7 +16,7 @@ import type React from "react";
 import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { type WorkflowExecuteResponse, apiClient } from "../../services/api-client";
+import { type WorkflowExecutionResponse, workflowsApi } from "../../services/workflows-api";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
@@ -64,6 +64,11 @@ const QUICK_PROMPTS_BY_WORKFLOW: Record<string, string[]> = {
   ],
 };
 
+function getResponseText(response: WorkflowExecutionResponse): string {
+  const output = response.outputs.answer ?? response.outputs.text ?? response.outputs.message;
+  return typeof output === "string" ? output : "Chưa có nội dung phản hồi từ workflow.";
+}
+
 export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
   workflowId,
   workflowName,
@@ -77,12 +82,15 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
   );
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("chat");
-  const [lastResponse, setLastResponse] = useState<WorkflowExecuteResponse | null>(null);
+  const [lastResponse, setLastResponse] = useState<WorkflowExecutionResponse | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isHumanApproved, setIsHumanApproved] = useState<boolean>(false);
+  const [approvalId, setApprovalId] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
+  const assistantCode = workflowId.replace(/-assistant$/, "");
   const quickPrompts =
-    QUICK_PROMPTS_BY_WORKFLOW[workflowId] || QUICK_PROMPTS_BY_WORKFLOW.admissions;
+    QUICK_PROMPTS_BY_WORKFLOW[assistantCode] || QUICK_PROMPTS_BY_WORKFLOW.admissions;
 
   const handleCopyText = useCallback((text: string) => {
     if (!navigator.clipboard) return;
@@ -94,6 +102,8 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
   const handleResetRun = useCallback(() => {
     setLastResponse(null);
     setIsHumanApproved(false);
+    setApprovalId(null);
+    setExecutionError(null);
     onResetCanvasStates();
   }, [onResetCanvasStates]);
 
@@ -102,6 +112,8 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
 
     setIsExecuting(true);
     setIsHumanApproved(false);
+    setApprovalId(null);
+    setExecutionError(null);
     setActiveTab("chat");
 
     // Clear previous states
@@ -114,86 +126,62 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
       });
 
       // 2. Call API
-      const response = await apiClient.executeWorkflow({
+      const response = await workflowsApi.execute({
         workflow_id: workflowId,
         inputs: { message: inputMessage.trim(), text: inputMessage.trim() },
       });
 
-      // 3. Sequential animation simulation for visual feedback
-      const executed = response.executed_nodes || [
-        "chat_input",
-        "condition_route",
-        "knowledge_answer",
-        "chat_output",
-      ];
-
+      // 3. Render the server execution trace exactly as returned by the runtime.
+      const executed = response.executed_nodes;
       const currentStates: Record<string, NodeExecutionState> = {};
-
-      for (let i = 0; i < executed.length; i++) {
-        const nodeId = executed[i];
-        const isLast = i === executed.length - 1;
-        const isApproval = nodeId.includes("approval");
-
-        // Mark previous nodes as completed
-        for (let j = 0; j < i; j++) {
-          const prevId = executed[j];
-          currentStates[prevId] = {
-            status: "completed",
-            durationMs: Math.floor(40 + Math.random() * 80),
-          };
-        }
-
-        // Current node is running or waiting
-        if (isApproval && !isHumanApproved) {
-          currentStates[nodeId] = {
-            status: "waiting",
-            durationMs: 120,
-          };
-          onUpdateExecutionState({ ...currentStates });
-          break;
-        }
-
+      for (const nodeId of executed) {
         currentStates[nodeId] = {
-          status: isLast ? "completed" : "running",
-          durationMs: Math.floor(50 + Math.random() * 100),
+          status:
+            response.status === "paused_for_approval" && nodeId === response.paused_node_id
+              ? "waiting"
+              : response.status === "failed"
+                ? "failed"
+                : "completed",
+          error: response.status === "failed" ? response.error_message || undefined : undefined,
         };
-
-        onUpdateExecutionState({ ...currentStates });
-        // Tiny visual delay for smooth animation
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      }
-
-      // Final state: all completed
-      for (const nid of executed) {
-        if (!currentStates[nid] || currentStates[nid].status !== "waiting") {
-          currentStates[nid] = {
-            status: "completed",
-            durationMs: currentStates[nid]?.durationMs || 65,
-          };
-        }
       }
       onUpdateExecutionState({ ...currentStates });
-
       setLastResponse(response);
-    } catch {
+      setApprovalId(
+        typeof response.outputs.approval_id === "string" ? response.outputs.approval_id : null
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Lỗi thực thi luồng DAG.";
+      setExecutionError(message);
       onUpdateExecutionState({
-        chat_input: { status: "failed", error: "Lỗi thực thi luồng DAG" },
+        chat_input: { status: "failed", error: message },
       });
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const handleApproveCheckpoint = () => {
-    setIsHumanApproved(true);
-    // Mark human_approval as completed and continue
-    onUpdateExecutionState({
-      chat_input: { status: "completed", durationMs: 45 },
-      condition_route: { status: "completed", durationMs: 35 },
-      nd30_formatter: { status: "completed", durationMs: 110 },
-      human_approval: { status: "completed", durationMs: 50 },
-      final_output: { status: "completed", durationMs: 30 },
-    });
+  const handleApproveCheckpoint = async () => {
+    if (!lastResponse || !approvalId || isExecuting) return;
+    setIsExecuting(true);
+    setExecutionError(null);
+    try {
+      const response = await workflowsApi.decideApproval(lastResponse.execution_id, approvalId, {
+        approved: true,
+        decided_by: "platform-admin",
+      });
+      setIsHumanApproved(true);
+      const completedStates = Object.fromEntries(
+        response.executed_nodes.map((nodeId) => [nodeId, { status: "completed" as const }])
+      );
+      onUpdateExecutionState(completedStates);
+      setLastResponse(response);
+      setApprovalId(null);
+    } catch (error: unknown) {
+      setExecutionError(error instanceof Error ? error.message : "Không thể phê duyệt checkpoint.");
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -304,16 +292,24 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
           </Button>
         </div>
 
-        {/* Human Approval Banner if waiting */}
-        {workflowId === "drafting" && lastResponse && !isHumanApproved && (
+        {executionError && (
+          <div className="rounded-control border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+            {executionError}
+          </div>
+        )}
+
+        {/* Approval only appears after a real paused execution returns an approval id. */}
+        {lastResponse?.status === "paused_for_approval" && approvalId && !isHumanApproved && (
           <div className="p-3 rounded-surface bg-warning/10 border border-warning/30 space-y-2 animate-in fade-in duration-200">
             <div className="flex items-start gap-2">
               <UserCheck className="size-4 text-warning shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-bold text-foreground">Điểm Dừng Phê Duyệt Cán Bộ</p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Node `human_approval` yêu cầu Trưởng phòng xác nhận trước khi kết xuất văn bản
-                  chính thức.
+                  {String(
+                    lastResponse.outputs.action_required ||
+                      "Cần cán bộ chuyên môn xác nhận trước khi tiếp tục."
+                  )}
                 </p>
               </div>
             </div>
@@ -361,11 +357,7 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
                   variant="ghost"
                   size="icon"
                   className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-foreground"
-                  onClick={() =>
-                    handleCopyText(
-                      String(lastResponse.outputs.text || lastResponse.outputs.message || "")
-                    )
-                  }
+                  onClick={() => handleCopyText(getResponseText(lastResponse))}
                   title="Sao chép kết quả"
                 >
                   {isCopied ? (
@@ -379,7 +371,7 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
                   className="prose prose-sm dark:prose-invert max-w-none text-xs"
                 >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {String(lastResponse.outputs.text || lastResponse.outputs.message || "")}
+                    {getResponseText(lastResponse)}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -400,7 +392,7 @@ export const InCanvasTestRunner: React.FC<InCanvasTestRunnerProps> = ({
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
                       <Clock className="size-3 text-muted-foreground" />
-                      <span>{Math.floor(30 + idx * 25)}ms</span>
+                      <span>đã ghi nhận</span>
                       <span className="size-1.5 rounded-full bg-success" />
                     </div>
                   </div>

@@ -19,8 +19,11 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
         config = node_spec.config or {}
+        profile = context.assistant_profile
         system_prompt = (
-            config.get("system_prompt")
+            profile.system_prompt
+            if profile
+            else config.get("system_prompt")
             or "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn."
         )
         user_message = (
@@ -36,9 +39,10 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
         gen_req = LLMGenerateRequest(
             messages=messages,
             tenant_id=context.tenant_id,
+            assistant_code=profile.assistant_code if profile else None,
             conversation_id=context.conversation_id,
-            temperature=config.get("temperature", 0.2),
-            max_tokens=config.get("max_tokens", 2000),
+            temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
+            max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
         )
 
         if context.db:

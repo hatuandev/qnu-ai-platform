@@ -1,0 +1,84 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "artifact.export",
+    "version": "1.0.0",
+    "display_name": "Kết xuất Tệp Tài liệu",
+    "description": "Đóng gói và kết xuất văn bản kết quả thành các định dạng tệp tải về như DOCX, PDF, XLSX, Markdown.",
+    "category": "tool",
+    "labels": {
+      "storage": "artifact_store"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "connector",
+      "operation": "artifact.export"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "filename_template"],
+      "properties": {
+        "format": {
+          "enum": ["docx", "pdf", "xlsx", "txt", "markdown"]
+        },
+        "filename_template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "content_type": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "type": "object"
+        },
+        "format": {
+          "type": "string"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["artifact"],
+      "properties": {
+        "artifact": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["artifact.write"],
+    "required_permissions": ["artifact.write"],
+    "connection_types": ["qnu_artifact_store"],
+    "execution": {
+      "default_timeout_seconds": 30,
+      "max_timeout_seconds": 120,
+      "default_max_attempts": 2,
+      "side_effects": "write",
+      "idempotency": "connector_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["artifact_id", "format", "size_bytes", "status"],
+      "redacted_fields": ["content"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

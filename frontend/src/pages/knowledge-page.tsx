@@ -8,9 +8,11 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
   Terminal,
   Trash2,
   Upload,
+  Zap,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -96,6 +98,14 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
     queryFn: () => apiClient.getIngestionTasks(),
   });
 
+  // Fetch system-wide model defaults (Embedding, Reranker, OCR)
+  const { data: systemDefaultsResponse } = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+    staleTime: 30000,
+  });
+  const systemDefaults = systemDefaultsResponse?.defaults;
+
   // Total summary metrics
   const totalDocs = useMemo(() => {
     return collections.reduce((acc, c) => acc + (c.document_count || 0), 0);
@@ -172,6 +182,32 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
               Quản trị kho vector Qdrant, giám sát tác vụ bóc tách tài liệu và cấu hình Embedding
               ModelOps phục vụ Trợ lý AI RAG
             </p>
+            {systemDefaults && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40 text-xs text-muted-foreground flex-wrap">
+                <span className="text-[11px] font-medium">Model mặc định hệ thống:</span>
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground bg-muted/60 px-2 py-0.5 rounded border border-border/50">
+                  {systemDefaults.default_embedding_model.includes("@cf/") ? (
+                    <Zap className="size-3 text-amber-500" />
+                  ) : (
+                    <Cpu className="size-3 text-primary" />
+                  )}
+                  {systemDefaults.default_embedding_model}
+                </span>
+                <span className="text-[11px] text-muted-foreground">•</span>
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                  Reranker: {systemDefaults.default_reranker_model}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onNavigate?.("/modelops")}
+                  className="h-6 px-2 text-[11px] text-primary hover:text-primary/80 gap-1 ml-auto"
+                >
+                  <Settings className="size-3" />
+                  <span>Quản lý ModelOps</span>
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -272,11 +308,31 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                   </p>
 
                   {/* Model Embedding Chip */}
-                  <div className="pt-1">
+                  <div className="pt-1 flex items-center gap-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/60 text-muted-foreground text-[11px] font-mono border border-border/50">
-                      <Cpu className="size-3 text-primary" />
-                      <span>{col.embedding_model || "BAAI/bge-m3 (1024-dim)"}</span>
+                      {(
+                        col.embedding_model ||
+                        systemDefaults?.default_embedding_model ||
+                        ""
+                      ).includes("@cf/") ? (
+                        <Zap className="size-3 text-amber-500 shrink-0" />
+                      ) : (
+                        <Cpu className="size-3 text-primary shrink-0" />
+                      )}
+                      <span>
+                        {col.embedding_model ||
+                          systemDefaults?.default_embedding_model ||
+                          "BAAI/bge-m3 (1024-dim)"}
+                      </span>
                     </span>
+                    {!col.embedding_model && systemDefaults?.default_embedding_model && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 border-primary/30 text-primary bg-primary/5"
+                      >
+                        Mặc định
+                      </Badge>
+                    )}
                   </div>
                 </div>
 

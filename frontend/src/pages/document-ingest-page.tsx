@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,7 +9,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -20,10 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  type FileRecommendation,
+  cleanTitleFromFilename,
+  detectDocumentTypeFromFilename,
+  extractYearFromFilename,
+  getPriorityForDocumentType,
+  inspectFileAndRecommend,
+} from "../lib/file-inspector";
 import { type KnowledgeCollection, apiClient } from "../services/api-client";
+import { listDocumentTypes } from "../services/document-types-api";
 
 const OCR_ENGINE_PARAM: Record<string, string | undefined> = {
   auto: undefined,
+  mistral: "mistral_ocr",
   docling: "docling",
   pymupdf: "pymupdf_ocr",
   easyocr: "easyocr",
@@ -42,22 +53,68 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
 }) => {
   // Khởi tạo form rỗng động — tuyệt đối không gán cứng tên tài liệu mẫu
   const [docTitle, setDocTitle] = useState<string>("");
-  const [docType, setDocType] = useState<string>("quy_che");
-  const [year, setYear] = useState<string>("2026");
+  const [docType, setDocType] = useState<string>("");
+  const [year, setYear] = useState<string>("");
   const [ocrEngine, setOcrEngine] = useState<string>("auto");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [recommendation, setRecommendation] = useState<FileRecommendation | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const documentTypesQuery = useQuery({
+    queryKey: ["document-types", "active"],
+    queryFn: () => listDocumentTypes({ activeOnly: true }),
+  });
+
+  // Tự động khởi tạo Loại văn bản mặc định theo ngữ cảnh Kho tri thức nếu chưa có
+  useEffect(() => {
+    if (!docType) {
+      const availableCodes = (documentTypesQuery.data || []).map((t) => t.code);
+      const defaultDocType = detectDocumentTypeFromFilename("", availableCodes, collection);
+      if (defaultDocType) {
+        setDocType(defaultDocType);
+      }
+    }
+  }, [collection, documentTypesQuery.data, docType]);
+
+  const processFile = (f: File) => {
+    setSelectedFile(f);
+    setSubmitError(null);
+
+    // 1. Tự động điền tiêu đề sạch từ tên tệp tin thực tế nếu ô tiêu đề đang rỗng
+    if (!docTitle.trim()) {
+      setDocTitle(cleanTitleFromFilename(f.name));
+    }
+
+    // 2. Chạy module phân tích tệp tin & đề xuất cấu hình bóc tách tối ưu
+    const rec = inspectFileAndRecommend(f);
+    setRecommendation(rec);
+
+    // 3. Tự động chọn bộ máy OCR theo đề xuất
+    if (rec.targetOcrKeyword === "docling") {
+      setOcrEngine("docling");
+    } else if (rec.targetOcrKeyword === "pymupdf") {
+      setOcrEngine("pymupdf");
+    } else {
+      setOcrEngine("auto");
+    }
+
+    // 4. Tự động nhận diện Loại văn bản từ tên tệp tin đối chiếu với 37 loại trong Taxonomy & ngữ cảnh Kho
+    const availableCodes = (documentTypesQuery.data || []).map((t) => t.code);
+    const detectedType = detectDocumentTypeFromFilename(f.name, availableCodes, collection);
+    if (detectedType) {
+      setDocType(detectedType);
+    }
+
+    // 5. Tự động trích xuất Năm ban hành / hiệu lực từ tên tệp tin
+    const detectedYear = extractYearFromFilename(f.name);
+    if (detectedYear) {
+      setYear(detectedYear);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      const f = e.target.files[0];
-      setSelectedFile(f);
-      setSubmitError(null);
-      // Tự động điền tiêu đề từ tên tệp tin thực tế nếu ô tiêu đề đang rỗng
-      if (!docTitle.trim()) {
-        setDocTitle(f.name.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
-      }
+      processFile(e.target.files[0]);
     }
   };
 
@@ -76,7 +133,8 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           collection.id,
           selectedFile,
           docTitle.trim() || undefined,
-          OCR_ENGINE_PARAM[ocrEngine]
+          OCR_ENGINE_PARAM[ocrEngine],
+          docType
         );
         onStartVerification(uploaded.id);
       } else {
@@ -87,7 +145,13 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           `${title}.txt`,
           { type: "text/plain;charset=utf-8" }
         );
-        const created = await apiClient.uploadDocument(collection.id, textBlob, title);
+        const created = await apiClient.uploadDocument(
+          collection.id,
+          textBlob,
+          title,
+          undefined,
+          docType
+        );
         onStartVerification(created.id);
       }
     } catch (err) {
@@ -168,13 +232,18 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   <SelectValue placeholder="Chọn loại văn bản" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="quy_che">Quy chế (Văn bản Quy phạm & Nội bộ)</SelectItem>
-                  <SelectItem value="de_an">Đề án & Kế hoạch Tuyển sinh</SelectItem>
-                  <SelectItem value="quyet_dinh">Quyết định Ban hành</SelectItem>
-                  <SelectItem value="thong_bao">Thông báo Hướng dẫn</SelectItem>
-                  <SelectItem value="giao_trinh">Giáo trình & Học liệu số</SelectItem>
+                  {(documentTypesQuery.data || []).map((type) => (
+                    <SelectItem key={type.code} value={type.code}>
+                      {type.name} ({type.category_name})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {documentTypesQuery.error ? (
+                <p className="text-[11px] text-destructive">
+                  Không tải được taxonomy: {documentTypesQuery.error.message}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -209,14 +278,17 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   <SelectItem value="auto">
                     ✨ Tự động nhận diện tối ưu theo tệp (Khuyên dùng...)
                   </SelectItem>
+                  <SelectItem value="mistral">
+                    Mistral OCR Cloud API (Chuyên văn bản scan tiếng Việt & con dấu, siêu tốc)
+                  </SelectItem>
                   <SelectItem value="docling">
-                    IBM Docling TableFormer (Bóc tách ma trận bảng biểu tuyển sinh)
+                    IBM Docling TableFormer (Bóc tách ma trận bảng biểu Word & Excel)
                   </SelectItem>
                   <SelectItem value="pymupdf">
                     PyMuPDF Fast (Bóc tách văn bản số nhanh & nguyên vẹn)
                   </SelectItem>
                   <SelectItem value="easyocr">
-                    EasyOCR Local (Nhận diện tài liệu scan ảnh & dấu mộc đỏ)
+                    EasyOCR Local (Nhận diện tài liệu scan ảnh offline & con dấu)
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -227,17 +299,95 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 Mức độ ưu tiên pháp lý tự động
               </span>
               <div className="h-10 px-3 rounded-md border border-border bg-muted/40 flex items-center justify-between text-xs">
-                <span className="font-mono text-muted-foreground text-[11px]">Điểm: 10/10</span>
+                <span className="font-mono text-muted-foreground text-[11px]">
+                  {getPriorityForDocumentType(docType).scoreText}
+                </span>
                 <Badge
                   variant="outline"
-                  className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[11px] gap-1 font-medium"
+                  className={`${getPriorityForDocumentType(docType).badgeClass} text-[11px] gap-1 font-medium`}
                 >
                   <ShieldCheck className="size-3" />
-                  <span>Ưu tiên Cao (Cốt lõi) (x100)</span>
+                  <span>{getPriorityForDocumentType(docType).label}</span>
                 </Badge>
               </div>
             </div>
           </div>
+
+          {/* Smart Recommendation Banner khi đã chọn tệp */}
+          {selectedFile && recommendation && (
+            <div className="p-4 rounded-lg bg-primary/5 border border-primary/25 text-xs space-y-3 transition-all animate-in fade-in duration-300">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="size-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Sparkles className="size-4" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-foreground text-xs flex items-center gap-2">
+                      <span>{recommendation.title}</span>
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {recommendation.reason}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="bg-primary/15 text-primary border-primary/30 text-[11px] font-semibold shrink-0"
+                >
+                  {recommendation.badgeText}
+                </Badge>
+              </div>
+
+              <div className="text-[11px] text-muted-foreground bg-background/70 p-3 rounded-md border border-border/60 space-y-1.5 leading-relaxed">
+                <p className="font-semibold text-foreground">Cấu hình tự động tối ưu đã áp dụng:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                  <div>
+                    <span className="text-foreground font-medium">• Bộ máy OCR:</span>{" "}
+                    <span className="text-primary font-medium">
+                      {ocrEngine === "docling"
+                        ? "IBM Docling TableFormer (Bảo toàn 100% bảng)"
+                        : ocrEngine === "pymupdf"
+                          ? "PyMuPDF Fast (Bóc tách native siêu tốc)"
+                          : "Tự động nhận diện tối ưu theo tệp"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-foreground font-medium">• Loại văn bản:</span>{" "}
+                    <span className="text-foreground font-medium">
+                      {documentTypesQuery.data?.find((t) => t.code === docType)?.name ||
+                        (docType === "de_an"
+                          ? "Đề án"
+                          : docType === "quy_che"
+                            ? "Quy chế"
+                            : docType === "quyet_dinh"
+                              ? "Quyết định"
+                              : docType === "thong_bao"
+                                ? "Thông báo"
+                                : docType
+                                  ? docType.replace(/_/g, " ")
+                                  : "Tự động nhận diện")}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-foreground font-medium">• Năm hiệu lực:</span>{" "}
+                    <span className="font-mono text-foreground">{year || "Mặc định"}</span>
+                  </div>
+                  <div>
+                    <span className="text-foreground font-medium">• Chiến lược phân đoạn:</span>{" "}
+                    <span className="text-foreground font-medium">
+                      {recommendation.recommendedChunking === "ClauseBasedChunker"
+                        ? "Phân đoạn Điều / Khoản (ClauseBasedChunker)"
+                        : "Phân đoạn Ngữ nghĩa (SemanticChunker)"}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground/90 pt-1 border-t border-border/40 italic">
+                  💡 {recommendation.technicalDetails} Bạn có thể tùy chỉnh lại bất kỳ thông số nào
+                  bên dưới nếu muốn.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Drag & Drop File Upload Area */}
           <div className="space-y-2">
@@ -247,6 +397,13 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
             </span>
             <label
               htmlFor="file-upload-input"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files?.[0]) {
+                  processFile(e.dataTransfer.files[0]);
+                }
+              }}
               className="border-2 border-dashed border-border hover:border-primary/60 transition-colors rounded-lg p-8 flex flex-col items-center justify-center text-center cursor-pointer bg-muted/10 hover:bg-muted/20"
             >
               <input
@@ -280,16 +437,19 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
             <div className="flex items-center justify-between">
               <span className="font-semibold text-foreground flex items-center gap-1.5">
                 <FileCheck2 className="size-4 text-primary" />
-                Chính sách Phân đoạn: Phân đoạn Tiêu chuẩn (Standard 512-Token)
+                Chính sách Phân đoạn:{" "}
+                {recommendation?.recommendedChunking === "ClauseBasedChunker"
+                  ? "Phân đoạn Điều / Khoản (ClauseBasedChunker)"
+                  : "Phân đoạn Tiêu chuẩn (Standard 512-Token)"}
               </span>
               <span className="font-mono text-[11px] text-primary">
                 Vector: {collection.embedding_model || "BAAI/bge-m3 (1024-dim)"}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Hệ thống sẽ bóc tách văn bản qua [✨ Tự động nhận diện tối ưu theo tệp], giữ nguyên
-              vẹn cấu trúc bảng biểu Markdown và mở Workspace Toàn màn hình để bạn kiểm tra đối
-              chiếu trước khi tính vector.
+              {recommendation
+                ? recommendation.technicalDetails
+                : "Hệ thống sẽ bóc tách văn bản qua [✨ Tự động nhận diện tối ưu theo tệp], giữ nguyên vẹn cấu trúc bảng biểu Markdown và mở Workspace Toàn màn hình để bạn kiểm tra đối chiếu trước khi tính vector."}
             </p>
           </div>
 

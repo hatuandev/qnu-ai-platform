@@ -10,6 +10,12 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt
 
 from app.core.config import settings
+from app.core.exceptions import AppException
+from app.modules.document_types.catalog import (
+    DOCUMENT_TYPE_CODES,
+    get_document_type_label,
+    normalize_document_type_code,
+)
 from app.modules.tools.builtin.base import BaseTool
 
 
@@ -44,8 +50,8 @@ class DocumentExporterTool(BaseTool):
                 "properties": {
                     "document_type": {
                         "type": "string",
-                        "enum": ["THÔNG BÁO", "TỜ TRÌNH", "KẾ HOẠCH", "QUYẾT ĐỊNH"],
-                        "description": "Tên loại văn bản",
+                        "enum": list(DOCUMENT_TYPE_CODES),
+                        "description": "Mã loại văn bản trong taxonomy qnu-ai-core",
                     },
                     "title": {
                         "type": "string",
@@ -80,7 +86,15 @@ class DocumentExporterTool(BaseTool):
     async def execute(
         self, parameters: dict[str, Any], context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        doc_type = parameters.get("document_type", "THÔNG BÁO").upper()
+        requested_doc_type = str(parameters.get("document_type") or "thong_bao")
+        doc_type_code = normalize_document_type_code(requested_doc_type)
+        if not doc_type_code:
+            raise AppException(
+                f"Loại văn bản không được hỗ trợ: {requested_doc_type}",
+                code="document_type_invalid",
+                details={"document_type": requested_doc_type},
+            )
+        doc_type = get_document_type_label(doc_type_code) or requested_doc_type
         title = parameters.get("title", "Về việc triển khai công tác đào tạo")
         paragraphs = parameters.get("body_paragraphs", [])
         signer_title = parameters.get("signer_title", "HIỆU TRƯỞNG")
@@ -190,7 +204,7 @@ class DocumentExporterTool(BaseTool):
         # Save to Artifacts directory
         artifacts_dir = Path(settings.LOCAL_STORAGE_PATH) / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{doc_type.lower()}_{title[:30].strip().replace(' ', '_')}.docx"
+        filename = f"{doc_type_code}_{title[:30].strip().replace(' ', '_')}.docx"
         file_path = artifacts_dir / filename
         doc.save(str(file_path))
 
@@ -199,6 +213,7 @@ class DocumentExporterTool(BaseTool):
             "file_name": filename,
             "file_path": str(file_path),
             "document_type": doc_type,
+            "document_type_code": doc_type_code,
             "title": title,
             "standard": "Decree 30/2020/ND-CP",
             "size_bytes": file_path.stat().st_size,

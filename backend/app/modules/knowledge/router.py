@@ -154,6 +154,9 @@ async def upload_document(
     collection_id: str,
     file: UploadFile = File(..., description="Tệp tài liệu (PDF, Word, Excel, Text)"),
     title: str | None = Form(None, description="Tiêu đề hiển thị của tài liệu"),
+    document_type_code: str | None = Form(
+        None, description="Mã loại văn bản chuẩn từ taxonomy qnu-ai-core"
+    ),
     ocr_engine: str | None = Form(
         None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
     ),
@@ -166,6 +169,7 @@ async def upload_document(
         file_bytes=content,
         file_name=file.filename or "unknown_file.txt",
         title=title,
+        document_type_code=document_type_code,
         ocr_engine=ocr_engine,
     )
     return DocumentResponse.model_validate(doc)
@@ -202,9 +206,12 @@ async def parse_preview(
 )
 async def list_documents(
     collection_id: str | None = Query(None, description="Lọc theo mã bộ sưu tập"),
+    document_type_code: str | None = Query(None, description="Lọc theo mã loại văn bản chuẩn"),
     db: AsyncSession = Depends(get_db),
 ) -> list[DocumentResponse]:
-    docs = await knowledge_service.list_documents(db, collection_id=collection_id)
+    docs = await knowledge_service.list_documents(
+        db, collection_id=collection_id, document_type_code=document_type_code
+    )
     return [DocumentResponse.model_validate(d) for d in docs]
 
 

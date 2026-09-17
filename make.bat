@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 if "%~1"=="infra-up" goto do_infra_up
 if "%~1"=="infra-down" goto do_infra_down
 if "%~1"=="infra-status" goto do_infra_status
@@ -30,6 +30,7 @@ goto end
 :do_dev
 echo [QNU AI Platform] Dang khoi chay Backend va Frontend...
 start "QNU Backend API (Port 8001)" cmd /k "cd backend && uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
+timeout /t 2 /nobreak >nul
 start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
 goto end
 

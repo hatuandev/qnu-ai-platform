@@ -1,4 +1,4 @@
-﻿# QNU AI Platform - Task Runner (PowerShell: .\make.ps1 hoặc .\make)
+# QNU AI Platform - Task Runner (PowerShell: .\make.ps1 hoặc .\make)
 param (
     [Parameter(Position = 0)]
     [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "dev", "be", "fe", "test", "help")]
@@ -22,8 +22,11 @@ switch ($Command) {
         docker compose logs -f
     }
     "dev" {
-        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend (Port 3001)..." -ForegroundColor Green
+        Write-Host "Dang khoi chay Backend (Port 8001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; uv run uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
+        Write-Host "Doi Backend khoi dong trong 2 giay de tranh proxy error..." -ForegroundColor Gray
+        Start-Sleep -Seconds 2
+        Write-Host "Dang khoi chay Frontend Studio (Port 3001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     "be" {

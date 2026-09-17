@@ -1,0 +1,84 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "input.chat",
+    "version": "1.0.0",
+    "display_name": "Đầu vào Trò chuyện",
+    "description": "Tiếp nhận và xác thực tin nhắn câu hỏi cùng tệp đính kèm từ người dùng qua các kênh tương tác.",
+    "category": "input",
+    "labels": {
+      "channel": "chat"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "builtin",
+      "operation": "input.chat"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trim": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50000,
+          "default": 10000
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "capabilities": ["chat.read"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 2,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "not_required",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["status", "message_length"],
+      "redacted_fields": ["message"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

@@ -5,7 +5,9 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Cloud,
   Copy,
+  Cpu,
   Globe,
   KeyRound,
   Layers,
@@ -17,12 +19,15 @@ import {
   RotateCw,
   Server,
   ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "../components/admin/empty-state";
 import { ProviderIcon } from "../components/icons/provider-icon";
 import { Badge } from "../components/ui/badge";
@@ -48,8 +53,31 @@ import {
   type ModelProvider,
   type ProviderApiKey,
   type ProviderPreset,
+  type SystemModelDefaults,
   apiClient,
 } from "../services/api-client";
+
+export type ProviderCategory = "all" | "cloud" | "local" | "custom";
+
+export const getProviderCategory = (prov: ModelProvider): "cloud" | "local" | "custom" => {
+  const t = (prov.type || prov.code || "").toLowerCase();
+  if (t === "custom") return "custom";
+  if (
+    t === "sentence_transformers" ||
+    t === "docling" ||
+    t === "ollama" ||
+    t === "local_vllm" ||
+    t === "local" ||
+    prov.id.includes("local") ||
+    prov.id.includes("sentence_transformers") ||
+    prov.id.includes("docling") ||
+    prov.name.toLowerCase().includes("local") ||
+    prov.name.toLowerCase().includes("cục bộ")
+  ) {
+    return "local";
+  }
+  return "cloud";
+};
 
 export interface ModelOpsPageProps {
   currentPath?: string;
@@ -83,6 +111,9 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
       }
     }
   }, [currentPath]);
+
+  // Category Filter Tab ("all" | "cloud" | "local" | "custom")
+  const [activeCategoryTab, setActiveCategoryTab] = useState<ProviderCategory>("all");
 
   // Dialog State for Provider Create/Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,9 +163,60 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   const [detailModelInput, setDetailModelInput] = useState("");
 
   // Fetch Providers
-  const { data: providers = [], isLoading } = useQuery({
+  const providersQuery = useQuery({
     queryKey: ["model-providers"],
     queryFn: () => apiClient.getModelProviders(),
+  });
+
+  const providers = providersQuery.data || [];
+  const isLoading = providersQuery.isLoading;
+
+  const cloudProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "cloud"),
+    [providers]
+  );
+  const localProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "local"),
+    [providers]
+  );
+  const customProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "custom"),
+    [providers]
+  );
+
+  // Fetch System Model Routing Defaults
+  const defaultsQuery = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+  });
+  const systemDefaults = defaultsQuery.data?.defaults;
+  const availableEmbeddings = defaultsQuery.data?.available_embeddings || [];
+  const availableRerankers = defaultsQuery.data?.available_rerankers || [];
+  const availableOcrs = defaultsQuery.data?.available_ocrs || [];
+
+  const updateDefaultsMutation = useMutation({
+    mutationFn: (payload: Partial<SystemModelDefaults>) =>
+      apiClient.updateSystemModelDefaults(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
+    },
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      role,
+      modelName,
+    }: {
+      providerId: string;
+      role: "embedding" | "reranker" | "ocr";
+      modelName: string;
+    }) => apiClient.setProviderModelAsDefault(providerId, role, modelName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
+    },
   });
 
   // Fetch Provider Presets
@@ -302,14 +384,14 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   });
 
   // Modal Openers
-  const openCreateModal = () => {
+  const openCreateModal = (defaultType: ModelProvider["type"] = "openai") => {
     setEditingProvider(null);
     setName("");
-    setProviderType("openai");
-    setApiBaseUrl("");
+    setProviderType(defaultType);
+    setApiBaseUrl(defaultType === "custom" ? "http://localhost:8000/v1" : "");
     setApiKey("");
     setAccountId("");
-    setModels([]);
+    setModels(PRESET_SUGGESTED_MODELS[defaultType] || []);
     setNewModelInput("");
     setIsActive(true);
     setIsModalOpen(true);
@@ -627,6 +709,10 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
                   <SelectItem value="mistral">Mistral AI</SelectItem>
                   <SelectItem value="cloudflare">Cloudflare Workers AI</SelectItem>
                   <SelectItem value="nvidia">NVIDIA NIM</SelectItem>
+                  <SelectItem value="sentence_transformers">
+                    Local SentenceTransformers (PyTorch)
+                  </SelectItem>
+                  <SelectItem value="docling">Docling Local (IBM Research)</SelectItem>
                   <SelectItem value="ollama">Ollama (On-Premise)</SelectItem>
                   <SelectItem value="local_vllm">Local vLLM Server</SelectItem>
                   <SelectItem value="custom">Tùy Chỉnh (OpenAI Compatible)</SelectItem>
@@ -883,6 +969,40 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
                   >
                     {selectedProvider.type}
                   </Badge>
+                  {(() => {
+                    const cat = getProviderCategory(selectedProvider);
+                    if (cat === "cloud") {
+                      return (
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-mono text-sky-600 dark:text-sky-400 border-sky-500/30 gap-1"
+                        >
+                          <Cloud className="h-3 w-3" />
+                          Cloud
+                        </Badge>
+                      );
+                    }
+                    if (cat === "local") {
+                      return (
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1"
+                        >
+                          <Cpu className="h-3 w-3" />
+                          Local
+                        </Badge>
+                      );
+                    }
+                    return (
+                      <Badge
+                        variant="outline"
+                        className="text-[11px] font-mono text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1"
+                      >
+                        <SlidersHorizontal className="h-3 w-3" />
+                        Custom
+                      </Badge>
+                    );
+                  })()}
                   <Badge
                     variant={selectedProvider.is_active ? "success" : "outline"}
                     className="text-[11px]"
@@ -1390,23 +1510,127 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
                       Chưa cấu hình mô hình nào. Hãy nhập tên model ở ô bên dưới hoặc bấm vào gợi ý.
                     </div>
                   ) : (
-                    (selectedProvider.models || []).map((m) => (
-                      <Badge
-                        key={m}
-                        variant="outline"
-                        className="text-xs font-mono bg-background gap-1.5 py-1 px-2.5 border-border"
-                      >
-                        <span>{m}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDetailRemoveModel(selectedProvider, m)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                          title={`Xóa model ${m}`}
+                    (selectedProvider.models || []).map((m) => {
+                      const isDefEmbedding =
+                        selectedProvider.id === systemDefaults?.default_embedding_provider_id &&
+                        m === systemDefaults?.default_embedding_model;
+                      const isDefReranker =
+                        selectedProvider.id === systemDefaults?.default_reranker_provider_id &&
+                        m === systemDefaults?.default_reranker_model;
+                      const isDefOcr =
+                        selectedProvider.id === systemDefaults?.default_ocr_provider_id &&
+                        m === systemDefaults?.default_ocr_model;
+                      const isDefault = isDefEmbedding || isDefReranker || isDefOcr;
+                      const mLower = m.toLowerCase();
+
+                      return (
+                        <div
+                          key={m}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-mono transition-all ${
+                            isDefault
+                              ? "bg-primary/10 border-primary/40 text-primary shadow-xs"
+                              : "bg-background border-border text-foreground"
+                          }`}
                         >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))
+                          <span className="font-semibold">{m}</span>
+
+                          {isDefEmbedding && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[9px] px-1 py-0 h-3.5 bg-primary/20 text-primary border-none gap-0.5"
+                            >
+                              <Star className="h-2.5 w-2.5 fill-primary" />
+                              Embedding Mặc Định
+                            </Badge>
+                          )}
+                          {isDefReranker && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[9px] px-1 py-0 h-3.5 bg-amber-500/20 text-amber-500 border-none gap-0.5"
+                            >
+                              <Star className="h-2.5 w-2.5 fill-amber-500" />
+                              Reranker Mặc Định
+                            </Badge>
+                          )}
+                          {isDefOcr && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[9px] px-1 py-0 h-3.5 bg-sky-500/20 text-sky-500 border-none gap-0.5"
+                            >
+                              <Star className="h-2.5 w-2.5 fill-sky-500" />
+                              OCR Mặc Định
+                            </Badge>
+                          )}
+
+                          {!isDefault && (
+                            <div className="flex items-center gap-1 ml-1">
+                              {(mLower.includes("bge") ||
+                                mLower.includes("embed") ||
+                                selectedProvider.type === "sentence_transformers") &&
+                                !mLower.includes("rerank") && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setDefaultMutation.mutate({
+                                        providerId: selectedProvider.id,
+                                        role: "embedding",
+                                        modelName: m,
+                                      })
+                                    }
+                                    className="text-[10px] text-muted-foreground hover:text-primary underline px-1 cursor-pointer"
+                                    title="Đặt làm Embedding mặc định cho Kho Tri Thức"
+                                  >
+                                    Đặt Default
+                                  </button>
+                                )}
+                              {mLower.includes("rerank") && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDefaultMutation.mutate({
+                                      providerId: selectedProvider.id,
+                                      role: "reranker",
+                                      modelName: m,
+                                    })
+                                  }
+                                  className="text-[10px] text-muted-foreground hover:text-amber-500 underline px-1 cursor-pointer"
+                                  title="Đặt làm Reranker mặc định cho RAG"
+                                >
+                                  Đặt Default
+                                </button>
+                              )}
+                              {(mLower.includes("ocr") ||
+                                selectedProvider.type === "docling" ||
+                                selectedProvider.type === "mistral") && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDefaultMutation.mutate({
+                                      providerId: selectedProvider.id,
+                                      role: "ocr",
+                                      modelName: m,
+                                    })
+                                  }
+                                  className="text-[10px] text-muted-foreground hover:text-sky-500 underline px-1 cursor-pointer"
+                                  title="Đặt làm OCR mặc định cho bóc tách tài liệu"
+                                >
+                                  Đặt Default
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDetailRemoveModel(selectedProvider, m)}
+                            className="text-muted-foreground hover:text-destructive transition-colors ml-1 cursor-pointer"
+                            title={`Xóa model ${m}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
 
@@ -1537,15 +1761,253 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
         </div>
 
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={openCreateModal} className="text-xs h-8 gap-1.5">
+          <Button
+            size="sm"
+            onClick={() => openCreateModal("openai")}
+            className="text-xs h-8 gap-1.5"
+          >
             <Plus className="h-3.5 w-3.5" />
             <span>Thêm Provider Mới</span>
           </Button>
         </div>
       </div>
 
-      {/* Overview Cards Grid - Minimalist & Clean Design */}
-      <div className="space-y-4">
+      {/* System Default Routing Card */}
+      <Card className="p-4 border-primary/20 bg-gradient-to-r from-card via-card to-primary/5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-foreground">
+                  Mô Hình Mặc Định Hệ Thống (Active System Defaults)
+                </h3>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-mono text-primary border-primary/30"
+                >
+                  Kho Tri Thức & RAG
+                </Badge>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Tự động áp dụng khi nạp tài liệu vào Kho Tri Thức (Embedding) và khi Trợ lý AI thực
+                hiện truy xuất thông tin (Reranker).
+              </p>
+            </div>
+          </div>
+          {defaultsQuery.isLoading && (
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* 1. Default Embedding */}
+          <div className="p-3 rounded-lg bg-background/60 border border-border/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Cpu className="h-3.5 w-3.5 text-primary" />
+                Embedding (Kho Tri Thức)
+              </span>
+              <Badge variant="secondary" className="text-[10px] font-mono">
+                1024-dim
+              </Badge>
+            </div>
+            <Select
+              value={`${systemDefaults?.default_embedding_provider_id}:::${systemDefaults?.default_embedding_model}`}
+              onValueChange={(val) => {
+                const [pId, mName] = val.split(":::");
+                if (pId && mName) {
+                  updateDefaultsMutation.mutate({
+                    default_embedding_provider_id: pId,
+                    default_embedding_model: mName,
+                  });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full h-8 text-xs font-mono bg-card">
+                <SelectValue placeholder="Chọn mô hình Embedding mặc định" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableEmbeddings.map((opt) => (
+                  <SelectItem
+                    key={`${opt.provider_id}:::${opt.model_name}`}
+                    value={`${opt.provider_id}:::${opt.model_name}`}
+                  >
+                    <span className="font-semibold">{opt.model_name}</span>{" "}
+                    <span className="text-muted-foreground text-[11px]">({opt.provider_name})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              {systemDefaults?.default_embedding_provider_id === "prov_cloudflare"
+                ? "⚡ Đang dùng Cloudflare Edge GPU (~1.0s / 16 chunks)"
+                : "💻 Đang dùng SentenceTransformers CPU Cục Bộ"}
+            </p>
+          </div>
+
+          {/* 2. Default Reranker */}
+          <div className="p-3 rounded-lg bg-background/60 border border-border/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-amber-500" />
+                Reranker (Truy Xuất RAG)
+              </span>
+              <Badge variant="secondary" className="text-[10px] font-mono">
+                Cross-Encoder
+              </Badge>
+            </div>
+            <Select
+              value={`${systemDefaults?.default_reranker_provider_id}:::${systemDefaults?.default_reranker_model}`}
+              onValueChange={(val) => {
+                const [pId, mName] = val.split(":::");
+                if (pId && mName) {
+                  updateDefaultsMutation.mutate({
+                    default_reranker_provider_id: pId,
+                    default_reranker_model: mName,
+                  });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full h-8 text-xs font-mono bg-card">
+                <SelectValue placeholder="Chọn mô hình Reranker mặc định" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRerankers.map((opt) => (
+                  <SelectItem
+                    key={`${opt.provider_id}:::${opt.model_name}`}
+                    value={`${opt.provider_id}:::${opt.model_name}`}
+                  >
+                    <span className="font-semibold">{opt.model_name}</span>{" "}
+                    <span className="text-muted-foreground text-[11px]">({opt.provider_name})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              {systemDefaults?.default_reranker_provider_id === "prov_cloudflare"
+                ? "⚡ Đang dùng Cloudflare BGE-Reranker-Base (~1.2s)"
+                : "💻 Đang dùng thuật toán RRF Fused Scoring nội bộ"}
+            </p>
+          </div>
+
+          {/* 3. Default OCR */}
+          <div className="p-3 rounded-lg bg-background/60 border border-border/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-500" />
+                OCR (Bóc Tách Văn Bản)
+              </span>
+              <Badge variant="secondary" className="text-[10px] font-mono">
+                Vision / OCR
+              </Badge>
+            </div>
+            <Select
+              value={`${systemDefaults?.default_ocr_provider_id}:::${systemDefaults?.default_ocr_model}`}
+              onValueChange={(val) => {
+                const [pId, mName] = val.split(":::");
+                if (pId && mName) {
+                  updateDefaultsMutation.mutate({
+                    default_ocr_provider_id: pId,
+                    default_ocr_model: mName,
+                  });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full h-8 text-xs font-mono bg-card">
+                <SelectValue placeholder="Chọn mô hình OCR mặc định" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableOcrs.map((opt) => (
+                  <SelectItem
+                    key={`${opt.provider_id}:::${opt.model_name}`}
+                    value={`${opt.provider_id}:::${opt.model_name}`}
+                  >
+                    <span className="font-semibold">{opt.model_name}</span>{" "}
+                    <span className="text-muted-foreground text-[11px]">({opt.provider_name})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              {systemDefaults?.default_ocr_provider_id === "prov_mistral"
+                ? "🌐 Đang dùng Mistral OCR Cloud Vision"
+                : "💻 Đang dùng Docling TableFormer Cục Bộ"}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Category Tabs / Filters */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+        <Button
+          variant={activeCategoryTab === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveCategoryTab("all")}
+          className="h-8 text-xs gap-1.5 rounded-full"
+        >
+          <span>Tất Cả</span>
+          <Badge
+            variant="secondary"
+            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+          >
+            {providers.length}
+          </Badge>
+        </Button>
+
+        <Button
+          variant={activeCategoryTab === "cloud" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveCategoryTab("cloud")}
+          className="h-8 text-xs gap-1.5 rounded-full"
+        >
+          <Cloud className="h-3.5 w-3.5" />
+          <span>Cloud (Đám Mây)</span>
+          <Badge
+            variant="secondary"
+            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+          >
+            {cloudProviders.length}
+          </Badge>
+        </Button>
+
+        <Button
+          variant={activeCategoryTab === "local" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveCategoryTab("local")}
+          className="h-8 text-xs gap-1.5 rounded-full"
+        >
+          <Cpu className="h-3.5 w-3.5" />
+          <span>Local (Cục Bộ)</span>
+          <Badge
+            variant="secondary"
+            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+          >
+            {localProviders.length}
+          </Badge>
+        </Button>
+
+        <Button
+          variant={activeCategoryTab === "custom" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setActiveCategoryTab("custom")}
+          className="h-8 text-xs gap-1.5 rounded-full"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span>Custom (Tùy Chỉnh)</span>
+          <Badge
+            variant="secondary"
+            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+          >
+            {customProviders.length}
+          </Badge>
+        </Button>
+      </div>
+
+      {/* Grouped Provider Sections */}
+      <div className="space-y-8">
         {isLoading ? (
           <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
             <RefreshCw className="h-4 w-4 animate-spin text-primary" />
@@ -1558,7 +2020,11 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
               title="Chưa Có Provider Nào Được Cấu Hình"
               description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
               action={
-                <Button size="sm" onClick={openCreateModal} className="text-xs h-8 gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={() => openCreateModal("openai")}
+                  className="text-xs h-8 gap-1.5"
+                >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Thêm Provider Mới</span>
                 </Button>
@@ -1566,32 +2032,288 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {providers.map((prov) => {
-              return (
-                <Card
-                  key={prov.id}
-                  onClick={() => handleSelectProvider(prov.id)}
-                  className="group p-4 transition-all flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-md hover:-translate-y-0.5 bg-card border border-border"
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-11 h-11 rounded-lg bg-muted/40 p-2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-border/50">
-                      <ProviderIcon code={prov.type || prov.code} size={30} />
+          <>
+            {/* Nhóm Cloud */}
+            {(activeCategoryTab === "all" || activeCategoryTab === "cloud") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-500">
+                      <Cloud className="h-4 w-4" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
-                        {prov.name}
-                      </h3>
-                      <span className="text-[11px] font-mono text-muted-foreground uppercase mt-0.5 block">
-                        {prov.type}
-                      </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-foreground">Nhóm Cloud (Đám Mây)</h2>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono text-sky-600 dark:text-sky-400 border-sky-500/30"
+                        >
+                          {cloudProviders.length} Provider{cloudProviders.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Nhà cung cấp dịch vụ mô hình AI và Edge GPU vận hành trên nền tảng đám mây
+                        (Cloudflare, Mistral, OpenAI, Gemini...)
+                      </p>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-                </Card>
-              );
-            })}
-          </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openCreateModal("cloudflare")}
+                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Thêm Cloud</span>
+                  </Button>
+                </div>
+
+                {cloudProviders.length === 0 ? (
+                  <Card className="p-6 border-dashed border-border bg-card/40 text-center">
+                    <p className="text-xs text-muted-foreground">Chưa có Provider đám mây nào.</p>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {cloudProviders.map((prov) => (
+                      <Card
+                        key={prov.id}
+                        onClick={() => handleSelectProvider(prov.id)}
+                        className="group p-4 transition-all flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-md hover:-translate-y-0.5 bg-card border border-border"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-lg bg-muted/40 p-2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-border/50">
+                            <ProviderIcon code={prov.type || prov.code} size={30} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                                {prov.name}
+                              </h3>
+                              {!prov.is_active && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30 font-mono shrink-0"
+                                >
+                                  Tắt
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] font-mono text-muted-foreground uppercase">
+                                {prov.type}
+                              </span>
+                              {prov.models && prov.models.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground/70 font-mono truncate">
+                                  • {prov.models.length} model{prov.models.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Nhóm Local */}
+            {(activeCategoryTab === "all" || activeCategoryTab === "local") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-500">
+                      <Cpu className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-foreground">
+                          Nhóm Local (Cục Bộ / On-Premise)
+                        </h2>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                        >
+                          {localProviders.length} Provider{localProviders.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Mô hình AI bóc tách và tính toán chạy trực tiếp trên máy chủ nội bộ ĐH Quy
+                        Nhơn (SentenceTransformers BGE-M3, Docling OCR, Ollama...)
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openCreateModal("ollama")}
+                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Thêm Local</span>
+                  </Button>
+                </div>
+
+                {localProviders.length === 0 ? (
+                  <Card className="p-6 border-dashed border-border bg-card/40 text-center">
+                    <p className="text-xs text-muted-foreground">Chưa có Provider cục bộ nào.</p>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {localProviders.map((prov) => (
+                      <Card
+                        key={prov.id}
+                        onClick={() => handleSelectProvider(prov.id)}
+                        className="group p-4 transition-all flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-md hover:-translate-y-0.5 bg-card border border-border"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-lg bg-muted/40 p-2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-border/50">
+                            <ProviderIcon code={prov.type || prov.code} size={30} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                                {prov.name}
+                              </h3>
+                              {!prov.is_active && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30 font-mono shrink-0"
+                                >
+                                  Tắt
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] font-mono text-muted-foreground uppercase">
+                                {prov.type}
+                              </span>
+                              {prov.models && prov.models.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground/70 font-mono truncate">
+                                  • {prov.models.length} model{prov.models.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Nhóm Custom */}
+            {(activeCategoryTab === "all" || activeCategoryTab === "custom") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-500">
+                      <SlidersHorizontal className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold text-foreground">
+                          Nhóm Custom (Tùy Chỉnh / Tự Cấu Hình)
+                        </h2>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono text-amber-600 dark:text-amber-400 border-amber-500/30"
+                        >
+                          {customProviders.length} Provider{customProviders.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Cổng API tùy chỉnh tương thích giao thức OpenAI API (vLLM, TGI, LocalAI,
+                        FastAPI tự phát triển...)
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openCreateModal("custom")}
+                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Thêm Custom</span>
+                  </Button>
+                </div>
+
+                {customProviders.length === 0 ? (
+                  <Card className="p-5 border-dashed border-border/80 bg-card/30 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                        <SlidersHorizontal className="h-4 w-4" />
+                      </div>
+                      <div className="text-xs">
+                        <p className="font-medium text-foreground">
+                          Chưa có Provider tùy chỉnh nào
+                        </p>
+                        <p className="text-muted-foreground text-[11px]">
+                          Thêm endpoint riêng để kết nối mô hình chuyên biệt hoặc máy chủ tự host
+                          của phòng ban.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openCreateModal("custom")}
+                      className="h-8 text-xs gap-1.5 shrink-0"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Thêm Custom Provider</span>
+                    </Button>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {customProviders.map((prov) => (
+                      <Card
+                        key={prov.id}
+                        onClick={() => handleSelectProvider(prov.id)}
+                        className="group p-4 transition-all flex items-center justify-between cursor-pointer hover:border-primary/70 hover:shadow-md hover:-translate-y-0.5 bg-card border border-border"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div className="w-11 h-11 rounded-lg bg-muted/40 p-2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform border border-border/50">
+                            <ProviderIcon code={prov.type || prov.code} size={30} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                                {prov.name}
+                              </h3>
+                              {!prov.is_active && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30 font-mono shrink-0"
+                                >
+                                  Tắt
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[11px] font-mono text-muted-foreground uppercase">
+                                {prov.type}
+                              </span>
+                              {prov.models && prov.models.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground/70 font-mono truncate">
+                                  • {prov.models.length} model{prov.models.length > 1 ? "s" : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

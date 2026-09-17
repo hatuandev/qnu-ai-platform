@@ -1,0 +1,127 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "core.knowledge.answer",
+    "version": "1.0.0",
+    "display_name": "Truy xuất Tri thức (RAG)",
+    "description": "Truy vấn tìm kiếm văn bản trong kho tri thức Qdrant và PostgreSQL FTS, tái xếp hạng và tạo câu trả lời chuẩn xác có trích dẫn nguồn.",
+    "category": "knowledge",
+    "labels": {
+      "provider": "qnu_ai_core"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "core_api",
+      "operation": "knowledge.answer"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_code", "profile", "require_citations"],
+      "properties": {
+        "module_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "profile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "retrieval_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        },
+        "context_max_chars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 12000
+        },
+        "require_citations": {
+          "type": "boolean",
+          "default": true
+        },
+        "no_answer_policy": {
+          "enum": ["insufficient_context", "clarify", "escalate"],
+          "default": "insufficient_context"
+        },
+        "system_prompt": {
+          "type": "string",
+          "description": "Chỉ dẫn hệ thống cho LLM (Persona, phong cách giao tiếp, quy tắc gợi ý)"
+        },
+        "user_prompt_template": {
+          "type": "string",
+          "description": "Mẫu prompt người dùng tùy biến chứa {{question}}, {{context}}, {{facts}}, {{history}}"
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["question"],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "history": {
+          "type": ["array", "string"],
+          "description": "Lịch sử hội thoại đa lượt gần nhất"
+        },
+        "search_query": {
+          "type": "string",
+          "description": "Câu hỏi tìm kiếm ngữ cảnh sau khi viết lại"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["response"],
+      "properties": {
+        "response": {
+          "type": "object"
+        },
+        "context": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        }
+      }
+    },
+    "capabilities": ["knowledge.read"],
+    "required_permissions": ["run.start"],
+    "connection_types": ["qnu_ai_core"],
+    "execution": {
+      "default_timeout_seconds": 30,
+      "max_timeout_seconds": 120,
+      "default_max_attempts": 2,
+      "side_effects": "read",
+      "idempotency": "runtime_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["status", "model", "timings_ms", "citation_ids"],
+      "redacted_fields": ["question", "answer", "provider_error_body"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

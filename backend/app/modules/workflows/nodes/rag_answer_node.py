@@ -21,14 +21,20 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
         query = context.node_data.get("user_message") or context.inputs.get("message", "")
         config = node_spec.config or {}
 
-        collection_id = config.get("collection_id") or "col_admissions"
-        module_code = config.get("module_code") or context.workflow_id.split("-")[0]
+        profile = context.assistant_profile
+        collection_id = (
+            profile.collection_id if profile else config.get("collection_id") or "col_admissions"
+        )
+        module_code = config.get("module_code") or (profile.assistant_code if profile else context.workflow_id.split("-")[0])
 
         ask_req = AskRequest(
             question=query,
             collection_id=collection_id,
             module_code=module_code,
             conversation_id=context.conversation_id,
+            system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
+            temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
+            max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
         )
 
         if context.db:

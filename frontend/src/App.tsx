@@ -1,11 +1,13 @@
 import { EmptyState } from "@/components/admin/empty-state";
-import { StatusBadge } from "@/components/admin/status-badge";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminShell } from "@/layouts/admin-shell";
 import { queryClient } from "@/lib/query-client";
+import { AssistantCreatePage } from "@/pages/assistant-create-page";
+import { AssistantDetailPage } from "@/pages/assistant-detail-page";
+import { AssistantsPage } from "@/pages/assistants-page";
 import { ChannelsPage } from "@/pages/channels-page";
 import { ChatStudioPage } from "@/pages/chat-studio-page";
 import { ConversationsPage } from "@/pages/conversations-page";
@@ -13,22 +15,17 @@ import { DAGCanvasPage } from "@/pages/dag-canvas-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { DesignSystemPage } from "@/pages/design-system-page";
 import { DeveloperPage } from "@/pages/developer-page";
+import { DocumentTypeDetailPage } from "@/pages/document-type-detail-page";
+import { DocumentTypesPage } from "@/pages/document-types-page";
 import { EvaluationPage } from "@/pages/evaluation-page";
 import { KnowledgePage } from "@/pages/knowledge-page";
 import { ModelOpsPage } from "@/pages/modelops-page";
+import { NodeCatalogPage } from "@/pages/node-catalog-page";
 import { RunsPage } from "@/pages/runs-page";
 import { ScanStudioPage } from "@/pages/scan-studio-page";
 import { ToolsPage } from "@/pages/tools-page";
 import { QueryClientProvider } from "@tanstack/react-query";
-import {
-  BookOpen,
-  Cpu,
-  FileText,
-  GraduationCap,
-  MessageSquare,
-  Network,
-  ShieldCheck,
-} from "lucide-react";
+import { Network } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 interface BackendStatus {
@@ -38,54 +35,6 @@ interface BackendStatus {
   timestamp?: string;
   error?: string;
 }
-
-const OFFICIAL_ASSISTANTS = [
-  {
-    code: "admissions",
-    name: "Trợ lý Tuyển sinh",
-    scope: "Chỉ tiêu, mã ngành, học phí, điểm chuẩn và đề án tuyển sinh ĐH Quy Nhơn",
-    icon: GraduationCap,
-    category: "admissions",
-    model: "gpt-4o-mini / gemini-1.5-flash",
-    chunks: "42 chunks",
-  },
-  {
-    code: "regulations",
-    name: "Trợ lý Quy chế Học vụ",
-    scope: "Quy chế đào tạo tín chỉ, chuẩn đầu ra, học bổng và rèn luyện sinh viên",
-    icon: ShieldCheck,
-    category: "regulations",
-    model: "gpt-4o-mini / qwen2.5-7b",
-    chunks: "128 chunks",
-  },
-  {
-    code: "library",
-    name: "Trợ lý Thư viện QNU",
-    scope: "Tra cứu tài nguyên giáo trình, luận văn tốt nghiệp, tạp chí khoa học",
-    icon: BookOpen,
-    category: "library",
-    model: "gemini-1.5-flash",
-    chunks: "85 chunks",
-  },
-  {
-    code: "drafting",
-    name: "Trợ lý Soạn thảo NĐ 30",
-    scope: "Hỗ trợ soạn thảo tờ trình, quyết định, công văn chuẩn thể thức văn bản hành chính",
-    icon: FileText,
-    category: "drafting",
-    model: "gpt-4o / gemini-1.5-pro",
-    chunks: "64 chunks",
-  },
-  {
-    code: "question_bank",
-    name: "Trợ lý Ngân hàng Đề thi",
-    scope: "Ma trận đề thi chuẩn Bloom, câu hỏi trắc nghiệm A-B-C-D và thang điểm",
-    icon: Cpu,
-    category: "question_bank",
-    model: "gpt-4o-mini",
-    chunks: "56 chunks",
-  },
-];
 
 function AppContent() {
   const [currentPath, setCurrentPath] = useState<string>(() => {
@@ -97,9 +46,13 @@ function AppContent() {
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "idle" });
 
   const handleNavigate = useCallback((path: string) => {
-    setCurrentPath(path);
-    if (typeof window !== "undefined" && window.location.pathname !== path) {
-      window.history.pushState(null, "", path);
+    const target = new URL(path, window.location.origin);
+    setCurrentPath(target.pathname);
+    if (
+      `${window.location.pathname}${window.location.search}` !==
+      `${target.pathname}${target.search}`
+    ) {
+      window.history.pushState(null, "", `${target.pathname}${target.search}`);
     }
   }, []);
 
@@ -147,88 +100,15 @@ function AppContent() {
       return <DashboardPage onNavigate={handleNavigate} />;
     }
 
-    // 2. 05 Assistants Catalog
+    // 2. Assistant administration
     if (currentPath === "/assistants") {
-      return (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                05 Trợ Lý AI Chuyên Trách Chuẩn QNU
-              </h1>
-              <p className="text-xs text-muted-foreground mt-1">
-                Danh mục Trợ lý AI tích hợp sẵn tri thức chuyên môn và luồng điều phối DAG phân
-                nhánh.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleNavigate("/nodes")}>
-                <Network className="size-3.5 mr-1" />
-                <span>Xem Sơ Đồ DAG</span>
-              </Button>
-              <Button size="sm" onClick={() => handleNavigate("/chat")}>
-                <MessageSquare className="size-3.5 mr-1" />
-                <span>Thử Nghiệm Chat</span>
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {OFFICIAL_ASSISTANTS.map((asst) => {
-              const Icon = asst.icon;
-              return (
-                <Card
-                  key={asst.code}
-                  className="flex flex-col justify-between hover:border-primary/50 transition-all"
-                >
-                  <CardHeader className="p-5 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Icon className="size-5" />
-                      </div>
-                      <StatusBadge status="ready" label="Hoạt Động" />
-                    </div>
-                    <CardTitle className="mt-3 text-base">{asst.name}</CardTitle>
-                    <CardDescription className="leading-relaxed">{asst.scope}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-5 pt-0 space-y-3">
-                    <div className="space-y-1.5 text-xs text-muted-foreground border-t border-border/60 pt-3">
-                      <div className="flex justify-between">
-                        <span>Mô hình:</span>
-                        <span className="font-mono text-foreground">{asst.model}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Kho tri thức:</span>
-                        <span className="text-foreground">{asst.chunks}</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="w-full text-xs"
-                        onClick={() => setCurrentPath("/chat")}
-                      >
-                        <MessageSquare className="size-3 mr-1" />
-                        <span>Trò chuyện</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-xs"
-                        onClick={() => setCurrentPath("/nodes")}
-                      >
-                        <Network className="size-3 mr-1" />
-                        <span>Sơ đồ DAG</span>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      );
+      return <AssistantsPage onNavigate={handleNavigate} />;
+    }
+    if (currentPath === "/assistants/new") {
+      return <AssistantCreatePage onNavigate={handleNavigate} />;
+    }
+    if (currentPath.startsWith("/assistants/")) {
+      return <AssistantDetailPage currentPath={currentPath} onNavigate={handleNavigate} />;
     }
 
     // 3. Studio Chat Toàn Năng (SSE)
@@ -248,15 +128,19 @@ function AppContent() {
 
     // 6. Lịch Sử Thực Thi DAG Runs
     if (currentPath === "/runs") {
-      return <RunsPage onNavigateToCanvas={() => setCurrentPath("/nodes")} />;
+      return <RunsPage onNavigateToCanvas={() => handleNavigate("/canvas")} />;
     }
 
-    // 7. Quản Trị Tri Thức & Loại Văn Bản
-    if (
-      currentPath === "/knowledge" ||
-      currentPath.startsWith("/knowledge/") ||
-      currentPath === "/document-types"
-    ) {
+    // 7. Quản Trị Loại Văn Bản theo taxonomy Core
+    if (currentPath === "/document-types") {
+      return <DocumentTypesPage currentPath={currentPath} onNavigate={handleNavigate} />;
+    }
+    if (currentPath.startsWith("/document-types/")) {
+      return <DocumentTypeDetailPage currentPath={currentPath} onNavigate={handleNavigate} />;
+    }
+
+    // 7a. Quản Trị Tri Thức
+    if (currentPath === "/knowledge" || currentPath.startsWith("/knowledge/")) {
       return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
     }
 
@@ -265,12 +149,21 @@ function AppContent() {
       return <ScanStudioPage />;
     }
 
-    // 8. DAG Canvas Studio & Thư Viện Nodes
-    if (currentPath === "/nodes" || currentPath === "/canvas") {
-      return <DAGCanvasPage onNavigateToChat={(_code) => setCurrentPath("/chat")} />;
+    // 8. Node Catalog from Core manifests
+    if (currentPath === "/nodes") {
+      return <NodeCatalogPage />;
     }
 
-    // 9. Cổng Công Cụ Tools (UIS, Word NĐ 30, Excel Bloom)
+    // 9. DAG Canvas Studio
+    if (currentPath === "/canvas") {
+      return (
+        <DAGCanvasPage
+          onNavigateToChat={(code) => handleNavigate(`/chat?assistant=${encodeURIComponent(code)}`)}
+        />
+      );
+    }
+
+    // 10. Cổng Công Cụ Tools (UIS, Word NĐ 30, Excel Bloom)
     if (currentPath === "/tools") {
       return <ToolsPage />;
     }

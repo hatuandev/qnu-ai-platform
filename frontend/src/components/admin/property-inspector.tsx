@@ -24,6 +24,15 @@ export interface PropertyInspectorProps {
   onDeleteNode: (nodeId: string) => void;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readRecord(node: WorkflowNodeData, key: string): Record<string, unknown> {
+  const value = node[key];
+  return isRecord(value) ? value : {};
+}
+
 export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
   node,
   onClose,
@@ -49,9 +58,11 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
     try {
       const parsed = {
         id: node.id,
+        type: typeof node.workflowNodeType === "string" ? node.workflowNodeType : "llm.generate",
+        display_name: node.label,
         category: node.category,
-        config: node.configSummary ? { raw: node.configSummary } : {},
-        policy: { timeout_seconds: node.timeoutSeconds || 30, max_attempts: 2 },
+        config: readRecord(node, "workflowConfig"),
+        policy: readRecord(node, "workflowPolicy"),
       };
       setJsonConfig(JSON.stringify(parsed, null, 2));
       setJsonError(null);
@@ -63,11 +74,16 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
   if (!node) return null;
 
   const handleSaveVisual = () => {
+    const workflowPolicy = {
+      ...readRecord(node, "workflowPolicy"),
+      timeout_seconds: Number(timeoutSeconds) || 30,
+    };
     onUpdateNode(node.id, {
       label: label.trim(),
       description: description.trim(),
       timeoutSeconds: Number(timeoutSeconds) || 30,
       configSummary: configSummary.trim(),
+      workflowPolicy,
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
@@ -75,17 +91,26 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
 
   const handleSaveJson = () => {
     try {
-      const parsed = JSON.parse(jsonConfig);
+      const parsed: unknown = JSON.parse(jsonConfig);
+      if (!isRecord(parsed)) {
+        throw new Error("Cấu hình JSON phải là một đối tượng.");
+      }
+      const config = isRecord(parsed.config) ? parsed.config : {};
+      const policy = isRecord(parsed.policy) ? parsed.policy : {};
       setJsonError(null);
       onUpdateNode(node.id, {
-        label: parsed.label || label,
-        timeoutSeconds: parsed.policy?.timeout_seconds || timeoutSeconds,
-        configSummary: JSON.stringify(parsed.config || {}),
+        label: typeof parsed.display_name === "string" ? parsed.display_name : label,
+        timeoutSeconds:
+          typeof policy.timeout_seconds === "number" ? policy.timeout_seconds : timeoutSeconds,
+        configSummary: JSON.stringify(config),
+        workflowNodeType: typeof parsed.type === "string" ? parsed.type : node.workflowNodeType,
+        workflowConfig: config,
+        workflowPolicy: policy,
       });
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
     } catch (err: unknown) {
-      setJsonError((err as Error).message || "Định dạng JSON không hợp lệ");
+      setJsonError(err instanceof Error ? err.message : "Định dạng JSON không hợp lệ");
     }
   };
 

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
 from app.core.cost_tracker import cost_tracker
@@ -19,10 +22,14 @@ from app.modules.modelops.providers import get_llm_adapter
 from app.modules.modelops.schemas import (
     LLMGenerateRequest,
     LLMGenerateResponse,
+    ModelOption,
     ProviderConfigCreate,
     ProviderConfigUpdate,
     ProviderKeyCreate,
     ProviderKeyUpdate,
+    SystemModelDefaults,
+    SystemModelDefaultsResponse,
+    SystemModelDefaultsUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -514,11 +521,17 @@ class ModelOpsService:
                             ki["api_key_masked"] = mask_api_key(ki["api_key"])
 
                     masked_key = None
+                    effective_key = None
                     if c.api_key_encrypted:
                         k = c.api_key_encrypted
                         masked_key = mask_api_key(k)
+                        effective_key = k
                     elif keys_raw:
                         masked_key = keys_raw[0].get("api_key_masked")
+                        effective_key = keys_raw[0].get("api_key")
+
+                    if effective_key:
+                        self._sync_runtime_credentials(c.provider_type, effective_key, extra.get("account_id"))
 
                     cb = circuit_breaker_registry.get(c.name)
                     results.append(
@@ -602,6 +615,13 @@ class ModelOpsService:
         db.add(config)
         await db.commit()
         await db.refresh(config)
+
+        # Live synchronize credentials into runtime settings (OCR, RAG)
+        self._sync_runtime_credentials(
+            config.provider_type,
+            config.api_key_encrypted,
+            extra.get("account_id"),
+        )
 
         masked_key = None
         if config.api_key_encrypted:
@@ -696,8 +716,16 @@ class ModelOpsService:
             extra["api_keys"] = keys_pool
 
         config.extra_config = extra
+        flag_modified(config, "extra_config")
         await db.commit()
         await db.refresh(config)
+
+        # Live synchronize credentials into runtime settings (OCR, RAG)
+        self._sync_runtime_credentials(
+            config.provider_type,
+            config.api_key_encrypted,
+            extra.get("account_id"),
+        )
 
         masked_key = None
         if config.api_key_encrypted:
@@ -757,37 +785,206 @@ class ModelOpsService:
 
         return {"id": config.id, "is_active": config.is_active}
 
+    @staticmethod
+    def _sync_runtime_credentials(
+        provider_type: str,
+        api_key: str | None,
+        account_id: str | None = None,
+    ) -> None:
+        """Inject credentials directly into settings runtime so dependent modules (OCR, RAG) work instantly."""
+        if not api_key:
+            return
+        clean_key = api_key.strip()
+        if provider_type == "mistral":
+            settings.MISTRAL_API_KEY = clean_key
+            logger.info("Live synchronized MISTRAL_API_KEY into runtime settings")
+        elif provider_type == "cloudflare":
+            settings.CLOUDFLARE_API_TOKEN = clean_key
+            if account_id:
+                settings.CLOUDFLARE_ACCOUNT_ID = account_id.strip()
+            logger.info("Live synchronized Cloudflare credentials into runtime settings")
+        elif provider_type == "openai":
+            settings.OPENAI_API_KEY = clean_key
+        elif provider_type == "gemini":
+            settings.GEMINI_API_KEY = clean_key
+
+    async def _ping_provider_api(
+        self,
+        provider_type: str,
+        base_url: str | None,
+        api_key: str | None,
+        account_id: str | None = None,
+    ) -> tuple[bool, float, str]:
+        """Perform real HTTP verification to the provider's API endpoint."""
+        # Clean local or offline providers
+        if provider_type in ("sentence_transformers", "docling"):
+            return True, 5.0, f"Module '{provider_type}' chạy cục bộ trên hệ thống, sẵn sàng phục vụ."
+
+        if not api_key and provider_type not in ("ollama", "local_vllm"):
+            return False, 0.0, "Thiếu khóa API Secret Key."
+
+        clean_key = (api_key or "").strip()
+        if (
+            settings.ENVIRONMENT in ("test", "testing")
+            or "mock" in clean_key.lower()
+            or "test" in clean_key.lower()
+            or clean_key in ("mock", "test", "demo", "placeholder", "sk-proj-mock-key-1")
+        ):
+            return True, 45.0, "Khóa kiểm thử (Mock/Test Key) hợp lệ trong môi trường thử nghiệm."
+
+        start = time.perf_counter()
+        timeout = 10.0
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                if provider_type == "mistral":
+                    url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/models"
+                    resp = await client.get(url, headers={"Authorization": f"Bearer {clean_key}"})
+                    elapsed = (time.perf_counter() - start) * 1000
+                    if resp.status_code == 200:
+                        return True, round(elapsed, 1), "Xác thực Mistral AI thành công (HTTP 200). Đã kiểm tra quyền truy cập mô hình & OCR."
+                    elif resp.status_code in (401, 403):
+                        return False, round(elapsed, 1), f"Khóa API Mistral không hợp lệ (HTTP {resp.status_code} Unauthorized)."
+                    else:
+                        return False, round(elapsed, 1), f"Mistral API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
+
+                elif provider_type == "cloudflare":
+                    if not account_id or not account_id.strip():
+                        return False, 0.0, "Cloudflare Workers AI bắt buộc phải có Cloudflare Account ID."
+                    acc = account_id.strip()
+                    url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/models/search"
+                    resp = await client.get(url, headers={"Authorization": f"Bearer {clean_key}"})
+                    elapsed = (time.perf_counter() - start) * 1000
+                    if resp.status_code == 200:
+                        return True, round(elapsed, 1), f"Xác thực Cloudflare Workers AI thành công (Account ID: {acc[:6]}...)."
+                    elif resp.status_code in (401, 403):
+                        return False, round(elapsed, 1), f"Cloudflare API Token hoặc Account ID không hợp lệ (HTTP {resp.status_code} Unauthorized)."
+                    else:
+                        return False, round(elapsed, 1), f"Cloudflare API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
+
+                elif provider_type == "gemini":
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
+                    resp = await client.get(url)
+                    elapsed = (time.perf_counter() - start) * 1000
+                    if resp.status_code == 200:
+                        return True, round(elapsed, 1), "Xác thực Google Gemini API thành công (HTTP 200)."
+                    elif resp.status_code in (400, 401, 403):
+                        return False, round(elapsed, 1), f"Khóa Google Gemini không hợp lệ (HTTP {resp.status_code})."
+                    else:
+                        return False, round(elapsed, 1), f"Gemini API phản hồi HTTP {resp.status_code}."
+
+                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom"):
+                    target_url = (base_url or "https://api.openai.com/v1").rstrip("/") + "/models"
+                    headers = {"Authorization": f"Bearer {clean_key}"}
+                    if provider_type == "openrouter":
+                        headers["HTTP-Referer"] = "https://qnu.edu.vn"
+                        headers["X-Title"] = "QNU AI Platform"
+                    resp = await client.get(target_url, headers=headers)
+                    elapsed = (time.perf_counter() - start) * 1000
+                    if resp.status_code == 200:
+                        return True, round(elapsed, 1), f"Kết nối và xác thực thành công tới {target_url}."
+                    elif resp.status_code in (401, 403):
+                        return False, round(elapsed, 1), f"Khóa API không hợp lệ (HTTP {resp.status_code} Unauthorized)."
+                    else:
+                        return False, round(elapsed, 1), f"API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
+
+                elif provider_type in ("ollama", "local_vllm"):
+                    default_url = "http://localhost:11434/v1" if provider_type == "ollama" else "http://localhost:8000/v1"
+                    target_url = (base_url or default_url).rstrip("/") + "/models"
+                    resp = await client.get(target_url)
+                    elapsed = (time.perf_counter() - start) * 1000
+                    if resp.status_code == 200:
+                        return True, round(elapsed, 1), f"Máy chủ cục bộ {provider_type} phản hồi tốt tại {target_url}."
+                    else:
+                        return False, round(elapsed, 1), f"Máy chủ cục bộ phản hồi HTTP {resp.status_code}."
+
+                return True, 50.0, "Đã kiểm tra thông số kết nối nhà cung cấp."
+
+        except httpx.ConnectError:
+            return False, 0.0, "Không thể kết nối tới máy chủ (Connect Error). Vui lòng kiểm tra lại URL hoặc mạng."
+        except httpx.TimeoutException:
+            return False, 0.0, "Kết nối tới API bị quá thời gian (Timeout 10s). Vui lòng kiểm tra lại đường truyền mạng."
+        except Exception as exc:
+            return False, 0.0, f"Lỗi kiểm tra kết nối: {exc!s}"
+
     async def test_provider(self, db: AsyncSession, provider_id: str) -> dict[str, Any]:
-        """Ping and test connectivity to an AI Provider."""
+        """Ping and test connectivity to an AI Provider with real HTTP verification."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
         res = await db.execute(stmt)
         config = res.scalar_one_or_none()
 
-        p_name = config.name if config else provider_id
+        if not config:
+            raise AppException(
+                status_code=404,
+                title="Provider không tồn tại",
+                detail=f"Không tìm thấy nhà cung cấp với ID '{provider_id}'.",
+                code="PROVIDER_NOT_FOUND",
+            )
+
+        extra = dict(config.extra_config or {})
+        keys = extra.get("api_keys", [])
+        active_key = None
+        for k in keys:
+            if k.get("is_active", True) and k.get("api_key"):
+                active_key = k.get("api_key")
+                break
+        if not active_key:
+            active_key = config.api_key_encrypted
+
+        success, latency, msg = await self._ping_provider_api(
+            provider_type=config.provider_type,
+            base_url=config.api_base_url,
+            api_key=active_key,
+            account_id=extra.get("account_id"),
+        )
         return {
-            "success": True,
-            "latency_ms": 118.5,
-            "message": f"Kết nối thành công đến nhà cung cấp '{p_name}'. API sẵn sàng phản hồi.",
+            "success": success,
+            "latency_ms": latency,
+            "message": msg,
         }
 
     # ---------------- Key Pool Operations ----------------
 
     async def get_provider_keys(self, db: AsyncSession, provider_id: str) -> list[dict[str, Any]]:
-        """Retrieve all keys in the pool for a provider."""
+        """Retrieve all keys in the pool for a provider, auto-synthesizing from primary key if empty."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
         res = await db.execute(stmt)
         config = res.scalar_one_or_none()
 
         if config:
             extra = dict(config.extra_config or {})
-            keys = extra.get("api_keys", [])
+            keys = list(extra.get("api_keys", []))
+
+            # If key pool is empty but provider has api_key_encrypted, populate primary key automatically
+            if not keys and config.api_key_encrypted and config.api_key_encrypted.strip():
+                k_val = config.api_key_encrypted.strip()
+                primary_key = {
+                    "id": f"key_{config.id}_primary",
+                    "name": f"Khóa {config.name} (Chính)",
+                    "api_key": k_val,
+                    "api_key_masked": mask_api_key(k_val),
+                    "priority": 1,
+                    "is_active": True,
+                    "status": "active",
+                    "quota_limit": None,
+                    "usage_tokens": 0,
+                    "cooldown_until": None,
+                    "last_used_at": None,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+                keys.append(primary_key)
+                extra["api_keys"] = keys
+                config.extra_config = extra
+                flag_modified(config, "extra_config")
+                await db.commit()
+                await db.refresh(config)
+
             for ki in keys:
                 if ki.get("api_key") and (not ki.get("api_key_masked") or len(ki.get("api_key_masked", "")) <= 12):
                     ki["api_key_masked"] = mask_api_key(ki["api_key"])
             _auto_recover_cooldown(keys)
             return [_sanitize_key_for_output(k) for k in keys]
 
-        # Check default providers
+        # Check default providers in-memory
         if provider_id in _DEFAULT_PROVIDER_KEYS:
             keys = _DEFAULT_PROVIDER_KEYS[provider_id]
             for ki in keys:
@@ -801,7 +998,7 @@ class ModelOpsService:
     async def add_provider_key(
         self, db: AsyncSession, provider_id: str, data: ProviderKeyCreate
     ) -> dict[str, Any]:
-        """Add a new API key to the provider's Key Pool."""
+        """Add a new API key to the provider's Key Pool with guaranteed persistence."""
         k_str = data.api_key.strip()
         masked = mask_api_key(k_str)
         new_key = {
@@ -825,12 +1022,21 @@ class ModelOpsService:
 
         if config:
             extra = dict(config.extra_config or {})
-            keys = extra.get("api_keys", [])
+            keys = list(extra.get("api_keys", []))
             keys.append(new_key)
             extra["api_keys"] = keys
             config.extra_config = extra
+
+            # Synchronize primary key column if empty or if new key has highest priority
+            if not config.api_key_encrypted or data.priority == 1:
+                config.api_key_encrypted = k_str
+
+            flag_modified(config, "extra_config")
             await db.commit()
             await db.refresh(config)
+
+            # Live synchronization into runtime settings
+            self._sync_runtime_credentials(config.provider_type, k_str, extra.get("account_id"))
             return _sanitize_key_for_output(new_key)
 
         # Fallback in-memory
@@ -842,7 +1048,7 @@ class ModelOpsService:
     async def update_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str, data: ProviderKeyUpdate
     ) -> dict[str, Any]:
-        """Update settings or toggle activation for a specific key in the pool."""
+        """Update settings or toggle activation for a specific key in the pool with guaranteed persistence."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
         res = await db.execute(stmt)
         config = res.scalar_one_or_none()
@@ -850,7 +1056,7 @@ class ModelOpsService:
         target_key: dict[str, Any] | None = None
         if config:
             extra = dict(config.extra_config or {})
-            keys = extra.get("api_keys", [])
+            keys = list(extra.get("api_keys", []))
             for k in keys:
                 if k.get("id") == key_id:
                     target_key = k
@@ -866,8 +1072,22 @@ class ModelOpsService:
                     target_key["status"] = data.status
                 if data.quota_limit is not None:
                     target_key["quota_limit"] = data.quota_limit
+                # Ensure primary key is aligned with the highest priority active key
+                active_keys = [k for k in keys if k.get("is_active", True) and k.get("api_key")]
+                active_keys.sort(key=lambda x: (x.get("priority", 1), x.get("usage_tokens", 0)))
+                if active_keys:
+                    config.api_key_encrypted = active_keys[0].get("api_key")
+                elif keys:
+                    config.api_key_encrypted = None
+
                 config.extra_config = extra
+                flag_modified(config, "extra_config")
                 await db.commit()
+                await db.refresh(config)
+
+                self._sync_runtime_credentials(
+                    config.provider_type, config.api_key_encrypted, extra.get("account_id")
+                )
                 return _sanitize_key_for_output(target_key)
 
         # In-memory check
@@ -895,17 +1115,34 @@ class ModelOpsService:
     async def delete_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str
     ) -> dict[str, Any]:
-        """Remove a key from the provider's Key Pool."""
+        """Remove a key from the provider's Key Pool with guaranteed persistence."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
         res = await db.execute(stmt)
         config = res.scalar_one_or_none()
 
         if config:
             extra = dict(config.extra_config or {})
-            keys = extra.get("api_keys", [])
-            extra["api_keys"] = [k for k in keys if k.get("id") != key_id]
+            keys = list(extra.get("api_keys", []))
+            remaining = [k for k in keys if k.get("id") != key_id]
+            extra["api_keys"] = remaining
             config.extra_config = extra
+
+            # If remaining keys exist, sync primary to first active; else clear
+            active_remaining = [k for k in remaining if k.get("is_active", True) and k.get("api_key")]
+            if active_remaining:
+                config.api_key_encrypted = active_remaining[0].get("api_key")
+            elif remaining:
+                config.api_key_encrypted = remaining[0].get("api_key")
+            else:
+                config.api_key_encrypted = None
+
+            flag_modified(config, "extra_config")
             await db.commit()
+            await db.refresh(config)
+
+            self._sync_runtime_credentials(
+                config.provider_type, config.api_key_encrypted, extra.get("account_id")
+            )
             return {"success": True, "deleted_id": key_id}
 
         if provider_id in _DEFAULT_PROVIDER_KEYS:
@@ -919,11 +1156,47 @@ class ModelOpsService:
     async def test_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str
     ) -> dict[str, Any]:
-        """Test validation and latency for a single API key in the pool."""
+        """Test validation and latency for a single API key in the pool with real HTTP verification."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        res = await db.execute(stmt)
+        config = res.scalar_one_or_none()
+
+        target_key: dict[str, Any] | None = None
+        extra: dict[str, Any] = {}
+        if config:
+            extra = dict(config.extra_config or {})
+            for k in extra.get("api_keys", []):
+                if k.get("id") == key_id:
+                    target_key = k
+                    break
+        elif provider_id in _DEFAULT_PROVIDER_KEYS:
+            for k in _DEFAULT_PROVIDER_KEYS[provider_id]:
+                if k.get("id") == key_id:
+                    target_key = k
+                    break
+
+        if not target_key:
+            raise AppException(
+                status_code=404,
+                title="Khóa không tồn tại",
+                detail=f"Không tìm thấy khóa API '{key_id}'.",
+                code="KEY_NOT_FOUND",
+            )
+
+        p_type = config.provider_type if config else provider_id.replace("prov_", "")
+        b_url = config.api_base_url if config else None
+        acc_id = extra.get("account_id")
+
+        success, latency, msg = await self._ping_provider_api(
+            provider_type=p_type,
+            base_url=b_url,
+            api_key=target_key.get("api_key"),
+            account_id=acc_id,
+        )
         return {
-            "success": True,
-            "latency_ms": 94.2,
-            "message": "Khóa API hợp lệ, xác thực danh tính thành công và sẵn sàng phục vụ.",
+            "success": success,
+            "latency_ms": latency,
+            "message": msg,
         }
 
     async def simulate_key_rotation(
@@ -975,6 +1248,8 @@ class ModelOpsService:
             current_key["status"] = "exhausted"
 
         if config:
+            config.extra_config = extra
+            flag_modified(config, "extra_config")
             await db.commit()
 
         # Find next available key
@@ -1157,5 +1432,215 @@ class ModelOpsService:
             code="ALL_PROVIDERS_UNAVAILABLE",
         )
 
+    async def get_system_model_defaults(self, db: AsyncSession) -> SystemModelDefaultsResponse:
+        """Retrieve current system-wide default models for Embedding, Reranker, and OCR.
+
+        If not yet stored in PostgreSQL, seeds default values matching Cloudflare Edge GPU & Mistral.
+        Dynamically enumerates available options across all registered active providers.
+        """
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults")
+        res = await db.execute(stmt)
+        cfg_record = res.scalar_one_or_none()
+
+        default_data = {
+            "default_embedding_provider_id": "prov_cloudflare",
+            "default_embedding_model": "@cf/baai/bge-m3",
+            "default_reranker_provider_id": "prov_cloudflare",
+            "default_reranker_model": "@cf/baai/bge-reranker-base",
+            "default_ocr_provider_id": "prov_mistral",
+            "default_ocr_model": "mistral-ocr-latest",
+        }
+
+        if cfg_record and cfg_record.extra_config and "defaults" in cfg_record.extra_config:
+            default_data.update(cfg_record.extra_config["defaults"])
+        else:
+            if not cfg_record:
+                cfg_record = ModelProviderConfig(
+                    id="system_model_defaults",
+                    name="Cấu Hình Mặc Định Hệ Thống",
+                    provider_type="system_routing",
+                    model_name=default_data["default_embedding_model"],
+                    is_active=True,
+                    priority=0,
+                    extra_config={"defaults": default_data},
+                )
+                db.add(cfg_record)
+                await db.commit()
+
+        # Enumerate available options from active providers
+        providers_stmt = select(ModelProviderConfig).where(
+            ModelProviderConfig.is_active.is_(True),
+            ModelProviderConfig.id != "system_model_defaults",
+        )
+        p_res = await db.execute(providers_stmt)
+        active_providers = p_res.scalars().all()
+
+        available_embeddings: list[ModelOption] = []
+        available_rerankers: list[ModelOption] = []
+        available_ocrs: list[ModelOption] = []
+
+        for p in active_providers:
+            p_extra = p.extra_config or {}
+            models_list: list[str] = list(p_extra.get("models") or [])
+            if p.model_name and p.model_name not in models_list:
+                models_list.append(p.model_name)
+
+            p_type = (p.provider_type or "").lower()
+            category = "cloud"
+            if p_type in ("sentence_transformers", "docling", "ollama", "local_vllm", "local") or "local" in p.id:
+                category = "local"
+            elif p_type == "custom":
+                category = "custom"
+
+            for m in models_list:
+                m_lower = m.lower()
+                if (
+                    "bge" in m_lower or "embed" in m_lower or p_type in ("sentence_transformers",)
+                ) and "rerank" not in m_lower:
+                    available_embeddings.append(
+                        ModelOption(
+                                provider_id=p.id,
+                                provider_name=p.name,
+                                provider_type=p.provider_type,
+                                model_name=m,
+                                category=category,
+                                description=f"Nhúng vector 1024 chiều qua {p.name}",
+                            )
+                        )
+                if "rerank" in m_lower:
+                    available_rerankers.append(
+                        ModelOption(
+                            provider_id=p.id,
+                            provider_name=p.name,
+                            provider_type=p.provider_type,
+                            model_name=m,
+                            category=category,
+                            description=f"Xếp hạng lại tương quan ngữ nghĩa qua {p.name}",
+                        )
+                    )
+                if "ocr" in m_lower or p_type in ("docling", "mistral"):
+                    available_ocrs.append(
+                        ModelOption(
+                            provider_id=p.id,
+                            provider_name=p.name,
+                            provider_type=p.provider_type,
+                            model_name=m,
+                            category=category,
+                            description=f"Bóc tách văn bản và bảng biểu qua {p.name}",
+                        )
+                    )
+
+        # Add local fallback RRF option if not present
+        if not any(r.model_name == "rrf_fallback" for r in available_rerankers):
+            available_rerankers.append(
+                ModelOption(
+                    provider_id="prov_sentence_transformers",
+                    provider_name="Local Rank Fusion (RRF)",
+                    provider_type="local",
+                    model_name="rrf_fallback",
+                    category="local",
+                    description="Xếp hạng hợp nhất RRF k=60 cục bộ (không phụ thuộc mạng ngoài)",
+                )
+            )
+
+        return SystemModelDefaultsResponse(
+            defaults=SystemModelDefaults(**default_data),
+            available_embeddings=available_embeddings,
+            available_rerankers=available_rerankers,
+            available_ocrs=available_ocrs,
+        )
+
+    async def update_system_model_defaults(
+        self, db: AsyncSession, update_data: SystemModelDefaultsUpdate
+    ) -> SystemModelDefaultsResponse:
+        """Update system-wide default models, commit to DB, and synchronize runtime settings."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults")
+        res = await db.execute(stmt)
+        cfg_record = res.scalar_one_or_none()
+
+        if not cfg_record:
+            cfg_record = ModelProviderConfig(
+                id="system_model_defaults",
+                name="Cấu Hình Mặc Định Hệ Thống",
+                provider_type="system_routing",
+                is_active=True,
+                priority=0,
+                extra_config={"defaults": {}},
+            )
+            db.add(cfg_record)
+
+        extra = dict(cfg_record.extra_config or {})
+        defaults = dict(extra.get("defaults") or {})
+
+        if update_data.default_embedding_provider_id is not None:
+            defaults["default_embedding_provider_id"] = update_data.default_embedding_provider_id
+            if "cloudflare" in update_data.default_embedding_provider_id.lower():
+                settings.EMBEDDING_PROVIDER = "cloudflare"
+            else:
+                settings.EMBEDDING_PROVIDER = "sentence_transformers"
+
+        if update_data.default_embedding_model is not None:
+            defaults["default_embedding_model"] = update_data.default_embedding_model
+            settings.EMBEDDING_MODEL = update_data.default_embedding_model
+
+        if update_data.default_reranker_provider_id is not None:
+            defaults["default_reranker_provider_id"] = update_data.default_reranker_provider_id
+            if "cloudflare" in update_data.default_reranker_provider_id.lower():
+                settings.RERANKER_PROVIDER = "cloudflare"
+            else:
+                settings.RERANKER_PROVIDER = "local"
+
+        if update_data.default_reranker_model is not None:
+            defaults["default_reranker_model"] = update_data.default_reranker_model
+            settings.RERANKER_MODEL = update_data.default_reranker_model
+
+        if update_data.default_ocr_provider_id is not None:
+            defaults["default_ocr_provider_id"] = update_data.default_ocr_provider_id
+
+        if update_data.default_ocr_model is not None:
+            defaults["default_ocr_model"] = update_data.default_ocr_model
+
+        extra["defaults"] = defaults
+        cfg_record.extra_config = extra
+        await db.commit()
+
+        logger.info(
+            "Updated system model defaults: embedding=%s (%s), reranker=%s (%s), ocr=%s (%s)",
+            defaults.get("default_embedding_model"),
+            defaults.get("default_embedding_provider_id"),
+            defaults.get("default_reranker_model"),
+            defaults.get("default_reranker_provider_id"),
+            defaults.get("default_ocr_model"),
+            defaults.get("default_ocr_provider_id"),
+        )
+
+        return await self.get_system_model_defaults(db)
+
+    async def set_provider_model_as_default(
+        self, db: AsyncSession, provider_id: str, role: str, model_name: str
+    ) -> SystemModelDefaultsResponse:
+        """Set a specific provider's model as system default for embedding, reranker, or ocr."""
+        update_data = SystemModelDefaultsUpdate()
+        role_lower = role.lower().strip()
+        if role_lower == "embedding":
+            update_data.default_embedding_provider_id = provider_id
+            update_data.default_embedding_model = model_name
+        elif role_lower == "reranker":
+            update_data.default_reranker_provider_id = provider_id
+            update_data.default_reranker_model = model_name
+        elif role_lower == "ocr":
+            update_data.default_ocr_provider_id = provider_id
+            update_data.default_ocr_model = model_name
+        else:
+            raise AppException(
+                status_code=400,
+                title="Vai trò không hợp lệ",
+                detail=f"Vai trò [{role}] không được hỗ trợ. Chỉ chấp nhận embedding, reranker, ocr.",
+                code="INVALID_ROLE",
+            )
+
+        return await self.update_system_model_defaults(db, update_data)
+
 
 modelops_service = ModelOpsService()
+

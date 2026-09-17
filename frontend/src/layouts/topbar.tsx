@@ -36,7 +36,9 @@ export function Topbar({ sidebarOpen, onToggleSidebar, onOpenCommand, currentPat
   const breadcrumbInfo = React.useMemo(() => {
     for (const section of NAVIGATION_CONFIG) {
       for (const item of section.items) {
-        if (item.path === currentPath) {
+        const isExactPath = item.path === currentPath;
+        const isNestedPath = item.path !== "/" && currentPath.startsWith(`${item.path}/`);
+        if (isExactPath || isNestedPath) {
           return { section: section.title, item: item.title };
         }
       }

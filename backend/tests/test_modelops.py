@@ -505,3 +505,76 @@ async def test_api_key_pool_crud_and_rotation():
     finally:
         app.dependency_overrides.pop(get_db, None)
 
+
+@pytest.mark.asyncio
+async def test_system_model_defaults_api():
+    """Test getting, updating, and setting system model routing defaults."""
+    from app.core.database import get_db
+    from app.main import create_app
+    from app.modules.modelops.models import ModelProviderConfig
+
+    app = create_app()
+    mock_db = AsyncMock()
+
+    cfg_record = ModelProviderConfig(
+        id="system_model_defaults",
+        name="Cấu Hình Mặc Định Hệ Thống",
+        provider_type="system_routing",
+        extra_config={
+            "defaults": {
+                "default_embedding_provider_id": "prov_cloudflare",
+                "default_embedding_model": "@cf/baai/bge-m3",
+                "default_reranker_provider_id": "prov_cloudflare",
+                "default_reranker_model": "@cf/baai/bge-reranker-base",
+                "default_ocr_provider_id": "prov_mistral",
+                "default_ocr_model": "mistral-ocr-latest",
+            }
+        },
+    )
+
+    mock_res_cfg = MagicMock()
+    mock_res_cfg.scalar_one_or_none.return_value = cfg_record
+
+    mock_res_providers = MagicMock()
+    mock_res_providers.scalars.return_value.all.return_value = [
+        ModelProviderConfig(
+            id="prov_cloudflare",
+            name="Cloudflare Workers AI",
+            provider_type="cloudflare",
+            extra_config={"models": ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base"]},
+        ),
+        ModelProviderConfig(
+            id="prov_sentence_transformers",
+            name="Local SentenceTransformers",
+            provider_type="sentence_transformers",
+            extra_config={"models": ["BAAI/bge-m3"]},
+        ),
+    ]
+
+    mock_db.execute.side_effect = [
+        mock_res_cfg,
+        mock_res_providers,
+        mock_res_cfg,
+        mock_res_providers,
+        mock_res_cfg,
+        mock_res_providers,
+        mock_res_cfg,
+        mock_res_providers,
+    ]
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.get("/platform/v1alpha1/modelops/defaults")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["defaults"]["default_embedding_provider_id"] == "prov_cloudflare"
+            assert data["defaults"]["default_embedding_model"] == "@cf/baai/bge-m3"
+            assert len(data["available_embeddings"]) >= 2
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+

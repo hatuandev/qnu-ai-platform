@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Response, status
+from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import check_db_health, engine
@@ -42,9 +43,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Automatically ensure PostgreSQL schema exists on startup
     try:
         import app.modules.assistants.models
+        import app.modules.document_types.models
         import app.modules.evaluation.models
         import app.modules.knowledge.models
         import app.modules.modelops.models
+        import app.modules.node_catalog.models
         import app.modules.ocr.models
         import app.modules.tools.models
         import app.modules.workflows.models  # noqa: F401
@@ -52,7 +55,51 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database schema initialized and verified.")
+            await conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS knowledge_documents "
+                    "ADD COLUMN IF NOT EXISTS document_type_code VARCHAR(64)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_documents_document_type_code "
+                    "ON knowledge_documents (document_type_code)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS workflow_definitions "
+                    "ADD COLUMN IF NOT EXISTS published_version_id VARCHAR(36)"
+                )
+            )
+            for column_definition in (
+                "workflow_version_id VARCHAR(36)",
+                "assistant_id VARCHAR(36)",
+                "assistant_revision VARCHAR(64)",
+                "correlation_id VARCHAR(128)",
+                "runtime_profile JSONB",
+            ):
+                await conn.execute(
+                    text(
+                        "ALTER TABLE IF EXISTS workflow_executions "
+                        f"ADD COLUMN IF NOT EXISTS {column_definition}"
+                    )
+                )
+        from app.core.database import AsyncSessionFactory
+        from app.modules.assistants.seeder import seed_standard_assistants
+        from app.modules.document_types.service import document_types_service
+        from app.modules.knowledge.service import knowledge_service
+        from app.modules.modelops.service import modelops_service
+
+        async with AsyncSessionFactory() as db:
+            await document_types_service.sync_from_catalog(db)
+            await seed_standard_assistants(db)
+            await modelops_service.get_system_model_defaults(db)
+            await knowledge_service.sync_ingestion_job_records(db)
+        logger.info(
+            "Database schema, assistants, system model defaults, and ingestion jobs initialized."
+        )
     except Exception as exc:
         logger.warning("Database schema check warning: %s", exc)
 
@@ -61,6 +108,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Shutting down QNU.AI Platform Backend...")
     await engine.dispose()
     logger.info("Database connection pool closed.")
+
 
 
 def create_app() -> FastAPI:
@@ -134,19 +182,23 @@ def create_app() -> FastAPI:
 
     # 6. Mount Feature Modules Routers
     from app.modules.assistants import assistants_router
+    from app.modules.document_types.router import router as document_types_router
     from app.modules.evaluation import evaluation_router
     from app.modules.jobs import jobs_router
     from app.modules.knowledge import knowledge_router
     from app.modules.modelops import modelops_router
+    from app.modules.node_catalog import node_catalog_router
     from app.modules.ocr import ocr_router
     from app.modules.rag import rag_router
     from app.modules.tools import tools_router
     from app.modules.workflows import workflow_router
 
     app.include_router(jobs_router, prefix=settings.API_PREFIX)
+    app.include_router(document_types_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_router, prefix=settings.API_PREFIX)
     app.include_router(rag_router, prefix=settings.API_PREFIX)
     app.include_router(modelops_router, prefix=settings.API_PREFIX)
+    app.include_router(node_catalog_router, prefix=settings.API_PREFIX)
     app.include_router(workflow_router, prefix=settings.API_PREFIX)
     app.include_router(assistants_router, prefix=settings.API_PREFIX)
     app.include_router(tools_router, prefix=settings.API_PREFIX)

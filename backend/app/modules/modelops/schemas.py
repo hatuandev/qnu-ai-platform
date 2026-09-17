@@ -329,3 +329,48 @@ PROVIDER_PRESETS: list[ProviderPresetItem] = [
         help_text="Địa chỉ endpoint và API Key của hệ thống riêng.",
     ),
 ]
+
+
+# ---------------- System Model Routing Defaults Schemas ----------------
+
+
+class ModelOption(BaseModel):
+    provider_id: str
+    provider_name: str
+    provider_type: str
+    model_name: str
+    category: str = "cloud"  # "cloud" | "local" | "custom"
+    description: str | None = None
+
+
+class SystemModelDefaults(BaseModel):
+    default_embedding_provider_id: str = "prov_cloudflare"
+    default_embedding_model: str = "@cf/baai/bge-m3"
+    default_reranker_provider_id: str = "prov_cloudflare"
+    default_reranker_model: str = "@cf/baai/bge-reranker-base"
+    default_ocr_provider_id: str = "prov_mistral"
+    default_ocr_model: str = "mistral-ocr-latest"
+
+
+class SystemModelDefaultsUpdate(BaseModel):
+    default_embedding_provider_id: str | None = None
+    default_embedding_model: str | None = None
+    default_reranker_provider_id: str | None = None
+    default_reranker_model: str | None = None
+    default_ocr_provider_id: str | None = None
+    default_ocr_model: str | None = None
+
+
+class SystemModelDefaultsResponse(BaseModel):
+    defaults: SystemModelDefaults
+    available_embeddings: list[ModelOption] = Field(default_factory=list)
+    available_rerankers: list[ModelOption] = Field(default_factory=list)
+    available_ocrs: list[ModelOption] = Field(default_factory=list)
+
+
+class SetDefaultModelRequest(BaseModel):
+    role: Literal["embedding", "reranker", "ocr"] = Field(
+        ..., description="Vai trò mặc định cần gán: embedding, reranker, hoặc ocr"
+    )
+    model_name: str = Field(..., min_length=1, description="Tên mô hình cần gán làm mặc định")
+

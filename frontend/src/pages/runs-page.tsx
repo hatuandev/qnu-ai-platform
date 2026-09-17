@@ -1,7 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CheckCircle2, Clock, Eye, GitBranch, History } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Eye,
+  GitBranch,
+  History,
+  RefreshCw,
+} from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -25,10 +34,31 @@ import { type WorkflowRun, apiClient } from "../services/api-client";
 export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavigateToCanvas }) => {
   const [selectedRun, setSelectedRun] = useState<WorkflowRun | null>(null);
 
-  const { data: runs = [] } = useQuery({
+  const {
+    data: runs = [],
+    error,
+    isPending,
+    refetch,
+  } = useQuery({
     queryKey: ["workflow-runs"],
     queryFn: () => apiClient.getWorkflowRuns(),
   });
+  const completedCount = runs.filter((run) => run.status === "completed").length;
+  const averageLatency = useMemo(
+    () =>
+      runs.length
+        ? Math.round(runs.reduce((sum, run) => sum + run.duration_ms, 0) / runs.length)
+        : 0,
+    [runs]
+  );
+
+  const getStatusPresentation = (status: WorkflowRun["status"]) => {
+    if (status === "completed") return { label: "Hoàn thành", variant: "success" as const };
+    if (status === "failed") return { label: "Thất bại", variant: "destructive" as const };
+    if (status === "paused_for_approval")
+      return { label: "Chờ phê duyệt", variant: "warning" as const };
+    return { label: "Đang chạy", variant: "info" as const };
+  };
 
   return (
     <div className="space-y-6">
@@ -61,12 +91,12 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
           <span className="text-xs text-muted-foreground">Tổng Phiên Thực Thi</span>
           <p className="text-xl font-bold text-foreground mt-1">{runs.length} Phiên chạy</p>
           <span className="text-[11px] text-success flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> 100% Hoàn thành thành công
+            <CheckCircle2 className="h-3 w-3" /> {completedCount}/{runs.length || 0} hoàn thành
           </span>
         </Card>
         <Card className="p-4">
           <span className="text-xs text-muted-foreground">Độ Trễ Trung Bình (E2E Latency)</span>
-          <p className="text-xl font-bold text-primary font-mono mt-1">646 ms</p>
+          <p className="text-xl font-bold text-primary font-mono mt-1">{averageLatency} ms</p>
           <span className="text-[11px] text-muted-foreground">Bao gồm RAG & LLM inference</span>
         </Card>
         <Card className="p-4">
@@ -77,6 +107,29 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
           </span>
         </Card>
       </div>
+
+      {isPending && (
+        <div className="flex items-center gap-2 rounded-surface border border-border bg-card p-4 text-xs text-muted-foreground">
+          <RefreshCw className="size-3.5 animate-spin text-primary" />
+          Đang tải lịch sử thực thi từ Backend…
+        </div>
+      )}
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-surface border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive">
+          <span className="flex items-center gap-2">
+            <AlertCircle className="size-3.5" />
+            {error instanceof Error ? error.message : "Không tải được lịch sử workflow."}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => void refetch()}
+          >
+            Thử lại
+          </Button>
+        </div>
+      )}
 
       {/* Runs Table */}
       <div className="rounded-surface border border-border bg-card overflow-hidden">
@@ -93,7 +146,7 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(runs || []).map((run) => (
+            {runs.map((run) => (
               <TableRow key={run.id}>
                 <TableCell className="font-mono text-xs font-bold text-foreground">
                   {run.id}
@@ -117,9 +170,12 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
                   {run.started_at}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="success" className="text-[10px] gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Completed
+                  <Badge
+                    variant={getStatusPresentation(run.status).variant}
+                    className="text-[10px] gap-1"
+                  >
+                    {run.status === "completed" ? <CheckCircle2 className="h-3 w-3" /> : null}
+                    {getStatusPresentation(run.status).label}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -137,6 +193,11 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
             ))}
           </TableBody>
         </Table>
+        {!isPending && !error && runs.length === 0 && (
+          <div className="p-10 text-center text-xs text-muted-foreground">
+            Chưa có phiên thực thi nào được ghi nhận.
+          </div>
+        )}
       </div>
 
       {/* Trace Detail Modal */}
@@ -177,59 +238,28 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
                 </span>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2.5 p-2.5 rounded-control bg-card border border-border">
-                    <span className="h-5 w-5 rounded-full bg-success/10 text-success flex items-center justify-center font-bold text-[10px]">
-                      1
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">chat_input (input.chat)</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Nhận câu hỏi, validate min_length
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">12 ms</span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 p-2.5 rounded-control bg-card border border-border">
-                    <span className="h-5 w-5 rounded-full bg-success/10 text-success flex items-center justify-center font-bold text-[10px]">
-                      2
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">
-                        condition_route (condition.route)
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Phân tích ý định & điều phối nhánh RAG
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">18 ms</span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 p-2.5 rounded-control bg-card border border-border">
-                    <span className="h-5 w-5 rounded-full bg-success/10 text-success flex items-center justify-center font-bold text-[10px]">
-                      3
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">knowledge_answer (rag_fast)</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Qdrant vector + FTS RRF k=60 + LLM stream
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono text-primary font-bold">295 ms</span>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 p-2.5 rounded-control bg-card border border-border">
-                    <span className="h-5 w-5 rounded-full bg-success/10 text-success flex items-center justify-center font-bold text-[10px]">
-                      4
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">chat_output (output.chat)</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Lắp ráp markdown & trích dẫn văn bản
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono text-muted-foreground">15 ms</span>
-                  </div>
+                  {selectedRun.executed_nodes.length > 0 ? (
+                    selectedRun.executed_nodes.map((nodeId, index) => (
+                      <div
+                        className="flex items-center gap-2.5 rounded-control border border-border bg-card p-2.5"
+                        key={`${selectedRun.id}-${nodeId}-${index}`}
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/10 text-[10px] font-bold text-success">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-foreground">{nodeId}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Node được runtime ghi nhận trong execution trace
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="rounded-control border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                      Backend chưa trả trace chi tiết cho phiên chạy này.
+                    </p>
+                  )}
                 </div>
               </div>
 

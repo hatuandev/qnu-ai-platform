@@ -45,12 +45,37 @@ const REGION_COLORS: Record<string, { bg: string; border: string; text: string; 
   stamp: { bg: "rgba(244, 63, 94, 0.16)", border: "#f43f5e", text: "#be123c", badge: "#e11d48" },
 };
 
+const REGION_BADGE_LABELS: Record<string, string> = {
+  header: "tiêu đề đầu",
+  title: "tiêu đề",
+  text: "văn bản",
+  list: "danh sách",
+  table: "bảng biểu",
+  signature: "chữ ký",
+  stamp: "con dấu & ký",
+};
+
 function getEffectiveType(box: DocumentBoundingBox): string {
   const lbl = (box.label || "").toLowerCase();
   if (["table", "title", "header", "text", "list", "signature", "stamp"].includes(lbl)) {
     return lbl;
   }
   return box.type;
+}
+
+function getDisplayBadge(box: DocumentBoundingBox): string {
+  const effectiveType = getEffectiveType(box);
+  if (REGION_BADGE_LABELS[effectiveType]) {
+    return REGION_BADGE_LABELS[effectiveType];
+  }
+  const clean = (box.label || box.type || "")
+    .replace(/[#*`_~|]/g, "")
+    .trim()
+    .toLowerCase();
+  if (!clean || clean.length > 20) {
+    return REGION_BADGE_LABELS[box.type] || box.type || "khối";
+  }
+  return clean;
 }
 
 export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProps> = ({
@@ -284,12 +309,14 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
               const effectiveType = getEffectiveType(box);
               const styleColor = REGION_COLORS[effectiveType] || REGION_COLORS.text;
 
+              const displayBadge = getDisplayBadge(box);
+
               return (
                 <button
                   type="button"
                   key={box.id}
                   onClick={() => onSelectBox?.(isActive ? null : box.id)}
-                  title={`${box.label.toUpperCase()}: ${box.content_snippet || ""}`}
+                  title={`${displayBadge.toUpperCase()}: ${box.content_snippet || ""}`}
                   className="absolute transition-all cursor-pointer group p-0 text-left"
                   style={{
                     left: `${box.coordinates.x}%`,
@@ -317,9 +344,14 @@ export const DocumentBoundingVisualizer: React.FC<DocumentBoundingVisualizerProp
                       lineHeight: 1.15,
                       fontFamily: "Inter, sans-serif",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                      maxWidth: "120px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      pointerEvents: "none",
                     }}
                   >
-                    {box.label}
+                    {displayBadge}
                   </span>
                 </button>
               );

@@ -544,3 +544,138 @@ async def test_api_parse_preview():
     assert data["file_name"] == "demo.txt"
     assert data["chunk_count"] == 2
     assert len(data["preview_chunks"]) == 2
+
+
+def test_build_studio_pages_per_page_markdown_and_blocks():
+    """Verify studio builder preserves per-page markdown and does not clump chunks into page 1."""
+    from app.modules.knowledge.service import knowledge_service
+
+    chunks = [
+        {"content": "Toan bo noi dung trang 1 va 2.", "chunk_index": 0, "page_number": 1},
+    ]
+    page_blocks = {
+        1: [
+            {
+                "type": "title",
+                "text": "THONG BAO TUYEN SINH 2026",
+                "coordinates": {"x": 10, "y": 10, "width": 80, "height": 10},
+            }
+        ],
+        2: [
+            {
+                "type": "text",
+                "text": "Phuong thuc 1: Xet diem thi THPT.",
+                "coordinates": {"x": 10, "y": 10, "width": 80, "height": 20},
+            }
+        ],
+    }
+    page_markdowns = {
+        1: "# THONG BAO TUYEN SINH 2026\n\nNoi dung trang 1.",
+        2: "## Phuong thuc xet tuyen\n\n| STT | Nganh |\n| --- | --- |\n| 1 | CNTT |",
+    }
+    pages = knowledge_service.build_studio_pages(
+        chunks=chunks,
+        page_blocks=page_blocks,
+        document_id="doc_ts",
+        page_markdowns=page_markdowns,
+    )
+    assert len(pages) == 2
+    assert "Noi dung trang 1." in pages[0]["markdown_content"]
+    assert "Phuong thuc xet tuyen" in pages[1]["markdown_content"]
+    assert "| CNTT |" in pages[1]["markdown_content"]
+    assert pages[1]["page_number"] == 2
+    assert len(pages[1]["bounding_boxes"]) == 1
+
+
+def test_build_studio_pages_synthesizes_from_blocks_when_chunks_clumped():
+    """When chunks are clumped into page 1 without page_markdowns, builder synthesizes per-page markdown from blocks."""
+    from app.modules.knowledge.service import knowledge_service
+
+    chunks = [
+        {"content": "Chunk duy nhat bi don vao trang 1.", "chunk_index": 0, "page_number": 1},
+    ]
+    page_blocks = {
+        1: [
+            {
+                "type": "title",
+                "text": "Tieu de trang 1",
+                "coordinates": {"x": 10, "y": 10, "width": 80, "height": 10},
+            }
+        ],
+        2: [
+            {
+                "type": "header",
+                "text": "Muc II. Phuong thuc",
+                "coordinates": {"x": 10, "y": 10, "width": 80, "height": 10},
+            },
+            {
+                "type": "list",
+                "text": "Xet tuyen hoc ba",
+                "coordinates": {"x": 10, "y": 25, "width": 80, "height": 10},
+            },
+        ],
+    }
+    pages = knowledge_service.build_studio_pages(
+        chunks=chunks,
+        page_blocks=page_blocks,
+        document_id="doc_test",
+        page_markdowns=None,
+    )
+    assert len(pages) == 2
+    assert "Tieu de trang 1" in pages[0]["markdown_content"]
+    assert "Muc II. Phuong thuc" in pages[1]["markdown_content"]
+    assert "- Xet tuyen hoc ba" in pages[1]["markdown_content"]
+    assert pages[1]["markdown_content"] != ""  # Trang 2 tuyệt đối không bị trắng tinh!
+
+
+def test_chunkers_track_page_number_from_page_markers():
+    """Chunkers must track page numbers accurately from '<!-- Trang X -->' markers."""
+    from app.modules.knowledge.chunker import ClauseBasedChunker, SemanticChunker
+
+    text = (
+        "<!-- Trang 1 -->\n\n"
+        "Điều 1. Ban hành quy chế\n\n"
+        "Quy chế này áp dụng cho toàn bộ giảng viên và sinh viên.\n\n"
+        "<!-- Trang 2 -->\n\n"
+        "Điều 2. Tổ chức thực hiện\n\n"
+        "Phòng Đào tạo chủ trì phối hợp với các khoa thực hiện."
+    )
+
+    clause_chunks = ClauseBasedChunker().chunk(text)
+    assert len(clause_chunks) >= 2
+    assert clause_chunks[0].page_number == 1
+    assert "Điều 1" in clause_chunks[0].content
+    assert clause_chunks[1].page_number == 2
+    assert "Điều 2" in clause_chunks[1].content
+
+    sem_chunks = SemanticChunker(max_tokens=30).chunk(text)
+    assert len(sem_chunks) >= 2
+    pages_found = {c.page_number for c in sem_chunks if c.page_number is not None}
+    assert 1 in pages_found
+    assert 2 in pages_found
+
+
+def test_build_studio_pages_rejects_synthetic_placeholders():
+    """Studio builder must discard synthetic placeholder strings like 'Đoạn văn bản quy định'."""
+    from app.modules.knowledge.service import knowledge_service
+
+    page_blocks = {
+        1: [
+            {"type": "header", "text": "Tiêu đề đầu trang", "coordinates": {}},
+            {"type": "text", "text": "Đoạn văn bản quy định", "coordinates": {}},
+            {"type": "table", "text": "Bảng biểu số liệu", "coordinates": {}},
+            {"type": "signature", "text": "Con dấu & Chữ ký xác thực", "coordinates": {}},
+        ]
+    }
+    pages = knowledge_service.build_studio_pages(
+        chunks=[],
+        page_blocks=page_blocks,
+        document_id="doc_zero",
+        page_markdowns=None,
+    )
+    assert len(pages) == 1
+    # All synthetic strings must be completely rejected — zero mock text in output
+    assert "Đoạn văn bản quy định" not in pages[0]["markdown_content"]
+    assert "Bảng biểu số liệu" not in pages[0]["markdown_content"]
+    assert pages[0]["markdown_content"] == ""
+

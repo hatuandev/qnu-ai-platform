@@ -75,8 +75,10 @@ class Settings(BaseSettings):
     GOTENBERG_URL: str = "http://localhost:3005"
 
     # --- Embedding & Reranker ---
-    EMBEDDING_MODEL: str = "BAAI/bge-m3"
-    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    EMBEDDING_PROVIDER: str = "cloudflare"  # 'cloudflare' or 'sentence_transformers'
+    EMBEDDING_MODEL: str = "@cf/baai/bge-m3"
+    RERANKER_PROVIDER: str = "cloudflare"  # 'cloudflare' or 'local'
+    RERANKER_MODEL: str = "@cf/baai/bge-reranker-base"
     DEFAULT_TOP_K: int = 8
     DEFAULT_RERANK_TOP_K: int = 5
     MAX_CONTEXT_TOKENS: int = 6000

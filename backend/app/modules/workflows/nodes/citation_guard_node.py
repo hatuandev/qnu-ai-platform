@@ -21,7 +21,12 @@ class CitationGuardNodeHandler(BaseNodeHandler):
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
         config = node_spec.config or {}
-        require_citation = config.get("require_citation_for_answer", True)
+        profile = context.assistant_profile
+        require_citation = (
+            profile.output_policy.require_citations
+            if profile
+            else config.get("require_citation_for_answer", True)
+        )
         accepted_statuses = config.get("accepted_statuses", ["answered", "success"])
         invalid_route = config.get("invalid_route", "ungrounded")
 
@@ -33,6 +38,9 @@ class CitationGuardNodeHandler(BaseNodeHandler):
 
         # Check 1: Status must be valid
         if rag_status not in accepted_statuses:
+            is_grounded = False
+
+        if profile and profile.guardrails.require_grounded_answer and rag_status != "answered":
             is_grounded = False
 
         # Check 2: Answer must not be empty

@@ -20,6 +20,7 @@ from app.core.storage import storage_service
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.docling_adapter import DoclingOCRAdapter
 from app.modules.ocr.adapters.easyocr_adapter import EasyOCRAdapter
+from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
 from app.modules.ocr.layout_detector import smart_layout_detector
@@ -48,17 +49,20 @@ class OCRService:
     def __init__(self) -> None:
         self._adapters: dict[str, BaseOCRAdapter] = {
             "pymupdf_ocr": PyMuPDFOCRAdapter(),
+            "mistral_ocr": MistralOCRAdapter(),
             "docling": DoclingOCRAdapter(),
             "easyocr": EasyOCRAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
+        self._adapters["mistral"] = self._adapters["mistral_ocr"]
         self.default_engine = "pymupdf_ocr"
 
     def list_engines(self) -> list[OCREngineResponse]:
         """List registered OCR engines with real availability status."""
         catalog = [
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
-            ("eng_docling", "docling", "docling", ["pdf", "tables", "layout", "markdown"], 0.97, False),
+            ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
+            ("eng_docling", "docling", "docling", ["docx", "xlsx", "pdf", "tables", "layout", "markdown"], 0.97, False),
             ("eng_easyocr", "easyocr", "easyocr", ["png", "jpg", "scan", "stamp"], 0.90, False),
             ("eng_mock", "mock_ocr", "mock", ["pdf", "text", "fallback"], 0.98, False),
         ]
@@ -71,7 +75,7 @@ class OCRService:
                     name=name,
                     display_name=adapter.display_name,
                     engine_type=engine_type,
-                    provider_category="local",
+                    provider_category="cloud" if name == "mistral_ocr" else "local",
                     capabilities=capabilities,
                     avg_confidence=confidence,
                     is_active=adapter.is_available(),
@@ -100,16 +104,24 @@ class OCRService:
             logger.warning("requested_ocr_engine_not_found_fallback_to_default", engine=requested)
             adapter = self._adapters[self.default_engine]
 
-        if not adapter.is_available():
-            hint = _ENGINE_INSTALL_HINTS.get(requested, "lien he quan tri vien")
-            raise AppException(
-                f"Engine OCR '{requested}' chua san sang (thieu dependency). Cai dat voi: {hint}",
-                code="ocr_engine_unavailable",
-                status_code=400,
-                details={"engine": requested, "install_hint": hint},
-            )
-
         fallback_triggered = False
+        if not adapter.is_available():
+            if requested in ("mistral_ocr", "mistral"):
+                logger.warning("mistral_ocr_missing_key_fallback_to_local", requested=requested)
+                for local_cand in ("easyocr", "docling", self.default_engine):
+                    cand_adapter = self._adapters[local_cand]
+                    if cand_adapter.is_available():
+                        adapter = cand_adapter
+                        fallback_triggered = True
+                        break
+            else:
+                hint = _ENGINE_INSTALL_HINTS.get(requested, "lien he quan tri vien")
+                raise AppException(
+                    f"Engine OCR '{requested}' chua san sang (thieu dependency). Cai dat voi: {hint}",
+                    code="ocr_engine_unavailable",
+                    status_code=400,
+                    details={"engine": requested, "install_hint": hint},
+                )
         result_dict = None
         error_msg = None
 
@@ -145,53 +157,93 @@ class OCRService:
         tenant_id: str,
         start_time: float,
     ) -> OCRExtractResponse:
-        """Smart routing: fast text extraction first, heavy OCR only for scans."""
+        """Smart routing:
+        1. For digital text PDFs: Fast PyMuPDF extraction first (10-30ms).
+        2. For scanned PDFs & Images: Prioritize Mistral OCR (Cloud API, 1-2s).
+           If Mistral API key is not configured, gracefully fall back to Local OCR (EasyOCR/Docling).
+        3. For Office files (.docx, .doc, .xlsx, .xls): Prioritize Docling TableFormer.
+        """
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "pdf"
+
+        # Special priority order by file format
+        if ext in ("docx", "doc", "xlsx", "xls"):
+            candidate_order = ("docling", "easyocr", "pymupdf_ocr")
+        elif ext in ("png", "jpg", "jpeg", "webp", "bmp", "tiff"):
+            candidate_order = ("mistral_ocr", "easyocr", "docling")
+        else:
+            candidate_order = ("mistral_ocr", "easyocr", "docling")
+
+        # For PDF and text files, try native PyMuPDF fast text extraction first (10-30ms)
         default_adapter = self._adapters[self.default_engine]
-        try:
-            result_dict = await default_adapter.extract(content, filename)
-        except Exception as exc:
-            logger.error("auto_ocr_primary_failed", engine=default_adapter.name, error=str(exc))
-            result_dict = {
+        result_dict = None
+        if ext not in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "xlsx", "xls"):
+            try:
+                result_dict = await default_adapter.extract(content, filename)
+            except Exception as exc:
+                logger.error("auto_ocr_primary_failed", engine=default_adapter.name, error=str(exc))
+
+        # If primary extracted substantial digital text (>80 chars), return immediately!
+        if (
+            result_dict
+            and (result_dict.get("raw_text") or "").strip()
+            and len(result_dict.get("raw_text", "").strip()) > 80
+        ):
+            return await self._build_response(
+                session=session,
+                result_dict=result_dict,
+                filename=filename,
+                tenant_id=tenant_id,
+                start_time=start_time,
+                fallback_triggered=False,
+                error_msg=None,
+            )
+
+        # Scanned PDF or images or office files:
+        # Loop through candidates in priority order:
+        # Mistral OCR (if key configured) -> Local OCR (EasyOCR / Docling)
+        for candidate in candidate_order:
+            upgrade = self._adapters.get(candidate)
+            if not upgrade or not upgrade.is_available():
+                # E.g. Mistral has no key -> automatically skips to Local OCR!
+                logger.debug("auto_ocr_candidate_skipped_unavailable", candidate=candidate)
+                continue
+            try:
+                upgraded = await upgrade.extract(content, filename)
+            except Exception as exc:
+                logger.warning("auto_ocr_candidate_failed_will_try_next", candidate=candidate, error=str(exc))
+                continue
+            if (upgraded.get("raw_text") or "").strip():
+                logger.info(
+                    "auto_ocr_upgraded",
+                    from_engine=default_adapter.name,
+                    to_engine=candidate,
+                    filename=filename,
+                )
+                return await self._build_response(
+                    session=session,
+                    result_dict=upgraded,
+                    filename=filename,
+                    tenant_id=tenant_id,
+                    start_time=start_time,
+                    fallback_triggered=True,
+                    error_msg=None,
+                )
+
+        # If all candidates failed or returned empty, return whatever primary had or empty
+        return await self._build_response(
+            session=session,
+            result_dict=result_dict or {
                 "engine_used": default_adapter.name,
                 "raw_text": "",
                 "pages": [],
                 "total_pages": 0,
                 "overall_confidence": 0.0,
-            }
-
-        if not (result_dict.get("raw_text") or "").strip():
-            for candidate in ("docling", "easyocr"):
-                upgrade = self._adapters[candidate]
-                if not upgrade.is_available():
-                    continue
-                try:
-                    upgraded = await upgrade.extract(content, filename)
-                except Exception as exc:
-                    logger.warning("auto_ocr_upgrade_failed", engine=candidate, error=str(exc))
-                    continue
-                if (upgraded.get("raw_text") or "").strip():
-                    logger.info(
-                        "auto_ocr_upgraded",
-                        from_engine=default_adapter.name,
-                        to_engine=candidate,
-                        filename=filename,
-                    )
-                    return await self._build_response(
-                        session=session,
-                        result_dict=upgraded,
-                        filename=filename,
-                        tenant_id=tenant_id,
-                        start_time=start_time,
-                        fallback_triggered=True,
-                    )
-
-        return await self._build_response(
-            session=session,
-            result_dict=result_dict,
+            },
             filename=filename,
             tenant_id=tenant_id,
             start_time=start_time,
             fallback_triggered=False,
+            error_msg=None,
         )
 
     async def _build_response(

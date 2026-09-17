@@ -80,6 +80,7 @@ class FactItem(BaseModel):
 class DocumentResponse(BaseModel):
     id: str
     collection_id: str
+    document_type_code: str | None = None
     title: str
     file_name: str
     file_type: str

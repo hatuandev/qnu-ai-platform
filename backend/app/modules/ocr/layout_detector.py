@@ -153,7 +153,7 @@ class SmartLayoutDetector:
             regions.append({
                 "type": "signature",
                 "label": "signature",
-                "text": s.get("text", "Con dấu & Chữ ký xác thực"),
+                "text": s.get("text", ""),
                 "top": s["top"],
                 "left": s["left"],
                 "width": s["width"],
@@ -190,7 +190,7 @@ class SmartLayoutDetector:
                         stamps.append({
                             "type": "signature",
                             "label": "signature",
-                            "text": "Con dấu & Chữ ký xác thực",
+                            "text": "",
                             "top": round((y / h) * 100, 1),
                             "left": round((x / w) * 100, 1),
                             "width": round((bw / w) * 100, 1),
@@ -292,7 +292,8 @@ class SmartLayoutDetector:
                     tables.append({
                         "type": "table",
                         "label": "table",
-                        "text": "Bảng biểu dữ liệu số hóa",
+                        "text": "",
+                        "content_snippet": "",
                         "top": round((y1 / h) * 100, 1),
                         "left": round((x1 / w) * 100, 1),
                         "width": round((bw / w) * 100, 1),
@@ -366,6 +367,39 @@ class SmartLayoutDetector:
         # 1., 2., 3. numbered lists
         return bool(re.match(r"^\d+\.\s+", first_line))
 
+    @staticmethod
+    def _format_table_markdown(rows: list[list[Any]]) -> str:
+        """Chuyển đổi ma trận ô bảng thành Markdown Table chuẩn GitHub Flavored Markdown."""
+        if not rows:
+            return ""
+        clean_rows: list[list[str]] = []
+        for row in rows:
+            if not row:
+                continue
+            r_cells = [str(c or "").strip().replace("|", "\\|").replace("\n", " ") for c in row]
+            if any(r_cells):  # Bỏ qua hàng hoàn toàn rỗng
+                clean_rows.append(r_cells)
+
+        if not clean_rows:
+            return ""
+
+        max_cols = max(len(r) for r in clean_rows)
+        if max_cols == 0:
+            return ""
+
+        padded_rows = [r + [""] * (max_cols - len(r)) for r in clean_rows]
+        raw_headers = padded_rows[0]
+        clean_headers = [h if h else f"Cột {idx + 1}" for idx, h in enumerate(raw_headers)]
+
+        lines = [
+            "| " + " | ".join(clean_headers) + " |",
+            "| " + " | ".join([":---:" if idx == 0 and max_cols > 3 else ":---" for idx in range(max_cols)]) + " |",
+        ]
+        for r in padded_rows[1:]:
+            lines.append("| " + " | ".join(r) + " |")
+
+        return "\n".join(lines)
+
     def _detect_hybrid_pdf_regions(
         self,
         fitz_page: Any,
@@ -375,7 +409,7 @@ class SmartLayoutDetector:
         """Vector-precise layout extraction from PyMuPDF page combined with HSV stamps.
 
         Identifies:
-        - Exact table bounding boxes via page.find_tables() and suppresses child text fragments.
+        - Exact table bounding boxes via page.find_tables() and extracts actual table rows into Markdown.
         - Unified signature block on closing pages (signer title + red seal + blue ink + signer name).
         - Administrative Vietnamese semantics (Nghị định 30/2020/NĐ-CP):
           * header (letterhead/quốc hiệu page 1)
@@ -383,6 +417,8 @@ class SmartLayoutDetector:
           * list (bullet items, dash items, 'Nơi nhận:')
           * text (independent paragraphs, never greedily collapsed)
         """
+        import pymupdf as fitz
+
         page_rect = fitz_page.rect
         pw = float(page_rect.width) or 1.0
         ph = float(page_rect.height) or 1.0
@@ -399,10 +435,26 @@ class SmartLayoutDetector:
                 t_w = round((x1 - x0) / pw * 100, 1)
                 t_h = round((y1 - y0) / ph * 100, 1)
                 if t_w > 15.0 and t_h > 2.0:
+                    rows = []
+                    try:
+                        rows = tab.extract() or []
+                    except Exception:
+                        rows = []
+                    md_table = self._format_table_markdown(rows) if rows else ""
+                    if not md_table:
+                        rect = fitz.Rect(x0, y0, x1, y1)
+                        clipped_txt = fitz_page.get_text("text", clip=rect).strip()
+                        md_table = clipped_txt or "Bảng dữ liệu"
+
+                    first_header = ""
+                    if rows and rows[0]:
+                        first_header = " | ".join(str(c or "").strip() for c in rows[0] if str(c or "").strip())
+
                     tables.append({
                         "type": "table",
                         "label": "table",
-                        "text": "Bảng biểu dữ liệu số hóa",
+                        "text": md_table,
+                        "content_snippet": (f"Bảng: {first_header}" if first_header else md_table[:160]),
                         "top": t_top,
                         "left": t_left,
                         "width": t_w,
@@ -519,8 +571,6 @@ class SmartLayoutDetector:
                 max_right = max(max_right, title_block["left"] + title_block["width"])
                 sig_text_lines.append(title_block["text"])
                 used_text_indices.add(title_idx)
-
-            sig_text_lines.append("Con dấu & Chữ ký xác thực")
 
             if name_block:
                 max_bottom = max(max_bottom, name_block["top"] + name_block["height"])
@@ -888,7 +938,7 @@ class SmartLayoutDetector:
                         raw_boxes.append({
                             "type": "header",
                             "label": "header",
-                            "text": "Cơ quan ban hành / Số hiệu",
+                            "text": "",
                             "top": top_pct,
                             "left": round((lx0 / w) * 100, 1),
                             "width": round(((lx1 - lx0) / w) * 100, 1),
@@ -900,7 +950,7 @@ class SmartLayoutDetector:
                         raw_boxes.append({
                             "type": "header",
                             "label": "header",
-                            "text": "Quốc hiệu / Tiêu ngữ / Ngày tháng",
+                            "text": "",
                             "top": top_pct,
                             "left": round((rx0 / w) * 100, 1),
                             "width": round(((rx1 - rx0) / w) * 100, 1),
@@ -910,36 +960,29 @@ class SmartLayoutDetector:
 
             rtype = "text"
             label = "text"
-            txt_desc = "Đoạn văn bản quy định"
 
             if page_number == 1:
                 if top_pct < 16.0:
                     rtype = "header"
                     label = "header"
-                    txt_desc = "Tiêu đề đầu trang"
-                elif 16.0 <= top_pct <= 24.0 and w_pct < 85.0 and left_pct > 12.0:
+                elif (16.0 <= top_pct <= 24.0 and w_pct < 85.0 and left_pct > 12.0) or (
+                    h_pct < 4.5 and w_pct < 38.0 and (36.0 <= left_pct <= 54.0)
+                ):
                     rtype = "title"
                     label = "title"
-                    txt_desc = "Tên loại văn bản / Trích yếu nội dung"
-                elif h_pct < 4.5 and w_pct < 38.0 and (36.0 <= left_pct <= 54.0):
-                    rtype = "title"
-                    label = "title"
-                    txt_desc = "Tiêu đề phân đoạn"
                 elif top_pct > 68.0 and left_pct < 20.0 and w_pct < 45.0:
                     rtype = "list"
                     label = "list"
-                    txt_desc = "Nơi nhận / Danh sách đơn vị phối hợp"
             else:
                 # Trang sau: Nơi nhận nằm ở góc dưới bên trái
                 if top_pct > 50.0 and left_pct < 30.0 and w_pct < 35.0:
                     rtype = "list"
                     label = "list"
-                    txt_desc = "Nơi nhận / Danh sách đơn vị phối hợp"
 
             raw_boxes.append({
                 "type": rtype,
                 "label": label,
-                "text": txt_desc,
+                "text": "",
                 "top": top_pct,
                 "left": left_pct,
                 "width": w_pct,

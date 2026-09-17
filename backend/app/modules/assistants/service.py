@@ -1,119 +1,290 @@
-"""Assistant Service — Orchestrating Catalog Management & Conversational Chat Executions."""
+"""Application service for persisted QNU AI Assistant administration."""
 
 from __future__ import annotations
 
 import logging
+import unicodedata
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import EntityNotFoundError
+from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.modules.assistants.models import AssistantModel
+from app.modules.assistants.runtime import build_runtime_profile, prepare_user_message
 from app.modules.assistants.schemas import (
+    AssistantBundle,
+    AssistantBundleWorkflow,
     AssistantChatRequest,
     AssistantChatResponse,
+    AssistantCreateRequest,
+    AssistantLifecycleConfig,
     AssistantResponse,
+    AssistantSeedResponse,
+    AssistantTemplateResponse,
+    AssistantUpdateRequest,
 )
-from app.modules.assistants.seeder import STANDARD_ASSISTANTS
+from app.modules.assistants.seeder import STANDARD_ASSISTANTS, seed_standard_assistants
+from app.modules.workflows.models import WorkflowDefinition
 from app.modules.workflows.schemas import WorkflowExecuteRequest
 from app.modules.workflows.service import workflow_service
 
 logger = logging.getLogger(__name__)
 
 
+def _clean_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return unicodedata.normalize("NFC", value.strip())
+
+
+def _to_response(record: AssistantModel) -> AssistantResponse:
+    config = AssistantLifecycleConfig.model_validate(record.config or {})
+    return AssistantResponse(
+        id=record.id,
+        code=record.code,
+        name=record.name,
+        description=record.description,
+        avatar_url=record.avatar_url,
+        category=record.category,
+        system_prompt=record.system_prompt,
+        workflow_id=record.workflow_id,
+        collection_id=record.collection_id,
+        is_active=record.is_active,
+        tenant_id=record.tenant_id,
+        sample_questions=config.sample_questions,
+        config=config,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
 class AssistantService:
-    """Service managing QNU's 5 Standard AI Assistants and their workflow invocations."""
+    """Manage assistants, their lifecycle policy, bundles and workflow invocations."""
 
-    async def list_assistants(self, db: AsyncSession) -> list[AssistantResponse]:
-        """List all assistants, automatically seeding default catalog if DB is empty."""
-        try:
-            stmt = select(AssistantModel).where(AssistantModel.is_active.is_(True))
-            res = await db.execute(stmt)
-            assistants = res.scalars().all()
-            if assistants:
-                return [
-                    AssistantResponse(
-                        id=a.id,
-                        code=a.code,
-                        name=a.name,
-                        description=a.description,
-                        avatar_url=a.avatar_url,
-                        category=a.category,
-                        workflow_id=a.workflow_id,
-                        collection_id=a.collection_id,
-                        is_active=a.is_active,
-                        sample_questions=a.config.get("sample_questions", []),
-                    )
-                    for a in assistants
-                ]
-        except Exception as e:
-            logger.debug("Database assistant query failed or empty, using standard catalog: %s", e)
-
-        # Fallback to seeded in-memory catalog
-        return [
-            AssistantResponse(
-                id=f"ast_{idx}",
-                code=item["code"],
-                name=item["name"],
-                description=item["description"],
-                avatar_url=item.get("avatar_url"),
-                category=item["category"],
-                workflow_id=item["workflow_id"],
-                collection_id=item["collection_id"],
-                is_active=True,
-                sample_questions=item.get("sample_questions", []),
+    async def list_assistants(
+        self,
+        db: AsyncSession,
+        *,
+        search: str | None = None,
+        category: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[AssistantResponse]:
+        query = select(AssistantModel).order_by(AssistantModel.name)
+        if not include_inactive:
+            query = query.where(AssistantModel.is_active.is_(True))
+        if category:
+            query = query.where(AssistantModel.category == category)
+        if search and search.strip():
+            pattern = f"%{_clean_text(search).casefold()}%"
+            query = query.where(
+                func.lower(AssistantModel.code).like(pattern)
+                | func.lower(AssistantModel.name).like(pattern)
+                | func.lower(AssistantModel.description).like(pattern)
             )
-            for idx, item in enumerate(STANDARD_ASSISTANTS, start=1)
+        records = list((await db.execute(query)).scalars().all())
+        return [_to_response(record) for record in records]
+
+    async def get_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
+        return _to_response(await self._get_record(db, reference))
+
+    async def create_assistant(
+        self, db: AsyncSession, request: AssistantCreateRequest
+    ) -> AssistantResponse:
+        code = _clean_text(request.code)
+        if not code:
+            raise AppException("Mã trợ lý không được để trống.", code="assistant_invalid")
+        existing = await db.execute(
+            select(AssistantModel.id).where(func.lower(AssistantModel.code) == code.casefold())
+        )
+        if existing.scalar_one_or_none():
+            raise EntityAlreadyExistsError(
+                f"Mã trợ lý '{code}' đã tồn tại.",
+                details={"assistant_code": code},
+            )
+
+        record = AssistantModel(
+            code=code,
+            name=_clean_text(request.name) or request.name,
+            description=_clean_text(request.description) or request.description,
+            avatar_url=_clean_text(request.avatar_url),
+            category=_clean_text(request.category) or request.category,
+            system_prompt=_clean_text(request.system_prompt) or request.system_prompt,
+            workflow_id=_clean_text(request.workflow_id) or request.workflow_id,
+            collection_id=_clean_text(request.collection_id) or request.collection_id,
+            is_active=request.is_active,
+            tenant_id=_clean_text(request.tenant_id) or request.tenant_id,
+            config=request.config.model_dump(mode="json"),
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Created assistant code=%s workflow=%s", record.code, record.workflow_id)
+        return _to_response(record)
+
+    async def update_assistant(
+        self,
+        db: AsyncSession,
+        reference: str,
+        request: AssistantUpdateRequest,
+    ) -> AssistantResponse:
+        record = await self._get_record(db, reference)
+        updates = request.model_dump(exclude_unset=True)
+        for field_name, value in updates.items():
+            if field_name == "config" and value is not None:
+                value = request.config.model_dump(mode="json") if request.config else None
+            elif isinstance(value, str):
+                value = _clean_text(value)
+            setattr(record, field_name, value)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Updated assistant code=%s", record.code)
+        return _to_response(record)
+
+    async def deactivate_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
+        record = await self._get_record(db, reference)
+        record.is_active = False
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Deactivated assistant code=%s", record.code)
+        return _to_response(record)
+
+    async def seed_defaults(self, db: AsyncSession) -> AssistantSeedResponse:
+        return await seed_standard_assistants(db)
+
+    def list_templates(self) -> list[AssistantTemplateResponse]:
+        return [
+            AssistantTemplateResponse(
+                code=str(item["code"]),
+                name=str(item["name"]),
+                description=str(item["description"]),
+                category=str(item["category"]),
+                workflow_id=str(item["workflow_id"]),
+                collection_id=str(item["collection_id"]),
+                system_prompt=str(item["system_prompt"]),
+                config=AssistantLifecycleConfig.model_validate(item["config"]),
+            )
+            for item in STANDARD_ASSISTANTS
         ]
 
-    async def get_assistant(self, db: AsyncSession, code: str) -> AssistantResponse:
-        """Get assistant details by unique code."""
-        all_ast = await self.list_assistants(db)
-        for a in all_ast:
-            if a.code.lower() == code.lower():
-                return a
-
-        raise EntityNotFoundError(
-            message=f"Trợ lý AI với mã '{code}' không tồn tại trên hệ thống QNU.",
-            details={"code": code},
+    async def export_bundle(self, db: AsyncSession, reference: str) -> AssistantBundle:
+        record = await self._get_record(db, reference)
+        workflow_result = await db.execute(
+            select(WorkflowDefinition).where(WorkflowDefinition.id == record.workflow_id)
         )
+        workflow_record = workflow_result.scalar_one_or_none()
+        workflow = None
+        if workflow_record:
+            workflow = AssistantBundleWorkflow(
+                id=workflow_record.id,
+                name=workflow_record.name,
+                display_name=workflow_record.display_name,
+                description=workflow_record.description,
+                module_code=workflow_record.module_code,
+                version=workflow_record.version,
+                dag_spec=workflow_record.dag_spec,
+            )
+        return AssistantBundle(
+            exported_at=datetime.now(UTC),
+            assistant=AssistantCreateRequest(
+                code=record.code,
+                name=record.name,
+                description=record.description,
+                avatar_url=record.avatar_url,
+                category=record.category,
+                system_prompt=record.system_prompt,
+                workflow_id=record.workflow_id,
+                collection_id=record.collection_id,
+                is_active=record.is_active,
+                tenant_id=record.tenant_id,
+                config=AssistantLifecycleConfig.model_validate(record.config or {}),
+            ),
+            workflow=workflow,
+        )
+
+    async def import_bundle(self, db: AsyncSession, bundle: AssistantBundle) -> AssistantResponse:
+        workflow = bundle.workflow
+        if workflow:
+            existing_workflow = await db.execute(
+                select(WorkflowDefinition.id).where(WorkflowDefinition.id == workflow.id)
+            )
+            if not existing_workflow.scalar_one_or_none():
+                db.add(
+                    WorkflowDefinition(
+                        id=workflow.id,
+                        name=workflow.name,
+                        display_name=workflow.display_name,
+                        description=workflow.description,
+                        module_code=workflow.module_code,
+                        version=workflow.version,
+                        is_active=True,
+                        dag_spec=workflow.dag_spec,
+                    )
+                )
+        return await self.create_assistant(db, bundle.assistant)
 
     async def chat(
-        self, db: AsyncSession, code: str, req: AssistantChatRequest
+        self,
+        db: AsyncSession,
+        reference: str,
+        request: AssistantChatRequest,
+        *,
+        correlation_id: str | None = None,
     ) -> AssistantChatResponse:
-        """Execute chat interaction by running the assistant's underlying Workflow DAG."""
-        assistant = await self.get_assistant(db, code)
-
-        # Execute through Workflow DAG Engine
-        wf_req = WorkflowExecuteRequest(
+        assistant = await self.get_assistant(db, reference)
+        if not assistant.is_active:
+            raise AppException(
+                f"Trợ lý '{assistant.code}' đang bị vô hiệu hóa.",
+                code="assistant_inactive",
+                status_code=409,
+                details={"assistant_code": assistant.code},
+            )
+        runtime_profile = build_runtime_profile(assistant)
+        sanitized_message = prepare_user_message(request.message, runtime_profile)
+        workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
-            inputs={"message": req.message},
-            tenant_id=req.tenant_id,
-            conversation_id=req.conversation_id,
+            inputs={"message": sanitized_message},
+            tenant_id=request.tenant_id,
+            conversation_id=request.conversation_id,
         )
-
-        wf_res = await workflow_service.execute(db, wf_req)
-
-        answer_text = (
-            wf_res.outputs.get("answer")
-            or "Trợ lý QNU đã xử lý xong yêu cầu của bạn."
+        workflow_response = await workflow_service.execute(
+            db,
+            workflow_request,
+            assistant_profile=runtime_profile,
+            correlation_id=correlation_id,
         )
-        citations = wf_res.outputs.get("citations", [])
-        status = wf_res.outputs.get("status") or wf_res.status
-
-        # Pick suggested follow-up questions
-        suggested = assistant.sample_questions[:3]
-
+        answer = workflow_response.outputs.get("answer")
+        if not isinstance(answer, str) or not answer.strip():
+            answer = assistant.config.guardrails.no_answer_message
+        citations = workflow_response.outputs.get("citations", [])
         return AssistantChatResponse(
             assistant_code=assistant.code,
             assistant_name=assistant.name,
-            answer=answer_text,
-            status=status,
-            citations=citations,
-            suggested_questions=suggested,
-            latency_ms=wf_res.latency_ms,
-            execution_id=wf_res.execution_id,
+            answer=answer,
+            status=str(workflow_response.outputs.get("status") or workflow_response.status),
+            citations=citations if isinstance(citations, list) else [],
+            suggested_questions=assistant.sample_questions[:3],
+            latency_ms=workflow_response.latency_ms,
+            execution_id=workflow_response.execution_id,
         )
+
+    async def _get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
+        normalized_reference = _clean_text(reference) or reference
+        result = await db.execute(
+            select(AssistantModel).where(
+                or_(
+                    AssistantModel.id == normalized_reference,
+                    func.lower(AssistantModel.code) == normalized_reference.casefold(),
+                )
+            )
+        )
+        record = result.scalar_one_or_none()
+        if not record:
+            raise EntityNotFoundError(
+                f"Trợ lý AI '{reference}' không tồn tại.",
+                details={"assistant_reference": reference},
+            )
+        return record
 
 
 assistant_service = AssistantService()

@@ -7,11 +7,213 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-17 17:55 (UTC+7)
-- **Phiên số**: #56 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 01:25 (UTC+7)
+- **Phiên số**: #77 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Khắc Phục Bóc Tách Bảng Song Song & Bảo Toàn Danh Sách (List) Độc Lập (phiên #56)**:
+  1. **Xử Lý Triệt Để Lỗi Chuẩn Hóa PDF Scan & Loại Bỏ Hoàn Toàn Text Giả Lập (phiên #77)**:
+     - **Vấn đề**: Người dùng kiểm tra tệp PDF scan 9 trang (`4740-qd-bgddt-bo-chi-so-cds-dai-hoc.pdf`, QĐ 4740 BGDĐT), Document Verification Studio hiển thị toàn bộ văn bản giả lập (`### Tiêu đề đầu trang`, `## Tên loại văn bản / Trích yếu nội dung`, `Đoạn văn bản quy định`, `Bảng biểu số liệu`, `Con dấu & Chữ ký xác thực`), mất 100% nội dung thật.
+     - **Nguyên nhân gốc rễ**:
+       * `layout_detector.py` (dòng 965..990, 295, 193) gán chuỗi mô tả tiếng Việt vào thuộc tính `text` của box thay vì để rỗng.
+       * `chunker.py` không parse ranh giới `<!-- Trang X -->`, gán `page_number = None` cho cả 9 chunks.
+       * `service.py` kích hoạt `is_clumped = True` giả mạo, vứt bỏ toàn bộ chunks thật để thay bằng `_synthesize_page_markdown_from_blocks` chứa text giả lập.
+       * `mistral_adapter.py` truyền `page.get_text()` rỗng vào Layout Detector thay vì text OCR thật.
+     - **Giải pháp triệt để**:
+       * `layout_detector.py`: Gỡ bỏ 100% text giả lập khỏi `raw_boxes`, `tables`, `stamps`. Khi không có text OCR, `text = ""` và `content_snippet = ""`.
+       * `chunker.py`: Tự động parse `_RE_PAGE_MARKER` để gán chính xác `page_number` cho từng chunk (1 đến 9).
+       * `mistral_adapter.py`: Truyền markdown THẬT từ Mistral OCR của từng trang vào `SmartLayoutDetector`.
+       * `service.py`: Lưu `page_markdowns` vào `doc_metadata`, ưu tiên dùng trong `build_studio_pages`, lọc sạch `_SYNTHESIS_PLACEHOLDERS`, và kích hoạt **Auto-Rescue** trong `get_studio_view` khi tài liệu có 0 chunks hoặc khi người dùng bấm `[Quét lại]`.
+       * Reprocess CSDL: Nạp đầy đủ **9 chunks thật (14.194 ký tự)** của QĐ 4740 vào PostgreSQL.
+     - **Kiểm thử**:
+       * Backend Pytest: 44/44 passed (100%) trong 46.65s (bổ sung 2 test case mới).
+       * Backend Ruff: 0 error.
+       * Zero Mojibake Audit: 225/225 files sạch (100%).
+       * Frontend: Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công (12.04s).
+  2. **Tối Giản Toàn Diện Màn Hình Đối Soát Document Verification Studio — Pure Markdown (Phương Án 1 - phiên #76)**:
+     - **Yêu cầu người dùng**: Bỏ các tab gây thừa thãi ("Văn bản", "Markdown", "Bố cục & Khối"); chỉ tập trung vào một đích duy nhất: dữ liệu chuẩn hóa Markdown sạch để nạp vào Vector DB hoặc xuất file .md.
+     - **Giải pháp**:
+       * Thay thế 3 tab cũ bằng **Right Toolbar tối giản**:
+         - Scope Switcher: `[Trang hiện tại (Trang X)]` vs `[Toàn bộ file (N trang)]` dùng `<Tabs>` semantic.
+         - Toggle Chế độ xem: `[Xem render]` vs `[Mã nguồn .md]` (icon `Code`/`Eye`).
+         - Công cụ hành động: `[✏️ Sửa tay]` (kèm `[Xem trước]`, `[Lưu sửa]`, `[Hủy]`), `[Sao chép]`, `[Tải file .md]`.
+       * Dọn dẹp sạch mã chết (Boy Scout Rule 8.1 & 8.2): Gỡ bỏ import `Layers`, `RegionsInspector` và `allRegions` useMemo.
+       * Cả 2 scope (`page` và `all`) đều hỗ trợ chuyển đổi linh hoạt giữa xem render GFM và xem mã nguồn thô trong thẻ `<pre>`.
+       * Footer stats đồng bộ tự động theo scope (`từ • dòng` khi ở trang đơn, `ký tự • trang` khi ở toàn bộ file).
+     - **Kiểm thử**: Biome lint 0 lỗi (91 files), TypeScript 0 lỗi (`tsc --noEmit`), Vite build thành công (9.72s), Zero Mojibake 225/225 files sạch.
+  2. **Sửa Triệt Để Lỗi Chuẩn Hóa Markdown Bị Mất Bảng Biểu & Scan Không Nhận Diện Bảng — Kế Thừa QNU-AI-Core (phiên #75)**:
+     - **Vấn đề**: Người dùng tải tệp (đặc biệt là tệp DOCX tuyển sinh 14 trang `Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1).docx`), toàn bộ các bảng biểu biểu mẫu tuyển sinh từ trang 2 đến trang 13 bị biến thành chuỗi chữ giữ chỗ `Bảng biểu dữ liệu số hóa` thay vì trích xuất thành bảng Markdown (`| STT | Mã xét tuyển | ... |`), khung scan nhận diện bảng không sinh ra bảng Markdown tương ứng.
+     - **Nguyên nhân gốc rễ**:
+       * `layout_detector.py` (dòng 295, 405) gán cứng `"text": "Bảng biểu dữ liệu số hóa"` và loại bỏ toàn bộ text con trong bảng, không gọi `tab.extract()`.
+       * `DocxParser` trong `office_parser.py` duyệt văn bản trước rồi dồn bảng xuống cuối tệp, trả về `page_count = 1` khiến chunks bị dồn về trang 1 (`is_clumped = True`).
+       * Trong `service.py`, `_synthesize_page_markdown_from_blocks` lấy text từ block của trang, dẫn đến toàn bộ nội dung từ trang 2 đến trang 13 biến thành dòng chữ giữ chỗ vô nghĩa.
+     - **Giải pháp bám sát `qnu-ai-core`**:
+       * `layout_detector.py`: Bổ sung `_format_table_markdown(rows)`. Khi `find_tables()` phát hiện bảng, gọi `tab.extract()` chuyển đổi thành Markdown table thực sự. Gán bảng Markdown này vào `table["text"]` và `content_snippet`. Triệt tiêu hoàn toàn chuỗi placeholder.
+       * `office_parser.py`: Nâng cấp toàn diện `DocxParser` theo chuẩn `docx_processor.py` của `qnu-ai-core`: duyệt tuần tự `child in doc.element.body`, chuẩn hóa Quốc hiệu/Tiêu ngữ/Số hiệu NĐ 30, tách hàng La Mã thành tiêu đề, xử lý colspan và ngắt dòng trong ô `<br>`/`;`, cân bằng số cột.
+       * `cleaner.py`: Bổ sung Unicode NFC (Zero Mojibake), chuẩn hóa cấu trúc bảng Markdown (`_normalize_markdown_table_block`), nối bảng qua trang (`_stitch_table_continuations`), làm sạch số trang đơn độc.
+       * `service.py`: Cập nhật `_synthesize_page_markdown_from_blocks` giữ nguyên bảng Markdown, bổ sung phát hiện `has_placeholder` trong `_is_stale_raw_blocks` để tự động re-extract dữ liệu cũ, lưu `text` đầy đủ cho từng block trong `_ensure_page_blocks`.
+       * `blocks.py`: Bổ sung `_format_table_markdown` và cập nhật `extract_page_blocks` trích xuất bảng Markdown từ PDF vector tables.
+       * `verification-data.ts`: Dọn dẹp sạch 12 vị trí chứa chuỗi `"Bảng biểu dữ liệu số hóa"` trong mock fixture.
+     - **Kiểm thử**:
+       * Parse thực tế tệp DOCX tuyển sinh: 23.118 ký tự, 4 bảng lớn, đầy đủ 53 ngành tuyển sinh và tổ hợp môn, 0 placeholder.
+       * Pytest: `test_knowledge_docx_tables.py` (3/3 passed), `test_smart_layout.py` (4/4 passed), `test_knowledge.py` (25/25 passed).
+       * Ruff: 0 lỗi. Biome: 0 lỗi. TypeScript: 0 lỗi. Vite build: thành công. Zero Mojibake: 225/225 files sạch.
+  2. **Sửa Lỗi OCR Bounding Box Nát Bét Trên PDF — Loại Bỏ Khối Giả Lập, Tích Hợp SmartLayoutDetector (phiên #74)**:
+     - **Vấn đề**: Upload file PDF (`4740-qd-bgddt-bo-chi-so-cds-dai-hoc.pdf`) vào Kho Tri Thức, Document Verification Studio hiển thị khu nhận diện OCR (bounding box overlay) nát bét: các khối ngang chồng chéo (x=8.0, width=84.0) với badge chứa 40 ký tự markdown thô (`**bộ giáo dục**`, `# **quyết định**`). Trên trang landscape (bảng biểu), dải sọc cắt ngang hoàn toàn lệch.
+     - **Nguyên nhân gốc rễ**: `MistralOCRAdapter` tạo blocks giả lập (mỗi dòng markdown = 1 khối ngang). `_is_stale_raw_blocks` chấp nhận khối giả (vì type `title`/`header` tồn tại) nên không kích hoạt SmartLayoutDetector. Frontend render `{box.label}` verbatim.
+     - **Giải pháp**: (1) `mistral_adapter.py`: Thay vòng lặp giả bằng `SmartLayoutDetector` thực (PyMuPDF hybrid + OpenCV), trả `blocks=[]` nếu detector thất bại. (2) `knowledge/service.py`: Phát hiện synthetic blocks (`x≈8.0, width≈84.0` hoặc markdown `**`/`#` trong label) → auto re-extract. (3) `document-bounding-visualizer.tsx`: `REGION_BADGE_LABELS` map + `getDisplayBadge` + max-width 120px ellipsis.
+     - **Kiểm thử**: Pytest 143/143 passed, Ruff 0 lỗi, Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công.
+  2. **Khắc Phục Lưu API Key Provider & Xử Lý Tính Đặc Thù Của Từng Provider (Cloudflare, Mistral, Gemini, OpenAI) (phiên #73)**:
+     - **Vấn đề**: Người dùng thêm API key vào Mistral trong Quản lý Provider (`/models`) nhưng không được lưu lại. Ngoài ra, cấu trúc API của Cloudflare Workers AI khác biệt (yêu cầu `account_id` trong URL), cần nghiên cứu tính đặc thù của từng provider.
+     - **Nguyên nhân gốc rễ**:
+       * Bảng `model_provider_configs` lưu `api_keys` trong cột `extra_config` (`JSONB`). Khi sửa đổi mảng con `extra["api_keys"]`, SQLAlchemy không phát hiện thay đổi nếu thiếu `flag_modified(config, "extra_config")`. Vì vậy `await db.commit()` âm thầm bỏ qua câu lệnh `UPDATE`!
+       * Thiếu cơ chế đồng bộ hóa tức thì (In-memory Live Sync) giữa cấu hình DB và các runtime services (`settings.MISTRAL_API_KEY`, `settings.CLOUDFLARE_API_TOKEN`, `settings.CLOUDFLARE_ACCOUNT_ID`), khiến OCR hoặc RAG không nhận được key mới nếu chưa restart backend.
+     - **Giải pháp**:
+       * Bổ sung `flag_modified(config, "extra_config")` cho toàn bộ các thao tác Key Pool: `add_provider_key`, `update_provider`, `update_provider_key`, `delete_provider_key`, `simulate_key_rotation`.
+       * Triển khai hàm `_sync_runtime_credentials`: tự động tiêm key và account_id vào `settings` ngay khi tạo/sửa/xóa key hoặc khi load danh sách provider lúc khởi động.
+       * Xử lý tính đặc thù của từng Provider:
+         - **Cloudflare Workers AI**: Hỗ trợ trường `account_id`, URL `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run`, endpoint xác thực `/accounts/{account_id}/ai/models/search`.
+         - **Mistral AI**: Endpoint xác thực `/v1/models`, model OCR `mistral-ocr-latest`.
+         - **Google Gemini**: Xác thực qua `?key=` hoặc header `x-goog-api-key`.
+         - **OpenAI / DeepSeek / Groq / OpenRouter / NVIDIA**: Xác thực chuẩn Bearer token và endpoint `/v1/models`.
+       * Triển khai kiểm tra kết nối thật (Real HTTP Verification) trong `test_provider` và `test_provider_key` thay cho số liệu giả lập.
+     - **Kiểm thử**:
+       * Pytest: 143/143 passed (100% pass toàn bộ test suite dự án).
+       * Ruff: 0 lỗi.
+       * Frontend: Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công (`dist/` bundle).
+  2. **Tích Hợp Mistral OCR & Cơ Chế Điều Phối Bóc Tách Đa Tầng Core → Platform (phiên #72)**:
+     - **Vấn đề**: Người dùng upload tệp PDF dạng scan (`4740-qd-bgddt-bo-chi-so-cds-dai-hoc.pdf`), Platform kích hoạt Docling TableFormer trên CPU tải trọng 770MB weights Heron Object Detection và chạy suy luận mất hàng chục giây.
+     - **Giải pháp bóc tách chuẩn Core**:
+       * Tạo `MistralOCRAdapter` (`backend/app/modules/ocr/adapters/mistral_adapter.py`) gọi Mistral OCR API (`POST https://api.mistral.ai/v1/ocr`, model `mistral-ocr-latest`), trả về markdown, pages và bounding boxes studio. Kiểm tra tính sẵn sàng trung thực qua `settings.MISTRAL_API_KEY`.
+       * Triển khai cơ chế phân định thông minh (Smart Extension-based Routing):
+         - File Word/Excel (`.docx`, `.doc`, `.xlsx`, `.xls`): Ưu tiên `Docling TableFormer` / `openpyxl` bảo toàn 100% ma trận bảng.
+         - File PDF: Trích xuất nhanh văn bản số hóa qua PyMuPDF fast-path (10-30ms); nếu là bản scan (văn bản <40 ký tự) $\rightarrow$ chuyển cứu hộ Mistral OCR (Cloud API 1-2s).
+         - Graceful Local Fallback: Nếu không cấu hình `MISTRAL_API_KEY` hoặc lỗi mạng, tự động rơi về Local OCR (`easyocr` / `docling` / `pymupdf_ocr`) với `fallback_triggered=True`.
+         - File ảnh (`.png`, `.jpg`,...): Ưu tiên Mistral OCR, fallback Local OCR.
+       * Sửa lỗi buffer 1D trong `easyocr_adapter.py`: truyền trực tiếp `image_bytes` vào `reader.readtext`.
+       * Frontend: Cập nhật `file-inspector.ts` và `document-ingest-page.tsx` với đề xuất `Fast-path + Mistral OCR` và option `mistral: "mistral_ocr"`.
+     - **Kiểm thử**:
+       * Backend: `uv run ruff check .` (0 lỗi), `pytest tests/test_ocr.py` (13/13 passed 100%), `pytest tests/test_knowledge.py` (25/25 passed 100%).
+       * Frontend: `npm run lint` (0 lỗi trên 90 files), `npm run typecheck` (0 lỗi), `npm run build` (thành công trong 15.95s).
+  2. **Đồng Bộ Quản Trị Trợ Lý AI Core → Platform Bằng Dữ Liệu Thật (phiên #71)**:
+     - Xác định bảng `assistants` ban đầu rỗng; API cũ che giấu tình trạng này bằng 5 bản ghi fallback trong bộ nhớ và trang `/assistants` tiếp tục hiển thị hằng số frontend.
+     - Tạo seed idempotent 5 trợ lý + 5 `WorkflowDefinition` từ `configs/workflows`, không ghi đè cấu hình người dùng và không chạm Provider/ModelOps.
+     - Chuẩn hóa cấu hình vòng đời 7 lớp: Persona/Scope, Knowledge, Model/Fallback, Guardrails, Tools/HITL, Output/Citations và Evaluation TM-08.
+     - Hoàn thiện API list/detail/create/update/deactivate, templates, seed-defaults, import/export bundle; lỗi DB được phản ánh trung thực, không fallback mock.
+     - Thay trang tĩnh bằng `/assistants`, `/assistants/new`, `/assistants/:code` dùng TanStack Query, có loading/error/empty, tìm kiếm/lọc, seed, import/export và liên kết Chat/DAG đúng trợ lý.
+     - Đã nạp và xác minh PostgreSQL có 5 bản ghi thật; API list/detail/templates trả HTTP 200; kiểm tra trực quan ba route trên trình duyệt thành công.
+     - **Kiểm thử**: Assistants 7/7 passed, Ruff 0 lỗi; frontend Biome 0 lỗi, TypeScript 0 lỗi, Vite build thành công. Toàn bộ backend đạt 141/142; 1 lỗi ngoài phạm vi ở OCR concurrent (`OCRExtractResponse.fallback_engine`).
+  1. **Khắc Phục Lỗi TypeError `document_type_code` & Hoàn Thiện Studio Page Builder (phiên #70)**:
+     - **Hiện tượng**: Tải lên tệp tin `7.1.6 Kế hoạch triển khai 2 phần mềm của Nhà trường.docx` qua Studio Nạp Kho Tri thức bị lỗi `Tải lên thất bại (HTTP 500). Vui lòng thử lại.` Do Backend trả `TypeError: KnowledgeService.list_documents() got an unexpected keyword argument 'document_type_code'` và `KnowledgeService.ingest_document()`.
+     - **Nguyên nhân**: `KnowledgeService` bị thiếu tham số `document_type_code` do quá trình revert trước đó.
+     - **Giải pháp**:
+       * Import `document_types_service` và bổ sung `document_type_code: str | None = None` vào `KnowledgeService.list_documents` (kèm query filter `where(KnowledgeDocument.document_type_code == document_type_code)`).
+       * Bổ sung `document_type_code: str | None = None` vào `KnowledgeService.ingest_document`, xác thực active code với `document_types_service.validate_active_code`, gán vào `KnowledgeDocument.document_type_code` và lưu `document_type_source`.
+       * Bổ sung tham số `page_markdowns` và helper `_synthesize_page_markdown_from_blocks` trong `build_studio_pages` để bảo toàn nội dung từng trang khi chunks bị dồn.
+     - **Kiểm thử**: `uv run ruff check .` (0 lỗi), `uv run --extra dev pytest tests/test_knowledge.py tests/test_document_types.py tests/test_jobs.py` (47/47 passed 100%), Endpoint `GET /platform/v1alpha1/knowledge/documents` phản hồi `HTTP 200 OK`.
+  2. **Đồng Bộ Lịch Sử Tác Vụ (`JobRecord`) Cho Luồng Nạp Tài Liệu Kho Tri Thức (phiên #69)**:
+     - **Hiện tượng**: Người dùng nạp tệp thành công vào CSDL (hiển thị 1 tài liệu hiệu lực 16 chunks), nhưng tab "Tiến trình & Lịch sử Tác vụ (0)" trống không có tác vụ nào.
+     - **Bản chất kỹ thuật**:
+       * Luồng nạp qua Studio chạy đồng bộ trực tiếp (Human-in-the-loop Ingestion) để trả kết quả bóc tách tức thì (<1s) cho người dùng đối soát mắt, không đẩy qua hàng đợi Redis/ARQ.
+       * Tab "Tiến trình & Lịch sử Tác vụ" gọi `GET /jobs?limit=50` từ bảng `job_records` (trước đây chỉ ghi khi người dùng bấm Reindex hoặc chạy worker task ngầm).
+     - **Giải pháp**:
+       * Cập nhật `ingest_document` và `approve_document` trong `knowledge/service.py` để tự động ghi nhận bản ghi `JobRecord(job_type="ingestion", status="completed", progress=100.0)` kèm metadata (tên tệp, dung lượng, OCR engine, chunks).
+       * Bổ sung `sync_ingestion_job_records` trong lifespan startup để tự động hồi tố lịch sử cho các tài liệu đang có trong kho.
+       * Đã tạo thành công bản ghi tác vụ cho `Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1).docx` trong CSDL.
+     - **Kiểm thử**: `test_jobs.py` pass 15/15 (100%), Ruff 0 lỗi, Biome 0 lỗi, TypeScript 0 lỗi.
+  2. **Tự Động Hóa 100% Loại Văn Bản (Taxonomy) Cho Trang Nạp Tài Liệu Kho Tri Thức (phiên #68)**:
+     - **Yêu cầu người dùng**: Sau khi trải nghiệm tính năng auto cấu hình ban đầu, người dùng phản hồi cần tự động chọn luôn "Loại văn bản" (đặc biệt khi upload file tuyển sinh như `Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1).docx` không bị rơi vào "Chọn loại văn bản" / "Chưa xác định").
+     - **Giải pháp toàn diện**:
+       * Nâng cấp `frontend/src/lib/file-inspector.ts`:
+         - Bổ sung nhận diện từ khóa tuyển sinh / đề án (`/(?:de\s*an|tuyen\s*sinh|thong\s*tin\s*tuyen\s*sinh)/` -> `de_an`).
+         - Cung cấp cơ chế dự phòng thông minh theo ngữ cảnh Kho Tri Thức đa hình (`collectionContext`: id, name, code) -> tự động gán loại văn bản đặc thù cho từng kho (`col_admissions` -> `de_an`, `col_regulations` -> `quy_che`, `col_library` -> `giao_trinh`, `col_question_bank` -> `de_cuong_mon_hoc`, `col_drafting` -> `cong_van`).
+         - Đồng bộ `getPriorityForDocumentType`: phân cấp chuẩn xác `de_an` vào `standardTypes` (Điểm 8/10, Tiêu chuẩn x50) theo đúng catalog backend NĐ 30.
+       * Cải tiến `frontend/src/pages/document-ingest-page.tsx`:
+         - Tách hàm `processFile(f: File)` dùng chung cho cả sự kiện click duyệt chọn file và kéo thả file (`onDrop` / `onDragOver`).
+         - Bổ sung `useEffect` tự động gán Loại văn bản mặc định theo Kho tri thức ngay khi mở trang mà không cần chờ chọn file.
+         - Cập nhật nhãn Loại văn bản trong Smart Recommendation Banner hiển thị tên tiếng Việt chính thức.
+     - **Kiểm thử**: Biome lint 0 lỗi trên 86 files, TypeScript 0 lỗi, Vite build thành công (10.81s), backend pytest 25/25 knowledge tests pass (100%), Ruff 0 lỗi.
+  2. **Tích Hợp Smart Auto-Recommendation Cho Trang Nạp Tài Liệu Kho Tri Thức (phiên #66)**:
+     - **Yêu cầu người dùng**: Tìm hiểu và tích hợp chức năng tự động đề xuất cấu hình bóc tách khi chọn file kế thừa từ `qnu-ai-core`.
+     - **Giải pháp**:
+       * Nâng cấp `frontend/src/lib/file-inspector.ts`: bổ sung `detectDocumentTypeFromFilename` (18 mẫu đối chiếu 37 loại Taxonomy), `extractYearFromFilename` (regex 4 chữ số), `cleanTitleFromFilename` và `getPriorityForDocumentType` (Cốt lõi 10/10, Tiêu chuẩn 8/10, Tham khảo 6/10).
+       * Tích hợp vào `frontend/src/pages/document-ingest-page.tsx`: tự động chọn bộ máy OCR (Word/Excel -> Docling TableFormer bảo toàn bảng; Text/MD -> PyMuPDF Fast; PDF -> Auto), tự động chọn Loại văn bản, tự động điền Năm hiệu lực, hiển thị **Smart Recommendation Banner** màu Academic Teal và cập nhật mức ưu tiên pháp lý động.
+     - **Kiểm thử**: Biome lint 0 lỗi trên 86 files, TypeScript 0 lỗi, Vite build thành công (12.59s), logic tests pass 100%.
+  2. **Khắc Phục Lỗi "Xóa Tài Liệu Thất Bại (HTTP 500)" Do Backend Offline & Tối Ưu Xử Lý Lỗi Proxy (phiên #65)**:
+     - **Nguyên nhân gốc rễ**: Người dùng duyệt Frontend (`port 3001`) nhưng tiến trình Backend (`port 8001`) chưa được khởi chạy. Vite Proxy (`localhost:3001 -> 127.0.0.1:8001`) bị từ chối kết nối `ECONNREFUSED` nên trả về `HTTP 500`. Frontend do không gọi được API danh sách nên fallback hiển thị tài liệu mẫu `doc_ts_2026`; khi người dùng bấm xóa, yêu cầu tiếp tục gặp 500 từ Vite proxy.
+     - **Giải pháp**:
+       * Khởi động dịch vụ Backend FastAPI trên port 8001, xác thực mọi API `/health/live`, `/knowledge/collections`, `/jobs`, `/modelops/defaults` đều phản hồi HTTP 200 OK.
+       * Cải tiến `apiClient.deleteDocument`: Tự động bắt lỗi HTTP 500 từ proxy khi backend offline, hiển thị thông báo lỗi rõ ràng hướng dẫn khởi động backend, và dọn dẹp mock list an toàn.
+     - **Kiểm thử**: Backend 136/136 tests pass (100%), Ruff 0 lỗi; Frontend Biome 0 lỗi (83 files), TypeScript 0 lỗi.
+  2. **Tính Năng Thiết Lập Model Mặc Định Hệ Thống (Embedding, Reranker, OCR) Cho Kho Tri Thức & RAG (phiên #64)**:
+     - **Yêu cầu người dùng**: Bổ sung tính năng cấu hình model mặc định (Cloudflare vs Local) để tự động áp dụng khi sử dụng Kho Tri Thức và RAG.
+     - **Kiến trúc & Giải pháp**:
+       * Backend Service & API (`modelops`): Cung cấp schema `SystemModelDefaults` và endpoints `GET /modelops/defaults`, `PUT /modelops/defaults`, `POST /modelops/providers/{id}/set-default`. Tự động scan model khả dụng của các provider active trong CSDL.
+       * Lưu trữ PostgreSQL bền vững: Bản ghi `system_model_defaults` trong `model_provider_configs`, tự động đồng bộ vào runtime `settings` (Lifespan Startup).
+       * Giao diện Quản trị ModelOps (`modelops-page.tsx`): Card điều khiển "Mô Hình Mặc Định Hệ Thống (Active System Defaults)" với 3 dropdowns tương tác thời gian thực; huy hiệu "★ Default" và nút gán nhanh "Đặt Default" trên từng model tag.
+       * Phản ánh trực quan Kho Tri Thức (`knowledge-page.tsx` & `collection-detail-page.tsx`): Hiển thị model embedding mặc định động kèm icon phân biệt (`Zap` cho Cloudflare Workers AI Edge vs `Cpu` cho Local CPU).
+     - **Kiểm thử**: Backend pytest 13/13 modelops + 34/34 rag/knowledge pass (100%), Ruff check 0 lỗi; Frontend Biome 0 lỗi, TypeScript 0 lỗi, Vite build bundle thành công.
+  2. **Tạo seed data taxonomy Platform và khắc phục lỗi không hiển thị dữ liệu (phiên #63)**:
+     - Xác định database đã có 37 dòng trong `platform_document_types`, nhưng API list HTTP 500 vì schema cũ thiếu `knowledge_documents.document_type_code`.
+     - Tạo `document_types/seed_data.py` làm manifest seed versioned, sinh từ catalog 37 loại đã đối chiếu với `qnu-ai-core`, không tạo nguồn dữ liệu nghiệp vụ thứ hai.
+     - Thêm `scripts/seed_document_types.py` để seed idempotent bằng lệnh rõ ràng; sửa logic sync không còn `KeyError` khi so sánh các trường source audit.
+     - Bổ sung startup schema repair và migration idempotent cho cột/index/FK; đã áp dụng migration vào PostgreSQL hiện tại.
+     - Xác minh API GET list trả 37 loại và POST sync trả HTTP 200 (`total=37`, `added=0`, `updated=0`); không chạm Provider/ModelOps seed của session song song.
+     - Kiểm thử phiên: Backend **135/135 passed**, Ruff 0 lỗi.
+  1. **Seed Dữ Liệu Provider Cloudflare Workers AI & Mistral OCR, Tích Hợp BGE-M3 và Reranker (phiên #60)**:
+     - **Yêu cầu người dùng**: Seed data Cloudflare, Mistral OCR cho Provider, đồng bộ API key từ file env của `qnu-ai-core`, sử dụng Cloudflare cho BGE-M3 Embedding và Reranker.
+     - **Giải pháp xử lý**:
+       * Cấu hình `config.py` & `.env`: Bổ sung `EMBEDDING_PROVIDER="cloudflare"` và `RERANKER_PROVIDER="cloudflare"`, đặt mặc định `EMBEDDING_MODEL="@cf/baai/bge-m3"` và `RERANKER_MODEL="@cf/baai/bge-reranker-base"`.
+       * Nạp `CLOUDFLARE_ACCOUNT_ID="ab6bf644b640759c330c44f109e3f000"`, `CLOUDFLARE_API_TOKEN="cfut_...df00"`, `MISTRAL_API_KEY="r1Dv...07T4"`.
+       * Tích hợp Cloudflare BGE-M3 trong `vector_indexer.py`: Thêm `_embed_texts_cloudflare` gọi trực tiếp API Cloudflare Workers AI (16 chunks tính xong trong 1.00s thay vì 101.94s trên CPU, nhanh gấp 100 lần), kèm fallback tự động sang SentenceTransformers hoặc mock vector.
+       * Tích hợp Cloudflare BGE Reranker trong `reranker.py`: Thêm `_rerank_cloudflare` gọi API `@cf/baai/bge-reranker-base`, xếp hạng chính xác ngữ nghĩa trong 1.21s, kèm fallback tự động sang RRF ordering.
+       * Seed CSDL PostgreSQL `model_provider_configs`: Cập nhật `prov_cloudflare` và `prov_mistral` kèm Key Pool hoạt động chuẩn UTF-8 ("Khóa Mistral OCR & Platform").
+     - **Kiểm thử**:
+       * Backend: 25/25 test_knowledge pass, 9/9 test_rag pass, Ruff 0 lỗi.
+       * Frontend: Biome check 0 lỗi, TypeScript 0 lỗi.
+       * Đo đạc thực tế: Cloudflare BGE-M3 trả về vector 1024 chiều trong **1.00s**, Cloudflare Reranker trả về điểm số tương quan cao (0.898) trong **1.21s**.
+  2. **Triển khai taxonomy loại văn bản Core → Platform (phiên #61)**:
+     - Khảo sát danh mục 37 loại văn bản trong `qnu-ai-core/services/platform-api/.../document_taxonomy.py`.
+     - Phân biệt taxonomy của Product Platform với `document_type` dạng chuỗi tự do trong AI Core engine.
+     - Xác định Platform mới chưa có module/table/API Document Types và `KnowledgeDocument` chưa có `document_type_code`.
+     - Tạo module `document_types` với catalog 37 loại/28 mã NĐ30, bảng `platform_document_types`, migration có kiểm tra schema, source hash/version và sync idempotent bảo vệ custom type.
+     - Bổ sung CRUD/filter/API sync, gắn `document_type_code` vào `KnowledgeDocument`, upload ingestion và filter tài liệu theo loại.
+     - Đồng bộ workflow extractor/exporter về mã canonical; thêm frontend `/document-types` list/detail, CRUD, deactivate và nút sync thật qua TanStack Query.
+     - Chốt taxonomy v1 là 37 loại; `Dự toán`, `Nghị định`, `Ma trận đề thi` giữ ngoài taxonomy như legacy/artifact.
+     - Trạng thái: nền tảng taxonomy v1 đã triển khai; chưa có Core HTTP endpoint versioned nên sync hiện dùng catalog import tương thích trong Platform.
+     - Phạm vi file không bao gồm provider/modelops seed của session song song.
+     - **Yêu cầu người dùng**: Khi làm sạch dữ liệu xong bấm "Xác nhận & Nạp vào Vector DB" trong Document Verification Studio thì nút bấm xoay mãi không dừng lại.
+     - **Nguyên nhân gốc rễ**:
+       * Mô hình BGE-M3 (2.24GB) chạy CPU inference cho 16 chunks dài mất tới 101.94s, vượt quá ngưỡng timeout 60s của client/proxy, khiến kết nối HTTP bị drop timeout và UI xoay mãi.
+       * `_get_embedding_model()` chạy đồng bộ trên main thread của Event Loop Uvicorn, kèm theo truy vấn unauthenticated lên HuggingFace Hub làm khóa cứng server 25-30s đầu.
+       * Thiết kế API `approve_document` đợi tính toán vector xong mới trả lời HTTP.
+     - **Giải pháp xử lý**:
+       * Tối ưu `vector_indexer.py`: Tải mô hình ưu tiên local cache (`local_files_only=True`, tải trong 2.45s), nạp qua `asyncio.to_thread` không chặn Event Loop, thêm timeout guard 30s với graceful fallback sang deterministic mock vector, chuẩn hóa tên collection tránh lặp `col_col_`.
+       * Tối ưu `service.py`: Tách nạp Qdrant sang `_background_index_document` chạy ngầm qua `asyncio.create_task`. Lưu bản sửa tay vào PostgreSQL xong trả về kết quả ngay (<0.5s), không bắt HTTP client phải đợi 1.5 phút.
+     - **Đo lường & Kiểm thử**:
+       * Độ trễ API `POST /documents/{id}/approve` giảm từ >60s (Timeout) xuống **0.39s** (giảm 99.6%).
+       * Điểm vector nạp thành công vào Qdrant (`col_question_bank`: 16 points).
+       * Backend: 25/25 test_knowledge pass, 9/9 test_rag pass, Ruff 0 lỗi.
+       * Frontend: Biome check 0 lỗi, TypeScript 0 lỗi, Vite build thành công.
+  2. **Điều Chỉnh Thứ Tự Tab & Phân Định Trách Nhiệm Markdown / Văn Bản Trong Studio (phiên #58)**:
+     - **Yêu cầu người dùng**: Sắp xếp lại 3 tab theo thứ tự `Văn bản`, `Markdown`, `Bố cục & Khối`; trong đó tab `Markdown` hiển thị tất cả nội dung của toàn bộ file, còn tab `Văn bản` hiển thị theo từng trang.
+     - **Giải pháp xử lý**:
+       * Sắp xếp lại thứ tự TabsList: `Văn bản` (1st, default), `Markdown` (2nd), `Bố cục & Khối` (3rd).
+       * Tab `Văn bản` (Page-by-page): Hiển thị nội dung bóc tách của từng trang (`currentPage`), hỗ trợ chế độ "Sửa tay" (Human-in-the-loop) trực tiếp trên trang đang chọn, sao chép và tải về tệp riêng cho trang đó.
+       * Tab `Markdown` (Full Document): Tổng hợp toàn bộ nội dung Markdown của tất cả các trang, kết hợp hiển thị các khối phân tách trang trực quan, tích hợp nút chuyển đổi nhanh giữa xem Render GFM và xem Mã nguồn thô, hỗ trợ sao chép toàn bộ Markdown và tải về tệp `.md` hoàn chỉnh của toàn bộ file.
+       * Thanh thống kê Footer: Hiển thị linh hoạt (tab Markdown hiển thị tổng ký tự & tổng trang; tab Văn bản hiển thị số từ & dòng của trang hiện tại).
+     - **Kiểm thử**: Biome lint 0 lỗi, TypeScript typecheck 0 lỗi, Vite build thành công; Backend 25/25 tests passed (100%), Ruff check 0 lỗi.
+  2. **Khắc Phục Dứt Điểm Lỗi Markdown Dồn Hết Vào Trang 1 & Trang 2 Trắng Tinh (phiên #57)**:
+     - **Nguyên nhân gốc rễ**: Khi tài liệu DOCX hoặc đa trang được upload, chunks được sinh ra có `page_number = None`. Trong `build_studio_pages`, toàn bộ chunks bị ép về `page_number = 1`, khiến Trang 1 gom toàn bộ 22.985 ký tự của cả 14 trang, còn các trang 2..14 không có chunk nào nên `markdown_content = ""` (trắng tinh).
+     - **Giải pháp xử lý**:
+       * Cập nhật `_ensure_page_blocks` trong `KnowledgeService`: Duyệt qua từng trang của PDF (cả PDF gốc hoặc Word render qua Gotenberg), bóc tách riêng bảng Markdown (`find_tables()`) và vùng văn bản (`SmartLayoutDetector`), lưu `page_markdowns` độc lập cho từng trang vào `doc_metadata`.
+       * Cập nhật `build_studio_pages`: Hỗ trợ tham số `page_markdowns`. Khi dựng nội dung từng trang, ưu tiên lấy trực tiếp `page_markdowns[page_number]`. Nếu chunks bị dồn vào trang 1 trong tài liệu nhiều trang (`is_all_clumped_in_p1`), không gán toàn bộ cho trang 1 mà tự động tổng hợp Markdown chuẩn từ blocks của từng trang đó.
+       * Cập nhật `approve_document`: Khi người dùng lưu sửa tay, đồng bộ cả `KnowledgeChunk(page_number=...)` và `doc_metadata["page_markdowns"]`.
+       * Bổ sung 2 unit test trong `tests/test_knowledge.py` kiểm chứng không bao giờ dồn chunks vào trang 1 và bảo đảm trang 2 không bị rỗng.
+     - **Khắc phục lỗi ECONNREFUSED khi chạy `make dev`**:
+       * Đổi Vite proxy target trong `frontend/vite.config.ts` từ `http://localhost:8001` sang `http://127.0.0.1:8001` (tránh lỗi IPv6 `::1` trên Windows).
+       * Thêm độ trễ an toàn 2s trong `make.bat` và `make.ps1` để Backend mở cổng 8001 trước khi Vite bật lên.
+     - **Kiểm thử**: Backend Ruff check 0 lỗi, pytest 3/3 passed; Frontend typecheck 0 lỗi.
+  2. **Khắc Phục Bóc Tách Bảng Song Song & Bảo Toàn Danh Sách (List) Độc Lập (phiên #56)**:
      - Giải quyết triệt để phản ánh của người dùng trên tài liệu 14 trang (`media_1789641791050.pdf` - Trang 9 chỉ hiện 2 bảng và mất sạch text/list):
        * Khử rò rỉ ô bảng song song (side-by-side tables) qua tính toán tỷ lệ giao cắt diện tích dọc (>50%) và ngang (>10px) hoặc tọa độ tâm block, không để các ô điểm IELTS/VSTEP tràn ra ngoài thành text.
        * Thiết lập rào cản `table_between`: ngăn cách tuyệt đối không gộp các đoạn văn bản xuyên qua bảng biểu.
@@ -102,7 +304,7 @@
 | 7 | Module Evaluation (Ragas TM-08: Faithfulness, Relevance, Precision) | ✅ Done |
 | 8 | Module Workflows (DAG Pipeline, ARQ Workers, Guardrails) | ✅ Done |
 
-**Backend Quality**: 125/125 tests passed | Ruff: 0 errors
+**Backend Quality**: Assistants 7/7 tests passed | Full suite 141/142 (1 lỗi OCR concurrent ngoài phạm vi) | Ruff: 0 errors
 (OCR: pymupdf + docling 2.128 + easyocr 1.7.2 thật | Layout: SmartLayoutDetector OpenCV morphological line + HSV stamps | Studio: studio-view + page-image + bboxes engine thật | Facts: entity/attribute/value đúng nghĩa | Jobs: ARQ thật + cancel/retry/stats, reindex/test, collection PUT/DELETE | Preview: office→PDF qua Gotenberg | Batch-approve | Lint exit 0 | Counts thật, download, vector cleanup)
 
 ---
@@ -122,7 +324,7 @@
 | 8 | Workflow DAG Canvas (@xyflow/react, 6 Custom Node types, Run DAG & Inspector) | ✅ Done |
 
 **Frontend Quality**:
-- Biome Lint: 0 errors across all 77 files | TypeScript: 0 errors | Vite Build: 100% passed (5.66s)
+- Biome Lint: 0 errors across all 90 files | TypeScript: 0 errors | Vite Build: 100% passed
 - Playwright E2E: Suite 09 có TC-INGEST-01→04 (bao gồm TC-INGEST-04 chống tái diễn hardcode)
 
 ---
@@ -156,3 +358,9 @@
 - [x] Xây dựng Scan & OCR Document Intelligence Studio độc lập (`/ocr`) kèm SmartLayoutDetector OpenCV (nhận diện bảng, con dấu đỏ, phân đoạn text) và ExcelSpreadsheetViewer đa sheet.
 - [ ] Kéo thả ROI trên ảnh scan (mở rộng studio-view).
 - [ ] Chuẩn hóa CRLF→LF + `.gitattributes` để `npm run lint` (biome check) xanh toàn repo.
+- [x] Triển khai nền tảng taxonomy 37 loại văn bản từ `qnu-ai-core` sang `qnu-ai-platform` (`docs/ke_hoach/03_ke_hoach_dong_bo_taxonomy_loai_van_ban.md`).
+- [x] Tạo seed manifest taxonomy Platform và sửa lỗi schema/API khiến danh sách loại văn bản không hiển thị (`backend/scripts/seed_document_types.py`).
+- [x] Đồng bộ 13 NodeManifest từ `qnu-ai-core` và hiển thị Node Catalog tại `/nodes`; giữ DAG Canvas tại `/canvas`.
+- [x] Đồng bộ 5 trợ lý Core vào PostgreSQL thật; hoàn thiện API CRUD/seed/bundle và UI list/create/detail tại `/assistants`.
+- [ ] Phiên OCR/Provider hoàn thiện trường `fallback_engine` trong `OCRExtractResponse` để full backend suite trở lại 142/142.
+- [ ] Bổ sung Core manifest/HTTP endpoint versioned, parser confidence/evidence, E2E CRUD/sync và scheduler sync taxonomy.

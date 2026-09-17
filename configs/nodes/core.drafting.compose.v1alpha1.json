@@ -1,0 +1,103 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "core.drafting.compose",
+    "version": "1.0.0",
+    "display_name": "Soạn thảo Văn bản Mẫu",
+    "description": "Tự động khởi tạo và biên soạn dự thảo văn bản hành chính, quyết định, thông báo chuẩn theo phôi mẫu của nhà trường.",
+    "category": "ai",
+    "labels": {
+      "provider": "qnu_ai_core"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "core_api",
+      "operation": "drafting.compose"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_code"],
+      "properties": {
+        "module_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "default": "general",
+          "description": "Mã phân hệ nghiệp vụ áp dụng quy định soạn thảo (general, academic, admissions...)."
+        },
+        "document_type": {
+          "type": "string",
+          "maxLength": 64,
+          "default": "auto",
+          "description": "Loại văn bản: 'auto' (AI tự động nhận diện mẫu phù hợp trong Kho Biểu mẫu) hoặc chỉ định mã mẫu cụ thể."
+        },
+        "template_code": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Mã định danh biểu mẫu cụ thể trong Kho Biểu mẫu (tùy chọn)."
+        },
+        "output_format": {
+          "enum": ["markdown", "html", "plain_text"],
+          "default": "markdown",
+          "description": "Định dạng kết xuất dự thảo sơ bộ (markdown, html, plain_text)."
+        },
+        "fabricate_missing_fields": {
+          "type": "boolean",
+          "default": false,
+          "description": "Tự động bịa đặt các trường dữ liệu còn thiếu (luôn đặt false để bảo đảm tính trung thực)."
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {
+        "fields": {
+          "type": "object"
+        },
+        "samples": {
+          "type": "string"
+        },
+        "reference_context": {
+          "type": "string"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["draft"],
+      "properties": {
+        "draft": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["drafting.compose"],
+    "required_permissions": ["drafting.compose"],
+    "connection_types": ["qnu_ai_core"],
+    "execution": {
+      "default_timeout_seconds": 30,
+      "max_timeout_seconds": 120,
+      "default_max_attempts": 2,
+      "side_effects": "none",
+      "idempotency": "runtime_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["document_type", "template_code", "status"],
+      "redacted_fields": ["fields", "draft"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

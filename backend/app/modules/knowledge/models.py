@@ -78,6 +78,12 @@ class KnowledgeDocument(Base):
         nullable=False,
         index=True,
     )
+    document_type_code: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("platform_document_types.code", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(32), nullable=False)  # pdf, docx, xlsx, txt...

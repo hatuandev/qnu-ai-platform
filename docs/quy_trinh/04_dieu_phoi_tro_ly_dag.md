@@ -37,6 +37,12 @@ flowchart TD
 
 05 Trợ lý được gieo mầm tự động qua Seeder (`STANDARD_ASSISTANTS`):
 
+Seeder lưu thật cả `AssistantModel` và `WorkflowDefinition` vào PostgreSQL theo cơ chế
+idempotent: chỉ thêm mã còn thiếu, không ghi đè cấu hình đã được cán bộ chỉnh sửa. Mỗi trợ lý
+đồng thời lưu cấu hình vòng đời 7 lớp (persona, knowledge, model/fallback, guardrails,
+tools/HITL, output/citations và ngưỡng TM-08). API không được phép trả dữ liệu mock khi CSDL
+rỗng hoặc gặp lỗi.
+
 | Mã Trợ Lý (`code`) | Tên Trợ Lý | Workflow Ràng Buộc | Chuyên Môn Nghiệp Vụ | Công Cụ Gắn Liền |
 | :--- | :--- | :--- | :--- | :--- |
 | **`admissions`** | **Trợ lý Tuyển sinh QNU** | `admissions-assistant` | Đề án tuyển sinh, điểm chuẩn, chỉ tiêu, học phí, KTX | `lookup_admission_score` |
