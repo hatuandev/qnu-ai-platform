@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Edge, Node } from "@xyflow/react";
 import {
   AlertCircle,
+  ArrowLeft,
   BookOpen,
   Check,
   Copy,
@@ -19,7 +20,7 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react";
-import type React from "react";
+import type { FC } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -31,6 +32,13 @@ import { PropertyInspector } from "../components/admin/property-inspector";
 import { WorkflowVersionHistoryDialog } from "../components/admin/workflow-version-history-dialog";
 import { DAGCanvas, type WorkflowNodeData } from "../components/ai/dag-canvas";
 import { Button } from "../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   type WorkflowDagSpec,
   type WorkflowDefinition,
@@ -240,7 +248,7 @@ function nodeTypeForCatalogItem(item: NodeCatalogItem): {
   return mappings[item.category] || mappings.llm;
 }
 
-export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({
+export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
   currentPath,
   onNavigate,
   onNavigateToChat,
@@ -493,150 +501,181 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({
 
   return (
     <div className="-m-6 flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background">
-      <div className="z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/90 px-5 backdrop-blur-md">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur-md">
+        {/* Left: Back button + Icon + Workflow Selector Dropdown + Dirty badge */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              if (onNavigate) {
+                onNavigate("/workflows");
+              } else {
+                window.location.href = "/workflows";
+              }
+            }}
+            title="Quay lại danh mục Quy trình"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+
           <div className="flex size-8 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
             <Network className="size-4" />
           </div>
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 truncate text-sm font-bold text-foreground">
-              <span>DAG Studio</span>
-              <span className="font-normal text-muted-foreground">•</span>
-              <span className="truncate text-xs font-medium text-primary">
-                {workflow.definition.display_name}
+
+          <div className="flex items-center gap-2">
+            <Select value={selectedWorkflowId} onValueChange={handleSelectWorkflow}>
+              <SelectTrigger className="h-8.5 w-60 sm:w-72 text-xs font-semibold bg-background border-border">
+                <SelectValue placeholder="Chọn quy trình…" />
+              </SelectTrigger>
+              <SelectContent>
+                {definitions.map((def) => (
+                  <SelectItem key={def.id} value={def.id} className="text-xs">
+                    <div className="flex items-center gap-2">
+                      {workflowIcon(def.module_code)}
+                      <span className="truncate">{def.display_name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {isDirty && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 animate-pulse shrink-0">
+                <AlertCircle className="size-3" />
+                Chưa lưu
               </span>
-              {isDirty && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 animate-pulse">
-                  <AlertCircle className="size-3" />
-                  Chưa lưu
-                </span>
-              )}
-            </h1>
-            <p className="truncate text-[10px] text-muted-foreground">
-              Bản nháp r{workflow.draftRevision} — {workflow.nodes.length} nodes,{" "}
-              {workflow.edges.length} connections
-            </p>
+            )}
           </div>
-          <div className="ml-3 hidden items-center gap-1 border-l border-border pl-3 lg:flex">
-            {definitions.map((definition) => (
-              <button
-                type="button"
-                key={definition.id}
-                onClick={() => handleSelectWorkflow(definition.id)}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-control px-2.5 py-1 text-xs font-medium transition-all ${
-                  selectedWorkflowId === definition.id
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-              >
-                {workflowIcon(definition.module_code)}
-                <span>{definition.display_name}</span>
-              </button>
-            ))}
-          </div>
+
+          <span className="hidden xl:inline text-xs text-muted-foreground border-l border-border/80 pl-2.5">
+            Bản nháp r{workflow.draftRevision} • {workflow.nodes.length} nodes,{" "}
+            {workflow.edges.length} connections
+          </span>
         </div>
 
+        {/* Right: Grouped Action Toolbar */}
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setIsCatalogOpen(true)}
-          >
-            <Plus className="mr-1 size-3.5 text-primary" />
-            Thêm node
-          </Button>
-          <Button size="sm" className="h-8 text-xs" onClick={() => setIsTestRunnerOpen(true)}>
-            <Play className="mr-1 size-3.5 fill-primary-foreground" />
-            Chạy thử
-          </Button>
-          <Button
-            variant={isDirty ? "default" : "outline"}
-            size="sm"
-            className={`h-8 text-xs ${isDirty ? "bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs" : ""}`}
-            disabled={isMutating}
-            onClick={() => saveMutation.mutate(workflow)}
-            title={isDirty ? "Bản nháp có thay đổi chưa lưu" : "Bản nháp đã đồng bộ"}
-          >
-            <Save className="mr-1 size-3.5" />
-            Lưu nháp
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            disabled={isMutating}
-            onClick={() => void handleValidateDraft()}
-          >
-            <ShieldCheck className="mr-1 size-3.5" />
-            Kiểm tra
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            disabled={isMutating}
-            onClick={() => void handlePublishDraft()}
-          >
-            <Send className="mr-1 size-3.5" />
-            Xuất bản
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setIsHistoryOpen(true)}
-            title="Xem lịch sử các phiên bản đã xuất bản & khôi phục"
-          >
-            <History className="mr-1 size-3.5 text-muted-foreground" />
-            Lịch sử
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={handleCopyWorkflowLink}
-            title="Sao chép liên kết trực tiếp tới Workflow"
-          >
-            {isLinkCopied ? (
-              <Check className="size-3.5 text-success" />
-            ) : (
-              <Link2 className="size-3.5" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={handleCopyDag}
-            title="Sao chép JSON"
-          >
-            {isJsonCopied ? (
-              <Check className="size-3.5 text-success" />
-            ) : (
-              <Copy className="size-3.5" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={() => void draftQuery.refetch()}
-            title="Tải lại bản nháp đã lưu"
-          >
-            <RefreshCw className="size-3.5" />
-          </Button>
-          {onNavigateToChat && (
+          {/* Group 1: Authoring actions */}
+          <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
-              className="ml-1 hidden h-8 text-xs sm:flex"
-              onClick={() => onNavigateToChat(assistantCode)}
+              className="h-8 text-xs gap-1"
+              onClick={() => setIsCatalogOpen(true)}
             >
-              <MessageSquare className="mr-1 size-3.5 text-primary" />
-              Studio Chat
+              <Plus className="size-3.5 text-primary" />
+              <span className="hidden sm:inline">Thêm node</span>
             </Button>
-          )}
+            <Button
+              size="sm"
+              className="h-8 text-xs font-semibold gap-1 shadow-xs"
+              onClick={() => setIsTestRunnerOpen(true)}
+            >
+              <Play className="size-3.5 fill-primary-foreground" />
+              <span>Chạy thử</span>
+            </Button>
+            <Button
+              variant={isDirty ? "default" : "outline"}
+              size="sm"
+              className={`h-8 text-xs gap-1 ${isDirty ? "bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs" : ""}`}
+              disabled={isMutating}
+              onClick={() => saveMutation.mutate(workflow)}
+              title={isDirty ? "Bản nháp có thay đổi chưa lưu" : "Bản nháp đã đồng bộ"}
+            >
+              <Save className="size-3.5" />
+              <span className="hidden sm:inline">Lưu nháp</span>
+            </Button>
+          </div>
+
+          <div className="h-4 w-px bg-border/80 mx-0.5 hidden sm:block" />
+
+          {/* Group 2: Control plane actions */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1"
+              disabled={isMutating}
+              onClick={() => void handleValidateDraft()}
+            >
+              <ShieldCheck className="size-3.5 text-muted-foreground" />
+              <span className="hidden md:inline">Kiểm tra</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1 text-primary hover:text-primary"
+              disabled={isMutating}
+              onClick={() => void handlePublishDraft()}
+            >
+              <Send className="size-3.5" />
+              <span className="hidden md:inline">Xuất bản</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1"
+              onClick={() => setIsHistoryOpen(true)}
+              title="Xem lịch sử các phiên bản đã xuất bản & khôi phục"
+            >
+              <History className="size-3.5 text-muted-foreground" />
+              <span className="hidden md:inline">Lịch sử</span>
+            </Button>
+          </div>
+
+          <div className="h-4 w-px bg-border/80 mx-0.5" />
+
+          {/* Group 3: Utility actions */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              onClick={handleCopyWorkflowLink}
+              title="Sao chép liên kết trực tiếp tới Workflow"
+            >
+              {isLinkCopied ? (
+                <Check className="size-3.5 text-emerald-500" />
+              ) : (
+                <Link2 className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              onClick={handleCopyDag}
+              title="Sao chép JSON"
+            >
+              {isJsonCopied ? (
+                <Check className="size-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              onClick={() => void draftQuery.refetch()}
+              title="Tải lại bản nháp đã lưu"
+            >
+              <RefreshCw className="size-3.5" />
+            </Button>
+            {onNavigateToChat && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-1 hidden h-8 text-xs lg:flex gap-1"
+                onClick={() => onNavigateToChat(assistantCode)}
+              >
+                <MessageSquare className="size-3.5 text-primary" />
+                Studio Chat
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

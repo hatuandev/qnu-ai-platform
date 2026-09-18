@@ -18,6 +18,7 @@ import {
   activateAssistant,
   deactivateAssistant,
   exportAssistantBundle,
+  generateAssistantSpec,
   getAssistant,
   updateAssistant,
 } from "@/services/assistants-api";
@@ -31,6 +32,7 @@ import {
   Download,
   ExternalLink,
   Library,
+  Loader2,
   MessageSquare,
   Network,
   Plus,
@@ -148,6 +150,26 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
   const reference = getReferenceFromPath(currentPath);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssistantEditForm | null>(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+
+  const handleGeneratePrompt = async () => {
+    if (!form) return;
+    const idea = form.description.trim() || form.name.trim();
+    if (!idea) {
+      toast.warning("Vui lòng nhập Tên hoặc Mô tả để AI viết System Prompt phù hợp.");
+      return;
+    }
+    setIsGeneratingPrompt(true);
+    try {
+      const spec = await generateAssistantSpec(idea, form.category);
+      setForm((prev) => (prev ? { ...prev, system_prompt: spec.system_prompt } : null));
+      toast.success("AI đã tối ưu và viết lại System Prompt chuẩn 5 phần ĐH Quy Nhơn!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tự sinh prompt.");
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
 
   const assistantQuery = useQuery({
     queryKey: ["assistants", reference],
@@ -526,18 +548,37 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
                 />
               </Field>
 
-              <Field
-                className="sm:col-span-2"
-                htmlFor="detail-assistant-prompt"
-                label="System Prompt (Chỉ thị hệ thống)"
-              >
+              <div className="sm:col-span-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="detail-assistant-prompt"
+                    className="text-xs font-semibold text-foreground"
+                  >
+                    System Prompt (Chỉ thị hệ thống)
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-primary hover:bg-primary/10 gap-1 font-medium"
+                    disabled={isGeneratingPrompt || (!form.name.trim() && !form.description.trim())}
+                    onClick={handleGeneratePrompt}
+                  >
+                    {isGeneratingPrompt ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-3" />
+                    )}
+                    Viết hộ tôi
+                  </Button>
+                </div>
                 <Textarea
                   className="min-h-40 font-mono text-xs leading-relaxed"
                   id="detail-assistant-prompt"
                   value={form.system_prompt}
                   onChange={(event) => setForm({ ...form, system_prompt: event.target.value })}
                 />
-              </Field>
+              </div>
             </CardContent>
           </Card>
 

@@ -11,6 +11,8 @@ from app.modules.assistants.schemas import (
     AssistantChatRequest,
     AssistantChatResponse,
     AssistantCreateRequest,
+    AssistantGenerateRequest,
+    AssistantGenerateResponse,
     AssistantResponse,
     AssistantSeedResponse,
     AssistantTemplateResponse,
@@ -25,6 +27,15 @@ router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chu�
 async def list_assistant_templates() -> list[AssistantTemplateResponse]:
     """Return the five official Core-derived templates for the creation wizard."""
     return assistant_service.list_templates()
+
+
+@router.post("/generate", response_model=AssistantGenerateResponse)
+async def generate_assistant_spec(
+    body: AssistantGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantGenerateResponse:
+    """Generate assistant metadata, system prompt, and sample questions from an idea."""
+    return await assistant_service.generate_spec(db, body)
 
 
 @router.post("/seed-defaults", response_model=AssistantSeedResponse)

@@ -219,3 +219,41 @@ Nhằm chuyển đổi hoàn toàn từ các trường nhập liệu văn bản 
 - Tự động nạp danh sách Kho tri thức và Quy trình DAG có sẵn vào các trường dropdown chọn lọc.
 - Giá trị mặc định an toàn cho Guardrails và ModelOps theo tôn chỉ Đại học Quy Nhơn.
 
+---
+
+## 7. Kiến Trúc Giao Diện Phân Hệ Quy Trình Workflow DAG (`/workflows` & `/workflows/:id`)
+
+Nhằm giải quyết triệt để lỗi vỡ giao diện thanh công cụ (Header collision) và hoàn thiện quy chuẩn Master-Detail Deep Routing, phân hệ Quy Trình DAG được tái cấu trúc thành 2 tầng giao diện độc lập:
+
+### 1. Trang Danh Mục Quy Trình Master View (`/workflows`)
+- **Header & Điều Hướng**: Tiêu đề phân hệ, nút làm mới dữ liệu từ CSDL, liên kết nhanh tới Thư viện DAG Nodes (`/nodes`) và Lịch sử Thực thi (`/runs`).
+- **Thanh Chỉ Số KPI Metrics Strip**:
+  - *Tổng Quy Trình*: Số lượng workflow chuẩn QNU đang quản lý (5 quy trình).
+  - *Đang Phục Vụ (Serving)*: Tỉ lệ workflows đã xuất bản phiên bản chính thức v1.0.0.
+  - *Độ Phức Tạp DAG*: Số nodes trung bình trên mỗi workflow (4 - 7 nodes).
+  - *Chuẩn Kiểm Định*: Trạng thái kiểm định Ragas TM-08 Anti-Hallucination.
+- **Bộ Lọc Đa Chiều & Tìm Kiếm**:
+  - Tìm kiếm thời gian thực theo tên quy trình, mã module hoặc nội dung mô tả.
+  - Bộ nút lọc theo 5 lĩnh vực chuyên môn (Tuyển sinh, Quy chế, Thư viện, Soạn thảo NĐ 30, Khảo thí Bloom).
+- **Workflow Cards Hiện Đại**:
+  - Icon chuyên môn, mã module `module_code`, badge version (`v1.0.0`), badge trạng thái xuất bản.
+  - Tóm tắt kiến trúc DAG: Số nodes, số kết nối connections, mã định danh.
+  - Trợ lý AI liên kết: Tên trợ lý và liên kết cấu hình nhanh sang `/assistants/:id`.
+  - Bộ 3 nút tác vụ:
+    * **[Mở DAG Studio]**: Điều hướng sâu sang `/workflows/:id`.
+    * **[Thử nghiệm]**: Mở Studio Chat với Trợ lý tương ứng.
+    * **[Lịch sử]**: Mở modal phiên bản xuất bản và phục hồi rollback.
+
+### 2. Giao Diện DAG Canvas Studio Mới (`/workflows/:id` & `/canvas`)
+- **Triệt Tiêu Hoàn Toàn Lỗi Vỡ Layout Header**:
+  - Thay thế dãy 5 tab nút bấm dài ngoằng (nguyên nhân gây co ép thanh công cụ và wrap chữ thành cột xanh lá cây che phủ icon) bằng **Workflow Switcher Dropdown** `<Select>` tinh gọn, hiển thị icon và tên quy trình kèm dirty indicator khi có thay đổi chưa lưu.
+  - Bổ sung nút quay lại (`<ArrowLeft>`) điều hướng mượt mà về `/workflows`.
+- **Thanh Công Cụ Phân Cụm 3 Khối Khoa Học**:
+  - *Khối Biên Soạn (Authoring)*: `[+ Thêm node]`, `[▶ Chạy thử]` (nút chính nổi bật), `[💾 Lưu nháp]` (tự động đổi màu hổ phách cảnh báo khi dirty).
+  - *Khối Control Plane*: `[🛡 Kiểm tra]` (static compiler), `[🚀 Xuất bản]` (immutable versioning), `[🕒 Lịch sử]` (modal rollback).
+  - *Khối Tiện Ích*: `[Sao chép link]`, `[Sao chép JSON]`, `[Tải lại]`, `[Studio Chat]`.
+- **Dải Thông Số & Canvas Viewport**:
+  - Breadcrumb và thông tin bản nháp rN, số nodes, số connections.
+  - Toàn bộ không gian màn hình tối ưu cho React Flow Canvas với 8 loại node nghiệp vụ, MiniMap, Controls, Node Catalog Drawer, Property Inspector và In-Canvas Test Runner.
+
+

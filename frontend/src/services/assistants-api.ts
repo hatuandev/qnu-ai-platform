@@ -144,3 +144,28 @@ export function importAssistantBundle(bundle: AssistantBundle): Promise<Assistan
     body: JSON.stringify(bundle),
   });
 }
+
+export interface AssistantGeneratedSpec {
+  name: string;
+  description: string;
+  category: string;
+  system_prompt: string;
+  sample_questions: string[];
+  temperature: number;
+  no_answer_message: string;
+  suggested_workflow_id?: string | null;
+}
+
+export function generateAssistantSpec(
+  idea: string,
+  categoryHint?: string
+): Promise<AssistantGeneratedSpec> {
+  return requestJson<AssistantGeneratedSpec>(`${ASSISTANTS_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      idea,
+      category_hint: categoryHint && categoryHint !== "all" ? categoryHint : undefined,
+    }),
+  });
+}

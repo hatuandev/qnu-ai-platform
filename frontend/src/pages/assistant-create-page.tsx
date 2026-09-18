@@ -17,11 +17,12 @@ import {
   type AssistantInput,
   type AssistantTemplate,
   createAssistant,
+  generateAssistantSpec,
   listAssistantTemplates,
 } from "@/services/assistants-api";
 import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Bot, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Bot, Loader2, Save, ShieldCheck, Sparkles } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -141,10 +142,43 @@ function PolicySwitch({
   );
 }
 
+const QUICK_IDEAS = [
+  {
+    label: "🏠 Ký túc xá & Nội trú",
+    text: "Trợ lý hướng dẫn đăng ký Ký túc xá và thủ tục nội trú sinh viên",
+  },
+  {
+    label: "🎓 Học bổng & Học phí",
+    text: "Trợ lý giải đáp mức học phí và chính sách học bổng khuyến khích học tập",
+  },
+  {
+    label: "📚 Thư viện & Giáo trình",
+    text: "Trợ lý tra cứu tài liệu học tập, giáo trình và cơ sở dữ liệu số",
+  },
+  {
+    label: "📑 Soạn thảo NĐ 30",
+    text: "Trợ lý soạn thảo công văn, tờ trình và biên bản chuẩn thể thức Nghị định 30",
+  },
+];
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 30);
+}
+
 export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssistantInput>(EMPTY_INPUT);
   const [selectedTemplate, setSelectedTemplate] = useState("blank");
+  const [ideaInput, setIdeaInput] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const templatesQuery = useQuery({
     queryKey: ["assistant-templates"],
     queryFn: listAssistantTemplates,
@@ -176,6 +210,77 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
     const template = templatesQuery.data?.find((item) => item.code === code);
     setForm(template ? toInput(template) : EMPTY_INPUT);
   };
+
+  const handleGenerateWithAI = async (customIdea?: string) => {
+    const promptIdea = (customIdea ?? ideaInput).trim();
+    if (!promptIdea) {
+      toast.warning("Vui lòng nhập ý tưởng mong muốn để AI tự sinh trợ lý.");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const spec = await generateAssistantSpec(promptIdea, form.category);
+      setForm((prev) => {
+        const nextCode = prev.code.trim() ? prev.code : slugify(spec.name) || "assistant-qnu";
+        return {
+          ...prev,
+          code: nextCode,
+          name: spec.name,
+          description: spec.description,
+          category: spec.category || prev.category,
+          system_prompt: spec.system_prompt,
+          workflow_id: spec.suggested_workflow_id || prev.workflow_id,
+          config: {
+            ...prev.config,
+            sample_questions: spec.sample_questions || prev.config.sample_questions,
+            model_policy: {
+              ...prev.config.model_policy,
+              temperature: spec.temperature ?? prev.config.model_policy.temperature,
+            },
+            guardrails: {
+              ...prev.config.guardrails,
+              no_answer_message: spec.no_answer_message || prev.config.guardrails.no_answer_message,
+            },
+          },
+        };
+      });
+      setSelectedTemplate("blank");
+      toast.success(`Đã tự động tạo đặc tả Trợ lý “${spec.name}” thành công!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tạo tự động đặc tả trợ lý.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGeneratePromptOnly = async () => {
+    const promptIdea = form.description.trim() || form.name.trim() || ideaInput.trim();
+    if (!promptIdea) {
+      toast.warning("Vui lòng nhập Tên hoặc Mô tả để AI viết System Prompt phù hợp.");
+      return;
+    }
+    setIsGeneratingPrompt(true);
+    try {
+      const spec = await generateAssistantSpec(promptIdea, form.category);
+      setForm((prev) => ({
+        ...prev,
+        system_prompt: spec.system_prompt,
+        config: {
+          ...prev.config,
+          sample_questions:
+            prev.config.sample_questions.length === 0
+              ? spec.sample_questions
+              : prev.config.sample_questions,
+        },
+      }));
+      toast.success("AI đã tối ưu và soạn lại System Prompt chuẩn 5 phần QNU!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tự sinh prompt.");
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     createMutation.mutate(form);
@@ -216,6 +321,88 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
           {getErrorMessage(createMutation.error)}
         </div>
       ) : null}
+
+      {/* AI Agent Auto-Creator Card */}
+      <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                <Sparkles className="size-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold text-foreground">
+                  AI Tự Sinh Agent Trọn Gói (AI Agent Auto-Creator)
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Chỉ cần nhập một câu ý tưởng mong muốn, AI sẽ tự động sinh tên, mô tả, chỉ thị 5
+                  phần chuẩn QNU và câu hỏi mẫu.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className="border-primary/40 bg-primary/10 text-primary text-xs font-semibold"
+            >
+              Khuyến nghị
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              id="ai-idea-input"
+              value={ideaInput}
+              onChange={(e) => setIdeaInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleGenerateWithAI();
+                }
+              }}
+              placeholder="Ví dụ: Trợ lý Ký túc xá cho tân sinh viên..."
+              className="h-10 text-sm bg-background/80"
+              disabled={isGenerating}
+            />
+            <Button
+              type="button"
+              onClick={() => handleGenerateWithAI()}
+              disabled={isGenerating || !ideaInput.trim()}
+              className="h-10 gap-1.5 shrink-0"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Đang khởi tạo...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-4" />
+                  Tự Sinh Agent
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-xs text-muted-foreground mr-1">Gợi ý nhanh:</span>
+            {QUICK_IDEAS.map((idea) => (
+              <button
+                key={idea.label}
+                type="button"
+                onClick={() => {
+                  setIdeaInput(idea.text);
+                  handleGenerateWithAI(idea.text);
+                }}
+                disabled={isGenerating}
+                className="inline-flex items-center rounded-md border border-border bg-background/80 px-2.5 py-1 text-xs text-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary cursor-pointer disabled:opacity-50"
+              >
+                {idea.label}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -301,14 +488,32 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
               }
             />
           </Field>
-          <Field
-            className="lg:col-span-2"
-            htmlFor="assistant-prompt"
-            label="System prompt"
-            required
-          >
+          <div className="lg:col-span-2 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="assistant-prompt" className="text-xs font-semibold text-foreground">
+                System prompt <span className="text-destructive">*</span>
+              </label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-primary hover:bg-primary/10 gap-1 font-medium"
+                disabled={
+                  isGeneratingPrompt ||
+                  (!form.name.trim() && !form.description.trim() && !ideaInput.trim())
+                }
+                onClick={handleGeneratePromptOnly}
+              >
+                {isGeneratingPrompt ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3" />
+                )}
+                Viết hộ tôi
+              </Button>
+            </div>
             <Textarea
-              className="min-h-36"
+              className="min-h-36 font-mono text-xs leading-relaxed"
               id="assistant-prompt"
               required
               value={form.system_prompt}
@@ -316,7 +521,7 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
                 setForm((value) => ({ ...value, system_prompt: event.target.value }))
               }
             />
-          </Field>
+          </div>
         </CardContent>
       </Card>
 

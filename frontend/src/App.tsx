@@ -24,6 +24,7 @@ import { NodeCatalogPage } from "@/pages/node-catalog-page";
 import { RunsPage } from "@/pages/runs-page";
 import { ScanStudioPage } from "@/pages/scan-studio-page";
 import { ToolsPage } from "@/pages/tools-page";
+import { WorkflowsPage } from "@/pages/workflows-page";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Network } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -158,6 +159,11 @@ function AppContent() {
     // 8. Node Catalog from Core manifests
     if (currentPath === "/nodes") {
       return <NodeCatalogPage />;
+    }
+
+    // 8a. Workflows Directory (Master List View)
+    if (currentPath === "/workflows") {
+      return <WorkflowsPage onNavigate={handleNavigate} />;
     }
 
     // 9. DAG Canvas Studio & Deep Linking

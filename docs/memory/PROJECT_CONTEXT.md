@@ -7,11 +7,54 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 09:30 (UTC+7)
-- **Phiên số**: #79 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 10:10 (UTC+7)
+- **Phiên số**: #81 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Nâng Cấp Toàn Diện UI/UX Phân Hệ Trợ Lý AI Thành Enterprise AI Assistant Control Center (phiên #79)**:
+  1. **Triển Khai Tính Năng AI Agent Auto-Creator (Tự Sinh Agent Trọn Gói) & Nút Viết Hộ Prompt (phiên #81)**:
+     - **Mục tiêu**: Hiện thực hóa tính năng AI Tự Sinh Agent từ một câu ý tưởng tự nhiên và nút Viết Hộ Prompt chuẩn phong thái học thuật ĐH Quy Nhơn (Zero Hallucination, Hotline 0256.3846.156).
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Backend Endpoint `POST /platform/v1alpha1/assistants/generate`**:
+         - Schemas `AssistantGenerateRequest` & `AssistantGenerateResponse` trong `backend/app/modules/assistants/schemas.py`.
+         - Service `generate_spec` kết nối ModelOps LLM generation và cơ chế dự phòng `_build_fallback_spec` tự động nhận diện từ khóa tiếng Việt chuẩn xác (Tuyển sinh, Quy chế, Soạn thảo NĐ 30, Khảo thí Bloom, Thư viện, Ký túc xá).
+         - Router endpoint `POST /generate` trong `backend/app/modules/assistants/router.py`.
+         - Unit test `test_api_generate_assistant_spec` trong `backend/tests/test_assistants.py`.
+       * **Frontend UI Agent Auto-Creator & Prompt Writer**:
+         - Client API `generateAssistantSpec(idea, categoryHint)` trong `frontend/src/services/assistants-api.ts`.
+         - Trang Tạo Mới (`/assistants/new` - `assistant-create-page.tsx`): Thêm Card "AI Tự Sinh Agent Trọn Gói" với input ý tưởng, nút **[✨ Tự Sinh Agent]**, 4 chip gợi ý nhanh, tự sinh mã slug không dấu chuẩn Unicode, tự điền trọn bộ thông số form; nút **[✨ Viết hộ tôi]** trên ô System Prompt.
+         - Trang Chi Tiết (`/assistants/:id` - `assistant-detail-page.tsx`): Bổ sung nút **[✨ Viết hộ tôi]** cạnh ô System Prompt để tối ưu hoặc viết lại prompt bất kỳ lúc nào.
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Backend Pytest: `uv run --extra dev pytest tests/test_assistants.py -v` — 9/9 passed (100%).
+       * Backend Ruff: `uv run ruff check .` — All checks passed (0 lỗi).
+       * Frontend Lint: `npm run lint` — Checked 93 files in 128ms (0 lỗi).
+       * Frontend Typecheck: `npm run typecheck` — `tsc --noEmit` (0 lỗi).
+       * Frontend Build: `npm run build` — Vite v6.4.3 built thành công trong 7.92s.
+       * Zero Mojibake Audit: `python scripts/check_mojibake.py` — 227/227 files UTF-8 sạch 100%.
+       * Browser Subagent E2E: Đã kiểm tra trực quan, tạo video recording `assistant_auto_creator_demo_1789700749600.webp` và 5 ảnh chụp màn hình minh chứng.
+  2. **Nâng Cấp Toàn Diện UI/UX Phân Hệ Quy Trình Workflow DAG Thành Enterprise Control Center (phiên #80)**:
+     - **Mục tiêu**: Xử lý triệt để lỗi visual collision trên thanh công cụ DAG Studio (nơi 5 tabs dài chen chúc làm wrap chữ thành cột xanh lá cây che phủ icon) và hoàn thiện chuẩn Master-Detail Deep Routing qua trang danh mục `/workflows`.
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Tạo mới Trang Danh Mục Quy Trình (`/workflows` - `workflows-page.tsx`)**:
+         - Thanh KPI Metrics Strip: Tổng quy trình (5 chuẩn QNU), Đang phục vụ (100% active v1.0.0), Độ phức tạp DAG (nodes/edges trung bình), Chuẩn kiểm định Ragas TM-08.
+         - Tìm kiếm thời gian thực và bộ lọc theo 5 lĩnh vực chuyên môn (Tuyển sinh, Quy chế, Thư viện, Soạn thảo NĐ 30, Khảo thí Bloom).
+         - 5 thẻ `WorkflowCard` hiện đại hiển thị chi tiết kiến trúc DAG, Trợ lý AI liên kết và 3 nút tác vụ: **[Mở DAG Studio]**, **[Thử nghiệm]**, **[Lịch sử]**.
+         - Tích hợp `WorkflowVersionHistoryDialog` hỗ trợ xem lịch sử và khôi phục rollback phiên bản ngay tại trang danh mục.
+       * **Đại Tu Thanh Header DAG Canvas Studio (`/workflows/:id` & `/canvas`)**:
+         - Triệt tiêu hoàn toàn lỗi vỡ layout: Thay thế dãy 5 tabs nút bấm bằng **Workflow Switcher Dropdown** `<Select>` tinh gọn, hiển thị icon chuyên môn và tên quy trình cùng dirty badge indicator.
+         - Bổ sung nút quay lại (`<ArrowLeft>`) điều hướng mượt mà về `/workflows`.
+         - Tái cấu trúc toolbar thành 3 cụm khoa học: Cụm Biên soạn (`+ Thêm node`, `Chạy thử`, `Lưu nháp`), Cụm Control Plane (`Kiểm tra`, `Xuất bản`, `Lịch sử`), và Cụm Tiện ích (`Sao chép link`, `Sao chép JSON`, `Tải lại`, `Studio Chat`).
+       * **Đồng Bộ Menu Sidebar & Routing**:
+         - Thêm mục *"Quy Trình Workflow DAG"* (`/workflows`, icon `Workflow`, badge `5 DAGs`) vào Sidebar mục *Kho Tri Thức & Quy Trình*.
+         - Đăng ký route `/workflows` trong `App.tsx` trỏ tới `WorkflowsPage`.
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Frontend Lint: `npm run lint` — Checked 93 files in 130ms (0 lỗi).
+       * Frontend Typecheck: `npm run typecheck` — `tsc --noEmit` (0 lỗi).
+       * Frontend Build: `npm run build` — Vite build thành công (8.17s, `dist/` bundle sạch).
+       * Backend Pytest: `uv run --extra dev pytest tests/test_workflows.py -v` — 18/18 tests passed (100%).
+       * Backend Ruff: `uv run ruff check .` — All checks passed (0 lỗi).
+       * Zero Mojibake Audit: `python scripts/check_mojibake.py` — 227/227 files UTF-8 sạch 100%.
+       * Browser E2E Test: Đã xác thực giao diện qua browser subagent, lưu 3 ảnh chụp màn hình và video recording `workflows_ui_demo_1789699203962.webp`.
+  2. **Nâng Cấp Toàn Diện UI/UX Phân Hệ Trợ Lý AI Thành Enterprise AI Assistant Control Center (phiên #79)**:
      - **Mục tiêu**: Chuyển đổi toàn diện giao diện quản trị Trợ lý AI (`/assistants`, `/assistants/:id`, `/assistants/new`) từ các ô nhập văn bản thô (free-text inputs) sang trải nghiệm Trung tâm Điều hành Cấp Doanh nghiệp (Enterprise AI Assistant Control Center) kết nối dữ liệu thật từ Backend APIs.
      - **Thay đổi kỹ thuật chi tiết**:
        * **Thanh KPI Metrics Strip thời gian thực**: Tự động tính toán tổng số lượt hội thoại (`totalRuns`), độ trễ trung bình (`avgLatency` ms), tên và số lượng tài liệu trong Kho tri thức RAG (`docCount`), và trạng thái đạt chuẩn TM-08.

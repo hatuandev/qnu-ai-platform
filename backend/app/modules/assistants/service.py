@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import unicodedata
 from datetime import UTC, datetime
 
@@ -18,6 +20,8 @@ from app.modules.assistants.schemas import (
     AssistantChatRequest,
     AssistantChatResponse,
     AssistantCreateRequest,
+    AssistantGenerateRequest,
+    AssistantGenerateResponse,
     AssistantLifecycleConfig,
     AssistantResponse,
     AssistantSeedResponse,
@@ -25,6 +29,8 @@ from app.modules.assistants.schemas import (
     AssistantUpdateRequest,
 )
 from app.modules.assistants.seeder import STANDARD_ASSISTANTS, seed_standard_assistants
+from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
+from app.modules.modelops.service import modelops_service
 from app.modules.workflows.models import WorkflowDefinition
 from app.modules.workflows.schemas import WorkflowExecuteRequest
 from app.modules.workflows.service import workflow_service
@@ -268,6 +274,95 @@ class AssistantService:
             execution_id=workflow_response.execution_id,
         )
 
+    async def generate_spec(
+        self, db: AsyncSession, request: AssistantGenerateRequest
+    ) -> AssistantGenerateResponse:
+        """AI Auto-Creator: Synthesizes a complete professional assistant specification from natural language."""
+        idea = _clean_text(request.idea) or request.idea.strip()
+        system_architect_prompt = (
+            "Bạn là Chuyên gia Thiết kế Trợ lý AI (Senior AI Agent Architect) của Trường Đại học Quy Nhơn (QNU).\n"
+            "Nhiệm vụ: Phân tích ý tưởng mong muốn của cán bộ và sinh ra một bản đặc tả hoàn chỉnh cho Trợ lý AI chuyên trách.\n\n"
+            "YÊU CẦU BẮT BUỘC:\n"
+            "1. Phản hồi CHỈ BẰNG một JSON Object hợp lệ (không kèm bất kỳ văn bản giải thích thừa nào).\n"
+            "2. JSON có đúng các trường sau:\n"
+            "{\n"
+            '  "name": "Tên trợ lý chuẩn phong thái học thuật ĐH Quy Nhơn (tối đa 60 ký tự)",\n'
+            '  "description": "Mô tả ngắn gọn 1-2 câu về nhiệm vụ chính",\n'
+            '  "category": "Một trong các mã: admissions | academic | resources | administration | examination | general",\n'
+            '  "system_prompt": "Toàn văn chỉ thị hệ thống chi tiết 5 phần: 1. Vai trò chính thức QNU; 2. Phạm vi & Giới hạn; 3. Căn cứ văn bản RAG (Zero Hallucination); 4. Tác phong sư phạm & Xưng hô; 5. No-answer hotline 0256.3846.156",\n'
+            '  "sample_questions": ["Câu hỏi thực tế 1 mà sinh viên/giảng viên hay hỏi?", "Câu hỏi thực tế 2?", "Câu hỏi thực tế 3?"],\n'
+            '  "temperature": 0.2,\n'
+            '  "no_answer_message": "Thông điệp cứu cánh khi không có tài liệu đối soát chính thức (kèm Hotline 0256.3846.156)",\n'
+            '  "suggested_workflow_id": "Mã workflow phù hợp: admissions-assistant | regulations-assistant | library-assistant | drafting-assistant | question-bank-assistant"\n'
+            "}"
+        )
+
+        user_content = f"Ý tưởng mong muốn của cán bộ: '{idea}'."
+        if request.category_hint:
+            user_content += f"\nGợi ý phân loại lĩnh vực: '{request.category_hint}'."
+
+        messages = [
+            ChatMessage(role="system", content=system_architect_prompt),
+            ChatMessage(role="user", content=user_content),
+        ]
+        gen_req = LLMGenerateRequest(
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2500,
+        )
+
+        try:
+            llm_resp = await modelops_service.generate(db, gen_req)
+            parsed = _extract_json(llm_resp.content)
+            if parsed and isinstance(parsed, dict) and "name" in parsed and "system_prompt" in parsed:
+                category = str(parsed.get("category") or request.category_hint or "academic").strip()
+                if category not in ["admissions", "academic", "resources", "administration", "examination", "general"]:
+                    category = "academic"
+
+                raw_questions = parsed.get("sample_questions", [])
+                questions = (
+                    [str(q).strip() for q in raw_questions if isinstance(q, str) and q.strip()]
+                    if isinstance(raw_questions, list)
+                    else []
+                )
+                if not questions:
+                    questions = [
+                        f"Quy trình thực hiện đối với {idea[:30]}?",
+                        "Các văn bản quy chế và hồ sơ cần chuẩn bị?",
+                        "Thời hạn giải quyết và đơn vị phụ trách trực tiếp?",
+                    ]
+
+                temp = parsed.get("temperature", 0.2)
+                try:
+                    temp_float = float(temp)
+                except (ValueError, TypeError):
+                    temp_float = 0.2
+
+                return AssistantGenerateResponse(
+                    name=str(parsed.get("name", f"Trợ lý Chuyên trách {idea[:30]}")).strip(),
+                    description=str(parsed.get("description", f"Trợ lý AI hỗ trợ {idea[:100]}")).strip(),
+                    category=category,
+                    system_prompt=str(parsed.get("system_prompt")).strip(),
+                    sample_questions=questions[:4],
+                    temperature=max(0.0, min(1.0, temp_float)),
+                    no_answer_message=str(
+                        parsed.get(
+                            "no_answer_message",
+                            "Thông tin này chưa có trong văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ Hotline: 0256.3846.156 để được hướng dẫn chi tiết.",
+                        )
+                    ).strip(),
+                    suggested_workflow_id=str(
+                        parsed.get("suggested_workflow_id", "regulations-assistant")
+                    ).strip(),
+                )
+        except Exception as exc:
+            logger.warning(
+                "ModelOps generate spec failed or returned unparseable output (%s). Using fallback template generator.",
+                exc,
+            )
+
+        return _build_fallback_spec(idea, request.category_hint)
+
     async def _get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
         normalized_reference = _clean_text(reference) or reference
         result = await db.execute(
@@ -287,4 +382,107 @@ class AssistantService:
         return record
 
 
+def _extract_json(text: str) -> dict[str, object] | None:
+    text = text.strip()
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    return None
+
+
+def _build_fallback_spec(idea: str, category_hint: str | None = None) -> AssistantGenerateResponse:
+    lower = idea.lower()
+    if any(k in lower for k in ["tuyển sinh", "xét tuyển", "ngành học", "điểm chuẩn"]):
+        name = "Trợ lý Tuyển sinh & Hướng nghiệp Số"
+        category = category_hint or "admissions"
+        workflow_id = "admissions-assistant"
+        questions = [
+            "Phương thức xét tuyển đại học năm nay gồm những gì?",
+            "Mức học phí và chính sách học bổng của trường như thế nào?",
+            "Thời gian và thủ tục nộp hồ sơ xét tuyển?",
+        ]
+    elif any(k in lower for k in ["văn bản", "soạn thảo", "nghị định 30", "công văn", "tờ trình"]):
+        name = "Trợ lý Soạn thảo Văn bản Hành chính NĐ 30"
+        category = category_hint or "administration"
+        workflow_id = "drafting-assistant"
+        questions = [
+            "Hướng dẫn thể thức trình bày Tờ trình theo Nghị định 30?",
+            "Mẫu Thông báo kết luận cuộc họp chuẩn Đại học Quy Nhơn?",
+            "Quy tắc ghi số hiệu và trích yếu văn bản hành chính?",
+        ]
+    elif any(k in lower for k in ["đề thi", "khảo thí", "bloom", "câu hỏi", "ma trận"]):
+        name = "Trợ lý Khảo thí & Ngân hàng Đề thi Bloom"
+        category = category_hint or "examination"
+        workflow_id = "question-bank-assistant"
+        questions = [
+            "Cách phân loại câu hỏi thi theo 4 mức độ nhận thức Bloom?",
+            "Xuất ma trận đề thi trắc nghiệm kết hợp tự luận?",
+            "Quy trình thẩm định và bảo mật ngân hàng câu hỏi thi?",
+        ]
+    elif any(k in lower for k in ["thư viện", "sách", "giáo trình", "tài liệu", "học liệu"]):
+        name = "Trợ lý Thư viện & Học liệu Số QNU"
+        category = category_hint or "resources"
+        workflow_id = "library-assistant"
+        questions = [
+            "Cách tra cứu giáo trình và tài liệu tham khảo theo mã DDC?",
+            "Hướng dẫn truy cập cơ sở dữ liệu bài báo khoa học trực tuyến?",
+            "Quy định về thời hạn mượn và gia hạn sách thư viện?",
+        ]
+    elif any(k in lower for k in ["ký túc xá", "nội trú", "tiền phòng", "ktx"]):
+        name = "Trợ lý Quản lý Ký túc xá & Đời sống Sinh viên"
+        category = category_hint or "resources"
+        workflow_id = "regulations-assistant"
+        questions = [
+            "Thủ tục đăng ký nội trú Ký túc xá cho tân sinh viên?",
+            "Mức phí lưu trú Ký túc xá và các chế độ ưu tiên, miễn giảm?",
+            "Nội quy sinh hoạt và quy định an ninh trật tự Ký túc xá?",
+        ]
+    else:
+        name = f"Trợ lý Chuyên trách {idea[:35].strip()}"
+        category = category_hint or "academic"
+        workflow_id = "regulations-assistant"
+        questions = [
+            f"Quy trình thực hiện đối với {idea[:30]}?",
+            "Các văn bản quy định và thủ tục cần chuẩn bị?",
+            "Thời hạn giải quyết và đơn vị phụ trách trực tiếp?",
+        ]
+
+    system_prompt = (
+        f"Bạn là {name}, Trợ lý Trí tuệ Nhân tạo chính thức thuộc Trường Đại học Quy Nhơn (QNU).\n\n"
+        f"1. VAI TRÒ & PHẠM VI:\n"
+        f"- Nhiệm vụ cốt lõi: Hỗ trợ cán bộ, giảng viên và người học về: {idea}.\n"
+        f"- Giới hạn phạm vi: Chỉ giải đáp các nội dung thuộc chuyên môn được giao. Tuyệt đối từ chối lịch sự và điều hướng các chủ đề nằm ngoài thẩm quyền.\n\n"
+        f"2. NGUYÊN TẮC CĂN CỨ TRI THỨC (ZERO HALLUCINATION):\n"
+        f"- Mọi câu trả lời bắt buộc phải dựa 100% trên các văn bản, quy chế và thông báo chính thức của Trường Đại học Quy Nhơn.\n"
+        f"- Luôn chỉ rõ căn cứ trích dẫn: Tên văn bản, Điều/Khoản và số trang (nếu có).\n"
+        f"- Tuyệt đối KHÔNG suy diễn số liệu, không đưa ra thông tin giả định.\n\n"
+        f"3. PHONG THÁI & QUY TẮC ỨNG XỬ:\n"
+        f"- Sử dụng tiếng Việt chuẩn mực, xưng hô 'Tôi/Em' và 'Bạn/Sinh viên/Quý Thầy Cô'.\n"
+        f"- Trình bày mạch lạc, sử dụng gạch đầu dòng hoặc bảng biểu rõ ràng khi có số liệu.\n\n"
+        f"4. CHÍNH SÁCH KHI THIẾU CĂN CỨ (NO-ANSWER POLICY):\n"
+        f"- Khi thông tin chưa có trong tài liệu chính thức, thông báo rõ ràng và hướng dẫn người dùng liên hệ:\n"
+        f"  * Đơn vị phụ trách chuyên môn Trường Đại học Quy Nhơn.\n"
+        f"  * Hotline hỗ trợ chính thức: 0256.3846.156 | Email: hotro@qnu.edu.vn | Cổng TT: https://qnu.edu.vn"
+    )
+
+    return AssistantGenerateResponse(
+        name=name,
+        description=f"Trợ lý AI chuyên trách hỗ trợ: {idea[:150]}.",
+        category=category,
+        system_prompt=system_prompt,
+        sample_questions=questions,
+        temperature=0.2,
+        no_answer_message="Thông tin này chưa có trong văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ Hotline: 0256.3846.156 để được hướng dẫn chi tiết.",
+        suggested_workflow_id=workflow_id,
+    )
+
+
 assistant_service = AssistantService()
+

@@ -234,3 +234,32 @@ class AssistantChatResponse(BaseModel):
     suggested_questions: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
     execution_id: str | None = None
+
+
+class AssistantGenerateRequest(BaseModel):
+    """Input payload for generating an assistant specification using AI."""
+
+    idea: str = Field(
+        ...,
+        min_length=3,
+        max_length=1000,
+        description="Mô tả ý tưởng hoặc mong muốn tự nhiên của cán bộ",
+    )
+    category_hint: str | None = Field(None, max_length=50)
+
+
+class AssistantGenerateResponse(BaseModel):
+    """Complete generated assistant specification ready for preview or creation."""
+
+    name: str = Field(..., min_length=2, max_length=150)
+    description: str = Field(..., min_length=10, max_length=500)
+    category: str = Field("academic", min_length=2, max_length=50)
+    system_prompt: str = Field(..., min_length=20, max_length=12000)
+    sample_questions: list[str] = Field(default_factory=list)
+    temperature: float = Field(0.2, ge=0.0, le=1.0)
+    no_answer_message: str = Field(
+        "Thông tin này chưa có trong nguồn chính thức của Nhà trường. Vui lòng liên hệ đơn vị phụ trách để được hỗ trợ."
+    )
+    suggested_workflow_id: str = "regulations-assistant"
+    suggested_collection_code: str | None = None
+

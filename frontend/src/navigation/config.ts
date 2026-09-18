@@ -13,6 +13,7 @@ import {
   Scan,
   Share2,
   ShieldCheck,
+  Workflow,
   Wrench,
 } from "lucide-react";
 import type * as React from "react";
@@ -115,6 +116,15 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         path: "/document-types",
         icon: FileText,
         description: "Quy chuẩn mẫu biểu hành chính: Quyết định, Quy chế, Tờ trình, Thông báo",
+      },
+      {
+        id: "workflows",
+        title: "Quy Trình Workflow DAG",
+        path: "/workflows",
+        icon: Workflow,
+        badge: "5 DAGs",
+        badgeVariant: "default",
+        description: "Điều phối luồng xử lý thông minh 05 Trợ lý AI qua đồ thị topo",
       },
       {
         id: "nodes",
