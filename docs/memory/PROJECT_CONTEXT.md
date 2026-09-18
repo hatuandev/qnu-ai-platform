@@ -7,16 +7,36 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 22:50 (UTC+7)
-- **Phiên số**: #102 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 23:30 (UTC+7)
+- **Phiên số**: #102
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Triển khai Đợt 2: Dev Access Gate Mật Khẩu Đơn Giản, Observability & Thống Kê Chi Phí Thật, Standalone Web Widget Embed (phiên #102)**:
-     - **Password-Only Dev Access Gate**: Màn hình `/login` tối giản, chỉ có 1 trường mật khẩu (`QNU@2026`), bỏ qua hoàn toàn RBAC & phòng ban theo đúng chỉ đạo người dùng; bọc ứng dụng trong `AuthProvider`, tích hợp Route Guard bảo vệ các trang quản trị; nút Đăng xuất trên Topbar (`Topbar.tsx`).
-     - **Observability & Real-Time Cost Tracking**: Khởi tạo bảng giá định danh `pricing.py`, hàm `calculate_cost_usd`; tự động ghi vết CSDL `LLMUsageLog` khi gọi LLM (cả sync và stream SSE); cộng dồn `TenantQuota`; cung cấp API `GET /platform/v1alpha1/modelops/usage-stats?days=30`; nối dữ liệu thật vào Dashboard KPI cards và Card 2 "Phân Bổ Token Mô Hình" thay thế số liệu gán cứng.
-     - **Web Widget Embed Độc Lập**: Khởi tạo `frontend/public/embed/qnu-chat-widget.js` độc lập; cập nhật Kênh phân phối `/channels` với mã trợ lý chuẩn và Live Preview; bổ sung nút và Dialog [Mã nhúng Web Widget] 1-click trên trang chi tiết trợ lý `/assistants/:id`.
-     - **Verification**: Backend Ruff 0 lỗi; Pytest targeted tests 17/17 passed (100%); Frontend Biome 128 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công (6.66s) sinh ra `dist/embed/qnu-chat-widget.js`; Zero Mojibake 277/277 files sạch 100%.
-     - **Đồng bộ Quy trình**: Cập nhật `docs/quy_trinh/06_modelops_circuit_breaker.md` Mục 5.
+  1. **Triển Khai Hoàn Tất Đợt 2: Quản Trị Phiên Bản Snapshot Trợ Lý AI, Nạp Bảng Biểu Số Liệu Excel/CSV & Bàn Giao Cán Bộ Trực Tiếp (phiên #102)**:
+     - **Quản Trị Phiên Bản Snapshot Trợ Lý AI (Assistant Versioning & 1-Click Rollback)**:
+       * Khởi tạo bảng SQLAlchemy `AssistantVersionRecord`: lưu trữ snapshot JSON 7 lớp bất biến (`persona`, `model_config`, `guardrails`, `workflow_id`, `collection_id`), `version_number` tự động tăng dần `v1.0`, `v1.1`,...
+       * Tự động chụp snapshot khi cập nhật cấu hình hoặc xuất bản Trợ lý.
+       * Endpoints: `GET /platform/v1alpha1/assistants/{ref}/versions` và `POST /platform/v1alpha1/assistants/{ref}/versions/{version_id}/rollback`.
+       * Frontend `assistant-detail-page.tsx`: Nút [Lịch sử phiên bản] trên topbar mở Dialog hiển thị danh sách snapshot, badge phiên bản hiện tại và nút [Khôi phục] kèm `ConfirmDialog` xác nhận an toàn.
+     - **Nạp Trực Tiếp Bảng Biểu Số Liệu Excel/CSV (Structured Facts Ingestion)**:
+       * Khởi tạo parser chuyên dụng `excel_parser.py`: đọc tệp `.xlsx`, `.xls`, `.csv` bằng `openpyxl`/`csv`, nhận diện linh hoạt các cột thực thể và thuộc tính (điểm chuẩn, chỉ tiêu, học phí).
+       * Chuyển đổi trực tiếp thành facts định lượng nạp vào bảng `knowledge_facts` với độ tin cậy tuyệt đối `confidence = 1.0`.
+       * Endpoints: `POST /platform/v1alpha1/knowledge/collections/{id}/facts/import-excel` và `GET /platform/v1alpha1/knowledge/collections/{id}/facts`.
+       * Frontend `collection-detail-page.tsx`: Bổ sung tab thứ 4 "Bảng Biểu & Số Liệu" (`facts`), bảng tra cứu số liệu, bộ lọc tìm kiếm và Dialog upload bảng tính Excel/CSV.
+     - **Bàn Giao Trực Tiếp & Giám Sát Hội Thoại Live (Live Conversations & Staff Handoff Desk)**:
+       * Khởi tạo module Backend `app.modules.conversations`: `models.py` (`ConversationThreadRecord`, `ConversationMessageRecord`), `schemas.py`, `service.py`, `router.py`.
+       * Hỗ trợ đầy đủ vòng đời trạng thái: `handoff_requested`, `staff_claimed`, `ai_active`, `resolved`.
+       * Giao diện Bàn trực Cán bộ `/conversations` (`conversations-page.tsx`): Bố cục Master-Detail 2 cột, polling 8s, bộ lọc trạng thái, tiếp nhận xử lý, gửi tin nhắn phản hồi trực tiếp kèm 4 mẫu câu trả lời nhanh (Canned Replies) chuyển tiếp thông tin ĐH Quy Nhơn.
+     - **Verification Toàn Diện**:
+       * Backend: `uv run ruff check .` **0 lỗi**; `uv run --extra dev pytest -v` **213/213 passed (100%)** (+20 tests mới).
+       * Frontend: `npm run lint` **130 files checked, 0 lỗi**; `npm run typecheck` **0 lỗi**; `npm run build` **thành công trong 7.69s** (2545 modules).
+       * Zero Mojibake: 280/280 files sạch 100%.
+     - **Đồng bộ Quy trình**:
+       * Cập nhật `docs/quy_trinh/02_nap_tri_thuc_minio.md`: Bước 10 (Nạp Trực Tiếp Bảng Biểu Số Liệu Excel/CSV).
+       * Cập nhật `docs/quy_trinh/04_dieu_phoi_tro_ly_dag.md`: Mục 9 (Assistant Versioning & Rollback) và Mục 10 (Live Conversations & Staff Handoff).
+  1. **Triển khai Đợt 2 Trước Đó: Dev Access Gate Mật Khẩu Đơn Giản, Observability & Thống Kê Chi Phí Thật, Standalone Web Widget Embed**:
+     - **Password-Only Dev Access Gate**: Màn hình `/login` tối giản, chỉ có 1 trường mật khẩu (`QNU@2026`), bỏ qua hoàn toàn RBAC & phòng ban; bọc ứng dụng trong `AuthProvider`, tích hợp Route Guard bảo vệ các trang quản trị; nút Đăng xuất trên Topbar (`Topbar.tsx`).
+     - **Observability & Real-Time Cost Tracking**: Bảng giá `pricing.py`, ghi vết `LLMUsageLog` khi gọi LLM (cả sync và stream SSE); API `GET /platform/v1alpha1/modelops/usage-stats?days=30`; Dashboard real models breakdown.
+     - **Web Widget Embed Độc Lập**: `frontend/public/embed/qnu-chat-widget.js`, Live Preview `/channels`, Dialog mã nhúng `/assistants/:id`.
   1. **Triển Khai Trọn Vẹn Đợt 1 Nâng Cấp Nền Tảng Quản Trị, Tạo Lập, Kiểm Định & Vận Hành Trợ Lý AI QNU (phiên #101)**:
      - **Cổng Kiểm Định Xuất Bản 5 Lớp (Publish Gate Engine)**:
        * Khởi tạo `backend/app/modules/assistants/readiness.py`: Thẩm định 5 tiêu chí (Kho tri thức có tài liệu ready, ModelOps dự phòng 2 tầng, Chốt chặn Tool Gateway allowlist, Guardrails an toàn chống jailbreak/che PII/hotline No-Answer, Kiểm định chất lượng TM-08 Ragas).

@@ -17,9 +17,11 @@ from app.modules.assistants.schemas import (
     AssistantPublishResponse,
     AssistantReadinessResponse,
     AssistantResponse,
+    AssistantRollbackResponse,
     AssistantSeedResponse,
     AssistantTemplateResponse,
     AssistantUpdateRequest,
+    AssistantVersionResponse,
 )
 from app.modules.assistants.service import assistant_service
 
@@ -180,3 +182,23 @@ async def clone_assistant(
 ) -> AssistantResponse:
     """Nhân bản 1-click Trợ lý AI để tùy biến cho khoa/phòng ban chuyên trách."""
     return await assistant_service.clone_assistant(db, reference, body)
+
+
+@router.get("/{reference}/versions", response_model=list[AssistantVersionResponse])
+async def get_assistant_versions(
+    reference: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[AssistantVersionResponse]:
+    """Lấy danh sách lịch sử các phiên bản cấu hình của Trợ lý AI."""
+    return await assistant_service.get_versions(db, reference)
+
+
+@router.post("/{reference}/rollback/{version_id}", response_model=AssistantRollbackResponse)
+async def rollback_assistant_version(
+    reference: str,
+    version_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantRollbackResponse:
+    """Khôi phục cấu hình Trợ lý AI về một phiên bản snapshot trước đó."""
+    return await assistant_service.rollback_version(db, reference, version_id)
+

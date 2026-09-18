@@ -1,384 +1,571 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { conversationsApi } from "@/services/conversations-api";
+import type {
+  ConversationStatus,
+  ConversationThreadDetail,
+  ConversationThreadItem,
+} from "@/types/conversations";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Bot,
+  CheckCircle2,
+  Clock,
+  CornerDownLeft,
   GraduationCap,
+  Headphones,
   Library,
+  MessageSquare,
+  RefreshCw,
   Search,
   Send,
+  ShieldAlert,
   ShieldCheck,
   User,
   UserCheck,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
-import { Badge } from "../components/ui/badge";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
-interface ConversationThread {
-  id: string;
-  user_name: string;
-  user_email: string;
-  assistant_code: string;
-  assistant_name: string;
-  last_message: string;
-  updated_at: string;
-  is_handed_off: boolean;
-  messages: Array<{
-    id: string;
-    sender: "user" | "assistant" | "agent";
-    text: string;
-    time: string;
-  }>;
-}
-
-const MOCK_THREADS: ConversationThread[] = [
-  {
-    id: "conv_01",
-    user_name: "Thí sinh Nguyễn Văn An",
-    user_email: "an.nguyen2007@gmail.com",
-    assistant_code: "admissions",
-    assistant_name: "Trợ lý Tuyển sinh QNU",
-    last_message: "Em muốn hỏi về phương thức xét học bạ ngành Công nghệ thông tin?",
-    updated_at: "19:45 hôm nay",
-    is_handed_off: false,
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        text: "Xin chào, em muốn tìm hiểu thông tin tuyển sinh năm 2025 ạ.",
-        time: "19:42",
-      },
-      {
-        id: "m2",
-        sender: "assistant",
-        text: "Chào bạn! Mình là Trợ lý Tuyển sinh ĐH Quy Nhơn. Năm 2025 trường có 4 phương thức xét tuyển. Bạn đang quan tâm đến ngành nào?",
-        time: "19:43",
-      },
-      {
-        id: "m3",
-        sender: "user",
-        text: "Em muốn hỏi về phương thức xét học bạ ngành Công nghệ thông tin?",
-        time: "19:45",
-      },
-    ],
-  },
-  {
-    id: "conv_02",
-    user_name: "Sinh viên Trần Thị Mai",
-    user_email: "4551050123@qnu.edu.vn",
-    assistant_code: "regulations",
-    assistant_name: "Trợ lý Quy chế Học vụ",
-    last_message: "Em xin bảo lưu học kỳ 1 năm học 2024-2025 thì nộp đơn ở đâu?",
-    updated_at: "18:20 hôm nay",
-    is_handed_off: true,
-    messages: [
-      {
-        id: "m4",
-        sender: "user",
-        text: "Em xin bảo lưu học kỳ 1 năm học 2024-2025 thì nộp đơn ở đâu?",
-        time: "18:18",
-      },
-      {
-        id: "m5",
-        sender: "assistant",
-        text: "Theo Điều 12 Quy chế đào tạo, bạn cần làm đơn xin tạm hoãn học tập và nộp tại Bộ phận Một cửa - Phòng Đào tạo (Tầng 1 Nhà A1).",
-        time: "18:19",
-      },
-      {
-        id: "m6",
-        sender: "agent",
-        text: "[Cán bộ tư vấn Nguyễn Thị Lan đã tiếp quản phiên trao đổi]",
-        time: "18:20",
-      },
-    ],
-  },
-  {
-    id: "conv_03",
-    user_name: "Học viên Lê Quốc Bảo",
-    user_email: "baolq.msc@qnu.edu.vn",
-    assistant_code: "library",
-    assistant_name: "Trợ lý Thư viện Số",
-    last_message: "Tài khoản ScienceDirect của em bị báo hết phiên đăng nhập từ xa.",
-    updated_at: "Hôm qua 15:30",
-    is_handed_off: false,
-    messages: [
-      {
-        id: "m7",
-        sender: "user",
-        text: "Tài khoản ScienceDirect của em bị báo hết phiên đăng nhập từ xa.",
-        time: "15:28",
-      },
-      {
-        id: "m8",
-        sender: "assistant",
-        text: "Bạn vui lòng đăng nhập qua Cổng xác thực thư viện SSO tại lib.qnu.edu.vn bằng email @qnu.edu.vn để gia hạn token nhé.",
-        time: "15:30",
-      },
-    ],
-  },
+const CANNED_REPLIES = [
+  "Chào bạn! Cán bộ phụ trách đang kiểm tra hồ sơ và sẽ phản hồi trong giây lát.",
+  "Bạn vui lòng cung cấp số CCCD hoặc mã hồ sơ để cán bộ tra cứu chi tiết nhé.",
+  "Nội dung này thuộc thẩm quyền Phòng Đào tạo (Tầng 1 Nhà A1), hotline 0256.3846.156.",
+  "Cảm ơn bạn đã liên hệ. Vấn đề của bạn đã được giải quyết xong!",
 ];
 
 export const ConversationsPage: React.FC = () => {
-  const [threads, setThreads] = useState<ConversationThread[]>(MOCK_THREADS);
-  const [selectedThreadId, setSelectedThreadId] = useState<string>("conv_01");
+  const queryClient = useQueryClient();
+
+  const [selectedThreadId, setSelectedThreadId] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [staffName, setStaffName] = useState<string>("Cán bộ QNU");
   const [replyText, setReplyText] = useState<string>("");
 
-  const activeThread = threads.find((t) => t.id === selectedThreadId) || threads[0];
+  // Fetch threads list with 8s polling
+  const threadsQuery = useQuery({
+    queryKey: ["conversations-list", statusFilter, searchQuery],
+    queryFn: () =>
+      conversationsApi.listConversations({
+        status: statusFilter === "all" ? undefined : statusFilter,
+        search: searchQuery || undefined,
+      }),
+    refetchInterval: 8_000,
+  });
 
-  const handleHandoffToggle = (id: string) => {
-    setThreads((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          const nextStatus = !t.is_handed_off;
-          const newMsg = nextStatus
-            ? {
-                id: `h_${Date.now()}`,
-                sender: "agent" as const,
-                text: "[Cán bộ tư vấn đã tiếp nhận cuộc trò chuyện]",
-                time: "Vừa xong",
-              }
-            : {
-                id: `h_${Date.now()}`,
-                sender: "assistant" as const,
-                text: "[Đã chuyển lại quyền điều phối cho Trợ lý AI]",
-                time: "Vừa xong",
-              };
-          return {
-            ...t,
-            is_handed_off: nextStatus,
-            messages: [...t.messages, newMsg],
-          };
-        }
-        return t;
-      })
-    );
-  };
+  const threads = threadsQuery.data || [];
 
-  const handleSendAgentReply = (e: React.FormEvent) => {
+  // Automatically select first thread if none selected
+  useEffect(() => {
+    if (!selectedThreadId && threads.length > 0) {
+      setSelectedThreadId(threads[0].id);
+    } else if (selectedThreadId && !threads.some((t) => t.id === selectedThreadId)) {
+      if (threads.length > 0) {
+        setSelectedThreadId(threads[0].id);
+      }
+    }
+  }, [threads, selectedThreadId]);
+
+  // Fetch selected thread detail
+  const threadDetailQuery = useQuery({
+    queryKey: ["conversation-detail", selectedThreadId],
+    queryFn: () => conversationsApi.getConversationDetail(selectedThreadId),
+    enabled: Boolean(selectedThreadId),
+    refetchInterval: 5_000,
+  });
+
+  const activeThread: ConversationThreadDetail | undefined = threadDetailQuery.data;
+
+  // Mutation: Reply
+  const replyMutation = useMutation({
+    mutationFn: (text: string) =>
+      conversationsApi.replyConversation(selectedThreadId, {
+        text,
+        staff_name: staffName.trim() || "Cán bộ QNU",
+      }),
+    onSuccess: () => {
+      setReplyText("");
+      queryClient.invalidateQueries({ queryKey: ["conversation-detail", selectedThreadId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations-list"] });
+      toast.success("Đã gửi phản hồi trực tiếp tới người học!");
+    },
+    onError: (err: Error) => toast.error(`Gửi phản hồi thất bại: ${err.message}`),
+  });
+
+  // Mutation: Status update (Claim / Handback / Resolve)
+  const statusMutation = useMutation({
+    mutationFn: ({ status, assigned_to }: { status: ConversationStatus; assigned_to?: string }) =>
+      conversationsApi.updateConversationStatus(selectedThreadId, {
+        status,
+        assigned_to,
+      }),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["conversation-detail", selectedThreadId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations-list"] });
+      const labels: Record<ConversationStatus, string> = {
+        ai_active: "Đã chuyển lại quyền điều phối cho Trợ lý AI",
+        staff_claimed: `Cán bộ ${updated.assigned_to || staffName} đã tiếp nhận phiên hỗ trợ`,
+        handoff_requested: "Đã đánh dấu yêu cầu cán bộ tiếp quản",
+        resolved: "Đã đánh dấu phiên trao đổi hoàn tất (Resolved)",
+      };
+      toast.success(labels[updated.status] || "Đã cập nhật trạng thái hội thoại.");
+    },
+    onError: (err: Error) => toast.error(`Cập nhật trạng thái thất bại: ${err.message}`),
+  });
+
+  const handleSendReply = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
-
-    setThreads((prev) =>
-      prev.map((t) => {
-        if (t.id === selectedThreadId) {
-          return {
-            ...t,
-            messages: [
-              ...t.messages,
-              { id: `r_${Date.now()}`, sender: "agent", text: replyText, time: "Vừa xong" },
-            ],
-          };
-        }
-        return t;
-      })
-    );
-    setReplyText("");
+    if (!replyText.trim() || replyMutation.isPending) return;
+    replyMutation.mutate(replyText.trim());
   };
 
-  const filteredThreads = threads.filter(
-    (t) =>
-      t.user_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.user_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.last_message.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handoffCount = useMemo(() => {
+    return threads.filter((t) => t.status === "handoff_requested").length;
+  }, [threads]);
 
   const getAssistantIcon = (code: string) => {
     switch (code) {
       case "admissions":
-        return <GraduationCap className="h-3.5 w-3.5" />;
+        return <GraduationCap className="size-3.5 text-emerald-500" />;
       case "regulations":
-        return <ShieldCheck className="h-3.5 w-3.5" />;
+        return <ShieldCheck className="size-3.5 text-sky-500" />;
       case "library":
-        return <Library className="h-3.5 w-3.5" />;
+        return <Library className="size-3.5 text-amber-500" />;
       default:
-        return <Bot className="h-3.5 w-3.5" />;
+        return <Bot className="size-3.5 text-primary" />;
+    }
+  };
+
+  const getStatusBadge = (status: ConversationStatus) => {
+    switch (status) {
+      case "handoff_requested":
+        return (
+          <Badge
+            variant="destructive"
+            className="text-[10px] gap-1 animate-pulse bg-rose-500/15 text-rose-600 border border-rose-500/30"
+          >
+            <AlertTriangle className="size-3" />
+            Cần tiếp quản
+          </Badge>
+        );
+      case "staff_claimed":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 bg-sky-500/10 text-sky-600 border-sky-500/30"
+          >
+            <UserCheck className="size-3" />
+            Cán bộ hỗ trợ
+          </Badge>
+        );
+      case "resolved":
+        return (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+          >
+            <CheckCircle2 className="size-3" />
+            Đã giải quyết
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="text-[10px] gap-1 bg-primary/10 text-primary border-primary/30"
+          >
+            <Bot className="size-3" />
+            AI đang xử lý
+          </Badge>
+        );
     }
   };
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-          Hội Thoại Đa Kênh & Bàn Giao Cán Bộ (Handoff)
-          <Badge variant="outline" className="font-mono text-xs">
-            Human-in-the-loop
-          </Badge>
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Giám sát các phiên hỏi đáp trực tiếp của người dùng và bàn giao tức thì cho Cán bộ tư vấn
-          khi gặp tình huống phức tạp.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-lg border border-border">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Headphones className="size-5 text-primary" />
+            <span>Giám Sát Hội Thoại & Bàn Giao Nhân Sự (Staff Handoff)</span>
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Theo dõi các phiên trao đổi thời gian thực giữa người học và Trợ lý AI ĐH Quy Nhơn. Cán
+            bộ có thể can thiệp 1-click khi câu hỏi vượt quá phạm vi tri thức.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {handoffCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="text-xs px-3 py-1 gap-1.5 bg-rose-500 text-white font-medium shadow-sm"
+            >
+              <ShieldAlert className="size-3.5" />
+              <span>{handoffCount} yêu cầu cần hỗ trợ</span>
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              threadsQuery.refetch();
+              if (selectedThreadId) threadDetailQuery.refetch();
+            }}
+            disabled={threadsQuery.isFetching}
+            className="h-8 text-xs gap-1.5"
+          >
+            <RefreshCw className={cn("size-3.5", threadsQuery.isFetching && "animate-spin")} />
+            <span>Làm mới</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Main split view */}
-      <div className="flex h-[calc(100vh-var(--topbar-height)-8rem)] flex-col md:flex-row gap-4">
-        {/* Left: Threads List */}
-        <div className="w-full md:w-80 shrink-0 flex flex-col rounded-surface border border-border bg-card shadow-xs overflow-hidden">
-          <div className="p-3 border-b border-border bg-muted/20">
+      {/* Main 2-Column Master-Detail Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[22rem_1fr] gap-4 min-h-[680px]">
+        {/* Left Column: Threads Master List */}
+        <Card className="flex flex-col border border-border overflow-hidden">
+          {/* Search & Status Filter */}
+          <div className="p-3 border-b border-border space-y-2 bg-muted/20">
             <div className="relative">
-              <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
+              <Search className="size-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
               <Input
-                placeholder="Tìm phiên hội thoại..."
+                placeholder="Tìm thí sinh, sinh viên, nội dung..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 text-xs bg-background"
+                className="h-8 text-xs pl-8"
               />
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
+              {[
+                { id: "all", label: "Tất cả" },
+                { id: "handoff_requested", label: `Cần tiếp quản (${handoffCount})` },
+                { id: "staff_claimed", label: "Cán bộ" },
+                { id: "ai_active", label: "AI xử lý" },
+                { id: "resolved", label: "Đã xong" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md whitespace-nowrap transition-colors font-medium",
+                    statusFilter === tab.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
+          {/* Threads List */}
           <div className="flex-1 overflow-y-auto divide-y divide-border/60">
-            {filteredThreads.map((thread) => {
-              const isSelected = thread.id === selectedThreadId;
-              return (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => setSelectedThreadId(thread.id)}
-                  className={`w-full text-left p-3.5 transition-colors cursor-pointer space-y-1.5 ${
-                    isSelected ? "bg-primary/10 border-l-3 border-l-primary" : "hover:bg-muted/40"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 min-w-0">
+            {threadsQuery.isLoading ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                <RefreshCw className="size-5 animate-spin mx-auto mb-2 text-primary" />
+                <span>Đang đồng bộ danh sách hội thoại...</span>
+              </div>
+            ) : threads.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                <MessageSquare className="size-8 mx-auto mb-2 opacity-30 text-primary" />
+                <p className="font-medium text-foreground">Không có hội thoại nào</p>
+                <p className="text-[11px] mt-1">
+                  Không tìm thấy phiên trò chuyện phù hợp với bộ lọc hiện tại.
+                </p>
+              </div>
+            ) : (
+              threads.map((thread: ConversationThreadItem) => {
+                const isSelected = thread.id === selectedThreadId;
+                return (
+                  <button
+                    type="button"
+                    key={thread.id}
+                    onClick={() => setSelectedThreadId(thread.id)}
+                    className={cn(
+                      "w-full text-left p-3 transition-colors flex flex-col gap-1.5",
+                      isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-muted/40"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-1">
                       <span className="font-semibold text-xs text-foreground truncate">
                         {thread.user_name}
                       </span>
+                      {getStatusBadge(thread.status)}
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
-                      {thread.updated_at}
+
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      {getAssistantIcon(thread.assistant_code)}
+                      <span className="truncate">{thread.assistant_name}</span>
+                      <span className="ml-auto shrink-0 flex items-center gap-1 text-[10px]">
+                        <Clock className="size-2.5" />
+                        {thread.updated_at
+                          ? new Date(thread.updated_at).toLocaleTimeString("vi-VN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "Vừa xong"}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                      {thread.last_message}
+                    </p>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </Card>
+
+        {/* Right Column: Active Conversation Desk & Live Messages */}
+        <Card className="flex flex-col border border-border overflow-hidden">
+          {!activeThread ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+              <Headphones className="size-12 opacity-20 text-primary mb-3" />
+              <p className="text-sm font-semibold text-foreground">
+                Chọn một phiên hội thoại để kiểm tra
+              </p>
+              <p className="text-xs max-w-sm mt-1">
+                Xem toàn bộ lịch sử trao đổi, thông tin người học và tiếp quản xử lý trực tiếp khi
+                cần thiết.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Desk Topbar */}
+              <div className="p-3.5 border-b border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm text-foreground">
+                      {activeThread.user_name}
                     </span>
+                    {activeThread.user_email && (
+                      <span className="text-xs text-muted-foreground font-mono">
+                        &lt;{activeThread.user_email}&gt;
+                      </span>
+                    )}
+                    {getStatusBadge(activeThread.status)}
                   </div>
-
-                  <div className="flex items-center gap-1 text-[11px] text-primary">
-                    {getAssistantIcon(thread.assistant_code)}
-                    <span className="truncate">{thread.assistant_name}</span>
-                  </div>
-
-                  <p className="text-[11px] text-muted-foreground line-clamp-1">
-                    {thread.last_message}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {thread.user_email}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      {getAssistantIcon(activeThread.assistant_code)}
+                      <span>{activeThread.assistant_name}</span>
                     </span>
-                    {thread.is_handed_off ? (
-                      <Badge variant="warning" className="text-[10px]">
-                        Cán bộ tiếp quản
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                        AI Điều Phối
-                      </Badge>
+                    {activeThread.assigned_to && (
+                      <span>
+                        • Cán bộ phụ trách:{" "}
+                        <strong className="text-foreground">{activeThread.assigned_to}</strong>
+                      </span>
                     )}
                   </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Conversation Transcript View */}
-        <div className="flex-1 flex flex-col rounded-surface border border-border bg-card shadow-xs overflow-hidden">
-          {/* Thread Header */}
-          <div className="flex items-center justify-between p-3.5 border-b border-border bg-muted/20">
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
-                <User className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="font-bold text-xs text-foreground">{activeThread.user_name}</h3>
-                <p className="text-[11px] text-muted-foreground font-mono">
-                  {activeThread.user_email} • Đang kết nối {activeThread.assistant_name}
-                </p>
-              </div>
-            </div>
-
-            <Button
-              size="sm"
-              variant={activeThread.is_handed_off ? "default" : "outline"}
-              onClick={() => handleHandoffToggle(activeThread.id)}
-              className="text-xs h-8 gap-1.5"
-            >
-              <UserCheck className="h-3.5 w-3.5" />
-              <span>
-                {activeThread.is_handed_off
-                  ? "Trả quyền cho Trợ lý AI"
-                  : "Tiếp Quản Phiên Hội Thoại"}
-              </span>
-            </Button>
-          </div>
-
-          {/* Transcript Messages */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-muted/10 text-xs">
-            {activeThread.messages.map((m) => {
-              if (m.sender === "agent") {
-                return (
-                  <div key={m.id} className="flex items-center justify-center my-2">
-                    <span className="px-3 py-1 rounded-full bg-warning/10 border border-warning/30 text-warning text-[11px] font-medium">
-                      {m.text} ({m.time})
-                    </span>
-                  </div>
-                );
-              }
-
-              const isUser = m.sender === "user";
-              return (
-                <div
-                  key={m.id}
-                  className={`flex gap-2.5 max-w-xl ${isUser ? "ml-auto justify-end" : "mr-auto"}`}
-                >
-                  {!isUser && (
-                    <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                      <Bot className="h-3.5 w-3.5" />
-                    </div>
-                  )}
-                  <div
-                    className={`p-3 rounded-surface text-xs leading-relaxed space-y-1 ${
-                      isUser
-                        ? "bg-primary text-primary-foreground rounded-br-micro"
-                        : "bg-card border border-border text-foreground rounded-bl-micro shadow-2xs"
-                    }`}
-                  >
-                    <p>{m.text}</p>
-                    <span className="text-[10px] opacity-70 block text-right font-mono">
-                      {m.time}
-                    </span>
-                  </div>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Reply box (for Human Counselor) */}
-          <form
-            onSubmit={handleSendAgentReply}
-            className="p-3 border-t border-border bg-card flex items-center gap-2"
-          >
-            <Input
-              placeholder={
-                activeThread.is_handed_off
-                  ? "Nhập tin nhắn với tư cách Cán bộ tư vấn QNU..."
-                  : "Bấm 'Tiếp Quản Phiên Hội Thoại' ở trên để trực tiếp nhắn tin..."
-              }
-              disabled={!activeThread.is_handed_off}
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              className="text-xs h-9"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!activeThread.is_handed_off || !replyText.trim()}
-              className="h-9 text-xs gap-1.5 shrink-0 font-semibold"
-            >
-              <Send className="h-3.5 w-3.5" />
-              <span>Gửi</span>
-            </Button>
-          </form>
-        </div>
+                {/* Status Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {activeThread.status === "handoff_requested" && (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        statusMutation.mutate({
+                          status: "staff_claimed",
+                          assigned_to: staffName.trim() || "Cán bộ QNU",
+                        })
+                      }
+                      disabled={statusMutation.isPending}
+                      className="h-8 text-xs gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-sm"
+                    >
+                      <UserCheck className="size-3.5" />
+                      <span>Tiếp nhận hỗ trợ</span>
+                    </Button>
+                  )}
+
+                  {activeThread.status === "staff_claimed" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        statusMutation.mutate({
+                          status: "ai_active",
+                        })
+                      }
+                      disabled={statusMutation.isPending}
+                      className="h-8 text-xs gap-1.5 text-primary hover:bg-primary/10"
+                    >
+                      <Bot className="size-3.5" />
+                      <span>Chuyển lại cho AI</span>
+                    </Button>
+                  )}
+
+                  {activeThread.status !== "resolved" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        statusMutation.mutate({
+                          status: "resolved",
+                        })
+                      }
+                      disabled={statusMutation.isPending}
+                      className="h-8 text-xs gap-1.5 text-emerald-600 hover:bg-emerald-500/10"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      <span>Đã giải quyết</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        statusMutation.mutate({
+                          status: "ai_active",
+                        })
+                      }
+                      disabled={statusMutation.isPending}
+                      className="h-8 text-xs gap-1.5"
+                    >
+                      <RefreshCw className="size-3.5" />
+                      <span>Mở lại phiên</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-muted/10">
+                {activeThread.messages.map((msg) => {
+                  const isUser = msg.sender === "user";
+                  const isStaff = msg.sender === "agent";
+                  const isAi = msg.sender === "assistant";
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex gap-3 max-w-[85%]",
+                        isUser ? "ml-auto flex-row-reverse" : "mr-auto"
+                      )}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className={cn(
+                          "size-7 rounded-full flex items-center justify-center text-xs shrink-0 font-medium",
+                          isUser && "bg-muted text-muted-foreground border border-border",
+                          isStaff && "bg-sky-500/15 text-sky-600 border border-sky-500/30",
+                          isAi && "bg-primary/15 text-primary border border-primary/30"
+                        )}
+                      >
+                        {isUser && <User className="size-3.5" />}
+                        {isStaff && <UserCheck className="size-3.5" />}
+                        {isAi && <Bot className="size-3.5" />}
+                      </div>
+
+                      {/* Bubble */}
+                      <div
+                        className={cn(
+                          "rounded-lg p-3 text-xs leading-relaxed border space-y-1 shadow-2xs",
+                          isUser && "bg-primary text-primary-foreground border-primary",
+                          isStaff &&
+                            "bg-sky-50 dark:bg-sky-950/40 text-foreground border-sky-200 dark:border-sky-800/40",
+                          isAi && "bg-card text-foreground border-border"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-3 text-[10px] opacity-75">
+                          <span className="font-semibold">
+                            {isUser && activeThread.user_name}
+                            {isStaff && "Cán bộ tư vấn QNU"}
+                            {isAi && activeThread.assistant_name}
+                          </span>
+                          <span>
+                            {msg.created_at
+                              ? new Date(msg.created_at).toLocaleTimeString("vi-VN", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "Vừa xong"}
+                          </span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Staff Reply Box & Canned Quick Replies */}
+              <div className="p-3 border-t border-border bg-card space-y-2.5">
+                {/* Canned replies pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                  <span className="text-muted-foreground text-[10px] whitespace-nowrap shrink-0 flex items-center gap-1">
+                    <CornerDownLeft className="size-3" /> Mẫu nhanh:
+                  </span>
+                  {CANNED_REPLIES.map((canned) => (
+                    <button
+                      type="button"
+                      key={canned}
+                      onClick={() => setReplyText(canned)}
+                      className="px-2 py-0.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] whitespace-nowrap border border-border transition-colors truncate max-w-[200px]"
+                      title={canned}
+                    >
+                      {canned}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Reply Form */}
+                <form onSubmit={handleSendReply} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground shrink-0 font-medium">
+                      Danh xưng cán bộ:
+                    </span>
+                    <Input
+                      value={staffName}
+                      onChange={(e) => setStaffName(e.target.value)}
+                      placeholder="Cán bộ QNU..."
+                      className="h-7 text-xs w-48 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendReply(e);
+                        }
+                      }}
+                      placeholder="Nhập câu trả lời trực tiếp gửi đến thí sinh/sinh viên (Nhấn Enter để gửi)..."
+                      rows={2}
+                      className="text-xs resize-none"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={!replyText.trim() || replyMutation.isPending}
+                      className="h-14 px-4 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                    >
+                      <Send className="size-3.5" />
+                      <span>{replyMutation.isPending ? "Đang gửi..." : "Gửi phản hồi"}</span>
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </>
+          )}
+        </Card>
       </div>
     </div>
   );

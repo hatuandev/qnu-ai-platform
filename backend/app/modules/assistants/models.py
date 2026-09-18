@@ -38,3 +38,21 @@ class AssistantModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+
+class AssistantVersionModel(Base):
+    """Snapshot record for assistant configuration versioning and rollback."""
+
+    __tablename__ = "assistant_versions"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: f"asv_{uuid.uuid4().hex[:12]}"
+    )
+    assistant_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    assistant_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    version_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    change_summary: Mapped[str] = mapped_column(String(255), nullable=False)
+    snapshot_data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_by: Mapped[str] = mapped_column(String(100), default="cán bộ quản trị")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

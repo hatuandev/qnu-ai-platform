@@ -4,6 +4,8 @@ import type {
   AssistantLifecycleConfig,
   AssistantPublishResponse,
   AssistantReadinessResponse,
+  AssistantRollbackResponse,
+  AssistantVersionItem,
 } from "@/types/assistants";
 
 const ASSISTANTS_URL = "/platform/v1alpha1/assistants";
@@ -202,6 +204,24 @@ export function cloneAssistant(
   });
 }
 
+export function getAssistantVersions(reference: string): Promise<AssistantVersionItem[]> {
+  return requestJson<AssistantVersionItem[]>(
+    `${ASSISTANTS_URL}/${encodeURIComponent(reference)}/versions`
+  );
+}
+
+export function rollbackAssistantVersion(
+  reference: string,
+  versionId: string
+): Promise<AssistantRollbackResponse> {
+  return requestJson<AssistantRollbackResponse>(
+    `${ASSISTANTS_URL}/${encodeURIComponent(reference)}/rollback/${encodeURIComponent(versionId)}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
 export const assistantsApi = {
   getAssistants: listAssistants,
   getAssistant,
@@ -218,4 +238,6 @@ export const assistantsApi = {
   getAssistantReadiness,
   publishAssistant,
   cloneAssistant,
+  getAssistantVersions,
+  rollbackAssistantVersion,
 };

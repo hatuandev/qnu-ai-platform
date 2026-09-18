@@ -15,7 +15,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
-from app.modules.assistants.models import AssistantModel
+from app.modules.assistants.models import AssistantModel, AssistantVersionModel
 from app.modules.assistants.readiness import readiness_engine
 from app.modules.assistants.runtime import build_runtime_profile, prepare_user_message
 from app.modules.assistants.schemas import (
@@ -31,9 +31,11 @@ from app.modules.assistants.schemas import (
     AssistantPublishResponse,
     AssistantReadinessResponse,
     AssistantResponse,
+    AssistantRollbackResponse,
     AssistantSeedResponse,
     AssistantTemplateResponse,
     AssistantUpdateRequest,
+    AssistantVersionResponse,
 )
 from app.modules.assistants.seeder import STANDARD_ASSISTANTS, seed_standard_assistants
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
@@ -152,6 +154,14 @@ class AssistantService:
         await db.commit()
         await db.refresh(record)
         logger.info("Updated assistant code=%s", record.code)
+
+        try:
+            await self._create_version_snapshot(
+                db, record, change_summary="Cập nhật cấu hình trợ lý"
+            )
+        except Exception as v_err:
+            logger.warning("failed_to_create_version_snapshot_on_update: %s", v_err)
+
         return _to_response(record)
 
     async def deactivate_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
@@ -583,6 +593,15 @@ class AssistantService:
         await db.commit()
         await db.refresh(record)
 
+        try:
+            await self._create_version_snapshot(
+                db,
+                record,
+                change_summary=f"Xuất bản chính thức (Điểm kiểm định: {readiness.overall_readiness_score}%)",
+            )
+        except Exception as v_err:
+            logger.warning("failed_to_create_version_snapshot_on_publish: %s", v_err)
+
         return AssistantPublishResponse(
             assistant_code=record.code,
             assistant_name=record.name,
@@ -643,6 +662,131 @@ class AssistantService:
         await db.refresh(new_record)
         logger.info("Cloned assistant source=%s new_code=%s", source.code, new_code)
         return _to_response(new_record)
+
+    async def _create_version_snapshot(
+        self,
+        db: AsyncSession,
+        record: AssistantModel,
+        change_summary: str,
+        created_by: str = "cán bộ quản trị",
+    ) -> AssistantVersionModel:
+        """Create a version snapshot of an assistant configuration."""
+        count_res = await db.execute(
+            select(func.count(AssistantVersionModel.id)).where(
+                AssistantVersionModel.assistant_id == record.id
+            )
+        )
+        total = count_res.scalar() or 0
+        version_number = f"v1.{total}"
+
+        snapshot_payload = {
+            "name": record.name,
+            "description": record.description,
+            "category": record.category,
+            "system_prompt": record.system_prompt,
+            "workflow_id": record.workflow_id,
+            "collection_id": record.collection_id,
+            "is_active": record.is_active,
+            "tenant_id": record.tenant_id,
+            "config": dict(record.config or {}),
+        }
+
+        now_ts = datetime.now(UTC).replace(tzinfo=None)
+        ver = AssistantVersionModel(
+            id=f"asv_{uuid.uuid4().hex[:12]}",
+            assistant_id=record.id,
+            assistant_code=record.code,
+            version_number=version_number,
+            change_summary=change_summary,
+            snapshot_data=snapshot_payload,
+            created_by=created_by,
+            created_at=now_ts,
+        )
+        db.add(ver)
+        await db.commit()
+        await db.refresh(ver)
+        logger.info("Saved assistant version %s for %s", version_number, record.code)
+        return ver
+
+    async def get_versions(
+        self, db: AsyncSession, reference: str
+    ) -> list[AssistantVersionResponse]:
+        """List all version snapshots for an assistant."""
+        record = await self._get_record(db, reference)
+        res = await db.execute(
+            select(AssistantVersionModel)
+            .where(AssistantVersionModel.assistant_id == record.id)
+            .order_by(AssistantVersionModel.created_at.desc())
+        )
+        versions = list(res.scalars().all())
+        return [
+            AssistantVersionResponse(
+                id=v.id,
+                assistant_id=v.assistant_id,
+                assistant_code=v.assistant_code,
+                version_number=v.version_number,
+                change_summary=v.change_summary,
+                snapshot_data=v.snapshot_data or {},
+                created_by=v.created_by,
+                created_at=v.created_at,
+            )
+            for v in versions
+        ]
+
+    async def rollback_version(
+        self, db: AsyncSession, reference: str, version_id: str
+    ) -> AssistantRollbackResponse:
+        """Rollback an assistant configuration to a selected previous version snapshot."""
+        record = await self._get_record(db, reference)
+        ver_res = await db.execute(
+            select(AssistantVersionModel).where(
+                AssistantVersionModel.id == version_id,
+                AssistantVersionModel.assistant_id == record.id,
+            )
+        )
+        target_version = ver_res.scalar_one_or_none()
+        if not target_version:
+            raise EntityNotFoundError(
+                f"Phiên bản '{version_id}' không tồn tại cho trợ lý '{record.code}'.",
+                details={"version_id": version_id, "assistant_code": record.code},
+            )
+
+        snap = target_version.snapshot_data or {}
+        if "name" in snap:
+            record.name = snap["name"]
+        if "description" in snap:
+            record.description = snap["description"]
+        if "category" in snap:
+            record.category = snap["category"]
+        if "system_prompt" in snap:
+            record.system_prompt = snap["system_prompt"]
+        if "workflow_id" in snap:
+            record.workflow_id = snap["workflow_id"]
+        if "collection_id" in snap:
+            record.collection_id = snap["collection_id"]
+        if "config" in snap and isinstance(snap["config"], dict):
+            record.config = dict(snap["config"])
+
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+
+        # Create a new version marking the rollback
+        new_ver = await self._create_version_snapshot(
+            db,
+            record,
+            change_summary=f"Khôi phục về phiên bản {target_version.version_number}",
+            created_by="Cán bộ quản trị (Rollback)",
+        )
+
+        return AssistantRollbackResponse(
+            assistant_code=record.code,
+            assistant_name=record.name,
+            restored_version=target_version.version_number,
+            current_version=new_ver.version_number,
+            message=f"Đã khôi phục thành công về phiên bản {target_version.version_number}.",
+            restored_at=new_ver.created_at,
+        )
 
     async def _get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
         normalized_reference = _clean_text(reference) or reference

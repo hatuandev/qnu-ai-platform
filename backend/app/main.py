@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Automatically ensure PostgreSQL schema exists on startup
     try:
         import app.modules.assistants.models
+        import app.modules.conversations.models
         import app.modules.document_types.models
         import app.modules.evaluation.models
         import app.modules.knowledge.models
@@ -186,6 +187,7 @@ def create_app() -> FastAPI:
     # 6. Mount Feature Modules Routers
     from app.modules.assistants import assistants_router
     from app.modules.auth import auth_router
+    from app.modules.conversations.router import router as conversations_router
     from app.modules.document_types.router import router as document_types_router
     from app.modules.evaluation import evaluation_router
     from app.modules.jobs import jobs_router
@@ -206,6 +208,7 @@ def create_app() -> FastAPI:
     app.include_router(node_catalog_router, prefix=settings.API_PREFIX)
     app.include_router(workflow_router, prefix=settings.API_PREFIX)
     app.include_router(assistants_router, prefix=settings.API_PREFIX)
+    app.include_router(conversations_router, prefix=settings.API_PREFIX)
     app.include_router(tools_router, prefix=settings.API_PREFIX)
     app.include_router(ocr_router, prefix=settings.API_PREFIX)
     app.include_router(evaluation_router, prefix=settings.API_PREFIX)

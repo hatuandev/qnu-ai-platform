@@ -95,3 +95,21 @@ export interface AssistantPublishResponse {
   published_at: string;
   message: string;
 }
+
+export interface AssistantVersionItem {
+  id: string;
+  assistant_id: string;
+  assistant_code: string;
+  version_number: string;
+  change_summary: string;
+  snapshot_data: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+}
+
+export interface AssistantRollbackResponse {
+  assistant_code: string;
+  restored_version: string;
+  current_version: string;
+  message: string;
+}

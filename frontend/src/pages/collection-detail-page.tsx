@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   ArrowLeft,
@@ -8,12 +8,14 @@ import {
   Cpu,
   Download,
   Eye,
+  FileSpreadsheet,
   FileText,
   RefreshCw,
   RotateCcw,
   Scan,
   Search,
   Settings,
+  Table2,
   Terminal,
   Trash2,
   Upload,
@@ -22,6 +24,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ConfirmDialog } from "../components/admin/confirm-dialog";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -44,12 +47,14 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { cn } from "../lib/utils";
 import {
   type IngestionTask,
   type KnowledgeCollection,
   type KnowledgeDocument,
   apiClient,
 } from "../services/api-client";
+import { knowledgeApi } from "../services/knowledge-api";
 import { DocumentIngestPage } from "./document-ingest-page";
 import { DocumentVerificationStudioPage } from "./document-verification-studio-page";
 
@@ -212,6 +217,41 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     queryKey: ["ingestion-tasks", currentCollection.id],
     queryFn: () => apiClient.getIngestionTasks(currentCollection.id),
   });
+
+  // Facts layer state & queries
+  const [factsSearchQuery, setFactsSearchQuery] = useState<string>("");
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState<boolean>(false);
+  const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
+
+  const factsQuery = useQuery({
+    queryKey: ["collection-facts", currentCollection.id],
+    queryFn: () => knowledgeApi.getCollectionFacts(currentCollection.id),
+    enabled: Boolean(currentCollection.id),
+  });
+
+  const importExcelMutation = useMutation({
+    mutationFn: (file: File) => knowledgeApi.importFactsExcel(currentCollection.id, file),
+    onSuccess: (res) => {
+      toast.success(res.message || `Đã nạp thành công ${res.imported_count} số liệu!`);
+      setIsExcelImportOpen(false);
+      setSelectedExcelFile(null);
+      queryClient.invalidateQueries({ queryKey: ["collection-facts", currentCollection.id] });
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+    onError: (err: Error) => toast.error(`Nạp bảng tính thất bại: ${err.message}`),
+  });
+
+  const filteredFacts = useMemo(() => {
+    const list = factsQuery.data?.facts || [];
+    if (!factsSearchQuery.trim()) return list;
+    const q = factsSearchQuery.toLowerCase();
+    return list.filter(
+      (f) =>
+        f.entity_name.toLowerCase().includes(q) ||
+        f.attribute_name.toLowerCase().includes(q) ||
+        f.attribute_value.toLowerCase().includes(q)
+    );
+  }, [factsQuery.data?.facts, factsSearchQuery]);
 
   // Filtered documents
   const filteredDocuments = useMemo(() => {
@@ -564,6 +604,10 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             <FileText className="size-3.5" />
             <span>Danh mục Tài liệu ({allDocuments.length})</span>
           </TabsTrigger>
+          <TabsTrigger value="facts" className="text-xs px-3.5 py-1.5 gap-1.5">
+            <Table2 className="size-3.5 text-primary" />
+            <span>Bảng Biểu & Số Liệu ({factsQuery.data?.total ?? 0})</span>
+          </TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs px-3.5 py-1.5 gap-1.5">
             <Activity className="size-3.5" />
             <span>Tiến trình & Lịch sử Tác vụ ({allTasks.length})</span>
@@ -756,6 +800,152 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                             <Trash2 className="size-3.5" />
                           </Button>
                         </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        {/* TAB: BẢNG BIỂU SỐ LIỆU (STRUCTURED FACTS LAYER) */}
+        <TabsContent value="facts" className="space-y-4 mt-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-lg border border-border">
+            <div>
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Table2 className="size-4 text-primary" />
+                <span>Bảng Biểu & Số Liệu Trích Xuất (Facts Layer)</span>
+                <Badge variant="outline" className="font-mono text-xs">
+                  {factsQuery.data?.total ?? 0} facts
+                </Badge>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Các số liệu chính xác 100% dạng bảng (điểm chuẩn, chỉ tiêu, học phí) được nạp trực
+                tiếp từ bảng tính Excel/CSV để Trợ lý AI tra cứu đối soát, chống bịa đặt (Zero
+                Hallucination).
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => factsQuery.refetch()}
+                disabled={factsQuery.isFetching}
+                className="h-8 text-xs gap-1.5"
+              >
+                <RefreshCw className={cn("size-3.5", factsQuery.isFetching && "animate-spin")} />
+                <span>Làm mới</span>
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setIsExcelImportOpen(true)}
+                className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <FileSpreadsheet className="size-3.5" />
+                <span>+ Nạp Bảng Biểu Excel/CSV</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Search bar for facts */}
+          <div className="flex items-center gap-2 bg-card p-3 rounded-lg border border-border">
+            <Search className="size-4 text-muted-foreground shrink-0" />
+            <Input
+              placeholder="Tìm theo thực thể (ngành, khoa), tên thuộc tính (điểm chuẩn, chỉ tiêu) hoặc giá trị..."
+              value={factsSearchQuery}
+              onChange={(e) => setFactsSearchQuery(e.target.value)}
+              className="h-8 text-xs"
+            />
+            {factsSearchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={() => setFactsSearchQuery("")}
+              >
+                Xóa lọc
+              </Button>
+            )}
+          </div>
+
+          {/* Facts Table */}
+          <div className="bg-card rounded-lg border border-border overflow-hidden shadow-xs">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40 text-[11px] font-semibold text-muted-foreground uppercase">
+                  <TableHead>Thực thể (Entity)</TableHead>
+                  <TableHead>Phân loại</TableHead>
+                  <TableHead>Thuộc tính (Attribute)</TableHead>
+                  <TableHead>Giá trị (Value)</TableHead>
+                  <TableHead>Độ tin cậy</TableHead>
+                  <TableHead>Thời điểm số hóa</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {factsQuery.isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center py-12 text-xs text-muted-foreground"
+                    >
+                      Đang tải danh sách bảng biểu số liệu...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredFacts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      <FileSpreadsheet className="size-8 mx-auto mb-2 opacity-30 text-primary" />
+                      <p className="text-sm font-medium text-foreground">
+                        {factsSearchQuery
+                          ? "Không tìm thấy số liệu phù hợp với từ khóa"
+                          : "Chưa có bảng biểu số liệu nào trong kho này"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                        Tải lên tệp Excel (.xlsx) hoặc CSV chứa các cột (Mã ngành, Tên ngành, Điểm
+                        chuẩn, Chỉ tiêu, Học phí) để hệ thống tự động bóc tách thành facts tra cứu.
+                      </p>
+                      {!factsSearchQuery && (
+                        <Button
+                          size="sm"
+                          onClick={() => setIsExcelImportOpen(true)}
+                          className="h-8 text-xs gap-1.5 mt-3"
+                        >
+                          <FileSpreadsheet className="size-3.5" />
+                          <span>Tải tệp Excel ngay</span>
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredFacts.map((fact) => (
+                    <TableRow key={fact.id} className="hover:bg-muted/30 text-xs">
+                      <TableCell className="font-semibold text-foreground">
+                        {fact.entity_name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-normal uppercase">
+                          {fact.entity_type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {fact.attribute_name}
+                      </TableCell>
+                      <TableCell className="font-semibold text-primary font-mono">
+                        {fact.attribute_value}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="default"
+                          className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        >
+                          {Math.round(fact.confidence * 100)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-[11px]">
+                        {fact.created_at
+                          ? new Date(fact.created_at).toLocaleString("vi-VN")
+                          : "N/A"}
                       </TableCell>
                     </TableRow>
                   ))
@@ -1170,6 +1360,97 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               trong kho tri thức{" "}
               <strong className="text-foreground">{currentCollection.name}</strong>.
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Excel Facts Import Dialog */}
+      <Dialog open={isExcelImportOpen} onOpenChange={setIsExcelImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <FileSpreadsheet className="size-4 text-primary" />
+              <span>Nạp Bảng Biểu Số Liệu (Excel / CSV)</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <p className="text-muted-foreground leading-relaxed">
+              Chọn tệp bảng tính <code>.xlsx</code>, <code>.xls</code> hoặc <code>.csv</code> chứa
+              các cột số liệu (Điểm chuẩn, Chỉ tiêu, Học phí, Tổ hợp xét tuyển). Hệ thống sẽ tự động
+              bóc tách từng dòng thành các facts định lượng.
+            </p>
+
+            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+              <input
+                type="file"
+                id="excel-facts-upload"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setSelectedExcelFile(f);
+                }}
+              />
+              <label htmlFor="excel-facts-upload" className="cursor-pointer block">
+                <FileSpreadsheet className="size-10 mx-auto mb-2 text-primary/70" />
+                {selectedExcelFile ? (
+                  <div>
+                    <p className="font-semibold text-foreground text-sm">
+                      {selectedExcelFile.name}
+                    </p>
+                    <p className="text-muted-foreground text-[11px] mt-0.5">
+                      {(selectedExcelFile.size / 1024).toFixed(1)} KB — Nhấp để chọn tệp khác
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium text-foreground">Kéo thả hoặc nhấp để chọn tệp</p>
+                    <p className="text-muted-foreground text-[11px] mt-0.5">
+                      Hỗ trợ .xlsx, .xls, .csv
+                    </p>
+                  </div>
+                )}
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => {
+                setIsExcelImportOpen(false);
+                setSelectedExcelFile(null);
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              disabled={!selectedExcelFile || importExcelMutation.isPending}
+              onClick={() => {
+                if (selectedExcelFile) {
+                  importExcelMutation.mutate(selectedExcelFile);
+                }
+              }}
+            >
+              {importExcelMutation.isPending ? (
+                <>
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  <span>Đang trích xuất...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="size-3.5" />
+                  <span>Bắt đầu nạp facts</span>
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

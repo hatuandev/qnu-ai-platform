@@ -188,3 +188,30 @@ class ParsePreviewResponse(BaseModel):
     extracted_tables_count: int
     preview_chunks: list[dict[str, Any]]
     ocr_method: str = "PyMuPdfParser"
+
+
+class FactItemResponse(BaseModel):
+    id: str
+    collection_id: str
+    document_id: str
+    entity_name: str
+    entity_type: str
+    attribute_name: str
+    attribute_value: str
+    confidence: float
+    raw_data: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class FactListResponse(BaseModel):
+    collection_id: str
+    total: int
+    facts: list[FactItemResponse]
+
+
+class FactExcelImportResponse(BaseModel):
+    collection_id: str
+    imported_count: int
+    document_id: str
+    message: str
+

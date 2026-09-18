@@ -129,3 +129,29 @@ export interface DocumentVerificationData {
     regions: DocumentRegion[];
   }[];
 }
+
+export interface FactItem {
+  id: string;
+  collection_id: string;
+  document_id: string;
+  entity_name: string;
+  entity_type: string;
+  attribute_name: string;
+  attribute_value: string;
+  confidence: number;
+  raw_data: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface FactListResponse {
+  collection_id: string;
+  total: number;
+  facts: FactItem[];
+}
+
+export interface FactExcelImportResponse {
+  collection_id: string;
+  imported_count: number;
+  document_id: string;
+  message: string;
+}

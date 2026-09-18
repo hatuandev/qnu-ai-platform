@@ -31,10 +31,13 @@ import {
   generateAssistantSpec,
   getAssistant,
   getAssistantReadiness,
+  getAssistantVersions,
   publishAssistant,
+  rollbackAssistantVersion,
   updateAssistant,
 } from "@/services/assistants-api";
 import { workflowsApi } from "@/services/workflows-api";
+import type { AssistantVersionItem } from "@/types/assistants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -49,6 +52,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  History,
   Library,
   Loader2,
   MessageSquare,
@@ -357,6 +361,29 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
     onError: (err: Error) => toast.error(`Xuất bản thất bại: ${err.message}`),
   });
 
+  // Version History & Rollback
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [rollbackTarget, setRollbackTarget] = useState<AssistantVersionItem | null>(null);
+
+  const versionsQuery = useQuery({
+    queryKey: ["assistant-versions", item?.code],
+    queryFn: () => getAssistantVersions(item?.code as string),
+    enabled: Boolean(item?.code) && isHistoryOpen,
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (versionId: string) => rollbackAssistantVersion(reference, versionId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["assistants", reference] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-versions", item?.code] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-readiness", item?.code] });
+      toast.success(`Đã khôi phục thành công về phiên bản ${res.restored_version}`);
+      setRollbackTarget(null);
+      setIsHistoryOpen(false);
+    },
+    onError: (err: Error) => toast.error(`Khôi phục thất bại: ${err.message}`),
+  });
+
   // Tính toán KPI Metrics thời gian thực
   const kpiStats = useMemo(() => {
     if (!item) return { totalRuns: 0, avgLatency: 0, collectionName: "", workflowName: "" };
@@ -509,6 +536,16 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
           >
             <Copy className="size-3.5 text-primary" />
             Nhân bản
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={() => setIsHistoryOpen(true)}
+          >
+            <History className="size-3.5 text-primary" />
+            Lịch sử phiên bản
           </Button>
           <Button
             type="button"
@@ -1429,6 +1466,136 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assistant Version History & Rollback Dialog */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <History className="size-4 text-primary" />
+              Lịch Sử Phiên Bản & Khôi Phục (Rollback)
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Xem lại các mốc cấu hình đã lưu của Trợ lý{" "}
+              <strong className="text-foreground">{item.name}</strong>. Mỗi lần lưu hoặc xuất bản
+              đều tự động tạo một snapshot.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 py-2 text-xs">
+            {versionsQuery.isLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                <Loader2 className="size-4 animate-spin text-primary" />
+                <span>Đang tải lịch sử phiên bản...</span>
+              </div>
+            ) : !versionsQuery.data || versionsQuery.data.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+                <History className="size-8 mx-auto mb-2 opacity-30" />
+                <p className="font-medium text-foreground">Chưa có bản ghi phiên bản nào</p>
+                <p className="text-[11px] mt-1">
+                  Khi bạn lưu thay đổi hoặc xuất bản, hệ thống sẽ tự động tạo mốc phiên bản tại đây.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {versionsQuery.data.map((ver, idx) => (
+                  <div
+                    key={ver.id}
+                    className="p-3.5 rounded-lg border border-border bg-card/60 hover:bg-card transition-colors flex items-start justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-primary bg-primary/10 border-primary/30"
+                        >
+                          {ver.version_number}
+                        </Badge>
+                        {idx === 0 && (
+                          <Badge
+                            variant="default"
+                            className="text-[10px] bg-primary text-primary-foreground"
+                          >
+                            Hiện tại
+                          </Badge>
+                        )}
+                        <span className="text-muted-foreground text-[11px] flex items-center gap-1">
+                          <Clock className="size-3" />
+                          {ver.created_at
+                            ? new Date(ver.created_at).toLocaleString("vi-VN")
+                            : "Gần đây"}
+                        </span>
+                        <span className="text-muted-foreground text-[11px]">
+                          • bởi <strong className="text-foreground">{ver.created_by}</strong>
+                        </span>
+                      </div>
+                      <p className="text-foreground font-medium">{ver.change_summary}</p>
+                      {ver.snapshot_data && (
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-3">
+                          <span>
+                            Workflow:{" "}
+                            <code className="text-primary font-mono">
+                              {String(ver.snapshot_data.workflow_id || "N/A")}
+                            </code>
+                          </span>
+                          <span>
+                            Kho:{" "}
+                            <code className="text-primary font-mono">
+                              {String(ver.snapshot_data.collection_id || "N/A")}
+                            </code>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 shrink-0 hover:border-primary hover:text-primary"
+                      disabled={rollbackMutation.isPending || idx === 0}
+                      onClick={() => setRollbackTarget(ver)}
+                    >
+                      <RotateCcw className="size-3.5" />
+                      {idx === 0 ? "Bản hiện hành" : "Khôi phục"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setIsHistoryOpen(false)}
+            >
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Rollback Dialog */}
+      <ConfirmDialog
+        open={Boolean(rollbackTarget)}
+        title={`Khôi phục về phiên bản ${rollbackTarget?.version_number}?`}
+        description={`Toàn bộ 7 lớp cấu hình hiện tại (Persona, ModelOps, Guardrails, Workflow, Kho tri thức) sẽ được khôi phục về trạng thái của mốc "${rollbackTarget?.change_summary}". Bạn có chắc chắn muốn thực hiện?`}
+        confirmText="Xác nhận khôi phục"
+        variant="default"
+        isPending={rollbackMutation.isPending}
+        onConfirm={() => {
+          if (rollbackTarget) {
+            rollbackMutation.mutate(rollbackTarget.id);
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) setRollbackTarget(null);
+        }}
+      />
     </form>
   );
 }

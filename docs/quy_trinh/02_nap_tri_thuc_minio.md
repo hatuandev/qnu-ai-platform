@@ -138,3 +138,13 @@ flowchart TD
     2. **Tầng Vector DB (Qdrant)**: Xóa toàn bộ point vectors theo `document_id` hoặc xóa collection tương ứng (triệt tiêu vĩnh viễn vector mồ côi / ghost vector).
     3. **Tầng CSDL Quan hệ (PostgreSQL)**: Xóa cascading bản ghi tài liệu, chunks và facts liên kết.
     4. **Tầng Bộ nhớ Đệm (Redis Semantic Cache)**: Tự động vô hiệu hóa toàn bộ cache ngữ nghĩa của collection liên quan (`invalidate_collection`), bảo đảm các truy vấn sau đó không nhận kết quả từ dữ liệu đã xóa.
+
+### Bước 10: Nạp Trực Tiếp Bảng Biểu Số Liệu Excel/CSV (Structured Facts Ingestion)
+- **Mục đích**: Đối với các tài liệu thuần số liệu dạng ma trận (điểm chuẩn tuyển sinh 3 năm, bảng chỉ tiêu từng ngành, biểu mức học phí, danh mục học phần tiên quyết), việc bóc tách OCR từ file scan có nguy cơ lệch cột. Hệ thống hỗ trợ nạp trực tiếp qua tệp bảng tính `.xlsx`, `.xls` hoặc `.csv`.
+- **Cơ chế hoạt động ([`excel_parser.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/knowledge/excel_parser.py))**:
+  1. Dùng `openpyxl` hoặc `csv` để đọc mọi sheet và dòng trong tệp nạp lên.
+  2. Tự động nhận diện cột Thực thể (`Mã ngành`, `Tên ngành`, `Đối tượng`) và các cột Thuộc tính (`Điểm chuẩn`, `Chỉ tiêu`, `Học phí`, `Tổ hợp môn`).
+  3. Bóc tách từng dòng thành các cặp `(entity_name, entity_type, attribute_name, attribute_value)` với độ tin cậy tuyệt đối (`confidence = 1.0`).
+  4. Lưu trữ bền vững vào bảng PostgreSQL `knowledge_facts`, tự động liên kết với `collection_id`.
+  5. Khi Trợ lý AI nhận câu hỏi có chứa số liệu (như "Điểm chuẩn ngành Công nghệ thông tin năm 2024?"), hệ thống RAG ưu tiên tra cứu trực tiếp từ tầng Facts số hóa trước khi truy xuất văn bản thô, bảo đảm **Zero Hallucination** 100%.
+

@@ -287,4 +287,30 @@ Nhằm giải quyết triệt để lỗi vỡ giao diện thanh công cụ (Hea
   * **Truy vấn Danh tính Máy chủ**: Endpoint `GET /platform/v1alpha1/auth/me` phân giải danh tính tác nhân (`AuthActor`) và `POST /platform/v1alpha1/auth/logout` hủy bỏ session cookie lập tức.
   * **Tác nhân Xác thực Đáng tin cậy (Trusted Principal)**: Dependency `get_current_actor` cung cấp định danh hợp lệ (`tenant_qnu`, `workspace_qnu`, role `admin`) cho các thao tác nhạy cảm, bao gồm Tool Gateway, phê duyệt nhân sự (HITL), và quản trị đồ thị DAG.
 
+---
+
+## 9. Quản Trị Phiên Bản Trợ Lý AI & Khôi Phục Snapshot (Assistant Versioning & Rollback)
+
+Nhằm bảo đảm an toàn vận hành khi cập nhật cấu hình Trợ lý AI (thay đổi System Prompt, đổi mô hình LLM, tinh chỉnh Guardrails hay gán lại Kho tri thức), hệ thống cung cấp cơ chế **Snapshot Versioning** tự động:
+1. **Tạo Snapshot Tự Động**: Mỗi khi cán bộ lưu cập nhật (`PUT /assistants/{ref}`) hoặc xuất bản Trợ lý (`POST /assistants/{ref}/publish`), hệ thống tự động chụp toàn bộ 7 lớp cấu hình hiện thời vào bảng `assistant_versions` với số phiên bản tăng dần `v1.0`, `v1.1`,...
+2. **Truy Vết & Đối Soát Lịch Sử**: Bảng `assistant_versions` lưu trữ JSON `snapshot_data` đầy đủ (`persona`, `model_config`, `guardrails`, `workflow_id`, `collection_id`) cùng `change_summary` và thời điểm thực hiện.
+3. **Khôi Phục Phiên Bản 1-Click (Rollback)**:
+   - Endpoint `POST /assistants/{ref}/versions/{version_id}/rollback` trích xuất `snapshot_data` từ mốc lịch sử, khôi phục nguyên trạng cấu hình 7 lớp và tự động tạo snapshot mới đánh dấu mốc rollback.
+   - Giao diện `assistant-detail-page.tsx` hiển thị Modal Lịch sử Phiên bản trực quan với danh sách mốc thời gian, badge phiên bản hiện tại và nút khôi phục có hộp thoại xác nhận an toàn (`ConfirmDialog`).
+
+---
+
+## 10. Giám Sát Hội Thoại Thời Gian Thực & Bàn Giao Cán Bộ (Live Conversations & Staff Handoff)
+
+Khi Trợ lý AI gặp các câu hỏi vượt ngoài phạm vi tri thức hoặc có độ nhạy cảm cao, luồng xử lý tự động chuyển tiếp tới bàn trực của cán bộ chuyên trách:
+1. **Kích Hoạt Yêu Cầu Handoff**: Khi Guardrail hoặc RAG phát hiện ngữ cảnh thiếu hụt, câu hỏi được gom vào `knowledge_gaps` và đồng thời phiên hội thoại được cập nhật trạng thái `handoff_requested`.
+2. **Bàn Trực Tiếp Cán Bộ (`/conversations`)**:
+   - Giao diện Master-Detail 2 cột hiển thị hàng đợi các phiên trao đổi với bộ lọc trạng thái: `Tất cả`, `Cần tiếp quản (Handoff)`, `Cán bộ hỗ trợ`, `AI đang xử lý`, `Đã giải quyết`.
+   - Polling nền tự động cập nhật danh sách hội thoại và chi tiết tin nhắn thời gian thực.
+3. **Tiếp Quản & Trả Lời Trực Tiếp**:
+   - Cán bộ bấm `[Tiếp nhận hỗ trợ]` (`POST /conversations/{id}/status` với `status = "staff_claimed"` và `assigned_to = "[Tên cán bộ]"`).
+   - Nhập tin nhắn phản hồi trực tiếp (`POST /conversations/{id}/reply`) kèm hỗ trợ các mẫu câu trả lời nhanh (Canned Replies) hướng dẫn người học tới đúng phòng ban, hotline ĐH Quy Nhơn.
+   - Khi hoàn tất, cán bộ có thể bấm `[Chuyển lại cho AI]` để bàn giao lại quyền điều phối cho bot hoặc bấm `[Đã giải quyết]` để đóng phiên trao đổi.
+
+
 

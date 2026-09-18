@@ -300,3 +300,24 @@ class AssistantPublishResponse(BaseModel):
     published_at: datetime
     message: str
 
+
+class AssistantVersionResponse(BaseModel):
+    id: str
+    assistant_id: str
+    assistant_code: str
+    version_number: str
+    change_summary: str
+    snapshot_data: dict[str, Any] = Field(default_factory=dict)
+    created_by: str
+    created_at: datetime
+
+
+class AssistantRollbackResponse(BaseModel):
+    assistant_code: str
+    assistant_name: str
+    restored_version: str
+    current_version: str
+    message: str
+    restored_at: datetime
+
+

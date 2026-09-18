@@ -16,6 +16,8 @@ from app.modules.knowledge.schemas import (
     CollectionUpdateRequest,
     DocumentDetailResponse,
     DocumentResponse,
+    FactExcelImportResponse,
+    FactListResponse,
     ParsePreviewResponse,
     StudioViewResponse,
 )
@@ -334,3 +336,43 @@ async def delete_document(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await knowledge_service.delete_document(db, document_id)
+
+
+@router.post(
+    "/collections/{collection_id}/facts/import-excel",
+    response_model=FactExcelImportResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Nạp Bảng biểu Excel vào Structured Facts Layer",
+)
+async def import_collection_facts_excel(
+    collection_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+) -> FactExcelImportResponse:
+    content = await file.read()
+    return await knowledge_service.import_facts_from_excel(
+        db=db,
+        collection_id=collection_id,
+        file_bytes=content,
+        filename=file.filename or "facts.xlsx",
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/facts",
+    response_model=FactListResponse,
+    summary="Danh sách Facts số hóa của Bộ sưu tập",
+)
+async def get_collection_facts(
+    collection_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> FactListResponse:
+    return await knowledge_service.get_collection_facts(
+        db=db,
+        collection_id=collection_id,
+        limit=limit,
+        offset=offset,
+    )
+

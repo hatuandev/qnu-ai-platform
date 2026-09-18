@@ -1,5 +1,7 @@
 import type {
   ApproveDocumentResult,
+  FactExcelImportResponse,
+  FactListResponse,
   KnowledgeCollection,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
@@ -360,5 +362,35 @@ export const knowledgeApi = {
       throw new Error(`Xóa tài liệu thất bại (HTTP 500): ${text.slice(0, 100)}`);
     }
     throw new Error(`Xóa tài liệu thất bại (HTTP ${res.status}).`);
+  },
+
+  async getCollectionFacts(
+    collectionId: string,
+    limit = 100,
+    offset = 0
+  ): Promise<FactListResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/facts?limit=${limit}&offset=${offset}`
+    );
+    if (!res.ok) {
+      throw new Error(`Tải danh sách facts thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as FactListResponse;
+  },
+
+  async importFactsExcel(collectionId: string, file: File): Promise<FactExcelImportResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/facts/import-excel`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Nạp bảng biểu số liệu thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as FactExcelImportResponse;
   },
 };
