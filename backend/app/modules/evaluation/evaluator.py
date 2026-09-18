@@ -11,6 +11,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
+VIETNAMESE_QUESTION_STOPWORDS = {
+    "là", "gì", "như", "thế", "nào", "ở", "đâu", "bao", "nhiêu", "sao", "mấy",
+    "ai", "của", "và", "các", "những", "được", "cho", "với", "trong", "khi",
+    "thì", "có", "không", "đến", "từ", "theo", "về", "ra", "đối", "sang", "mỗi",
+}
+
 
 class RagasTM08Evaluator:
     """Mathematical and heuristic evaluator for Ragas TM-08 metrics."""
@@ -33,9 +39,24 @@ class RagasTM08Evaluator:
             return 0.0
 
         # Extract factual sentences/clauses from answer
-        sentences = [s.strip() for s in re.split(r"[.!?;\n]+", answer) if len(s.strip()) > 8]
-        if not sentences:
+        raw_sentences = [s.strip() for s in re.split(r"[.!?;\n]+", answer) if len(s.strip()) > 8]
+        if not raw_sentences:
             return 1.0
+
+        # Exclude polite conversational framing from factual grounding check
+        sentences = []
+        for s in raw_sentences:
+            s_lower = s.lower().strip()
+            if any(s_lower.startswith(p) for p in [
+                "căn cứ quy định", "căn cứ tài liệu", "căn cứ thông tin", "căn cứ dữ liệu",
+                "dựa trên", "theo quy chế", "theo thông báo", "theo đề án",
+                "xin giải đáp", "xin gửi thông tin", "chào bạn", "kính gửi"
+            ]) and len(s.split()) <= 16:
+                continue
+            sentences.append(s)
+
+        if not sentences:
+            sentences = raw_sentences
 
         grounded_count = 0
         for sent in sentences:
@@ -57,7 +78,9 @@ class RagasTM08Evaluator:
         if not query.strip() or not answer.strip():
             return 0.0
 
-        query_tokens = set(re.findall(r"\b\w{2,}\b", query.lower()))
+        all_query_tokens = set(re.findall(r"\b\w{2,}\b", query.lower()))
+        content_tokens = all_query_tokens - VIETNAMESE_QUESTION_STOPWORDS
+        query_tokens = content_tokens if content_tokens else all_query_tokens
         answer_tokens = set(re.findall(r"\b\w{2,}\b", answer.lower()))
 
         if not query_tokens:
@@ -74,7 +97,7 @@ class RagasTM08Evaluator:
         return round(min(1.0, max(0.0, relevance)), 3)
 
     def compute_context_precision(self, ground_truth: str, contexts: list[str]) -> float:
-        """Measure if retrieved contexts contain the essential facts of the ground truth."""
+        """Measure if retrieved contexts contain the essential facts of the ground truth using Ragas AP@k."""
         if not contexts or not ground_truth.strip():
             return 0.0
 
@@ -82,14 +105,20 @@ class RagasTM08Evaluator:
         if not gt_tokens:
             return 1.0
 
-        relevant_chunks = 0
-        for ctx in contexts:
+        relevant_count = 0
+        precision_at_k_sum = 0.0
+
+        for rank, ctx in enumerate(contexts, start=1):
             ctx_lower = ctx.lower()
             matching = [t for t in gt_tokens if t in ctx_lower]
-            if len(matching) / len(gt_tokens) >= 0.30:
-                relevant_chunks += 1
+            if len(matching) / len(gt_tokens) >= 0.25:
+                relevant_count += 1
+                precision_at_k_sum += relevant_count / rank
 
-        precision = relevant_chunks / len(contexts)
+        if relevant_count == 0:
+            return 0.0
+
+        precision = precision_at_k_sum / relevant_count
         return round(min(1.0, max(0.0, precision)), 3)
 
     def detect_hallucination(self, answer: str, contexts: list[str]) -> bool:

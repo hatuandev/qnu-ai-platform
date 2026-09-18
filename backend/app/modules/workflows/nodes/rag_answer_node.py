@@ -25,7 +25,15 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
         collection_id = (
             profile.collection_id if profile else config.get("collection_id") or "col_admissions"
         )
-        module_code = config.get("module_code") or (profile.assistant_code if profile else context.workflow_id.split("-")[0])
+        module_code = config.get("module_code") or (
+            profile.assistant_code if profile else context.workflow_id.split("-")[0]
+        )
+
+        primary_model = (
+            profile.model_policy.primary_model
+            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            else None
+        )
 
         ask_req = AskRequest(
             question=query,
@@ -35,6 +43,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
             temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
             max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
+            preferred_model_name=primary_model,
         )
 
         if context.db:

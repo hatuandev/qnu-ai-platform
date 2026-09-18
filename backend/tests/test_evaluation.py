@@ -77,7 +77,7 @@ def test_evaluation_service_datasets():
     assert len(datasets) >= 2
 
     admissions_ds = next(d for d in datasets if d.id == "qnu_admissions_benchmark")
-    assert admissions_ds.assistant_code == "admissions_assistant"
+    assert admissions_ds.assistant_code == "admissions"
     assert admissions_ds.total_test_cases >= 5
 
     cases = service.get_dataset_test_cases("qnu_admissions_benchmark")
@@ -96,7 +96,7 @@ async def test_evaluation_service_run():
     mock_session.commit = AsyncMock()
 
     req = EvaluationRunRequest(
-        assistant_code="admissions_assistant",
+        assistant_code="admissions",
         dataset_id="qnu_admissions_benchmark",
         sample_size=2,
     )

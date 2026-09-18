@@ -163,6 +163,8 @@ class RagService:
                 temperature=req.temperature,
                 max_tokens=req.max_tokens,
                 conversation_id=req.conversation_id,
+                preferred_provider_id=req.preferred_provider_id,
+                preferred_model_name=req.preferred_model_name,
             )
             llm_res = await modelops_service.generate(db, llm_req)
             synthesized_answer = llm_res.content.strip()

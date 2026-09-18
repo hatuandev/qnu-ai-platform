@@ -484,7 +484,7 @@ async def verify_module_8() -> None:
 
     eval_run = await eval_service.run_evaluation(
         mock_db,
-        EvaluationRunRequest(assistant_code="admissions_assistant", dataset_id="qnu_admissions_benchmark", sample_size=3),
+        EvaluationRunRequest(assistant_code="admissions", dataset_id="qnu_admissions_benchmark", sample_size=3),
     )
     assert eval_run.status == "completed" and eval_run.meets_tm08_standard is True
     log_result(

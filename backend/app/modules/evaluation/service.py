@@ -174,8 +174,8 @@ class EvaluationService:
             context_precision_avg=prec_avg,
             meets_tm08_standard=meets_tm08,
             metadata_info={"item_count": total_cases},
-            created_at=datetime.now(UTC),
-            completed_at=datetime.now(UTC),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
 
         try:
@@ -303,5 +303,9 @@ class EvaluationService:
                 logger.warning("failed_to_load_gap_inbox_from_db", error=str(exc))
 
         return []
+
+
+evaluation_service = EvaluationService()
+
 
 

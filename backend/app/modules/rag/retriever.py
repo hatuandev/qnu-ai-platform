@@ -40,6 +40,7 @@ class HybridRetriever:
                 .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
                 .where(
                     KnowledgeChunk.collection_id == collection_id,
+                    KnowledgeDocument.status.in_(["completed", "approved", "processed"]),
                     KnowledgeDocument.is_active.is_(True),
                     ts_vector.op("@@")(ts_query),
                 )
@@ -58,21 +59,32 @@ class HybridRetriever:
         chunks = list(fts_chunks)
 
         if len(chunks) < top_k:
-            tokens = [t.strip().lower() for t in query.split() if len(t.strip()) > 2]
-            if not tokens:
-                tokens = [query.strip()]
+            raw_tokens = [t.strip().lower() for t in query.split() if len(t.strip()) > 2]
+            stop_syllables = {"cách", "trong", "được", "những", "thực", "hiện", "theo", "nào", "như", "thế"}
+            meaningful_tokens = [t for t in raw_tokens if t not in stop_syllables] or raw_tokens
 
-            conditions = [KnowledgeChunk.content.ilike(f"%{token}%") for token in tokens[:5]]
-            stmt_ilike = (
-                select(KnowledgeChunk)
-                .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                .where(
-                    KnowledgeChunk.collection_id == collection_id,
-                    KnowledgeDocument.is_active.is_(True),
-                    or_(*conditions),
+            if meaningful_tokens:
+                if not fts_chunks and len(meaningful_tokens) >= 2:
+                    from sqlalchemy import and_
+                    match_expr = and_(
+                        KnowledgeChunk.content.ilike(f"%{meaningful_tokens[0]}%"),
+                        KnowledgeChunk.content.ilike(f"%{meaningful_tokens[1]}%"),
+                    )
+                else:
+                    conditions = [KnowledgeChunk.content.ilike(f"%{token}%") for token in meaningful_tokens[:3]]
+                    match_expr = or_(*conditions)
+
+                stmt_ilike = (
+                    select(KnowledgeChunk)
+                    .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                    .where(
+                        KnowledgeChunk.collection_id == collection_id,
+                        KnowledgeDocument.status.in_(["completed", "approved", "processed"]),
+                        KnowledgeDocument.is_active.is_(True),
+                        match_expr,
+                    )
+                    .limit(top_k)
                 )
-                .limit(top_k)
-            )
             try:
                 res_ilike = await db.execute(stmt_ilike)
                 scalars_ilike = res_ilike.scalars()

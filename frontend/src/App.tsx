@@ -5,29 +5,64 @@ import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminShell } from "@/layouts/admin-shell";
 import { queryClient } from "@/lib/query-client";
-import { AssistantCreatePage } from "@/pages/assistant-create-page";
-import { AssistantDetailPage } from "@/pages/assistant-detail-page";
-import { AssistantsPage } from "@/pages/assistants-page";
-import { ChannelsPage } from "@/pages/channels-page";
-import { ChatStudioPage } from "@/pages/chat-studio-page";
-import { ConversationsPage } from "@/pages/conversations-page";
-import { DAGCanvasPage } from "@/pages/dag-canvas-page";
 import { DashboardPage } from "@/pages/dashboard-page";
-import { DesignSystemPage } from "@/pages/design-system-page";
-import { DeveloperPage } from "@/pages/developer-page";
-import { DocumentTypeDetailPage } from "@/pages/document-type-detail-page";
-import { DocumentTypesPage } from "@/pages/document-types-page";
-import { EvaluationPage } from "@/pages/evaluation-page";
-import { KnowledgePage } from "@/pages/knowledge-page";
-import { ModelOpsPage } from "@/pages/modelops-page";
-import { NodeCatalogPage } from "@/pages/node-catalog-page";
-import { RunsPage } from "@/pages/runs-page";
-import { ScanStudioPage } from "@/pages/scan-studio-page";
-import { ToolsPage } from "@/pages/tools-page";
-import { WorkflowsPage } from "@/pages/workflows-page";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Network } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+
+const AssistantsPage = lazy(() =>
+  import("@/pages/assistants-page").then((m) => ({ default: m.AssistantsPage }))
+);
+const KnowledgePage = lazy(() =>
+  import("@/pages/knowledge-page").then((m) => ({ default: m.KnowledgePage }))
+);
+const AssistantCreatePage = lazy(() =>
+  import("@/pages/assistant-create-page").then((m) => ({ default: m.AssistantCreatePage }))
+);
+const AssistantDetailPage = lazy(() =>
+  import("@/pages/assistant-detail-page").then((m) => ({ default: m.AssistantDetailPage }))
+);
+const ChannelsPage = lazy(() =>
+  import("@/pages/channels-page").then((m) => ({ default: m.ChannelsPage }))
+);
+const ChatStudioPage = lazy(() =>
+  import("@/pages/chat-studio-page").then((m) => ({ default: m.ChatStudioPage }))
+);
+const ConversationsPage = lazy(() =>
+  import("@/pages/conversations-page").then((m) => ({ default: m.ConversationsPage }))
+);
+const DAGCanvasPage = lazy(() =>
+  import("@/pages/dag-canvas-page").then((m) => ({ default: m.DAGCanvasPage }))
+);
+const DesignSystemPage = lazy(() =>
+  import("@/pages/design-system-page").then((m) => ({ default: m.DesignSystemPage }))
+);
+const DeveloperPage = lazy(() =>
+  import("@/pages/developer-page").then((m) => ({ default: m.DeveloperPage }))
+);
+const DocumentTypeDetailPage = lazy(() =>
+  import("@/pages/document-type-detail-page").then((m) => ({ default: m.DocumentTypeDetailPage }))
+);
+const DocumentTypesPage = lazy(() =>
+  import("@/pages/document-types-page").then((m) => ({ default: m.DocumentTypesPage }))
+);
+const EvaluationPage = lazy(() =>
+  import("@/pages/evaluation-page").then((m) => ({ default: m.EvaluationPage }))
+);
+const ModelOpsPage = lazy(() =>
+  import("@/pages/modelops-page").then((m) => ({ default: m.ModelOpsPage }))
+);
+const NodeCatalogPage = lazy(() =>
+  import("@/pages/node-catalog-page").then((m) => ({ default: m.NodeCatalogPage }))
+);
+const RunsPage = lazy(() => import("@/pages/runs-page").then((m) => ({ default: m.RunsPage })));
+const ScanStudioPage = lazy(() =>
+  import("@/pages/scan-studio-page").then((m) => ({ default: m.ScanStudioPage }))
+);
+const ToolsPage = lazy(() => import("@/pages/tools-page").then((m) => ({ default: m.ToolsPage })));
+const WorkflowsPage = lazy(() =>
+  import("@/pages/workflows-page").then((m) => ({ default: m.WorkflowsPage }))
+);
 
 interface BackendStatus {
   status: "idle" | "loading" | "online" | "offline";
@@ -240,7 +275,16 @@ function AppContent() {
       onNavigate={handleNavigate}
       backendOnline={backendStatus.status === "online"}
     >
-      {renderContent()}
+      <Suspense
+        fallback={
+          <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span>Đang tải phân hệ...</span>
+          </div>
+        }
+      >
+        {renderContent()}
+      </Suspense>
     </AdminShell>
   );
 }

@@ -57,8 +57,10 @@ class AskRequest(BaseModel):
     )
     conversation_id: str | None = None
     system_prompt: str | None = None
-    temperature: float = Field(0.2, ge=0.0, le=1.0)
+    temperature: float = Field(0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(2000, ge=100, le=4096)
+    preferred_model_name: str | None = None
+    preferred_provider_id: str | None = None
 
 
 class AskResponse(BaseModel):

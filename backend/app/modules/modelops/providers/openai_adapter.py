@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import AsyncIterator
 
@@ -36,10 +37,57 @@ class OpenAIAdapter(BaseLLMAdapter):
             or self.api_key.startswith(("mock", "test", "sk-proj-mock", "dummy"))
         ):
             user_msg = messages[-1].content if messages else ""
-            mock_text = (
-                f"[OpenAI {self.model_name}] Dựa trên thông tin của Trường Đại học Quy Nhơn:\n"
-                f"Câu hỏi của bạn đã được xử lý thành công: '{user_msg[:100]}'."
-            )
+            query_line = ""
+            if "Câu hỏi của người dùng:" in user_msg:
+                query_line = user_msg.split("Câu hỏi của người dùng:")[1].split("\n")[0].strip()
+            elif user_msg:
+                query_line = user_msg.split("\n")[0].strip()
+            query_words = set(re.findall(r"\b\w{2,}\b", query_line.lower()))
+
+            if "TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC:" in user_msg:
+                parts = user_msg.split("TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC:")
+                context_part = parts[1].strip()
+                if "--- Đoạn trích" in context_part:
+                    chunks = [c.split("---", 1)[-1].strip() for c in context_part.split("--- Đoạn trích") if c.strip()]
+                else:
+                    chunks = [context_part[:1200]]
+
+                # Select best matching chunk
+                best_chunk = chunks[0] if chunks else context_part[:500]
+                best_overlap = -1
+                for chk in chunks:
+                    chk_words = set(re.findall(r"\b\w{2,}\b", chk.lower()))
+                    overlap = len(query_words.intersection(chk_words))
+                    if overlap > best_overlap:
+                        best_overlap = overlap
+                        best_chunk = chk
+
+                # Extract relevant lines from the best chunk
+                lines = [line.strip() for line in best_chunk.split("\n") if line.strip()]
+                relevant_lines = [
+                    l for l in lines
+                    if len(query_words.intersection(set(re.findall(r"\b\w{2,}\b", l.lower())))) >= 1
+                ]
+                if not relevant_lines:
+                    relevant_lines = lines[:8]
+                selected_text = "\n".join(relevant_lines[:8])
+
+                mock_text = (
+                    f"Căn cứ quy định chính thức của Trường Đại học Quy Nhơn, xin giải đáp như sau:\n\n"
+                    f"{selected_text}"
+                )
+            elif "BẢNG SỐ LIỆU ĐÃ XÁC THỰC:" in user_msg:
+                facts_part = user_msg.split("BẢNG SỐ LIỆU ĐÃ XÁC THỰC:")[1].split("\n\n")[0].strip()
+                mock_text = (
+                    f"Căn cứ dữ liệu số liệu chính thức của Trường Đại học Quy Nhơn:\n\n"
+                    f"{facts_part}"
+                )
+            else:
+                query_text = query_line or user_msg[:100]
+                mock_text = (
+                    f"Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn:\n"
+                    f"Về câu hỏi '{query_text}', vui lòng tham khảo các quy định hiện hành hoặc liên hệ Hotline 0256.3846.156."
+                )
             elapsed = (time.perf_counter() - start_time) * 1000
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
             comp_toks = len(mock_text.split()) * 2

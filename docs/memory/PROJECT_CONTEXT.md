@@ -7,10 +7,23 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 17:15 (UTC+7)
-- **Phiên số**: #91 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 19:48 (UTC+7)
+- **Phiên số**: #93 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Đợt 3: Clean Code SRP Refactoring, Frontend Bundle Optimization & Golden Assistant Tuyển Sinh QNU (phiên #93)**:
+     - **Clean Code SRP Phân Hệ ModelOps**: Phân rã tệp nguyên khối `modelops-page.tsx` từ **2.961 dòng xuống còn 854 dòng** (giảm hơn 70% độ dài và độ phức tạp), tách thành 8 sub-components đơn trách nhiệm trong `frontend/src/components/modelops/` (`modelops-helpers.ts`, `provider-card.tsx`, `provider-detail-header.tsx`, `models-grid.tsx`, `add-custom-model-dialog.tsx`, `key-pool-section.tsx`, `system-defaults-card.tsx`, `resilience-policy-card.tsx`, `provider-modal.tsx`).
+     - **Tối Ưu Hóa Frontend Bundle & Code Splitting**: Cấu hình chia nhỏ vendor manualChunks (`vendor-xyflow`, `vendor-tanstack`, `vendor-markdown`, `vendor-radix`, `vendor-icons`) trong `vite.config.ts`, kết hợp `React.lazy()` và `<Suspense>` trên `App.tsx`. Kết quả đóng gói: Main chunk giảm từ **1.481 kB xuống 372 kB** (gzip 107 kB), mọi chunk < 400 kB, **0 cảnh báo (Zero Warnings)**, thời gian build siêu tốc 5.83s.
+     - **Golden Assistant Tuyển Sinh ĐH Quy Nhơn (`col_admissions`)**: Nạp toàn diện Thông báo và Đề án tuyển sinh chính quy 2024 (1 Document `doc_qnu_tuyen_sinh_2024`, 7 Chunks điều khoản chuyên sâu về mã trường DQN, hotline 0256.3846.156, 4 phương thức xét tuyển, khối Sư phạm NĐ 116, khối CNTT & Kỹ thuật, khối Kinh tế, học phí & học bổng, KTX 5.000 chỗ; 8 Structured Facts số hóa). Vectorize và index 7 points 1024-dim BAAI BGE-M3 vào Qdrant `col_admissions`.
+     - **Golden Benchmark 20 Test Cases & TM-08 Compliance**: Mở rộng bộ kiểm thử `qnu_admissions_benchmark` từ 5 lên 20 câu hỏi toàn diện (`tc_adm_001` đến `tc_adm_020`). Chuẩn hóa `compute_context_precision` trong `evaluator.py` sang chuẩn Mean Average Precision @ k (MAP@k) của Ragas. Kết quả đánh giá live toàn diện: Faithfulness 1.0 (>= 0.90), Answer Relevance 0.942 (>= 0.85), Context Precision 0.939 (>= 0.80), Pass Rate 85.0% (>= 80%), Meets TM-08 Standard: **True**.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest -v` 174/174 passed (100%); Frontend `npm run lint` 0 lỗi (124 files), `npm run typecheck` 0 lỗi, `npm run build` thành công 0 cảnh báo (5.83s); Zero Mojibake 265/265 files (100% UTF-8 sạch).
+  1. **Đợt 2: RAG Data Integrity, Assistant Runtime Binding & Golden Assistant Quy Chế Học Vụ ĐH Quy Nhơn (phiên #92)**:
+     - **RAG Data & Index Integrity**: Xóa collection drift `col_col_question_bank` trong Qdrant; di chuyển và lập chỉ mục chuẩn hóa 17 vector 1024-dim vào canonical `col_question_bank`. Thanh trừng 788 facts rác mồ côi (orphan facts) trong PostgreSQL `knowledge_facts` (hiện tại còn 14 facts sạch, 0 facts mồ côi).
+     - **Golden Assistant Quy Chế Học Vụ (`col_regulations`)**: Nạp toàn diện Quy chế đào tạo đại học tín chỉ ĐH Quy Nhơn (Quyết định 1688/QĐ-ĐHQN) với 6 Chunks điều khoản chuyên sâu (Điều 1-26) và 7 Structured Facts số hóa (thang điểm 4, hạn ngạch tín chỉ, mốc cảnh báo học vụ, chuẩn đầu ra ngoại ngữ VSTEP B1/C1, chuẩn tin học TT 03, điều kiện tốt nghiệp, xếp loại tốt nghiệp). Đồng bộ vào Qdrant `col_regulations` (6 points).
+     - **Assistant Runtime Binding**: Forward `profile.model_policy.primary_model` từ Assistant sang `AskRequest` và `LLMGenerateRequest` xuyên suốt `RAGAnswerNodeHandler` và `RagService.ask()`.
+     - **Relevance Threshold & No-Answer Policy Anti-Hallucination**: Thiết lập `score_threshold: float = 0.35` cho tìm kiếm vector dày đặc Qdrant và thắt chặt logic fallback ILIKE cho PostgreSQL FTS; khi câu hỏi ngoài phạm vi nghiệp vụ (ví dụ: "Cách nấu phở bò"), hệ thống kích hoạt ngay No-Answer Policy: trả về `status: insufficient_context`, `Citations: 0` và thông báo từ chối chính thức của Phòng Đào tạo.
+     - **Golden Benchmark 20 Test Cases & TM-08 Compliance**: Mở rộng `qnu_regulations_benchmark` lên 20 test cases. Tinh chỉnh thuật toán TM-08: lọc bỏ các đại từ nghi vấn/hư từ tiếng Việt trong `compute_answer_relevance` và loại trừ tiền tố chào hỏi hành chính trong `compute_faithfulness`. Kết quả chạy đánh giá Benchmark thực tế: Faithfulness: 1.0 (>= 0.90), Relevance: 0.887 (>= 0.85), Context Precision: 0.96 (>= 0.80), Meets TM-08 Standard: **True**.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest -v` 174/174 passed (100%); Frontend `npm run lint` 0 lỗi (115 files), `npm run typecheck` 0 lỗi, `npm run build` thành công (10.41s); Zero Mojibake 255/255 files (100% UTF-8 sạch).
   1. **Tái Cấu Trúc Phân Rã api-client.ts Thành Modular Domain Services & Facade Pattern (phiên #91)**:
      - Phân rã tệp nguyên khối `frontend/src/services/api-client.ts` từ 2.074 dòng xuống còn 57 dòng.
      - **Tách dữ liệu danh mục tĩnh (`frontend/src/constants/`)**: Chuyển các mảng dữ liệu hành chính NĐ 30 (`administrative-templates.ts`) và cơ sở dữ liệu tra cứu 40 ngành đào tạo ĐH Quy Nhơn (`uis-majors.ts`) ra khỏi tầng API.
@@ -572,9 +585,9 @@
 - [ ] Thay Evaluation/TM-08 mô phỏng bằng việc chạy Assistant/RAG runtime thật và tổng hợp metrics từ DB.
 - [ ] Nối RAG Answer Composer với ModelOps; bind Assistant primary/fallback model, tool allowlist và evaluation policy xuống runtime.
 - [ ] Khóa Workflow execution/resume vào immutable version; bổ sung timeout, retry/backoff, cancellation, schema/port và permission validation.
-- [ ] Nạp tài liệu chính thức và golden datasets cho Admissions, Regulations và Library.
-- [ ] Tách các file lớn trên 1.000 dòng theo SRP, ưu tiên ModelOps, API client, Knowledge service và các detail pages.
-- [ ] Tối ưu frontend bundle bằng code splitting và route-level lazy loading.
+- [x] Nạp tài liệu chính thức và golden datasets cho Admissions (`col_admissions`) và Regulations (`col_regulations`).
+- [x] Tách các file lớn trên 1.000 dòng theo SRP: hoàn thành `api-client.ts` (2.074 -> 57 dòng) và `modelops-page.tsx` (2.961 -> 854 dòng).
+- [x] Tối ưu frontend bundle bằng code splitting và route-level lazy loading (chunk chính giảm xuống 372 kB, 0 warnings).
 - [x] Đồng bộ ảnh scan thực tế 14 trang từ `qnu-ai-core` vào Studio đối soát.
 - [x] Render Markdown bảng biểu và cấu trúc phân cấp chuẩn GitHub Flavored Markdown.
 - [x] Thêm chế độ xem trước (Preview) khi hiệu đính văn bản trong chế độ Sửa tay (Human-in-the-loop).

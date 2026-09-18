@@ -43,7 +43,7 @@ class CitationGuard:
             seen_chunks.add(c.chunk_id)
 
             title = c.section or f"Tài liệu {c.document_id[:8]}"
-            quote = c.content[:200].strip() + ("..." if len(c.content) > 200 else "")
+            quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")
 
             citations.append(
                 Citation(

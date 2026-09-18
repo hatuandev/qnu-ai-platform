@@ -277,8 +277,9 @@ class VectorIndexer:
         query: str,
         top_k: int = 8,
         query_vector: list[float] | None = None,
+        score_threshold: float = 0.35,
     ) -> list[dict[str, Any]]:
-        """Perform dense cosine similarity search in Qdrant."""
+        """Perform dense cosine similarity search in Qdrant with score threshold filtering."""
         cname = self._get_collection_name(collection_id)
         if query_vector is not None:
             vec = query_vector
@@ -317,13 +318,16 @@ class VectorIndexer:
                 )
             results: list[dict[str, Any]] = []
             for hit in hits:
+                score = float(hit.score)
+                if score < score_threshold:
+                    continue
                 payload = hit.payload or {}
                 results.append(
                     {
                         "chunk_id": payload.get("chunk_id", str(hit.id)),
                         "document_id": payload.get("document_id", ""),
                         "content": payload.get("content", ""),
-                        "score": float(hit.score),
+                        "score": score,
                         "section": payload.get("section"),
                         "page_number": payload.get("page_number"),
                         "metadata": payload,

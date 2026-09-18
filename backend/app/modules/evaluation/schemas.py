@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class EvaluationRunRequest(BaseModel):
-    assistant_code: str = Field(..., description="Mã trợ lý cần đánh giá (ví dụ: admissions_assistant)")
+    assistant_code: str = Field(..., description="Mã trợ lý cần đánh giá (ví dụ: admissions hoặc regulations)")
     dataset_id: str = Field("qnu_admissions_benchmark", description="Mã tập benchmark")
     sample_size: int | None = Field(None, description="Số câu hỏi muốn chạy mẫu (None = chạy tất cả)", ge=1)
 
