@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import unicodedata
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select
@@ -265,20 +267,116 @@ class AssistantService:
         )
         answer = workflow_response.outputs.get("answer")
         if not isinstance(answer, str) or not answer.strip():
-            answer = assistant.config.guardrails.no_answer_message
+            guardrails = getattr(getattr(assistant, "config", None), "guardrails", None)
+            answer = getattr(guardrails, "no_answer_message", "Xin lỗi, hiện tại tôi chưa có dữ liệu chính thức để trả lời câu hỏi này.")
         citations = workflow_response.outputs.get("citations", [])
         artifacts = workflow_response.outputs.get("artifacts", [])
+
+        sample_questions = getattr(assistant, "sample_questions", None)
+        if not sample_questions:
+            config = getattr(assistant, "config", None)
+            if hasattr(config, "persona_scope"):
+                sample_questions = getattr(config.persona_scope, "sample_questions", [])
+            elif isinstance(config, dict):
+                sample_questions = config.get("persona_scope", {}).get("sample_questions", [])
+            else:
+                sample_questions = []
+
         return AssistantChatResponse(
             assistant_code=assistant.code,
             assistant_name=assistant.name,
             answer=answer,
             status=str(workflow_response.outputs.get("status") or workflow_response.status),
             citations=citations if isinstance(citations, list) else [],
-            suggested_questions=assistant.sample_questions[:3],
+            suggested_questions=(sample_questions or [])[:3],
             latency_ms=workflow_response.latency_ms,
             execution_id=workflow_response.execution_id,
             artifacts=artifacts if isinstance(artifacts, list) else [],
         )
+
+    async def chat_stream(
+        self,
+        db: AsyncSession,
+        reference: str,
+        request: AssistantChatRequest,
+        *,
+        correlation_id: str | None = None,
+    ) -> AsyncIterator[str]:
+        """Stream assistant response token-by-token via Server-Sent Events (SSE)."""
+        assistant = await self.get_assistant(db, reference)
+        if not assistant.is_active:
+            err_data = json.dumps({"error": f"Trợ lý '{assistant.code}' đang bị vô hiệu hóa."}, ensure_ascii=False)
+            yield f"event: error\ndata: {err_data}\n\n"
+            return
+
+        yield f"event: status\ndata: {json.dumps({'stage': 'retrieving', 'message': 'Đang tìm kiếm tài liệu đối soát...'}, ensure_ascii=False)}\n\n"
+
+        runtime_profile = build_runtime_profile(assistant)
+        sanitized_message = prepare_user_message(request.message, runtime_profile)
+        workflow_request = WorkflowExecuteRequest(
+            workflow_id=assistant.workflow_id,
+            inputs={
+                "message": sanitized_message,
+                "is_approved": True,
+                "format": "docx,pdf",
+            },
+            tenant_id=request.tenant_id,
+            conversation_id=request.conversation_id,
+        )
+
+        try:
+            workflow_response = await workflow_service.execute(
+                db,
+                workflow_request,
+                assistant_profile=runtime_profile,
+                correlation_id=correlation_id,
+            )
+        except Exception as e:
+            logger.error("Workflow execution failed during chat_stream: %s", e)
+            err_data = json.dumps({"error": f"Lỗi thực thi quy trình: {e}"}, ensure_ascii=False)
+            yield f"event: error\ndata: {err_data}\n\n"
+            return
+
+        citations = workflow_response.outputs.get("citations", [])
+        if isinstance(citations, list):
+            for cite in citations:
+                yield f"event: citation\ndata: {json.dumps(cite, ensure_ascii=False)}\n\n"
+
+        artifacts = workflow_response.outputs.get("artifacts", [])
+        if isinstance(artifacts, list):
+            for art in artifacts:
+                yield f"event: artifact\ndata: {json.dumps(art, ensure_ascii=False)}\n\n"
+
+        answer = workflow_response.outputs.get("answer")
+        if not isinstance(answer, str) or not answer.strip():
+            guardrails = getattr(getattr(assistant, "config", None), "guardrails", None)
+            answer = getattr(guardrails, "no_answer_message", "Xin lỗi, hiện tại tôi chưa có dữ liệu chính thức để trả lời câu hỏi này.")
+
+        # Stream tokens smoothly with async yield
+        words = answer.split(" ")
+        for idx, word in enumerate(words):
+            suffix = " " if idx < len(words) - 1 else ""
+            delta = word + suffix
+            yield f"event: token\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.012)
+
+        sample_questions = getattr(assistant, "sample_questions", None)
+        if not sample_questions:
+            config = getattr(assistant, "config", None)
+            if hasattr(config, "persona_scope"):
+                sample_questions = getattr(config.persona_scope, "sample_questions", [])
+            elif isinstance(config, dict):
+                sample_questions = config.get("persona_scope", {}).get("sample_questions", [])
+            else:
+                sample_questions = []
+
+        done_payload = {
+            "latency_ms": workflow_response.latency_ms,
+            "suggested_questions": (sample_questions or [])[:3],
+            "execution_id": workflow_response.execution_id,
+            "status": "completed",
+        }
+        yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 
     async def generate_spec(
         self, db: AsyncSession, request: AssistantGenerateRequest

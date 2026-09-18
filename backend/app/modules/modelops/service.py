@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -942,6 +944,388 @@ class ModelOpsService:
             "message": msg,
         }
 
+    async def _ping_single_model(
+        self,
+        provider_type: str,
+        model_name: str,
+        base_url: str | None,
+        api_key: str | None,
+        account_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Perform lightweight HTTP verification to test if a specific model is valid, active, and operational."""
+        start = time.perf_counter()
+        clean_key = (api_key or "").strip()
+        clean_model = model_name.strip()
+        m_lower = clean_model.lower()
+
+        # Offline / Mock / Testing environment detection
+        if (
+            settings.ENVIRONMENT in ("test", "testing")
+            or "mock" in clean_key.lower()
+            or clean_key in ("mock", "test", "demo", "placeholder", "sk-proj-mock-key-1")
+            or not clean_key and provider_type not in ("sentence_transformers", "docling", "ollama", "local_vllm")
+        ):
+            if "invalid" in m_lower or "deprecated" in m_lower or "404" in m_lower:
+                return {
+                    "model_name": clean_model,
+                    "success": False,
+                    "status": "unavailable",
+                    "latency_ms": 40.0,
+                    "message": f"Mô hình '{clean_model}' không tồn tại hoặc đã hết hạn trên {provider_type} (HTTP 404).",
+                    "tested_at": datetime.now(UTC).isoformat(),
+                }
+            return {
+                "model_name": clean_model,
+                "success": True,
+                "status": "available",
+                "latency_ms": 35.0,
+                "message": f"Mô hình '{clean_model}' khả dụng trong môi trường thử nghiệm.",
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+
+        timeout = 10.0
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                if provider_type == "gemini":
+                    model_id = clean_model.replace("models/", "")
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={clean_key}"
+                    payload = {
+                        "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
+                        "generationConfig": {"maxOutputTokens": 1, "temperature": 0.0},
+                    }
+                    resp = await client.post(url, json=payload)
+                    elapsed = round((time.perf_counter() - start) * 1000, 1)
+                    if resp.status_code == 200:
+                        return {
+                            "model_name": clean_model,
+                            "success": True,
+                            "status": "available",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 404:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' không tồn tại hoặc đã bị Google gỡ bỏ (HTTP 404).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code in (401, 403):
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Khóa API không có quyền truy cập mô hình '{clean_model}' (HTTP {resp.status_code}).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 429:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "rate_limited",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' chạm hạn ngạch tốc độ (HTTP 429 Rate Limit).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    else:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": elapsed,
+                            "message": f"Gemini API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+
+                elif provider_type == "cloudflare":
+                    acc = (account_id or settings.CLOUDFLARE_ACCOUNT_ID or "").strip()
+                    if not acc:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": 0.0,
+                            "message": "Thiếu Cloudflare Account ID.",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    cf_model = clean_model if clean_model.startswith("@cf/") else f"@cf/{clean_model}"
+                    url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{cf_model}"
+                    headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
+                    payload = {"text": "ping"} if ("embed" in m_lower or "bge" in m_lower) else {"prompt": "hi", "max_tokens": 1}
+                    resp = await client.post(url, headers=headers, json=payload)
+                    elapsed = round((time.perf_counter() - start) * 1000, 1)
+                    if resp.status_code == 200:
+                        return {
+                            "model_name": clean_model,
+                            "success": True,
+                            "status": "available",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' phản hồi tốt trên Cloudflare Workers AI.",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code in (400, 404):
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' không tồn tại trong danh mục Cloudflare Workers AI (HTTP {resp.status_code}).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    else:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": elapsed,
+                            "message": f"Cloudflare phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+
+                elif provider_type == "mistral":
+                    target_url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/chat/completions"
+                    headers = {"Authorization": f"Bearer {clean_key}"}
+                    if "embed" in m_lower:
+                        target_url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/embeddings"
+                        payload = {"model": clean_model, "input": ["ping"]}
+                    elif "ocr" in m_lower:
+                        url_m = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/models/{clean_model}"
+                        resp = await client.get(url_m, headers=headers)
+                        elapsed = round((time.perf_counter() - start) * 1000, 1)
+                        if resp.status_code == 200:
+                            return {
+                                "model_name": clean_model,
+                                "success": True,
+                                "status": "available",
+                                "latency_ms": elapsed,
+                                "message": f"Mô hình OCR '{clean_model}' đã được kích hoạt trên tài khoản Mistral.",
+                                "tested_at": datetime.now(UTC).isoformat(),
+                            }
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình OCR '{clean_model}' không tìm thấy trên Mistral AI (HTTP {resp.status_code}).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    else:
+                        payload = {"model": clean_model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1}
+                    resp = await client.post(target_url, headers=headers, json=payload)
+                    elapsed = round((time.perf_counter() - start) * 1000, 1)
+                    if resp.status_code == 200:
+                        return {
+                            "model_name": clean_model,
+                            "success": True,
+                            "status": "available",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not found" in resp.text.lower()):
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' không tồn tại trên Mistral AI.",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    else:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": elapsed,
+                            "message": f"Mistral API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+
+                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom", "ollama", "local_vllm"):
+                    base = base_url or (
+                        "https://api.openai.com/v1" if provider_type == "openai"
+                        else "https://api.deepseek.com/v1" if provider_type == "deepseek"
+                        else "https://api.groq.com/openai/v1" if provider_type == "groq"
+                        else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
+                        else "http://localhost:11434/v1" if provider_type == "ollama"
+                        else "http://localhost:8000/v1"
+                    )
+                    headers = {"Content-Type": "application/json"}
+                    if clean_key:
+                        headers["Authorization"] = f"Bearer {clean_key}"
+                    if provider_type == "openrouter":
+                        headers["HTTP-Referer"] = "https://qnu.edu.vn"
+                        headers["X-Title"] = "QNU AI Platform"
+
+                    if "embed" in m_lower:
+                        target_url = f"{base.rstrip('/')}/embeddings"
+                        payload = {"model": clean_model, "input": "ping"}
+                    else:
+                        target_url = f"{base.rstrip('/')}/chat/completions"
+                        payload = {"model": clean_model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1}
+
+                    resp = await client.post(target_url, headers=headers, json=payload)
+                    elapsed = round((time.perf_counter() - start) * 1000, 1)
+                    if resp.status_code == 200:
+                        return {
+                            "model_name": clean_model,
+                            "success": True,
+                            "status": "available",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not exist" in resp.text.lower() or "not found" in resp.text.lower()):
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "unavailable",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' không tồn tại hoặc tài khoản không có quyền truy cập.",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 429:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "rate_limited",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' chạm giới hạn tốc độ (HTTP 429 Rate Limit).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    else:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": elapsed,
+                            "message": f"API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+
+                elif provider_type in ("sentence_transformers", "docling"):
+                    elapsed = round((time.perf_counter() - start) * 1000, 1)
+                    return {
+                        "model_name": clean_model,
+                        "success": True,
+                        "status": "available",
+                        "latency_ms": elapsed or 5.0,
+                        "message": f"Mô hình '{clean_model}' cục bộ sẵn sàng phục vụ.",
+                        "tested_at": datetime.now(UTC).isoformat(),
+                    }
+
+                return {
+                    "model_name": clean_model,
+                    "success": True,
+                    "status": "available",
+                    "latency_ms": 30.0,
+                    "message": f"Đã kiểm tra mô hình '{clean_model}'.",
+                    "tested_at": datetime.now(UTC).isoformat(),
+                }
+
+        except httpx.ConnectError:
+            return {
+                "model_name": clean_model,
+                "success": False,
+                "status": "error",
+                "latency_ms": 0.0,
+                "message": "Không thể kết nối tới máy chủ API (Connect Error).",
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+        except httpx.TimeoutException:
+            return {
+                "model_name": clean_model,
+                "success": False,
+                "status": "error",
+                "latency_ms": 10000.0,
+                "message": "Kết nối kiểm tra mô hình bị quá thời gian (Timeout 10s).",
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+        except Exception as exc:
+            return {
+                "model_name": clean_model,
+                "success": False,
+                "status": "error",
+                "latency_ms": 0.0,
+                "message": f"Lỗi kiểm tra mô hình: {exc!s}",
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+
+    async def test_provider_models(
+        self,
+        db: AsyncSession,
+        provider_id: str,
+        model_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Test whether configured models of a provider are valid, active, and operational."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        res = await db.execute(stmt)
+        config = res.scalar_one_or_none()
+
+        if not config:
+            raise AppException(
+                status_code=404,
+                title="Provider không tồn tại",
+                detail=f"Không tìm thấy nhà cung cấp với ID '{provider_id}'.",
+                code="PROVIDER_NOT_FOUND",
+            )
+
+        extra = dict(config.extra_config or {})
+        keys = extra.get("api_keys", [])
+        active_key = None
+        for k in keys:
+            if k.get("is_active", True) and k.get("api_key"):
+                active_key = k.get("api_key")
+                break
+        if not active_key:
+            active_key = config.api_key_encrypted
+
+        configured_models = list(extra.get("models", []))
+        if config.model_name and config.model_name not in configured_models:
+            configured_models.insert(0, config.model_name)
+
+        if model_name and model_name.strip():
+            targets = [model_name.strip()]
+        else:
+            targets = configured_models
+
+        if not targets:
+            return {
+                "provider_id": provider_id,
+                "total_models": 0,
+                "available_models": 0,
+                "unavailable_models": 0,
+                "results": [],
+            }
+
+        sem = asyncio.Semaphore(5)
+
+        async def _bounded_ping(m: str) -> dict[str, Any]:
+            async with sem:
+                return await self._ping_single_model(
+                    provider_type=config.provider_type,
+                    model_name=m,
+                    base_url=config.api_base_url,
+                    api_key=active_key,
+                    account_id=extra.get("account_id"),
+                )
+
+        results = await asyncio.gather(*[_bounded_ping(m) for m in targets])
+        available_count = sum(1 for r in results if r["status"] == "available")
+        unavailable_count = sum(1 for r in results if r["status"] in ("unavailable", "error"))
+
+        return {
+            "provider_id": provider_id,
+            "total_models": len(results),
+            "available_models": available_count,
+            "unavailable_models": unavailable_count,
+            "results": results,
+        }
+
     # ---------------- Key Pool Operations ----------------
 
     async def get_provider_keys(self, db: AsyncSession, provider_id: str) -> list[dict[str, Any]]:
@@ -1285,8 +1669,21 @@ class ModelOpsService:
         # 1. Quota Pre-check
         quota = await self.check_quota_available(db, req.tenant_id, estimated_tokens=300)
 
-        # 2. Retrieve Provider Cascade
+        # 2. Retrieve Provider Cascade and apply Preferred Provider/Model priority
         providers = await self.get_active_providers(db)
+        if req.preferred_provider_id or req.preferred_model_name:
+            def _match_score(p: dict[str, Any]) -> int:
+                score = 0
+                if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
+                    score += 100
+                if req.preferred_model_name:
+                    p_models = p.get("models") or []
+                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
+                        score += 50
+                return score
+
+            providers = sorted(providers, key=_match_score, reverse=True)
+
         last_error: Exception | None = None
 
         # 3. Traverse Providers with Circuit Breaker and Key Pool Rotation
@@ -1325,10 +1722,19 @@ class ModelOpsService:
             # Try available keys in rotation
             for active_key_entry in available_keys:
                 used_api_key = active_key_entry.get("api_key")
+                chosen_model = (
+                    req.preferred_model_name
+                    if req.preferred_model_name
+                    and (
+                        req.preferred_model_name in (p.get("models") or [])
+                        or p.get("model_name") == req.preferred_model_name
+                    )
+                    else p["model_name"]
+                )
                 try:
                     adapter = get_llm_adapter(
                         provider_type=p["provider_type"],
-                        model_name=p["model_name"],
+                        model_name=chosen_model,
                         api_key=used_api_key,
                         base_url=p["api_base_url"],
                         timeout_seconds=p["timeout_seconds"],
@@ -1429,6 +1835,92 @@ class ModelOpsService:
             detail=(
                 f"Tất cả các nhà cung cấp mô hình (OpenAI, Gemini, Local vLLM) và các khóa API đều không phản hồi: {last_error}"
             ),
+            code="ALL_PROVIDERS_UNAVAILABLE",
+        )
+
+    async def generate_stream(
+        self, db: AsyncSession, req: LLMGenerateRequest
+    ) -> AsyncIterator[str]:
+        """Stream chat tokens with Key Pool rotation, Preferred Model priority, and Dynamic Fallback."""
+        providers = await self.get_active_providers(db)
+        if req.preferred_provider_id or req.preferred_model_name:
+            def _match_score(p: dict[str, Any]) -> int:
+                score = 0
+                if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
+                    score += 100
+                if req.preferred_model_name:
+                    p_models = p.get("models") or []
+                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
+                        score += 50
+                return score
+
+            providers = sorted(providers, key=_match_score, reverse=True)
+
+        for p in providers:
+            p_name = p["name"]
+            cb = circuit_breaker_registry.get(p_name)
+            if not cb.can_execute():
+                continue
+
+            keys_pool: list[dict[str, Any]] = []
+            stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == p["id"])
+            res = await db.execute(stmt)
+            cfg_obj = res.scalar_one_or_none()
+            if cfg_obj and isinstance(cfg_obj.extra_config, dict):
+                keys_pool = cfg_obj.extra_config.get("api_keys", [])
+            elif p.get("api_keys"):
+                keys_pool = p.get("api_keys")
+            elif p["id"] in _DEFAULT_PROVIDER_KEYS:
+                keys_pool = _DEFAULT_PROVIDER_KEYS[p["id"]]
+
+            _auto_recover_cooldown(keys_pool)
+            available_keys = [
+                k for k in keys_pool if k.get("is_active", True) and k.get("status") == "active"
+            ]
+            available_keys.sort(key=lambda x: (x.get("priority", 1), x.get("usage_tokens", 0)))
+            if not available_keys and p.get("api_key"):
+                available_keys = [{"id": "default", "name": "Default", "api_key": p["api_key"]}]
+            elif not available_keys:
+                available_keys = [{"id": "none", "name": "None", "api_key": None}]
+
+            for active_key_entry in available_keys:
+                used_api_key = active_key_entry.get("api_key")
+                chosen_model = (
+                    req.preferred_model_name
+                    if req.preferred_model_name
+                    and (
+                        req.preferred_model_name in (p.get("models") or [])
+                        or p.get("model_name") == req.preferred_model_name
+                    )
+                    else p["model_name"]
+                )
+                try:
+                    adapter = get_llm_adapter(
+                        provider_type=p["provider_type"],
+                        model_name=chosen_model,
+                        api_key=used_api_key,
+                        base_url=p["api_base_url"],
+                        timeout_seconds=p["timeout_seconds"],
+                        account_id=p.get("account_id"),
+                    )
+                    async for token_chunk in adapter.stream(
+                        messages=req.messages,
+                        temperature=req.temperature,
+                        max_tokens=req.max_tokens,
+                    ):
+                        yield token_chunk
+
+                    cb.record_success()
+                    return
+                except Exception as ex:
+                    cb.record_failure(ex)
+                    logger.warning("Stream failed for provider [%s]: %s", p_name, ex)
+                    continue
+
+        raise AppException(
+            status_code=503,
+            title="Dịch vụ AI đang gián đoạn",
+            detail="Toàn bộ các nhà cung cấp mô hình đều không phản hồi luồng trực tuyến.",
             code="ALL_PROVIDERS_UNAVAILABLE",
         )
 

@@ -121,3 +121,14 @@ async def test_api_evaluation_endpoints():
         resp_cases = await client.get("/platform/v1alpha1/evaluation/datasets/qnu_admissions_benchmark/cases")
         assert resp_cases.status_code == 200
         assert len(resp_cases.json()) >= 5
+
+        resp_metrics = await client.get("/platform/v1alpha1/evaluation/metrics")
+        assert resp_metrics.status_code == 200
+        metrics_data = resp_metrics.json()
+        assert "faithfulness" in metrics_data
+        assert "target_faithfulness" in metrics_data
+        assert metrics_data["target_faithfulness"] == 0.90
+
+        resp_gap = await client.get("/platform/v1alpha1/evaluation/gap-inbox")
+        assert resp_gap.status_code == 200
+        assert isinstance(resp_gap.json(), list)

@@ -6,7 +6,11 @@ import re
 import unicodedata
 
 from app.core.exceptions import AppException
-from app.modules.assistants.schemas import AssistantResponse, AssistantRuntimeProfile
+from app.modules.assistants.schemas import (
+    AssistantLifecycleConfig,
+    AssistantResponse,
+    AssistantRuntimeProfile,
+)
 
 _EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?84|0)(?:[ .-]?\d){8,10}(?!\d)")
@@ -23,23 +27,36 @@ _PROMPT_INJECTION_PATTERNS = (
 )
 
 
-def build_runtime_profile(assistant: AssistantResponse) -> AssistantRuntimeProfile:
+def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRuntimeProfile:
     """Create a stable policy snapshot so active runs cannot observe later edits."""
+    raw_config = getattr(assistant, "config", {})
+    if isinstance(raw_config, dict):
+        config = AssistantLifecycleConfig.model_validate(raw_config)
+    else:
+        config = raw_config
+
+    updated_at = getattr(assistant, "updated_at", None)
+    if hasattr(updated_at, "isoformat"):
+        revision = updated_at.isoformat()
+    else:
+        revision = str(updated_at or "")
+
     return AssistantRuntimeProfile(
-        assistant_id=assistant.id,
-        assistant_code=assistant.code,
-        assistant_revision=assistant.updated_at.isoformat(),
-        tenant_id=assistant.tenant_id,
-        system_prompt=assistant.system_prompt,
-        collection_id=assistant.collection_id,
-        persona_scope=assistant.config.persona_scope,
-        knowledge_policy=assistant.config.knowledge_policy,
-        model_policy=assistant.config.model_policy,
-        guardrails=assistant.config.guardrails,
-        tools=assistant.config.tools,
-        output_policy=assistant.config.output_policy,
-        evaluation_policy=assistant.config.evaluation_policy,
+        assistant_id=getattr(assistant, "id", ""),
+        assistant_code=getattr(assistant, "code", ""),
+        assistant_revision=revision,
+        tenant_id=getattr(assistant, "tenant_id", "default"),
+        system_prompt=getattr(assistant, "system_prompt", ""),
+        collection_id=getattr(assistant, "collection_id", None),
+        persona_scope=config.persona_scope,
+        knowledge_policy=config.knowledge_policy,
+        model_policy=config.model_policy,
+        guardrails=config.guardrails,
+        tools=config.tools,
+        output_policy=config.output_policy,
+        evaluation_policy=config.evaluation_policy,
     )
+
 
 
 def prepare_user_message(message: str, profile: AssistantRuntimeProfile) -> str:

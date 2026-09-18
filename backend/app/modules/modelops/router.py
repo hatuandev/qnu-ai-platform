@@ -18,6 +18,8 @@ from app.modules.modelops.schemas import (
     ProviderKeyItem,
     ProviderKeyTestResponse,
     ProviderKeyUpdate,
+    ProviderModelsTestRequest,
+    ProviderModelsTestResponse,
     ProviderPresetItem,
     ProviderTestResponse,
     SetDefaultModelRequest,
@@ -169,6 +171,21 @@ async def test_provider_connection(
 ) -> ProviderTestResponse:
     res = await modelops_service.test_provider(db, provider_id)
     return ProviderTestResponse(**res)
+
+
+@router.post(
+    "/providers/{provider_id}/models/test",
+    response_model=ProviderModelsTestResponse,
+    summary="Kiểm tra tính khả dụng và hiệu lực thực tế của từng mô hình do Provider cung cấp",
+)
+async def test_provider_models_endpoint(
+    provider_id: str,
+    body: ProviderModelsTestRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> ProviderModelsTestResponse:
+    target_model = body.model_name if body else None
+    res = await modelops_service.test_provider_models(db, provider_id, target_model)
+    return ProviderModelsTestResponse(**res)
 
 
 # ---------------- Key Pool Endpoints ----------------

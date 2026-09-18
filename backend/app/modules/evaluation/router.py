@@ -51,14 +51,18 @@ async def list_evaluation_runs(
 
 
 @router.get("/metrics", summary="Lấy tổng quan các chỉ số chất lượng Ragas TM-08")
-async def get_evaluation_metrics() -> dict[str, Any]:
+async def get_evaluation_metrics(
+    session: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
     """Tổng quan chỉ số Faithfulness, Answer Relevance và Context Precision."""
-    return service.get_summary_metrics()
+    return await service.get_summary_metrics(session=session)
 
 
 @router.get("/gap-inbox", summary="Danh sách các câu hỏi kích hoạt No-Answer Policy cần bổ sung tri thức")
-async def get_gap_inbox() -> list[dict[str, Any]]:
+async def get_gap_inbox(
+    session: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
     """Hòm thư lỗ hổng tri thức: danh sách câu hỏi kích hoạt No-Answer Policy."""
-    return service.get_gap_inbox()
+    return await service.get_gap_inbox(session=session)
 
 

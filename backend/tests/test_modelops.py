@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.exceptions import AppException
 from app.main import app
 from app.modules.modelops.circuit_breaker import CircuitBreaker, CircuitBreakerState
-from app.modules.modelops.models import TenantQuota
+from app.modules.modelops.models import ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import (
     CloudflareAdapter,
     GeminiAdapter,
@@ -576,5 +576,80 @@ async def test_system_model_defaults_api():
             assert len(data["available_embeddings"]) >= 2
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_provider_models_test_all_success():
+    """Verify endpoint tests all configured models of a provider and returns status."""
+    mock_db = AsyncMock()
+    cfg_record = ModelProviderConfig(
+        id="prov_gemini",
+        name="Google Gemini",
+        provider_type="gemini",
+        is_active=True,
+        api_key_encrypted="mock_key",
+        extra_config={"models": ["gemini-1.5-flash", "gemini-1.5-pro"]},
+    )
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = cfg_record
+    mock_db.execute.return_value = mock_res
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res = await ac.post("/platform/v1alpha1/modelops/providers/prov_gemini/models/test")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["provider_id"] == "prov_gemini"
+            assert data["total_models"] == 2
+            assert data["available_models"] == 2
+            assert data["unavailable_models"] == 0
+            assert len(data["results"]) == 2
+            assert data["results"][0]["model_name"] == "gemini-1.5-flash"
+            assert data["results"][0]["status"] == "available"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_provider_models_test_single_model_and_invalid():
+    """Verify endpoint tests a single model and correctly flags invalid/deprecated models."""
+    mock_db = AsyncMock()
+    cfg_record = ModelProviderConfig(
+        id="prov_gemini",
+        name="Google Gemini",
+        provider_type="gemini",
+        is_active=True,
+        api_key_encrypted="mock_key",
+        extra_config={"models": ["gemini-1.5-flash", "gemini-deprecated-404"]},
+    )
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = cfg_record
+    mock_db.execute.return_value = mock_res
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            # Test single invalid model
+            res = await ac.post(
+                "/platform/v1alpha1/modelops/providers/prov_gemini/models/test",
+                json={"model_name": "gemini-deprecated-404"},
+            )
+            assert res.status_code == 200
+            data = res.json()
+            assert data["total_models"] == 1
+            assert data["available_models"] == 0
+            assert data["unavailable_models"] == 1
+            assert data["results"][0]["status"] == "unavailable"
+            assert data["results"][0]["success"] is False
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
 
 

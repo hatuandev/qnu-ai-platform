@@ -41,7 +41,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   const { data: quota } = useQuery({
     queryKey: ["quotas"],
-    queryFn: () => apiClient.getTokenQuotas(),
+    queryFn: () => apiClient.getTokenQuota(),
   });
 
   const { data: evaluation } = useQuery({

@@ -1,4 +1,4 @@
-import type { DocumentVerificationData } from "./api-client";
+import type { DocumentVerificationData } from "@/types/knowledge";
 
 /**
  * Dữ liệu bóc tách và đối soát đầy đủ 14 trang chuẩn hóa từ QNU-AI-Core.

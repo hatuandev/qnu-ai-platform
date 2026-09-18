@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.assistants.schemas import (
     AssistantBundle,
     AssistantChatRequest,
-    AssistantChatResponse,
     AssistantCreateRequest,
     AssistantGenerateRequest,
     AssistantGenerateResponse,
@@ -93,18 +93,35 @@ async def export_assistant_bundle(
     return await assistant_service.export_bundle(db, reference)
 
 
-@router.post("/{reference}/chat", response_model=AssistantChatResponse)
+@router.post("/{reference}/chat")
 async def chat_with_assistant(
     reference: str,
     body: AssistantChatRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> AssistantChatResponse:
+):
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if body.stream:
+        return StreamingResponse(
+            assistant_service.chat_stream(
+                db,
+                reference,
+                body,
+                correlation_id=correlation_id,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     return await assistant_service.chat(
         db,
         reference,
         body,
-        correlation_id=getattr(request.state, "correlation_id", None),
+        correlation_id=correlation_id,
     )
 
 

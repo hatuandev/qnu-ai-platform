@@ -2,15 +2,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
+  Bot,
+  Brain,
   Check,
   CheckCircle2,
   ChevronRight,
   Cloud,
   Copy,
   Cpu,
+  Eye,
+  FlaskConical,
   Globe,
   KeyRound,
   Layers,
+  Loader2,
   Lock,
   Pencil,
   Play,
@@ -52,7 +57,9 @@ import { Switch } from "../components/ui/switch";
 import {
   type ModelProvider,
   type ProviderApiKey,
+  type ProviderModelsTestResponse,
   type ProviderPreset,
+  type SingleModelTestResult,
   type SystemModelDefaults,
   apiClient,
 } from "../services/api-client";
@@ -77,6 +84,38 @@ export const getProviderCategory = (prov: ModelProvider): "cloud" | "local" | "c
     return "local";
   }
   return "cloud";
+};
+
+export const getModelCapabilities = (modelName: string) => {
+  const mLower = modelName.toLowerCase();
+  const hasVision =
+    mLower.includes("vision") ||
+    mLower.includes("flash") ||
+    mLower.includes("4o") ||
+    mLower.includes("sonnet") ||
+    mLower.includes("opus") ||
+    mLower.includes("ocr") ||
+    mLower.includes("docling");
+  const hasReasoning =
+    mLower.includes("reason") ||
+    mLower.includes("o1") ||
+    mLower.includes("o3") ||
+    mLower.includes("r1") ||
+    mLower.includes("thinking") ||
+    mLower.includes("pro") ||
+    mLower.includes("high");
+  return { hasVision, hasReasoning };
+};
+
+export const getModelDisplayName = (modelName: string): string => {
+  if (modelName.startsWith("@cf/")) {
+    return modelName.replace("@cf/", "").toUpperCase();
+  }
+  const clean = modelName.replace(/^ag\//, "").replace(/-\d{8}$/, "");
+  return clean
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 };
 
 export interface ModelOpsPageProps {
@@ -159,8 +198,28 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   // Copy feedback state
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Detail View inline model input
-  const [detailModelInput, setDetailModelInput] = useState("");
+  // Testing models state
+  const [isTestingAllModels, setIsTestingAllModels] = useState(false);
+  const [testingModelName, setTestingModelName] = useState<string | null>(null);
+  const [modelTestResults, setModelTestResults] = useState<Record<string, SingleModelTestResult>>(
+    {}
+  );
+  const [modelTestSummary, setModelTestSummary] = useState<ProviderModelsTestResponse | null>(null);
+
+  // Add Custom Model Dialog state (Image 2 style)
+  const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
+  const [newCustomModelId, setNewCustomModelId] = useState("");
+  const [isVisionCapable, setIsVisionCapable] = useState(false);
+  const [isReasoningCapable, setIsReasoningCapable] = useState(false);
+  const [testingNewModel, setTestingNewModel] = useState(false);
+  const [newModelTestResult, setNewModelTestResult] = useState<SingleModelTestResult | null>(null);
+  const [modelRoleDefault, setModelRoleDefault] = useState<
+    "none" | "embedding" | "reranker" | "ocr"
+  >("none");
+
+  // Filter & Copy feedback
+  const [modelFilter, setModelFilter] = useState<"all" | "vision" | "reasoning" | "default">("all");
+  const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
 
   // Fetch Providers
   const providersQuery = useQuery({
@@ -240,6 +299,38 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   // Identify current selected provider object
   const selectedProvider = providers.find((p) => p.id === selectedProviderId) || null;
 
+  // Count unavailable models
+  const unavailableModelsCount = useMemo(() => {
+    if (!selectedProvider) return 0;
+    return (selectedProvider.models || []).filter(
+      (m) => modelTestResults[m]?.status === "unavailable"
+    ).length;
+  }, [selectedProvider, modelTestResults]);
+
+  // Filtered models for Available Models Grid
+  const filteredModels = useMemo(() => {
+    const allM = selectedProvider?.models || [];
+    if (modelFilter === "all") return allM;
+    if (modelFilter === "vision") {
+      return allM.filter((m) => getModelCapabilities(m).hasVision);
+    }
+    if (modelFilter === "reasoning") {
+      return allM.filter((m) => getModelCapabilities(m).hasReasoning);
+    }
+    if (modelFilter === "default") {
+      return allM.filter(
+        (m) =>
+          (selectedProvider?.id === systemDefaults?.default_embedding_provider_id &&
+            m === systemDefaults?.default_embedding_model) ||
+          (selectedProvider?.id === systemDefaults?.default_reranker_provider_id &&
+            m === systemDefaults?.default_reranker_model) ||
+          (selectedProvider?.id === systemDefaults?.default_ocr_provider_id &&
+            m === systemDefaults?.default_ocr_model)
+      );
+    }
+    return allM;
+  }, [selectedProvider, modelFilter, systemDefaults]);
+
   // Navigation handlers
   const handleSelectProvider = (providerId: string) => {
     setSelectedProviderId(providerId);
@@ -247,6 +338,10 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     setShowAddKeyForm(false);
     setRotationResult(null);
     setKeyTestFeedback({});
+    setModelTestResults({});
+    setModelTestSummary(null);
+    setIsTestingAllModels(false);
+    setTestingModelName(null);
     const nextPath = `/models/${providerId}`;
     if (onNavigate) {
       onNavigate(nextPath);
@@ -261,6 +356,10 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     setShowAddKeyForm(false);
     setRotationResult(null);
     setKeyTestFeedback({});
+    setModelTestResults({});
+    setModelTestSummary(null);
+    setIsTestingAllModels(false);
+    setTestingModelName(null);
     const nextPath = "/models";
     if (onNavigate) {
       onNavigate(nextPath);
@@ -484,21 +583,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     }
   };
 
-  // Detail View: Add model tag directly
-  const handleDetailAddModel = (provider: ModelProvider) => {
-    const val = detailModelInput.trim();
-    if (!val) return;
-    const currentModels = provider.models || [];
-    if (!currentModels.includes(val)) {
-      const updated = [...currentModels, val];
-      updateMutation.mutate({
-        id: provider.id,
-        payload: { models: updated },
-      });
-    }
-    setDetailModelInput("");
-  };
-
   // Detail View: Remove model tag directly
   const handleDetailRemoveModel = (provider: ModelProvider, modelName: string) => {
     const updated = (provider.models || []).filter((m) => m !== modelName);
@@ -590,6 +674,176 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     }
   };
 
+  // Testing all models for provider
+  const handleTestAllModels = async (providerId: string) => {
+    setIsTestingAllModels(true);
+    try {
+      const res = await apiClient.testProviderModels(providerId);
+      setModelTestSummary(res);
+      const resultMap: Record<string, SingleModelTestResult> = {};
+      for (const r of res.results) {
+        resultMap[r.model_name] = r;
+      }
+      setModelTestResults(resultMap);
+    } catch (_err) {
+      setModelTestSummary(null);
+    } finally {
+      setIsTestingAllModels(false);
+    }
+  };
+
+  // Testing single model
+  const handleTestSingleModel = async (providerId: string, modelName: string) => {
+    setTestingModelName(modelName);
+    try {
+      const res = await apiClient.testProviderModels(providerId, modelName);
+      if (res.results && res.results.length > 0) {
+        const r = res.results[0];
+        setModelTestResults((prev) => ({
+          ...prev,
+          [modelName]: r,
+        }));
+      }
+    } catch (_err) {
+      setModelTestResults((prev) => ({
+        ...prev,
+        [modelName]: {
+          model_name: modelName,
+          success: false,
+          status: "error",
+          latency_ms: 0,
+          message: "Lỗi mạng hoặc không thể gửi request kiểm tra",
+          tested_at: new Date().toISOString(),
+        },
+      }));
+    } finally {
+      setTestingModelName(null);
+    }
+  };
+
+  // 1-Click clean dead / unavailable models from provider
+  const handleCleanUnavailableModels = (provider: ModelProvider) => {
+    const deadModels = (provider.models || []).filter(
+      (m) => modelTestResults[m]?.status === "unavailable"
+    );
+    if (deadModels.length === 0) return;
+    const remaining = (provider.models || []).filter(
+      (m) => modelTestResults[m]?.status !== "unavailable"
+    );
+    updateMutation.mutate({
+      id: provider.id,
+      payload: { models: remaining },
+    });
+    setModelTestResults((prev) => {
+      const copy = { ...prev };
+      for (const d of deadModels) {
+        delete copy[d];
+      }
+      return copy;
+    });
+    if (modelTestSummary) {
+      setModelTestSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              total_models: remaining.length,
+              unavailable_models: 0,
+              results: prev.results.filter((r) => r.status !== "unavailable"),
+            }
+          : null
+      );
+    }
+  };
+
+  // Add Model Modal handlers (Image 2 style)
+  const handleOpenAddModelModal = (prefillId = "") => {
+    setNewCustomModelId(prefillId);
+    const lower = prefillId.toLowerCase();
+    setIsVisionCapable(
+      lower.includes("flash") ||
+        lower.includes("vision") ||
+        lower.includes("4o") ||
+        lower.includes("sonnet") ||
+        lower.includes("ocr")
+    );
+    setIsReasoningCapable(
+      lower.includes("o1") ||
+        lower.includes("o3") ||
+        lower.includes("reason") ||
+        lower.includes("r1") ||
+        lower.includes("thinking")
+    );
+    setNewModelTestResult(null);
+    setModelRoleDefault("none");
+    setIsAddModelModalOpen(true);
+  };
+
+  const handleCloseAddModelModal = () => {
+    setIsAddModelModalOpen(false);
+    setNewCustomModelId("");
+    setNewModelTestResult(null);
+    setTestingNewModel(false);
+  };
+
+  const handleTestNewModel = async () => {
+    if (!selectedProvider || !newCustomModelId.trim()) return;
+    setTestingNewModel(true);
+    setNewModelTestResult(null);
+    try {
+      const res = await apiClient.testProviderModels(selectedProvider.id, newCustomModelId.trim());
+      if (res.results && res.results.length > 0) {
+        setNewModelTestResult(res.results[0]);
+      }
+    } catch (_err) {
+      setNewModelTestResult({
+        model_name: newCustomModelId.trim(),
+        success: false,
+        status: "error",
+        latency_ms: 0,
+        message: "Không thể kết nối hoặc gửi request kiểm tra tới Provider.",
+        tested_at: new Date().toISOString(),
+      });
+    } finally {
+      setTestingNewModel(false);
+    }
+  };
+
+  const handleConfirmAddCustomModel = () => {
+    if (!selectedProvider) return;
+    const trimmed = newCustomModelId.trim();
+    if (!trimmed) return;
+    const currentModels = selectedProvider.models || [];
+    if (!currentModels.includes(trimmed)) {
+      const updated = [...currentModels, trimmed];
+      updateMutation.mutate({
+        id: selectedProvider.id,
+        payload: { models: updated },
+      });
+      if (newModelTestResult) {
+        setModelTestResults((prev) => ({
+          ...prev,
+          [trimmed]: newModelTestResult,
+        }));
+      }
+      if (modelRoleDefault !== "none") {
+        setDefaultMutation.mutate({
+          providerId: selectedProvider.id,
+          role: modelRoleDefault,
+          modelName: trimmed,
+        });
+      }
+    }
+    handleCloseAddModelModal();
+  };
+
+  const handleCopyModelId = (id: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(id);
+      setCopiedModelId(id);
+      setTimeout(() => setCopiedModelId(null), 1500);
+    }
+  };
+
   // Add new key handler
   const handleSaveNewKey = (e: React.FormEvent) => {
     e.preventDefault();
@@ -623,11 +877,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
       setTimeout(() => setCopiedKeyId(null), 2000);
     }
   };
-
-  // Find preset for current provider to get suggested models
-  const currentPreset = selectedProvider
-    ? presets.find((p) => p.code === selectedProvider.type)
-    : null;
 
   // -------------------------------------------------------------
   // RENDER OVERVIEW VIEW MODAL HELPER
@@ -1117,7 +1366,340 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
           )}
         </Card>
 
-        {/* Main Content Grid: Left 2/3 Key Pool, Right 1/3 Models & Specs */}
+        {/* Available Models Full-Width Card (Style of User Reference Image 1) */}
+        <Card className="p-6 space-y-5 border-border shadow-xs bg-card">
+          {/* Header with Title, Count badge, Capabilities Filter, and Action Buttons */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Bot className="h-4 w-4 text-primary" />
+                Mô Hình Khả Dụng (Available Models)
+              </h2>
+              <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
+                {(selectedProvider.models || []).length} models
+              </Badge>
+            </div>
+
+            {/* Filter & Action Toolbar */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Capability Filter Select */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground font-medium hidden md:inline">
+                  Lọc:
+                </span>
+                <Select
+                  value={modelFilter}
+                  onValueChange={(val) =>
+                    setModelFilter(val as "all" | "vision" | "reasoning" | "default")
+                  }
+                >
+                  <SelectTrigger className="h-8 w-44 text-xs font-medium">
+                    <SelectValue placeholder="Tất cả mô hình" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả mô hình</SelectItem>
+                    <SelectItem value="vision">Vision (Thị giác)</SelectItem>
+                    <SelectItem value="reasoning">Reasoning (Suy luận)</SelectItem>
+                    <SelectItem value="default">Mặc định hệ thống</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Add Custom Model Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenAddModelModal()}
+                className="h-8 px-3 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10 cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Thêm Model</span>
+              </Button>
+
+              {/* Bulk Test Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isTestingAllModels || (selectedProvider.models || []).length === 0}
+                onClick={() => handleTestAllModels(selectedProvider.id)}
+                className="h-8 px-3 text-xs text-primary border-primary/30 hover:bg-primary/10 gap-1.5 cursor-pointer"
+                title="Gửi ping kiểm tra tính khả dụng thực tế của toàn bộ các model này"
+              >
+                {isTestingAllModels ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Zap className="h-3.5 w-3.5" />
+                )}
+                <span>{isTestingAllModels ? "Đang Kiểm Tra..." : "Test Tất Cả"}</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Model Cards Grid (3 Columns on Desktop) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {filteredModels.length === 0 && (selectedProvider.models || []).length > 0 ? (
+              <div className="col-span-full py-8 text-center text-xs text-muted-foreground italic border border-dashed rounded-lg">
+                Không tìm thấy model nào phù hợp với bộ lọc đã chọn.
+              </div>
+            ) : null}
+
+            {filteredModels.map((m) => {
+              const isDefEmbedding =
+                selectedProvider.id === systemDefaults?.default_embedding_provider_id &&
+                m === systemDefaults?.default_embedding_model;
+              const isDefReranker =
+                selectedProvider.id === systemDefaults?.default_reranker_provider_id &&
+                m === systemDefaults?.default_reranker_model;
+              const isDefOcr =
+                selectedProvider.id === systemDefaults?.default_ocr_provider_id &&
+                m === systemDefaults?.default_ocr_model;
+              const isDefault = isDefEmbedding || isDefReranker || isDefOcr;
+
+              const testRes = modelTestResults[m];
+              const isTestingThis = testingModelName === m || isTestingAllModels;
+              const capabilities = getModelCapabilities(m);
+              const displayName = getModelDisplayName(m);
+
+              return (
+                <div
+                  key={m}
+                  className={`rounded-lg border p-3 bg-card transition-all flex items-center justify-between gap-2.5 group relative hover:border-primary/50 hover:shadow-xs ${
+                    testRes?.status === "unavailable"
+                      ? "border-destructive/50 bg-destructive/5"
+                      : isDefault
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-border/80"
+                  }`}
+                >
+                  {/* Left Robot Icon */}
+                  <div className="p-2 rounded-md bg-muted/60 border border-border/50 text-primary shrink-0 flex items-center justify-center">
+                    <Bot className="h-4 w-4" />
+                  </div>
+
+                  {/* Center Info */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-muted/70 text-foreground border border-border/60 truncate max-w-[160px]"
+                        title={m}
+                      >
+                        {m}
+                      </span>
+
+                      {isDefEmbedding && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] px-1 py-0 h-3.5 bg-primary/20 text-primary border-none gap-0.5"
+                        >
+                          <Star className="h-2.5 w-2.5 fill-primary" />
+                          Embed
+                        </Badge>
+                      )}
+                      {isDefReranker && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] px-1 py-0 h-3.5 bg-amber-500/20 text-amber-500 border-none gap-0.5"
+                        >
+                          <Star className="h-2.5 w-2.5 fill-amber-500" />
+                          Rerank
+                        </Badge>
+                      )}
+                      {isDefOcr && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[9px] px-1 py-0 h-3.5 bg-sky-500/20 text-sky-500 border-none gap-0.5"
+                        >
+                          <Star className="h-2.5 w-2.5 fill-sky-500" />
+                          OCR
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="truncate max-w-[130px] italic">{displayName}</span>
+                      <div className="flex items-center gap-1 text-muted-foreground/70 shrink-0">
+                        {capabilities.hasVision && (
+                          <span title="Hỗ trợ Vision / Đa phương thức">
+                            <Eye className="h-3 w-3" />
+                          </span>
+                        )}
+                        {capabilities.hasReasoning && (
+                          <span title="Hỗ trợ Suy luận chuyên sâu (Reasoning)">
+                            <Brain className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Toolbar / Test Badge */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Test Status Indicator */}
+                    {isTestingThis ? (
+                      <span
+                        className="text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"
+                        title="Đang kiểm tra..."
+                      >
+                        <RotateCw className="h-2.5 w-2.5 animate-spin" />
+                      </span>
+                    ) : testRes ? (
+                      testRes.status === "available" ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-sans border border-emerald-500/20"
+                          title={`Khả dụng (${testRes.latency_ms}ms) - ${testRes.message}`}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          <span>{testRes.latency_ms}ms</span>
+                        </span>
+                      ) : testRes.status === "unavailable" ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
+                          title={`Hết hiệu lực: ${testRes.message}`}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
+                          <span>404</span>
+                        </span>
+                      ) : testRes.status === "rate_limited" ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
+                          title={testRes.message}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                          <span>429</span>
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
+                          title={testRes.message}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
+                          <span>Lỗi</span>
+                        </span>
+                      )
+                    ) : null}
+
+                    {/* Quick Action Buttons */}
+                    <button
+                      type="button"
+                      disabled={isTestingThis}
+                      onClick={() => handleTestSingleModel(selectedProvider.id, m)}
+                      className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-muted/70 transition-colors cursor-pointer"
+                      title={`Test hiệu lực model '${m}'`}
+                    >
+                      <FlaskConical className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyModelId(m)}
+                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
+                      title="Sao chép Model ID"
+                    >
+                      {copiedModelId === m ? (
+                        <Check className="h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDetailRemoveModel(selectedProvider, m)}
+                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      title={`Xóa model '${m}'`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Dashed "+ Add Model" Card Button */}
+            <button
+              type="button"
+              onClick={() => handleOpenAddModelModal()}
+              className="border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 rounded-lg p-3.5 flex items-center justify-center gap-2 text-primary font-medium text-xs transition-all cursor-pointer min-h-[58px]"
+              title="Thêm mô hình tùy chỉnh mới vào Provider"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Thêm Mô Hình (Add Model)</span>
+            </button>
+          </div>
+
+          {/* Dead Models Cleanup Alert */}
+          {unavailableModelsCount > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-md bg-destructive/10 border border-destructive/30 text-xs">
+              <div className="flex items-center gap-2 text-destructive font-medium">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  Phát hiện <strong>{unavailableModelsCount}</strong> model không còn hiệu lực do
+                  nhà cung cấp ngừng cung cấp (HTTP 404).
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleCleanUnavailableModels(selectedProvider)}
+                className="h-7 px-2.5 text-xs gap-1 cursor-pointer"
+                title="Tự động loại bỏ các model không còn hỗ trợ khỏi cấu hình Provider"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Dọn Dẹp Model Lỗi</span>
+              </Button>
+            </div>
+          )}
+
+          {/* Test Success Summary Banner */}
+          {modelTestSummary && unavailableModelsCount === 0 && (
+            <div className="flex items-center gap-2 p-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>
+                Đã kiểm tra <strong>{modelTestSummary.total_models}</strong> model: Toàn bộ{" "}
+                <strong>{modelTestSummary.available_models}</strong> model đều đang hoạt động tốt!
+              </span>
+            </div>
+          )}
+
+          {/* Quick Suggest from Presets */}
+          {(() => {
+            const currentPreset = presets.find((pr) => pr.code === selectedProvider.type);
+            const suggestedList =
+              currentPreset?.suggested_models ||
+              PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
+              [];
+            if (suggestedList.length === 0) return null;
+            return (
+              <div className="pt-3 border-t border-border/60 space-y-2">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Gợi Ý 1-Click Thêm Nhanh ({selectedProvider.name}):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestedList.map((sm) => {
+                    const isAlreadyAdded = (selectedProvider.models || []).includes(sm);
+                    return (
+                      <button
+                        type="button"
+                        key={sm}
+                        disabled={isAlreadyAdded}
+                        onClick={() => handleQuickAddPresetModel(selectedProvider, sm)}
+                        className={`text-[11px] font-mono px-2 py-1 rounded border transition-colors ${
+                          isAlreadyAdded
+                            ? "bg-muted/40 text-muted-foreground/50 border-transparent cursor-not-allowed"
+                            : "bg-muted/20 hover:bg-primary/10 hover:text-primary hover:border-primary/40 text-muted-foreground border-border cursor-pointer"
+                        }`}
+                      >
+                        + {sm}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </Card>
+
+        {/* Main Content Grid: Left 2/3 Key Pool, Right 1/3 Specs */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           {/* LEFT 2 COLS: KEY POOL & ROTATION FAILOVER */}
           <div className="lg:col-span-2 space-y-6">
@@ -1489,213 +2071,8 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
             </Card>
           </div>
 
-          {/* RIGHT 1 COL: MODELS & SPECIFICATIONS */}
+          {/* RIGHT 1 COL: SPECIFICATIONS */}
           <div className="space-y-6">
-            {/* Models Card */}
-            <Card className="p-5 space-y-4 border-border">
-              <div className="flex items-center justify-between pb-2 border-b border-border/70">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Mô Hình Khả Dụng</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {(selectedProvider.models || []).length} mô hình đã cấu hình
-                  </p>
-                </div>
-              </div>
-
-              {/* Models Tags */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                  {(selectedProvider.models || []).length === 0 ? (
-                    <div className="w-full text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-md">
-                      Chưa cấu hình mô hình nào. Hãy nhập tên model ở ô bên dưới hoặc bấm vào gợi ý.
-                    </div>
-                  ) : (
-                    (selectedProvider.models || []).map((m) => {
-                      const isDefEmbedding =
-                        selectedProvider.id === systemDefaults?.default_embedding_provider_id &&
-                        m === systemDefaults?.default_embedding_model;
-                      const isDefReranker =
-                        selectedProvider.id === systemDefaults?.default_reranker_provider_id &&
-                        m === systemDefaults?.default_reranker_model;
-                      const isDefOcr =
-                        selectedProvider.id === systemDefaults?.default_ocr_provider_id &&
-                        m === systemDefaults?.default_ocr_model;
-                      const isDefault = isDefEmbedding || isDefReranker || isDefOcr;
-                      const mLower = m.toLowerCase();
-
-                      return (
-                        <div
-                          key={m}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-mono transition-all ${
-                            isDefault
-                              ? "bg-primary/10 border-primary/40 text-primary shadow-xs"
-                              : "bg-background border-border text-foreground"
-                          }`}
-                        >
-                          <span className="font-semibold">{m}</span>
-
-                          {isDefEmbedding && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] px-1 py-0 h-3.5 bg-primary/20 text-primary border-none gap-0.5"
-                            >
-                              <Star className="h-2.5 w-2.5 fill-primary" />
-                              Embedding Mặc Định
-                            </Badge>
-                          )}
-                          {isDefReranker && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] px-1 py-0 h-3.5 bg-amber-500/20 text-amber-500 border-none gap-0.5"
-                            >
-                              <Star className="h-2.5 w-2.5 fill-amber-500" />
-                              Reranker Mặc Định
-                            </Badge>
-                          )}
-                          {isDefOcr && (
-                            <Badge
-                              variant="secondary"
-                              className="text-[9px] px-1 py-0 h-3.5 bg-sky-500/20 text-sky-500 border-none gap-0.5"
-                            >
-                              <Star className="h-2.5 w-2.5 fill-sky-500" />
-                              OCR Mặc Định
-                            </Badge>
-                          )}
-
-                          {!isDefault && (
-                            <div className="flex items-center gap-1 ml-1">
-                              {(mLower.includes("bge") ||
-                                mLower.includes("embed") ||
-                                selectedProvider.type === "sentence_transformers") &&
-                                !mLower.includes("rerank") && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setDefaultMutation.mutate({
-                                        providerId: selectedProvider.id,
-                                        role: "embedding",
-                                        modelName: m,
-                                      })
-                                    }
-                                    className="text-[10px] text-muted-foreground hover:text-primary underline px-1 cursor-pointer"
-                                    title="Đặt làm Embedding mặc định cho Kho Tri Thức"
-                                  >
-                                    Đặt Default
-                                  </button>
-                                )}
-                              {mLower.includes("rerank") && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setDefaultMutation.mutate({
-                                      providerId: selectedProvider.id,
-                                      role: "reranker",
-                                      modelName: m,
-                                    })
-                                  }
-                                  className="text-[10px] text-muted-foreground hover:text-amber-500 underline px-1 cursor-pointer"
-                                  title="Đặt làm Reranker mặc định cho RAG"
-                                >
-                                  Đặt Default
-                                </button>
-                              )}
-                              {(mLower.includes("ocr") ||
-                                selectedProvider.type === "docling" ||
-                                selectedProvider.type === "mistral") && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setDefaultMutation.mutate({
-                                      providerId: selectedProvider.id,
-                                      role: "ocr",
-                                      modelName: m,
-                                    })
-                                  }
-                                  className="text-[10px] text-muted-foreground hover:text-sky-500 underline px-1 cursor-pointer"
-                                  title="Đặt làm OCR mặc định cho bóc tách tài liệu"
-                                >
-                                  Đặt Default
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleDetailRemoveModel(selectedProvider, m)}
-                            className="text-muted-foreground hover:text-destructive transition-colors ml-1 cursor-pointer"
-                            title={`Xóa model ${m}`}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Add model input */}
-                <div className="flex items-center gap-1.5 pt-2">
-                  <Input
-                    placeholder="Ví dụ: gpt-4o, gemini-1.5-flash..."
-                    value={detailModelInput}
-                    onChange={(e) => setDetailModelInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleDetailAddModel(selectedProvider);
-                      }
-                    }}
-                    className="h-8 text-xs font-mono"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => handleDetailAddModel(selectedProvider)}
-                    className="h-8 px-3 text-xs"
-                    disabled={!detailModelInput.trim()}
-                  >
-                    Thêm
-                  </Button>
-                </div>
-              </div>
-
-              {/* Quick Suggest from Presets */}
-              {(() => {
-                const suggestedList =
-                  currentPreset?.suggested_models ||
-                  PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
-                  [];
-                if (suggestedList.length === 0) return null;
-                return (
-                  <div className="pt-2 border-t border-border/60 space-y-2">
-                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                      Gợi Ý 1-Click Thêm Nhanh ({selectedProvider.name}):
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {suggestedList.map((sm) => {
-                        const isAlreadyAdded = (selectedProvider.models || []).includes(sm);
-                        return (
-                          <button
-                            type="button"
-                            key={sm}
-                            disabled={isAlreadyAdded}
-                            onClick={() => handleQuickAddPresetModel(selectedProvider, sm)}
-                            className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${
-                              isAlreadyAdded
-                                ? "bg-muted/40 text-muted-foreground/50 border-transparent cursor-not-allowed"
-                                : "bg-muted/20 hover:bg-primary/10 hover:text-primary hover:border-primary/40 text-muted-foreground border-border cursor-pointer"
-                            }`}
-                          >
-                            + {sm}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-            </Card>
-
             {/* Provider Technical Specs Card */}
             <Card className="p-5 space-y-3 border-border">
               <h3 className="text-sm font-bold text-foreground">Thông Số Kỹ Thuật</h3>
@@ -1736,6 +2113,216 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
             </Card>
           </div>
         </div>
+
+        {/* Add Custom Model Dialog (User Reference Image 2 Style) */}
+        <Dialog open={isAddModelModalOpen} onOpenChange={setIsAddModelModalOpen}>
+          <DialogContent className="sm:max-w-md p-6 space-y-5 rounded-lg bg-card border-border shadow-lg">
+            <div className="space-y-2">
+              {/* Mac-style window controls dots */}
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="h-2.5 w-2.5 rounded-full bg-destructive/80 inline-block" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80 inline-block" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80 inline-block" />
+              </div>
+              <DialogTitle className="text-base font-bold text-foreground">
+                Thêm Mô Hình Tùy Chỉnh (Add Custom Model)
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Nhập mã định danh model do {selectedProvider?.name} cung cấp và kiểm thử tính khả
+                dụng trực tiếp.
+              </DialogDescription>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-xs font-semibold text-foreground block">
+                Mã Định Danh Model (Model ID)
+              </span>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ví dụ: gemini-2.0-flash, gpt-4o, claude-3-5-sonnet..."
+                  value={newCustomModelId}
+                  onChange={(e) => {
+                    setNewCustomModelId(e.target.value);
+                    setNewModelTestResult(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleConfirmAddCustomModel();
+                    }
+                  }}
+                  className="font-mono text-xs h-9 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!newCustomModelId.trim() || testingNewModel}
+                  onClick={handleTestNewModel}
+                  className="h-9 px-3 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10 shrink-0 cursor-pointer"
+                >
+                  {testingNewModel ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FlaskConical className="h-3.5 w-3.5" />
+                  )}
+                  <span>{testingNewModel ? "Đang Test..." : "Test"}</span>
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-mono">
+                Gửi tới nhà cung cấp dưới dạng:{" "}
+                <code className="text-foreground bg-muted/60 px-1 py-0.5 rounded font-mono">
+                  {newCustomModelId.trim() || "model-id"}
+                </code>
+              </p>
+
+              {newModelTestResult && (
+                <div
+                  className={`p-2.5 rounded-md text-xs border flex items-center justify-between ${
+                    newModelTestResult.status === "available"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                      : newModelTestResult.status === "rate_limited"
+                        ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400"
+                        : "bg-destructive/10 border-destructive/30 text-destructive"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    {newModelTestResult.status === "available" ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                    )}
+                    <span>{newModelTestResult.message}</span>
+                  </div>
+                  {newModelTestResult.latency_ms > 0 && (
+                    <span className="font-mono font-semibold text-[11px]">
+                      {newModelTestResult.latency_ms}ms
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Capabilities switches */}
+            <div className="space-y-2 pt-2 border-t border-border/70">
+              <span className="text-xs font-semibold text-foreground block">
+                Khả Năng Hỗ Trợ (Capabilities)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <Eye className="h-3.5 w-3.5 text-primary" />
+                      Vision
+                    </span>
+                    <p className="text-[10px] text-muted-foreground">Hỗ trợ ảnh & OCR</p>
+                  </div>
+                  <Switch
+                    checked={isVisionCapable}
+                    onCheckedChange={setIsVisionCapable}
+                    aria-label="Bật tính năng Vision"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <Brain className="h-3.5 w-3.5 text-primary" />
+                      Reasoning
+                    </span>
+                    <p className="text-[10px] text-muted-foreground">Suy luận tư duy</p>
+                  </div>
+                  <Switch
+                    checked={isReasoningCapable}
+                    onCheckedChange={setIsReasoningCapable}
+                    aria-label="Bật tính năng Reasoning"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick suggestions from provider preset */}
+            {(() => {
+              if (!selectedProvider) return null;
+              const currentPreset = presets.find((pr) => pr.code === selectedProvider.type);
+              const suggestedList =
+                currentPreset?.suggested_models ||
+                PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
+                [];
+              if (suggestedList.length === 0) return null;
+              return (
+                <div className="space-y-1.5 pt-2 border-t border-border/60">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Gợi ý nhanh từ {selectedProvider.name}:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {suggestedList.map((sm) => {
+                      const isAlreadyAdded = (selectedProvider.models || []).includes(sm);
+                      return (
+                        <button
+                          type="button"
+                          key={sm}
+                          disabled={isAlreadyAdded}
+                          onClick={() => {
+                            setNewCustomModelId(sm);
+                            const lower = sm.toLowerCase();
+                            setIsVisionCapable(
+                              lower.includes("flash") ||
+                                lower.includes("vision") ||
+                                lower.includes("4o") ||
+                                lower.includes("sonnet") ||
+                                lower.includes("ocr")
+                            );
+                            setIsReasoningCapable(
+                              lower.includes("o1") ||
+                                lower.includes("o3") ||
+                                lower.includes("reason") ||
+                                lower.includes("r1") ||
+                                lower.includes("thinking")
+                            );
+                            setNewModelTestResult(null);
+                          }}
+                          className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                            isAlreadyAdded
+                              ? "bg-muted/40 text-muted-foreground/50 border-transparent cursor-not-allowed"
+                              : "bg-muted/20 hover:bg-primary/10 hover:text-primary hover:border-primary/40 text-muted-foreground border-border cursor-pointer"
+                          }`}
+                        >
+                          + {sm}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Dialog Footer Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCloseAddModelModal}
+                className="h-9 px-4 text-xs cursor-pointer"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={
+                  !newCustomModelId.trim() ||
+                  (selectedProvider?.models || []).includes(newCustomModelId.trim())
+                }
+                onClick={handleConfirmAddCustomModel}
+                className="h-9 px-4 text-xs cursor-pointer"
+              >
+                Thêm Mô Hình
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Modal edit provider reuse */}
         {renderProviderModal()}

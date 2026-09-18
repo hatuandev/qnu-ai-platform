@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -24,6 +25,15 @@ class LLMGenerateRequest(BaseModel):
     temperature: float = Field(0.2, ge=0.0, le=2.0, description="Độ sáng tạo")
     max_tokens: int = Field(2000, ge=50, le=8192, description="Giới hạn số token đầu ra")
     stream: bool = Field(False, description="Bật chế độ Streaming SSE")
+    preferred_provider_id: str | None = Field(
+        None, description="Mã nhà cung cấp được Trợ lý AI ưu tiên chỉ định"
+    )
+    preferred_model_name: str | None = Field(
+        None, description="Tên mô hình chính (primary model) được Trợ lý AI chỉ định"
+    )
+    fallback_model_name: str | None = Field(
+        None, description="Tên mô hình dự phòng (fallback model) được Trợ lý AI chỉ định"
+    )
 
 
 class LLMGenerateResponse(BaseModel):
@@ -373,4 +383,32 @@ class SetDefaultModelRequest(BaseModel):
         ..., description="Vai trò mặc định cần gán: embedding, reranker, hoặc ocr"
     )
     model_name: str = Field(..., min_length=1, description="Tên mô hình cần gán làm mặc định")
+
+
+# ---------------- Model Validity Testing Schemas ----------------
+
+
+class SingleModelTestResult(BaseModel):
+    model_name: str
+    success: bool
+    status: Literal["available", "unavailable", "rate_limited", "error"]
+    latency_ms: float = 0.0
+    message: str
+    tested_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class ProviderModelsTestRequest(BaseModel):
+    model_name: str | None = Field(
+        default=None,
+        description="Tên mô hình cụ thể cần kiểm tra. Nếu để trống, hệ thống sẽ kiểm tra tất cả mô hình của Provider.",
+    )
+
+
+class ProviderModelsTestResponse(BaseModel):
+    provider_id: str
+    total_models: int
+    available_models: int
+    unavailable_models: int
+    results: list[SingleModelTestResult] = Field(default_factory=list)
+
 

@@ -174,3 +174,70 @@ async def test_api_rag_ask_no_context():
     data = response.json()
     assert data["status"] == "insufficient_context"
     assert "0256.3846.156" in data["answer"]  # Returns polite QNU admissions hotline
+
+
+@pytest.mark.asyncio
+async def test_api_rag_ask_with_modelops_synthesis():
+    """Verify RagService.ask calls ModelOps generate and returns synthesized answer with citations."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.core.database import get_db
+    from app.modules.modelops.schemas import LLMGenerateResponse
+    from app.modules.modelops.service import modelops_service
+    from app.modules.rag.fusion import FusionCandidate
+
+    payload = {
+        "question": "Học phí ngành CNTT năm 2024?",
+        "collection_id": "col_admissions",
+        "module_code": "admissions",
+    }
+
+    mock_db = AsyncMock()
+
+    async def override_get_db():
+        yield mock_db
+
+    candidate = FusionCandidate(
+        chunk_id="chk_1",
+        document_id="doc_1",
+        content="Học phí ngành Công nghệ thông tin là 16.500.000 VNĐ một năm.",
+        rrf_score=0.95,
+        section="Học phí",
+        page_number=3,
+        metadata={"title": "Thông báo Học phí QNU"},
+    )
+
+    mock_llm_res = LLMGenerateResponse(
+        content="Dựa trên thông báo chính thức của QNU, học phí ngành CNTT là 16.500.000 VNĐ/năm.",
+        provider="openai",
+        model="gpt-4o-mini",
+        prompt_tokens=150,
+        completion_tokens=30,
+        total_tokens=180,
+    )
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with (
+            patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock, return_value=None),
+            patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_ret,
+            patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_facts,
+            patch.object(modelops_service, "generate", new_callable=AsyncMock) as mock_gen,
+        ):
+            mock_ret.return_value = [candidate]
+            mock_facts.return_value = []
+            mock_gen.return_value = mock_llm_res
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+                response = await ac.post("/platform/v1alpha1/rag/ask", json=payload)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "answered"
+    assert "16.500.000 VNĐ" in data["answer"]
+    assert len(data["citations"]) >= 1
+    assert data["citations"][0]["source_id"] == "doc_1"
+    mock_gen.assert_awaited_once()
+

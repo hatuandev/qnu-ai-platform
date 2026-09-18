@@ -7,11 +7,102 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 11:25 (UTC+7)
-- **Phiên số**: #82 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 17:15 (UTC+7)
+- **Phiên số**: #91 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Triển Khai Phân Hệ Xuất Văn Bản DOCX/PDF Chuẩn NĐ 30 & Nạp Toàn Văn Nghị Định 30 Vào CSDL Mặc Định (phiên #82)**:
+  1. **Tái Cấu Trúc Phân Rã api-client.ts Thành Modular Domain Services & Facade Pattern (phiên #91)**:
+     - Phân rã tệp nguyên khối `frontend/src/services/api-client.ts` từ 2.074 dòng xuống còn 57 dòng.
+     - **Tách dữ liệu danh mục tĩnh (`frontend/src/constants/`)**: Chuyển các mảng dữ liệu hành chính NĐ 30 (`administrative-templates.ts`) và cơ sở dữ liệu tra cứu 40 ngành đào tạo ĐH Quy Nhơn (`uis-majors.ts`) ra khỏi tầng API.
+     - **Tách kiểu dữ liệu DTO (`frontend/src/types/`)**: Phân loại toàn bộ 38 TypeScript interfaces vào 9 tệp domain types (`common.ts`, `assistants.ts`, `knowledge.ts`, `modelops.ts`, `tools.ts`, `evaluation.ts`, `workflows.ts`, `domain-templates.ts`, `studio-ocr.ts`).
+     - **Chia tách Domain API Services (`frontend/src/services/`)**: Tạo các service client độc lập (mỗi file 40 - 250 dòng): `http-client.ts`, `system-api.ts`, `knowledge-api.ts`, `jobs-api.ts`, `modelops-api.ts`, `tools-api.ts`, `evaluation-api.ts`, `workflow-runs-api.ts`, `ocr-studio-api.ts`.
+     - **Facade Pattern Zero Breaking Changes**: Giữ lại `api-client.ts` làm Facade entrypoint re-export toàn bộ types, constants và đối tượng composite `apiClient`, bảo đảm toàn bộ 25 components/trang hiện hữu hoạt động nguyên vẹn 100% không đổi cú pháp import.
+     - **Verification**: Frontend `npm run lint` 0 lỗi (115 files), `npm run typecheck` 0 lỗi (`tsc --noEmit`), `npm run build` thành công (9.50s); Backend `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest` 27/27 passed; Zero Mojibake 253/253 files (100% sạch).
+  1. **Góp Ý Định Hướng Chức Năng Trọng Tâm (phiên #90)**:
+     - Tạo tài liệu [`docs/gop_y_dinh_huong_chuc_nang_trong_tam_qnu_ai_platform_2026-09-18.md`](../gop_y_dinh_huong_chuc_nang_trong_tam_qnu_ai_platform_2026-09-18.md).
+     - Định vị năm trợ lý hiện tại là **Official Starter Templates**, không phải giới hạn cứng của nền tảng.
+     - Chốt thứ tự ưu tiên: RAG Data Integrity → Assistant Runtime Integrity → Golden Assistant Quy chế → Assistant Builder → Auth/RBAC/Tenant → Evaluation/Observability → Workflow nâng cao.
+     - Phiên chỉ cập nhật tài liệu, không thay đổi code/schema/runtime.
+  1. **Triển Khai Đợt 1: Truthfulness & Real Runtime (phiên #89)**:
+     - **RAG Real LLM Answer Synthesis**: Tích hợp `modelops_service.generate()` vào `RagService.ask()` với Zero-Hallucination prompt instruction của ĐH Quy Nhơn, bảo lưu trích dẫn và grounded context fallback.
+     - **Sparse Lexical Search**: Hoàn thiện `search_sparse_fts()` trong `retriever.py` qua PostgreSQL FTS (`tsvector`, `plainto_tsquery`, `ts_rank_cd`), kết hợp RRF k=60 với dense vectors.
+     - **Real SSE Streaming**: Triển khai endpoint `/assistants/{reference}/chat_stream` và `stream=true` trên `/chat`, phát chuẩn SSE events: `status`, `citation`, `artifact`, `token`, `done`, `error`.
+     - **Triệt tiêu Deceptive Mock Fallbacks**: Xóa bỏ `MOCK_ASSISTANT_DATA` và `streamSimulatedText` trong `use-rag-stream.ts`. Xóa bỏ `MOCK_DOCUMENTS`, `MOCK_INGESTION_TASKS`, `MOCK_PROVIDERS`, `MOCK_QUOTA`, `MOCK_TOOLS` trong `api-client.ts`, surface lỗi thật tới người dùng.
+     - **Truthful Continuous Evaluation (TM-08)**: Backend `run_evaluation()` gọi trợ lý/RAG thật; `get_summary_metrics()` & `get_gap_inbox()` truy vấn CSDL `evaluation_runs` thật qua `AsyncSession`. Frontend `evaluation-page.tsx` hiển thị bảng lịch sử chạy thật, thanh progress tỷ lệ thật, huy hiệu chuẩn TM-08 và nút chạy Benchmark TM-08.
+     - **Verification**: Frontend `npm run lint` 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công (10.17s); Backend `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest -v` 174/174 passed (100%); Zero Mojibake 231/231 files.
+  1. **Đánh Giá Chuyên Sâu Hệ Thống RAG (phiên #88)**:
+     - Rà soát Qdrant dense search, PostgreSQL FTS, RRF, reranker, Structured Facts, ModelOps synthesis, cache, citation/no-answer, evaluation và Frontend retrieval UX.
+     - Kết luận: RAG ở mức **Internal Beta / RAG Engineering Preview**, điểm đề xuất **5.0/10**; kiến trúc pipeline đạt 6.5–7.0 nhưng data integrity live chỉ 2.5–3.0.
+     - Tạo báo cáo [`docs/nhan_xet_rag_hien_tai_2026-09-18.md`](../nhan_xet_rag_hien_tai_2026-09-18.md) với dữ liệu live, scorecard, P0/P1/P2, roadmap và production gate.
+     - Phát hiện live: sparse retrieval lấy document pending; 788 Question Bank facts đều orphan; Qdrant canonical `col_question_bank` rỗng còn legacy `col_col_question_bank` có 16/17 points.
+     - Verification: RAG Pytest 10/10 pass; Ruff còn 1 import-order error trong test mới của session song song; PostgreSQL/Qdrant read-only audit thành công.
+     - Gói ưu tiên tiếp theo: **RAG Data Integrity & Groundedness**.
+  1. **Đánh Giá Chuyên Sâu Trợ Lý AI và Quy Trình Workflow (phiên #87)**:
+     - Rà soát Assistant Lifecycle 7 lớp, Chat runtime, Workflow Control Plane, compiler, DAG engine, approval, tools, ModelOps, RAG, citation và TM-08.
+     - Kết luận: phân hệ ở mức **Internal Beta / Workflow Control Plane Preview**, điểm đề xuất **5.2/10**; UI/control plane đạt 7.0–8.0 nhưng runtime production chỉ 3.5–4.5.
+     - Tạo báo cáo [`docs/nhan_xet_tro_ly_ai_va_workflow_2026-09-18.md`](../nhan_xet_tro_ly_ai_va_workflow_2026-09-18.md) với scorecard, đánh giá năm workflow, P0/P1/P2, roadmap và production gate.
+     - Rủi ro P0: approval bị bypass; LiveMode còn mock nghiệp vụ; TM-08 mô phỏng; execute/resume không khóa immutable version; tenant/audit identity chưa trusted; tool policy chưa enforce.
+     - Gói ưu tiên tiếp theo: **Assistant–Workflow Runtime Integrity** — bỏ auto-approval/mock LiveMode, bind policy xuống runtime, exact-version execution và evaluation thật.
+  1. **Đánh Giá Chuyên Sâu Chức Năng Kho Tri Thức (phiên #86)**:
+     - Rà soát ingestion, storage, OCR, chunking, facts, human verification, Qdrant indexing, Hybrid Retrieval và Frontend fallback theo hai skill Knowledge/RAG.
+     - Kết luận: Kho tri thức ở mức **Internal Beta**, điểm đề xuất **6.0/10**; Document Intelligence/verification đạt khoảng 7.5–8.0 nhưng index/retrieval integrity chỉ khoảng 4.5–5.0.
+     - Tạo báo cáo [`docs/nhan_xet_kho_tri_thuc_2026-09-18.md`](../nhan_xet_kho_tri_thuc_2026-09-18.md) với scorecard, P0/P1/P2, roadmap và production acceptance gate.
+     - Phát hiện Qdrant drift: `col_col_question_bank` có 16 points, `col_question_bank` có 0 points, `col_drafting` có 6 points.
+     - Ưu tiên tiếp theo: state machine `ready/index_failed`, migrate/reconcile Question Bank, chống ghost vector, cấm mock embedding LiveMode và enforce tenant filter.
+  1. **Đánh Giá Tổng Thể QNU AI Platform & Hiệu Chỉnh Maturity Status (phiên #85)**:
+     - Rà soát source, API live, dữ liệu PostgreSQL, test suite và đối chiếu `qnu-ai-core`.
+     - Kết luận chính thức: dự án ở mức **Internal Beta / Engineering Preview**, điểm đề xuất **5.6/10**, chưa production-ready.
+     - Tạo báo cáo [`docs/nhan_xet_tong_the_qnu_ai_platform_2026-09-18.md`](../nhan_xet_tong_the_qnu_ai_platform_2026-09-18.md) với scorecard, rủi ro P0/P1, nhận xét từng phân hệ, roadmap và acceptance gate.
+     - Rủi ro cao nhất: chưa enforce auth/RBAC/tenant isolation; Evaluation/TM-08 mô phỏng; LiveMode còn mock fallback; RAG chưa gọi LLM synthesis; Assistant model/tool policy chưa bind đầy đủ; DAG chưa có production resilience và exact-version resume.
+     - Dữ liệu live: 13 nodes, 5 assistants, 5 workflows, 5 collections, 11 providers; ba collection Admissions/Regulations/Library đang 0 document/0 chunk.
+     - Verification: Backend Ruff pass, Pytest 172 passed/17 warnings; Frontend lint/typecheck/build pass; Mojibake 231/231 files sạch; frontend build còn cảnh báo bundle 1.50 MB.
+  1. **Redesign Giao Diện Mô Hình Khả Dụng & Hộp Thoại Thêm Model Theo Chuẩn Modern Card Grid & Mac-Style Dialog (phiên #84)**:
+     - **Mục tiêu**: Điều chỉnh toàn diện UI/UX khu vực "Mô Hình Khả Dụng" và "Hộp thoại Thêm Mô Hình Tùy Chỉnh" theo 2 hình ảnh tham khảo người dùng cung cấp, tuân thủ 100% OKLCH Academic Teal semantic tokens, chuẩn bo góc 8px/6px và clean code.
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Khu vực Mô Hình Khả Dụng (Full-Width Card Grid - Ảnh Mẫu 1)**:
+         - Đưa thành Full-Width Card nằm trên khu vực 2 cột Key Pool & Specs.
+         - Topbar: Tiêu đề `Bot` icon, badge tổng models, dropdown bộ lọc `all` / `vision` / `reasoning` / `default`, nút `[+ Thêm Model]`, nút `[⚡ Test Tất Cả]`.
+         - 3-Column Responsive Grid (`grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3`).
+         - Model Card: Icon Robot `Bot` bên trái, Model ID pill font-mono, tên thân thiện tiếng Việt, icons Vision (`Eye`) / Reasoning (`Brain`), huy hiệu mặc định hệ thống (`Embed`, `Rerank`, `OCR`), thanh công cụ mini (🟢 latency ms / 🔴 404 / 🟡 429 badge, nút bình nghiệm `FlaskConical` test đơn lẻ, nút copy `Copy` / `Check`, nút xóa `X`).
+         - Dashed Card `[+ Thêm Mô Hình (Add Model)]` tạo CTA trực quan cuối grid.
+         - Smart alert banner phát hiện model chết kèm nút `[🧹 Dọn Dẹp Model Lỗi]` 1-click.
+       * **Hộp Thoại Thêm Mô Hình Tùy Chỉnh (Add Custom Model Dialog - Ảnh Mẫu 2)**:
+         - Mac-style window controls (3 chấm đỏ/vàng/xanh) + Tiêu đề & mô tả.
+         - Input Model ID font-mono kèm nút `[🧪 Test]` inline live ping tới provider trước khi lưu.
+         - Subtext: `Gửi tới nhà cung cấp dưới dạng: model-id`.
+         - Banner hiển thị kết quả kiểm thử trực tiếp (success/error/latency ms).
+         - 2 công tắc gạt (Switches) cho **Vision** (Hỗ trợ ảnh & OCR) và **Reasoning** (Suy luận chuyên sâu).
+         - 1-Click suggested chips từ preset của provider, tự động gán gợi ý Vision/Reasoning.
+       * **Clean Code & Type Safety**:
+         - Loại bỏ các biến chết/unused `detailModelInput`, `handleDetailAddModel`, `currentPreset`.
+         - Bọc icons Lucide trong thẻ `<span>` để tránh lỗi TS2322 `title` prop.
+         - Biome linter check 93 files 0 lỗi, TypeScript typecheck 0 lỗi, Vite build thành công 10.42s, Pytest 15/15 passed (100%), Zero Mojibake 231/231 files.
+  2. **Tính Năng Kiểm Thử Hiệu Lực Mô Hình LLM Provider & Dọn Dẹp Model Hết Hỗ Trợ 1-Click (phiên #83)**:
+     - **Mục tiêu**: Bổ sung tính năng kiểm thử xem các model hiện tại cấu hình trong Provider còn hiệu lực hoạt động do nhà cung cấp cung cấp hay không, phát hiện model đã bị ngừng cung cấp (deprecated/404) hoặc gặp lỗi cấp quyền/quota.
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Backend ModelOps Health Probing**:
+         - Schemas `SingleModelTestResult`, `ProviderModelsTestRequest`, `ProviderModelsTestResponse` trong `backend/app/modules/modelops/schemas.py`.
+         - Service `_ping_single_model` thực hiện ping thực tế có phân nhánh adapter (Google Gemini `generateContent`, Cloudflare Workers AI `run`, Mistral OCR lookup/completions, OpenAI `chat/completions` / `embeddings`, Docling/SentenceTransformers local).
+         - Service `test_provider_models` hỗ trợ chạy song song tối đa 5 model đồng thời bằng `asyncio.Semaphore(5)`.
+         - Endpoint `POST /platform/v1alpha1/modelops/providers/{provider_id}/models/test`.
+         - Pytest suite `tests/test_modelops.py` (15/15 passed 100%).
+       * **Frontend Model Testing UI**:
+         - Client method `testProviderModels(providerId, modelName?)` trong `frontend/src/services/api-client.ts`.
+         - Trang Chi Tiết Provider (`/models/:id` - `modelops-page.tsx`):
+           * Nút `[⚡ Test Tất Cả Models]` trên Header thẻ "Mô Hình Khả Dụng" với loading state.
+           * Per-model status tag: chấm tròn & badge trạng thái (🟢 Khả dụng kèm latency ms, 🔴 Không khả dụng 404, 🟡 Cooldown Rate Limit 429).
+           * Nút `[▶]` kiểm thử đơn lẻ cho từng model.
+           * Smart cleanup alert banner khi phát hiện model chết kèm nút `[🧹 Dọn Dẹp Model Lỗi]` 1-click tự động gỡ bỏ khỏi cấu hình.
+       * **Đồng bộ Quy trình**:
+         - Cập nhật `docs/quy_trinh/06_modelops_circuit_breaker.md` (Mục 4: Kiểm Thử Hiệu Lực Mô Hình LLM Đa Nhà Cung Cấp).
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Backend Pytest: 15/15 passed (100%).
+       * Backend Ruff: All checks passed (0 lỗi).
+       * Frontend Lint: Biome checked 93 files (0 lỗi).
+       * Frontend Typecheck: `tsc --noEmit` (0 lỗi).
+       * Frontend Build: `tsc -b && vite build` built thành công trong 8.94s.
+       * Zero Mojibake Audit: 231/231 files UTF-8 sạch 100%.
+  2. **Triển Khai Phân Hệ Xuất Văn Bản DOCX/PDF Chuẩn NĐ 30 & Nạp Toàn Văn Nghị Định 30 Vào CSDL Mặc Định (phiên #82)**:
      - **Mục tiêu**: Xây dựng phân hệ tạo và kết xuất văn bản hành chính chuẩn Nghị định 30/2020/NĐ-CP (`docxtpl` + Gotenberg 8 PDF conversion) cho Trợ lý Soạn thảo (`ast_drafting`), cấu hình prompt 3 tầng tương tác tự nhiên, và nạp toàn văn 11 trang NĐ 30 vào PostgreSQL (`col_drafting`) & Qdrant vector index làm Seed Data mặc định của nền tảng.
      - **Thay đổi kỹ thuật chi tiết**:
        * **Bộ mẫu Word `.docx` QNU (`backend/app/templates/documents/`)**:
@@ -403,7 +494,9 @@
 
 ## 3. Trạng Thái Hoàn Thành Các Giai Đoạn
 
-### ✅ Backend (8/8 Giai Đoạn — HOÀN THÀNH)
+### ⚠️ Backend — Đủ bề rộng chức năng, production readiness còn một phần
+
+> Lưu ý phiên #85: bảng dưới đây phản ánh **độ phủ module/UI lịch sử**, không đồng nghĩa mọi module đã hoàn thiện runtime hoặc đủ điều kiện production. Trạng thái production phải theo acceptance gate trong báo cáo đánh giá tổng thể.
 
 | Giai Đoạn | Mô Tả | Trạng Thái |
 | :--- | :--- | :---: |
@@ -421,7 +514,9 @@
 
 ---
 
-### ✅ Frontend (ĐỒNG BỘ 100% VỚI QNU-AI-CORE + SCAN STUDIO)
+### ⚠️ Frontend — Độ phủ màn hình cao, LiveMode cần loại bỏ business mock fallback
+
+> Lưu ý phiên #85: frontend còn business mock fallback; SSE Chat hiện là JSON + simulated text streaming; bundle production hiện khoảng 1.50 MB sau minify.
 
 | Giai Đoạn | Màn Hình / Module | Trạng Thái |
 | :--- | :--- | :---: |
@@ -459,6 +554,27 @@
 
 ## 5. Backlog & Kế Hoạch Tiếp Theo
 
+- [ ] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.
+- [ ] Xóa/rebuild 788 orphan facts Question Bank; thêm FK/cascade, source evidence và content revision cho `knowledge_facts`.
+- [ ] Reconcile 17 chunks Question Bank sang Qdrant collection chuẩn `col_question_bank`; kiểm chứng parity rồi mới xóa `col_col_question_bank`.
+- [ ] Cấm mock embedding trong LiveMode; hỗ trợ sparse-only degraded mode có nhãn và health signal rõ ràng.
+- [ ] Version hóa RAG cache theo tenant/collection/content revision/assistant/model/policy và invalidate khi approve/edit/archive/delete/reindex.
+- [ ] Thực hiện hotfix **Assistant–Workflow Runtime Integrity**: bỏ `is_approved=true`, bỏ mock answer/citation/artifact trong LiveMode, fail-fast khi export lỗi và loại KPI/count giả.
+- [ ] Lấy tenant/user/role/approval actor từ trusted auth context; enforce tool allowlist, node permissions, connection allowlist và approval trước side effect.
+- [ ] Hoàn thiện workflow Soạn thảo/Ngân hàng câu hỏi: clarify wait/resume, RAG context assembly, syllabus/CLO/Bloom validation và artifact metadata động.
+- [ ] Triển khai SSE thật và cancellation server-side; sửa citation DTO mapping `source_id/section/page_number/quote` sang Frontend.
+- [ ] Thực hiện gói **Knowledge Index Integrity**: state machine `review_pending/indexing/ready/index_failed`, retrieval chỉ lấy đúng revision `ready`, và reconciliation PostgreSQL–Qdrant.
+- [ ] Đối chiếu/migrate 16 points từ `col_col_question_bank` sang collection chuẩn `col_question_bank`; chỉ xóa legacy sau khi kiểm chứng.
+- [ ] Đồng bộ vector/facts khi approve, sửa, archive, xóa document/collection; loại ghost citations và cấm mock embedding trong LiveMode.
+- [ ] Nâng lexical retrieval từ `ILIKE` lên PostgreSQL FTS thật; chạy dense/sparse song song và enforce tenant/workspace filter trong Qdrant.
+- [ ] Áp authentication, RBAC và trusted tenant context lên toàn bộ router thay đổi dữ liệu.
+- [ ] Tách DemoMode/LiveMode và loại business mock fallback khỏi LiveMode.
+- [ ] Thay Evaluation/TM-08 mô phỏng bằng việc chạy Assistant/RAG runtime thật và tổng hợp metrics từ DB.
+- [ ] Nối RAG Answer Composer với ModelOps; bind Assistant primary/fallback model, tool allowlist và evaluation policy xuống runtime.
+- [ ] Khóa Workflow execution/resume vào immutable version; bổ sung timeout, retry/backoff, cancellation, schema/port và permission validation.
+- [ ] Nạp tài liệu chính thức và golden datasets cho Admissions, Regulations và Library.
+- [ ] Tách các file lớn trên 1.000 dòng theo SRP, ưu tiên ModelOps, API client, Knowledge service và các detail pages.
+- [ ] Tối ưu frontend bundle bằng code splitting và route-level lazy loading.
 - [x] Đồng bộ ảnh scan thực tế 14 trang từ `qnu-ai-core` vào Studio đối soát.
 - [x] Render Markdown bảng biểu và cấu trúc phân cấp chuẩn GitHub Flavored Markdown.
 - [x] Thêm chế độ xem trước (Preview) khi hiệu đính văn bản trong chế độ Sửa tay (Human-in-the-loop).

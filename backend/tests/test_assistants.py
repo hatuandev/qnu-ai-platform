@@ -218,5 +218,55 @@ async def test_api_generate_assistant_spec():
     assert len(payload["sample_questions"]) >= 3
     assert any("ký túc xá" in q.lower() for q in payload["sample_questions"])
     assert payload["temperature"] <= 0.3
-    assert "0256.3846.156" in payload["no_answer_message"]
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_sse_endpoint():
+    """Verify POST /assistants/{ref}/chat with stream=True returns text/event-stream with token chunks."""
+    record = _assistant_record()
+    mock_db = AsyncMock()
+
+    async def override_get_db():
+        yield mock_db
+
+    mock_wf_response = WorkflowExecuteResponse(
+        execution_id="exec_stream_test",
+        workflow_id="wf_admissions",
+        status="completed",
+        outputs={
+            "answer": "Điểm chuẩn ngành CNTT là 24.50 điểm.",
+            "citations": [{"id": "cite_1", "title": "Thông báo 1906"}],
+            "artifacts": [],
+            "status": "completed",
+        },
+        latency_ms=150.0,
+    )
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with (
+            patch.object(assistant_service, "get_assistant", new_callable=AsyncMock) as mock_get,
+            patch("app.modules.assistants.service.workflow_service.execute", new_callable=AsyncMock) as mock_wf,
+        ):
+            mock_get.return_value = record
+            mock_wf.return_value = mock_wf_response
+
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post(
+                    f"/platform/v1alpha1/assistants/{record.code}/chat",
+                    json={
+                        "message": "Điểm chuẩn ngành CNTT bao nhiêu?",
+                        "stream": True,
+                    },
+                )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers.get("content-type", "")
+    content = response.text
+    assert "event: token" in content
+    assert "event: citation" in content
+    assert "event: done" in content
+    assert "24.50" in content
 

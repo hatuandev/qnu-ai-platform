@@ -1,4 +1,4 @@
-import type { AssistantItem, AssistantLifecycleConfig } from "@/services/api-client";
+import type { AssistantItem, AssistantLifecycleConfig } from "@/types/assistants";
 
 const ASSISTANTS_URL = "/platform/v1alpha1/assistants";
 
@@ -169,3 +169,18 @@ export function generateAssistantSpec(
     }),
   });
 }
+
+export const assistantsApi = {
+  getAssistants: listAssistants,
+  getAssistant,
+  createAssistant,
+  updateAssistant,
+  deleteAssistant: deactivateAssistant,
+  toggleAssistant: (reference: string, isActive: boolean) =>
+    updateAssistant(reference, { is_active: isActive }),
+  generateAssistantSpec,
+  listAssistantTemplates,
+  seedDefaultAssistants,
+  exportAssistantBundle,
+  importAssistantBundle,
+};

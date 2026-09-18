@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.guardrails import input_guardrail, output_guardrail
 from app.core.redis import semantic_cache
+from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
+from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
 from app.modules.rag.composer import answer_format_planner
 from app.modules.rag.facts import fact_layer
@@ -125,31 +127,65 @@ class RagService:
         )
         logger.debug("Assembled prompt for query '%s' (length: %d)", req.question, len(full_prompt))
 
-        # Build answer synthesis
+        # 7. Assemble Prompt & Generate Answer via ModelOps LLM Runtime
+        context_texts = [c.content for c in candidates]
         citations = citation_guard.build_citations(candidates)
 
-        # When structured facts are available, incorporate directly into answer
+        system_instruction = (
+            req.system_prompt
+            or (
+                "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU).\n"
+                "Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA HOÀN TOÀN VÀO tài liệu và số liệu chính thức được cung cấp bên dưới.\n"
+                "QUY TẮC BẮT BUỘC (Zero Hallucination):\n"
+                "1. Chỉ sử dụng thông tin có trong Bảng Số Liệu hoặc Tài Liệu Trích Xuất. Tuyệt đối không tự suy diễn hoặc bịa đặt.\n"
+                "2. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức "
+                "và hướng dẫn liên hệ Hotline tư vấn: 0256.3846.156.\n"
+                "3. Trình bày rõ ràng theo định dạng Markdown, giữ nguyên tính chính xác của các con số, văn phong sư phạm chuẩn mực."
+            )
+        )
+
+        user_content = f"Câu hỏi của người dùng: {req.question}\n\n"
         if fact_markdown:
-            synthesized_answer = (
-                f"Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
-                f"{fact_markdown}\n\n"
-                f"**Thông tin bổ sung:**\n"
-                f"{candidates[0].content[:400] if candidates else ''}\n\n"
-                f"---\n"
-                f"*Bạn có thể muốn tìm hiểu thêm:*\n"
-                f"- Phương thức xét tuyển học bạ của ngành này như thế nào?\n"
-                f"- Cơ hội việc làm sau khi tốt nghiệp ra sao?"
+            user_content += f"BẢNG SỐ LIỆU ĐÃ XÁC THỰC:\n{fact_markdown}\n\n"
+        if context_texts:
+            user_content += "TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC:\n"
+            for i, text in enumerate(context_texts, 1):
+                user_content += f"--- Đoạn trích [{i}] ---\n{text}\n\n"
+
+        llm_messages = [
+            ChatMessage(role="system", content=system_instruction),
+            ChatMessage(role="user", content=user_content),
+        ]
+
+        try:
+            llm_req = LLMGenerateRequest(
+                messages=llm_messages,
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
+                conversation_id=req.conversation_id,
             )
-        else:
-            main_chunk = candidates[0].content if candidates else ""
-            synthesized_answer = (
-                f"Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
-                f"{main_chunk}\n\n"
-                f"---\n"
-                f"*Bạn có thể muốn tìm hiểu thêm:*\n"
-                f"- Các mốc thời gian nộp hồ sơ quan trọng trong năm?\n"
-                f"- Học phí và chính sách miễn giảm cho sinh viên?"
+            llm_res = await modelops_service.generate(db, llm_req)
+            synthesized_answer = llm_res.content.strip()
+        except Exception as e:
+            logger.warning(
+                "ModelOps LLM generation unavailable (%s), using grounded context synthesis fallback",
+                e,
             )
+            # Factual grounded synthesis fallback without hallucinating
+            if fact_markdown:
+                synthesized_answer = (
+                    f"Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
+                    f"{fact_markdown}\n\n"
+                    f"**Thông tin bổ sung:**\n"
+                    f"{candidates[0].content[:400] if candidates else ''}"
+                )
+            elif candidates:
+                synthesized_answer = (
+                    f"Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
+                    f"{candidates[0].content}"
+                )
+            else:
+                synthesized_answer = citation_guard.get_no_answer_response(req.module_code)
 
         # 8. Output Guardrail safety check
         safe_output = output_guardrail.check(synthesized_answer)
