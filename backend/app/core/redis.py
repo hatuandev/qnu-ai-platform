@@ -52,13 +52,16 @@ class SemanticCache:
         self.client = client or get_redis_client()
         self.ttl = ttl_seconds
 
-    def _make_key(self, collection_id: str, query: str) -> str:
+    def _make_key(self, collection_id: str, query: str, preferred_model: str = "default") -> str:
         h = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()
-        return f"rag:cache:{collection_id}:{h}"
+        model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
+        return f"rag:cache:{collection_id}:{model_part}:{h}"
 
-    async def get(self, collection_id: str, query: str) -> dict[str, Any] | None:
+    async def get(
+        self, collection_id: str, query: str, preferred_model: str = "default"
+    ) -> dict[str, Any] | None:
         try:
-            key = self._make_key(collection_id, query)
+            key = self._make_key(collection_id, query, preferred_model)
             val = await self.client.get(key)
             if val:
                 return json.loads(val)
@@ -66,9 +69,15 @@ class SemanticCache:
             logger.warning("Failed to read from SemanticCache: %s", exc)
         return None
 
-    async def set(self, collection_id: str, query: str, data: dict[str, Any]) -> None:
+    async def set(
+        self,
+        collection_id: str,
+        query: str,
+        data: dict[str, Any],
+        preferred_model: str = "default",
+    ) -> None:
         try:
-            key = self._make_key(collection_id, query)
+            key = self._make_key(collection_id, query, preferred_model)
             await self.client.setex(key, self.ttl, json.dumps(data, ensure_ascii=False))
         except Exception as exc:
             logger.warning("Failed to write to SemanticCache: %s", exc)
@@ -83,6 +92,16 @@ class SemanticCache:
                 logger.info("Invalidated %d cache keys for collection %s", len(keys), collection_id)
         except Exception as exc:
             logger.warning("Failed to invalidate cache for collection %s: %s", collection_id, exc)
+
+    async def clear(self) -> None:
+        """Clear all RAG semantic cache entries."""
+        try:
+            keys = await self.client.keys("rag:cache:*")
+            if keys:
+                await self.client.delete(*keys)
+                logger.info("Cleared %d RAG cache keys", len(keys))
+        except Exception as exc:
+            logger.warning("Failed to clear SemanticCache: %s", exc)
 
 
 semantic_cache = SemanticCache()

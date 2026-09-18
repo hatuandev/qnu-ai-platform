@@ -78,7 +78,11 @@ class RagService:
             )
 
         # 2. Check Semantic Cache
-        cached = await semantic_cache.get(req.collection_id, req.question)
+        cached = await semantic_cache.get(
+            req.collection_id,
+            req.question,
+            req.preferred_model_name or "default",
+        )
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
             cached["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
@@ -193,12 +197,15 @@ class RagService:
         safe_output = output_guardrail.check(synthesized_answer)
         final_answer = safe_output.sanitized_text
 
+        # Evidence-based citation filtering
+        final_citations = citation_guard.filter_evidence_citations(citations, final_answer)
+
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
         resp = AskResponse(
             status="answered",
             answer=final_answer,
             answer_format=chosen_format,
-            citations=citations,
+            citations=final_citations,
             facts_used=[
                 {"entity": f.entity_name, "attr": f.attribute_name, "val": f.attribute_value}
                 for f in facts
@@ -207,7 +214,12 @@ class RagService:
         )
 
         # 9. Save to Semantic Cache
-        await semantic_cache.set(req.collection_id, req.question, resp.model_dump())
+        await semantic_cache.set(
+            req.collection_id,
+            req.question,
+            resp.model_dump(),
+            req.preferred_model_name or "default",
+        )
 
         return resp
 

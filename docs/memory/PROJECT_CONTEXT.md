@@ -7,10 +7,27 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 19:48 (UTC+7)
-- **Phiên số**: #93 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 19:47 (UTC+7)
+- **Phiên số**: #96 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Sửa lỗi 1 Test Fail & Đồng Bộ Quy Trình (phiên #96)**:
+     - **Sửa `test_seed_preserves_existing_user_configuration`** (fail #95): Loại bỏ logic `update_stmt` trong `seed_standard_assistants()` tại [`backend/app/modules/assistants/seeder.py`](../../backend/app/modules/assistants/seeder.py) — Seeder hiện chỉ `continue` khi gặp assistant đã tồn tại, không ghi đè `system_prompt`, `collection_id` hay `config` đã do người dùng tùy chỉnh.
+     - **Verification hoàn tất**: `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest -v` **174/174 passed** (100%); `npm run lint` 0 lỗi (124 files), `npm run typecheck` 0 lỗi, `npm run build` thành công 0 warnings (9.09s); Zero Mojibake **267/267 files** sạch.
+     - **Cập nhật quy trình** 3 tệp trong `docs/quy_trinh/`:
+       * [`02_nap_tri_thuc_minio.md`](../../docs/quy_trinh/02_nap_tri_thuc_minio.md): Thêm Bước 9 — Fact Reconciliation khi sửa tay & Cascading Cleanup triệt tiêu Ghost Vector trên 4 tầng (MinIO, Qdrant, PostgreSQL, Redis Cache).
+       * [`03_hybrid_rag_truy_xuat.md`](../../docs/quy_trinh/03_hybrid_rag_truy_xuat.md): Cập nhật Bước 4-5 (song song `asyncio.gather`), Bước 7-8 (Evidence-Based Citation Filtering), thêm Bước 9 (Model-Partitioned Semantic Cache `rag:cache:{collection_id}:{model}:{hash}`).
+       * [`04_dieu_phoi_tro_ly_dag.md`](../../docs/quy_trinh/04_dieu_phoi_tro_ly_dag.md): Thêm Mục 8 — Bảo Toàn Tính Toàn Vẹn Thực Thi (Immutable Version Resolution, Server-Side Approval Flag Enforcement, Concurrent Execution Context Isolation).
+  1. **Hiệu chỉnh báo cáo sau cải thiện & Review Worktree (phiên #95)**:
+     - Cập nhật [`docs/nhan_xet_sau_cai_thien_platform_2026-09-18.md`](../nhan_xet_sau_cai_thien_platform_2026-09-18.md) thành báo cáo review mã có evidence; xác nhận maturity giữ ở 6,4/10, Internal Beta.
+     - Theo quyết định phạm vi của chủ dự án: giai đoạn phát triển chỉ cần **Dev Access Gate** server-side (password hash từ env + signed HttpOnly session + principal cố định), không cần RBAC/SSO phức tạp.
+     - Review phát hiện blocker mới trong worktree: Library/Question Bank seed được gắn official nhưng chưa có source provenance/original storage; `KnowledgeService` redefine cleanup methods; Assistant seeder overwrite user config; Evaluation vẫn fallback từ ground truth; dense search chưa filter lifecycle/tenant/revision; approval/tool bypass và citation guard false-positive.
+     - Trong lúc review, session song song tiếp tục sửa cache/workflow version/knowledge cleanup. Ghi nhận cải thiện workflow version và cache model key, nhưng approval vẫn tin client flag, citation guard fallback giữ citation thiếu evidence và cleanup còn trùng method. Verification `ruff`/pytest là snapshot trước diff mới: 7 lỗi / 71 pass, 1 fail, 17 warnings; Zero Mojibake 267 files pass. Không sửa code của session seed song song.
+  1. **Đánh Giá Độc Lập Sau Các Cải Thiện (phiên #94)**:
+     - Tạo báo cáo [`docs/nhan_xet_sau_cai_thien_platform_2026-09-18.md`](../nhan_xet_sau_cai_thien_platform_2026-09-18.md); maturity đề xuất tăng từ 5,6/10 lên 6,4/10 nhưng vẫn Internal Beta.
+     - Xác nhận live: cả 5 collection có dữ liệu, orphan facts = 0, Qdrant có 7/6/6/6/23 points cho Admissions/Regulations/Library/Drafting/Question Bank.
+     - Phát hiện P0 còn lại: Evaluation dựng answer/context từ ground truth khi runtime thiếu kết quả; chat tự gán `is_approved=true`; dense Qdrant không filter document lifecycle/tenant; execute/resume không đọc exact WorkflowVersion; thay đổi seed đang ghi đè cấu hình user.
+     - Verification: Backend Ruff pass; targeted tests 44/45 pass (1 seed test fail), backend API 8001 offline.
   1. **Đợt 3: Clean Code SRP Refactoring, Frontend Bundle Optimization & Golden Assistant Tuyển Sinh QNU (phiên #93)**:
      - **Clean Code SRP Phân Hệ ModelOps**: Phân rã tệp nguyên khối `modelops-page.tsx` từ **2.961 dòng xuống còn 854 dòng** (giảm hơn 70% độ dài và độ phức tạp), tách thành 8 sub-components đơn trách nhiệm trong `frontend/src/components/modelops/` (`modelops-helpers.ts`, `provider-card.tsx`, `provider-detail-header.tsx`, `models-grid.tsx`, `add-custom-model-dialog.tsx`, `key-pool-section.tsx`, `system-defaults-card.tsx`, `resilience-policy-card.tsx`, `provider-modal.tsx`).
      - **Tối Ưu Hóa Frontend Bundle & Code Splitting**: Cấu hình chia nhỏ vendor manualChunks (`vendor-xyflow`, `vendor-tanstack`, `vendor-markdown`, `vendor-radix`, `vendor-icons`) trong `vite.config.ts`, kết hợp `React.lazy()` và `<Suspense>` trên `App.tsx`. Kết quả đóng gói: Main chunk giảm từ **1.481 kB xuống 372 kB** (gzip 107 kB), mọi chunk < 400 kB, **0 cảnh báo (Zero Warnings)**, thời gian build siêu tốc 5.83s.
@@ -567,6 +584,8 @@
 
 ## 5. Backlog & Kế Hoạch Tiếp Theo
 
+- [ ] Sửa blocker worktree trước mọi đợt seed tiếp: hợp nhất 3 method `delete_document/delete_collection/archive_document`, khôi phục xóa storage gốc, dùng cleanup retryable/outbox và đưa Ruff về xanh.
+- [ ] Không gắn Library/Question Bank là official trước khi có PDF/DOCX nguồn, metadata provenance/evidence và lưu tệp gốc qua storage driver; seed/reconcile asset-by-asset thay vì return sớm.
 - [ ] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.
 - [ ] Xóa/rebuild 788 orphan facts Question Bank; thêm FK/cascade, source evidence và content revision cho `knowledge_facts`.
 - [ ] Reconcile 17 chunks Question Bank sang Qdrant collection chuẩn `col_question_bank`; kiểm chứng parity rồi mới xóa `col_col_question_bank`.
@@ -580,7 +599,7 @@
 - [ ] Đối chiếu/migrate 16 points từ `col_col_question_bank` sang collection chuẩn `col_question_bank`; chỉ xóa legacy sau khi kiểm chứng.
 - [ ] Đồng bộ vector/facts khi approve, sửa, archive, xóa document/collection; loại ghost citations và cấm mock embedding trong LiveMode.
 - [ ] Nâng lexical retrieval từ `ILIKE` lên PostgreSQL FTS thật; chạy dense/sparse song song và enforce tenant/workspace filter trong Qdrant.
-- [ ] Áp authentication, RBAC và trusted tenant context lên toàn bộ router thay đổi dữ liệu.
+- [ ] Triển khai **Dev Access Gate** tối giản: password hash từ env, signed HttpOnly session, `/auth/login`/`me`/`logout`, principal `tenant_qnu/workspace_qnu/admin`; bảo vệ API thay đổi dữ liệu, Tool Gateway và approval. Chỉ mở rộng RBAC/SSO khi có nhiều cán bộ/tenant.
 - [ ] Tách DemoMode/LiveMode và loại business mock fallback khỏi LiveMode.
 - [ ] Thay Evaluation/TM-08 mô phỏng bằng việc chạy Assistant/RAG runtime thật và tổng hợp metrics từ DB.
 - [ ] Nối RAG Answer Composer với ModelOps; bind Assistant primary/fallback model, tool allowlist và evaluation policy xuống runtime.

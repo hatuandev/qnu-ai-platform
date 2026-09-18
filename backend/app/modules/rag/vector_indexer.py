@@ -271,6 +271,20 @@ class VectorIndexer:
             logger.warning("Qdrant delete failed for document %s: %s", document_id, exc)
             return 0
 
+    async def delete_collection(self, collection_id: str) -> bool:
+        """Delete an entire Qdrant vector collection to prevent ghost vector collections."""
+        cname = self._get_collection_name(collection_id)
+        try:
+            exists = await self.client.collection_exists(cname)
+            if exists:
+                await self.client.delete_collection(collection_name=cname)
+                logger.info("Deleted Qdrant collection %s", cname)
+                return True
+            return False
+        except Exception as exc:
+            logger.warning("Qdrant delete collection failed for %s: %s", cname, exc)
+            return False
+
     async def search_dense(
         self,
         collection_id: str,

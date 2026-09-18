@@ -55,8 +55,9 @@ flowchart TD
 - Khi người dùng hỏi các câu hỏi thông số cụ thể: *"Điểm chuẩn ngành Công nghệ thông tin 2024?"*, Fact Layer trả về ngay dữ liệu bảng `24.5 điểm (tổ hợp A00, A01, D01, D07)`.
 - Thông số này được gắn vào đầu Prompt dưới dạng Markdown Table bắt buộc LLM phải tuân thủ, triệt tiêu bịa đặt.
 
-### Bước 4 & 5: Tìm kiếm lai & Dung hợp thứ hạng RRF ($k=60$)
-- Công thức Reciprocal Rank Fusion:
+### Bước 4 & 5: Tìm kiếm lai song song (Concurrent Hybrid Retrieval) & Dung hợp thứ hạng RRF ($k=60$)
+- **Thực thi song song phi phong tỏa**: Động cơ `retriever.py` kích hoạt đồng thời Dense Vector Search trên Qdrant và Sparse FTS Lexical Search trên PostgreSQL thông qua `asyncio.gather`, giảm tối đa 50% độ trễ (latency) so với truy vấn tuần tự.
+- **Công thức Reciprocal Rank Fusion**:
   $$RRF\_Score(d) = \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \quad (\text{với } k = 60)$$
 - Cân bằng tối ưu giữa khả năng hiểu ngữ nghĩa sâu sắc của Vector BGE-M3 và độ chính xác tuyệt đối của từ khóa FTS tiếng Việt.
 
@@ -64,11 +65,18 @@ flowchart TD
 - Gọi mô hình Cross-Encoder `BAAI/bge-reranker-v2-m3` để chấm điểm tương quan cặp `(Query, Chunk)`.
 - **Cơ chế phòng thủ Graceful Fallback**: Nếu dịch vụ reranker bị timeout (>3 giây) hoặc ngoại tuyến, hệ thống tự động suy thoái an toàn về thứ tự ban đầu của thuật toán RRF mà không làm gián đoạn request của người dùng.
 
-### Bước 7 & 8: Chốt chặn Trích dẫn (Citation Guard) & Chính Sách Không Trả Lời
-- Kiểm tra chứng cứ: Nếu không có chunk nào đạt điểm tin cậy hoặc thông tin ngoài phạm vi tài liệu chính thức của ĐH Quy Nhơn, hệ thống **bắt buộc kích hoạt No-Answer Policy**.
-- Phản hồi từ chối ấm áp kèm số điện thoại hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
+### Bước 7 & 8: Chốt chặn Trích dẫn Dựa Trên Bằng Chứng (Evidence-Based Citation Filtering) & Chính Sách Không Trả Lời
+- **Lọc trích dẫn theo bằng chứng thực tế (`filter_evidence_citations`)**:
+  * Khi mô hình kích hoạt No-Answer Policy (từ chối do không đủ dữ liệu hoặc ngoài phạm vi): hệ thống tự động xóa sạch trích dẫn (`citations = []`) nhằm ngăn chặn việc hiển thị citation giả tạo khi câu trả lời thực chất là từ chối.
+  * Khi có câu trả lời: hệ thống đối soát trích đoạn minh chứng (`quote` / `source`) với nội dung câu trả lời; chỉ giữ lại các trích dẫn mà nội dung có căn cứ trực tiếp đóng góp vào câu trả lời, loại bỏ các tài liệu râu ria hoặc false-positive.
+- **Phản hồi từ chối chuẩn mực**: Phản hồi ấm áp kèm số điện thoại hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
 
-### Bước 9: Định dạng thông minh (Answer Format Planner)
+### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Theo Model (Model-Partitioned Semantic Cache)
+- Lớp cache ngữ nghĩa trên Redis sử dụng khóa phân vùng theo mô hình: `rag:cache:{collection_id}:{preferred_model}:{hash(query)}`.
+- Việc phân tách theo model đảm bảo khi người dùng chuyển đổi giữa các model (`gpt-4o-mini`, `gemini-1.5-flash`, `qwen2.5-7b`), cache không trả kết quả lệch lạc do định dạng hoặc phong cách của model trước đó sinh ra.
+- Hỗ trợ cơ chế vô hiệu hóa cache chủ động (`clear()`, `invalidate_collection()`) ngay khi có tài liệu mới được phê duyệt hoặc tài liệu cũ bị xóa/lưu trữ.
+
+### Bước 10: Định dạng thông minh (Answer Format Planner)
 Tự động lập kế hoạch trình bày câu trả lời:
 - Hỏi so sánh / danh sách ngành $\rightarrow$ Trả về **Bảng Markdown** (`markdown_table`).
 - Hỏi thủ tục / hồ sơ $\rightarrow$ Trả về **Danh sách kiểm tra** (`checklist`).

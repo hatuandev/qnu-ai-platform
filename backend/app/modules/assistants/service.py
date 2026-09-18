@@ -253,7 +253,7 @@ class AssistantService:
             workflow_id=assistant.workflow_id,
             inputs={
                 "message": sanitized_message,
-                "is_approved": True,
+                "is_approved": request.is_approved,
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,
@@ -317,7 +317,7 @@ class AssistantService:
             workflow_id=assistant.workflow_id,
             inputs={
                 "message": sanitized_message,
-                "is_approved": True,
+                "is_approved": request.is_approved,
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,

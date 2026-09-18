@@ -52,25 +52,35 @@ class OpenAIAdapter(BaseLLMAdapter):
                 else:
                     chunks = [context_part[:1200]]
 
-                # Select best matching chunk
+                stopwords = {
+                    "văn", "bản", "hành", "chính", "quy", "định", "các", "những", "của",
+                    "cho", "trong", "theo", "về", "được", "có", "không", "là", "gì",
+                    "như", "thế", "nào", "bao", "nhiêu", "trường", "đại", "học", "nhơn"
+                }
+                target_words = query_words - stopwords or query_words
+
+                # Select best matching chunk based on informative words
                 best_chunk = chunks[0] if chunks else context_part[:500]
                 best_overlap = -1
                 for chk in chunks:
                     chk_words = set(re.findall(r"\b\w{2,}\b", chk.lower()))
-                    overlap = len(query_words.intersection(chk_words))
+                    overlap = len(target_words.intersection(chk_words))
                     if overlap > best_overlap:
                         best_overlap = overlap
                         best_chunk = chk
 
-                # Extract relevant lines from the best chunk
-                lines = [line.strip() for line in best_chunk.split("\n") if line.strip()]
-                relevant_lines = [
-                    l for l in lines
-                    if len(query_words.intersection(set(re.findall(r"\b\w{2,}\b", l.lower())))) >= 1
-                ]
-                if not relevant_lines:
-                    relevant_lines = lines[:8]
-                selected_text = "\n".join(relevant_lines[:8])
+                # Preserve full chunk if within reasonable length, else extract focused window
+                if len(best_chunk) <= 2500:
+                    selected_text = best_chunk
+                else:
+                    lines = [line.strip() for line in best_chunk.split("\n") if line.strip()]
+                    relevant_lines = [
+                        l for l in lines
+                        if len(target_words.intersection(set(re.findall(r"\b\w{2,}\b", l.lower())))) >= 1
+                    ]
+                    if not relevant_lines:
+                        relevant_lines = lines[:15]
+                    selected_text = "\n".join(relevant_lines[:20])
 
                 mock_text = (
                     f"Căn cứ quy định chính thức của Trường Đại học Quy Nhơn, xin giải đáp như sau:\n\n"

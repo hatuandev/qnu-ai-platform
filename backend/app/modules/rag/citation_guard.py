@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import Citation
@@ -56,6 +57,38 @@ class CitationGuard:
             )
 
         return citations
+
+    def filter_evidence_citations(
+        self,
+        citations: list[Citation],
+        answer: str,
+        min_overlap_words: int = 3,
+    ) -> list[Citation]:
+        """Filter candidate citations to only those whose quotes provide actual evidence used in the answer."""
+        if not answer.strip() or not citations:
+            return []
+
+        answer_lower = answer.lower()
+        if any(msg in answer_lower for msg in [
+            "thông tin này hiện chưa có",
+            "chưa có trong tài liệu chính thức",
+            "chưa có dữ liệu chính thức",
+            "vui lòng liên hệ hotline",
+            "vui lòng liên hệ ban tư vấn",
+            "vui lòng liên hệ phòng đào tạo",
+        ]):
+            return []
+
+        answer_words = set(re.findall(r"\b\w{3,}\b", answer_lower))
+        filtered: list[Citation] = []
+
+        for cite in citations:
+            quote_words = set(re.findall(r"\b\w{3,}\b", cite.quote.lower()))
+            overlap = len(answer_words.intersection(quote_words))
+            if overlap >= min_overlap_words:
+                filtered.append(cite)
+
+        return filtered if filtered else citations[:2]
 
     def get_no_answer_response(self, module_code: str = "general") -> str:
         """Return friendly rejection response when context is insufficient."""

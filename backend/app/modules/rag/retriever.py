@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -121,18 +122,19 @@ class HybridRetriever:
         rerank_top_k: int = 5,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker."""
-        # 1. Concurrent Dense & Sparse Search
-        dense_hits = await vector_indexer.search_dense(
-            collection_id=collection_id,
-            query=query,
-            top_k=top_k,
-        )
-
-        sparse_hits = await self.search_sparse_fts(
-            db=db,
-            collection_id=collection_id,
-            query=query,
-            top_k=top_k,
+        # 1. Concurrent Dense & Sparse Search (Non-blocking asyncio.gather)
+        dense_hits, sparse_hits = await asyncio.gather(
+            vector_indexer.search_dense(
+                collection_id=collection_id,
+                query=query,
+                top_k=top_k,
+            ),
+            self.search_sparse_fts(
+                db=db,
+                collection_id=collection_id,
+                query=query,
+                top_k=top_k,
+            ),
         )
 
         # 2. Reciprocal Rank Fusion (RRF)

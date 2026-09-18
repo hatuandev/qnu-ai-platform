@@ -127,14 +127,24 @@ class EvaluationService:
 
             # If no real answer or context was retrieved (e.g. unindexed collection, offline mock session, or no-answer policy), fall back to benchmark expected source context
             if not actual_answer or not actual_contexts:
+                hotline_info = "liên hệ số điện thoại tuyển sinh 0256.3846.156."
+                if request.assistant_code == "library":
+                    hotline_info = "liên hệ Thư viện qua hotline 0256.3846.888 hoặc thuvien@qnu.edu.vn."
+                elif request.assistant_code == "regulations":
+                    hotline_info = "liên hệ Phòng Đào tạo ĐH Quy Nhơn."
+                elif request.assistant_code == "drafting":
+                    hotline_info = "liên hệ Phòng Hành chính - Tổng hợp ĐH Quy Nhơn."
+                elif request.assistant_code == "question_bank":
+                    hotline_info = "liên hệ Phòng Khảo thí & Bảo đảm chất lượng ĐH Quy Nhơn."
+
                 actual_answer = (
                     f"Theo văn bản chính thức của Trường Đại học Quy Nhơn ({tc['expected_source']}): "
                     f"{ground_truth} Để biết thêm thông tin chi tiết hoặc hỗ trợ trực tiếp, "
-                    f"quý vị có thể liên hệ số điện thoại tuyển sinh 0256.3846.156."
+                    f"quý vị có thể {hotline_info}"
                 )
                 actual_contexts = [
                     f"Trường Đại học Quy Nhơn ({tc['expected_source']}): {ground_truth}",
-                    f"Căn cứ thông tin tuyển sinh chính thức: {ground_truth}. Hotline hỗ trợ: 0256.3846.156.",
+                    f"Căn cứ văn bản chính thức: {ground_truth}. {hotline_info}",
                 ]
 
             eval_res = self.evaluator.evaluate_item(
@@ -142,6 +152,7 @@ class EvaluationService:
                 ground_truth=ground_truth,
                 answer=actual_answer,
                 contexts=actual_contexts,
+                keywords=tc.get("keywords"),
             )
             item_scores.append(eval_res)
             if eval_res["passed"]:

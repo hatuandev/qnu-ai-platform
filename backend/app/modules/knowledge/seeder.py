@@ -23,6 +23,14 @@ from app.modules.knowledge.seed_data_admissions import (
     ADMISSIONS_FILENAME,
     ADMISSIONS_TITLE,
 )
+from app.modules.knowledge.seed_data_library import (
+    LIBRARY_CHUNKS,
+    LIBRARY_COLLECTION_ID,
+    LIBRARY_DOCUMENT_ID,
+    LIBRARY_FACTS,
+    LIBRARY_FILENAME,
+    LIBRARY_TITLE,
+)
 from app.modules.knowledge.seed_data_nd30 import (
     DECREE_30_CHUNKS,
     DECREE_30_COLLECTION_ID,
@@ -30,6 +38,14 @@ from app.modules.knowledge.seed_data_nd30 import (
     DECREE_30_FACTS,
     DECREE_30_FILENAME,
     DECREE_30_TITLE,
+)
+from app.modules.knowledge.seed_data_question_bank import (
+    QUESTION_BANK_CHUNKS,
+    QUESTION_BANK_COLLECTION_ID,
+    QUESTION_BANK_DOCUMENT_ID,
+    QUESTION_BANK_FACTS,
+    QUESTION_BANK_FILENAME,
+    QUESTION_BANK_TITLE,
 )
 from app.modules.knowledge.seed_data_regulations import (
     REGULATIONS_CHUNKS,
@@ -440,27 +456,310 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
     }
 
 
+async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
+    """Seed official QNU Library Knowledge into col_library if not present."""
+    # 1. Ensure col_library collection exists
+    col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == LIBRARY_COLLECTION_ID)
+    col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if not col:
+        col = KnowledgeCollection(
+            id=LIBRARY_COLLECTION_ID,
+            name="Kho Tri Thức Cẩm Nang Thư Viện & Học Liệu Số",
+            module_code="library",
+            description="Quy chế mượn trả sách, tra cứu OPAC, cơ sở dữ liệu số (ScienceDirect, IEEE, Springer), phòng tự học 24/7 và dịch vụ kiểm tra đạo văn Turnitin QNU.",
+            tenant_id="tenant_qnu",
+            workspace_id="workspace_library",
+            collection_metadata={
+                "chunking_strategy": "ClauseBasedChunker",
+                "ocr_profile": "PyMuPDF",
+                "document_count": 1,
+                "chunk_count": len(LIBRARY_CHUNKS),
+            },
+        )
+        db.add(col)
+        await db.flush()
+
+    # 2. Check if Library document already exists
+    doc_stmt = select(KnowledgeDocument).where(KnowledgeDocument.id == LIBRARY_DOCUMENT_ID)
+    existing_doc = (await db.execute(doc_stmt)).scalar_one_or_none()
+
+    if existing_doc:
+        logger.info("QNU Library document already present in col_library.")
+        return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+
+    # 3. Create KnowledgeDocument
+    file_content = "\n\n".join(c["content"] for c in LIBRARY_CHUNKS)
+    file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
+
+    doc = KnowledgeDocument(
+        id=LIBRARY_DOCUMENT_ID,
+        collection_id=LIBRARY_COLLECTION_ID,
+        document_type_code="huong_dan",
+        title=LIBRARY_TITLE,
+        file_name=LIBRARY_FILENAME,
+        file_type="pdf",
+        file_size_bytes=len(file_content.encode("utf-8")),
+        file_hash=file_hash,
+        storage_path=f"uploads/{LIBRARY_COLLECTION_ID}/{LIBRARY_FILENAME}",
+        doc_metadata={
+            "page_count": 6,
+            "ocr_method": "ClauseBasedChunker",
+            "chunk_count": len(LIBRARY_CHUNKS),
+            "fact_count": len(LIBRARY_FACTS),
+            "year": 2024,
+        },
+        status="completed",
+        is_active=True,
+    )
+    db.add(doc)
+    await db.flush()
+
+    # 4. Create KnowledgeChunks
+    chunk_objs: list[KnowledgeChunk] = []
+    for c in LIBRARY_CHUNKS:
+        c_hash = hashlib.sha256(c["content"].encode("utf-8")).hexdigest()
+        chunk_obj = KnowledgeChunk(
+            id=c["id"],
+            document_id=LIBRARY_DOCUMENT_ID,
+            collection_id=LIBRARY_COLLECTION_ID,
+            chunk_index=c["chunk_index"],
+            content=c["content"],
+            chunk_hash=c_hash,
+            token_count=len(c["content"].split()),
+            section=c["title"],
+            page_number=c["metadata"].get("page", 1),
+            chunk_metadata=c["metadata"],
+        )
+        chunk_objs.append(chunk_obj)
+        db.add(chunk_obj)
+
+    # 5. Create KnowledgeFacts
+    fact_objs: list[KnowledgeFact] = []
+    for f in LIBRARY_FACTS:
+        fact_obj = KnowledgeFact(
+            id=f["fact_key"],
+            collection_id=LIBRARY_COLLECTION_ID,
+            document_id=LIBRARY_DOCUMENT_ID,
+            entity_name=f["entity_name"],
+            entity_type=f["category"],
+            attribute_name=f["attribute_name"],
+            attribute_value=f["value"],
+            confidence=1.0,
+            raw_data=f.get("fact_metadata", {}),
+        )
+        fact_objs.append(fact_obj)
+        db.add(fact_obj)
+
+    await db.commit()
+    logger.info(
+        "Successfully seeded QNU Library: 1 document, %d chunks, %d facts into %s",
+        len(chunk_objs),
+        len(fact_objs),
+        LIBRARY_COLLECTION_ID,
+    )
+
+    # 6. Index into Qdrant
+    try:
+        from app.modules.rag.vector_indexer import vector_indexer
+
+        await vector_indexer.index_chunks(
+            collection_id=LIBRARY_COLLECTION_ID,
+            chunks=[
+                {
+                    "id": c.id,
+                    "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{LIBRARY_COLLECTION_ID}:{c.id}")),
+                    "chunk_id": c.id,
+                    "document_id": c.document_id,
+                    "content": c.content,
+                    "section": c.section,
+                    "page_number": c.page_number,
+                    "metadata": c.chunk_metadata,
+                }
+                for c in chunk_objs
+            ],
+        )
+        logger.info("Indexed QNU Library chunks into Qdrant collection %s", LIBRARY_COLLECTION_ID)
+    except Exception as exc:
+        logger.warning("Vector indexing to Qdrant for col_library skipped or failed (graceful): %s", exc)
+
+    return {
+        "documents_seeded": 1,
+        "chunks_seeded": len(chunk_objs),
+        "facts_seeded": len(fact_objs),
+    }
+
+
+async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
+    """Seed official QNU Question Bank & Bloom Matrix Knowledge into col_question_bank if not present."""
+    # 1. Ensure col_question_bank collection exists
+    col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == QUESTION_BANK_COLLECTION_ID)
+    col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if not col:
+        col = KnowledgeCollection(
+            id=QUESTION_BANK_COLLECTION_ID,
+            name="Kho Tri Thức Ngân Hàng Câu Hỏi & Đề Thi",
+            module_code="question_bank",
+            description="Quy định xây dựng ngân hàng câu hỏi, ma trận đề thi theo thang đo Bloom, tiêu chuẩn MCQ và barem chấm điểm QNU.",
+            tenant_id="tenant_qnu",
+            workspace_id="workspace_question_bank",
+            collection_metadata={
+                "chunking_strategy": "ClauseBasedChunker",
+                "ocr_profile": "PyMuPDF",
+                "document_count": 1,
+                "chunk_count": len(QUESTION_BANK_CHUNKS),
+            },
+        )
+        db.add(col)
+        await db.flush()
+
+    # 2. Check if Question Bank document already exists
+    doc_stmt = select(KnowledgeDocument).where(KnowledgeDocument.id == QUESTION_BANK_DOCUMENT_ID)
+    existing_doc = (await db.execute(doc_stmt)).scalar_one_or_none()
+
+    doc_created = 0
+    chunk_objs: list[KnowledgeChunk] = []
+    if not existing_doc:
+        # 3. Create KnowledgeDocument
+        file_content = "\n\n".join(c["content"] for c in QUESTION_BANK_CHUNKS)
+        file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
+
+        doc = KnowledgeDocument(
+            id=QUESTION_BANK_DOCUMENT_ID,
+            collection_id=QUESTION_BANK_COLLECTION_ID,
+            document_type_code="quy_dinh",
+            title=QUESTION_BANK_TITLE,
+            file_name=QUESTION_BANK_FILENAME,
+            file_type="pdf",
+            file_size_bytes=len(file_content.encode("utf-8")),
+            file_hash=file_hash,
+            storage_path=f"uploads/{QUESTION_BANK_COLLECTION_ID}/{QUESTION_BANK_FILENAME}",
+            doc_metadata={
+                "page_count": 6,
+                "ocr_method": "ClauseBasedChunker",
+                "chunk_count": len(QUESTION_BANK_CHUNKS),
+                "fact_count": len(QUESTION_BANK_FACTS),
+                "year": 2024,
+            },
+            status="completed",
+            is_active=True,
+        )
+        db.add(doc)
+        await db.flush()
+        doc_created = 1
+
+        # 4. Create KnowledgeChunks
+        for c in QUESTION_BANK_CHUNKS:
+            c_hash = hashlib.sha256(c["content"].encode("utf-8")).hexdigest()
+            chunk_obj = KnowledgeChunk(
+                id=c["id"],
+                document_id=QUESTION_BANK_DOCUMENT_ID,
+                collection_id=QUESTION_BANK_COLLECTION_ID,
+                chunk_index=c["chunk_index"],
+                content=c["content"],
+                chunk_hash=c_hash,
+                token_count=len(c["content"].split()),
+                section=c["title"],
+                page_number=c["metadata"].get("page", 1),
+                chunk_metadata=c["metadata"],
+            )
+            chunk_objs.append(chunk_obj)
+            db.add(chunk_obj)
+
+    # 5. Create KnowledgeFacts if not already present
+    fact_objs: list[KnowledgeFact] = []
+    existing_facts_stmt = select(KnowledgeFact).where(
+        KnowledgeFact.collection_id == QUESTION_BANK_COLLECTION_ID
+    )
+    existing_fact_keys = {
+        f.id for f in (await db.execute(existing_facts_stmt)).scalars().all()
+    }
+
+    for f in QUESTION_BANK_FACTS:
+        if f["fact_key"] not in existing_fact_keys:
+            fact_obj = KnowledgeFact(
+                id=f["fact_key"],
+                collection_id=QUESTION_BANK_COLLECTION_ID,
+                document_id=QUESTION_BANK_DOCUMENT_ID,
+                entity_name=f["entity_name"],
+                entity_type=f["category"],
+                attribute_name=f["attribute_name"],
+                attribute_value=f["value"],
+                confidence=1.0,
+                raw_data=f.get("fact_metadata", {}),
+            )
+            fact_objs.append(fact_obj)
+            db.add(fact_obj)
+
+    await db.commit()
+    logger.info(
+        "Successfully seeded QNU Question Bank: %d documents, %d chunks, %d facts into %s",
+        doc_created,
+        len(chunk_objs),
+        len(fact_objs),
+        QUESTION_BANK_COLLECTION_ID,
+    )
+
+    # 6. Index into Qdrant if new chunks were created
+    if chunk_objs:
+        try:
+            from app.modules.rag.vector_indexer import vector_indexer
+
+            await vector_indexer.index_chunks(
+                collection_id=QUESTION_BANK_COLLECTION_ID,
+                chunks=[
+                    {
+                        "id": c.id,
+                        "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{QUESTION_BANK_COLLECTION_ID}:{c.id}")),
+                        "chunk_id": c.id,
+                        "document_id": c.document_id,
+                        "content": c.content,
+                        "section": c.section,
+                        "page_number": c.page_number,
+                        "metadata": c.chunk_metadata,
+                    }
+                    for c in chunk_objs
+                ],
+            )
+            logger.info("Indexed QNU Question Bank chunks into Qdrant collection %s", QUESTION_BANK_COLLECTION_ID)
+        except Exception as exc:
+            logger.warning("Vector indexing to Qdrant for col_question_bank skipped or failed (graceful): %s", exc)
+
+    return {
+        "documents_seeded": doc_created,
+        "chunks_seeded": len(chunk_objs),
+        "facts_seeded": len(fact_objs),
+    }
+
+
 async def seed_default_knowledge(db: AsyncSession) -> dict[str, int]:
-    """Seed all official QNU default knowledge collections (Decree 30, Regulations, and Admissions)."""
+    """Seed all official QNU default knowledge collections (Decree 30, Regulations, Admissions, Library, and Question Bank)."""
     res_drafting = await seed_drafting_knowledge(db)
     res_regulations = await seed_regulations_knowledge(db)
     res_admissions = await seed_admissions_knowledge(db)
+    res_library = await seed_library_knowledge(db)
+    res_question_bank = await seed_question_bank_knowledge(db)
 
     return {
         "documents_seeded": (
             res_drafting["documents_seeded"]
             + res_regulations["documents_seeded"]
             + res_admissions["documents_seeded"]
+            + res_library["documents_seeded"]
+            + res_question_bank["documents_seeded"]
         ),
         "chunks_seeded": (
             res_drafting["chunks_seeded"]
             + res_regulations["chunks_seeded"]
             + res_admissions["chunks_seeded"]
+            + res_library["chunks_seeded"]
+            + res_question_bank["chunks_seeded"]
         ),
         "facts_seeded": (
             res_drafting["facts_seeded"]
             + res_regulations["facts_seeded"]
             + res_admissions["facts_seeded"]
+            + res_library["facts_seeded"]
+            + res_question_bank["facts_seeded"]
         ),
     }
 

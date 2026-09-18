@@ -223,6 +223,7 @@ class AssistantChatRequest(BaseModel):
     conversation_id: str | None = Field(None, max_length=128)
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
     stream: bool = False
+    is_approved: bool = False
 
 
 class AssistantChatResponse(BaseModel):

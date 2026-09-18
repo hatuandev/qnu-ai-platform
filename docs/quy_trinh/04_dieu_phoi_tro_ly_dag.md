@@ -257,3 +257,26 @@ Nhằm giải quyết triệt để lỗi vỡ giao diện thanh công cụ (Hea
   - Toàn bộ không gian màn hình tối ưu cho React Flow Canvas với 8 loại node nghiệp vụ, MiniMap, Controls, Node Catalog Drawer, Property Inspector và In-Canvas Test Runner.
 
 
+## 8. Bảo Toàn Tính Toàn Vẹn Thực Thi (Execution Integrity Guarantees)
+
+### 8.1. Phân Giải Phiên Bản Bất Biến (Immutable Version Resolution)
+- Khi `WorkflowService.execute()` hoặc `WorkflowService.resume()` được gọi, hệ thống **BẮT BUỘC** đọc `dag_spec` trực tiếp từ bản ghi `workflow_versions` tương ứng với `published_version_id` đang hoạt động tại thời điểm bắt đầu thực thi.
+- Quy trình phân giải phiên bản:
+  1. Đọc `workflow_definitions.published_version_id` (ID phiên bản hiện hành).
+  2. Tải `dag_spec` từ bảng `workflow_versions` theo `published_version_id` đó.
+  3. **Nếu không tìm thấy bản ghi phiên bản**: Hệ thống **từ chối thực thi** và ném ngoại lệ `WorkflowVersionNotFoundError` (`workflow_version_not_found`, HTTP 409) — **CẤM** tự động rơi về `workflow_definitions.dag_spec` như một silent fallback.
+- Điều này đảm bảo: Mọi phiên thực thi — dù diễn ra đồng thời hay bị tạm dừng qua Human-in-the-Loop — đều được hoàn tất trên **đúng chính xác phiên bản DAG đã được kiểm định và phê duyệt** tại thời điểm bắt đầu, không bị ảnh hưởng bởi các lần xuất bản phiên bản mới diễn ra song song.
+
+### 8.2. Tách Biệt Phê Duyệt Phía Máy Chủ (Server-Side Approval Flag Enforcement)
+- Cờ `is_approved` trong luồng HITL **KHÔNG** được tin tưởng từ phía client. Cờ này chỉ được đọc từ bản ghi `WorkflowApprovalRequest` trong PostgreSQL.
+- Quy trình phê duyệt nghiêm ngặt:
+  1. Khi node `tool.human_approval` được kích hoạt, Engine tạo bản ghi `WorkflowApprovalRequest` với `status = "pending"`, lưu bền vững vào PostgreSQL và trả về `approval_id` cho Client.
+  2. Cán bộ gửi quyết định qua `POST /executions/{id}/approvals/{approval_id}/decision`.
+  3. Engine **đọc `status` từ DB** (không đọc từ body request) để xác định quyết định phê duyệt cuối cùng.
+  4. Chỉ khi `status = "approved"` trong DB mới kích hoạt node công cụ tiếp theo.
+- **CẤM** cho phép client tự gửi `is_approved = True` trong request body để bypass cơ chế HITL.
+
+### 8.3. Cô Lập Ngữ Cảnh Thực Thi Song Song (Concurrent Execution Context Isolation)
+- Mỗi phiên thực thi (`WorkflowExecution`) mang `execution_id` duy nhất và lưu `checkpoint_state` riêng biệt trong PostgreSQL.
+- `AssistantRuntimeProfile` được đóng gói bất biến từ đầu phiên: mọi thay đổi cấu hình Trợ lý sau đó **không ảnh hưởng** đến phiên đang chạy — đảm bảo người dùng nhận phản hồi nhất quán từ cùng một ngữ cảnh đã khởi tạo.
+

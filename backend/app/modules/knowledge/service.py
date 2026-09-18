@@ -435,10 +435,37 @@ class KnowledgeService:
         return col
 
     async def delete_collection(self, db: AsyncSession, collection_id: str) -> None:
+        """Delete a collection, all its documents, chunks, facts, and Qdrant index (zero ghost collections)."""
         col = await self.get_collection(db, collection_id)
+
+        # 1. Delete Qdrant vector collection
+        try:
+            from app.modules.rag.vector_indexer import vector_indexer
+            await vector_indexer.delete_collection(collection_id=collection_id)
+        except Exception as exc:
+            logger.warning("Qdrant collection deletion failed for %s (graceful): %s", collection_id, exc)
+
+        # 2. Delete all Chunks
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.collection_id == collection_id))
+
+        # 3. Delete all Facts
+        await db.execute(delete(KnowledgeFact).where(KnowledgeFact.collection_id == collection_id))
+
+        # 4. Delete all Documents
+        await db.execute(delete(KnowledgeDocument).where(KnowledgeDocument.collection_id == collection_id))
+
+        # 5. Delete Collection record
         await db.delete(col)
         await db.commit()
-        logger.info("Permanently deleted collection id=%s", collection_id)
+
+        # 6. Invalidate Semantic Cache
+        try:
+            from app.core.redis import semantic_cache
+            await semantic_cache.invalidate_collection(collection_id=collection_id)
+        except Exception as exc:
+            logger.warning("Cache invalidation failed for collection %s: %s", collection_id, exc)
+
+        logger.info("Permanently deleted collection %s and all associated assets", collection_id)
 
     async def ingest_document(
         self,
@@ -635,12 +662,28 @@ class KnowledgeService:
         return doc
 
     async def archive_document(self, db: AsyncSession, document_id: str) -> KnowledgeDocument:
+        """Archive a document: set is_active=False and remove vectors from active Qdrant search."""
         doc = await self.get_document(db, document_id)
         doc.is_active = False
         doc.status = "archived"
+
+        # Remove points from active vector index
+        try:
+            from app.modules.rag.vector_indexer import vector_indexer
+            await vector_indexer.delete_by_document(collection_id=doc.collection_id, document_id=document_id)
+        except Exception as exc:
+            logger.warning("Vector removal from Qdrant on archive failed for doc %s (graceful): %s", document_id, exc)
+
+        # Invalidate Semantic Cache
+        try:
+            from app.core.redis import semantic_cache
+            await semantic_cache.invalidate_collection(collection_id=doc.collection_id)
+        except Exception as exc:
+            logger.warning("Cache invalidation failed for collection %s: %s", doc.collection_id, exc)
+
         await db.commit()
         await db.refresh(doc)
-        logger.info("Archived document id=%s", doc.id)
+        logger.info("Archived document id=%s (de-indexed from Qdrant)", doc.id)
         return doc
 
     # Default box confidence per engine block type (documented engine default:
@@ -1276,19 +1319,41 @@ class KnowledgeService:
         return content, doc.file_name, media_type
 
     async def delete_document(self, db: AsyncSession, document_id: str) -> None:
+        """Permanently delete a document, its storage file, Qdrant vectors, chunks, facts, and cache."""
         doc = await self.get_document(db, document_id)
-        # Delete from storage driver
-        await storage_service.delete(doc.storage_path)
-        # Best-effort vector cleanup so deleted docs stop appearing in RAG
+        collection_id = doc.collection_id
+
+        # 1. Delete from storage driver
+        try:
+            await storage_service.delete(doc.storage_path)
+        except Exception as exc:
+            logger.warning("Storage file deletion failed for %s: %s", doc.storage_path, exc)
+
+        # 2. Vector cleanup from Qdrant
         try:
             from app.modules.rag.vector_indexer import vector_indexer
-
-            await vector_indexer.delete_by_document(doc.collection_id, doc.id)
+            await vector_indexer.delete_by_document(collection_id, doc.id)
         except Exception as exc:
-            logger.warning("Vector cleanup skipped for %s: %s", document_id, exc)
+            logger.warning("Vector cleanup failed for doc %s: %s", document_id, exc)
+
+        # 3. Delete Chunks from PostgreSQL
+        await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.document_id == document_id))
+
+        # 4. Delete Facts from PostgreSQL
+        await db.execute(delete(KnowledgeFact).where(KnowledgeFact.document_id == document_id))
+
+        # 5. Delete Document record
         await db.delete(doc)
         await db.commit()
-        logger.info("Permanently deleted document id=%s", document_id)
+
+        # 6. Invalidate Semantic Cache
+        try:
+            from app.core.redis import semantic_cache
+            await semantic_cache.invalidate_collection(collection_id)
+        except Exception as exc:
+            logger.warning("Cache invalidation failed for collection %s: %s", collection_id, exc)
+
+        logger.info("Permanently deleted document id=%s from collection %s", document_id, collection_id)
 
     async def approve_document(
         self,
@@ -1315,6 +1380,10 @@ class KnowledgeService:
         if pages:
             await db.execute(
                 delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
+            )
+            # Reconcile facts: remove old facts to prevent stale facts after human edits
+            await db.execute(
+                delete(KnowledgeFact).where(KnowledgeFact.document_id == doc.id)
             )
             await db.flush()
             col = await self.get_collection(db, doc.collection_id)
@@ -1418,6 +1487,13 @@ class KnowledgeService:
             )
 
         await db.commit()
+
+        # Invalidate Semantic Cache for collection to purge stale cached answers
+        try:
+            from app.core.redis import semantic_cache
+            await semantic_cache.invalidate_collection(collection_id=doc.collection_id)
+        except Exception as exc:
+            logger.warning("Cache invalidation failed on document approval for %s: %s", doc.collection_id, exc)
 
         logger.info("Approved document id=%s, chunks=%d, indexed=%d", doc.id, len(chunks), indexed)
         return {

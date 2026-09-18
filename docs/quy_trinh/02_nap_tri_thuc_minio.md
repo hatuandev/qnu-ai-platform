@@ -130,3 +130,11 @@ flowchart TD
   2. **Chỉ mục Từ khóa (Sparse Lexical Search)**: Cập nhật chỉ mục `tsvector` tiếng Việt trên cột `tsv_content` của bảng PostgreSQL `knowledge_chunks` phục vụ tra cứu từ khóa chính xác và chữ viết tắt (DQN, CNTT, UIS).
   3. **Chuyển đổi trạng thái hoàn tất**: Tài liệu được cập nhật sang **`status = "approved"`**, ghi nhận `indexed_chunks` và sẵn sàng 100% cho bộ máy Hybrid RAG kết hợp thuật toán **Reciprocal Rank Fusion (RRF $k=60$)** và Cross-Encoder Reranking không bịa đặt.
 
+### Bước 9: Tái Đối Soát Facts Khi Sửa Tay (Fact Reconciliation) & Xóa Thác Đổ (Cascading Cleanup) Chống Ghost Vector
+- **Tái đối soát Facts khi sửa tay (Facts Reconciliation)**: Khi cán bộ phê duyệt tài liệu sau khi sửa tay các trang trong Verification Studio (`approve_document`), hệ thống tự động xóa toàn bộ Facts cũ (`DELETE FROM knowledge_facts WHERE document_id = ...`) và kích hoạt trích xuất lại Facts mới từ Markdown đã hiệu đính, ngăn chặn triệt để tình trạng Facts lỗi thời mâu thuẫn với nội dung trang.
+- **Xóa thác đổ (Cascading Cleanup) triệt tiêu Ghost Vectors**:
+  * Khi gọi API Xóa tài liệu (`DELETE /knowledge/documents/{id}`), Lưu trữ (`POST /knowledge/documents/{id}/archive`) hoặc Xóa bộ sưu tập (`DELETE /knowledge/collections/{id}`), hệ thống xóa đồng bộ và dọn dẹp triệt để trên 4 tầng:
+    1. **Tầng Lưu trữ (MinIO / Local Disk)**: Xóa tệp gốc và toàn bộ ảnh render trang trong thư mục cache.
+    2. **Tầng Vector DB (Qdrant)**: Xóa toàn bộ point vectors theo `document_id` hoặc xóa collection tương ứng (triệt tiêu vĩnh viễn vector mồ côi / ghost vector).
+    3. **Tầng CSDL Quan hệ (PostgreSQL)**: Xóa cascading bản ghi tài liệu, chunks và facts liên kết.
+    4. **Tầng Bộ nhớ Đệm (Redis Semantic Cache)**: Tự động vô hiệu hóa toàn bộ cache ngữ nghĩa của collection liên quan (`invalidate_collection`), bảo đảm các truy vấn sau đó không nhận kết quả từ dữ liệu đã xóa.

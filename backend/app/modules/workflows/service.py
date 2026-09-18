@@ -449,13 +449,23 @@ class WorkflowService:
         correlation_id: str | None = None,
     ) -> WorkflowExecuteResponse:
         """Run workflow DAG end-to-end and audit execution trace."""
-        dag_spec = await self.get_workflow_spec(db, req.workflow_id)
         version_result = await db.execute(
             select(WorkflowDefinition.published_version_id).where(
                 WorkflowDefinition.id == req.workflow_id
             )
         )
         workflow_version_id = version_result.scalar_one_or_none()
+
+        # Exact-version resolution: read immutable dag_spec from published version if present
+        if workflow_version_id:
+            version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == workflow_version_id)
+            v_spec = (await db.execute(version_stmt)).scalar_one_or_none()
+            if v_spec:
+                dag_spec = WorkflowDagSpec.model_validate(v_spec)
+            else:
+                dag_spec = await self.get_workflow_spec(db, req.workflow_id)
+        else:
+            dag_spec = await self.get_workflow_spec(db, req.workflow_id)
         context = WorkflowContext(
             workflow_id=req.workflow_id,
             tenant_id=req.tenant_id,
@@ -651,7 +661,16 @@ class WorkflowService:
                 error_message=execution_record.error_message,
             )
 
-        dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
+        # Exact-version resume: read immutable dag_spec from version when available
+        if execution_record.workflow_version_id:
+            version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == execution_record.workflow_version_id)
+            v_spec = (await db.execute(version_stmt)).scalar_one_or_none()
+            if v_spec:
+                dag_spec = WorkflowDagSpec.model_validate(v_spec)
+            else:
+                dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
+        else:
+            dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
         from app.modules.assistants.schemas import AssistantRuntimeProfile
 
         runtime_profile = (

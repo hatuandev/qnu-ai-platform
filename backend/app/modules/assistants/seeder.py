@@ -141,6 +141,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             ],
             chunking_strategy="ClauseBasedChunker",
             temperature=0.1,
+            require_structured_facts=True,
             no_answer_message=(
                 "Chưa đủ căn cứ trong quy chế hiện hành để trả lời. Vui lòng liên hệ Phòng Đào tạo."
             ),
@@ -163,17 +164,18 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý tra cứu thư viện và học liệu số của QNU.",
-            topics=["giáo trình", "luận văn", "mượn trả sách", "cơ sở dữ liệu số"],
+            topics=["giáo trình", "luận văn", "mượn trả sách", "cơ sở dữ liệu số", "phòng học nhóm", "kiểm tra đạo văn Turnitin"],
             questions=[
-                "Cách tìm giáo trình trên hệ thống thư viện số như thế nào?",
-                "Thời hạn mượn sách và quy định quá hạn ra sao?",
-                "Làm thế nào để truy cập tạp chí khoa học quốc tế của trường?",
+                "Hạn ngạch mượn sách và thời gian được giữ sách của sinh viên là bao nhiêu?",
+                "Phí phạt quá hạn mượn sách thư viện được tính như thế nào?",
+                "Sinh viên có thể truy cập các cơ sở dữ liệu quốc tế như ScienceDirect, IEEE từ xa bằng cách nào?",
             ],
-            chunking_strategy="SemanticChunker",
+            chunking_strategy="ClauseBasedChunker",
+            require_structured_facts=True,
             enabled_tools=["library.catalog_search"],
             no_answer_message=(
                 "Chưa tìm thấy thông tin trong cẩm nang thư viện. Vui lòng liên hệ Trung tâm "
-                "Thông tin - Thư viện QNU."
+                "Thông tin - Thư viện QNU qua hotline 0256.3846.888 hoặc thuvien@qnu.edu.vn."
             ),
         ),
     },
@@ -206,10 +208,11 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             questions=[
                 "Soạn thông báo tổ chức hội nghị nghiên cứu khoa học sinh viên.",
                 "Lập tờ trình xin phê duyệt kinh phí mua sắm thiết bị.",
-                "Quy cách trình bày văn bản theo Nghị định 30/2020/NĐ-CP là gì?",
+                "Quy cách căn lề văn bản và phông chữ theo Nghị định 30/2020/NĐ-CP là gì?",
             ],
             chunking_strategy="ClauseBasedChunker",
             temperature=0.3,
+            require_structured_facts=True,
             enabled_tools=["document.docx_export", "export_administrative_document"],
             no_answer_message=(
                 "Chưa có mẫu hoặc căn cứ phù hợp. Vui lòng cung cấp thêm yêu cầu hoặc liên hệ "
@@ -234,18 +237,19 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý khảo thí và xây dựng ngân hàng câu hỏi theo Bloom của QNU.",
-            topics=["ma trận đề", "Bloom", "CLO", "câu hỏi trắc nghiệm", "biểu điểm"],
+            topics=["ma trận đề", "Bloom", "CLO", "câu hỏi trắc nghiệm", "biểu điểm", "chỉ số độ khó P", "chỉ số phân cách D"],
             questions=[
-                "Xây dựng ma trận đề 40 câu theo thang đo Bloom.",
-                "Tạo 5 câu hỏi mức vận dụng kèm đáp án và giải thích.",
-                "Thiết kế đề tự luận cuối kỳ với biểu điểm chi tiết.",
+                "Tỷ lệ trọng số phân bổ mức độ nhận thức trong ma trận đề thi chuẩn QNU là bao nhiêu?",
+                "Cấu trúc và quy tắc cấm đối với câu hỏi trắc nghiệm MCQ là gì?",
+                "Dải chỉ số độ khó P và độ phân cách D chấp nhận được cho câu hỏi thi là bao nhiêu?",
             ],
-            chunking_strategy="SemanticChunker",
-            temperature=0.5,
+            chunking_strategy="ClauseBasedChunker",
+            temperature=0.3,
+            require_structured_facts=True,
             enabled_tools=["assessment.xlsx_export"],
             no_answer_message=(
                 "Chưa đủ chuẩn đầu ra hoặc nội dung học phần để xây dựng câu hỏi. Vui lòng cung "
-                "cấp đề cương học phần đã phê duyệt."
+                "cấp đề cương học phần đã phê duyệt hoặc liên hệ Phòng Khảo thí & Đảm bảo chất lượng."
             ),
         ),
     },
