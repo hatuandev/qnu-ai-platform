@@ -3,6 +3,7 @@ import {
   Bot,
   Check,
   Copy,
+  Download,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -135,6 +136,46 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           senderRole="assistant"
           isStreaming={message.status === "streaming"}
         />
+
+        {/* Exported Document Artifacts (.docx, .pdf) */}
+        {message.artifacts && message.artifacts.length > 0 && (
+          <div className="mt-2 p-3 rounded-surface border border-primary/20 bg-primary/5 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <Download className="h-4 w-4" />
+              <span>
+                Tài liệu kết xuất chuẩn Nghị định 30 ({message.artifacts.length} tệp tải về):
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {message.artifacts.map((art) => (
+                <a
+                  key={art.id}
+                  href={art.url || "#"}
+                  download={art.name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-card hover:bg-muted border border-border shadow-xs hover:border-primary/40 text-xs transition-all cursor-pointer group/art"
+                >
+                  {art.type.includes("pdf") ? (
+                    <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                  )}
+                  <div className="flex flex-col text-left">
+                    <span className="font-semibold text-foreground group-hover/art:text-primary transition-colors">
+                      {art.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {art.size > 0 ? `${(art.size / 1024).toFixed(1)} KB` : "Sẵn sàng"} • Nhấp để
+                      tải về
+                    </span>
+                  </div>
+                  <Download className="h-3.5 w-3.5 text-muted-foreground group-hover/art:text-primary ml-1 shrink-0" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Citation Badges */}
         {message.citations && message.citations.length > 0 && (

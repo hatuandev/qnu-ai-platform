@@ -286,19 +286,35 @@ class VectorIndexer:
             vec = (await self.embed_texts([query]))[0]
 
         try:
-            hits = await self.client.search(
-                collection_name=cname,
-                query_vector=vec,
-                limit=top_k,
-                query_filter=qmodels.Filter(
-                    must=[
-                        qmodels.FieldCondition(
-                            key="is_active",
-                            match=qmodels.MatchValue(value=True),
-                        )
-                    ]
-                ),
-            )
+            if hasattr(self.client, "query_points"):
+                res = await self.client.query_points(
+                    collection_name=cname,
+                    query=vec,
+                    limit=top_k,
+                    query_filter=qmodels.Filter(
+                        must=[
+                            qmodels.FieldCondition(
+                                key="is_active",
+                                match=qmodels.MatchValue(value=True),
+                            )
+                        ]
+                    ),
+                )
+                hits = res.points
+            else:
+                hits = await self.client.search(
+                    collection_name=cname,
+                    query_vector=vec,
+                    limit=top_k,
+                    query_filter=qmodels.Filter(
+                        must=[
+                            qmodels.FieldCondition(
+                                key="is_active",
+                                match=qmodels.MatchValue(value=True),
+                            )
+                        ]
+                    ),
+                )
             results: list[dict[str, Any]] = []
             for hit in hits:
                 payload = hit.payload or {}

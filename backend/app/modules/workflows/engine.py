@@ -24,7 +24,6 @@ _TERMINAL_NODE_TYPES = frozenset(
         "no_answer_output",
         "output.file",
         "output.artifact",
-        "artifact.export",
     }
 )
 

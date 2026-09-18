@@ -34,9 +34,12 @@ class OutputChatNodeHandler(BaseNodeHandler):
             citations = context.node_data.get("citations", [])
             status = context.node_data.get("rag_status", "answered")
 
+        artifacts = context.node_data.get("artifacts") or context.outputs.get("artifacts", [])
         context.outputs["answer"] = final_answer
         context.outputs["citations"] = citations
         context.outputs["status"] = status
+        if artifacts:
+            context.outputs["artifacts"] = artifacts
 
         return NodeExecutionResult(
             node_id=node_spec.id,
@@ -45,5 +48,6 @@ class OutputChatNodeHandler(BaseNodeHandler):
                 "answer": final_answer,
                 "citations": citations,
                 "status": status,
+                "artifacts": artifacts,
             },
         )

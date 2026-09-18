@@ -89,6 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from app.core.database import AsyncSessionFactory
         from app.modules.assistants.seeder import seed_standard_assistants
         from app.modules.document_types.service import document_types_service
+        from app.modules.knowledge.seeder import seed_default_knowledge
         from app.modules.knowledge.service import knowledge_service
         from app.modules.modelops.service import modelops_service
         from app.modules.workflows.service import workflow_service
@@ -97,10 +98,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await document_types_service.sync_from_catalog(db)
             await workflow_service.sync_default_workflows(db)
             await seed_standard_assistants(db)
+            await seed_default_knowledge(db)
             await modelops_service.get_system_model_defaults(db)
             await knowledge_service.sync_ingestion_job_records(db)
         logger.info(
-            "Database schema, workflows, assistants, system model defaults, and ingestion jobs initialized."
+            "Database schema, workflows, assistants, knowledge, system model defaults, and ingestion jobs initialized."
         )
     except Exception as exc:
         logger.warning("Database schema check warning: %s", exc)

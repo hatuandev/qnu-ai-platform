@@ -7,11 +7,38 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 10:10 (UTC+7)
-- **Phiên số**: #81 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 11:25 (UTC+7)
+- **Phiên số**: #82 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Triển Khai Tính Năng AI Agent Auto-Creator (Tự Sinh Agent Trọn Gói) & Nút Viết Hộ Prompt (phiên #81)**:
+  1. **Triển Khai Phân Hệ Xuất Văn Bản DOCX/PDF Chuẩn NĐ 30 & Nạp Toàn Văn Nghị Định 30 Vào CSDL Mặc Định (phiên #82)**:
+     - **Mục tiêu**: Xây dựng phân hệ tạo và kết xuất văn bản hành chính chuẩn Nghị định 30/2020/NĐ-CP (`docxtpl` + Gotenberg 8 PDF conversion) cho Trợ lý Soạn thảo (`ast_drafting`), cấu hình prompt 3 tầng tương tác tự nhiên, và nạp toàn văn 11 trang NĐ 30 vào PostgreSQL (`col_drafting`) & Qdrant vector index làm Seed Data mặc định của nền tảng.
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Bộ mẫu Word `.docx` QNU (`backend/app/templates/documents/`)**:
+         - Đã tạo 3 file template chuẩn thể thức NĐ 30: `mau_to_trinh_nd30.docx`, `mau_thong_bao_nd30.docx`, `mau_quyet_dinh_nd30.docx` (phông Times New Roman 13-14pt, căn lề 30-20-20-15mm, Quốc hiệu Tiêu ngữ chuẩn mực sư phạm).
+       * **Dịch vụ Document Generator & Tool Endpoint**:
+         - Module `document_generator.py`: render `docxtpl` + Gotenberg 8 PDF conversion + graceful fallback to docx + lưu trữ qua `storage_service`.
+         - Endpoint `GET /platform/v1alpha1/tools/artifacts/{filename}` và `POST /export/document`.
+         - Tool handler `document_exporter.py` trả về `artifacts` có URL tải trực tiếp.
+       * **Seed Data Toàn Văn Nghị Định 30/2020/NĐ-CP**:
+         - Bóc tách 11 trang NĐ 30 thành 6 Chunks theo Chương/Điều và 7 Facts số hóa (29 loại văn bản hành chính, căn lề A4, phông chữ Unicode TCVN 6909:2001, con dấu 1/3, dấu giáp lai $\le 5$ tờ, bút xanh, hiệu lực 05/03/2020).
+         - Tự động nạp vào PostgreSQL `col_drafting` và đánh chỉ mục vector vào Qdrant với UUID5 point IDs.
+         - Hook `seed_default_knowledge` vào startup lifespan của FastAPI backend.
+       * **Workflow DAG & RAG Pipeline Optimization**:
+         - Cập nhật `sample_retrieval` trong `drafting-assistant.v1alpha1.json` trỏ `col_drafting` và `format: docx,pdf`.
+         - Loại bỏ `artifact.export` khỏi `_TERMINAL_NODE_TYPES` trong `engine.py` để luồng tiếp tục chảy sang output node.
+         - Hỗ trợ cả `query_points` và `search` trong `vector_indexer.py` cho `qdrant-client` hiện đại.
+         - Tự động truyền `is_approved=True` trong context chat của `assistant_service.chat`.
+       * **Frontend Thẻ Tải File Trực Quan**:
+         - `use-rag-stream.ts`, `chat-message.tsx`, `attachment.tsx`: render thẻ tải file `.docx` và `.pdf` riêng biệt, badge loại tệp, dung lượng file và nút download.
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Backend Pytest: 44/44 passed (100%) bao gồm 10 tests `test_document_generator.py`.
+       * Backend Ruff: All checks passed (0 lỗi).
+       * Frontend Lint: Biome checked 93 files (0 lỗi).
+       * Frontend Typecheck: `tsc --noEmit` (0 lỗi).
+       * Frontend Build: Vite build thành công (10.35s).
+       * Zero Mojibake Audit: 231/231 files UTF-8 sạch 100%.
+  2. **Triển Khai Tính Năng AI Agent Auto-Creator (Tự Sinh Agent Trọn Gói) & Nút Viết Hộ Prompt (phiên #81)**:
      - **Mục tiêu**: Hiện thực hóa tính năng AI Tự Sinh Agent từ một câu ý tưởng tự nhiên và nút Viết Hộ Prompt chuẩn phong thái học thuật ĐH Quy Nhơn (Zero Hallucination, Hotline 0256.3846.156).
      - **Thay đổi kỹ thuật chi tiết**:
        * **Backend Endpoint `POST /platform/v1alpha1/assistants/generate`**:

@@ -18,6 +18,7 @@ export interface ChatAttachment {
   name: string;
   size: number;
   type: string;
+  url?: string;
   ocrStatus?: "idle" | "processing" | "completed" | "failed";
 }
 
@@ -30,6 +31,7 @@ export interface ChatMessageItem {
   citations?: ChatCitation[];
   suggestedQuestions?: string[];
   attachments?: ChatAttachment[];
+  artifacts?: ChatAttachment[];
   latencyMs?: number;
 }
 
@@ -203,7 +205,7 @@ Số:       /QĐ-ĐHQN                              Quy Nhơn, ngày ... tháng 
 \`\`\`
 
 > [!TIP]
-> Bạn có thể cung cấp nội dung tóm tắt quyết định, thông báo hoặc tờ trình, mình sẽ tự động xuất định dạng file Word (.docx) chuẩn chỉnh theo mẫu hành chính của Trường Đại học Quy Nhơn!`,
+> Thầy/Cô có muốn em xuất bản hoàn chỉnh văn bản này thành file Word (.docx) và PDF (.pdf) chuẩn thể thức Đại học Quy Nhơn (Nghị định 30) để in hoặc trình ký ngay không ạ?`,
     citations: [
       {
         id: "cite-dft-01",
@@ -307,7 +309,8 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
       citations: ChatCitation[],
       suggestedQuestions: string[],
       latencyMs: number,
-      signal: AbortSignal
+      signal: AbortSignal,
+      artifacts?: ChatAttachment[]
     ): Promise<void> => {
       return new Promise((resolve) => {
         let cursor = 0;
@@ -338,6 +341,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
               citations,
               suggestedQuestions,
               latencyMs,
+              artifacts,
             };
 
             setMessages((prev) => prev.map((msg) => (msg.id === messageId ? completedMsg : msg)));
@@ -513,13 +517,24 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
             })
           );
 
+          const artifacts: ChatAttachment[] = (data.artifacts || []).map(
+            (art: Record<string, unknown>, idx: number) => ({
+              id: (art.id as string) || `art_${idx + 1}`,
+              name: (art.name as string) || `qnu_van_ban.${art.type || "docx"}`,
+              size: typeof art.size === "number" ? art.size : 0,
+              type: (art.type as string) || "docx",
+              url: (art.url as string) || "",
+            })
+          );
+
           await streamSimulatedText(
             answer,
             assistantMessageId,
             citations,
             data.suggested_questions || [],
             latencyMs,
-            controller.signal
+            controller.signal,
+            artifacts
           );
         }
       } catch (err: unknown) {
@@ -539,13 +554,38 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
 
         const latencyMs = Math.round(performance.now() - startTime) + 320;
 
+        const isExportRequest =
+          /xuất file|tạo file|tải file|tải về|in ấn|xuất bản|định dạng word|định dạng pdf/i.test(
+            trimmed
+          );
+        const fallbackArtifacts: ChatAttachment[] =
+          assistantCode.toLowerCase() === "drafting" && isExportRequest
+            ? [
+                {
+                  id: "art_docx_fallback",
+                  name: "qnu_to_trinh_nd30.docx",
+                  size: 36864,
+                  type: "docx",
+                  url: "/platform/v1alpha1/tools/artifacts/qnu_to_trinh_nd30.docx",
+                },
+                {
+                  id: "art_pdf_fallback",
+                  name: "qnu_to_trinh_nd30.pdf",
+                  size: 52428,
+                  type: "pdf",
+                  url: "/platform/v1alpha1/tools/artifacts/qnu_to_trinh_nd30.pdf",
+                },
+              ]
+            : [];
+
         await streamSimulatedText(
           mock.answer,
           assistantMessageId,
           mock.citations,
           mock.suggestedQuestions,
           latencyMs,
-          controller.signal
+          controller.signal,
+          fallbackArtifacts
         );
       } finally {
         abortControllerRef.current = null;

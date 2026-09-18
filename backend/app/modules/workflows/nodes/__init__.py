@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.modules.workflows.nodes.artifact_export_node import ArtifactExportNodeHandler
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
     NodeExecutionResult,
@@ -18,6 +19,7 @@ from app.modules.workflows.nodes.output_chat_node import OutputChatNodeHandler
 from app.modules.workflows.nodes.rag_answer_node import RAGAnswerNodeHandler
 
 __all__ = [
+    "ArtifactExportNodeHandler",
     "BaseNodeHandler",
     "ChatInputNodeHandler",
     "CitationGuardNodeHandler",

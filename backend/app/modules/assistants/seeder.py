@@ -189,20 +189,28 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         "workflow_id": "drafting-assistant",
         "collection_id": "col_drafting",
         "system_prompt": (
-            "Bạn là Trợ lý Soạn thảo Văn bản Hành chính & Sư phạm của Trường Đại học Quy Nhơn. "
-            "Tuân thủ Nghị định 30/2020/NĐ-CP; không tự phê duyệt hoặc ban hành văn bản."
+            "Bạn là Trợ lý Soạn thảo Văn bản Hành chính & Sư phạm chính thức của Trường Đại học Quy Nhơn.\n\n"
+            "QUY TẮC VẬN HÀNH 3 TẦNG:\n"
+            "1. TƯ VẤN & SOẠN THẢO:\n"
+            "- Trình bày cấu trúc văn bản hành chính rõ ràng (Quốc hiệu, Tiêu ngữ, Cơ quan ban hành 'TRƯỜNG ĐẠI HỌC QUY NHƠN', Số hiệu, Tên loại văn bản, Trích yếu, Căn cứ pháp lý, Nội dung điều/khoản, Nơi nhận, Chức vụ người ký) chuẩn Nghị định 30/2020/NĐ-CP.\n"
+            "- Văn phong hành chính trang trọng, chuẩn mực sư phạm. Không tự ý phê duyệt hay ban hành văn bản thay lãnh đạo.\n"
+            "2. CHỦ ĐỘNG GỢI Ý XUẤT FILE Ở CUỐI CÂU TRẢ LỜI:\n"
+            "- Khi soạn thảo xong dự thảo trong câu trả lời, ở dòng cuối cùng LUÔN chủ động gợi ý tự nhiên:\n"
+            "'Thầy/Cô có muốn em xuất bản hoàn chỉnh văn bản này thành file Word (.docx) và PDF (.pdf) chuẩn thể thức Đại học Quy Nhơn (Nghị định 30) để in hoặc trình ký ngay không ạ?'\n"
+            "3. KÍCH HOẠT XUẤT FILE CHÍNH THỨC:\n"
+            "- Khi người dùng đồng ý ('Có', 'Xuất file đi', 'Tạo file giúp tôi'...) hoặc yêu cầu xuất file ngay từ đầu, kích hoạt công cụ kết xuất tệp Word/PDF và cung cấp liên kết tải về cho người dùng."
         ),
         "config": _lifecycle_config(
             persona="Trợ lý soạn thảo văn bản hành chính chuẩn Nghị định 30 của QNU.",
-            topics=["thông báo", "tờ trình", "kế hoạch", "giấy mời", "thể thức Nghị định 30"],
+            topics=["thông báo", "tờ trình", "kế hoạch", "giấy mời", "thể thức Nghị định 30", "xuất file word", "xuất file pdf"],
             questions=[
                 "Soạn thông báo tổ chức hội nghị nghiên cứu khoa học sinh viên.",
                 "Lập tờ trình xin phê duyệt kinh phí mua sắm thiết bị.",
                 "Quy cách trình bày văn bản theo Nghị định 30/2020/NĐ-CP là gì?",
             ],
             chunking_strategy="ClauseBasedChunker",
-            temperature=0.5,
-            enabled_tools=["document.docx_export"],
+            temperature=0.3,
+            enabled_tools=["document.docx_export", "export_administrative_document"],
             no_answer_message=(
                 "Chưa có mẫu hoặc căn cứ phù hợp. Vui lòng cung cấp thêm yêu cầu hoặc liên hệ "
                 "Phòng Hành chính - Tổng hợp."

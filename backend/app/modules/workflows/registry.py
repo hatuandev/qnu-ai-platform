@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.modules.workflows.nodes import (
+    ArtifactExportNodeHandler,
     BaseNodeHandler,
     ChatInputNodeHandler,
     CitationGuardNodeHandler,
@@ -50,11 +51,15 @@ class NodeHandlerRegistry:
         self.register("core.drafting.compose", llm_gen)
         self.register("question_bank.generate", llm_gen)
 
+        artifact_export = ArtifactExportNodeHandler()
+        self.register("artifact.export", artifact_export)
+        self.register("export.artifact", artifact_export)
+        self.register("document.docx_export", artifact_export)
+
         output_chat = OutputChatNodeHandler()
         self.register("output.chat", output_chat)
         self.register("chat_output", output_chat)
         self.register("output.artifact", output_chat)
-        self.register("artifact.export", output_chat)
 
         human_app = HumanApprovalNodeHandler()
         self.register("tool.human_approval", human_app)

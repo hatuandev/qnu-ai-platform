@@ -249,7 +249,11 @@ class AssistantService:
         sanitized_message = prepare_user_message(request.message, runtime_profile)
         workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
-            inputs={"message": sanitized_message},
+            inputs={
+                "message": sanitized_message,
+                "is_approved": True,
+                "format": "docx,pdf",
+            },
             tenant_id=request.tenant_id,
             conversation_id=request.conversation_id,
         )
@@ -263,6 +267,7 @@ class AssistantService:
         if not isinstance(answer, str) or not answer.strip():
             answer = assistant.config.guardrails.no_answer_message
         citations = workflow_response.outputs.get("citations", [])
+        artifacts = workflow_response.outputs.get("artifacts", [])
         return AssistantChatResponse(
             assistant_code=assistant.code,
             assistant_name=assistant.name,
@@ -272,6 +277,7 @@ class AssistantService:
             suggested_questions=assistant.sample_questions[:3],
             latency_ms=workflow_response.latency_ms,
             execution_id=workflow_response.execution_id,
+            artifacts=artifacts if isinstance(artifacts, list) else [],
         )
 
     async def generate_spec(

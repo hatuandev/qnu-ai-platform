@@ -113,8 +113,8 @@
         "version": "1.0.0",
         "display_name": "Tra cứu Mẫu Văn bản NĐ30",
         "config": {
-          "module_code": "kb_drafting",
-          "collection_id": "kb_drafting",
+          "module_code": "drafting",
+          "collection_id": "col_drafting",
           "profile": "rag_fast",
           "require_citations": false,
           "retrieval_limit": 3,
@@ -193,7 +193,7 @@
         "version": "1.0.0",
         "display_name": "Xuất Tệp Văn bản",
         "config": {
-          "format": "docx",
+          "format": "docx,pdf",
           "filename_template": "qnu-van-ban-{run_id}.docx",
           "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         },

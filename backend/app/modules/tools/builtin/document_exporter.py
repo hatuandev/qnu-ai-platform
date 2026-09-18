@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-import docx
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Inches, Pt
-
-from app.core.config import settings
+from app.core.config import get_settings
 from app.core.exceptions import AppException
 from app.modules.document_types.catalog import (
     DOCUMENT_TYPE_CODES,
@@ -17,6 +12,8 @@ from app.modules.document_types.catalog import (
     normalize_document_type_code,
 )
 from app.modules.tools.builtin.base import BaseTool
+
+settings = get_settings()
 
 
 class DocumentExporterTool(BaseTool):
@@ -101,120 +98,52 @@ class DocumentExporterTool(BaseTool):
         signer_name = parameters.get("signer_name", "PGS.TS. Đỗ Ngọc Mỹ")
         recipients = parameters.get("recipients", ["Như Điều 3", "Lưu: VT, ĐT."])
 
-        # Create DOCX Document
-        doc = docx.Document()
+        from app.modules.tools.document_generator import export_document_package
 
-        # Set Standard Margins (Top: 2cm, Bottom: 2cm, Left: 3cm, Right: 1.5cm according to ND 30)
-        sections = doc.sections
-        for s in sections:
-            s.top_margin = Inches(0.79)
-            s.bottom_margin = Inches(0.79)
-            s.left_margin = Inches(1.18)
-            s.right_margin = Inches(0.59)
+        content_body = (
+            "\n\n".join(paragraphs)
+            if isinstance(paragraphs, list)
+            else str(paragraphs or "Kính trình Ban Giám hiệu xem xét và phê duyệt.")
+        )
+        recipients_str = (
+            "\n".join(f"- {r}" for r in recipients)
+            if isinstance(recipients, list)
+            else str(recipients or "- Như kính gửi;\n- Lưu: VT, ĐT.")
+        )
 
-        # 1. Header Table (Left: Issuing Agency; Right: National Motto)
-        header_table = doc.add_table(rows=2, cols=2)
-        header_table.autofit = True
+        context_data = {
+            "trich_yeu": title,
+            "noi_dung": content_body,
+            "chuc_vu_nguoi_ky": signer_title,
+            "ho_ten_nguoi_ky": signer_name,
+            "noi_nhan": recipients_str,
+            "don_vi_ban_hanh": parameters.get("issuing_unit", "TRƯỜNG ĐẠI HỌC QUY NHƠN"),
+            "so_hieu": parameters.get("document_number", ".../TTr-ĐHQN"),
+        }
 
-        # Left Header
-        cell_agency = header_table.cell(0, 0)
-        p_agency = cell_agency.paragraphs[0]
-        p_agency.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_parent = p_agency.add_run("BỘ GIÁO DỤC VÀ ĐÀO TẠO\n")
-        run_parent.font.size = Pt(12)
-        run_parent.font.name = "Times New Roman"
-        run_qnu = p_agency.add_run("TRƯỜNG ĐẠI HỌC QUY NHƠN")
-        run_qnu.bold = True
-        run_qnu.font.size = Pt(12)
-        run_qnu.font.name = "Times New Roman"
+        formats = parameters.get("formats", ["docx", "pdf"])
+        clean_title = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in title[:30].strip())
+        base_name = f"{doc_type_code}_{clean_title}"
 
-        cell_number = header_table.cell(1, 0)
-        p_num = cell_number.paragraphs[0]
-        p_num.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_num = p_num.add_run("Số: ... /TB-ĐHQN")
-        run_num.italic = True
-        run_num.font.size = Pt(12)
+        artifacts = await export_document_package(
+            template_code=doc_type_code,
+            context=context_data,
+            formats=formats if isinstance(formats, list) else ["docx", "pdf"],
+            base_name=base_name,
+        )
 
-        # Right Header (Motto)
-        cell_motto = header_table.cell(0, 1)
-        p_motto = cell_motto.paragraphs[0]
-        p_motto.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_country = p_motto.add_run("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n")
-        run_country.bold = True
-        run_country.font.size = Pt(12)
-        run_motto = p_motto.add_run("Độc lập - Tự do - Hạnh phúc")
-        run_motto.bold = True
-        run_motto.font.size = Pt(13)
-
-        cell_date = header_table.cell(1, 1)
-        p_date = cell_date.paragraphs[0]
-        p_date.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_date = p_date.add_run("Quy Nhơn, ngày ... tháng ... năm 2026")
-        run_date.italic = True
-        run_date.font.size = Pt(12)
-
-        doc.add_paragraph()
-
-        # 2. Document Title
-        p_title = doc.add_paragraph()
-        p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_dt = p_title.add_run(f"{doc_type}\n")
-        run_dt.bold = True
-        run_dt.font.size = Pt(15)
-
-        run_sub = p_title.add_run(f"{title}")
-        run_sub.bold = True
-        run_sub.font.size = Pt(13)
-
-        doc.add_paragraph()
-
-        # 3. Document Body
-        for idx, p_text in enumerate(paragraphs, start=1):
-            p = doc.add_paragraph()
-            p.paragraph_format.first_line_indent = Inches(0.4)
-            p.paragraph_format.line_spacing = 1.2
-            run = p.add_run(p_text)
-            run.font.name = "Times New Roman"
-            run.font.size = Pt(13)
-
-        doc.add_paragraph()
-
-        # 4. Footer Table (Left: Recipients; Right: Signer)
-        footer_table = doc.add_table(rows=1, cols=2)
-        cell_rec = footer_table.cell(0, 0)
-        p_rec = cell_rec.paragraphs[0]
-        run_rh = p_rec.add_run("Nơi nhận:\n")
-        run_rh.bold = True
-        run_rh.italic = True
-        run_rh.font.size = Pt(11)
-        for r in recipients:
-            run_item = p_rec.add_run(f"- {r}\n")
-            run_item.font.size = Pt(10)
-
-        cell_sig = footer_table.cell(0, 1)
-        p_sig = cell_sig.paragraphs[0]
-        p_sig.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_st = p_sig.add_run(f"{signer_title}\n\n\n\n")
-        run_st.bold = True
-        run_st.font.size = Pt(13)
-        run_sn = p_sig.add_run(signer_name)
-        run_sn.bold = True
-        run_sn.font.size = Pt(13)
-
-        # Save to Artifacts directory
-        artifacts_dir = Path(settings.LOCAL_STORAGE_PATH) / "artifacts"
-        artifacts_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{doc_type_code}_{title[:30].strip().replace(' ', '_')}.docx"
-        file_path = artifacts_dir / filename
-        doc.save(str(file_path))
+        docx_art = next((a for a in artifacts if a["type"] == "docx"), None)
+        pdf_art = next((a for a in artifacts if a["type"] == "pdf"), None)
 
         return {
             "status": "generated",
-            "file_name": filename,
-            "file_path": str(file_path),
             "document_type": doc_type,
             "document_type_code": doc_type_code,
             "title": title,
             "standard": "Decree 30/2020/ND-CP",
-            "size_bytes": file_path.stat().st_size,
+            "artifacts": artifacts,
+            "docx_url": docx_art["url"] if docx_art else None,
+            "pdf_url": pdf_art["url"] if pdf_art else None,
+            "size_bytes": docx_art["size"] if docx_art else 0,
+            "file_name": docx_art["name"] if docx_art else f"{base_name}.docx",
         }

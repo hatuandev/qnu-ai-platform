@@ -8,14 +8,16 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
-from app.modules.assistants.schemas import AssistantRuntimeProfile
 from app.modules.evaluation.models import EvaluationRun
+
+if TYPE_CHECKING:
+    from app.modules.assistants.schemas import AssistantRuntimeProfile
 from app.modules.workflows.compiler import workflow_compiler
 from app.modules.workflows.engine import dag_engine
 from app.modules.workflows.models import (
@@ -650,6 +652,8 @@ class WorkflowService:
             )
 
         dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
+        from app.modules.assistants.schemas import AssistantRuntimeProfile
+
         runtime_profile = (
             AssistantRuntimeProfile.model_validate(execution_record.runtime_profile)
             if execution_record.runtime_profile

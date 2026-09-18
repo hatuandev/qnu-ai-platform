@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.assistants.schemas import AssistantRuntimeProfile
 from app.modules.workflows.schemas import WorkflowNodeSpec
+
+if TYPE_CHECKING:
+    from app.modules.assistants.schemas import AssistantRuntimeProfile
 
 
 @dataclass

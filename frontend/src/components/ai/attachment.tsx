@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
   File,
   FileCode,
   FileImage,
@@ -103,6 +104,20 @@ export const Attachment: React.FC<AttachmentProps> = ({ attachment, onRemove, cl
             </span>
           )}
         </span>
+      )}
+
+      {attachment.url && (
+        <a
+          href={attachment.url}
+          download={attachment.name}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground hover:text-primary p-0.5 rounded-micro transition-colors shrink-0"
+          title={`Tải về ${attachment.name}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
       )}
 
       {onRemove && (

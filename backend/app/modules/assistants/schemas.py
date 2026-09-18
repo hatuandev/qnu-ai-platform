@@ -234,6 +234,7 @@ class AssistantChatResponse(BaseModel):
     suggested_questions: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
     execution_id: str | None = None
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AssistantGenerateRequest(BaseModel):

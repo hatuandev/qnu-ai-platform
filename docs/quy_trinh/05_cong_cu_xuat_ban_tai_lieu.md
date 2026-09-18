@@ -59,3 +59,18 @@ sequenceDiagram
 
 ### 3. `AdmissionScoreLookupTool` — Cổng Tra Cứu Dữ Liệu Tuyển Sinh
 - Tra cứu bảng điểm chuẩn các năm (2024, 2025, 2026), mã ngành, tên ngành, tổ hợp môn xét tuyển từ CSDL nội bộ mà không cần phụ thuộc vào mô hình LLM ngoại vi.
+
+---
+
+## 3. Cơ Chế Tương Tác 3 Tầng & Dữ Liệu Mặc Định (Seed Data)
+
+1. **Quy Tắc Vận Hành 3 Tầng Trong Trợ Lý Soạn Thảo (`ast_drafting`)**:
+   - **Tầng 1 (Tư vấn & Phác thảo)**: Giải đáp quy cách thể thức, soạn thảo bản dự thảo văn bản hành chính theo văn phong sư phạm chuẩn mực.
+   - **Tầng 2 (Chủ động gợi ý xuất file)**: Ở dòng cuối cùng của câu trả lời, trợ lý LUÔN chủ động gợi ý tự nhiên:
+     > *"Thầy/Cô có muốn em xuất bản hoàn chỉnh văn bản này thành file Word (.docx) và PDF (.pdf) chuẩn thể thức Đại học Quy Nhơn (Nghị định 30) để in hoặc trình ký ngay không ạ?"*
+   - **Tầng 3 (Kích hoạt xuất file chính thức)**: Khi người dùng đồng ý (*"Có"*, *"Xuất file đi"*, *"Tạo file giúp tôi"*...) hoặc có yêu cầu xuất file ngay từ đầu, trợ lý gọi `DocumentGeneratorService` / DAG Node `artifact.export` để render tệp Word `.docx` và chuyển đổi Gotenberg `.pdf`.
+2. **Nạp Toàn Văn Nghị Định 30/2020/NĐ-CP Vào CSDL Mặc Định (Seed Data)**:
+   - Toàn bộ 11 trang Nghị định 30/2020/NĐ-CP được đóng gói tại `backend/app/modules/knowledge/seed_data_nd30.py` gồm 6 Chunks chuẩn Chương/Điều và 7 Facts số hóa.
+   - Tự động nạp vào collection `col_drafting` và đánh chỉ mục vector vào Qdrant khi ứng dụng khởi chạy (`seed_default_knowledge` trong lifespan startup).
+   - Bảo đảm triệt tiêu hoàn toàn No-Answer Trap khi người dùng hỏi các câu hỏi quy chế/thể thức văn bản.
+
