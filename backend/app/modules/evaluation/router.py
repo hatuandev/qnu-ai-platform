@@ -12,6 +12,8 @@ from app.modules.evaluation.schemas import (
     DatasetResponse,
     EvaluationRunRequest,
     EvaluationRunResponse,
+    KnowledgeGapResolveRequest,
+    KnowledgeGapResponse,
     TestCaseResponse,
 )
 from app.modules.evaluation.service import EvaluationService
@@ -60,9 +62,21 @@ async def get_evaluation_metrics(
 
 @router.get("/gap-inbox", summary="Danh sách các câu hỏi kích hoạt No-Answer Policy cần bổ sung tri thức")
 async def get_gap_inbox(
+    assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
+    status: str = Query("pending", description="Trạng thái: pending, resolved, dismissed, all"),
     session: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Hòm thư lỗ hổng tri thức: danh sách câu hỏi kích hoạt No-Answer Policy."""
-    return await service.get_gap_inbox(session=session)
+    return await service.get_gap_inbox(session=session, assistant_code=assistant_code, status=status)
+
+
+@router.patch("/gap-inbox/{gap_id}", response_model=KnowledgeGapResponse, summary="Đánh dấu xử lý lỗ hổng tri thức")
+async def resolve_gap(
+    gap_id: str,
+    request: KnowledgeGapResolveRequest,
+    session: AsyncSession = Depends(get_db),
+) -> KnowledgeGapResponse:
+    """Đánh dấu lỗ hổng tri thức đã giải quyết (nạp thêm tài liệu) hoặc bỏ qua."""
+    return await service.resolve_gap(session=session, gap_id=gap_id, req=request)
 
 

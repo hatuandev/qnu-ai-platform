@@ -39,8 +39,17 @@ export interface GapInboxItem {
   question: string;
   assistant_code: string;
   assistant_name: string;
+  collection_id?: string;
   reason: string;
   frequency: number;
   timestamp: string;
-  status: "pending" | "resolved";
+  status: "pending" | "resolved" | "dismissed";
+  resolution_notes?: string | null;
+  resolved_by?: string | null;
+}
+
+export interface KnowledgeGapResolveRequest {
+  status: "resolved" | "dismissed";
+  resolution_notes?: string;
+  resolved_by?: string;
 }

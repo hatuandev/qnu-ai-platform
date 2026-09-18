@@ -34,16 +34,23 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             if (profile and hasattr(profile, "model_policy") and profile.model_policy)
             else None
         )
+        fallback_model = (
+            profile.model_policy.fallback_model
+            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            else None
+        )
 
         ask_req = AskRequest(
             question=query,
             collection_id=collection_id,
             module_code=module_code,
             conversation_id=context.conversation_id,
+            tenant_id=context.tenant_id or "tenant_qnu",
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
             temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
             max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
             preferred_model_name=primary_model,
+            fallback_model=fallback_model,
         )
 
         if context.db:

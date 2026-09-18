@@ -26,8 +26,11 @@ class HybridRetriever:
         collection_id: str,
         query: str,
         top_k: int = 10,
+        tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Perform lexical keyword search in PostgreSQL using full-text search with ts_rank and ILIKE fallback."""
+        from app.modules.knowledge.models import KnowledgeCollection
+
         fts_chunks: list[KnowledgeChunk] = []
 
         # 1. Try PostgreSQL Full-Text Search with ts_rank ranking
@@ -39,15 +42,17 @@ class HybridRetriever:
             stmt = (
                 select(KnowledgeChunk)
                 .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
                 .where(
                     KnowledgeChunk.collection_id == collection_id,
                     KnowledgeDocument.status.in_(["completed", "approved", "processed"]),
                     KnowledgeDocument.is_active.is_(True),
                     ts_vector.op("@@")(ts_query),
                 )
-                .order_by(desc(rank_expr))
-                .limit(top_k)
             )
+            if tenant_id:
+                stmt = stmt.where(KnowledgeCollection.tenant_id == tenant_id)
+            stmt = stmt.order_by(desc(rank_expr)).limit(top_k)
             res = await db.execute(stmt)
             scalars = res.scalars()
             fts_chunks = list(scalars.all()) if hasattr(scalars, "all") else []
@@ -120,6 +125,7 @@ class HybridRetriever:
         query: str,
         top_k: int = 8,
         rerank_top_k: int = 5,
+        tenant_id: str | None = None,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker."""
         # 1. Concurrent Dense & Sparse Search (Non-blocking asyncio.gather)
@@ -128,12 +134,14 @@ class HybridRetriever:
                 collection_id=collection_id,
                 query=query,
                 top_k=top_k,
+                tenant_id=tenant_id,
             ),
             self.search_sparse_fts(
                 db=db,
                 collection_id=collection_id,
                 query=query,
                 top_k=top_k,
+                tenant_id=tenant_id,
             ),
         )
 

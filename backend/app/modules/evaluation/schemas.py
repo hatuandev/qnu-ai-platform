@@ -67,3 +67,24 @@ class DatasetResponse(BaseModel):
     total_test_cases: int
 
     model_config = {"from_attributes": True}
+
+
+class KnowledgeGapResponse(BaseModel):
+    id: str
+    assistant_code: str
+    collection_id: str | None = None
+    question: str
+    frequency: int = 1
+    status: str
+    resolution_notes: str | None = None
+    resolved_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class KnowledgeGapResolveRequest(BaseModel):
+    status: str = Field("resolved", description="Trạng thái mới: resolved hoặc dismissed")
+    resolution_notes: str | None = Field(None, max_length=1000, description="Ghi chú về văn bản nạp bổ sung")
+    resolved_by: str | None = Field("can_bo_phu_trach", max_length=100)

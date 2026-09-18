@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   Download,
+  FileSpreadsheet,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -143,7 +144,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
               <Download className="h-4 w-4" />
               <span>
-                Tài liệu kết xuất chuẩn Nghị định 30 ({message.artifacts.length} tệp tải về):
+                {message.artifacts.some((a) => a.name.endsWith(".xlsx") || a.type.includes("sheet"))
+                  ? `Ma trận đề thi kết xuất (${message.artifacts.length} tệp tải về):`
+                  : `Tài liệu kết xuất (${message.artifacts.length} tệp tải về):`}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -156,8 +159,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-card hover:bg-muted border border-border shadow-xs hover:border-primary/40 text-xs transition-all cursor-pointer group/art"
                 >
-                  {art.type.includes("pdf") ? (
+                  {art.type.includes("pdf") || art.name.endsWith(".pdf") ? (
                     <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                  ) : art.type.includes("sheet") ||
+                    art.type.includes("excel") ||
+                    art.name.endsWith(".xlsx") ||
+                    art.name.endsWith(".xls") ? (
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
                   ) : (
                     <FileText className="h-4 w-4 text-blue-600 shrink-0" />
                   )}

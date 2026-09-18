@@ -60,3 +60,38 @@ export interface AssistantItem {
 }
 
 export type AssistantDetailItem = AssistantItem;
+
+export interface ReadinessCheckItem {
+  category: "knowledge" | "model" | "tools" | "guardrails" | "evaluation";
+  name: string;
+  status: "passed" | "failed" | "warning";
+  score: number;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface AssistantReadinessResponse {
+  assistant_code: string;
+  assistant_name: string;
+  is_ready_for_publish: boolean;
+  overall_readiness_score: number;
+  checks: ReadinessCheckItem[];
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface AssistantCloneRequest {
+  new_code: string;
+  new_name: string;
+  new_description?: string;
+  target_collection_id?: string;
+}
+
+export interface AssistantPublishResponse {
+  assistant_code: string;
+  assistant_name: string;
+  is_active: boolean;
+  readiness_score: number;
+  published_at: string;
+  message: string;
+}

@@ -13,11 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundException
 from app.modules.evaluation.dataset_seeder import QNU_BENCHMARK_DATASETS
 from app.modules.evaluation.evaluator import tm08_evaluator
-from app.modules.evaluation.models import EvaluationRun
+from app.modules.evaluation.models import EvaluationRun, KnowledgeGapRecord
 from app.modules.evaluation.schemas import (
     DatasetResponse,
     EvaluationRunRequest,
     EvaluationRunResponse,
+    KnowledgeGapResolveRequest,
+    KnowledgeGapResponse,
     TestCaseResponse,
 )
 
@@ -125,27 +127,8 @@ class EvaluationService:
                     actual_answer = ""
                     actual_contexts = []
 
-            # If no real answer or context was retrieved (e.g. unindexed collection, offline mock session, or no-answer policy), fall back to benchmark expected source context
-            if not actual_answer or not actual_contexts:
-                hotline_info = "liên hệ số điện thoại tuyển sinh 0256.3846.156."
-                if request.assistant_code == "library":
-                    hotline_info = "liên hệ Thư viện qua hotline 0256.3846.888 hoặc thuvien@qnu.edu.vn."
-                elif request.assistant_code == "regulations":
-                    hotline_info = "liên hệ Phòng Đào tạo ĐH Quy Nhơn."
-                elif request.assistant_code == "drafting":
-                    hotline_info = "liên hệ Phòng Hành chính - Tổng hợp ĐH Quy Nhơn."
-                elif request.assistant_code == "question_bank":
-                    hotline_info = "liên hệ Phòng Khảo thí & Bảo đảm chất lượng ĐH Quy Nhơn."
-
-                actual_answer = (
-                    f"Theo văn bản chính thức của Trường Đại học Quy Nhơn ({tc['expected_source']}): "
-                    f"{ground_truth} Để biết thêm thông tin chi tiết hoặc hỗ trợ trực tiếp, "
-                    f"quý vị có thể {hotline_info}"
-                )
-                actual_contexts = [
-                    f"Trường Đại học Quy Nhơn ({tc['expected_source']}): {ground_truth}",
-                    f"Căn cứ văn bản chính thức: {ground_truth}. {hotline_info}",
-                ]
+            actual_answer = actual_answer or ""
+            actual_contexts = actual_contexts or []
 
             eval_res = self.evaluator.evaluate_item(
                 query=query,
@@ -284,18 +267,105 @@ class EvaluationService:
             "total_evaluations": 0,
         }
 
-    async def get_gap_inbox(self, session: AsyncSession | None = None) -> list[dict[str, Any]]:
+    async def record_gap(
+        self,
+        session: AsyncSession,
+        *,
+        assistant_code: str,
+        collection_id: str | None = None,
+        question: str,
+    ) -> KnowledgeGapRecord | None:
+        """Record an unanswered user question triggering No-Answer Policy into gap inbox."""
+        clean_q = question.strip()
+        if not clean_q or len(clean_q) < 5:
+            return None
+
+        try:
+            stmt = (
+                select(KnowledgeGapRecord)
+                .where(
+                    KnowledgeGapRecord.assistant_code == assistant_code,
+                    KnowledgeGapRecord.question == clean_q,
+                    KnowledgeGapRecord.status == "pending",
+                )
+                .limit(1)
+            )
+            res = await session.execute(stmt)
+            existing = res.scalar_one_or_none()
+            if existing:
+                existing.frequency += 1
+                existing.updated_at = datetime.now(UTC)
+                await session.commit()
+                await session.refresh(existing)
+                return existing
+
+            new_gap = KnowledgeGapRecord(
+                id=str(uuid.uuid4()),
+                assistant_code=assistant_code,
+                collection_id=collection_id,
+                question=clean_q,
+                frequency=1,
+                status="pending",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            session.add(new_gap)
+            await session.commit()
+            await session.refresh(new_gap)
+            logger.info("recorded_new_knowledge_gap", assistant=assistant_code, question=clean_q)
+            return new_gap
+        except Exception as exc:
+            logger.warning("failed_to_record_knowledge_gap", error=str(exc))
+            return None
+
+    async def get_gap_inbox(
+        self,
+        session: AsyncSession | None = None,
+        *,
+        assistant_code: str | None = None,
+        status: str = "pending",
+    ) -> list[dict[str, Any]]:
         """Get unanswered knowledge gap questions triggering No-Answer Policy."""
         if session is not None:
             try:
-                stmt = (
+                stmt = select(KnowledgeGapRecord)
+                if status != "all":
+                    stmt = stmt.where(KnowledgeGapRecord.status == status)
+                if assistant_code:
+                    stmt = stmt.where(KnowledgeGapRecord.assistant_code == assistant_code)
+                stmt = stmt.order_by(KnowledgeGapRecord.frequency.desc(), KnowledgeGapRecord.updated_at.desc()).limit(50)
+                result = await session.execute(stmt)
+                records = result.scalars().all()
+                if records:
+                    return [
+                        {
+                            "id": r.id,
+                            "question": r.question,
+                            "assistant_code": r.assistant_code,
+                            "assistant_name": r.assistant_code.replace("_", " ").title(),
+                            "collection_id": r.collection_id or f"col_{r.assistant_code}",
+                            "reason": "Kích hoạt No-Answer Policy do thiếu tài liệu trong kho tri thức.",
+                            "frequency": r.frequency,
+                            "timestamp": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
+                            "status": r.status,
+                            "resolution_notes": r.resolution_notes,
+                            "resolved_by": r.resolved_by,
+                        }
+                        for r in records
+                    ]
+            except Exception as exc:
+                logger.warning("failed_to_load_gap_records_from_db", error=str(exc))
+
+            # Fallback to failed evaluation runs if no explicit gap records yet
+            try:
+                run_stmt = (
                     select(EvaluationRun)
                     .where(EvaluationRun.meets_tm08_standard.is_(False))
                     .order_by(EvaluationRun.created_at.desc())
                     .limit(10)
                 )
-                result = await session.execute(stmt)
-                failed_runs = result.scalars().all()
+                run_res = await session.execute(run_stmt)
+                failed_runs = run_res.scalars().all()
                 if failed_runs:
                     return [
                         {
@@ -303,6 +373,7 @@ class EvaluationService:
                             "question": f"Kiểm định bộ '{r.dataset_id}' chưa đạt chuẩn TM-08 (Đạt {int(r.pass_rate * 100)}%)",
                             "assistant_code": r.assistant_code,
                             "assistant_name": r.assistant_code.replace("_", " ").title(),
+                            "collection_id": f"col_{r.assistant_code}",
                             "reason": f"Faithfulness: {r.faithfulness_avg:.2f}, Relevance: {r.answer_relevance_avg:.2f}. Cần bổ sung văn bản chính thức.",
                             "frequency": max(1, r.total_cases - r.passed_cases),
                             "timestamp": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
@@ -311,9 +382,29 @@ class EvaluationService:
                         for r in failed_runs
                     ]
             except Exception as exc:
-                logger.warning("failed_to_load_gap_inbox_from_db", error=str(exc))
+                logger.warning("failed_to_load_fallback_gaps", error=str(exc))
 
         return []
+
+    async def resolve_gap(
+        self,
+        session: AsyncSession,
+        gap_id: str,
+        req: KnowledgeGapResolveRequest,
+    ) -> KnowledgeGapResponse:
+        """Mark a knowledge gap as resolved or dismissed with resolution notes."""
+        stmt = select(KnowledgeGapRecord).where(KnowledgeGapRecord.id == gap_id)
+        res = await session.execute(stmt)
+        record = res.scalar_one_or_none()
+        if not record:
+            raise NotFoundException(f"Không tìm thấy lỗ hổng tri thức với ID '{gap_id}'.")
+        record.status = req.status
+        record.resolution_notes = req.resolution_notes
+        record.resolved_by = req.resolved_by
+        record.updated_at = datetime.now(UTC)
+        await session.commit()
+        await session.refresh(record)
+        return KnowledgeGapResponse.model_validate(record)
 
 
 evaluation_service = EvaluationService()

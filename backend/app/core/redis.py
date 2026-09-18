@@ -52,16 +52,26 @@ class SemanticCache:
         self.client = client or get_redis_client()
         self.ttl = ttl_seconds
 
-    def _make_key(self, collection_id: str, query: str, preferred_model: str = "default") -> str:
+    def _make_key(
+        self,
+        collection_id: str,
+        query: str,
+        preferred_model: str = "default",
+        tenant_id: str = "tenant_qnu",
+    ) -> str:
         h = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()
         model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
-        return f"rag:cache:{collection_id}:{model_part}:{h}"
+        return f"rag:cache:{tenant_id}:{collection_id}:{model_part}:{h}"
 
     async def get(
-        self, collection_id: str, query: str, preferred_model: str = "default"
+        self,
+        collection_id: str,
+        query: str,
+        preferred_model: str = "default",
+        tenant_id: str = "tenant_qnu",
     ) -> dict[str, Any] | None:
         try:
-            key = self._make_key(collection_id, query, preferred_model)
+            key = self._make_key(collection_id, query, preferred_model, tenant_id)
             val = await self.client.get(key)
             if val:
                 return json.loads(val)
@@ -75,21 +85,24 @@ class SemanticCache:
         query: str,
         data: dict[str, Any],
         preferred_model: str = "default",
+        tenant_id: str = "tenant_qnu",
     ) -> None:
         try:
-            key = self._make_key(collection_id, query, preferred_model)
+            key = self._make_key(collection_id, query, preferred_model, tenant_id)
             await self.client.setex(key, self.ttl, json.dumps(data, ensure_ascii=False))
         except Exception as exc:
             logger.warning("Failed to write to SemanticCache: %s", exc)
 
     async def invalidate_collection(self, collection_id: str) -> None:
-        """Invalidate all cached queries for a modified collection."""
+        """Invalidate all cached queries for a modified collection across all tenants."""
         try:
-            pattern = f"rag:cache:{collection_id}:*"
+            pattern = f"rag:cache:*:{collection_id}:*"
             keys = await self.client.keys(pattern)
-            if keys:
-                await self.client.delete(*keys)
-                logger.info("Invalidated %d cache keys for collection %s", len(keys), collection_id)
+            legacy_keys = await self.client.keys(f"rag:cache:{collection_id}:*")
+            all_keys = list(set(keys + legacy_keys))
+            if all_keys:
+                await self.client.delete(*all_keys)
+                logger.info("Invalidated %d cache keys for collection %s", len(all_keys), collection_id)
         except Exception as exc:
             logger.warning("Failed to invalidate cache for collection %s: %s", collection_id, exc)
 

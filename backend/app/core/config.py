@@ -111,6 +111,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     INTERNAL_API_KEY: str = "qnu_internal_secret_key_2026"
     DEV_AUTH_ENABLED: bool = True
+    DEV_ACCESS_PASSWORD: str = "QNU@2026"
     RATE_LIMIT_PER_MINUTE: int = 120
 
     # --- Observability ---

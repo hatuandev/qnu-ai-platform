@@ -639,3 +639,39 @@ async def test_workflow_publish_enforces_tm08_quality_gate():
     assert exc_info.value.code == "workflow_quality_gate_failed"
     assert exc_info.value.status_code == 422
     assert "TM-08" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_workflow_execution_fail_closed_on_missing_version():
+    from app.core.exceptions import AppException
+    from app.modules.workflows.schemas import WorkflowExecuteRequest
+    from app.modules.workflows.service import workflow_service
+
+    mock_db = AsyncMock()
+
+    # Case 1: Execute with a published_version_id pointing to a nonexistent version row
+    def execute_side_effect(stmt: object) -> MagicMock:
+        mock_exec = MagicMock()
+        stmt_str = str(stmt)
+        if "published_version_id" in stmt_str:
+            mock_exec.scalar_one_or_none.return_value = "ver_missing_999"
+        elif "workflow_versions" in stmt_str:
+            mock_exec.scalar_one_or_none.return_value = None  # Missing row!
+        else:
+            mock_exec.scalar_one_or_none.return_value = None
+        return mock_exec
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    req = WorkflowExecuteRequest(
+        workflow_id="admissions-assistant",
+        inputs={"message": "Xin chào"},
+        tenant_id="tenant_qnu",
+    )
+
+    with pytest.raises(AppException) as exc_info:
+        await workflow_service.execute(mock_db, req)
+
+    assert exc_info.value.code == "workflow_version_not_found"
+    assert exc_info.value.status_code == 404
+    assert "ver_missing_999" in exc_info.value.message

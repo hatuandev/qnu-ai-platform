@@ -223,10 +223,14 @@ class VectorIndexer:
                 "chunk_id": chunk_id,
                 "document_id": str(c.get("document_id", "")),
                 "collection_id": collection_id,
+                "tenant_id": str(c.get("tenant_id") or "tenant_qnu"),
+                "workspace_id": str(c.get("workspace_id") or "workspace_qnu"),
+                "document_status": str(c.get("document_status") or "completed"),
+                "is_retrievable": bool(c.get("is_retrievable", True)),
                 "content": content,
                 "section": c.get("section"),
                 "page_number": c.get("page_number"),
-                "is_active": True,
+                "is_active": bool(c.get("is_active", True)),
             }
             if "metadata" in c:
                 payload.update(c["metadata"])
@@ -285,6 +289,19 @@ class VectorIndexer:
             logger.warning("Qdrant delete collection failed for %s: %s", cname, exc)
             return False
 
+    async def count_points(self, collection_id: str) -> int:
+        """Get total point count in collection, returning 0 if collection missing or offline."""
+        cname = self._get_collection_name(collection_id)
+        try:
+            exists = await self.client.collection_exists(cname)
+            if not exists:
+                return 0
+            info = await self.client.get_collection(cname)
+            return info.points_count or 0
+        except Exception as exc:
+            logger.debug("Could not count points for Qdrant collection %s: %s", cname, exc)
+            return 0
+
     async def search_dense(
         self,
         collection_id: str,
@@ -292,13 +309,52 @@ class VectorIndexer:
         top_k: int = 8,
         query_vector: list[float] | None = None,
         score_threshold: float = 0.35,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform dense cosine similarity search in Qdrant with score threshold filtering."""
+        """Perform dense cosine similarity search in Qdrant with lifecycle, tenant, and score threshold filtering."""
         cname = self._get_collection_name(collection_id)
         if query_vector is not None:
             vec = query_vector
         else:
             vec = (await self.embed_texts([query]))[0]
+
+        must_conditions: list[Any] = [
+            qmodels.FieldCondition(
+                key="is_active",
+                match=qmodels.MatchValue(value=True),
+            )
+        ]
+        if tenant_id:
+            must_conditions.append(
+                qmodels.FieldCondition(
+                    key="tenant_id",
+                    match=qmodels.MatchValue(value=tenant_id),
+                )
+            )
+        if workspace_id:
+            must_conditions.append(
+                qmodels.FieldCondition(
+                    key="workspace_id",
+                    match=qmodels.MatchValue(value=workspace_id),
+                )
+            )
+
+        must_not_conditions: list[Any] = [
+            qmodels.FieldCondition(
+                key="is_retrievable",
+                match=qmodels.MatchValue(value=False),
+            ),
+            qmodels.FieldCondition(
+                key="document_status",
+                match=qmodels.MatchAny(any=["pending", "archived", "rejected", "failed", "processing"]),
+            ),
+        ]
+
+        qfilter = qmodels.Filter(
+            must=must_conditions,
+            must_not=must_not_conditions,
+        )
 
         try:
             if hasattr(self.client, "query_points"):
@@ -306,14 +362,7 @@ class VectorIndexer:
                     collection_name=cname,
                     query=vec,
                     limit=top_k,
-                    query_filter=qmodels.Filter(
-                        must=[
-                            qmodels.FieldCondition(
-                                key="is_active",
-                                match=qmodels.MatchValue(value=True),
-                            )
-                        ]
-                    ),
+                    query_filter=qfilter,
                 )
                 hits = res.points
             else:
@@ -321,14 +370,7 @@ class VectorIndexer:
                     collection_name=cname,
                     query_vector=vec,
                     limit=top_k,
-                    query_filter=qmodels.Filter(
-                        must=[
-                            qmodels.FieldCondition(
-                                key="is_active",
-                                match=qmodels.MatchValue(value=True),
-                            )
-                        ]
-                    ),
+                    query_filter=qfilter,
                 )
             results: list[dict[str, Any]] = []
             for hit in hits:

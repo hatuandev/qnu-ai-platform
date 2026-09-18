@@ -6,6 +6,7 @@ import type {
   SystemModelDefaults,
   SystemModelDefaultsResponse,
   TokenQuota,
+  UsageStatsResponse,
 } from "@/types/modelops";
 import { BASE_URL } from "./http-client";
 
@@ -338,5 +339,16 @@ export const modelopsApi = {
 
   async getTokenQuotas(tenantId?: string): Promise<TokenQuota> {
     return this.getTokenQuota(tenantId);
+  },
+
+  async getModelOpsUsageStats(days = 30, tenantId?: string): Promise<UsageStatsResponse> {
+    const params = new URLSearchParams({ days: String(days) });
+    if (tenantId) params.append("tenant_id", tenantId);
+
+    const res = await fetch(`${BASE_URL}/modelops/usage-stats?${params.toString()}`);
+    if (!res.ok) {
+      throw new Error(`Không tải được thống kê sử dụng (HTTP ${res.status}).`);
+    }
+    return res.json();
   },
 };

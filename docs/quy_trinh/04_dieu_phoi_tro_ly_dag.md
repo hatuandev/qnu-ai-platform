@@ -280,3 +280,11 @@ Nhằm giải quyết triệt để lỗi vỡ giao diện thanh công cụ (Hea
 - Mỗi phiên thực thi (`WorkflowExecution`) mang `execution_id` duy nhất và lưu `checkpoint_state` riêng biệt trong PostgreSQL.
 - `AssistantRuntimeProfile` được đóng gói bất biến từ đầu phiên: mọi thay đổi cấu hình Trợ lý sau đó **không ảnh hưởng** đến phiên đang chạy — đảm bảo người dùng nhận phản hồi nhất quán từ cùng một ngữ cảnh đã khởi tạo.
 
+### 8.4. Cổng Truy Cập Nhà Phát Triển & Bảo Mật Phiên Server-Side (Dev Access Gate)
+- Trong giai đoạn thử nghiệm và phát triển nội bộ, hệ thống thiết lập chốt chặn truy cập tối giản nhưng an toàn tuyệt đối phía máy chủ:
+  * **Xác thực qua Server**: Endpoint `POST /platform/v1alpha1/auth/login` tiếp nhận `access_key`, so khớp với `DEV_ACCESS_PASSWORD` thông qua thuật toán hàm băm thời gian không đổi `hmac.compare_digest` nhằm triệt tiêu hoàn toàn rủi ro timing attack.
+  * **Session Cookie Ký Số HttpOnly**: Khi đăng nhập thành công, máy chủ thiết lập cookie `qnu_session` mang chữ ký số JWT với các cờ `HttpOnly=True`, `SameSite="Lax"`, ngăn chặn 100% tấn công XSS đánh cắp phiên.
+  * **Truy vấn Danh tính Máy chủ**: Endpoint `GET /platform/v1alpha1/auth/me` phân giải danh tính tác nhân (`AuthActor`) và `POST /platform/v1alpha1/auth/logout` hủy bỏ session cookie lập tức.
+  * **Tác nhân Xác thực Đáng tin cậy (Trusted Principal)**: Dependency `get_current_actor` cung cấp định danh hợp lệ (`tenant_qnu`, `workspace_qnu`, role `admin`) cho các thao tác nhạy cảm, bao gồm Tool Gateway, phê duyệt nhân sự (HITL), và quản trị đồ thị DAG.
+
+

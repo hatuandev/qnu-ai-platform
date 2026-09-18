@@ -136,15 +136,19 @@ LIBRARY_CHUNKS: list[dict[str, Any]] = [
         "chunk_index": 5,
         "title": "Phần VI: Dịch vụ Hỗ trợ Nghiên cứu, Kiểm tra Đạo văn Turnitin và Thủ tục Thanh toán Ra trường",
         "content": (
-            "Phần VI - HỖ TRỢ HỌC THUẬT VÀ THỦ TỤC THANH TOÁN THƯ VIỆN:\n"
-            "1. Dịch vụ Kiểm tra tính trùng lặp học thuật (Chống đạo văn):\n"
-            "   - Thư viện cung cấp tài khoản và thực hiện dịch vụ kiểm tra tỷ lệ tương đồng học thuật bằng phần mềm Turnitin dành cho sinh viên làm khóa luận tốt nghiệp, học viên cao học và giảng viên xuất bản bài báo.\n"
+            "Phần VI - HỖ TRỢ HỌC THUẬT, KIỂM TRA ĐẠO VĂN VÀ THỦ TỤC THANH TOÁN THƯ VIỆN:\n"
+            "1. Dịch vụ Kiểm tra tính trùng lặp học thuật (Chống đạo văn bằng Turnitin):\n"
+            "   - Thư viện cung cấp tài khoản và thực hiện dịch vụ kiểm tra tỷ lệ tương đồng học thuật bằng phần mềm bản quyền Turnitin dành cho sinh viên làm khóa luận tốt nghiệp, học viên cao học và giảng viên xuất bản bài báo khoa học.\n"
+            "   - Quy định ngưỡng trùng lặp chuẩn tại ĐH Quy Nhơn: Tỷ lệ tương đồng học thuật tổng thể bắt buộc dưới 20% (< 20%), và tỷ lệ trùng lặp với một nguồn đơn lẻ bất kỳ không được vượt quá 5% (< 5%).\n"
+            "   - Nếu vượt quá ngưỡng quy định, tác giả phải viết lại, chỉnh sửa trích dẫn và nộp kiểm tra lại trước khi được phép bảo vệ trước Hội đồng.\n"
             "   - Hướng dẫn cài đặt và sử dụng các công cụ quản lý tài liệu trích dẫn tự động chuẩn quốc tế như Zotero, Mendeley, EndNote.\n"
-            "2. Dịch vụ in ấn và số hóa học liệu theo yêu cầu:\n"
+            "2. Quy trình nộp lưu chiểu khóa luận, luận văn tốt nghiệp bản điện tử:\n"
+            "   - Sinh viên sau khi bảo vệ thành công nộp 01 bản mềm định dạng PDF toàn văn (kèm tóm tắt) lên Cổng thông tin học liệu số https://lib.qnu.edu.vn để lưu chiểu phục vụ bạn đọc các khóa sau tra cứu.\n"
+            "3. Dịch vụ in ấn và số hóa học liệu theo yêu cầu:\n"
             "   - Hỗ trợ in ấn, photocopy tài liệu học tập tuân thủ đúng Luật Sở hữu trí tuệ (nghiêm cấm sao chép nhân bản nguyên cuốn sách có bản quyền thương mại).\n"
-            "3. Thủ tục xác nhận thanh toán thư viện để nhận bằng tốt nghiệp ra trường:\n"
+            "4. Thủ tục xác nhận thanh toán thư viện để nhận bằng tốt nghiệp ra trường:\n"
             "   - Sinh viên năm cuối phải hoàn trả toàn bộ sách đã mượn và thanh toán các khoản phí quá hạn (nếu có).\n"
-            "   - Thủ tục ký xác nhận thư viện được thực hiện hoàn toàn trực tuyến tự động thông qua phần mềm quản lý; sinh viên không cần xin chữ ký giấy trực tiếp."
+            "   - Thủ tục ký xác nhận thư viện (online clearance) được thực hiện hoàn toàn trực tuyến tự động thông qua phần mềm quản lý; sinh viên không cần xin chữ ký giấy trực tiếp."
         ),
         "metadata": {
             "section": "Phần VI",
@@ -266,10 +270,13 @@ LIBRARY_FACTS: list[dict[str, Any]] = [
         "attribute_name": "Phần mềm kiểm tra trùng lặp học thuật và công cụ trích dẫn",
         "value": (
             "Thư viện hỗ trợ kiểm tra tính trùng lặp học thuật bằng phần mềm bản quyền Turnitin "
-            "cho khóa luận tốt nghiệp, luận văn thạc sĩ; hỗ trợ hướng dẫn công cụ trích dẫn Zotero, Mendeley."
+            "cho khóa luận tốt nghiệp, luận văn thạc sĩ. Quy định ngưỡng trùng lặp: Tổng thể dưới 20% (< 20%) "
+            "và không quá 5% (< 5%) cho mỗi nguồn đơn lẻ; hỗ trợ công cụ trích dẫn Zotero, Mendeley, EndNote."
         ),
         "fact_metadata": {
             "similarity_software": "Turnitin",
+            "max_total_similarity": 0.20,
+            "max_single_source_similarity": 0.05,
             "citation_tools": ["Zotero", "Mendeley", "EndNote"],
             "online_clearance": True,
         },

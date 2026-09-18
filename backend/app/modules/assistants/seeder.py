@@ -98,16 +98,16 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý Tuyển sinh chính thức, thân thiện và chính xác của QNU.",
-            topics=["đề án tuyển sinh", "điểm chuẩn", "học phí", "học bổng", "ký túc xá"],
+            topics=["đề án tuyển sinh", "điểm chuẩn", "học phí", "học bổng", "ký túc xá", "sư phạm", "Nghị định 116"],
             questions=[
-                "Điểm chuẩn ngành Công nghệ thông tin năm gần nhất là bao nhiêu?",
-                "Phương thức xét tuyển bằng học bạ THPT thực hiện như thế nào?",
-                "Mức học phí và chính sách học bổng của trường ra sao?",
-                "Thủ tục đăng ký ở ký túc xá gồm những gì?",
+                "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin năm 2024 là bao nhiêu?",
+                "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+                "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
+                "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?",
             ],
             chunking_strategy="SemanticChunker",
             require_structured_facts=True,
-            enabled_tools=["admissions.fact_lookup"],
+            enabled_tools=["lookup_admission_score"],
             no_answer_message=(
                 "Thông tin này chưa có trong Đề án tuyển sinh chính thức. Vui lòng liên hệ "
                 "Hotline 0256.3846.156 hoặc tuyensinh@qnu.edu.vn."
@@ -132,16 +132,17 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý tra cứu quy chế đào tạo và khảo thí chính thức của QNU.",
-            topics=["quy chế đào tạo", "tín chỉ", "cảnh báo học vụ", "chuẩn đầu ra", "tốt nghiệp"],
+            topics=["quy chế đào tạo", "tín chỉ", "cảnh báo học vụ", "chuẩn đầu ra", "tốt nghiệp", "thang điểm 4", "VSTEP"],
             questions=[
-                "Điều kiện cảnh báo học tập và buộc thôi học được quy định thế nào?",
-                "Sinh viên được đăng ký tối đa bao nhiêu tín chỉ trong một học kỳ?",
-                "Chuẩn đầu ra ngoại ngữ đối với sinh viên được quy định ra sao?",
-                "Cách tính điểm trung bình tích lũy thang điểm 4 như thế nào?",
+                "Điều kiện cảnh báo học tập và buộc thôi học được quy định tại Điều 16 như thế nào?",
+                "Cách tính điểm trung bình tích lũy thang điểm 4 và quy đổi điểm chữ ra sao?",
+                "Chuẩn đầu ra ngoại ngữ VSTEP và tin học đối với sinh viên chính quy quy định thế nào?",
+                "Sinh viên được đăng ký tối đa bao nhiêu tín chỉ trong một học kỳ chính?",
             ],
             chunking_strategy="ClauseBasedChunker",
             temperature=0.1,
             require_structured_facts=True,
+            enabled_tools=[],
             no_answer_message=(
                 "Chưa đủ căn cứ trong quy chế hiện hành để trả lời. Vui lòng liên hệ Phòng Đào tạo."
             ),
@@ -164,15 +165,16 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý tra cứu thư viện và học liệu số của QNU.",
-            topics=["giáo trình", "luận văn", "mượn trả sách", "cơ sở dữ liệu số", "phòng học nhóm", "kiểm tra đạo văn Turnitin"],
+            topics=["giáo trình", "luận văn", "mượn trả sách", "cơ sở dữ liệu số", "phòng học nhóm", "kiểm tra đạo văn Turnitin", "ScienceDirect", "IEEE"],
             questions=[
-                "Hạn ngạch mượn sách và thời gian được giữ sách của sinh viên là bao nhiêu?",
-                "Phí phạt quá hạn mượn sách thư viện được tính như thế nào?",
-                "Sinh viên có thể truy cập các cơ sở dữ liệu quốc tế như ScienceDirect, IEEE từ xa bằng cách nào?",
+                "Quy định kiểm tra chống đạo văn Turnitin đối với khóa luận tốt nghiệp như thế nào?",
+                "Cách truy cập các cơ sở dữ liệu số quốc tế như ScienceDirect, IEEE Xplore từ xa bằng tài khoản QNU?",
+                "Hạn ngạch mượn giáo trình và thời gian được giữ sách của sinh viên là bao nhiêu?",
+                "Quy trình nộp lưu chiểu luận văn tốt nghiệp bản điện tử cho thư viện gồm những bước nào?",
             ],
             chunking_strategy="ClauseBasedChunker",
             require_structured_facts=True,
-            enabled_tools=["library.catalog_search"],
+            enabled_tools=[],
             no_answer_message=(
                 "Chưa tìm thấy thông tin trong cẩm nang thư viện. Vui lòng liên hệ Trung tâm "
                 "Thông tin - Thư viện QNU qua hotline 0256.3846.888 hoặc thuvien@qnu.edu.vn."
@@ -206,14 +208,15 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             persona="Trợ lý soạn thảo văn bản hành chính chuẩn Nghị định 30 của QNU.",
             topics=["thông báo", "tờ trình", "kế hoạch", "giấy mời", "thể thức Nghị định 30", "xuất file word", "xuất file pdf"],
             questions=[
-                "Soạn thông báo tổ chức hội nghị nghiên cứu khoa học sinh viên.",
-                "Lập tờ trình xin phê duyệt kinh phí mua sắm thiết bị.",
-                "Quy cách căn lề văn bản và phông chữ theo Nghị định 30/2020/NĐ-CP là gì?",
+                "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên năm học 2024-2025.",
+                "Lập tờ trình xin phê duyệt kinh phí mua sắm trang thiết bị phòng thực hành.",
+                "Quy chuẩn căn lề, phông chữ và cách đánh số văn bản theo Nghị định 30/2020/NĐ-CP như thế nào?",
+                "Soạn giấy mời dự Lễ Khai giảng năm học mới chuẩn thể thức Đại học Quy Nhơn.",
             ],
             chunking_strategy="ClauseBasedChunker",
             temperature=0.3,
             require_structured_facts=True,
-            enabled_tools=["document.docx_export", "export_administrative_document"],
+            enabled_tools=["export_administrative_document"],
             no_answer_message=(
                 "Chưa có mẫu hoặc căn cứ phù hợp. Vui lòng cung cấp thêm yêu cầu hoặc liên hệ "
                 "Phòng Hành chính - Tổng hợp."
@@ -239,14 +242,15 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             persona="Trợ lý khảo thí và xây dựng ngân hàng câu hỏi theo Bloom của QNU.",
             topics=["ma trận đề", "Bloom", "CLO", "câu hỏi trắc nghiệm", "biểu điểm", "chỉ số độ khó P", "chỉ số phân cách D"],
             questions=[
-                "Tỷ lệ trọng số phân bổ mức độ nhận thức trong ma trận đề thi chuẩn QNU là bao nhiêu?",
-                "Cấu trúc và quy tắc cấm đối với câu hỏi trắc nghiệm MCQ là gì?",
-                "Dải chỉ số độ khó P và độ phân cách D chấp nhận được cho câu hỏi thi là bao nhiêu?",
+                "Tỷ lệ trọng số phân bổ 4 mức độ nhận thức Bloom trong ma trận đề thi kết thúc học phần là bao nhiêu?",
+                "Quy tắc thiết kế câu hỏi trắc nghiệm khách quan MCQ chuẩn khảo thí là gì?",
+                "Dải chỉ số độ khó P và độ phân biệt D chấp nhận được của câu hỏi thi trắc nghiệm ra sao?",
+                "Xuất ma trận đề thi chuẩn cho học phần 3 tín chỉ theo định dạng Excel.",
             ],
             chunking_strategy="ClauseBasedChunker",
             temperature=0.3,
             require_structured_facts=True,
-            enabled_tools=["assessment.xlsx_export"],
+            enabled_tools=["export_exam_matrix"],
             no_answer_message=(
                 "Chưa đủ chuẩn đầu ra hoặc nội dung học phần để xây dựng câu hỏi. Vui lòng cung "
                 "cấp đề cương học phần đã phê duyệt hoặc liên hệ Phòng Khảo thí & Đảm bảo chất lượng."

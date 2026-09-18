@@ -59,6 +59,57 @@ from app.modules.knowledge.seed_data_regulations import (
 logger = logging.getLogger(__name__)
 
 
+async def _ensure_seed_storage(storage_path: str, raw_text: str) -> None:
+    """Ensure raw text is saved to storage driver for provenance and file download (P0.1)."""
+    try:
+        from app.core.storage import storage_service
+
+        if not await storage_service.exists(storage_path):
+            await storage_service.save(storage_path, raw_text.encode("utf-8"))
+            logger.info("Saved seed document payload to storage service: %s", storage_path)
+    except Exception as exc:
+        logger.warning("Failed to ensure seed storage for %s: %s", storage_path, exc)
+
+
+async def _ensure_qdrant_points(db: AsyncSession, collection_id: str) -> None:
+    """Check if Qdrant points exist for collection; if 0, re-index existing chunks from DB (P1.2 self-recovery)."""
+    try:
+        from app.modules.rag.vector_indexer import vector_indexer
+
+        points = await vector_indexer.count_points(collection_id)
+        if points == 0:
+            logger.info(
+                "Self-recovery: 0 Qdrant points found for %s, re-indexing chunks from DB...",
+                collection_id,
+            )
+            chunk_stmt = select(KnowledgeChunk).where(KnowledgeChunk.collection_id == collection_id)
+            chunks = (await db.execute(chunk_stmt)).scalars().all()
+            if chunks:
+                await vector_indexer.index_chunks(
+                    collection_id=collection_id,
+                    chunks=[
+                        {
+                            "id": c.id,
+                            "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{collection_id}:{c.id}")),
+                            "chunk_id": c.id,
+                            "document_id": c.document_id,
+                            "content": c.content,
+                            "section": c.section,
+                            "page_number": c.page_number,
+                            "metadata": c.chunk_metadata,
+                        }
+                        for c in chunks
+                    ],
+                )
+                logger.info(
+                    "Self-recovery: Successfully re-indexed %d chunks into Qdrant collection %s",
+                    len(chunks),
+                    collection_id,
+                )
+    except Exception as exc:
+        logger.warning("Self-recovery Qdrant check for %s skipped or failed (graceful): %s", collection_id, exc)
+
+
 async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     """Seed official QNU Academic Regulations into col_regulations if not present."""
     # 1. Ensure col_regulations collection exists
@@ -88,10 +139,14 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
 
     if existing_doc:
         logger.info("QNU Academic Regulations document already present in col_regulations.")
+        file_content = "\n\n".join(c["content"] for c in REGULATIONS_CHUNKS)
+        await _ensure_seed_storage(existing_doc.storage_path, file_content)
+        await _ensure_qdrant_points(db, REGULATIONS_COLLECTION_ID)
         return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in REGULATIONS_CHUNKS)
+    await _ensure_seed_storage(f"uploads/{REGULATIONS_COLLECTION_ID}/{REGULATIONS_FILENAME}", file_content)
     file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
 
     doc = KnowledgeDocument(
@@ -221,10 +276,14 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
 
     if existing_doc:
         logger.info("Decree 30/2020/ND-CP document already present in col_drafting.")
+        file_content_mock = "\n\n".join(c["content"] for c in DECREE_30_CHUNKS)
+        await _ensure_seed_storage(existing_doc.storage_path, file_content_mock)
+        await _ensure_qdrant_points(db, DECREE_30_COLLECTION_ID)
         return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
 
     # 3. Create KnowledgeDocument
     file_content_mock = "\n\n".join(c["content"] for c in DECREE_30_CHUNKS)
+    await _ensure_seed_storage(f"uploads/{DECREE_30_COLLECTION_ID}/{DECREE_30_FILENAME}", file_content_mock)
     file_hash = hashlib.sha256(file_content_mock.encode("utf-8")).hexdigest()
 
     doc = KnowledgeDocument(
@@ -352,10 +411,14 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
 
     if existing_doc:
         logger.info("QNU Admissions document already present in col_admissions.")
+        file_content = "\n\n".join(c["content"] for c in ADMISSIONS_CHUNKS)
+        await _ensure_seed_storage(existing_doc.storage_path, file_content)
+        await _ensure_qdrant_points(db, ADMISSIONS_COLLECTION_ID)
         return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in ADMISSIONS_CHUNKS)
+    await _ensure_seed_storage(f"uploads/{ADMISSIONS_COLLECTION_ID}/{ADMISSIONS_FILENAME}", file_content)
     file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
 
     doc = KnowledgeDocument(
@@ -485,10 +548,14 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
 
     if existing_doc:
         logger.info("QNU Library document already present in col_library.")
+        file_content = "\n\n".join(c["content"] for c in LIBRARY_CHUNKS)
+        await _ensure_seed_storage(existing_doc.storage_path, file_content)
+        await _ensure_qdrant_points(db, LIBRARY_COLLECTION_ID)
         return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in LIBRARY_CHUNKS)
+    await _ensure_seed_storage(f"uploads/{LIBRARY_COLLECTION_ID}/{LIBRARY_FILENAME}", file_content)
     file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
 
     doc = KnowledgeDocument(
@@ -618,9 +685,13 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
 
     doc_created = 0
     chunk_objs: list[KnowledgeChunk] = []
-    if not existing_doc:
+    file_content = "\n\n".join(c["content"] for c in QUESTION_BANK_CHUNKS)
+    if existing_doc:
+        await _ensure_seed_storage(existing_doc.storage_path, file_content)
+        await _ensure_qdrant_points(db, QUESTION_BANK_COLLECTION_ID)
+    else:
         # 3. Create KnowledgeDocument
-        file_content = "\n\n".join(c["content"] for c in QUESTION_BANK_CHUNKS)
+        await _ensure_seed_storage(f"uploads/{QUESTION_BANK_COLLECTION_ID}/{QUESTION_BANK_FILENAME}", file_content)
         file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
 
         doc = KnowledgeDocument(

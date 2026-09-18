@@ -90,17 +90,35 @@ def test_evaluation_service_datasets():
 
 @pytest.mark.asyncio
 async def test_evaluation_service_run():
+    from unittest.mock import patch
+
+    from app.modules.assistants.schemas import AssistantChatResponse
+
     service = EvaluationService()
     mock_session = AsyncMock()
     mock_session.add = MagicMock()
     mock_session.commit = AsyncMock()
 
-    req = EvaluationRunRequest(
-        assistant_code="admissions",
-        dataset_id="qnu_admissions_benchmark",
-        sample_size=2,
-    )
-    res = await service.run_evaluation(mock_session, req)
+    async def fake_chat(session, assistant_code, req):
+        if "mã" in req.message.lower():
+            ans = "Mã cơ sở đào tạo của Trường Đại học Quy Nhơn trong kỳ tuyển sinh toàn quốc là DQN."
+        else:
+            ans = "Địa chỉ trụ sở chính của Trường Đại học Quy Nhơn đặt tại Số 170 An Dương Vương, thành phố Quy Nhơn, tỉnh Bình Định."
+        return AssistantChatResponse(
+            assistant_code=assistant_code,
+            assistant_name="Trợ lý Tuyển sinh QNU",
+            status="completed",
+            answer=ans,
+            citations=[{"quote": ans}],
+        )
+
+    with patch("app.modules.assistants.service.assistant_service.chat", side_effect=fake_chat):
+        req = EvaluationRunRequest(
+            assistant_code="admissions",
+            dataset_id="qnu_admissions_benchmark",
+            sample_size=2,
+        )
+        res = await service.run_evaluation(mock_session, req)
 
     assert res.status == "completed"
     assert res.total_cases == 2
@@ -132,3 +150,32 @@ async def test_api_evaluation_endpoints():
         resp_gap = await client.get("/platform/v1alpha1/evaluation/gap-inbox")
         assert resp_gap.status_code == 200
         assert isinstance(resp_gap.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_evaluation_service_run_failed_rag_honest_rejection():
+    """Verify that when RAG returns empty/error, EvaluationService records honest failure without fabricating ground truth."""
+    from unittest.mock import patch
+
+    from app.modules.rag.service import rag_service
+
+    service = EvaluationService()
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock()
+    mock_session.commit = AsyncMock()
+
+    req = EvaluationRunRequest(
+        assistant_code="admissions",
+        dataset_id="qnu_admissions_benchmark",
+        sample_size=2,
+    )
+    with patch.object(rag_service, "ask", side_effect=RuntimeError("Simulated RAG database failure")):
+        res = await service.run_evaluation(mock_session, req)
+
+    assert res.status == "completed"
+    assert res.total_cases == 2
+    # Since RAG failed and no answer/context was fabricated, scores must be 0 and fail TM-08!
+    assert res.faithfulness_avg == 0.0
+    assert res.answer_relevance_avg == 0.0
+    assert res.meets_tm08_standard is False
+    assert res.passed_cases == 0

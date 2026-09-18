@@ -23,7 +23,7 @@ import {
 } from "../components/ui/select";
 
 export const ChannelsPage: React.FC = () => {
-  const [selectedAssistant, setSelectedAssistant] = useState("admissions");
+  const [selectedAssistant, setSelectedAssistant] = useState("ast_admissions");
   const [widgetTitle, setWidgetTitle] = useState("Trợ lý Tuyển sinh QNU");
   const [position, setPosition] = useState<"bottom-right" | "bottom-left">("bottom-right");
   const [welcomeMessage, setWelcomeMessage] = useState(
@@ -31,11 +31,12 @@ export const ChannelsPage: React.FC = () => {
   );
   const [copied, setCopied] = useState(false);
 
-  const embedScript = `<!-- QNU.AI Web Chat Widget - Cổng Thông Tin ĐH Quy Nhơn -->
+  const originUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://ai.qnu.edu.vn";
+  const embedScript = `<!-- QNU AI Platform — Standalone Web Chat Widget ĐH Quy Nhơn -->
 <script
-  src="https://ai.qnu.edu.vn/cdn/v1/widget.js"
+  src="${originUrl}/embed/qnu-chat-widget.js"
   data-assistant="${selectedAssistant}"
-  data-tenant="tenant_qnu"
   data-title="${widgetTitle}"
   data-position="${position}"
   data-welcome="${welcomeMessage}"
@@ -85,10 +86,10 @@ export const ChannelsPage: React.FC = () => {
                 value={selectedAssistant}
                 onValueChange={(val) => {
                   setSelectedAssistant(val);
-                  if (val === "admissions") setWidgetTitle("Trợ lý Tuyển sinh QNU");
-                  else if (val === "regulations") setWidgetTitle("Trợ lý Quy chế Học vụ");
-                  else if (val === "library") setWidgetTitle("Trợ lý Thư viện Số");
-                  else if (val === "drafting") setWidgetTitle("Trợ lý Soạn thảo NĐ 30");
+                  if (val === "ast_admissions") setWidgetTitle("Trợ lý Tuyển sinh QNU");
+                  else if (val === "ast_regulations") setWidgetTitle("Trợ lý Quy chế Học vụ");
+                  else if (val === "ast_library") setWidgetTitle("Trợ lý Thư viện Số");
+                  else if (val === "ast_drafting") setWidgetTitle("Trợ lý Soạn thảo NĐ 30");
                   else setWidgetTitle("Trợ lý Ngân hàng Đề thi");
                 }}
               >
@@ -96,17 +97,17 @@ export const ChannelsPage: React.FC = () => {
                   <SelectValue placeholder="Chọn Trợ lý AI" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admissions">
+                  <SelectItem value="ast_admissions">
                     Trợ lý Tuyển sinh (tuyensinh.qnu.edu.vn)
                   </SelectItem>
-                  <SelectItem value="regulations">
+                  <SelectItem value="ast_regulations">
                     Trợ lý Quy chế Học vụ (daotao.qnu.edu.vn)
                   </SelectItem>
-                  <SelectItem value="library">Trợ lý Thư viện Số (lib.qnu.edu.vn)</SelectItem>
-                  <SelectItem value="drafting">
+                  <SelectItem value="ast_library">Trợ lý Thư viện Số (lib.qnu.edu.vn)</SelectItem>
+                  <SelectItem value="ast_drafting">
                     Trợ lý Soạn thảo NĐ 30 (hanhchinh.qnu.edu.vn)
                   </SelectItem>
-                  <SelectItem value="question-bank">
+                  <SelectItem value="ast_question_bank">
                     Trợ lý Ngân hàng Đề thi (khaothi.qnu.edu.vn)
                   </SelectItem>
                 </SelectContent>

@@ -116,3 +116,28 @@ export interface TokenQuota {
     local_tokens: number;
   };
 }
+
+export interface ModelUsageBreakdownItem {
+  model_name: string;
+  provider: string;
+  total_requests: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_latency_ms: number;
+}
+
+export interface DailyUsageItem {
+  date: string;
+  requests: number;
+  total_tokens: number;
+  cost_usd: number;
+}
+
+export interface UsageStatsResponse {
+  total_requests: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  avg_latency_ms: number;
+  models_breakdown: ModelUsageBreakdownItem[];
+  daily_usage: DailyUsageItem[];
+}

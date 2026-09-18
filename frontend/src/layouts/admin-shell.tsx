@@ -58,6 +58,7 @@ export function AdminShell({
           onToggleSidebar={toggleSidebar}
           onOpenCommand={() => setCommandOpen(true)}
           currentPath={currentPath}
+          onNavigate={onNavigate}
         />
 
         {/* Page Content */}

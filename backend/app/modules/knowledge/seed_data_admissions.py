@@ -173,6 +173,35 @@ ADMISSIONS_CHUNKS: list[dict[str, Any]] = [
             "page": 7,
         },
     },
+    {
+        "id": "chk_adm_8",
+        "chunk_index": 7,
+        "title": "Phần VIII: Bảng tổng hợp điểm chuẩn trúng tuyển 3 năm liên tiếp (2022 - 2024)",
+        "content": (
+            "Phần VIII - BẢNG TỔNG HỢP ĐIỂM CHUẨN XÉT THEO KẾT QUẢ THI TỐT NGHIỆP THPT (2022 - 2024):\n"
+            "Dưới đây là điểm chuẩn trúng tuyển một số ngành trọng điểm của Trường Đại học Quy Nhơn qua 3 năm gần nhất:\n"
+            "1. Nhóm ngành Đào tạo Giáo viên (Sư phạm):\n"
+            "   - Sư phạm Toán học (Mã 7140209): Năm 2022: 25.50 | Năm 2023: 26.00 | Năm 2024: 26.25 (Tổ hợp A00, A01).\n"
+            "   - Giáo dục Tiểu học (Mã 7140202): Năm 2022: 25.00 | Năm 2023: 25.25 | Năm 2024: 25.50 (Tổ hợp C00, D01).\n"
+            "   - Sư phạm Tiếng Anh (Mã 7140231): Năm 2022: 25.00 | Năm 2023: 25.50 | Năm 2024: 25.75 (Tiếng Anh nhân hệ số 2).\n"
+            "   - Sư phạm Ngữ văn (Mã 7140217): Năm 2022: 25.25 | Năm 2023: 25.75 | Năm 2024: 26.00 (Tổ hợp C00, D01, D14).\n"
+            "2. Nhóm ngành Công nghệ Thông tin & Kỹ thuật:\n"
+            "   - Công nghệ thông tin (Mã 7480201): Năm 2022: 23.50 | Năm 2023: 24.00 | Năm 2024: 24.50 (Tổ hợp A00, A01, D01, D07).\n"
+            "   - Kỹ thuật phần mềm (Mã 7480103): Năm 2022: 22.00 | Năm 2023: 22.50 | Năm 2024: 23.00 (Tổ hợp A00, A01, D01, D07).\n"
+            "3. Nhóm ngành Kinh tế, Quản trị & Du lịch:\n"
+            "   - Quản trị kinh doanh (Mã 7340101): Năm 2022: 20.50 | Năm 2023: 21.00 | Năm 2024: 21.50 (Tổ hợp A00, A01, D01, D07).\n"
+            "   - Kinh tế quốc tế (Mã 7310106): Năm 2022: 20.00 | Năm 2023: 20.50 | Năm 2024: 21.00 (Tổ hợp A00, A01, D01, D07).\n"
+            "   - Ngôn ngữ Anh (Mã 7220201): Năm 2022: 22.00 | Năm 2023: 22.50 | Năm 2024: 22.50 (Tiếng Anh nhân 2, tổ hợp D01, D14, D15).\n"
+            "Xu hướng chung: Điểm chuẩn các ngành Sư phạm và Công nghệ thông tin của ĐH Quy Nhơn liên tục duy trì ở mức cao và tăng đều qua các năm."
+        ),
+        "metadata": {
+            "section": "Phần VIII",
+            "topic": "Điểm chuẩn 3 năm 2022-2024",
+            "document_name": ADMISSIONS_FILENAME,
+            "title": ADMISSIONS_TITLE,
+            "page": 8,
+        },
+    },
 ]
 
 ADMISSIONS_FACTS: list[dict[str, Any]] = [
@@ -305,6 +334,32 @@ ADMISSIONS_FACTS: list[dict[str, Any]] = [
             "price_min": 150000,
             "price_max": 300000,
             "has_wifi": True,
+        },
+    },
+    {
+        "fact_key": "fact_adm_diem_chuan_3_nam",
+        "category": "cutoff_trend",
+        "entity_name": "Điểm chuẩn 3 năm liên tiếp 2022 - 2024 các ngành trọng điểm ĐH Quy Nhơn",
+        "attribute_name": "Điểm chuẩn trúng tuyển tốt nghiệp THPT qua các năm 2022, 2023, 2024",
+        "value": (
+            "Điểm chuẩn 3 năm (2022 -> 2023 -> 2024): "
+            "Sư phạm Toán học: 25.50 -> 26.00 -> 26.25; "
+            "Giáo dục Tiểu học: 25.00 -> 25.25 -> 25.50; "
+            "Sư phạm Ngữ văn: 25.25 -> 25.75 -> 26.00; "
+            "Sư phạm Tiếng Anh: 25.00 -> 25.50 -> 25.75; "
+            "Công nghệ thông tin: 23.50 -> 24.00 -> 24.50; "
+            "Kỹ thuật phần mềm: 22.00 -> 22.50 -> 23.00; "
+            "Quản trị kinh doanh: 20.50 -> 21.00 -> 21.50."
+        ),
+        "fact_metadata": {
+            "years": [2022, 2023, 2024],
+            "sp_toan": {"2022": 25.50, "2023": 26.00, "2024": 26.25},
+            "cntt": {"2022": 23.50, "2023": 24.00, "2024": 24.50},
+            "sp_tieu_hoc": {"2022": 25.00, "2023": 25.25, "2024": 25.50},
+            "sp_van": {"2022": 25.25, "2023": 25.75, "2024": 26.00},
+            "sp_anh": {"2022": 25.00, "2023": 25.50, "2024": 25.75},
+            "ktpm": {"2022": 22.00, "2023": 22.50, "2024": 23.00},
+            "qtkd": {"2022": 20.50, "2023": 21.00, "2024": 21.50},
         },
     },
 ]

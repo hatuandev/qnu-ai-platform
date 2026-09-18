@@ -1,8 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BookOpen,
+  Check,
   CheckCircle2,
+  ExternalLink,
   HelpCircle,
   Inbox,
   Play,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { EmptyState } from "../components/admin/empty-state";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -52,6 +55,33 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
     queryFn: () => apiClient.getGapInbox(),
   });
 
+  const resolveGapMutation = useMutation({
+    mutationFn: ({
+      gapId,
+      status,
+      notes,
+    }: {
+      gapId: string;
+      status: "resolved" | "dismissed";
+      notes?: string;
+    }) =>
+      apiClient.resolveGap(gapId, {
+        status,
+        resolution_notes: notes,
+        resolved_by: "can_bo_phu_trach",
+      }),
+    onSuccess: (_, variables) => {
+      setResolvedGaps((prev) => [...prev, variables.gapId]);
+      queryClient.invalidateQueries({ queryKey: ["gap-inbox"] });
+      toast.success(
+        variables.status === "resolved"
+          ? "Đã đánh dấu xử lý và bổ sung tri thức thành công!"
+          : "Đã bỏ qua lỗ hổng tri thức."
+      );
+    },
+    onError: (err: Error) => toast.error(`Xử lý lỗ hổng thất bại: ${err.message}`),
+  });
+
   const handleRunEvaluation = async () => {
     try {
       setIsRunningEval(true);
@@ -70,8 +100,15 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
     }
   };
 
-  const handleResolve = (id: string) => {
-    setResolvedGaps((prev) => [...prev, id]);
+  const handleResolve = (id: string, status: "resolved" | "dismissed" = "resolved") => {
+    resolveGapMutation.mutate({
+      gapId: id,
+      status,
+      notes:
+        status === "resolved"
+          ? "Đã cập nhật văn bản giải quyết lỗ hổng tri thức vào Kho tri thức."
+          : undefined,
+    });
   };
 
   const totalEvals = metrics?.total_evaluations ?? 0;
@@ -337,19 +374,25 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
             ) : (
               <div className="grid grid-cols-1 gap-3">
                 {gapItems.map((item: GapInboxItem) => {
-                  const isResolved = resolvedGaps.includes(item.id);
+                  const isResolved =
+                    item.status === "resolved" ||
+                    item.status === "dismissed" ||
+                    resolvedGaps.includes(item.id);
                   return (
                     <Card
                       key={item.id}
                       className={`p-4 transition-all ${
-                        isResolved ? "opacity-50 bg-muted/20" : "hover:border-primary/50"
+                        isResolved ? "opacity-60 bg-muted/20" : "hover:border-primary/50"
                       }`}
                     >
                       <CardContent className="p-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                         <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <HelpCircle className="h-4 w-4 text-warning shrink-0" />
-                            <h4 className="font-bold text-foreground truncate">
+                            <h4
+                              className="font-bold text-foreground truncate max-w-md"
+                              title={item.question}
+                            >
                               "{item.question}"
                             </h4>
                             <Badge variant="outline" className="text-[10px] font-mono shrink-0">
@@ -358,19 +401,35 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                             <Badge variant="secondary" className="text-[10px] shrink-0 font-mono">
                               Hỏi {item.frequency} lần
                             </Badge>
+                            {item.timestamp && (
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {new Date(item.timestamp).toLocaleDateString("vi-VN")}
+                              </span>
+                            )}
                           </div>
                           <p className="text-muted-foreground text-[11px] leading-relaxed pl-6">
-                            Nguyên nhân thiếu: {item.reason}
+                            Nguyên nhân: {item.reason}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
                           {isResolved ? (
-                            <span className="text-success font-medium text-xs flex items-center gap-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xử lý
-                            </span>
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-success font-medium text-xs flex items-center gap-1">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {item.status === "dismissed" ? "Đã bỏ qua" : "Đã xử lý & nạp RAG"}
+                              </span>
+                              {item.resolution_notes && (
+                                <span
+                                  className="text-[10px] text-muted-foreground max-w-xs truncate"
+                                  title={item.resolution_notes}
+                                >
+                                  {item.resolution_notes}
+                                </span>
+                              )}
+                            </div>
                           ) : (
-                            <>
+                            <div className="flex flex-wrap items-center gap-1.5">
                               {onNavigateToKnowledge && (
                                 <Button
                                   variant="outline"
@@ -379,18 +438,29 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                                   className="h-7 text-xs text-primary gap-1"
                                 >
                                   <BookOpen className="h-3 w-3" />
-                                  <span>Bổ sung vào RAG</span>
+                                  <span>Nạp vào RAG</span>
+                                  <ExternalLink className="h-2.5 w-2.5 opacity-60" />
                                 </Button>
                               )}
                               <Button
+                                size="sm"
+                                disabled={resolveGapMutation.isPending}
+                                onClick={() => handleResolve(item.id, "resolved")}
+                                className="h-7 text-xs gap-1 bg-success hover:bg-success/90 text-success-foreground"
+                              >
+                                <Check className="h-3 w-3" />
+                                <span>Đánh dấu đã nạp</span>
+                              </Button>
+                              <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleResolve(item.id)}
+                                disabled={resolveGapMutation.isPending}
+                                onClick={() => handleResolve(item.id, "dismissed")}
                                 className="h-7 text-xs text-muted-foreground hover:text-foreground"
                               >
                                 Bỏ qua
                               </Button>
-                            </>
+                            </div>
                           )}
                         </div>
                       </CardContent>

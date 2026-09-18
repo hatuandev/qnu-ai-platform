@@ -10,10 +10,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
+import { useAuth } from "@/contexts/auth-context";
 import { NAVIGATION_CONFIG } from "@/navigation/config";
 import {
   ChevronRight,
   ExternalLink,
+  LogOut,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -27,10 +29,27 @@ interface TopbarProps {
   onToggleSidebar: () => void;
   onOpenCommand: () => void;
   currentPath: string;
+  onNavigate?: (path: string) => void;
 }
 
-export function Topbar({ sidebarOpen, onToggleSidebar, onOpenCommand, currentPath }: TopbarProps) {
+export function Topbar({
+  sidebarOpen,
+  onToggleSidebar,
+  onOpenCommand,
+  currentPath,
+  onNavigate,
+}: TopbarProps) {
   const { resolvedTheme, setTheme } = useTheme();
+  const { logout } = useAuth();
+
+  const handleLogout = React.useCallback(async () => {
+    await logout();
+    if (onNavigate) {
+      onNavigate("/login");
+    } else {
+      window.location.href = "/login";
+    }
+  }, [logout, onNavigate]);
 
   // Compute breadcrumbs from current path
   const breadcrumbInfo = React.useMemo(() => {
@@ -152,8 +171,12 @@ export function Topbar({ sidebarOpen, onToggleSidebar, onOpenCommand, currentPat
               </a>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive cursor-pointer">
-              Đăng xuất
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-destructive cursor-pointer flex items-center justify-between"
+            >
+              <span>Đăng xuất</span>
+              <LogOut className="size-3.5 text-destructive" />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

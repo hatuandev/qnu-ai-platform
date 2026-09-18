@@ -460,10 +460,14 @@ class WorkflowService:
         if workflow_version_id:
             version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == workflow_version_id)
             v_spec = (await db.execute(version_stmt)).scalar_one_or_none()
-            if v_spec:
-                dag_spec = WorkflowDagSpec.model_validate(v_spec)
-            else:
-                dag_spec = await self.get_workflow_spec(db, req.workflow_id)
+            if not v_spec:
+                raise AppException(
+                    f"Không tìm thấy phiên bản workflow đã công bố '{workflow_version_id}'.",
+                    code="workflow_version_not_found",
+                    status_code=404,
+                    details={"workflow_id": req.workflow_id, "workflow_version_id": workflow_version_id},
+                )
+            dag_spec = WorkflowDagSpec.model_validate(v_spec)
         else:
             dag_spec = await self.get_workflow_spec(db, req.workflow_id)
         context = WorkflowContext(
@@ -665,10 +669,17 @@ class WorkflowService:
         if execution_record.workflow_version_id:
             version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == execution_record.workflow_version_id)
             v_spec = (await db.execute(version_stmt)).scalar_one_or_none()
-            if v_spec:
-                dag_spec = WorkflowDagSpec.model_validate(v_spec)
-            else:
-                dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
+            if not v_spec:
+                raise AppException(
+                    f"Không tìm thấy phiên bản workflow '{execution_record.workflow_version_id}' để tiếp tục thực thi.",
+                    code="workflow_version_not_found",
+                    status_code=404,
+                    details={
+                        "workflow_id": execution_record.workflow_id,
+                        "workflow_version_id": execution_record.workflow_version_id,
+                    },
+                )
+            dag_spec = WorkflowDagSpec.model_validate(v_spec)
         else:
             dag_spec = await self.get_workflow_spec(db, execution_record.workflow_id)
         from app.modules.assistants.schemas import AssistantRuntimeProfile

@@ -8,7 +8,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import AppException, NotFoundException
 from app.modules.tools.models import ToolExecutionLog
 from app.modules.tools.registry import tool_registry
 from app.modules.tools.schemas import (
@@ -28,7 +28,6 @@ class ToolService:
 
     def list_tools(self, category: str | None = None) -> list[ToolDefinitionResponse]:
         """List registered tools formatted for API response."""
-        tools = self.registry.list_all(category)
         return [
             ToolDefinitionResponse(
                 id=f"tool_{t.name}",
@@ -41,11 +40,11 @@ class ToolService:
                 is_active=True,
                 requires_approval=t.requires_approval,
             )
-            for t in tools
+            for t in self.registry.list_all(category)
         ]
 
     def get_tool(self, name: str) -> ToolDefinitionResponse:
-        """Get detail of a registered tool."""
+        """Get a single tool definition by name."""
         tool = self.registry.get(name)
         if not tool:
             raise NotFoundException(f"Công cụ (Tool) '{name}' không tồn tại trong hệ thống")
@@ -74,6 +73,60 @@ class ToolService:
         tool = self.registry.get(request.tool_name)
         if not tool:
             raise NotFoundException(f"Công cụ (Tool) '{request.tool_name}' không tồn tại trong hệ thống")
+
+        # 1. Check Assistant enabled_tools allowlist if executed in assistant context
+        if request.assistant_code:
+            import asyncio
+
+            from sqlalchemy import select
+
+            from app.modules.assistants.models import AssistantModel
+
+            stmt = select(AssistantModel).where(AssistantModel.code == request.assistant_code)
+            exec_res = await session.execute(stmt)
+            assistant_rec = (
+                exec_res.scalar_one_or_none()
+                if hasattr(exec_res, "scalar_one_or_none")
+                else None
+            )
+            if asyncio.iscoroutine(assistant_rec):
+                assistant_rec = await assistant_rec
+
+            if isinstance(assistant_rec, AssistantModel):
+                config_data = assistant_rec.config or {}
+                tools_config = (
+                    config_data.get("tools")
+                    if isinstance(config_data, dict)
+                    else getattr(config_data, "tools", None)
+                )
+                enabled_tools = (
+                    tools_config.get("enabled_tools")
+                    if isinstance(tools_config, dict)
+                    else getattr(tools_config, "enabled_tools", None)
+                )
+                if (
+                    enabled_tools is not None
+                    and len(enabled_tools) > 0
+                    and request.tool_name not in enabled_tools
+                ):
+                    raise AppException(
+                        f"Công cụ '{request.tool_name}' không được kích hoạt cho trợ lý '{request.assistant_code}'.",
+                        code="tool_not_allowed_for_assistant",
+                        status_code=403,
+                        details={
+                            "assistant_code": request.assistant_code,
+                            "tool_name": request.tool_name,
+                        },
+                    )
+
+        # 2. Check approval requirement if tool has side-effects
+        if tool.requires_approval and not request.parameters.get("is_approved"):
+            raise AppException(
+                f"Công cụ '{request.tool_name}' yêu cầu phê duyệt nhân sự (Human-in-the-loop) trước khi thực thi.",
+                code="tool_requires_approval",
+                status_code=403,
+                details={"tool_name": request.tool_name},
+            )
 
         start_time = time.perf_counter()
         status = "success"

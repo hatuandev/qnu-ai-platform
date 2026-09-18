@@ -47,3 +47,29 @@ flowchart TD
 ## 3. Quản Trị & Lưu Trữ Kết Quả Đánh Giá
 - Mọi đợt kiểm định đều được lưu bản ghi vào bảng CSDL `evaluation_runs`.
 - Báo cáo chi tiết từng câu hỏi (kèm lý do đạt/hỏng) được xuất thành tệp JSON/Excel lưu trữ bền vững tại **MinIO** (`artifacts/eval_report_UUID.xlsx`).
+
+---
+
+## 4. Hòm Thư Lỗ Hổng Tri Thức (Knowledge Gap Inbox) & Vòng Lặp Học Chủ Động (Active Remediation)
+
+Bên cạnh benchmark định kỳ, hệ thống thiết lập cơ chế **Active Learning khép kín** nhằm liên tục phát hiện và bổ sung tri thức thiếu hụt từ người dùng thực tế:
+
+```mermaid
+flowchart LR
+    USER[Sinh viên / Cán bộ đặt câu hỏi] --> CHAT[Chat Engine / SSE Stream]
+    CHAT --> RAG{Hybrid RAG Retrieval}
+    RAG -->|Không tìm thấy văn bản đối soát| NO_ANSWER[Kích hoạt No-Answer Policy<br>Hotline: 0256.3846.156]
+    NO_ANSWER --> HOOK[Hook: evaluation_service.record_gap]
+    HOOK --> GAP_DB[(Bảng knowledge_gaps<br>Cộng dồn frequency nếu lặp lại)]
+    GAP_DB --> INBOX[Hòm Thư Lỗ Hổng Tri Thức<br>Trang /evaluation]
+    INBOX --> REMEDIATE[Cán bộ nạp văn bản chính thức vào /knowledge]
+    REMEDIATE --> RESOLVE[PATCH /gap-inbox/:id<br>Đánh dấu resolved kèm ghi chú]
+```
+
+1. **Thu Thập Tự Động (Automatic Gap Capture)**:
+   - Khi luồng chat trả về `status == "insufficient_context"`, câu hỏi người dùng được tự động đẩy vào bảng `knowledge_gaps`.
+   - Nếu câu hỏi đã tồn tại ở trạng thái `pending`, hệ thống tự động tăng `frequency += 1` để xếp hạng các chủ đề sinh viên quan tâm nhiều nhất lên đầu.
+2. **Khắc Phục Chủ Động (Active Remediation)**:
+   - Chuyên viên phòng ban truy cập `/evaluation` xem danh sách câu hỏi chưa có tài liệu trả lời.
+   - Nút **[Nạp Tri Thức Bổ Sung]** dẫn thẳng sang `/knowledge` để tải lên văn bản chính thức tương ứng.
+   - Nút **[Đánh Dấu Đã Nạp]** cập nhật trạng thái `resolved` kèm số hiệu văn bản vừa ban hành.

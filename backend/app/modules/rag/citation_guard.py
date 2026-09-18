@@ -29,6 +29,15 @@ NO_ANSWER_MESSAGES = {
     ),
 }
 
+ACADEMIC_STOPWORDS = {
+    "sinh", "viên", "trường", "đại", "học", "quy", "nhơn", "được", "trong", "theo",
+    "những", "các", "cho", "với", "của", "và", "hoặc", "khi", "thì", "tại", "này",
+    "mỗi", "một", "hai", "ba", "bốn", "tối", "đa", "thiểu", "người", "thời",
+    "gian", "thực", "hiện", "định", "có", "không", "phải", "để", "biết", "thêm",
+    "chi", "tiết", "trực", "tiếp", "quý", "vị", "bạn", "chào", "xin", "cảm", "ơn",
+    "liên", "hệ", "qua", "số", "điện", "thoại", "vui", "lòng", "năm",
+}
+
 
 class CitationGuard:
     """Verifies that RAG answers are backed by verified citations and enforces refusal policy."""
@@ -79,16 +88,25 @@ class CitationGuard:
         ]):
             return []
 
-        answer_words = set(re.findall(r"\b\w{3,}\b", answer_lower))
+        answer_words = {
+            w for w in re.findall(r"\b\w{2,}\b", answer_lower)
+            if w not in ACADEMIC_STOPWORDS
+        }
         filtered: list[Citation] = []
 
         for cite in citations:
-            quote_words = set(re.findall(r"\b\w{3,}\b", cite.quote.lower()))
+            quote_text = cite.quote or ""
+            if not quote_text:
+                continue
+            quote_words = {
+                w for w in re.findall(r"\b\w{2,}\b", quote_text.lower())
+                if w not in ACADEMIC_STOPWORDS
+            }
             overlap = len(answer_words.intersection(quote_words))
             if overlap >= min_overlap_words:
                 filtered.append(cite)
 
-        return filtered if filtered else citations[:2]
+        return filtered
 
     def get_no_answer_response(self, module_code: str = "general") -> str:
         """Return friendly rejection response when context is insufficient."""

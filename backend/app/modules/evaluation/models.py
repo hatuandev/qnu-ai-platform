@@ -91,3 +91,24 @@ class EvaluationResultItem(Base):
     is_hallucinated: Mapped[bool] = mapped_column(Boolean, default=False)
     passed_all_criteria: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class KnowledgeGapRecord(Base):
+    """Unanswered question triggering No-Answer Policy (knowledge deficiency)."""
+
+    __tablename__ = "knowledge_gaps"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    assistant_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    collection_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    frequency: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(30), default="pending", index=True)  # pending, resolved, dismissed
+    resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_gap_assistant_status", "assistant_code", "status"),
+    )

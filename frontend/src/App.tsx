@@ -3,9 +3,11 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AdminShell } from "@/layouts/admin-shell";
 import { queryClient } from "@/lib/query-client";
 import { DashboardPage } from "@/pages/dashboard-page";
+import { LoginPage } from "@/pages/login-page";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Network } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
@@ -80,6 +82,7 @@ function AppContent() {
     return "/";
   });
   const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "idle" });
+  const { isAuthenticated, isLoading } = useAuth();
 
   const handleNavigate = useCallback((path: string) => {
     const target = new URL(path, window.location.origin);
@@ -269,6 +272,27 @@ function AppContent() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-xs text-muted-foreground font-medium">
+          Đang kiểm tra phiên làm việc...
+        </span>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <LoginPage
+        onSuccess={() => {
+          handleNavigate(currentPath === "/login" ? "/" : currentPath);
+        }}
+      />
+    );
+  }
+
   return (
     <AdminShell
       currentPath={currentPath}
@@ -294,7 +318,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
         <TooltipProvider delayDuration={0}>
-          <AppContent />
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

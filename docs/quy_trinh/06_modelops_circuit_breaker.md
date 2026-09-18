@@ -69,5 +69,17 @@ Triển khai tại [`app/modules/modelops/circuit_breaker.py`](file:///d:/DuAnPh
     - **Local / Docling / SentenceTransformers**: Kiểm tra registry in-memory nội bộ.
 - **Trải Nghiệm UI & Dọn Dẹp 1-Click**:
   - Nút **[⚡ Test Tất Cả Models]** trên header thẻ *Mô Hình Khả Dụng* hiển thị spinner loading khi đang ping.
-  - Từng thẻ tag model hiển thị chấm tròn & huy hiệu trạng thái: 🟢 Khả dụng (kèm độ trễ ms), 🔴 Không khả dụng (kèm lý do/mã 404), 🟡 Cooldown 429, kèm nút **[▶]** để test nhanh từng model riêng lẻ.
   - Khi phát hiện bất kỳ model nào bị 404/ngừng hỗ trợ, hệ thống hiển thị banner cảnh báo thông minh kèm nút **[🧹 Dọn Dẹp Model Lỗi]** để cán bộ quản trị loại bỏ ngay lập tức khỏi cấu hình chỉ với 1 click chuột.
+
+### 5. Cơ Chế Observability & Thống Kê Chi Phí Thời Gian Thực (Real-Time Usage & Cost Tracking)
+- **Mục tiêu**: Loại bỏ hoàn toàn số liệu giả lập/gán cứng trên Dashboard; lưu trữ và tổng hợp chính xác số lượt gọi, tổng số token tiêu thụ, chi phí quy đổi USD thật và độ trễ phản hồi của toàn bộ các giao tác LLM.
+- **Tầng CSDL Bền Vững**:
+  - Bảng `llm_usage_logs`: Lưu vết từng lượt gọi LLM (`id`, `tenant_id`, `assistant_id`, `provider`, `model_name`, `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`, `latency_ms`, `is_fallback`, `status`).
+  - Bảng `tenant_quotas`: Tự động cộng dồn `tokens_used` và `cost_used_usd` trong chu kỳ tháng.
+- **Tầng Tính Toán Chi Phí (`app/modules/modelops/pricing.py`)**:
+  - Bảng giá định danh chi tiết cho từng họ mô hình (OpenAI `gpt-4o-mini`: $0.15/$0.60 per 1M tokens; Gemini `gemini-1.5-flash`: $0.075/$0.30 per 1M tokens; Mistral OCR: $0.001/call; Local vLLM: $0.0).
+- **Tích Hợp Tự Động (Telemetry Hooks)**:
+  - Tích hợp ghi log trong cả 2 phương thức: `modelops_service.generate()` và `AssistantService.chat_stream()`.
+- **API Phân Tích & Giám Sát**:
+  - Endpoint `GET /platform/v1alpha1/modelops/usage-stats?days=30` trả về số liệu tổng hợp: `total_requests`, `total_tokens`, `total_cost_usd`, `avg_latency_ms`, danh sách phân bổ theo mô hình `models_breakdown` và diễn biến theo ngày `daily_usage` phục vụ trực tiếp biểu đồ thời gian thực trên Dashboard.
+

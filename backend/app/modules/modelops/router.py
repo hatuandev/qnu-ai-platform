@@ -28,6 +28,7 @@ from app.modules.modelops.schemas import (
     SystemModelDefaultsResponse,
     SystemModelDefaultsUpdate,
     TenantQuotaResponse,
+    UsageStatsResponse,
 )
 from app.modules.modelops.service import modelops_service
 
@@ -305,3 +306,17 @@ async def get_tenant_quota(
         is_blocked=quota.is_blocked,
         usage_percent=percent,
     )
+
+
+@router.get(
+    "/usage-stats",
+    response_model=UsageStatsResponse,
+    summary="Thống kê thực tế lượng token tiêu thụ, chi phí USD và breakdown theo mô hình",
+)
+async def get_modelops_usage_stats(
+    days: int = 30,
+    tenant_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> UsageStatsResponse:
+    return await modelops_service.get_usage_statistics(db, days=days, tenant_id=tenant_id)
+

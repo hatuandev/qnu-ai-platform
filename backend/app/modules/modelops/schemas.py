@@ -412,3 +412,32 @@ class ProviderModelsTestResponse(BaseModel):
     results: list[SingleModelTestResult] = Field(default_factory=list)
 
 
+# ---------------- Real-time Usage & Cost Tracking Schemas ----------------
+
+
+class ModelUsageBreakdownItem(BaseModel):
+    model_name: str
+    provider: str
+    total_requests: int
+    total_tokens: int
+    total_cost_usd: float
+    avg_latency_ms: float
+
+
+class DailyUsageItem(BaseModel):
+    date: str  # YYYY-MM-DD
+    requests: int
+    total_tokens: int
+    cost_usd: float
+
+
+class UsageStatsResponse(BaseModel):
+    total_requests: int
+    total_tokens: int
+    total_cost_usd: float
+    avg_latency_ms: float
+    models_breakdown: list[ModelUsageBreakdownItem] = Field(default_factory=list)
+    daily_usage: list[DailyUsageItem] = Field(default_factory=list)
+
+
+

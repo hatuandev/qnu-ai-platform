@@ -3,6 +3,7 @@ import type {
   EvaluationRunItem,
   EvaluationRunRequest,
   GapInboxItem,
+  KnowledgeGapResolveRequest,
 } from "@/types/evaluation";
 import { BASE_URL } from "./http-client";
 
@@ -15,8 +16,19 @@ export const evaluationApi = {
     return await res.json();
   },
 
-  async getGapInbox(): Promise<GapInboxItem[]> {
-    const res = await fetch(`${BASE_URL}/evaluation/gap-inbox`);
+  async getGapInbox(options?: {
+    assistantCode?: string;
+    status?: string;
+  }): Promise<GapInboxItem[]> {
+    const params = new URLSearchParams();
+    if (options?.assistantCode && options.assistantCode !== "all") {
+      params.set("assistant_code", options.assistantCode);
+    }
+    if (options?.status) {
+      params.set("status", options.status);
+    }
+    const query = params.toString();
+    const res = await fetch(`${BASE_URL}/evaluation/gap-inbox${query ? `?${query}` : ""}`);
     if (!res.ok) {
       throw new Error(`Không tải được danh sách gap inbox (HTTP ${res.status}).`);
     }
@@ -31,12 +43,27 @@ export const evaluationApi = {
         question: (d.question as string) || "Câu hỏi cần bổ sung tri thức",
         assistant_code: (d.assistant_code as string) || "admissions",
         assistant_name: (d.assistant_name as string) || "Trợ lý QNU",
+        collection_id: (d.collection_id as string) || undefined,
         reason: (d.reason as string) || "Chưa có tài liệu tương ứng trong Kho tri thức.",
         frequency: typeof d.frequency === "number" ? d.frequency : 1,
         timestamp: (d.timestamp as string) || new Date().toISOString(),
-        status: ((d.status as string) || "pending") as "pending" | "resolved",
+        status: ((d.status as string) || "pending") as "pending" | "resolved" | "dismissed",
+        resolution_notes: (d.resolution_notes as string) || null,
+        resolved_by: (d.resolved_by as string) || null,
       };
     });
+  },
+
+  async resolveGap(gapId: string, req: KnowledgeGapResolveRequest): Promise<GapInboxItem> {
+    const res = await fetch(`${BASE_URL}/evaluation/gap-inbox/${encodeURIComponent(gapId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) {
+      throw new Error(`Không thể đánh dấu xử lý lỗ hổng tri thức (HTTP ${res.status}).`);
+    }
+    return await res.json();
   },
 
   async getEvaluationRuns(assistantCode?: string): Promise<EvaluationRunItem[]> {

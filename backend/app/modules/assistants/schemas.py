@@ -265,3 +265,38 @@ class AssistantGenerateResponse(BaseModel):
     suggested_workflow_id: str = "regulations-assistant"
     suggested_collection_code: str | None = None
 
+
+class ReadinessCheckItem(BaseModel):
+    category: str = Field(..., description="knowledge, model, tools, guardrails, evaluation")
+    name: str = Field(..., description="Tên tiêu chí kiểm định")
+    status: Literal["passed", "failed", "warning"] = Field(..., description="Trạng thái đạt hay chưa")
+    score: int = Field(..., ge=0, le=100, description="Điểm số đạt được (0-100)")
+    message: str = Field(..., description="Chi tiết giải thích kết quả")
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class AssistantReadinessResponse(BaseModel):
+    assistant_code: str
+    assistant_name: str
+    is_ready_for_publish: bool
+    overall_readiness_score: int = Field(..., ge=0, le=100)
+    checks: list[ReadinessCheckItem]
+    blockers: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class AssistantCloneRequest(BaseModel):
+    new_code: str = Field(..., min_length=2, max_length=64, pattern=r"^[a-z0-9_-]+$")
+    new_name: str = Field(..., min_length=2, max_length=150)
+    new_description: str | None = Field(None, max_length=500)
+    target_collection_id: str | None = Field(None, max_length=64)
+
+
+class AssistantPublishResponse(BaseModel):
+    assistant_code: str
+    assistant_name: str
+    is_active: bool
+    readiness_score: int
+    published_at: datetime
+    message: str
+

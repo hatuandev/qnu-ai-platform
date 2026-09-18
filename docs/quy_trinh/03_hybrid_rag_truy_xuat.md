@@ -57,6 +57,9 @@ flowchart TD
 
 ### Bước 4 & 5: Tìm kiếm lai song song (Concurrent Hybrid Retrieval) & Dung hợp thứ hạng RRF ($k=60$)
 - **Thực thi song song phi phong tỏa**: Động cơ `retriever.py` kích hoạt đồng thời Dense Vector Search trên Qdrant và Sparse FTS Lexical Search trên PostgreSQL thông qua `asyncio.gather`, giảm tối đa 50% độ trễ (latency) so với truy vấn tuần tự.
+- **Ràng buộc Vòng đời & Phân quyền Đa người thuê (Lifecycle & Tenant Parity)**:
+  * Qdrant payload lưu trữ đầy đủ: `tenant_id`, `workspace_id`, `document_status`, `is_retrievable`, `chunk_id`, `document_id`.
+  * `search_dense` áp dụng bộ lọc nghiêm ngặt tương đồng 100% với PostgreSQL FTS: lọc bắt buộc `tenant_id` và `workspace_id`, đồng thời cấm triệt để (`must_not`) các tài liệu có `is_retrievable=False` hoặc `document_status in ["pending", "archived", "rejected", "failed", "processing"]`. Ngăn chặn hoàn toàn hiện tượng tài liệu dự thảo, nháp hoặc đã lưu trữ lọt vào kết quả dense search.
 - **Công thức Reciprocal Rank Fusion**:
   $$RRF\_Score(d) = \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \quad (\text{với } k = 60)$$
 - Cân bằng tối ưu giữa khả năng hiểu ngữ nghĩa sâu sắc của Vector BGE-M3 và độ chính xác tuyệt đối của từ khóa FTS tiếng Việt.
@@ -65,16 +68,19 @@ flowchart TD
 - Gọi mô hình Cross-Encoder `BAAI/bge-reranker-v2-m3` để chấm điểm tương quan cặp `(Query, Chunk)`.
 - **Cơ chế phòng thủ Graceful Fallback**: Nếu dịch vụ reranker bị timeout (>3 giây) hoặc ngoại tuyến, hệ thống tự động suy thoái an toàn về thứ tự ban đầu của thuật toán RRF mà không làm gián đoạn request của người dùng.
 
-### Bước 7 & 8: Chốt chặn Trích dẫn Dựa Trên Bằng Chứng (Evidence-Based Citation Filtering) & Chính Sách Không Trả Lời
-- **Lọc trích dẫn theo bằng chứng thực tế (`filter_evidence_citations`)**:
-  * Khi mô hình kích hoạt No-Answer Policy (từ chối do không đủ dữ liệu hoặc ngoài phạm vi): hệ thống tự động xóa sạch trích dẫn (`citations = []`) nhằm ngăn chặn việc hiển thị citation giả tạo khi câu trả lời thực chất là từ chối.
-  * Khi có câu trả lời: hệ thống đối soát trích đoạn minh chứng (`quote` / `source`) với nội dung câu trả lời; chỉ giữ lại các trích dẫn mà nội dung có căn cứ trực tiếp đóng góp vào câu trả lời, loại bỏ các tài liệu râu ria hoặc false-positive.
-- **Phản hồi từ chối chuẩn mực**: Phản hồi ấm áp kèm số điện thoại hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
+### Bước 7 & 8: Chốt chặn Trích dẫn Nghiêm Ngặt (Strict Evidence-Based Citation Guardrail) & Chính Sách Không Trả Lời
+- **Bộ lọc Trích dẫn Nghiêm ngặt (Strict Citation Filtering)**:
+  * **Lọc bỏ từ dừng học thuật tiếng Việt (`ACADEMIC_STOPWORDS`)**: Trước khi tính điểm giao thoa giữa câu trả lời và đoạn trích, thuật toán loại trừ toàn bộ các từ dừng phổ biến như *"sinh viên"*, *"quy nhơn"*, *"đại học"*, *"trường"*, *"theo"*, *"trong"*, *"với"*, *"tối"*... nhằm loại bỏ hoàn toàn các trường hợp match giả (false positive overlap).
+  * **Xử lý an toàn `quote is None`**: Đảm bảo không bao giờ phát sinh lỗi ngoại lệ khi trích đoạn rỗng.
+  * **Tuyệt đối không cấp Citation giả**: Khi không có trích dẫn nào vượt qua ngưỡng kiểm định bằng chứng, hệ thống trả về danh sách rỗng (`[]`) và chuyển trạng thái câu trả lời sang `insufficient_context` (chấm dứt hoàn toàn cơ chế fallback trả ngẫu nhiên 2 citation đầu).
+- **Phản hồi từ chối chuẩn mực (No-Answer Policy)**: Khi thiếu căn cứ, phản hồi hướng dẫn lịch sự kèm hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
 
-### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Theo Model (Model-Partitioned Semantic Cache)
-- Lớp cache ngữ nghĩa trên Redis sử dụng khóa phân vùng theo mô hình: `rag:cache:{collection_id}:{preferred_model}:{hash(query)}`.
-- Việc phân tách theo model đảm bảo khi người dùng chuyển đổi giữa các model (`gpt-4o-mini`, `gemini-1.5-flash`, `qwen2.5-7b`), cache không trả kết quả lệch lạc do định dạng hoặc phong cách của model trước đó sinh ra.
-- Hỗ trợ cơ chế vô hiệu hóa cache chủ động (`clear()`, `invalidate_collection()`) ngay khi có tài liệu mới được phê duyệt hoặc tài liệu cũ bị xóa/lưu trữ.
+### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Theo Tenant & Model (Tenant & Model-Partitioned Semantic Cache)
+- Lớp cache ngữ nghĩa trên Redis sử dụng khóa phân vùng bảo vệ đa khách thuê: `rag:cache:{tenant_id}:{collection_id}:{preferred_model}:{hash(query)}`.
+- Việc phân tách kép theo cả `tenant_id` và `preferred_model` đảm bảo:
+  1. Không rò rỉ dữ liệu hoặc câu trả lời giữa các tenant.
+  2. Khi người dùng đổi mô hình (`gpt-4o-mini`, `gemini-1.5-flash`, `qwen2.5-7b`), cache không trả kết quả lệch lạc do định dạng của model trước đó sinh ra.
+- Hỗ trợ cơ chế vô hiệu hóa cache chủ động theo mẫu wildcard (`clear()`, `invalidate_collection()`) ngay khi có tài liệu mới được phê duyệt hoặc tài liệu cũ bị xóa/lưu trữ.
 
 ### Bước 10: Định dạng thông minh (Answer Format Planner)
 Tự động lập kế hoạch trình bày câu trả lời:

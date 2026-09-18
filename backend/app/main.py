@@ -114,7 +114,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Database connection pool closed.")
 
 
-
 def create_app() -> FastAPI:
     """Create and configure the production FastAPI application instance."""
     app = FastAPI(
@@ -186,6 +185,7 @@ def create_app() -> FastAPI:
 
     # 6. Mount Feature Modules Routers
     from app.modules.assistants import assistants_router
+    from app.modules.auth import auth_router
     from app.modules.document_types.router import router as document_types_router
     from app.modules.evaluation import evaluation_router
     from app.modules.jobs import jobs_router
@@ -197,6 +197,7 @@ def create_app() -> FastAPI:
     from app.modules.tools import tools_router
     from app.modules.workflows import workflow_router
 
+    app.include_router(auth_router, prefix=settings.API_PREFIX)
     app.include_router(jobs_router, prefix=settings.API_PREFIX)
     app.include_router(document_types_router, prefix=settings.API_PREFIX)
     app.include_router(knowledge_router, prefix=settings.API_PREFIX)

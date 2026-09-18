@@ -61,6 +61,8 @@ class AskRequest(BaseModel):
     max_tokens: int = Field(2000, ge=100, le=4096)
     preferred_model_name: str | None = None
     preferred_provider_id: str | None = None
+    fallback_model: str | None = None
+    tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
 
 
 class AskResponse(BaseModel):

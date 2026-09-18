@@ -151,3 +151,89 @@ async def test_tool_service_not_found():
     req = ToolExecuteRequest(tool_name="non_existent_tool", parameters={})
     with pytest.raises(NotFoundException):
         await service.execute_tool(mock_session, req)
+
+
+@pytest.mark.asyncio
+async def test_tool_service_assistant_allowlist_enforcement():
+    """Verify tool execution is blocked if tool is not in assistant's enabled_tools."""
+    from app.core.exceptions import AppException
+    from app.modules.assistants.models import AssistantModel
+
+    service = ToolService()
+    mock_session = AsyncMock()
+
+    # Mock assistant record with enabled_tools not containing lookup_admission_score
+    mock_assistant = AssistantModel(
+        code="drafting_assistant",
+        name="Trợ lý Soạn thảo",
+        config={"tools": {"enabled_tools": ["export_administrative_document"]}},
+    )
+
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = mock_assistant
+    mock_session.execute.return_value = mock_res
+
+    req = ToolExecuteRequest(
+        tool_name="lookup_admission_score",
+        parameters={"major_name": "Sư phạm Toán", "year": 2024},
+        assistant_code="drafting_assistant",
+    )
+
+    with pytest.raises(AppException) as exc_info:
+        await service.execute_tool(mock_session, req)
+
+    assert exc_info.value.code == "tool_not_allowed_for_assistant"
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_tool_service_requires_approval_enforcement():
+    """Verify tool execution requires human approval when tool.requires_approval is True."""
+    from app.core.exceptions import AppException
+    from app.modules.tools.builtin.base import BaseTool
+
+    class SensitiveTool(BaseTool):
+        @property
+        def name(self) -> str:
+            return "sensitive_action_tool"
+
+        @property
+        def display_name(self) -> str:
+            return "Thao tác nhạy cảm"
+
+        @property
+        def description(self) -> str:
+            return "Cần duyệt trước khi thi hành"
+
+        @property
+        def requires_approval(self) -> bool:
+            return True
+
+        def get_openapi_schema(self) -> dict:
+            return {"name": self.name, "description": self.description}
+
+        async def execute(self, **kwargs):
+            return {"done": True}
+
+    service = ToolService()
+    service.registry.register(SensitiveTool())
+
+    mock_session = AsyncMock()
+
+    # Attempt 1: Not approved -> Must fail with 403
+    req_unapproved = ToolExecuteRequest(
+        tool_name="sensitive_action_tool",
+        parameters={"is_approved": False},
+    )
+    with pytest.raises(AppException) as exc_info:
+        await service.execute_tool(mock_session, req_unapproved)
+    assert exc_info.value.status_code == 403
+
+    # Attempt 2: Approved -> Must succeed
+    req_approved = ToolExecuteRequest(
+        tool_name="sensitive_action_tool",
+        parameters={"is_approved": True},
+    )
+    resp = await service.execute_tool(mock_session, req_approved)
+    assert resp.status == "success"
+

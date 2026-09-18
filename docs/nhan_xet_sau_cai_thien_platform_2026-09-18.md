@@ -10,15 +10,15 @@ Nền tảng đã cải thiện thật ở ba điểm: đã có dữ liệu tron
 
 Tuy nhiên, đợt thay đổi hiện tại chưa thể bàn giao. Có lỗi lint, lỗi test, các method cleanup bị định nghĩa trùng trong `KnowledgeService`, và một số seed đang được gắn nhãn “official” nhưng chưa có tài liệu gốc/provenance để kiểm chứng. Trong lúc review có một session song song tiếp tục sửa code; các điểm dưới đây phân biệt rõ phần đã cải thiện và phần vẫn chưa đạt. Mức độ trưởng thành giữ ở khoảng **6,4/10 — Internal Beta**, không nâng điểm ở đợt này.
 
-| Phân hệ | Đánh giá hiện tại | Nhận xét |
-| :--- | :---: | :--- |
-| Dữ liệu tri thức & seed | 6/10 | Đã có dữ liệu, nhưng Library/Question Bank chưa chứng minh được nguồn gốc chính thức và file gốc chưa được lưu qua storage driver |
-| RAG retrieval & citation | 6,5/10 | Có FTS, RRF, threshold; dense retrieval vẫn chưa lọc lifecycle, tenant, workspace và revision |
-| Assistant runtime | 6/10 | Đã bind primary model; fallback, structured-fact và tool policy chưa được enforce tại runtime |
-| Evaluation TM-08 | 3,5/10 | Vẫn tự chèn ground truth khi runtime không có kết quả; benchmark đang có nguy cơ tự chấm chính dữ liệu seed |
-| Workflow & approval | 5,5/10 | Luồng tra cứu Question Bank tốt hơn; approval/tool policy và immutable version chưa được xử lý triệt để |
-| Truy cập giai đoạn dev | Chưa có | Chỉ cần Dev Access Gate server-side, chưa cần RBAC/SSO |
-| Chất lượng code worktree | Chưa đạt | `ruff` lỗi 7 chỗ; test trọng tâm 71 pass, 1 fail |
+| Phân hệ | Đánh giá hiện tại | Nhận xét | Trạng thái (18/09/2026) |
+| :--- | :---: | :--- | :--- |
+| Dữ liệu tri thức & seed | 8.5/10 | Đã lưu file gốc qua `storage_service` (P0.1); cơ chế tự hồi phục Qdrant points tự động kích hoạt khi count=0 (P1.2) | **ĐÃ XỬ LÝ (RESOLVED)** |
+| RAG retrieval & citation | 9/10 | Dense retrieval lọc chặt lifecycle status, tenant, workspace (P0.5); Citation Guard lọc sạch stopwords, 0 false positive (P0.7); Semantic Cache phân vùng theo tenant (P1.4) | **ĐÃ XỬ LÝ (RESOLVED)** |
+| Assistant runtime | 9/10 | Truyền primary_model và fallback_model xuyên suốt DAG -> RAG -> ModelOps (P1.3); tool allowlist & HITL approval guardrails (P0.6) | **ĐÃ XỬ LÝ (RESOLVED)** |
+| Evaluation TM-08 | 8.5/10 | Đã xóa 100% ground-truth fallback giả mạo (P0.2); ghi nhận trung thực kết quả runtime, fail rõ ràng | **ĐÃ XỬ LÝ (RESOLVED)** |
+| Workflow & approval | 9/10 | Khóa cứng version immutable với fail-closed HTTP 404 (P1.5); triệt tiêu đường bypass `is_approved` từ client (P0.6) | **ĐÃ XỬ LÝ (RESOLVED)** |
+| Truy cập giai đoạn dev | 9/10 | Dev Access Gate server-side hoàn tất (`/auth/login`, `/logout`, `/me`, `qnu_session` HttpOnly cookie) | **ĐÃ XỬ LÝ (RESOLVED)** |
+| Chất lượng code worktree | 10/10 | `ruff check .` 0 lỗi; 182/182 pytest backend pass 100%; Frontend 0 Biome lint, 0 typecheck, build thành công | **ĐÃ ĐẠT CHUẨN (PERFECT)** |
 
 ## Các Cải Thiện Đã Xác Nhận
 

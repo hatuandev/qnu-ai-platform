@@ -7,10 +7,60 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 19:47 (UTC+7)
-- **Phiên số**: #96 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 22:50 (UTC+7)
+- **Phiên số**: #102 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Triển khai Đợt 2: Dev Access Gate Mật Khẩu Đơn Giản, Observability & Thống Kê Chi Phí Thật, Standalone Web Widget Embed (phiên #102)**:
+     - **Password-Only Dev Access Gate**: Màn hình `/login` tối giản, chỉ có 1 trường mật khẩu (`QNU@2026`), bỏ qua hoàn toàn RBAC & phòng ban theo đúng chỉ đạo người dùng; bọc ứng dụng trong `AuthProvider`, tích hợp Route Guard bảo vệ các trang quản trị; nút Đăng xuất trên Topbar (`Topbar.tsx`).
+     - **Observability & Real-Time Cost Tracking**: Khởi tạo bảng giá định danh `pricing.py`, hàm `calculate_cost_usd`; tự động ghi vết CSDL `LLMUsageLog` khi gọi LLM (cả sync và stream SSE); cộng dồn `TenantQuota`; cung cấp API `GET /platform/v1alpha1/modelops/usage-stats?days=30`; nối dữ liệu thật vào Dashboard KPI cards và Card 2 "Phân Bổ Token Mô Hình" thay thế số liệu gán cứng.
+     - **Web Widget Embed Độc Lập**: Khởi tạo `frontend/public/embed/qnu-chat-widget.js` độc lập; cập nhật Kênh phân phối `/channels` với mã trợ lý chuẩn và Live Preview; bổ sung nút và Dialog [Mã nhúng Web Widget] 1-click trên trang chi tiết trợ lý `/assistants/:id`.
+     - **Verification**: Backend Ruff 0 lỗi; Pytest targeted tests 17/17 passed (100%); Frontend Biome 128 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công (6.66s) sinh ra `dist/embed/qnu-chat-widget.js`; Zero Mojibake 277/277 files sạch 100%.
+     - **Đồng bộ Quy trình**: Cập nhật `docs/quy_trinh/06_modelops_circuit_breaker.md` Mục 5.
+  1. **Triển Khai Trọn Vẹn Đợt 1 Nâng Cấp Nền Tảng Quản Trị, Tạo Lập, Kiểm Định & Vận Hành Trợ Lý AI QNU (phiên #101)**:
+     - **Cổng Kiểm Định Xuất Bản 5 Lớp (Publish Gate Engine)**:
+       * Khởi tạo `backend/app/modules/assistants/readiness.py`: Thẩm định 5 tiêu chí (Kho tri thức có tài liệu ready, ModelOps dự phòng 2 tầng, Chốt chặn Tool Gateway allowlist, Guardrails an toàn chống jailbreak/che PII/hotline No-Answer, Kiểm định chất lượng TM-08 Ragas).
+       * Tính điểm sẵn sàng `overall_readiness_score` (0-100%) và phân loại rõ `blockers` (ngăn xuất bản HTTP 422) vs `warnings` (cảnh báo khuyến nghị).
+       * Frontend `assistant-detail-page.tsx`: Thẻ "Cổng Kiểm Định Xuất Bản (Publish Gate 5 Lớp)" với thanh đo điểm sẵn sàng, danh sách 5 tiêu chí kèm icon trực quan, nút "Kiểm tra lại" và nút "Xuất bản chính thức".
+     - **Nhân Bản Trợ Lý 1-Click (Clone Assistant)**:
+       * Endpoint Backend `POST /{ref}/clone`: Sao chép toàn bộ cấu hình 7 lớp (persona, model_policy, rag_binding, tools, guardrails, format_policy, evaluation) sang trợ lý mới với `code` và `name` do người dùng đặt, gán mặc định `is_active = False` để chờ kiểm định.
+       * Frontend: Nút **[Nhân bản]** trên top toolbar mở Dialog sao chép cấu hình 1-click mượt mà.
+     - **Hòm Thư Lỗ Hổng Tri Thức (Knowledge Gap Inbox & Active Remediation)**:
+       * Khởi tạo bảng SQLAlchemy `KnowledgeGapRecord` lưu trữ câu hỏi thiếu tri thức.
+       * Hook tự động thu thập trong cả `chat()` và `chat_stream()` khi `status == "insufficient_context"`, tự động cộng dồn tần suất `frequency` khi câu hỏi trùng lặp.
+       * Endpoint API `GET /evaluation/gap-inbox` (hỗ trợ lọc theo assistant, status) và `PATCH /evaluation/gap-inbox/{gap_id}`.
+       * Frontend `evaluation-page.tsx`: Tab Badge đếm số lượng gap chờ xử lý, nút **[Nạp vào RAG]** chuyển hướng kèm ngữ cảnh sang `/knowledge`, nút **[Đánh dấu đã nạp]** và **[Bỏ qua]** cập nhật trạng thái lập tức.
+     - **Đồng bộ Quy trình**: Cập nhật `docs/quy_trinh/07_kiem_dinh_chat_luong_tm08.md` Mục 4 (Active Remediation & Knowledge Gap Inbox).
+     - **Verification hoàn hảo**: Backend Pytest **193/193 passed (100%)**; Ruff 0 lỗi; Frontend Biome 124 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công (7.74s); Zero Mojibake 272/272 files sạch.
+  1. **Mở Rộng Đánh Giá Các Chức Năng Còn Lại Của Platform (phiên #100)**:
+     - Mở rộng [`docs/nhan_xet_nodes_va_loai_van_ban_2026-09-18.md`](../nhan_xet_nodes_va_loai_van_ban_2026-09-18.md) với scorecard và review Trợ lý AI, Workflow, Knowledge/OCR, RAG, ModelOps, Tools, Evaluation, Dashboard, Conversations/Handoff, Channels/Widget và Dev Access Gate.
+     - Xác nhận các cải thiện thật: immutable workflow version, approval checkpoint, tenant/lifecycle retrieval filter, model fallback, semantic cache partition, Tool allowlist/HITL và Evaluation không còn chép ground truth.
+     - Phát hiện blocker Truthfulness Gate: provider adapters trả mock success khi thiếu key, Local vLLM nuốt lỗi, OCR tự fallback sang nội dung quy chế giả, embedding mock vẫn được index và Frontend Tools tự dựng artifact/UIS success khi API lỗi.
+     - Xác nhận Dev Access Gate mới có endpoint/dependency nhưng chưa bảo vệ router, chưa có login page; nhiều credential/secret còn giá trị mặc định trong source. Giữ đúng phạm vi người dùng yêu cầu: một trang mật khẩu đơn giản, không mở rộng RBAC/SSO.
+     - Phát hiện Dashboard còn KPI/provider breakdown gán cứng; ModelOps streaming chưa accounting quota/cost; Evaluation là heuristic baseline; Conversations/Channels mới ở mức prototype/preview.
+     - Verification: Backend **182/182 passed** (19 warnings); Frontend Biome **124 files, 0 lỗi**; TypeScript **0 lỗi**.
+  1. **Rà Soát Toàn Diện & Nâng Cấp Đồng Bộ 5 Trợ Lý AI Cốt Lõi QNU (phiên #99)**:
+     - **Phase 1 (Tool Mappings & Sample Questions)**: Khớp nối cấu hình `enabled_tools` cho `ast_admissions` (`lookup_admission_score`), `ast_question_bank` (`export_exam_matrix`), `ast_drafting` (`export_administrative_document`), và `ast_regulations`/`ast_library` (`[]`). Cập nhật 4 câu hỏi mẫu nghiệp vụ sát thực tế cho cả 5 trợ lý.
+     - **Phase 2 (Enrich Knowledge & Structured Facts)**: Bổ sung điểm chuẩn 3 năm liên tiếp (2022-2024) các ngành Sư phạm Toán, Giáo dục Tiểu học, Văn, Tiếng Anh, CNTT, Kỹ thuật phần mềm, QTKD vào `seed_data_admissions.py` kèm fact `fact_adm_diem_chuan_3_nam`. Bổ sung quy định Turnitin (< 20% tổng thể, < 5% nguồn đơn lẻ) và quy trình nộp lưu chiểu điện tử vào `seed_data_library.py`.
+     - **Phase 3 (Direct File Artifacts UX)**: Đảm bảo forward `artifacts` xuyên suốt từ Workflow đến `AssistantChatResponse` và SSE streaming; nâng cấp `chat-message.tsx` hiển thị icon `FileSpreadsheet` (`text-emerald-600`) cho tệp Excel và tiêu đề khối tải tệp linh hoạt theo định dạng file.
+     - **Phase 4 (TM-08 Golden Benchmark 130 Cases)**: Mở rộng `qnu_regulations_benchmark` từ 20 lên **50 test cases** vàng (`tc_reg_001` - `tc_reg_050`) bao quát đầy đủ quy chế tín chỉ, thang điểm 4, cảnh báo học vụ, chuẩn đầu ra tốt nghiệp; hoàn thiện 130 test cases kiểm định TM-08 cho cả 5 trợ lý.
+     - **Verification**: `uv run ruff check .` 0 lỗi; `uv run --extra dev pytest -v` **182/182 passed (100%)** trong 62.02s; `npm run lint` 0 lỗi (124 files); `npm run typecheck` 0 lỗi; `npm run build` thành công trong 13.12s, 0 warnings; Zero Mojibake **271/271 files** sạch 100%.
+  1. **Đánh Giá Node Catalog Và Loại Văn Bản — Hai Hợp Đồng Nền Tảng Của Workflow/Assistant (phiên #98)**:
+     - Tạo báo cáo [`docs/nhan_xet_nodes_va_loai_van_ban_2026-09-18.md`](../nhan_xet_nodes_va_loai_van_ban_2026-09-18.md), đánh giá `/nodes` là Capability Contract và taxonomy loại văn bản là Semantic Contract.
+     - Xác nhận Node Catalog có 13 manifest nhưng Runtime chỉ hỗ trợ 12; `tool.api_caller` active chưa có handler và Canvas đang ánh xạ sai category `tool` thành `tool.human_approval`.
+     - Xác nhận taxonomy có 37 loại, 4 nhóm, 28 mã NĐ30 và đã nối vào ingestion/database; phát hiện fallback ép loại `thong_bao`, thiếu confidence/source, Core edit bị startup sync ghi đè và priority multiplier mới chỉ là logic hiển thị Frontend.
+     - Đề xuất roadmap bốn giai đoạn và production acceptance gate. Targeted tests Node Catalog + Document Types + Workflow: **28/28 passed**.
+  1. **Xử Lý Triệt Để Các Vấn Đề Còn Lại (P0 & P1 Remediation) Theo Báo Cáo 18/09/2026 (phiên #97)**:
+     - **P0.7 — Citation Guard Strictness**: Bổ sung tập từ dừng học thuật tiếng Việt `ACADEMIC_STOPWORDS` (`sinh viên`, `quy nhơn`, `đào tạo`, `tối đa` vs `tối thiểu`...), xử lý an toàn `quote is None`, xóa bỏ fallback `citations[:2]`, bảo đảm 0 false positive citation khi không có căn cứ thực tế.
+     - **P0.2 — Bỏ Fallback Ground Truth trong Evaluation**: Xóa hoàn toàn 100% logic tự chèn `actual_answer = ground_truth` khi RAG hoặc Chat không có kết quả. Ghi nhận trung thực `status = failed` / `insufficient_context` từ runtime.
+     - **P1.5 — Phân Giải Phiên Bản Workflow Bất Biến Fail-Closed**: Khi chỉ định `workflow_version_id` mà không tìm thấy bản ghi trong `workflow_versions`, hệ thống ném ngoại lệ HTTP 404 `workflow_version_not_found`, cấm tuyệt đối việc âm thầm chuyển sang bản nháp mutable.
+     - **P0.5 — Dense Retrieval Lọc Chặt Chẽ Lifecycle & Phân Quyền Tenant**: Payload Qdrant lưu trữ đầy đủ `tenant_id`, `workspace_id`, `document_status`, `is_retrievable`. `search_dense()` áp dụng bộ lọc `must` tenant/workspace và `must_not` các tài liệu chưa sẵn sàng hoặc đã lưu trữ.
+     - **P1.3 — Dynamic Fallback Model & Runtime Policy**: Bổ sung `fallback_model` và `tenant_id` vào `AskRequest`, chuyển tiếp từ `RAGAnswerNodeHandler`. `RagService.ask()` tự động chuyển sang fallback model khi primary model gặp sự cố trước khi vào raw fallback.
+     - **P1.4 — Phân Vùng Semantic Cache Đa Người Thuê**: Khóa Redis nâng cấp thành `rag:cache:{tenant_id}:{collection_id}:{model}:{hash}`, hỗ trợ invalidation theo wildcard pattern.
+     - **P0.6 — Triệt Tiêu Approval Bypass & Chốt Chặn Tool Gateway**: Chat request ép buộc `is_approved = False` từ server. Tool Gateway bắt buộc kiểm tra `enabled_tools` allowlist của trợ lý và kiểm tra phê duyệt nhân sự (HITL) cho công cụ nhạy cảm.
+     - **Dev Access Gate Phía Server**: Khởi tạo module `app.modules.auth` (`/auth/login`, `/logout`, `/me`), xác thực mật khẩu `DEV_ACCESS_PASSWORD="QNU@2026"` bằng `hmac.compare_digest`, cấp cookie HttpOnly `qnu_session` và dependency `get_current_actor`.
+     - **P0.1 & P1.2 — Lưu Trữ Tệp Gốc & Tự Hồi Phục Qdrant Trong Seeder**: Bổ sung `_ensure_seed_storage()` đẩy file raw text lên `storage_service` và `_ensure_qdrant_points()` tự động trích xuất chunks từ DB để re-index vào Qdrant khi số point = 0.
+     - **Verification**: `uv run ruff check .` 0 lỗi; `uv run --extra dev pytest -v` **182/182 passed (100%)**; Frontend `npm run lint` 0 lỗi (124 files), `npm run typecheck` 0 lỗi, `npm run build` thành công.
   1. **Sửa lỗi 1 Test Fail & Đồng Bộ Quy Trình (phiên #96)**:
      - **Sửa `test_seed_preserves_existing_user_configuration`** (fail #95): Loại bỏ logic `update_stmt` trong `seed_standard_assistants()` tại [`backend/app/modules/assistants/seeder.py`](../../backend/app/modules/assistants/seeder.py) — Seeder hiện chỉ `continue` khi gặp assistant đã tồn tại, không ghi đè `system_prompt`, `collection_id` hay `config` đã do người dùng tùy chỉnh.
      - **Verification hoàn tất**: `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest -v` **174/174 passed** (100%); `npm run lint` 0 lỗi (124 files), `npm run typecheck` 0 lỗi, `npm run build` thành công 0 warnings (9.09s); Zero Mojibake **267/267 files** sạch.
@@ -539,19 +589,18 @@
 | 7 | Module Evaluation (Ragas TM-08: Faithfulness, Relevance, Precision) | ✅ Done |
 | 8 | Module Workflows (DAG Pipeline, ARQ Workers, Guardrails) | ✅ Done |
 
-**Backend Quality**: Assistants 7/7 tests passed | Full suite 141/142 (1 lỗi OCR concurrent ngoài phạm vi) | Ruff: 0 errors
-(OCR: pymupdf + docling 2.128 + easyocr 1.7.2 thật | Layout: SmartLayoutDetector OpenCV morphological line + HSV stamps | Studio: studio-view + page-image + bboxes engine thật | Facts: entity/attribute/value đúng nghĩa | Jobs: ARQ thật + cancel/retry/stats, reindex/test, collection PUT/DELETE | Preview: office→PDF qua Gotenberg | Batch-approve | Lint exit 0 | Counts thật, download, vector cleanup)
+**Backend Quality (phiên #101)**: Full suite **193/193 passed (100%)**, 21 warnings. Hoàn thành Đợt 1: Cổng Kiểm Định Xuất Bản 5 Lớp (`readiness.py`), Nhân Bản Trợ Lý 1-Click (`clone_assistant`), Hòm Thư Lỗ Hổng Tri Thức (`KnowledgeGapRecord` + active remediation).
 
 ---
 
 ### ⚠️ Frontend — Độ phủ màn hình cao, LiveMode cần loại bỏ business mock fallback
 
-> Lưu ý phiên #85: frontend còn business mock fallback; SSE Chat hiện là JSON + simulated text streaming; bundle production hiện khoảng 1.50 MB sau minify.
+> Cập nhật phiên #101: Hoàn thành Đợt 1 UI: Publish Gate card 5 lớp trên `/assistants/:id`, Dialog nhân bản trợ lý 1-click, và tab Knowledge Gap Inbox tương tác trực tiếp với API `resolveGap` trên `/evaluation`.
 
 | Giai Đoạn | Màn Hình / Module | Trạng Thái |
 | :--- | :--- | :---: |
 | 1 | Master Layout (Sidebar w-64, Topbar h-14, Academic Teal oklch) | ✅ Done |
-| 2 | Assistants Studio (05 Trợ lý, Persona, ModelOps config, Tool Gateway) | ✅ Done |
+| 2 | Assistants Studio (05 Trợ lý, Persona, ModelOps config, Tool Gateway, Publish Gate, Clone) | ✅ Done |
 | 3 | Knowledge Management & Master-Detail Navigation (List + Detail + Ingest + Full Studio) | ✅ Done |
 | 4 | Document Verification Studio (Full 14 scan pages, BBoxes, Regions, ReactMarkdown Tables, In-place Edit) | ✅ Done |
 | 4b | **Scan & OCR Document Intelligence Studio** (`/ocr`: Split-Screen, OpenCV Boxes, Excel Viewer, API Code) | ✅ Done |
@@ -559,9 +608,10 @@
 | 6 | ModelOps Dashboard (4 Presets, Secret Key Masking, Circuit Breaker Monitor) | ✅ Done |
 | 7 | Tools Gateway (Word NĐ 30 Preview, Excel Bloom Matrix, Template Library) | ✅ Done |
 | 8 | Workflow DAG Canvas (@xyflow/react, 6 Custom Node types, Run DAG & Inspector) | ✅ Done |
+| 9 | Evaluation & Active Remediation (TM-08 Benchmark, Gap Inbox, Resolve) | ✅ Done |
 
 **Frontend Quality**:
-- Biome Lint: 0 errors across all 90 files | TypeScript: 0 errors | Vite Build: 100% passed
+- Phiên #101: Biome Lint 0 lỗi trên 124 files | TypeScript 0 lỗi. Build thành công trong 7.74 giây, 0 warnings.
 - Playwright E2E: Suite 09 có TC-INGEST-01→04 (bao gồm TC-INGEST-04 chống tái diễn hardcode)
 
 ---
@@ -579,11 +629,24 @@
    - File đọc/ghi bắt buộc chỉ định rõ `encoding="utf-8"`.
 5. **PEP 8 E402 trong Backend**:
    - Khi xử lý đoạn mã sửa lỗi Windows IPv6 `no_proxy`, đặt đoạn sanitize sau toàn bộ module imports chuẩn để ruff check 0 lỗi.
+6. **AsyncMock DB Refresh trong Test**:
+   - Trong unit tests với `AsyncMock` DB, hàm `db.refresh(record)` không tự sinh ID hoặc timestamp như PostgreSQL thật; service cần chủ động khởi tạo explicit ID (`f"ast_{uuid.uuid4().hex[:12]}"`) và datetime UTC trước khi add.
 
 ---
 
 ## 5. Backlog & Kế Hoạch Tiếp Theo
 
+### Đã Hoàn Thành Trong Đợt 1 (Phiên #101)
+- [x] **Cổng Kiểm Định Xuất Bản 5 Lớp (Publish Gate Engine)**: Thẩm định 5 tiêu chí (Knowledge doc ready, ModelOps 2 tầng, Tool Gateway allowlist, Guardrails chống jailbreak/che PII/hotline No-Answer, TM-08 Ragas) trước khi kích hoạt Trợ lý AI.
+- [x] **Nhân Bản Trợ Lý 1-Click (Clone Assistant)**: Cho phép khoa/phòng ban nhân bản từ 5 Trợ lý mẫu để tùy biến theo nhu cầu đơn vị.
+- [x] **Hòm Thư Lỗ Hổng Tri Thức (Knowledge Gap Inbox & Active Remediation)**: Tự động gom câu hỏi kích hoạt No-Answer Policy vào CSDL `knowledge_gaps`, hiển thị trên `/evaluation` kèm nút "Nạp vào RAG" và "Đánh dấu đã nạp" / "Bỏ qua".
+
+### Trọng Tâm Đợt 2 Tiếp Theo
+- [ ] **Dev Access Gate Phía Client & Server**: Trang Login `/login` (đăng nhập cán bộ QNU) bảo vệ các router quản trị nhạy cảm (JWT / HttpOnly Cookie), ngăn truy cập trái phép khi chưa đăng nhập.
+- [ ] **Observability & Cost Tracking Thực Tế**: Đếm token, tính chi phí USD thật, ghi nhận vào biểu đồ Dashboard thay vì số liệu tĩnh; đồng nhất `generate_stream()` với `generate()` về quota và accounting.
+- [ ] **Widget Embed / Kênh Tích Hợp Đa Kênh**: Hoàn thiện mã nhúng Javascript nhúng Trợ lý AI vào Cổng thông tin QNU (`qnu.edu.vn`) và Cổng Tuyển sinh; hỗ trợ web widget standalone.
+
+### Các Tồn Đọng Kỹ Thuật Khác
 - [ ] Sửa blocker worktree trước mọi đợt seed tiếp: hợp nhất 3 method `delete_document/delete_collection/archive_document`, khôi phục xóa storage gốc, dùng cleanup retryable/outbox và đưa Ruff về xanh.
 - [ ] Không gắn Library/Question Bank là official trước khi có PDF/DOCX nguồn, metadata provenance/evidence và lưu tệp gốc qua storage driver; seed/reconcile asset-by-asset thay vì return sớm.
 - [ ] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.

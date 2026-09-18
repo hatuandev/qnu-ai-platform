@@ -10,9 +10,12 @@ from app.core.database import get_db
 from app.modules.assistants.schemas import (
     AssistantBundle,
     AssistantChatRequest,
+    AssistantCloneRequest,
     AssistantCreateRequest,
     AssistantGenerateRequest,
     AssistantGenerateResponse,
+    AssistantPublishResponse,
+    AssistantReadinessResponse,
     AssistantResponse,
     AssistantSeedResponse,
     AssistantTemplateResponse,
@@ -149,3 +152,31 @@ async def deactivate_assistant(
 ) -> AssistantResponse:
     """Soft-delete an assistant so workflow history and audits remain intact."""
     return await assistant_service.deactivate_assistant(db, reference)
+
+
+@router.get("/{reference}/readiness", response_model=AssistantReadinessResponse)
+async def get_assistant_readiness(
+    reference: str,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantReadinessResponse:
+    """Kiểm tra 5 tiêu chí sẵn sàng xuất bản (Publish Gate) cho Trợ lý AI."""
+    return await assistant_service.get_readiness(db, reference)
+
+
+@router.post("/{reference}/publish", response_model=AssistantPublishResponse)
+async def publish_assistant(
+    reference: str,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantPublishResponse:
+    """Cổng xuất bản chính thức (Publish Gate) - Chặn kích hoạt nếu có lỗi nghiêm trọng."""
+    return await assistant_service.publish_assistant(db, reference)
+
+
+@router.post("/{reference}/clone", response_model=AssistantResponse, status_code=status.HTTP_201_CREATED)
+async def clone_assistant(
+    reference: str,
+    body: AssistantCloneRequest,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantResponse:
+    """Nhân bản 1-click Trợ lý AI để tùy biến cho khoa/phòng ban chuyên trách."""
+    return await assistant_service.clone_assistant(db, reference, body)

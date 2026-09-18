@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import unicodedata
+import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
@@ -15,16 +16,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.modules.assistants.models import AssistantModel
+from app.modules.assistants.readiness import readiness_engine
 from app.modules.assistants.runtime import build_runtime_profile, prepare_user_message
 from app.modules.assistants.schemas import (
     AssistantBundle,
     AssistantBundleWorkflow,
     AssistantChatRequest,
     AssistantChatResponse,
+    AssistantCloneRequest,
     AssistantCreateRequest,
     AssistantGenerateRequest,
     AssistantGenerateResponse,
     AssistantLifecycleConfig,
+    AssistantPublishResponse,
+    AssistantReadinessResponse,
     AssistantResponse,
     AssistantSeedResponse,
     AssistantTemplateResponse,
@@ -253,7 +258,7 @@ class AssistantService:
             workflow_id=assistant.workflow_id,
             inputs={
                 "message": sanitized_message,
-                "is_approved": request.is_approved,
+                "is_approved": False,
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,
@@ -282,11 +287,47 @@ class AssistantService:
             else:
                 sample_questions = []
 
+        output_status = str(workflow_response.outputs.get("status") or workflow_response.status)
+        if output_status == "insufficient_context":
+            try:
+                from app.modules.evaluation.service import evaluation_service
+
+                await evaluation_service.record_gap(
+                    db,
+                    assistant_code=assistant.code,
+                    collection_id=assistant.collection_id,
+                    question=request.message,
+                )
+            except Exception as gap_err:
+                logger.warning("failed_to_record_knowledge_gap_in_chat: %s", gap_err)
+
+        # Record LLM Usage
+        try:
+            from app.modules.modelops.service import modelops_service
+
+            model_name = getattr(assistant, "preferred_model_name", None) or "gpt-4o-mini"
+            prompt_toks = max(1, len(request.message) // 4 + 80)
+            comp_toks = max(1, len(answer) // 4)
+            await modelops_service.record_usage_log(
+                db,
+                tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
+                assistant_id=assistant.code,
+                conversation_id=request.conversation_id,
+                provider="qnu_workflow",
+                model_name=model_name,
+                prompt_tokens=prompt_toks,
+                completion_tokens=comp_toks,
+                latency_ms=workflow_response.latency_ms,
+                status="success" if output_status != "error" else "error",
+            )
+        except Exception as u_err:
+            logger.warning("failed_to_record_usage_in_chat: %s", u_err)
+
         return AssistantChatResponse(
             assistant_code=assistant.code,
             assistant_name=assistant.name,
             answer=answer,
-            status=str(workflow_response.outputs.get("status") or workflow_response.status),
+            status=output_status,
             citations=citations if isinstance(citations, list) else [],
             suggested_questions=(sample_questions or [])[:3],
             latency_ms=workflow_response.latency_ms,
@@ -317,7 +358,7 @@ class AssistantService:
             workflow_id=assistant.workflow_id,
             inputs={
                 "message": sanitized_message,
-                "is_approved": request.is_approved,
+                "is_approved": False,
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,
@@ -369,6 +410,42 @@ class AssistantService:
                 sample_questions = config.get("persona_scope", {}).get("sample_questions", [])
             else:
                 sample_questions = []
+
+        output_status = str(workflow_response.outputs.get("status") or workflow_response.status)
+        if output_status == "insufficient_context":
+            try:
+                from app.modules.evaluation.service import evaluation_service
+
+                await evaluation_service.record_gap(
+                    db,
+                    assistant_code=assistant.code,
+                    collection_id=assistant.collection_id,
+                    question=request.message,
+                )
+            except Exception as gap_err:
+                logger.warning("failed_to_record_knowledge_gap_in_chat_stream: %s", gap_err)
+
+        # Record LLM Usage
+        try:
+            from app.modules.modelops.service import modelops_service
+
+            model_name = getattr(assistant, "preferred_model_name", None) or "gpt-4o-mini"
+            prompt_toks = max(1, len(request.message) // 4 + 80)
+            comp_toks = max(1, len(answer) // 4)
+            await modelops_service.record_usage_log(
+                db,
+                tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
+                assistant_id=assistant.code,
+                conversation_id=request.conversation_id,
+                provider="qnu_workflow",
+                model_name=model_name,
+                prompt_tokens=prompt_toks,
+                completion_tokens=comp_toks,
+                latency_ms=workflow_response.latency_ms,
+                status="success" if output_status != "error" else "error",
+            )
+        except Exception as u_err:
+            logger.warning("failed_to_record_usage_in_chat_stream: %s", u_err)
 
         done_payload = {
             "latency_ms": workflow_response.latency_ms,
@@ -466,6 +543,106 @@ class AssistantService:
             )
 
         return _build_fallback_spec(idea, request.category_hint)
+
+    async def get_readiness(
+        self,
+        db: AsyncSession,
+        reference: str,
+    ) -> AssistantReadinessResponse:
+        """Evaluate 5-layer publish gate readiness for this assistant."""
+        record = await self._get_record(db, reference)
+        return await readiness_engine.evaluate_readiness(db, record)
+
+    async def publish_assistant(
+        self,
+        db: AsyncSession,
+        reference: str,
+    ) -> AssistantPublishResponse:
+        """Publish an assistant to production if it passes the publish gate."""
+        record = await self._get_record(db, reference)
+        readiness = await readiness_engine.evaluate_readiness(db, record)
+        if not readiness.is_ready_for_publish:
+            blocker_text = (
+                "; ".join(readiness.blockers)
+                if readiness.blockers
+                else f"Điểm sẵn sàng {readiness.overall_readiness_score}% chưa đạt yêu cầu tối thiểu (>=65%)."
+            )
+            raise AppException(
+                f"Không thể xuất bản trợ lý '{record.name}': {blocker_text}",
+                code="assistant_not_ready_for_publish",
+                status_code=422,
+                details={
+                    "blockers": readiness.blockers,
+                    "warnings": readiness.warnings,
+                    "readiness_score": readiness.overall_readiness_score,
+                },
+            )
+
+        record.is_active = True
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+
+        return AssistantPublishResponse(
+            assistant_code=record.code,
+            assistant_name=record.name,
+            is_active=record.is_active,
+            readiness_score=readiness.overall_readiness_score,
+            published_at=datetime.now(UTC),
+            message=f"Trợ lý '{record.name}' đã vượt qua kiểm định và được xuất bản thành công.",
+        )
+
+    async def clone_assistant(
+        self,
+        db: AsyncSession,
+        reference: str,
+        request: AssistantCloneRequest,
+    ) -> AssistantResponse:
+        """Clone an existing assistant to create a specialized departmental variation."""
+        source = await self._get_record(db, reference)
+
+        new_code = _clean_text(request.new_code) or request.new_code.strip()
+        existing = (
+            await db.execute(select(AssistantModel).where(func.lower(AssistantModel.code) == new_code.casefold()))
+        ).scalar_one_or_none()
+        if existing:
+            raise EntityAlreadyExistsError(
+                f"Mã trợ lý '{new_code}' đã tồn tại.",
+                details={"assistant_code": new_code},
+            )
+
+        new_name = _clean_text(request.new_name) or request.new_name.strip()
+        new_desc = (
+            _clean_text(request.new_description)
+            if request.new_description
+            else f"Bản sao từ {source.name}. Chuyên trách phục vụ đơn vị."
+        )
+
+        cloned_config = dict(source.config or {})
+
+        now_ts = datetime.now(UTC).replace(tzinfo=None)
+        new_record = AssistantModel(
+            id=f"ast_{uuid.uuid4().hex[:12]}",
+            code=new_code,
+            name=new_name,
+            description=new_desc,
+            avatar_url=source.avatar_url,
+            category=source.category,
+            system_prompt=source.system_prompt,
+            workflow_id=source.workflow_id,
+            collection_id=request.target_collection_id or source.collection_id,
+            is_active=False,
+            tenant_id=source.tenant_id,
+            config=cloned_config,
+            created_at=now_ts,
+            updated_at=now_ts,
+        )
+
+        db.add(new_record)
+        await db.commit()
+        await db.refresh(new_record)
+        logger.info("Cloned assistant source=%s new_code=%s", source.code, new_code)
+        return _to_response(new_record)
 
     async def _get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
         normalized_reference = _clean_text(reference) or reference

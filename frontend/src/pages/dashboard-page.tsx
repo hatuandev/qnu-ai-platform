@@ -24,6 +24,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { apiClient } from "../services/api-client";
+import { modelopsApi } from "../services/modelops-api";
 
 export interface DashboardPageProps {
   onNavigate: (path: string) => void;
@@ -44,6 +45,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     queryFn: () => apiClient.getTokenQuota(),
   });
 
+  const { data: usageStats } = useQuery({
+    queryKey: ["modelops-usage-stats"],
+    queryFn: () => modelopsApi.getModelOpsUsageStats(30),
+  });
+
   const { data: evaluation } = useQuery({
     queryKey: ["evaluation"],
     queryFn: () => apiClient.getEvaluationMetrics(),
@@ -59,8 +65,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     queryFn: () => apiClient.getAssistants(),
   });
 
-  const totalTokensFormatted = (quota?.total_tokens ?? 1458200).toLocaleString("vi-VN");
-  const costFormatted = `$${(quota?.usd_cost ?? 0.4374).toFixed(4)}`;
+  const totalTokensNum = usageStats?.total_tokens ?? quota?.total_tokens ?? 0;
+  const totalTokensFormatted = totalTokensNum.toLocaleString("vi-VN");
+  const costNum = usageStats?.total_cost_usd ?? quota?.usd_cost ?? 0.0;
+  const costFormatted = `$${costNum.toFixed(4)}`;
   const faithfulnessScore = `${((evaluation?.faithfulness ?? 0.942) * 100).toFixed(1)}%`;
   const totalCollectionsCount = collections?.length || 5;
 
@@ -184,49 +192,55 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </CardContent>
         </Card>
 
-        {/* Card 2: Token Consumption by Provider */}
+        {/* Card 2: Token Consumption by Provider / Model */}
         <Card>
           <div className="flex items-center justify-between p-4 border-b border-border">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-primary" />
               <h3 className="font-semibold text-xs text-foreground uppercase tracking-wider">
-                Phân Bổ Token Provider
+                Phân Bổ Token Mô Hình
               </h3>
             </div>
             <Badge variant="outline" className="text-[10px] font-mono">
-              FinOps
+              FinOps Thực Tế
             </Badge>
           </div>
           <CardContent className="p-4 space-y-3 text-xs">
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-foreground font-medium">OpenAI (gpt-4o-mini)</span>
-                <span className="font-mono text-muted-foreground">820K tokens (56%)</span>
+            {usageStats?.models_breakdown && usageStats.models_breakdown.length > 0 ? (
+              usageStats.models_breakdown.slice(0, 3).map((item) => {
+                const percent =
+                  totalTokensNum > 0 ? Math.round((item.total_tokens / totalTokensNum) * 100) : 0;
+                return (
+                  <div key={`${item.provider}:${item.model_name}`} className="space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span
+                        className="text-foreground font-medium truncate max-w-[170px]"
+                        title={`${item.provider} / ${item.model_name}`}
+                      >
+                        {item.model_name}
+                      </span>
+                      <span className="font-mono text-muted-foreground">
+                        {item.total_tokens.toLocaleString("vi-VN")} tok ({percent}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(percent, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-6 text-center text-xs text-muted-foreground space-y-1">
+                <Coins className="h-6 w-6 mx-auto text-muted-foreground/50 mb-1" />
+                <p className="font-medium">Chưa phát sinh token thực tế</p>
+                <p className="text-[11px] text-muted-foreground/80">
+                  Số liệu sẽ tự động cập nhật khi Trợ lý AI thực thi.
+                </p>
               </div>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-primary rounded-full w-[56%]" />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-foreground font-medium">Google (Gemini 1.5 Flash)</span>
-                <span className="font-mono text-muted-foreground">490K tokens (34%)</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-info rounded-full w-[34%]" />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-foreground font-medium">Local vLLM (Qwen2.5)</span>
-                <span className="font-mono text-muted-foreground">148K tokens (10%)</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full w-[10%]" />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

@@ -82,6 +82,7 @@ class RagService:
             req.collection_id,
             req.question,
             req.preferred_model_name or "default",
+            tenant_id=req.tenant_id,
         )
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
@@ -100,6 +101,7 @@ class RagService:
             query=req.question,
             top_k=8,
             rerank_top_k=5,
+            tenant_id=req.tenant_id,
         )
 
         # 5. No-Answer Policy if context is empty
@@ -174,24 +176,47 @@ class RagService:
             synthesized_answer = llm_res.content.strip()
         except Exception as e:
             logger.warning(
-                "ModelOps LLM generation unavailable (%s), using grounded context synthesis fallback",
+                "ModelOps primary model '%s' generation failed (%s). Checking fallback model...",
+                req.preferred_model_name,
                 e,
             )
-            # Factual grounded synthesis fallback without hallucinating
-            if fact_markdown:
-                synthesized_answer = (
-                    f"Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
-                    f"{fact_markdown}\n\n"
-                    f"**Thông tin bổ sung:**\n"
-                    f"{candidates[0].content[:400] if candidates else ''}"
-                )
-            elif candidates:
-                synthesized_answer = (
-                    f"Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
-                    f"{candidates[0].content}"
-                )
-            else:
-                synthesized_answer = citation_guard.get_no_answer_response(req.module_code)
+            fallback_success = False
+            if req.fallback_model and req.fallback_model != req.preferred_model_name:
+                try:
+                    fallback_llm_req = LLMGenerateRequest(
+                        messages=llm_messages,
+                        temperature=req.temperature,
+                        max_tokens=req.max_tokens,
+                        conversation_id=req.conversation_id,
+                        preferred_model_name=req.fallback_model,
+                    )
+                    llm_res = await modelops_service.generate(db, fallback_llm_req)
+                    synthesized_answer = llm_res.content.strip()
+                    fallback_success = True
+                    logger.info("Successfully recovered using fallback model '%s'", req.fallback_model)
+                except Exception as fb_err:
+                    logger.warning(
+                        "ModelOps fallback model '%s' also failed (%s), using grounded context synthesis fallback",
+                        req.fallback_model,
+                        fb_err,
+                    )
+
+            if not fallback_success:
+                # Factual grounded synthesis fallback without hallucinating
+                if fact_markdown:
+                    synthesized_answer = (
+                        f"Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
+                        f"{fact_markdown}\n\n"
+                        f"**Thông tin bổ sung:**\n"
+                        f"{candidates[0].content[:400] if candidates else ''}"
+                    )
+                elif candidates:
+                    synthesized_answer = (
+                        f"Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
+                        f"{candidates[0].content}"
+                    )
+                else:
+                    synthesized_answer = citation_guard.get_no_answer_response(req.module_code)
 
         # 8. Output Guardrail safety check
         safe_output = output_guardrail.check(synthesized_answer)
@@ -200,9 +225,19 @@ class RagService:
         # Evidence-based citation filtering
         final_citations = citation_guard.filter_evidence_citations(citations, final_answer)
 
+        is_refusal = any(msg in final_answer.lower() for msg in [
+            "thông tin này hiện chưa có",
+            "chưa có trong tài liệu chính thức",
+            "chưa có dữ liệu chính thức",
+            "vui lòng liên hệ hotline",
+            "vui lòng liên hệ ban tư vấn",
+            "vui lòng liên hệ phòng đào tạo",
+        ])
+        status = "insufficient_context" if is_refusal else "answered"
+
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
         resp = AskResponse(
-            status="answered",
+            status=status,
             answer=final_answer,
             answer_format=chosen_format,
             citations=final_citations,
@@ -219,6 +254,7 @@ class RagService:
             req.question,
             resp.model_dump(),
             req.preferred_model_name or "default",
+            tenant_id=req.tenant_id,
         )
 
         return resp

@@ -1,4 +1,10 @@
-import type { AssistantItem, AssistantLifecycleConfig } from "@/types/assistants";
+import type {
+  AssistantCloneRequest,
+  AssistantItem,
+  AssistantLifecycleConfig,
+  AssistantPublishResponse,
+  AssistantReadinessResponse,
+} from "@/types/assistants";
 
 const ASSISTANTS_URL = "/platform/v1alpha1/assistants";
 
@@ -170,6 +176,32 @@ export function generateAssistantSpec(
   });
 }
 
+export function getAssistantReadiness(reference: string): Promise<AssistantReadinessResponse> {
+  return requestJson<AssistantReadinessResponse>(
+    `${ASSISTANTS_URL}/${encodeURIComponent(reference)}/readiness`
+  );
+}
+
+export function publishAssistant(reference: string): Promise<AssistantPublishResponse> {
+  return requestJson<AssistantPublishResponse>(
+    `${ASSISTANTS_URL}/${encodeURIComponent(reference)}/publish`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export function cloneAssistant(
+  reference: string,
+  request: AssistantCloneRequest
+): Promise<AssistantItem> {
+  return requestJson<AssistantItem>(`${ASSISTANTS_URL}/${encodeURIComponent(reference)}/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+}
+
 export const assistantsApi = {
   getAssistants: listAssistants,
   getAssistant,
@@ -183,4 +215,7 @@ export const assistantsApi = {
   seedDefaultAssistants,
   exportAssistantBundle,
   importAssistantBundle,
+  getAssistantReadiness,
+  publishAssistant,
+  cloneAssistant,
 };

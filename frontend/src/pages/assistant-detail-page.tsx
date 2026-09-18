@@ -3,6 +3,14 @@ import { Field } from "@/components/admin/field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -13,22 +21,32 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { type AssistantItem, apiClient } from "@/services/api-client";
 import {
   activateAssistant,
+  cloneAssistant,
   deactivateAssistant,
   exportAssistantBundle,
   generateAssistantSpec,
   getAssistant,
+  getAssistantReadiness,
+  publishAssistant,
   updateAssistant,
 } from "@/services/assistants-api";
 import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
+  AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   Bot,
+  Check,
+  CheckCircle2,
   Clock,
+  Code,
+  Copy,
   Download,
   ExternalLink,
   Library,
@@ -37,11 +55,14 @@ import {
   Network,
   Plus,
   Power,
+  RefreshCw,
+  Rocket,
   RotateCcw,
   Save,
   ShieldCheck,
   Sparkles,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -151,6 +172,8 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssistantEditForm | null>(null);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [isEmbedOpen, setIsEmbedOpen] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const handleGeneratePrompt = async () => {
     if (!form) return;
@@ -281,6 +304,58 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
   });
 
   const item = assistantQuery.data;
+
+  // Clone assistant state & mutation
+  const [isCloneOpen, setIsCloneOpen] = useState(false);
+  const [cloneCode, setCloneCode] = useState("");
+  const [cloneName, setCloneName] = useState("");
+  const [cloneDescription, setCloneDescription] = useState("");
+  const [cloneCollectionId, setCloneCollectionId] = useState("");
+
+  const handleOpenClone = () => {
+    if (!item) return;
+    setCloneCode(`${item.code}_copy`);
+    setCloneName(`${item.name} (Bản sao)`);
+    setCloneDescription(`Bản sao nhân bản từ ${item.name} chuyên trách phục vụ đơn vị.`);
+    setCloneCollectionId(item.collection_id);
+    setIsCloneOpen(true);
+  };
+
+  const cloneMutation = useMutation({
+    mutationFn: () =>
+      cloneAssistant(reference, {
+        new_code: cloneCode.trim(),
+        new_name: cloneName.trim(),
+        new_description: cloneDescription.trim() || undefined,
+        target_collection_id: cloneCollectionId || undefined,
+      }),
+    onSuccess: (cloned) => {
+      queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      toast.success(`Đã nhân bản thành công Trợ lý "${cloned.name}"!`);
+      setIsCloneOpen(false);
+      onNavigate(`/assistants/${encodeURIComponent(cloned.code)}`);
+    },
+    onError: (err: Error) => toast.error(`Nhân bản thất bại: ${err.message}`),
+  });
+
+  // 5-Layer Publish Gate Readiness Query & Publish Mutation
+  const readinessQuery = useQuery({
+    queryKey: ["assistant-readiness", item?.code],
+    queryFn: () => getAssistantReadiness(item?.code as string),
+    enabled: !!item?.code,
+    staleTime: 30_000,
+  });
+
+  const publishMutation = useMutation({
+    mutationFn: () => publishAssistant(reference),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["assistants", reference] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-readiness", item?.code] });
+      queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      toast.success(res.message);
+    },
+    onError: (err: Error) => toast.error(`Xuất bản thất bại: ${err.message}`),
+  });
 
   // Tính toán KPI Metrics thời gian thực
   const kpiStats = useMemo(() => {
@@ -424,6 +499,26 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
           >
             <Network className="size-3.5 text-primary" />
             Mở DAG
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={handleOpenClone}
+          >
+            <Copy className="size-3.5 text-primary" />
+            Nhân bản
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={() => setIsEmbedOpen(true)}
+          >
+            <Code className="size-3.5 text-primary" />
+            Mã nhúng Web
           </Button>
           <Button
             type="button"
@@ -783,6 +878,180 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
             </CardContent>
           </Card>
 
+          {/* 5-Layer Publish Gate Card */}
+          <Card className="border-primary/30 shadow-xs">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Rocket className="size-4 text-primary" />
+                  <CardTitle className="text-sm font-bold">
+                    Cổng Kiểm Định Xuất Bản (Publish Gate)
+                  </CardTitle>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                  disabled={readinessQuery.isFetching}
+                  onClick={() => readinessQuery.refetch()}
+                >
+                  <RefreshCw
+                    className={cn("size-3", readinessQuery.isFetching && "animate-spin")}
+                  />
+                  Kiểm tra lại
+                </Button>
+              </div>
+              <CardDescription className="text-xs">
+                Đánh giá mức độ sẵn sàng 5 lớp trước khi kích hoạt phục vụ sinh viên/cán bộ.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3.5">
+              {readinessQuery.isLoading ? (
+                <div className="flex h-28 items-center justify-center text-xs text-muted-foreground gap-2">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  Đang thẩm định 5 tiêu chí sẵn sàng...
+                </div>
+              ) : readinessQuery.data ? (
+                <>
+                  {/* Score progress overview */}
+                  <div className="rounded-lg border p-3 bg-muted/20 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-foreground font-semibold flex items-center gap-1.5">
+                        Điểm Sẵn Sàng:
+                        <span
+                          className={cn(
+                            "font-bold font-mono text-sm",
+                            readinessQuery.data.overall_readiness_score >= 80
+                              ? "text-success"
+                              : readinessQuery.data.overall_readiness_score >= 65
+                                ? "text-warning"
+                                : "text-destructive"
+                          )}
+                        >
+                          {readinessQuery.data.overall_readiness_score}%
+                        </span>
+                      </span>
+                      <Badge
+                        variant={
+                          readinessQuery.data.is_ready_for_publish
+                            ? "success"
+                            : readinessQuery.data.blockers.length > 0
+                              ? "destructive"
+                              : "warning"
+                        }
+                        className="text-[10px]"
+                      >
+                        {readinessQuery.data.is_ready_for_publish
+                          ? "Đủ chuẩn xuất bản"
+                          : readinessQuery.data.blockers.length > 0
+                            ? "Có lỗi chặn xuất bản"
+                            : "Khuyến nghị bổ sung"}
+                      </Badge>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          "h-full transition-all duration-300",
+                          readinessQuery.data.overall_readiness_score >= 80
+                            ? "bg-success"
+                            : readinessQuery.data.overall_readiness_score >= 65
+                              ? "bg-warning"
+                              : "bg-destructive"
+                        )}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(0, readinessQuery.data.overall_readiness_score)
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 5 Criteria Items */}
+                  <div className="space-y-2">
+                    {readinessQuery.data.checks.map((check) => (
+                      <div
+                        key={check.name}
+                        className="flex items-start justify-between gap-2 rounded-md border p-2 text-xs bg-card hover:bg-muted/10 transition-colors"
+                      >
+                        <div className="flex items-start gap-2 min-w-0">
+                          {check.status === "passed" ? (
+                            <CheckCircle2 className="size-4 shrink-0 text-success mt-0.5" />
+                          ) : check.status === "warning" ? (
+                            <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
+                          ) : (
+                            <XCircle className="size-4 shrink-0 text-destructive mt-0.5" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground">{check.name}</span>
+                              <span
+                                className={cn(
+                                  "text-[10px] font-mono font-bold",
+                                  check.score >= 80
+                                    ? "text-success"
+                                    : check.score >= 60
+                                      ? "text-warning"
+                                      : "text-destructive"
+                                )}
+                              >
+                                {check.score}/100
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                              {check.message}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Blockers Alert Banner */}
+                  {readinessQuery.data.blockers.length > 0 && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <AlertCircle className="size-3.5" />
+                        Lỗi chặn xuất bản (Cần khắc phục trước khi kích hoạt):
+                      </div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                        {readinessQuery.data.blockers.map((blocker) => (
+                          <li key={blocker}>{blocker}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Publish Trigger Button */}
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      className="w-full h-9 text-xs gap-1.5"
+                      variant={item.is_active ? "outline" : "default"}
+                      disabled={
+                        publishMutation.isPending ||
+                        (!item.is_active && !readinessQuery.data.is_ready_for_publish)
+                      }
+                      onClick={() => publishMutation.mutate()}
+                    >
+                      <Rocket className="size-3.5" />
+                      {publishMutation.isPending
+                        ? "Đang xuất bản..."
+                        : item.is_active
+                          ? "Tái xuất bản (Đang hoạt động)"
+                          : "Xuất Bản Trợ Lý Chính Thức"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">Không thể tải thông tin kiểm định.</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Interactive Guardrails Switch */}
           <Card>
             <CardHeader>
@@ -981,6 +1250,185 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
           </Card>
         </div>
       </div>
+
+      {/* 1-Click Clone Assistant Dialog */}
+      <Dialog open={isCloneOpen} onOpenChange={setIsCloneOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Copy className="size-4 text-primary" />
+              Nhân Bản Trợ Lý AI Chuyên Trách
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Sao chép toàn bộ cấu hình 7 lớp từ “{item.name}” để tùy biến cho khoa, phòng ban hoặc
+              viện nghiên cứu.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-2 text-xs">
+            <Field htmlFor="clone-assistant-code" label="Mã định danh mới (Slug code)" required>
+              <Input
+                id="clone-assistant-code"
+                className="font-mono text-xs"
+                placeholder="vi_du: admissions_cntt"
+                value={cloneCode}
+                onChange={(e) => setCloneCode(e.target.value)}
+              />
+              <span className="text-[10px] text-muted-foreground">
+                Chỉ gồm chữ thường, số, gạch dưới (_) hoặc gạch ngang (-).
+              </span>
+            </Field>
+
+            <Field htmlFor="clone-assistant-name" label="Tên trợ lý mới" required>
+              <Input
+                id="clone-assistant-name"
+                placeholder="Ví dụ: Trợ lý Tuyển sinh Khoa CNTT"
+                value={cloneName}
+                onChange={(e) => setCloneName(e.target.value)}
+              />
+            </Field>
+
+            <Field htmlFor="clone-assistant-desc" label="Mô tả chức năng">
+              <Textarea
+                id="clone-assistant-desc"
+                rows={2}
+                placeholder="Mô tả ngắn gọn phạm vi phục vụ của trợ lý nhân bản..."
+                value={cloneDescription}
+                onChange={(e) => setCloneDescription(e.target.value)}
+              />
+            </Field>
+
+            <Field htmlFor="clone-assistant-col" label="Kho Tri Thức Liên Kết">
+              <Select value={cloneCollectionId} onValueChange={setCloneCollectionId}>
+                <SelectTrigger id="clone-assistant-col">
+                  <SelectValue placeholder="Chọn kho tri thức" />
+                </SelectTrigger>
+                <SelectContent>
+                  {collections.map((col) => (
+                    <SelectItem key={col.id} value={col.id}>
+                      {col.name} ({col.document_count} tài liệu)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setIsCloneOpen(false)}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              disabled={cloneMutation.isPending || !cloneCode.trim() || !cloneName.trim()}
+              onClick={() => cloneMutation.mutate()}
+            >
+              {cloneMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+              {cloneMutation.isPending ? "Đang nhân bản..." : "Xác nhận nhân bản"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Mã Nhúng Web Widget */}
+      <Dialog open={isEmbedOpen} onOpenChange={setIsEmbedOpen}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Code className="size-4 text-primary" />
+              Mã Nhúng Web Widget Cho Trợ Lý
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Nhúng Trợ lý <strong className="text-foreground">{item.name}</strong> vào Cổng thông
+              tin trường qua 1 dòng thẻ script.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-foreground">
+                Mã nhúng HTML (Dán trước thẻ &lt;/body&gt;)
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-primary gap-1"
+                onClick={async () => {
+                  const originUrl =
+                    typeof window !== "undefined"
+                      ? window.location.origin
+                      : "https://ai.qnu.edu.vn";
+                  const script = `<!-- QNU AI Platform — Web Chat Widget -->\n<script\n  src="${originUrl}/embed/qnu-chat-widget.js"\n  data-assistant="${item.code}"\n  data-title="${item.name}"\n  data-position="bottom-right"\n  defer>\n</script>`;
+                  await navigator.clipboard.writeText(script);
+                  setEmbedCopied(true);
+                  toast.success("Đã sao chép mã nhúng Web Widget!");
+                  setTimeout(() => setEmbedCopied(false), 2000);
+                }}
+              >
+                {embedCopied ? (
+                  <Check className="size-3.5 text-success" />
+                ) : (
+                  <Copy className="size-3.5" />
+                )}
+                <span>{embedCopied ? "Đã sao chép" : "Sao chép"}</span>
+              </Button>
+            </div>
+
+            <pre className="p-3 rounded-control bg-muted font-mono text-[11px] text-foreground overflow-x-auto border border-border leading-relaxed select-text">
+              {`<!-- QNU AI Platform — Web Chat Widget -->
+<script
+  src="${typeof window !== "undefined" ? window.location.origin : "https://ai.qnu.edu.vn"}/embed/qnu-chat-widget.js"
+  data-assistant="${item.code}"
+  data-title="${item.name}"
+  data-position="bottom-right"
+  defer>
+</script>`}
+            </pre>
+
+            <p className="text-[11px] text-muted-foreground">
+              Widget hoạt động độc lập, tự động đồng bộ câu trả lời và trích dẫn quy chế theo thời
+              gian thực.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setIsEmbedOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => {
+                setIsEmbedOpen(false);
+                onNavigate("/channels");
+              }}
+            >
+              <ExternalLink className="size-3.5" />
+              Tùy biến tại Kênh phân phối
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
