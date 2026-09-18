@@ -23,6 +23,27 @@ _TERMINAL_NODE_TYPES = frozenset(
     }
 )
 
+_RAG_NODE_TYPES = frozenset(
+    {
+        "core.knowledge.answer",
+        "rag.knowledge",
+        "rag.answer",
+        "rag.search",
+    }
+)
+
+_CITATION_GUARD_TYPES = frozenset(
+    {
+        "guard.citation",
+        "guard.citation_policy",
+        "guardrail",
+        "output.no_answer",
+        "no_answer_output",
+        "human.approval",
+        "tool.human_approval",
+    }
+)
+
 
 class WorkflowCompiler:
     """Performs deterministic static checks shared by save, publish, and rollback flows."""
@@ -163,6 +184,25 @@ class WorkflowCompiler:
                     message="Workflow cần ít nhất một node đầu ra có thể tới từ node bắt đầu.",
                 )
             )
+
+        rag_nodes = [node for node in dag_spec.nodes if node.type in _RAG_NODE_TYPES]
+        if rag_nodes:
+            has_guard = any(
+                node.type in _CITATION_GUARD_TYPES
+                for node in dag_spec.nodes
+                if node.id in reachable
+            )
+            if not has_guard:
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_rag_missing_citation_guard",
+                        message=(
+                            "Workflow sử dụng RAG tri thức bắt buộc phải có chốt chặn kiểm tra "
+                            "trích dẫn (guard.citation_policy) hoặc đường rẽ nhánh không trả lời "
+                            "(output.no_answer) để chống bịa đặt (Anti-Hallucination)."
+                        ),
+                    )
+                )
 
     @staticmethod
     def _validate_runtime_policy(

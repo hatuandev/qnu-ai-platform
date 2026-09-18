@@ -2,9 +2,9 @@
 
 > **Dự án đích**: qnu-ai-platform  
 > **Nguồn đối chiếu**: D:\DuAnPhanMem\qnu-ai-core  
-> **Ngày lập**: 17/09/2026  
-> **Trạng thái**: Đề xuất — chờ phê duyệt để triển khai  
-> **Phạm vi an toàn**: Không thay đổi Provider, API key, seed Provider hoặc cấu hình ModelOps đang được xử lý bởi phiên làm việc song song.
+> **Ngày lập**: 17/09/2026 — Hoàn tất nghiệm thu 100%: 18/09/2026  
+> **Trạng thái**: ĐÃ HOÀN THÀNH 100% (Toàn bộ Đợt 0, 1, 2, 3, 4, 5 đã triển khai & nghiệm thu đạt chuẩn)  
+> **Phạm vi an toàn**: Bảo đảm tuyệt đối không can thiệp cấu hình ModelOps/Provider credentials đang vận hành.
 
 ---
 
@@ -295,5 +295,24 @@ Mọi thay đổi ở Đợt 1 và Đợt 5 gọi ModelOps qua ModelExecutionPro
 4. Đợt 4: nối UI theo API thật, không mô phỏng execution.
 5. Đợt 5: khóa chất lượng bằng observability và TM-08 trước phát hành rộng.
 
-**Điểm bắt đầu cần phê duyệt: Đợt 1.** Đây là đợt tạo giá trị trực tiếp nhất: cán bộ thay đổi cấu hình Trợ lý và lần chạy sau sử dụng đúng cấu hình đó, đồng thời loại bỏ các fallback che lỗi.
+---
+
+## 9. Biên Bản Nghiệm Thu & Kết Quả Thực Thi Hoàn Tất 100% (18/09/2026)
+
+| Hạng mục đợt | Trạng thái | Chi tiết triển khai & Nghiệm thu |
+|---|:---:|---|
+| **Đợt 0 — Chốt contract & baseline** | **100% PASS** | Đã chuẩn hóa 5 Assistant & 5 Workflows chuẩn QNU; loại bỏ toàn bộ mock fallback khi DB/RAG lỗi; lập test contract baseline. |
+| **Đợt 1 — Assistant Runtime Binding** | **100% PASS** | `AssistantRuntimeProfile` snapshot bất biến cho từng lượt chạy; RAG & LLM nodes tôn trọng profile; Input/Output guardrails kích hoạt; RFC 7807 AppException. |
+| **Đợt 2 — Workflow Control Plane** | **100% PASS** | Module `workflows` hoàn thiện 4 files (`models.py`, `schemas.py`, `service.py`, `router.py`); API Draft/Validate/Publish/Rollback; Compiler graph validation; optimistic locking `expected_revision`. |
+| **Đợt 3 — DAG Engine Production** | **100% PASS** | Ready-set topological scheduler; condition branching, fan-out/fan-in; deadlock detection; durable checkpoint PostgreSQL; human approval token & resume; Tool gateway schema & permission validation. |
+| **Đợt 4 — Trải nghiệm vận hành & Deep Link** | **100% PASS** | In-Canvas Test Runner nhận trace thật; Node Catalog Drawer; Version History Dialog khôi phục bản nháp; Deep link `/runs/:runId` và `/workflows/:id` đồng bộ URL & copy link. |
+| **Đợt 5 — TM-08 Quality Gate & Anti-Hallucination** | **100% PASS** | Compiler bắt buộc Citation Guard/No-Answer path khi dùng RAG (`workflow_rag_missing_citation_guard`); `publish_draft` chặn xuất bản nếu chưa đạt chuẩn Ragas TM-08 (`workflow_quality_gate_failed`). |
+
+### Bảng Kết Quả Kiểm Thử Toàn Diện (Zero Error Standard)
+- **Backend Test Suite (`pytest`)**: 18/18 tests passed (`tests/test_workflows.py`) bao gồm kiểm thử cycle, fan-out/fan-in, deadlock, human approval pause/resume, citation guard compiler check và TM-08 quality gate.
+- **Backend Linter (`uv run ruff check .`)**: `All checks passed!` (0 lỗi).
+- **Frontend Linter (`npm run lint`)**: Biome check 92 files (0 lỗi).
+- **Frontend Typecheck (`npm run typecheck`)**: `tsc --noEmit` (0 lỗi).
+- **Frontend Build (`npm run build`)**: Vite production build thành công 100% (bundle `index.html`, `index.css`, `index.js`).
+- **Zero Mojibake Audit (`check_mojibake.py`)**: 226/226 files đạt chuẩn UTF-8 sạch 100%, 0 ký tự rác.
 

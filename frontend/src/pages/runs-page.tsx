@@ -2,15 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowRight,
+  Check,
   CheckCircle2,
   Clock,
+  Copy,
   Eye,
   GitBranch,
   History,
   RefreshCw,
 } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -31,8 +34,19 @@ import {
 } from "../components/ui/table";
 import { type WorkflowRun, apiClient } from "../services/api-client";
 
-export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavigateToCanvas }) => {
+export interface RunsPageProps {
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
+  onNavigateToCanvas?: () => void;
+}
+
+export const RunsPage: React.FC<RunsPageProps> = ({
+  currentPath,
+  onNavigate,
+  onNavigateToCanvas,
+}) => {
   const [selectedRun, setSelectedRun] = useState<WorkflowRun | null>(null);
+  const [copiedLinkRunId, setCopiedLinkRunId] = useState<string | null>(null);
 
   const {
     data: runs = [],
@@ -43,6 +57,40 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
     queryKey: ["workflow-runs"],
     queryFn: () => apiClient.getWorkflowRuns(),
   });
+
+  const runIdFromPath = useMemo(() => {
+    if (currentPath?.startsWith("/runs/")) {
+      return decodeURIComponent(currentPath.replace("/runs/", ""));
+    }
+    return null;
+  }, [currentPath]);
+
+  useEffect(() => {
+    if (runIdFromPath && runs.length > 0) {
+      const match = runs.find((r) => r.id === runIdFromPath);
+      if (match) {
+        setSelectedRun(match);
+      }
+    }
+  }, [runIdFromPath, runs]);
+
+  const handleOpenRun = (run: WorkflowRun) => {
+    setSelectedRun(run);
+    onNavigate?.(`/runs/${encodeURIComponent(run.id)}`);
+  };
+
+  const handleCloseRun = () => {
+    setSelectedRun(null);
+    onNavigate?.("/runs");
+  };
+
+  const handleCopyLink = (runId: string) => {
+    const url = `${window.location.origin}/runs/${encodeURIComponent(runId)}`;
+    void navigator.clipboard.writeText(url);
+    setCopiedLinkRunId(runId);
+    toast.success("Đã sao chép liên kết trực tiếp tới phiên chạy!");
+    setTimeout(() => setCopiedLinkRunId(null), 2000);
+  };
   const completedCount = runs.filter((run) => run.status === "completed").length;
   const averageLatency = useMemo(
     () =>
@@ -179,15 +227,30 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedRun(run)}
-                    className="h-7 text-xs text-primary hover:text-primary/80 gap-1"
-                  >
-                    <Eye className="h-3.5 w-3.5" />
-                    <span>Xem Trace</span>
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyLink(run.id)}
+                      title="Sao chép liên kết phiên chạy"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {copiedLinkRunId === run.id ? (
+                        <Check className="h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenRun(run)}
+                      className="h-7 text-xs text-primary hover:text-primary/80 gap-1"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Xem Trace</span>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -204,15 +267,37 @@ export const RunsPage: React.FC<{ onNavigateToCanvas?: () => void }> = ({ onNavi
       <Dialog
         open={selectedRun !== null}
         onOpenChange={(open) => {
-          if (!open) setSelectedRun(null);
+          if (!open) handleCloseRun();
         }}
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" />
-              Chi Tiết Truy Vết Thực Thi: {selectedRun?.id}
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-2 pr-6">
+              <DialogTitle className="text-sm font-bold flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" />
+                Chi Tiết Truy Vết Thực Thi: {selectedRun?.id}
+              </DialogTitle>
+              {selectedRun && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopyLink(selectedRun.id)}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  {copiedLinkRunId === selectedRun.id ? (
+                    <>
+                      <Check className="h-3 w-3 text-success" />
+                      <span>Đã chép</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Sao chép link</span>
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             <DialogDescription className="text-xs">
               Các bước checkpoint của luồng quy trình điều phối AI
             </DialogDescription>

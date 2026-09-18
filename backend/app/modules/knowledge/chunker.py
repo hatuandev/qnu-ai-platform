@@ -72,12 +72,7 @@ class ClauseBasedChunker(BaseChunker):
 
             sec_matches = list(self._RE_PAGE_MARKER.finditer(raw_sec))
             sec_start_page = current_page
-            if sec_matches and sec_matches[0].start() < 60:
-                try:
-                    sec_start_page = int(sec_matches[0].group(1))
-                except (TypeError, ValueError):
-                    pass
-            elif sec_start_page is None and sec_matches:
+            if sec_matches and (sec_matches[0].start() < 60 or sec_start_page is None):
                 try:
                     sec_start_page = int(sec_matches[0].group(1))
                 except (TypeError, ValueError):

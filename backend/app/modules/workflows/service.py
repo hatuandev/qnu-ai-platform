@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.assistants.schemas import AssistantRuntimeProfile
+from app.modules.evaluation.models import EvaluationRun
 from app.modules.workflows.compiler import workflow_compiler
 from app.modules.workflows.engine import dag_engine
 from app.modules.workflows.models import (
@@ -311,6 +312,36 @@ class WorkflowService:
                 code="workflow_validation_failed",
                 status_code=422,
                 details=validation_report.model_dump(mode="json"),
+            )
+
+        # Quality Gate TM-08: Verify evaluation benchmark metrics if available
+        assistant_code = workflow_id.replace("-assistant", "")
+        eval_run_result = await db.execute(
+            select(EvaluationRun)
+            .where(
+                (EvaluationRun.assistant_code == workflow_id)
+                | (EvaluationRun.assistant_code == assistant_code)
+            )
+            .order_by(EvaluationRun.created_at.desc())
+        )
+        latest_eval = eval_run_result.scalars().first()
+        if (
+            latest_eval
+            and latest_eval.status == "completed"
+            and not latest_eval.meets_tm08_standard
+        ):
+            raise AppException(
+                f"Workflow chưa đạt chuẩn chất lượng TM-08 (Faithfulness: {latest_eval.faithfulness_avg:.2f}, "
+                f"Answer Relevance: {latest_eval.answer_relevance_avg:.2f}, Context Precision: {latest_eval.context_precision_avg:.2f}). "
+                "Cần đạt tiêu chuẩn TM-08 trước khi phát hành chính thức.",
+                code="workflow_quality_gate_failed",
+                status_code=422,
+                details={
+                    "faithfulness_avg": latest_eval.faithfulness_avg,
+                    "answer_relevance_avg": latest_eval.answer_relevance_avg,
+                    "context_precision_avg": latest_eval.context_precision_avg,
+                    "meets_tm08_standard": False,
+                },
             )
 
         version_result = await db.execute(
@@ -743,6 +774,88 @@ class WorkflowService:
             for record in records
         ]
 
+    async def sync_default_workflows(self, db: AsyncSession) -> int:
+        """Seed checked-in workflow definitions, drafts, and initial published versions."""
+        if not self.workflows_dir.exists():
+            return 0
+
+        synced = 0
+        for json_file in sorted(self.workflows_dir.glob("*.json")):
+            try:
+                data = await asyncio.to_thread(self._read_json_file, json_file)
+                meta = data.get("metadata", {})
+                workflow_id = meta.get("name") or json_file.stem.replace(".v1alpha1", "")
+                display_name = meta.get("display_name") or workflow_id
+                description = meta.get("description") or ""
+                module_code = meta.get("module_code") or "general"
+                tenant_id = meta.get("scope", {}).get("tenant_id", "tenant_qnu")
+
+                dag_spec = self._parse_spec_from_json(data)
+                validation = workflow_compiler.validate(dag_spec)
+                if not validation.is_valid:
+                    continue
+
+                serialized_spec = self._serialize_dag_spec(dag_spec)
+                content_hash = self._content_hash(dag_spec)
+
+                stmt = select(WorkflowDefinition).where(WorkflowDefinition.id == workflow_id)
+                res = await db.execute(stmt)
+                wf_def = res.scalar_one_or_none()
+                if wf_def is None:
+                    wf_def = WorkflowDefinition(
+                        id=workflow_id,
+                        name=workflow_id,
+                        display_name=display_name,
+                        description=description,
+                        module_code=module_code,
+                        tenant_id=tenant_id,
+                        version="1.0.0",
+                        is_active=True,
+                        dag_spec=serialized_spec,
+                    )
+                    db.add(wf_def)
+                    await db.flush()
+
+                draft_stmt = select(WorkflowDraft).where(WorkflowDraft.workflow_id == workflow_id)
+                draft_res = await db.execute(draft_stmt)
+                draft = draft_res.scalar_one_or_none()
+                if draft is None:
+                    draft = WorkflowDraft(
+                        workflow_id=workflow_id,
+                        dag_spec=serialized_spec,
+                        revision=1,
+                        updated_by="system_seeder",
+                    )
+                    db.add(draft)
+                    await db.flush()
+
+                ver_stmt = select(WorkflowVersion).where(
+                    WorkflowVersion.workflow_id == workflow_id,
+                    WorkflowVersion.version_number == 1,
+                )
+                ver_res = await db.execute(ver_stmt)
+                version = ver_res.scalar_one_or_none()
+                if version is None:
+                    version = WorkflowVersion(
+                        workflow_id=workflow_id,
+                        version_number=1,
+                        content_hash=content_hash,
+                        dag_spec=serialized_spec,
+                        validation_report=validation.model_dump(mode="json"),
+                        published_by="system_seeder",
+                    )
+                    db.add(version)
+                    await db.flush()
+
+                if wf_def.published_version_id != version.id:
+                    wf_def.published_version_id = version.id
+
+                synced += 1
+            except Exception as exc:
+                logger.warning("Failed to sync default workflow %s: %s", json_file.name, exc)
+
+        await db.commit()
+        return synced
+
 
 workflow_service = WorkflowService()
-

@@ -127,8 +127,14 @@ function AppContent() {
     }
 
     // 6. Lịch Sử Thực Thi DAG Runs
-    if (currentPath === "/runs") {
-      return <RunsPage onNavigateToCanvas={() => handleNavigate("/canvas")} />;
+    if (currentPath === "/runs" || currentPath.startsWith("/runs/")) {
+      return (
+        <RunsPage
+          currentPath={currentPath}
+          onNavigate={handleNavigate}
+          onNavigateToCanvas={() => handleNavigate("/canvas")}
+        />
+      );
     }
 
     // 7. Quản Trị Loại Văn Bản theo taxonomy Core
@@ -154,10 +160,16 @@ function AppContent() {
       return <NodeCatalogPage />;
     }
 
-    // 9. DAG Canvas Studio
-    if (currentPath === "/canvas") {
+    // 9. DAG Canvas Studio & Deep Linking
+    if (
+      currentPath === "/canvas" ||
+      currentPath.startsWith("/canvas/") ||
+      currentPath.startsWith("/workflows/")
+    ) {
       return (
         <DAGCanvasPage
+          currentPath={currentPath}
+          onNavigate={handleNavigate}
           onNavigateToChat={(code) => handleNavigate(`/chat?assistant=${encodeURIComponent(code)}`)}
         />
       );

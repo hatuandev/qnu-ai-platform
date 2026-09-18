@@ -7,11 +7,53 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 01:25 (UTC+7)
-- **Phiên số**: #77 (tính từ đầu dự án)
+- **Thời gian cập nhật**: 2026-09-18 09:30 (UTC+7)
+- **Phiên số**: #79 (tính từ đầu dự án)
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Xử Lý Triệt Để Lỗi Chuẩn Hóa PDF Scan & Loại Bỏ Hoàn Toàn Text Giả Lập (phiên #77)**:
+  1. **Nâng Cấp Toàn Diện UI/UX Phân Hệ Trợ Lý AI Thành Enterprise AI Assistant Control Center (phiên #79)**:
+     - **Mục tiêu**: Chuyển đổi toàn diện giao diện quản trị Trợ lý AI (`/assistants`, `/assistants/:id`, `/assistants/new`) từ các ô nhập văn bản thô (free-text inputs) sang trải nghiệm Trung tâm Điều hành Cấp Doanh nghiệp (Enterprise AI Assistant Control Center) kết nối dữ liệu thật từ Backend APIs.
+     - **Thay đổi kỹ thuật chi tiết**:
+       * **Thanh KPI Metrics Strip thời gian thực**: Tự động tính toán tổng số lượt hội thoại (`totalRuns`), độ trễ trung bình (`avgLatency` ms), tên và số lượng tài liệu trong Kho tri thức RAG (`docCount`), và trạng thái đạt chuẩn TM-08.
+       * **Ràng Buộc Tri Thức & Quy Trình Động (Dynamic Select Gateway)**:
+         - Thay thế ô input text `collection_id` bằng dropdown `<Select>` kết nối trực tiếp `apiClient.getCollections()`, hiển thị tên bộ sưu tập và số lượng tài liệu kèm nút "Mở chi tiết kho tri thức" (`/knowledge/:id`).
+         - Thay thế ô input text `workflow_id` bằng dropdown `<Select>` kết nối `workflowsApi.listDefinitions()`, hiển thị tên quy trình DAG kèm nút "Mở đồ thị DAG Studio" (`/workflows/:id`).
+       * **ModelOps & Mô Hình Kép**: Dropdown chọn lọc `primary_model` và `fallback_model` từ danh mục mô hình chuẩn có chú thích hiệu năng, kèm thanh trượt `temperature` (0.0 - 1.0) và giới hạn `max_tokens`.
+       * **Trung Tâm Kiểm Soát An Toàn 6 Công Tắc (Interactive Guardrails Switch Center)**:
+         - Thay thế 6 badge tĩnh bằng 6 thẻ điều khiển có `<Switch>` tương tác hai chiều, liên kết trực tiếp vào `config.guardrails` (Prompt Injection, Mask PII, Require Grounded Answer, Protect System Prompt), `config.tools` (Human Approval HITL), và `config.output_policy` (Require Citations).
+       * **Quản Lý Câu Hỏi Gợi Ý Tương Tác (Editable Sample Questions List)**:
+         - Danh sách câu hỏi mẫu đánh số thứ tự với cấu trúc Object độc lập `{ id, text }`, cho phép thêm mới, chỉnh sửa trực tiếp và xóa từng câu hỏi. Triệt tiêu hoàn toàn cảnh báo Biome `noArrayIndexKey`.
+       * **Bảng Kiểm Toán Chuẩn Ragas TM-08**:
+         - Hiển thị 3 chỉ số Ragas TM-08 (Faithfulness $\ge 0.90$, Answer Relevance $\ge 0.85$, Context Precision $\ge 0.80$), ô chỉnh sửa `no_answer_message` dự phòng khi thiếu căn cứ, và nút liên kết nhanh sang `/evaluation`.
+       * **Quản Lý Vòng Đời Vùng Nguy Hiểm & Kích Hoạt Lại (Reactivate Assistant)**:
+         - Bổ sung hàm `activateAssistant(reference)` trong `frontend/src/services/assistants-api.ts`.
+         - Nút kép thông minh: "Vô hiệu hóa trợ lý" (khi đang hoạt động) và "Kích hoạt lại trợ lý" (khi đã bị vô hiệu hóa), gửi `PATCH /assistants/:id` với `{ is_active: true }` để kích hoạt lại tức thì.
+       * **Trang Danh Sách (`/assistants`) & Tạo Mới (`/assistants/new`)**:
+         - Cập nhật `AssistantCard` với 3 nút tác vụ nhanh (`Thử chat`, `Mở DAG`, `Cấu hình`), huy hiệu chuẩn TM-08, bộ lọc trạng thái (`Tất cả`, `Đang hoạt động`, `Đã tạm dừng`), và đồng bộ hóa thông báo bằng `toast` (Sonner).
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Frontend Lint: `npm run lint` — Checked 92 files (0 lỗi).
+       * Frontend Typecheck: `npm run typecheck` — `tsc --noEmit` (0 lỗi).
+       * Frontend Build: `npm run build` — Vite build thành công (8.34s, `dist/` bundle sạch).
+       * Backend Pytest: `uv run --extra dev pytest tests/test_assistants.py -v` — 8/8 tests passed (100%).
+       * Backend Ruff: `uv run ruff check .` — All checks passed (0 lỗi).
+       * Zero Mojibake Audit: `python scripts/check_mojibake.py` — 226/226 files UTF-8 sạch 100%.
+       * Browser E2E Test: Đã xác thực giao diện qua browser subagent và lưu video/screenshot tại artifacts.
+  2. **Triển Khai Hoàn Tất 100% Toàn Bộ 5 Đợt Kế Hoạch 04 — Hoàn Thiện Hệ Sinh Thái Trợ Lý AI & DAG Control Plane (phiên #78)**:
+     - **Mục tiêu**: Hiện thực hóa 100% [Kế hoạch 04](file:///d:/DuAnPhanMem/qnu-ai-platform/docs/ke_hoach/04_ke_hoach_hoan_thien_tro_ly_ai_dag.md), xóa bỏ hoàn toàn dữ liệu giả, nâng cấp DAG Canvas và Trợ lý AI thành Workflow Control Plane cấp Enterprise với bảo vệ chống bịa đặt (Anti-Hallucination), cổng kiểm định chất lượng TM-08 và điều hướng sâu (Deep Linking).
+     - **Thay đổi kỹ thuật chi tiết theo 5 Đợt**:
+       * **Đợt 0 & 1 (Assistant Binding & Snapshot bất biến)**: `AssistantRuntimeProfile` snapshot cho từng lượt chạy; RAG & LLM nodes tôn trọng profile; Input/Output guardrails; loại bỏ toàn bộ fallback mock.
+       * **Đợt 2 (Workflow Control Plane)**: Module `workflows` 4 files chuẩn Clean Architecture (`models.py`, `schemas.py`, `service.py`, `router.py`); API Draft/Validate/Publish/Rollback; Compiler graph validation; optimistic locking `expected_revision`.
+       * **Đợt 3 (DAG Engine Production)**: Ready-set topological scheduler; condition branching với regex tiếng Việt an toàn; fan-out/fan-in synchronization; deadlock detection; durable checkpoint PostgreSQL; human approval token & resume; Tool gateway schema & permission validation.
+       * **Đợt 4 (Trải nghiệm vận hành & Deep Link)**: In-Canvas Test Runner nhận trace thật; Node Catalog Drawer; Version History Dialog khôi phục bản nháp; Dirty state tracking; Deep link `/runs/:runId` (mở modal timeline checkpoint & copy link) và `/workflows/:id` (đồng bộ tab workflow trên DAG Studio & copy link).
+       * **Đợt 5 (Quality Gate TM-08 & Anti-Hallucination)**: `compiler.py` bắt buộc có node thẩm định trích dẫn hoặc fallback (`workflow_rag_missing_citation_guard`) khi dùng RAG; `service.py` kiểm tra kết quả `EvaluationRun` mới nhất trước khi publish (`workflow_quality_gate_failed`).
+     - **Kiểm thử đạt chuẩn 100% Zero Error**:
+       * Backend Pytest: 18/18 tests passed (`tests/test_workflows.py`) bao gồm cycle, deadlock, fan-out/fan-in, human approval, compiler citation guard và TM-08 quality gate.
+       * Backend Ruff: All checks passed (0 lỗi).
+       * Frontend Biome: Checked 92 files (0 lỗi).
+       * Frontend Typecheck: `tsc --noEmit` (0 lỗi).
+       * Frontend Build: Vite build thành công (8.10s, `dist/` bundle sạch).
+       * Zero Mojibake Audit: 226/226 files UTF-8 sạch 100%.
+  2. **Xử Lý Triệt Để Lỗi Chuẩn Hóa PDF Scan & Loại Bỏ Hoàn Toàn Text Giả Lập (phiên #77)**:
      - **Vấn đề**: Người dùng kiểm tra tệp PDF scan 9 trang (`4740-qd-bgddt-bo-chi-so-cds-dai-hoc.pdf`, QĐ 4740 BGDĐT), Document Verification Studio hiển thị toàn bộ văn bản giả lập (`### Tiêu đề đầu trang`, `## Tên loại văn bản / Trích yếu nội dung`, `Đoạn văn bản quy định`, `Bảng biểu số liệu`, `Con dấu & Chữ ký xác thực`), mất 100% nội dung thật.
      - **Nguyên nhân gốc rễ**:
        * `layout_detector.py` (dòng 965..990, 295, 193) gán chuỗi mô tả tiếng Việt vào thuộc tính `text` của box thay vì để rỗng.

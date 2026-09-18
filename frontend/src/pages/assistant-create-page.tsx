@@ -19,13 +19,34 @@ import {
   createAssistant,
   listAssistantTemplates,
 } from "@/services/assistants-api";
+import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Bot, Save, ShieldCheck } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { toast } from "sonner";
 
 interface AssistantCreatePageProps {
   onNavigate: (path: string) => void;
 }
+
+const CATEGORY_OPTIONS = [
+  { value: "admissions", label: "Tuyển sinh & Hướng nghiệp" },
+  { value: "academic", label: "Quy chế & Học vụ" },
+  { value: "resources", label: "Thư viện & Học liệu Số" },
+  { value: "administration", label: "Soạn thảo Văn bản NĐ 30" },
+  { value: "examination", label: "Khảo thí & Đề thi Bloom" },
+  { value: "general", label: "Hỗ trợ Đa năng" },
+];
+
+const STANDARD_MODELS = [
+  { value: "gpt-4o-mini", label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)" },
+  { value: "gpt-4o", label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)" },
+  { value: "gemini-1.5-flash", label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)" },
+  { value: "gemini-1.5-pro", label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)" },
+  { value: "deepseek-chat", label: "DeepSeek V3 (Thông minh & tiết kiệm)" },
+  { value: "mistral-small-latest", label: "Mistral Small (Chính xác & bảo mật)" },
+  { value: "qwen2.5-7b-instruct", label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)" },
+];
 
 const DEFAULT_CONFIG: AssistantLifecycleConfig = {
   sample_questions: [],
@@ -132,11 +153,19 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
     queryKey: ["knowledge-collections"],
     queryFn: () => apiClient.getCollections(),
   });
+  const workflowsQuery = useQuery({
+    queryKey: ["workflow-definitions"],
+    queryFn: () => workflowsApi.listDefinitions(),
+  });
   const createMutation = useMutation({
     mutationFn: createAssistant,
     onSuccess: (assistant) => {
       queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      toast.success(`Đã khởi tạo thành công Trợ lý “${assistant.name}”!`);
       onNavigate(`/assistants/${encodeURIComponent(assistant.code)}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Tạo trợ lý thất bại.");
     },
   });
 
@@ -242,13 +271,22 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
               }
             />
           </Field>
-          <Field htmlFor="assistant-category" label="Lĩnh vực" required>
-            <Input
-              id="assistant-category"
-              required
+          <Field htmlFor="assistant-category" label="Lĩnh vực chuyên môn" required>
+            <Select
               value={form.category}
-              onChange={(event) => setForm((value) => ({ ...value, category: event.target.value }))}
-            />
+              onValueChange={(cat) => setForm((value) => ({ ...value, category: cat }))}
+            >
+              <SelectTrigger id="assistant-category">
+                <SelectValue placeholder="Chọn lĩnh vực" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
           <Field htmlFor="assistant-persona" label="Tư cách trợ lý" required>
             <Input
@@ -302,7 +340,7 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
                 <SelectContent>
                   {(collectionsQuery.data ?? []).map((collection) => (
                     <SelectItem key={collection.id} value={collection.id}>
-                      {collection.name}
+                      {collection.name} ({collection.document_count} tài liệu)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -325,8 +363,12 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SemanticChunker">SemanticChunker</SelectItem>
-                  <SelectItem value="ClauseBasedChunker">ClauseBasedChunker</SelectItem>
+                  <SelectItem value="SemanticChunker">
+                    SemanticChunker (Cẩm nang / Đoạn văn)
+                  </SelectItem>
+                  <SelectItem value="ClauseBasedChunker">
+                    ClauseBasedChunker (Quy chế / Điều khoản)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -339,37 +381,56 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
             <CardDescription>Mô hình chính, dự phòng và tham số sinh.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field htmlFor="assistant-primary-model" label="Mô hình chính" required>
-              <Input
-                id="assistant-primary-model"
-                required
+            <Field htmlFor="assistant-primary-model" label="Mô hình chính (Primary)" required>
+              <Select
                 value={form.config.model_policy.primary_model}
-                onChange={(event) =>
+                onValueChange={(val) =>
                   updateConfig({
                     ...form.config,
                     model_policy: {
                       ...form.config.model_policy,
-                      primary_model: event.target.value,
+                      primary_model: val,
                     },
                   })
                 }
-              />
+              >
+                <SelectTrigger id="assistant-primary-model">
+                  <SelectValue placeholder="Chọn mô hình chính" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
-            <Field htmlFor="assistant-fallback-model" label="Mô hình dự phòng" required>
-              <Input
-                id="assistant-fallback-model"
-                required
+
+            <Field htmlFor="assistant-fallback-model" label="Mô hình dự phòng (Fallback)" required>
+              <Select
                 value={form.config.model_policy.fallback_model}
-                onChange={(event) =>
+                onValueChange={(val) =>
                   updateConfig({
                     ...form.config,
                     model_policy: {
                       ...form.config.model_policy,
-                      fallback_model: event.target.value,
+                      fallback_model: val,
                     },
                   })
                 }
-              />
+              >
+                <SelectTrigger id="assistant-fallback-model">
+                  <SelectValue placeholder="Chọn mô hình dự phòng" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field htmlFor="assistant-temperature" label="Temperature">
               <Input
@@ -516,18 +577,28 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Workflow</CardTitle>
+          <CardTitle>Quy Trình Điều Phối (Workflow DAG)</CardTitle>
+          <CardDescription>
+            Đồ thị DAG chịu trách nhiệm điều phối luồng hội thoại và công cụ cho Trợ lý.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Field htmlFor="assistant-workflow" label="Workflow ID" required>
-            <Input
-              id="assistant-workflow"
-              required
+          <Field htmlFor="assistant-workflow" label="Chọn Quy Trình Workflow" required>
+            <Select
               value={form.workflow_id}
-              onChange={(event) =>
-                setForm((value) => ({ ...value, workflow_id: event.target.value }))
-              }
-            />
+              onValueChange={(wfId) => setForm((value) => ({ ...value, workflow_id: wfId }))}
+            >
+              <SelectTrigger id="assistant-workflow">
+                <SelectValue placeholder="Chọn quy trình workflow" />
+              </SelectTrigger>
+              <SelectContent>
+                {(workflowsQuery.data ?? []).map((wf) => (
+                  <SelectItem key={wf.id} value={wf.id}>
+                    {wf.display_name} ({wf.id})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </CardContent>
       </Card>

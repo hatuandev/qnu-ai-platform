@@ -125,16 +125,20 @@ Agent có thể kích hoạt và tuân thủ các hướng dẫn chuyên sâu t�
 
 ---
 
-## 6. Quy Tắc Bắt Buộc Cập Nhật Nhật Ký Làm Việc (Vibe Coding Work Log Policy)
+## 6. Quy Tắc Bắt Buộc Cập Nhật Nhật Ký Làm Việc & Đồng Bộ Quy Trình Hệ Thống (Work Log & Procedure Sync Policy)
 
-Mỗi lần thực hiện phiên làm việc ("Vibe Coding") — bao gồm: phát triển tính năng mới, refactor mã nguồn, sửa lỗi, cập nhật cấu hình hạ tầng hay kiểm thử — **AI Agent BẮT BUỘC phải tuân thủ hệ thống quy trình tại [`docs/quy_trinh/`](docs/quy_trinh/) và cập nhật tiến trình vào thư mục [`docs/nhat_ky/`](docs/nhat_ky/) (đồng bộ tại [`docs/WORK_LOG.md`](docs/WORK_LOG.md))**:
+Mỗi lần thực hiện phiên làm việc ("Vibe Coding") — bao gồm: phát triển tính năng mới, refactor mã nguồn, sửa lỗi, cập nhật cấu hình hạ tầng hay kiểm thử — **AI Agent BẮT BUỘC phải tuân thủ hệ thống quy trình tại [`docs/quy_trinh/`](docs/quy_trinh/), đồng bộ tài liệu quy trình khi có thay đổi nghiệp vụ/kỹ thuật, và cập nhật tiến trình vào thư mục [`docs/nhat_ky/`](docs/nhat_ky/) (đồng bộ tại [`docs/WORK_LOG.md`](docs/WORK_LOG.md))**:
 1. **Thời gian & Tiêu đề**: Ghi rõ ngày giờ và mục tiêu chính của phiên làm việc.
 2. **Thay đổi kỹ thuật (Key Changes)**: Liệt kê chi tiết các tệp tin đã chỉnh sửa hoặc tạo mới, gắn link markdown trực tiếp và nêu rõ lý do kỹ thuật.
-3. **Kết quả kiểm thử (Verification)**: Chạy và ghi nhận kết quả kiểm thử tương ứng:
+3. **Bắt Buộc Đồng Bộ Tài Liệu Quy Trình (`docs/quy_trinh/`)**:
+   - **Bất kỳ khi nào có sự thay đổi, mở rộng, tái cấu trúc (refactor) luồng luân chuyển dữ liệu, vòng đời trạng thái thực thể (lifecycle status), kiến trúc tương tác giữa các tầng (Frontend ↔ Backend ↔ Storage Driver ↔ AI Services) hoặc xuất hiện bước nghiệp vụ mới (như Human-in-the-loop Verification, OCR rescue, Dual Indexing, DAG Control Plane)**: AI Agent **BẮT BUỘC PHẢI CẬP NHẬT NGAY** tài liệu quy trình tương ứng trong thư mục [`docs/quy_trinh/`](docs/quy_trinh/) (từ `01_` đến `07_`).
+   - Tuyệt đối cấm để tài liệu quy trình bị "lệch pha" (out-of-sync) với mã nguồn thực tế.
+   - Nếu xuất hiện một luồng nghiệp vụ hoàn toàn mới chưa có trong danh mục quy trình, Agent phải khởi tạo thêm tệp quy trình mới (ví dụ: `08_...md`) và đồng bộ mục lục tại [`docs/quy_trinh/README.md`](docs/quy_trinh/README.md).
+4. **Kết quả kiểm thử (Verification)**: Chạy và ghi nhận kết quả kiểm thử tương ứng:
    - Thay đổi Backend: `uv run ruff check .` (0 lỗi) và `uv run --extra dev pytest -v` (100% pass).
    - Thay đổi Frontend: `npm run lint` (0 lỗi), `npm run typecheck` (0 lỗi), và `npm run build` (thành công).
-4. **MinIO Object Storage Compliance**: Luôn bảo đảm các luồng lưu trữ file upload gốc và file thành phẩm (Word NĐ 30, Excel Bloom) được đẩy trực tiếp lên MinIO trước khi chuyển tầng bóc tách (tuân thủ [`docs/quy_trinh/02_nap_tri_thuc_minio.md`](docs/quy_trinh/02_nap_tri_thuc_minio.md)).
-5. **Không bỏ sót**: Tuyệt đối không kết thúc phiên làm việc khi chưa cập nhật nhật ký làm việc trong thư mục `docs/nhat_ky/`.
+5. **Lưu Trữ Tệp Bền Vững & Dual-Driver Compliance**: Luôn bảo đảm các luồng lưu trữ file upload gốc và file thành phẩm (Word NĐ 30, Excel Bloom) được đẩy trực tiếp lên MinIO S3 (hoặc Local Storage khi dev) trước khi chuyển tầng bóc tách (tuân thủ [`docs/quy_trinh/02_nap_tri_thuc_minio.md`](docs/quy_trinh/02_nap_tri_thuc_minio.md)).
+6. **Không bỏ sót**: Tuyệt đối không kết thúc phiên làm việc khi chưa cập nhật nhật ký làm việc trong thư mục `docs/nhat_ky/` và chưa đồng bộ tệp quy trình liên quan trong `docs/quy_trinh/` nếu có thay đổi logic.
 
 ---
 

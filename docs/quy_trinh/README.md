@@ -10,7 +10,7 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 | STT | Tên Quy Trình Nghiệp Vụ | Tệp Tài Liệu Chi Tiết | Trọng Tâm Kỹ Thuật |
 | :---: | :--- | :--- | :--- |
 | **01** | **Khởi Động & Vòng Đời Nền Tảng** | [`01_khoi_dong_nen_tang.md`](./01_khoi_dong_nen_tang.md) | Docker Compose, thứ tự nạp container, healthchecks, kết nối Connection Pool |
-| **02** | **Nạp Tri Thức & Lưu Trữ MinIO** | [`02_nap_tri_thuc_minio.md`](./02_nap_tri_thuc_minio.md) | Upload tệp $\rightarrow$ MinIO $\rightarrow$ PyMuPDF/DOCX $\rightarrow$ Chunker $\rightarrow$ Qdrant + Postgres FTS |
+| **02** | **Nạp Tri Thức, Phân Nhánh OCR & Đối Soát HITL MinIO** | [`02_nap_tri_thuc_minio.md`](./02_nap_tri_thuc_minio.md) | Smart Recommendation $\rightarrow$ MinIO/Local $\rightarrow$ PyMuPDF/Mistral OCR $\rightarrow$ Chunker $\rightarrow$ Studio HITL Review $\rightarrow$ Approve Qdrant + Postgres FTS |
 | **03** | **Truy Vấn Hybrid RAG & Chống Bịa Đặt** | [`03_hybrid_rag_truy_xuat.md`](./03_hybrid_rag_truy_xuat.md) | Structured Fact Layer, RRF $k=60$, Reranker, Citation Guardrail, Hotline Fallback |
 | **04** | **Điều Phối 05 Trợ Lý AI (DAG Engine)** | [`04_dieu_phoi_tro_ly_dag.md`](./04_dieu_phoi_tro_ly_dag.md) | DAG Engine, Node Handlers, Word Boundary Safe Route, Human Approval Checkpoint |
 | **05** | **Cổng Công Cụ & Xuất Bản Tài Liệu** | [`05_cong_cu_xuat_ban_tai_lieu.md`](./05_cong_cu_xuat_ban_tai_lieu.md) | Function Calling, Xuất Word NĐ 30, Excel Bloom, Lưu MinIO, Gotenberg Preview |

@@ -185,6 +185,21 @@ export const workflowsApi = {
     );
   },
 
+  listVersions(workflowId: string): Promise<WorkflowVersion[]> {
+    return requestWorkflow<WorkflowVersion[]>(`/definitions/${workflowId}/versions`);
+  },
+
+  rollbackVersion(
+    workflowId: string,
+    versionId: string,
+    payload: { published_by: string }
+  ): Promise<WorkflowVersion> {
+    return requestWorkflow<WorkflowVersion>(
+      `/definitions/${workflowId}/versions/${versionId}/rollback`,
+      jsonRequest("POST", payload)
+    );
+  },
+
   execute(payload: WorkflowExecutionRequest): Promise<WorkflowExecutionResponse> {
     return requestWorkflow<WorkflowExecutionResponse>("/execute", jsonRequest("POST", payload));
   },

@@ -7,7 +7,9 @@ import {
   Copy,
   FileText,
   GraduationCap,
+  History,
   Library,
+  Link2,
   MessageSquare,
   Network,
   Play,
@@ -26,6 +28,7 @@ import {
 } from "../components/admin/in-canvas-test-runner";
 import { NodeCatalogDrawer, type NodeCatalogItem } from "../components/admin/node-catalog-drawer";
 import { PropertyInspector } from "../components/admin/property-inspector";
+import { WorkflowVersionHistoryDialog } from "../components/admin/workflow-version-history-dialog";
 import { DAGCanvas, type WorkflowNodeData } from "../components/ai/dag-canvas";
 import { Button } from "../components/ui/button";
 import {
@@ -55,6 +58,8 @@ interface WorkflowCanvasState {
 }
 
 export interface DAGCanvasPageProps {
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
   onNavigateToChat?: (assistantCode: string) => void;
 }
 
@@ -235,17 +240,35 @@ function nodeTypeForCatalogItem(item: NodeCatalogItem): {
   return mappings[item.category] || mappings.llm;
 }
 
-export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }) => {
-  const requestedAssistant = new URLSearchParams(window.location.search).get("assistant");
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState(
-    requestedAssistant ? `${requestedAssistant}-assistant` : ""
-  );
+export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({
+  currentPath,
+  onNavigate,
+  onNavigateToChat,
+}) => {
+  const pathWorkflowId = useMemo(() => {
+    if (currentPath?.startsWith("/workflows/")) {
+      return decodeURIComponent(currentPath.replace("/workflows/", ""));
+    }
+    if (currentPath?.startsWith("/canvas/")) {
+      return decodeURIComponent(currentPath.replace("/canvas/", ""));
+    }
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedWorkflow = searchParams.get("workflow");
+    if (requestedWorkflow) return requestedWorkflow;
+    const requestedAssistant = searchParams.get("assistant");
+    if (requestedAssistant) return `${requestedAssistant}-assistant`;
+    return null;
+  }, [currentPath]);
+
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(pathWorkflowId ?? "");
   const [workflow, setWorkflow] = useState<WorkflowCanvasState | null>(null);
   const [executionStates, setExecutionStates] = useState<Record<string, NodeExecutionState>>({});
   const [selectedNodeData, setSelectedNodeData] = useState<WorkflowNodeData | null>(null);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isTestRunnerOpen, setIsTestRunnerOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isJsonCopied, setIsJsonCopied] = useState(false);
+  const [isLinkCopied, setIsLinkCopied] = useState(false);
   const [validationSummary, setValidationSummary] = useState<string | null>(null);
 
   const definitionsQuery = useQuery({
@@ -255,10 +278,30 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
   const definitions = definitionsQuery.data ?? [];
 
   useEffect(() => {
+    if (pathWorkflowId && pathWorkflowId !== selectedWorkflowId) {
+      setSelectedWorkflowId(pathWorkflowId);
+    }
+  }, [pathWorkflowId, selectedWorkflowId]);
+
+  useEffect(() => {
     if (definitions.length === 0) return;
     if (definitions.some((definition) => definition.id === selectedWorkflowId)) return;
     setSelectedWorkflowId(definitions[0].id);
   }, [definitions, selectedWorkflowId]);
+
+  const handleSelectWorkflow = (workflowId: string) => {
+    setSelectedWorkflowId(workflowId);
+    onNavigate?.(`/workflows/${encodeURIComponent(workflowId)}`);
+  };
+
+  const handleCopyWorkflowLink = () => {
+    if (!workflow) return;
+    const url = `${window.location.origin}/workflows/${encodeURIComponent(workflow.definition.id)}`;
+    void navigator.clipboard.writeText(url);
+    setIsLinkCopied(true);
+    toast.success("Đã sao chép liên kết trực tiếp tới Workflow!");
+    window.setTimeout(() => setIsLinkCopied(false), 2000);
+  };
 
   const selectedDefinition = useMemo(
     () => definitions.find((definition) => definition.id === selectedWorkflowId) ?? null,
@@ -277,6 +320,13 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
     setExecutionStates({});
     setValidationSummary(null);
   }, [draftQuery.data, selectedDefinition]);
+
+  const isDirty = useMemo(() => {
+    if (!workflow || !draftQuery.data) return false;
+    const currentSpec = toPersistedDagSpec(workflow);
+    const initialSpec = draftQuery.data.dag_spec;
+    return JSON.stringify(currentSpec) !== JSON.stringify(initialSpec);
+  }, [workflow, draftQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: (currentWorkflow: WorkflowCanvasState) =>
@@ -455,6 +505,12 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
               <span className="truncate text-xs font-medium text-primary">
                 {workflow.definition.display_name}
               </span>
+              {isDirty && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 animate-pulse">
+                  <AlertCircle className="size-3" />
+                  Chưa lưu
+                </span>
+              )}
             </h1>
             <p className="truncate text-[10px] text-muted-foreground">
               Bản nháp r{workflow.draftRevision} — {workflow.nodes.length} nodes,{" "}
@@ -466,7 +522,7 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
               <button
                 type="button"
                 key={definition.id}
-                onClick={() => setSelectedWorkflowId(definition.id)}
+                onClick={() => handleSelectWorkflow(definition.id)}
                 className={`flex cursor-pointer items-center gap-1.5 rounded-control px-2.5 py-1 text-xs font-medium transition-all ${
                   selectedWorkflowId === definition.id
                     ? "bg-primary text-primary-foreground shadow-xs"
@@ -495,11 +551,12 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
             Chạy thử
           </Button>
           <Button
-            variant="outline"
+            variant={isDirty ? "default" : "outline"}
             size="sm"
-            className="h-8 text-xs"
+            className={`h-8 text-xs ${isDirty ? "bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs" : ""}`}
             disabled={isMutating}
             onClick={() => saveMutation.mutate(workflow)}
+            title={isDirty ? "Bản nháp có thay đổi chưa lưu" : "Bản nháp đã đồng bộ"}
           >
             <Save className="mr-1 size-3.5" />
             Lưu nháp
@@ -523,6 +580,29 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
           >
             <Send className="mr-1 size-3.5" />
             Xuất bản
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setIsHistoryOpen(true)}
+            title="Xem lịch sử các phiên bản đã xuất bản & khôi phục"
+          >
+            <History className="mr-1 size-3.5 text-muted-foreground" />
+            Lịch sử
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={handleCopyWorkflowLink}
+            title="Sao chép liên kết trực tiếp tới Workflow"
+          >
+            {isLinkCopied ? (
+              <Check className="size-3.5 text-success" />
+            ) : (
+              <Link2 className="size-3.5" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -596,6 +676,13 @@ export const DAGCanvasPage: React.FC<DAGCanvasPageProps> = ({ onNavigateToChat }
             setExecutionStates((previous) => ({ ...previous, ...states }))
           }
           onResetCanvasStates={() => setExecutionStates({})}
+        />
+        <WorkflowVersionHistoryDialog
+          workflowId={workflow.definition.id}
+          workflowName={workflow.definition.display_name}
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          onRollbackSuccess={() => void draftQuery.refetch()}
         />
       </div>
     </div>

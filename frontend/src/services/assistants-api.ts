@@ -125,6 +125,10 @@ export function deactivateAssistant(reference: string): Promise<AssistantItem> {
   });
 }
 
+export function activateAssistant(reference: string): Promise<AssistantItem> {
+  return updateAssistant(reference, { is_active: true });
+}
+
 export function seedDefaultAssistants(): Promise<AssistantSeedResult> {
   return requestJson<AssistantSeedResult>(`${ASSISTANTS_URL}/seed-defaults`, { method: "POST" });
 }

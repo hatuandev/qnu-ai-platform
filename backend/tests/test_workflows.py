@@ -376,3 +376,266 @@ async def test_citation_guard_branches_grounded_vs_ungrounded():
         assert "chat_output" not in res.executed_nodes
         assert res.outputs["status"] == "insufficient_context"
         assert "0256.3846.156" in res.outputs["answer"]
+
+
+def test_workflow_compiler_detects_unreachable_and_missing_terminal():
+    """Verify compiler catches unreachable nodes, duplicate edges, and missing terminal output nodes."""
+    spec_with_unreachable = WorkflowDagSpec(
+        entry_node_id="input_1",
+        nodes=[
+            WorkflowNodeSpec(id="input_1", type="input.chat"),
+            WorkflowNodeSpec(id="orphan_node", type="output.chat"),
+            WorkflowNodeSpec(id="connected_tool", type="tool.lookup_admission_score"),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="input_1", target="connected_tool"),
+            WorkflowEdgeSpec(source="input_1", target="connected_tool"),
+        ],
+    )
+    report = workflow_compiler.validate(spec_with_unreachable)
+    assert report.is_valid is False
+    codes = {issue.code for issue in report.issues}
+    assert "workflow_node_unreachable" in codes
+    assert "workflow_terminal_missing" in codes
+    assert "workflow_edge_duplicate" in codes
+
+
+@pytest.mark.asyncio
+async def test_dag_engine_detects_deadlock_stall():
+    """Verify DAG engine detects when nodes cannot proceed due to circular dependency deadlock."""
+    from app.modules.workflows.registry import node_registry
+
+    node_registry.register("test.pass_through_stall", _PassThroughNodeHandler())
+    dag_spec = WorkflowDagSpec(
+        entry_node_id="split",
+        nodes=[
+            WorkflowNodeSpec(id="split", type="test.pass_through_stall"),
+            WorkflowNodeSpec(id="node_a", type="test.pass_through_stall"),
+            WorkflowNodeSpec(id="node_b", type="test.pass_through_stall"),
+            WorkflowNodeSpec(id="output", type="output.chat"),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="split", target="node_a"),
+            WorkflowEdgeSpec(source="split", target="node_b"),
+            WorkflowEdgeSpec(source="node_a", target="node_b"),
+            WorkflowEdgeSpec(source="node_b", target="node_a"),
+            WorkflowEdgeSpec(source="node_a", target="output"),
+        ],
+    )
+    ctx = WorkflowContext(
+        workflow_id="wf_stall",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={},
+    )
+    resp = await dag_engine.execute(dag_spec, ctx)
+    assert resp.status == "failed"
+    assert resp.error_message is not None
+    assert "bị kẹt" in resp.error_message
+
+
+@pytest.mark.asyncio
+async def test_dag_engine_human_approval_pause_and_resume_lifecycle():
+    """Verify DAG engine halts at approval node and safely resumes from checkpoint upon approval."""
+    from app.modules.workflows.registry import node_registry
+
+    node_registry.register("test.pass_through_appr", _PassThroughNodeHandler())
+    dag_spec = WorkflowDagSpec(
+        entry_node_id="prep_node",
+        nodes=[
+            WorkflowNodeSpec(id="prep_node", type="test.pass_through_appr"),
+            WorkflowNodeSpec(
+                id="approval_node",
+                type="tool.human_approval",
+                config={"description": "Duyệt cấp học bổng"},
+            ),
+            WorkflowNodeSpec(
+                id="final_output",
+                type="output.chat",
+                config={"output_template": "Cấp học bổng thành công."},
+            ),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="prep_node", target="approval_node"),
+            WorkflowEdgeSpec(source="approval_node", target="final_output"),
+        ],
+    )
+
+    ctx_run1 = WorkflowContext(
+        workflow_id="wf_appr_cycle",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"is_approved": False},
+    )
+    res_pause = await dag_engine.execute(dag_spec, ctx_run1)
+    assert res_pause.status == "paused_for_approval"
+    assert res_pause.paused_node_id == "approval_node"
+    assert "prep_node" in res_pause.executed_nodes
+    assert "final_output" not in res_pause.executed_nodes
+
+    ctx_run2 = WorkflowContext(
+        workflow_id="wf_appr_cycle",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"is_approved": True, "approved_by": "phong_ctsv"},
+        node_data=dict(ctx_run1.node_data),
+    )
+    res_resume = await dag_engine.execute(
+        dag_spec,
+        ctx_run2,
+        start_node_id="approval_node",
+        completed_node_ids={"prep_node"},
+    )
+    assert res_resume.status == "completed"
+    assert "approval_node" in res_resume.executed_nodes
+    assert "final_output" in res_resume.executed_nodes
+    assert res_resume.outputs["answer"] == "Cấp học bổng thành công."
+
+
+@pytest.mark.asyncio
+async def test_workflow_service_sync_default_workflows_idempotent():
+    """Verify sync_default_workflows loads all 5 official definitions, drafts, and v1.0.0 versions."""
+    from app.modules.workflows.service import workflow_service
+
+    added_objects: list[object] = []
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock(side_effect=lambda obj: added_objects.append(obj))
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+
+    synced_count = await workflow_service.sync_default_workflows(mock_db)
+    assert synced_count == 5
+    assert len(added_objects) >= 15
+    assert mock_db.commit.called
+
+
+@pytest.mark.asyncio
+async def test_workflow_control_plane_draft_optimistic_lock():
+    """Verify saving draft rejects conflicting revision numbers with HTTP 409 AppException."""
+    from app.core.exceptions import AppException
+    from app.modules.workflows.models import WorkflowDefinition, WorkflowDraft
+    from app.modules.workflows.schemas import WorkflowDraftSaveRequest
+    from app.modules.workflows.service import workflow_service
+
+    mock_db = AsyncMock()
+
+    wf_def = WorkflowDefinition(
+        id="admissions-assistant",
+        name="admissions-assistant",
+        display_name="Tuyển sinh",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        version="1.0.0",
+    )
+    existing_draft = WorkflowDraft(
+        workflow_id="admissions-assistant",
+        dag_spec={},
+        revision=5,
+        updated_by="admin_1",
+    )
+
+    def execute_side_effect(stmt: object) -> MagicMock:
+        mock_exec = MagicMock()
+        stmt_str = str(stmt)
+        if "workflow_definitions" in stmt_str:
+            mock_exec.scalar_one_or_none.return_value = wf_def
+        else:
+            mock_exec.scalar_one_or_none.return_value = existing_draft
+        return mock_exec
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    conflict_request = WorkflowDraftSaveRequest(
+        dag_spec=await workflow_service.get_workflow_spec(None, "admissions-assistant"),
+        expected_revision=4,
+        updated_by="admin_2",
+    )
+
+    with pytest.raises(AppException) as exc_info:
+        await workflow_service.save_draft(mock_db, "admissions-assistant", conflict_request)
+
+    assert exc_info.value.code == "workflow_draft_conflict"
+    assert exc_info.value.status_code == 409
+
+
+def test_workflow_compiler_rejects_rag_without_citation_guard():
+    """Verify compiler rejects RAG workflows that lack a citation policy or no_answer guard."""
+    unguarded_rag_spec = WorkflowDagSpec(
+        entry_node_id="input_1",
+        nodes=[
+            WorkflowNodeSpec(id="input_1", type="input.chat"),
+            WorkflowNodeSpec(id="rag_node", type="core.knowledge.answer"),
+            WorkflowNodeSpec(id="output_node", type="output.chat"),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="input_1", target="rag_node"),
+            WorkflowEdgeSpec(source="rag_node", target="output_node"),
+        ],
+    )
+    report = workflow_compiler.validate(unguarded_rag_spec)
+    assert report.is_valid is False
+    codes = {issue.code for issue in report.issues}
+    assert "workflow_rag_missing_citation_guard" in codes
+
+
+@pytest.mark.asyncio
+async def test_workflow_publish_enforces_tm08_quality_gate():
+    """Verify publish_draft blocks publication when assistant evaluation failed TM-08 standards."""
+    from app.core.exceptions import AppException
+    from app.modules.evaluation.models import EvaluationRun
+    from app.modules.workflows.models import WorkflowDefinition, WorkflowDraft
+    from app.modules.workflows.schemas import WorkflowPublishRequest
+    from app.modules.workflows.service import workflow_service
+
+    mock_db = AsyncMock()
+
+    valid_spec = await workflow_service.get_workflow_spec(None, "admissions-assistant")
+    wf_def = WorkflowDefinition(
+        id="admissions-assistant",
+        name="admissions-assistant",
+        display_name="Tuyển sinh",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        version="1.0.0",
+    )
+    draft = WorkflowDraft(
+        workflow_id="admissions-assistant",
+        dag_spec=workflow_service._serialize_dag_spec(valid_spec),
+        revision=2,
+        updated_by="admin",
+    )
+    failed_eval = EvaluationRun(
+        id="eval_failed_1",
+        dataset_id="ds_1",
+        assistant_code="admissions",
+        status="completed",
+        faithfulness_avg=0.65,
+        answer_relevance_avg=0.70,
+        context_precision_avg=0.60,
+        meets_tm08_standard=False,
+    )
+
+    def execute_side_effect(stmt: object) -> MagicMock:
+        mock_exec = MagicMock()
+        stmt_str = str(stmt)
+        if "workflow_definitions" in stmt_str:
+            mock_exec.scalar_one_or_none.return_value = wf_def
+        elif "workflow_drafts" in stmt_str:
+            mock_exec.scalar_one_or_none.return_value = draft
+        elif "evaluation_runs" in stmt_str:
+            mock_exec.scalars.return_value.first.return_value = failed_eval
+        else:
+            mock_exec.scalar_one_or_none.return_value = None
+        return mock_exec
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    publish_req = WorkflowPublishRequest(expected_revision=2, published_by="admin")
+
+    with pytest.raises(AppException) as exc_info:
+        await workflow_service.publish_draft(mock_db, "admissions-assistant", publish_req)
+
+    assert exc_info.value.code == "workflow_quality_gate_failed"
+    assert exc_info.value.status_code == 422
+    assert "TM-08" in exc_info.value.message
