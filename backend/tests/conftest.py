@@ -22,7 +22,7 @@ for env_var in ("no_proxy", "NO_PROXY"):
 os.environ["STORAGE_DRIVER"] = "local"
 os.environ["ENVIRONMENT"] = "test"
 
-from app.core.config import get_settings  # noqa: E402
+from app.core.config import get_settings
 
 get_settings.cache_clear()
 

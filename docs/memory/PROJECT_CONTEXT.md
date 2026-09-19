@@ -7,10 +7,29 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-19 18:25 (UTC+7)
-- **Phiên số**: #118
+- **Thời gian cập nhật**: 2026-09-19 18:40 (UTC+7)
+- **Phiên số**: #119
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Triển Khai Giai Đoạn 9: Knowledge Workspace Deep Modularization & Monolithic Page Decomposition (P1.3, P0.4, P1.4) (phiên #119)**:
+     - **Phân rã tệp Monolithic khổng lồ `collection-detail-page.tsx` (1.718 dòng xuống còn 485 dòng, giảm hơn 70%)**:
+       * Đưa `collection-detail-page.tsx` về đúng vai trò Page Orchestrator: tiếp nhận routing, quản lý queries/mutations và điều phối hiển thị.
+       * Tách 11 module độc lập có Single Responsibility Principle (SRP) trong `frontend/src/components/knowledge/`:
+         - `frontend/src/components/knowledge/types.ts`: Định nghĩa constants trạng thái (`STATUS_BADGE`, `TASK_STATUS_BADGE`), interfaces (`SandboxSearchResult`) và utility helpers (`formatFileSize`).
+         - `frontend/src/components/knowledge/collection-header.tsx`: Hero card, embedding model chip, action toolbar (Đối soát Kho, Reindex Kho, Cấu hình, + Nạp tài liệu).
+         - `frontend/src/components/knowledge/tabs/collection-documents-tab.tsx`: Tab danh mục tài liệu, search, 3 filters (Type, Status, Priority), bảng tài liệu với badge kép `Đã duyệt` + `Đã index`, row action buttons chuẩn semantic.
+         - `frontend/src/components/knowledge/tabs/collection-facts-tab.tsx`: Tab bảng biểu số liệu Facts Layer, search bar, nút nạp Excel/CSV, bảng facts định lượng với độ tin cậy % và empty state.
+         - `frontend/src/components/knowledge/tabs/collection-tasks-tab.tsx`: Tab hàng đợi & tác vụ ngầm, search bar, status filter, progress % bar, nút dọn dẹp đã xong, row actions: Terminal log, Retry, Cancel, Delete.
+         - `frontend/src/components/knowledge/tabs/collection-playground-tab.tsx`: Tab sandbox truy vấn thử nghiệm Hybrid RRF (BGE-M3 + Postgres FTS) với form query và kết quả chunks kèm điểm số.
+         - `frontend/src/components/knowledge/dialogs/collection-config-dialog.tsx`: Dialog sửa tên và mô tả bộ sưu tập.
+         - `frontend/src/components/knowledge/dialogs/collection-reconcile-dialog.tsx`: Dialog đối soát kiểm toán dữ liệu 4 tầng (DB, Qdrant, MinIO, Redis) kèm 4 metric cards và nút "Đồng bộ tất cả".
+         - `frontend/src/components/knowledge/dialogs/collection-excel-import-dialog.tsx`: Dialog kéo thả tải tệp Excel/CSV bóc tách facts.
+         - `frontend/src/components/knowledge/dialogs/document-preview-dialog.tsx`: Dialog xem nhanh thông tin bóc tách tài liệu và chunks count.
+         - `frontend/src/components/knowledge/dialogs/task-log-dialog.tsx`: Dialog terminal log dạng console đen cho worker task.
+     - **Chuẩn Hóa Semantic & Accessibility (P0.4) & Typography (P1.4)**:
+       * Thay thế thẻ `<p onClick>` bằng `<button type="button">` chuẩn semantic kèm focus ring (`focus-visible:ring-2`) và `aria-label`.
+       * Loại bỏ triệt để `text-[9px]` và `text-[10px]` ở các vùng dữ liệu quản trị, chuẩn hóa thành `text-xs` (12px) hoặc `text-sm` (14px).
+     - **Verification hoàn hảo**: Frontend Biome 157 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 6.69s; Backend Ruff 0 lỗi; Pytest 232/232 passed (100%); Zero Mojibake 313/313 files sạch 100%.
   1. **Triển Khai Giai Đoạn 8: Assistant Workspace Deep Modularization & Monolithic Page Decomposition (phiên #118)**:
      - **Phân rã tệp "quái vật" `assistant-detail-page.tsx` (1.745 dòng xuống ~550 dòng, giảm gần 70%)**:
        * Đưa `assistant-detail-page.tsx` về đúng vai trò Orchestrator: tiếp nhận routing, quản lý queries/mutations và điều phối hiển thị.
