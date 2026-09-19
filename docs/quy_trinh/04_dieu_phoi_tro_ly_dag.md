@@ -304,14 +304,18 @@ Nhằm bảo đảm an toàn vận hành khi cập nhật cấu hình Trợ lý 
 
 Nhằm hỗ trợ mở rộng không giới hạn các loại Node trong quy trình làm việc tự động hóa và tích hợp phần mềm nhà trường:
 
-### 10.1. Bộ Xử Lý Node Gọi Công Cụ (`APICallerNodeHandler`)
+### 10.1. Bộ Xử Lý Node Gọi Công Cụ & Cổng Quản Lý An Toàn (`APICallerNodeHandler` ↔ `ToolService`)
 - Định danh loại Node: `tool.api_caller` (phiên bản `1.0.0`).
 - Đăng ký chính thức trong `WorkflowNodeRegistry` và sẵn sàng thực thi trên `WorkflowDAGEngine`.
-- **Cơ chế vận hành**:
-  1. Trích xuất `tool_id` từ cấu hình Node (ví dụ `uis_admissions_query`, `document_exporter`).
-  2. Kiểm tra quyền và tính khả dụng của công cụ trong `ToolRegistry`.
-  3. Tổng hợp tham số đầu vào từ `context.inputs` và kết quả của các node tiền nhiệm.
-  4. Thực thi công cụ bất đồng bộ và đóng gói kết quả vào `result.output["tool_result"]`, đồng thời cập nhật `context.inputs["tool_result"]` cho các node xử lý tiếp theo (như `core.llm.generate` hoặc `output.chat`).
+- **Cơ chế vận hành bảo đảm an toàn & kiểm toán (Zero Direct Bypass)**:
+  1. **Trích xuất công cụ**: Lấy `tool_id` từ cấu hình Node (ví dụ `export_administrative_document`, `export_exam_matrix`, `lookup_admission_score`).
+  2. **Điều phối qua Tool Gateway**: Node bắt buộc gọi thông qua `ToolService.execute_tool(context.db, tool_req)`, tuyệt đối không gọi trực tiếp driver công cụ nhằm bảo đảm tính toàn vẹn của hệ thống.
+  3. **Kiểm tra Danh mục Cho phép của Trợ lý (Assistant Allowlist Gate)**: Nếu DAG chạy trong ngữ cảnh của một Trợ lý AI có khai báo `enabled_tools`, công cụ bắt buộc phải nằm trong danh mục này; nếu vi phạm, runtime lập tức từ chối với mã lỗi `403 Forbidden` (`tool_not_allowed_for_assistant`).
+  4. **Kiểm tra Phê duyệt Nhân sự (Human-in-the-Loop Checkpoint)**:
+     - Đối với các công cụ có tác động phụ (Side-effects) như xuất tài liệu chính thức (`requires_approval = True`), nếu trong ngữ cảnh thực thi chưa có xác nhận phê duyệt (`is_approved` = True), DAG Engine sẽ **tạm dừng thực thi** và trả về trạng thái `paused_for_approval` kèm `checkpoint: node_spec.id`.
+     - Quá trình thực thi chỉ tiếp tục khi cán bộ chuyên môn phê duyệt và gửi lại yêu cầu kèm token xác thực `approved_by`.
+  5. **Ghi Nhật Ký Kiểm Toán (Audit Trail)**: Mọi lượt gọi công cụ (dù thành công, thất bại hay bị chặn) đều được tự động lưu vết vào bảng `tool_execution_logs` trong CSDL PostgreSQL với đầy đủ `latency_ms`, `parameters`, `result` và danh tính trợ lý/phiên hội thoại.
+
 
 ### 10.2. Tải Động Thư Viện Node từ Server (Dynamic Manifest-Driven Node Catalog)
 - Giao diện `NodeCatalogDrawer` (`node-catalog-drawer.tsx`) kết nối trực tiếp với API `/platform/v1alpha1/system/nodes` thay vì dựa vào hằng số gán cứng cục bộ.
@@ -322,15 +326,51 @@ Nhằm hỗ trợ mở rộng không giới hạn các loại Node trong quy tr�
 
 ## 11. Giám Sát Hội Thoại Thời Gian Thực & Bàn Giao Cán Bộ (Live Conversations & Staff Handoff)
 
-Khi Trợ lý AI gặp các câu hỏi vượt ngoài phạm vi tri thức hoặc có độ nhạy cảm cao, luồng xử lý tự động chuyển tiếp tới bàn trực của cán bộ chuyên trách:
-1. **Kích Hoạt Yêu Cầu Handoff**: Khi Guardrail hoặc RAG phát hiện ngữ cảnh thiếu hụt, câu hỏi được gom vào `knowledge_gaps` và đồng thời phiên hội thoại được cập nhật trạng thái `handoff_requested`.
-2. **Bàn Trực Tiếp Cán Bộ (`/conversations`)**:
+Khi Trợ lý AI trao đổi với người dùng qua Chat Studio hoặc Web Widget:
+1. **Lưu Vết Nguyên Tử & Duy Trì Phiên (Atomic Conversation Recording & Session Persistence)**:
+   - Trong cả hai phương thức `AssistantService.chat()` (đồng bộ) và `AssistantService.chat_stream()` (SSE trực tiếp), hệ thống tự động sinh hoặc sử dụng `conversation_id` ổn định cho toàn bộ phiên trao đổi.
+   - Tin nhắn câu hỏi của người dùng và câu trả lời hoàn chỉnh của Trợ lý AI đều được ghi nhận trực tiếp vào CSDL PostgreSQL (`conversation_threads` và `conversation_messages`) qua `conversation_service.record_message`.
+   - Các tệp đính kèm (PDF, Word, Excel, ảnh) được bóc tách nội dung thật qua Cổng OCR (`/platform/v1alpha1/ocr/extract`) và tích hợp trực tiếp vào ngữ cảnh xử lý câu hỏi của Trợ lý.
+2. **Kích Hoạt Yêu Cầu Handoff (Intent-Driven Handoff Detection)**:
+   - Hệ thống tự động phân tích ngữ nghĩa câu hỏi của người dùng để phát hiện ý định gặp người thật (các từ khóa: *"gặp tư vấn viên"*, *"chuyên viên tư vấn"*, *"liên hệ cán bộ"*, *"hotline"*...).
+   - Khi phát hiện ý định handoff hoặc khi RAG trả về trạng thái `insufficient_context`, phiên hội thoại tự động chuyển sang trạng thái `handoff_requested` và xuất hiện tức thì trong danh sách chờ của cán bộ.
+3. **Bàn Trực Tiếp Cán Bộ (`/conversations`)**:
    - Giao diện Master-Detail 2 cột hiển thị hàng đợi các phiên trao đổi với bộ lọc trạng thái: `Tất cả`, `Cần tiếp quản (Handoff)`, `Cán bộ hỗ trợ`, `AI đang xử lý`, `Đã giải quyết`.
    - Polling nền tự động cập nhật danh sách hội thoại và chi tiết tin nhắn thời gian thực.
-3. **Tiếp Quản & Trả Lời Trực Tiếp**:
+4. **Tiếp Quản & Trả Lời Trực Tiếp**:
    - Cán bộ bấm `[Tiếp nhận hỗ trợ]` (`POST /conversations/{id}/status` với `status = "staff_claimed"` và `assigned_to = "[Tên cán bộ]"`).
    - Nhập tin nhắn phản hồi trực tiếp (`POST /conversations/{id}/reply`) kèm hỗ trợ các mẫu câu trả lời nhanh (Canned Replies) hướng dẫn người học tới đúng phòng ban, hotline ĐH Quy Nhơn.
    - Khi hoàn tất, cán bộ có thể bấm `[Chuyển lại cho AI]` để bàn giao lại quyền điều phối cho bot hoặc bấm `[Đã giải quyết]` để đóng phiên trao đổi.
+
+---
+
+## 12. Kiểm Định Cấu Hình Node Theo JSON Schema & Hộp Thư Phê Duyệt Vận Hành (Schema Validation & Approval Inbox)
+
+Nhằm bảo đảm tính toàn vẹn cấu hình đồ thị trước khi xuất bản và tối ưu hóa trải nghiệm vận hành chốt kiểm duyệt Human-in-the-loop:
+
+### 12.1. Kiểm Định Cấu Hình Node Theo JSON Schema (`WorkflowCompiler` ↔ `NodeManifest`)
+- **Đối soát thời gian biên dịch (Compile-Time Schema Validation)**:
+  * Khi cán bộ lưu nháp (`PUT /draft`) hoặc xuất bản quy trình (`POST /publish`), module `workflow_compiler` tự động tải từ điển `NodeManifest` từ thư mục `configs/nodes/*.json`.
+  * Đối với từng Node trong đồ thị, Compiler ánh xạ `node.type` (hoặc Canonical Alias) sang manifest tương ứng và đối soát trường `config` với `config_schema` chuẩn JSON Schema:
+    - **Trường bắt buộc (Required Fields)**: Kiểm tra sự hiện diện của các thuộc tính khai báo trong mảng `required` của schema (ví dụ: `collection_id` cho `core.knowledge.answer`, `tool_id` cho `tool.api_caller`). Nếu thiếu, trình biên dịch báo lỗi `workflow_node_config_missing_required`.
+    - **Kiểm định kiểu dữ liệu (Type Consistency)**: Kiểm tra các kiểu dữ liệu `string`, `integer`, `number`, `boolean`, `array`, `object`. Báo lỗi `workflow_node_config_type_mismatch` nếu có sai lệch.
+    - **Kiểm định tập giá trị danh mục (Enum Validation)**: Đối soát giá trị cấu hình với tập giá trị cho phép trong `enum` (bao gồm hỗ trợ các chuỗi danh mục phân tách bằng dấu phẩy như `"docx,pdf"` cho node xuất tài liệu). Báo lỗi `workflow_node_config_invalid_enum` nếu giá trị nằm ngoài danh mục.
+    - **Cảnh báo vòng đời Manifest**: Nếu node sử dụng manifest có trạng thái `deprecated`, compiler ghi nhận cảnh báo; nếu manifest ở trạng thái `inactive`, compiler chặn xuất bản đồ thị với lỗi `workflow_node_manifest_inactive`.
+
+### 12.2. Đồng Bộ Thuộc Tính Hai Chiều Trên Canvas (`PropertyInspector` Two-Way Binding)
+- **Xóa bỏ thuộc tính tĩnh gán cứng**: Thanh điều khiển thuộc tính (`PropertyInspector`) chuyển hoàn toàn sang cơ chế động:
+  * Cung cấp các trường nhập liệu tương tác chuyên biệt: RAG Search Mode, Top-K Chunks, Minimum RRF Score, Fact Layer Threshold, Target Tool ID, Timeout, Routing Rules,...
+  * Đồng bộ hai chiều (Two-Way Binding) giữa **Tab Trực Quan (Visual Form)** và **Tab Mã Nguồn (JSON Schema)**: Mọi thay đổi trên Form cập nhật tức thì vào JSON và ngược lại.
+  * Khi người dùng kéo thả hoặc thêm node từ `NodeCatalogDrawer`, hệ thống tự động trích xuất các giá trị mặc định (`defaultConfig`) từ `config_schema` của manifest để khởi tạo `node.data.workflowConfig`, triệt tiêu tình trạng node rỗng gây lỗi biên dịch.
+
+### 12.3. Hộp Thư Phê Duyệt Vận Hành Tập Trung (`/runs` Human-in-the-Loop Approval Inbox)
+- **Giám sát & Quyết định ngoài Canvas**:
+  * Thay vì buộc cán bộ phải mở In-Canvas Test Runner để phê duyệt, trang lịch sử thực thi `/runs` tích hợp sẵn **Hộp Thư Phê Duyệt Tác Vụ (HITL Inbox)**.
+  * Polling nền tự động truy vấn `GET /platform/v1alpha1/workflows/approvals` mỗi 8 giây để phát hiện các phiên chạy bị tạm dừng (`paused_for_approval`).
+  * Giao diện cung cấp thẻ thông tin trực quan: Tên Node, Mã phiên (Run ID), Mã Checkpoint, Thông điệp kiểm duyệt, Thời điểm khởi tạo, cùng cặp nút hành động nhanh **[Phê duyệt]** và **[Từ chối]**.
+  * Hộp thoại quyết định (`Approval Decision Dialog`) cho phép cán bộ nhập danh tính người thẩm định (`decided_by`) và ý kiến/căn cứ chuyên môn (`decision_reason`).
+  * Khi gửi quyết định (`POST /executions/{execution_id}/approvals/{approval_id}/decision`), Backend cập nhật trạng thái `WorkflowApprovalRequest`, đánh dấu checkpoint hoàn tất và tự động đánh thức động cơ DAG tiếp tục thực thi các bước kế tiếp.
+
 
 
 

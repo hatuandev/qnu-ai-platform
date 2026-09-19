@@ -6,11 +6,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AdminShell } from "@/layouts/admin-shell";
 import { queryClient } from "@/lib/query-client";
+import { resolveRoute } from "@/navigation/route-resolver";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Network } from "lucide-react";
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 
 const AssistantsPage = lazy(() =>
   import("@/pages/assistants-page").then((m) => ({ default: m.AssistantsPage }))
@@ -24,12 +25,6 @@ const AssistantCreatePage = lazy(() =>
 const AssistantDetailPage = lazy(() =>
   import("@/pages/assistant-detail-page").then((m) => ({ default: m.AssistantDetailPage }))
 );
-const ChannelsPage = lazy(() =>
-  import("@/pages/channels-page").then((m) => ({ default: m.ChannelsPage }))
-);
-const ChatStudioPage = lazy(() =>
-  import("@/pages/chat-studio-page").then((m) => ({ default: m.ChatStudioPage }))
-);
 const ConversationsPage = lazy(() =>
   import("@/pages/conversations-page").then((m) => ({ default: m.ConversationsPage }))
 );
@@ -38,9 +33,6 @@ const DAGCanvasPage = lazy(() =>
 );
 const DesignSystemPage = lazy(() =>
   import("@/pages/design-system-page").then((m) => ({ default: m.DesignSystemPage }))
-);
-const DeveloperPage = lazy(() =>
-  import("@/pages/developer-page").then((m) => ({ default: m.DeveloperPage }))
 );
 const DocumentTypeDetailPage = lazy(() =>
   import("@/pages/document-type-detail-page").then((m) => ({ default: m.DocumentTypeDetailPage }))
@@ -60,6 +52,11 @@ const NodeCatalogPage = lazy(() =>
 const RunsPage = lazy(() => import("@/pages/runs-page").then((m) => ({ default: m.RunsPage })));
 const ScanStudioPage = lazy(() =>
   import("@/pages/scan-studio-page").then((m) => ({ default: m.ScanStudioPage }))
+);
+const SettingsIntegrationsPage = lazy(() =>
+  import("@/pages/settings-integrations-page").then((m) => ({
+    default: m.SettingsIntegrationsPage,
+  }))
 );
 const ToolsPage = lazy(() => import("@/pages/tools-page").then((m) => ({ default: m.ToolsPage })));
 const WorkflowsPage = lazy(() =>
@@ -103,6 +100,20 @@ function AppContent() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  const resolved = useMemo(() => {
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    return resolveRoute(currentPath, search);
+  }, [currentPath]);
+
+  // Backward-compatibility redirect handler
+  useEffect(() => {
+    if (resolved.shouldRedirect) {
+      const search = resolved.searchParams.toString();
+      const target = `${resolved.canonicalPath}${search ? `?${search}` : ""}`;
+      handleNavigate(target);
+    }
+  }, [resolved, handleNavigate]);
+
   const checkBackendHealth = useCallback(async () => {
     setBackendStatus({ status: "loading" });
     try {
@@ -134,142 +145,124 @@ function AppContent() {
   }, [checkBackendHealth]);
 
   const renderContent = () => {
-    // 1. Dashboard
-    if (currentPath === "/") {
-      return <DashboardPage onNavigate={handleNavigate} />;
-    }
+    switch (resolved.viewType) {
+      // 1. Dashboard
+      case "dashboard":
+        return <DashboardPage onNavigate={handleNavigate} />;
 
-    // 2. Assistant administration
-    if (currentPath === "/assistants") {
-      return <AssistantsPage onNavigate={handleNavigate} />;
-    }
-    if (currentPath === "/assistants/new") {
-      return <AssistantCreatePage onNavigate={handleNavigate} />;
-    }
-    if (currentPath.startsWith("/assistants/")) {
-      return <AssistantDetailPage currentPath={currentPath} onNavigate={handleNavigate} />;
-    }
-
-    // 3. Studio Chat Toàn Năng (SSE)
-    if (currentPath === "/chat") {
-      return <ChatStudioPage />;
-    }
-
-    // 4. Hội Thoại & Handoff
-    if (currentPath === "/conversations") {
-      return <ConversationsPage />;
-    }
-
-    // 5. Kênh & Mã Nhúng Web Widget
-    if (currentPath === "/channels") {
-      return <ChannelsPage />;
-    }
-
-    // 6. Lịch Sử Thực Thi DAG Runs
-    if (currentPath === "/runs" || currentPath.startsWith("/runs/")) {
-      return (
-        <RunsPage
-          currentPath={currentPath}
-          onNavigate={handleNavigate}
-          onNavigateToCanvas={() => handleNavigate("/canvas")}
-        />
-      );
-    }
-
-    // 7. Quản Trị Loại Văn Bản theo taxonomy Core
-    if (currentPath === "/document-types") {
-      return <DocumentTypesPage currentPath={currentPath} onNavigate={handleNavigate} />;
-    }
-    if (currentPath.startsWith("/document-types/")) {
-      return <DocumentTypeDetailPage currentPath={currentPath} onNavigate={handleNavigate} />;
-    }
-
-    // 7a. Quản Trị Tri Thức
-    if (currentPath === "/knowledge" || currentPath.startsWith("/knowledge/")) {
-      return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
-    }
-
-    // 7b. Scan & OCR Document Intelligence Studio
-    if (currentPath === "/ocr" || currentPath.startsWith("/ocr/")) {
-      return <ScanStudioPage />;
-    }
-
-    // 8. Node Catalog from Core manifests
-    if (currentPath === "/nodes") {
-      return <NodeCatalogPage />;
-    }
-
-    // 8a. Workflows Directory (Master List View)
-    if (currentPath === "/workflows") {
-      return <WorkflowsPage onNavigate={handleNavigate} />;
-    }
-
-    // 9. DAG Canvas Studio & Deep Linking
-    if (
-      currentPath === "/canvas" ||
-      currentPath.startsWith("/canvas/") ||
-      currentPath.startsWith("/workflows/")
-    ) {
-      return (
-        <DAGCanvasPage
-          currentPath={currentPath}
-          onNavigate={handleNavigate}
-          onNavigateToChat={(code) => handleNavigate(`/chat?assistant=${encodeURIComponent(code)}`)}
-        />
-      );
-    }
-
-    // 10. Cổng Công Cụ Tools (UIS, Word NĐ 30, Excel Bloom)
-    if (currentPath === "/tools") {
-      return <ToolsPage />;
-    }
-
-    // 10. Kiểm Định Ragas TM-08
-    if (currentPath === "/evaluation") {
-      return <EvaluationPage onNavigateToKnowledge={() => setCurrentPath("/knowledge")} />;
-    }
-
-    // 11. Quản Trị Mô Hình & Circuit Breaker
-    if (currentPath === "/models" || currentPath.startsWith("/models/")) {
-      return <ModelOpsPage currentPath={currentPath} onNavigate={handleNavigate} />;
-    }
-
-    // 12. Cổng Developer & API Key
-    if (currentPath === "/developer") {
-      return <DeveloperPage />;
-    }
-
-    // 13. Design System Showcase
-    if (currentPath === "/design-system") {
-      return <DesignSystemPage />;
-    }
-
-    // Fallback View
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Phân Hệ</h1>
-            <p className="text-xs text-muted-foreground mt-1">Đường dẫn: {currentPath}</p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => handleNavigate("/")}>
-            Về Trang Chủ
-          </Button>
-        </div>
-        <Card className="p-8">
-          <EmptyState
-            icon={Network}
-            title={`Đang tải phân hệ: ${currentPath}`}
-            description="Phân hệ này đã sẵn sàng trên QNU AI Platform."
-            action={
-              <Button size="sm" onClick={() => handleNavigate("/")}>
-                Quay lại Bảng Điều Khiển
-              </Button>
+      // 2. Assistant Workspace
+      case "assistants_list":
+        return <AssistantsPage onNavigate={handleNavigate} />;
+      case "assistant_create":
+        return <AssistantCreatePage onNavigate={handleNavigate} />;
+      case "assistant_detail":
+        return (
+          <AssistantDetailPage
+            currentPath={resolved.canonicalPath}
+            onNavigate={handleNavigate}
+            subView={
+              resolved.params.subView as import(
+                "@/components/assistants/assistant-workspace-nav"
+              ).AssistantSubView
             }
           />
-        </Card>
-      </div>
-    );
+        );
+
+      // 3. Knowledge Workspace
+      case "knowledge":
+        return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
+      case "knowledge_ocr_lab":
+        return <ScanStudioPage />;
+      case "document_types_list":
+        return <DocumentTypesPage currentPath={currentPath} onNavigate={handleNavigate} />;
+      case "document_type_detail":
+        return <DocumentTypeDetailPage currentPath={currentPath} onNavigate={handleNavigate} />;
+
+      // 4. ModelOps
+      case "models":
+        return <ModelOpsPage currentPath={currentPath} onNavigate={handleNavigate} />;
+
+      // 5. Conversations & Handoff
+      case "conversations":
+        return <ConversationsPage />;
+
+      // 6. Quality & Evaluation
+      case "quality":
+        return <EvaluationPage onNavigateToKnowledge={() => handleNavigate("/knowledge")} />;
+
+      // 7. Operations Runs
+      case "operations_runs":
+        return (
+          <RunsPage
+            currentPath={currentPath}
+            onNavigate={handleNavigate}
+            onNavigateToCanvas={() => handleNavigate("/advanced/workflows")}
+          />
+        );
+
+      // 8. Settings & Integrations
+      case "settings_integrations":
+        return (
+          <SettingsIntegrationsPage
+            initialTab={resolved.params.tab || "channels"}
+            onTabChange={(tab) => {
+              handleNavigate(`/settings/integrations?tab=${tab}`);
+            }}
+          />
+        );
+
+      // 9. Advanced Workflows
+      case "advanced_workflows":
+        return <WorkflowsPage onNavigate={handleNavigate} />;
+      case "dag_canvas":
+        return (
+          <DAGCanvasPage
+            currentPath={currentPath}
+            onNavigate={handleNavigate}
+            onNavigateToChat={(code) =>
+              handleNavigate(`/assistants/${encodeURIComponent(code)}/playground`)
+            }
+          />
+        );
+
+      // 10. Advanced Capabilities: Nodes & Tools
+      case "advanced_nodes":
+        return <NodeCatalogPage />;
+      case "advanced_tools":
+        return <ToolsPage />;
+
+      // 11. Design System
+      case "design_system":
+        return <DesignSystemPage />;
+
+      // Fallback View
+      default:
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Phân Hệ</h1>
+                <p className="text-xs text-muted-foreground mt-1">Đường dẫn: {currentPath}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => handleNavigate("/")}>
+                Về Trang Chủ
+              </Button>
+            </div>
+            <Card className="p-8">
+              <EmptyState
+                icon={Network}
+                title={`Đang tải phân hệ: ${currentPath}`}
+                description="Phân hệ này đã sẵn sàng trên QNU AI Platform."
+                action={
+                  <Button size="sm" onClick={() => handleNavigate("/")}>
+                    Quay lại Bảng Điều Khiển
+                  </Button>
+                }
+              />
+            </Card>
+          </div>
+        );
+    }
   };
 
   if (isLoading) {

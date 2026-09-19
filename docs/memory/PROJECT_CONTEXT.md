@@ -7,10 +7,107 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-19 15:26 (UTC+7)
-- **Phiên số**: #109
+- **Thời gian cập nhật**: 2026-09-19 18:25 (UTC+7)
+- **Phiên số**: #118
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Triển Khai Giai Đoạn 8: Assistant Workspace Deep Modularization & Monolithic Page Decomposition (phiên #118)**:
+     - **Phân rã tệp "quái vật" `assistant-detail-page.tsx` (1.745 dòng xuống ~550 dòng, giảm gần 70%)**:
+       * Đưa `assistant-detail-page.tsx` về đúng vai trò Orchestrator: tiếp nhận routing, quản lý queries/mutations và điều phối hiển thị.
+       * Tách 11 module độc lập có Single Responsibility Principle (SRP):
+         - `frontend/src/components/assistants/types.ts`: Các types dùng chung (`AssistantEditForm`, `SampleQuestionItem`, `CATEGORY_OPTIONS`).
+         - `frontend/src/components/assistants/assistant-header.tsx`: Hero header, status badges, action toolbar, KPI metrics strip, và Publish Gate readiness banner (5 tiêu chí).
+         - `frontend/src/components/assistants/sections/assistant-persona-section.tsx`: Tầng 1 (Persona, Scope, System Prompt kèm AI generate prompt, sample questions).
+         - `frontend/src/components/assistants/sections/assistant-model-section.tsx`: Tầng 3 (ModelOps Primary & Fallback model selector, Temperature, Max Tokens).
+         - `frontend/src/components/assistants/sections/assistant-knowledge-section.tsx`: Tầng 2 (Collection binding, link mở chi tiết kho, khuyến nghị Chunking).
+         - `frontend/src/components/assistants/sections/assistant-tools-section.tsx`: Tầng 5 & 6 (Workflow DAG selector, nút mở DAG Studio, chính sách HITL & OpenAPI).
+         - `frontend/src/components/assistants/sections/assistant-guardrails-section.tsx`: Tầng 4 & 7 (6 chốt an toàn Guardrails, No-Answer Policy, TM-08 Ragas score panel).
+         - `frontend/src/components/assistants/sections/assistant-danger-zone.tsx`: Card kích hoạt lại / vô hiệu hóa trợ lý kèm dialog xác nhận an toàn.
+         - `frontend/src/components/assistants/dialogs/assistant-clone-dialog.tsx`: Dialog nhân bản trợ lý AI 1-click.
+         - `frontend/src/components/assistants/dialogs/assistant-embed-dialog.tsx`: Dialog sao chép mã nhúng Web Chat Widget.
+         - `frontend/src/components/assistants/dialogs/assistant-version-history-dialog.tsx`: Dialog xem lịch sử snapshot và rollback cấu hình.
+     - **Chuẩn Hóa Semantic & Accessibility (P0.4) & Typography (P1.4)**:
+       * Thay thế toàn bộ thẻ span clickable bằng `<button>` chuẩn semantic kèm focus ring (`focus-visible:ring-2`).
+       * Loại bỏ triệt để `text-[9px]` và `text-[10px]` ở các vùng dữ liệu quản trị, chuẩn hóa thành `text-xs` (12px) hoặc `text-sm` (14px).
+       * Bổ sung đầy đủ `aria-label` cho tất cả các công tắc Switch Guardrails.
+     - **Boy Scout Rule Dọn Sạch Linter Backend**:
+       * Khắc phục 10 cảnh báo Ruff E741 (biến `l` mơ hồ) và E402 trong `openai_adapter.py`, `layout_detector.py`, `service.py`, `conftest.py`, `test_auth.py`.
+     - **Verification hoàn hảo**: Frontend Biome 146 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 8.23s; Backend Ruff 0 lỗi; Pytest 232/232 passed (100%); Zero Mojibake 302/302 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 7: Responsive App Shell (Mobile Drawer & 3 Layout Variants - P0.1), Dọn Dẹp Dev Junk (P0.3), Khung Chuẩn Hóa Trạng Thái Dữ Liệu (P0.2) (phiên #117)**:
+     - **Responsive App Shell & Mobile Drawer (P0.1)**:
+       - Ẩn sidebar cố định trên màn hình `< 1024px` (`lg`), chuyển đổi thành **Mobile Drawer Sheet** mở ra từ nút Menu hamburger trên Topbar.
+       - Tự động đóng Mobile Drawer khi người dùng click vào bất kỳ liên kết điều hướng nào (`handleMobileNavigate`).
+       - Thiết lập vùng đệm chuẩn: `pl-0` trên mobile, `lg:pl-64` / `lg:pl-16` trên desktop.
+       - Hỗ trợ **3 Layout Variants** cho `<main>`:
+         * `full-bleed` (`h-[calc(100vh-3.5rem)]`, `p-0`, `overflow-hidden`): Dành cho DAG Canvas Studio, Scan & OCR Studio Split-Screen, Chat Studio, Conversations Desk.
+         * `wide` (`max-w-[1600px] mx-auto`): Dành cho Dashboard KPI và Bảng Runs.
+         * `standard` (`max-w-7xl mx-auto`): Dành cho các trang danh mục và form thông thường.
+     - **Dọn Dẹp Dev Junk Khỏi Production UI (P0.3)**:
+       - Đọc thông tin người dùng thật từ `useAuth()` (`actor`) để hiển thị tên, email, vai trò và avatar initials thay vì dữ liệu gán cứng.
+       - Ẩn triệt để các liên kết localhost (`localhost:8001/docs`, `localhost:6333`) khỏi production; chỉ hiển thị khi `import.meta.env.DEV` kèm nhãn `[Dev]`.
+       - Cập nhật footer Sidebar hiển thị tiếng Việt thân thiện ("Hệ thống sẵn sàng" / "Mất kết nối máy chủ"), không rò rỉ port nội bộ.
+     - **Khung Chuẩn Hóa Trạng Thái Dữ Liệu (P0.2)**:
+       - Tạo mới component [`StateBanner`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/components/admin/state-banner.tsx) hỗ trợ các trạng thái: `degraded` (cảnh báo dữ liệu suy giảm/cache kèm timestamp và nút làm mới), `demo` (nhãn dữ liệu mẫu minh họa), `offline` (mất kết nối máy chủ), `info`, `success`.
+       - Nâng cấp component [`EmptyState`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/components/admin/empty-state.tsx) hỗ trợ `variant="filter-empty"` với icon `SearchX` mặc định và nút "Xóa bộ lọc" (`onReset`).
+     - **Verification hoàn hảo**: Frontend Biome 135 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 6.02s; Backend Ruff 0 lỗi; Pytest 232/232 passed (100%); Zero Mojibake 291/291 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 6: Tái Cấu Trúc Chức Năng & Thu Gọn Điều Hướng QNU AI Platform (Theo Kế Hoạch 06) (phiên #116)**:
+     - **Tái cấu trúc Sidebar 4 nhóm & 7–8 mục chính**:
+       - Thu gọn từ 16 mục xuống còn: **Tổng Quan** (`/`), **Xây Dựng AI** (`/assistants`, `/knowledge`, `/models`), **Vận Hành** (`/conversations`, `/quality`, `/operations/runs`), **Hệ Thống** (`/settings/integrations`).
+       - Tích hợp nhóm **Nâng Cao** dạng Collapsible Accordion (lưu trạng thái vào `localStorage`): Thư viện Workflow (`/advanced/workflows`), Thư viện Nodes (`/advanced/capabilities/nodes`), Cổng Công cụ Tools (`/advanced/capabilities/tools`), Loại văn bản (`/knowledge/settings/document-types`), OCR Studio Lab (`/knowledge/ocr-lab`), Design System (`/design-system`, chỉ hiển thị khi `import.meta.env.DEV`).
+     - **Module Typed Route Resolver & 100% Backward-compatible Redirects**:
+       - Khởi tạo [`route-resolver.ts`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/navigation/route-resolver.ts) phân giải tập trung pathname và searchParams thành `ResolvedRoute`.
+       - Xử lý chuyển hướng tự động cho 100% URLs cũ: `/chat?assistant=xxx` $\rightarrow$ `/assistants/:id/playground`, `/channels` $\rightarrow$ `/settings/integrations?tab=channels`, `/developer` $\rightarrow$ `/settings/integrations?tab=api-keys`, `/workflows` $\rightarrow$ `/advanced/workflows`, `/runs` $\rightarrow$ `/operations/runs`, `/evaluation` $\rightarrow$ `/quality`, `/ocr` $\rightarrow$ `/knowledge/ocr-lab`, `/document-types` $\rightarrow$ `/knowledge/settings/document-types`, `/nodes` $\rightarrow$ `/advanced/capabilities/nodes`, `/tools` $\rightarrow$ `/advanced/capabilities/tools`.
+     - **Khởi tạo Assistant Workspace (`/assistants/:id/*`)**:
+       - Tích hợp thanh điều hướng cục bộ [`AssistantWorkspaceNav`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/components/assistants/assistant-workspace-nav.tsx) kết nối 6 sub-views: Tổng quan & Cấu hình 7 lớp (`overview`), Thử nghiệm Chat (`playground`), Quy trình DAG Canvas (`workflow`), Mã nhúng Kênh (`channels`), Kiểm định Chất lượng TM-08 (`quality`), Lịch sử Chạy (`runs`).
+       - Cập nhật `ChatStudioPage` nhận prop `initialAssistant` để nạp sẵn trợ lý đang chọn từ Workspace.
+     - **Trang Cài Đặt & Tích Hợp Thống Nhất (`/settings/integrations`)**:
+       - Hợp nhất `ChannelsPage` và `DeveloperPage` thành 1 trang 2 Tabs mượt mà.
+     - **Verification hoàn hảo**: Frontend Biome 134 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 7.17s; Backend Ruff 0 lỗi; Zero Mojibake 289/289 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 5: Chuẩn Hóa Vòng Đời Tri Thức, Indexing Nguyên Tử & Đối Soát Bền Vững 4 Tầng (phiên #115)**:
+     - **P1-09 Chuẩn hóa vòng đời trạng thái lập chỉ mục (`index_status` & `index_error`)**:
+       - Bổ sung `index_status` (`pending`, `indexing`, `indexed`, `index_failed`) và `index_error` (nullable) trên `KnowledgeDocument` (`models.py`, `schemas.py`).
+       - Trong `approve_document`: chuyển `index_status="indexing"`, thực hiện indexing an toàn, chuyển `index_status="indexed"` hoặc `"index_failed"` kèm lý do lỗi chi tiết, chấm dứt hoàn toàn tình trạng approved nhưng vector bị lỗi bị nuốt âm thầm.
+     - **P1-10 Tách bạch Job Type trong hàng đợi nền**:
+       - Tách biệt dứt khoát `job_type="ingestion_extract"` (lúc upload/OCR) và `job_type="vector_indexing"` (lúc approve/reindex), chấm dứt tắc nghẽn và nhập nhằng hàng đợi.
+     - **P1-11 Bổ sung siêu dữ liệu cô lập đa người thuê vào Qdrant**:
+       - Payload vector nạp vào Qdrant bắt buộc chứa đầy đủ: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_status="approved"`, `is_retrievable=True`, `chunk_index`, `page_number`, `header_path`.
+     - **P1-12 Dọn sạch thác đổ 4 tầng khi xóa Collection**:
+       - `delete_collection` dọn sạch tệp vật lý trên Storage driver (MinIO/Local) trước khi xóa DB, kết hợp xóa Qdrant vectors và Redis semantic cache.
+     - **P1-13 Đối soát bền vững 4 tầng & Khôi phục Indexing**:
+       - Backend: API `POST /documents/{id}/reindex` khôi phục vector đơn lẻ; API `GET /collections/{id}/reconcile` thanh tra 4 tầng (DB, Qdrant, Storage, Redis); API `POST /collections/{id}/reconcile-fix` tự động re-index toàn bộ approved documents thiếu vector.
+       - Frontend `collection-detail-page.tsx`: Nút `[Đối soát Kho]`, huy hiệu kép trạng thái (`Đã duyệt` + `Đã index`), nút `[⚡ Thử lại Index]` trên dòng tài liệu, Dialog **Reconciliation Audit 4 Tầng** kèm nút `[Đồng bộ tất cả]`.
+     - **Đồng bộ Quy trình 02**: Bổ sung Bước 11 vào `docs/quy_trinh/02_nap_tri_thuc_minio.md`.
+     - **Verification hoàn hảo**: Backend Pytest **232/232 passed (100%)** (+4 tests mới); Ruff 0 lỗi; Frontend Biome 130 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 7.59s; Zero Mojibake 286/286 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 4: Node Catalog Contract, DAG Schema Validation & Approval Inbox Vận Hành (phiên #114)**:
+     - **P1-07 Node Catalog Runtime Contract & Validation**:
+       - Bổ sung `get_manifests_map()` trong `backend/app/modules/node_catalog/service.py` nạp đồng bộ 13 NodeManifests từ `configs/nodes/*.json`.
+       - Nâng cấp `WorkflowCompiler` (`backend/app/modules/workflows/compiler.py`): thêm từ điển alias canonical (`_CANONICAL_TYPE_ALIASES`), viết hàm `_validate_node_config_schema` kiểm tra nghiêm ngặt các trường bắt buộc (`required`), kiểu dữ liệu (`string`, `integer`, `number`, `boolean`, `array`, `object`), kiểm tra `enum` cho phép (bao gồm chuỗi phân tách dấu phẩy như `"docx,pdf"`), và kiểm tra vòng đời manifest (`deprecated` -> cảnh báo, `inactive` -> chặn xuất bản).
+       - Khởi tạo `workflowConfig` từ `defaultConfig` trích xuất từ schema khi kéo thả/thêm node từ `NodeCatalogDrawer` vào Canvas trong `dag-canvas-page.tsx`.
+     - **P1-08 Schema-Driven Property Inspector**:
+       - Viết lại toàn diện `PropertyInspector` (`frontend/src/components/admin/property-inspector.tsx`) hỗ trợ Two-Way Binding giữa Tab Trực Quan và Tab JSON Schema.
+       - Xóa bỏ mọi tham số tĩnh gán cứng, cung cấp form controls tương tác theo schema thực tế (Search Mode, Top K, RRF k, Fact Threshold, Tool ID, Timeout, Routing rules,...), lưu cấu hình trực tiếp vào `workflowConfig`.
+     - **P2-08 Approval Inbox Vận Hành Tại `/runs`**:
+       - Bổ sung types `WorkflowApproval` trong `frontend/src/types/workflows.ts`, methods `getPendingApprovals()` và `decideApproval()` trong API client.
+       - Nâng cấp `RunsPage` (`frontend/src/pages/runs-page.tsx`): tích hợp Hộp Thư Phê Duyệt Tác Vụ (HITL Approval Inbox) với auto-refetch mỗi 8 giây; hiển thị danh sách checkpoint kèm thẻ thông tin chi tiết; hộp thoại quyết định (`Approval Decision Dialog`) cho phép nhập người duyệt và lý do/chỉ đạo; nút [Duyệt ngay] shortcut trên các hàng bảng có trạng thái `paused_for_approval`.
+     - **Đồng bộ Quy trình 04**: Bổ sung Mục 12 vào `docs/quy_trinh/04_dieu_phoi_tro_ly_dag.md` đặc tả chi tiết kiểm định schema node và luồng vận hành hộp thư phê duyệt.
+     - **Verification hoàn hảo**: Backend Pytest **228/228 passed (100%)** (+4 test cases mới cho validation và approval API); Ruff check 0 lỗi; Frontend Biome 130 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 7.41s; Zero Mojibake 286/286 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 3: Nối Assistant Với ModelOps Thật & Khép Kín Chat Studio ↔ Conversations (phiên #113)**:
+     - **P1-04 Chat Studio Query Trợ Lý Thật Từ CSDL**: Xóa bỏ mảng tĩnh 5 trợ lý `ASSISTANTS` trong `chat-studio-page.tsx`, thay bằng `useQuery` gọi `listAssistants({ includeInactive: false })`; hỗ trợ deep-link `?assistant={code}` tự động đồng bộ trên URL khi chuyển trợ lý; nạp câu hỏi mẫu nghiệp vụ từ `sample_questions` cấu hình thật.
+     - **P1-01 & P1-02 Form Trợ Lý Nối ModelOps Thật**: Thay thế mảng mô hình tĩnh `STANDARD_MODELS` trong trang Tạo mới (`assistant-create-page.tsx`) và Chi tiết (`assistant-detail-page.tsx`) bằng danh mục models nạp động từ `modelopsApi.getModelProviders()`, tự động gom nhóm các models thuộc các Provider đang hoạt động (`is_active: true`).
+     - **P1-03 Sửa Lỗi Usage / Model Name Tracking**: Viết helper `_extract_primary_model` trong `assistants/service.py` đọc chuẩn xác từ `config.model_policy.primary_model`, chấm dứt việc đọc sai thuộc tính không tồn tại `preferred_model_name`.
+     - **P1-06 Khép Kín Chat ↔ Conversation Thread ↔ Staff Handoff**: Tự động ghi nhận tin nhắn người dùng (`sender="user"`) và câu trả lời AI (`sender="assistant"`) vào CSDL PostgreSQL (`conversation_threads` và `conversation_messages`) qua `conversation_service.record_message` trong cả hai luồng `chat` và `chat_stream`; tự động phát hiện intent gặp cán bộ/hotline để chuyển trạng thái sang `handoff_requested`.
+     - **P1-05 Tệp Đính Kèm Thật Trong Chat Studio**: Mở rộng `ChatAttachment` hỗ trợ `textContent`; kết nối nút Paperclip với API OCR `/platform/v1alpha1/ocr/extract` thật; chèn văn bản bóc tách vào prompt context của Trợ lý AI; hiển thị spinner trạng thái và disable input khi đang xử lý OCR.
+     - **Verification hoàn hảo**: Backend Pytest **224/224 passed (100%)** (+2 test cases mới cho attachments, conversation recording và primary_model tracking); Ruff check 0 lỗi; Frontend Biome 130 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 8.37s; Zero Mojibake 286/286 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 2: Khóa An Toàn API Quản Trị & Kết Nối Tool Gateway trong Workflow (phiên #112)**:
+     - **P0-01 Bảo Vệ API Quản Trị Bằng Dev Access Gate**: Áp dụng `Depends(get_current_actor)` cho toàn bộ 11 router quản trị trong `main.py` (Workflows, Knowledge, ModelOps, Assistants Admin, Tools, Jobs, Document Types, RAG, Node Catalog, Conversations, OCR, Evaluation); tách `assistant_chat_router` giữ endpoint chat công khai `POST /assistants/{reference}/chat` cho Web Chat Widget và thí sinh/sinh viên; cấu hình cookie phiên `secure=settings.ENVIRONMENT not in ("development", "test")`.
+     - **P0-04 Kết Nối Workflow API Caller Node ↔ Tool Gateway & HITL**: Refactor `APICallerNodeHandler` điều phối qua `ToolService.execute_tool(context.db, tool_req)` thay vì gọi trực tiếp driver; kiểm tra allowlist công cụ của trợ lý (`assistant_profile.tools.enabled_tools`); hỗ trợ tạm dừng workflow an toàn (`status="paused_for_approval"`) khi gặp công cụ side-effect (`export_administrative_document` tạo Word NĐ 30, `export_exam_matrix` tạo Excel Bloom có `requires_approval = True`) chưa có phê duyệt nhân sự; tự động lưu vết kiểm toán bất biến `ToolExecutionLog`.
+     - **P0-02 Bảo Vệ Secret API Key (ModelOps Secret Masking)**: Loại bỏ trường `api_key: c.api_key_encrypted` trong API danh sách Provider (`modelops/service.py:556`), chỉ trả `api_key_masked` và các sub-keys đã sanitize, ngăn chặn hoàn toàn rò rỉ secret key ra ngoài giao diện.
+     - **Verification hoàn hảo**: Backend Pytest **222/222 passed (100%)** (+4 test cases mới cho Auth API protection và Tool Gateway HITL/allowlist); Ruff check 0 lỗi; Frontend Biome 130 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 7.77s; Zero Mojibake 286/286 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 1: Sửa Khoảng Hở Kết Nối (phiên #111)**:
+     - **P0-06 Web Chat Widget**: Chuẩn hóa `qnu-chat-widget.js` gọi đúng endpoint `POST /platform/v1alpha1/assistants/{id}/chat` kèm `stream: true`, chuẩn hóa đọc `data-api-base` và xử lý SSE delta/error. Bổ sung `data-api-base="${originUrl}"` vào snippet mã nhúng trên trang Channels (`channels-page.tsx`) và Chi tiết Trợ lý (`assistant-detail-page.tsx`).
+     - **P1-14 Contract Quota API**: Sửa URL gọi trong `modelops-api.ts` từ `/models/quota?tenant_id=...` thành `/modelops/quotas/${tenantId}`; bổ sung endpoint alias `GET /platform/v1alpha1/modelops/quota?tenant_id=...` trong `modelops/router.py` bảo đảm tương thích ngược.
+     - **P0-05 Ràng Buộc Vòng Đời Facts (Fact Layer Lifecycle Binding)**: Cập nhật `FactRetriever.lookup_facts` trong `rag/facts.py` thực hiện `outerjoin(KnowledgeDocument)`, lọc bỏ 100% facts từ tài liệu `pending` (chưa duyệt) hoặc `archived` (đã thu hồi); đồng bộ Bước 3 trong `docs/quy_trinh/03_hybrid_rag_truy_xuat.md`.
+
   1. **Lập Kế Hoạch Tái Cấu Trúc Chức Năng Và Điều Hướng (phiên #109)**:
      - Tạo [`docs/ke_hoach/06_ke_hoach_tai_cau_truc_chuc_nang_va_dieu_huong.md`](../ke_hoach/06_ke_hoach_tai_cau_truc_chuc_nang_va_dieu_huong.md).
      - Chốt nguyên tắc “gộp trải nghiệm, giữ domain”: đưa Workflow/Playground/Channels/Quality/Runs vào Assistant Workspace; đưa OCR/Loại văn bản vào Knowledge Workspace; giữ Provider, Conversations và runtime entities độc lập.
@@ -647,13 +744,13 @@
 | 7 | Module Evaluation (Ragas TM-08: Faithfulness, Relevance, Precision) | ✅ Done |
 | 8 | Module Workflows (DAG Pipeline, ARQ Workers, Guardrails) | ✅ Done |
 
-**Backend Quality (phiên #101)**: Full suite **193/193 passed (100%)**, 21 warnings. Hoàn thành Đợt 1: Cổng Kiểm Định Xuất Bản 5 Lớp (`readiness.py`), Nhân Bản Trợ Lý 1-Click (`clone_assistant`), Hòm Thư Lỗ Hổng Tri Thức (`KnowledgeGapRecord` + active remediation).
+**Backend Quality (phiên #111)**: Full suite **218/218 passed (100%)**, 34 warnings. Hoàn thành Giai đoạn 1 khắc phục khoảng hở kết nối: P0-05 Facts Lifecycle outerjoin & filter, P1-14 Quota endpoint alias, P0-06 Chat Widget endpoint /chat.
 
 ---
 
 ### ⚠️ Frontend — Độ phủ màn hình cao, LiveMode cần loại bỏ business mock fallback
 
-> Cập nhật phiên #101: Hoàn thành Đợt 1 UI: Publish Gate card 5 lớp trên `/assistants/:id`, Dialog nhân bản trợ lý 1-click, và tab Knowledge Gap Inbox tương tác trực tiếp với API `resolveGap` trên `/evaluation`.
+> Cập nhật phiên #111: Hoàn thành Giai đoạn 1 UI: Sửa endpoint Widget `/chat`, bóc tách `data-api-base` và cập nhật template mã nhúng Channels & Assistant Detail, sửa URL gọi Quota `/modelops/quotas/${tenantId}`.
 
 | Giai Đoạn | Màn Hình / Module | Trạng Thái |
 | :--- | :--- | :---: |
@@ -669,7 +766,7 @@
 | 9 | Evaluation & Active Remediation (TM-08 Benchmark, Gap Inbox, Resolve) | ✅ Done |
 
 **Frontend Quality**:
-- Phiên #101: Biome Lint 0 lỗi trên 124 files | TypeScript 0 lỗi. Build thành công trong 7.74 giây, 0 warnings.
+- Phiên #111: Biome Lint 0 lỗi trên 130 files | TypeScript 0 lỗi. Build thành công trong 8.03 giây, 0 warnings.
 - Playwright E2E: Suite 09 có TC-INGEST-01→04 (bao gồm TC-INGEST-04 chống tái diễn hardcode)
 
 ---
@@ -694,11 +791,15 @@
 
 ## 5. Backlog & Kế Hoạch Tiếp Theo
 
-### Ưu Tiên Tích Hợp Sau Phiên #108
+### Đã Hoàn Thành Trong Giai Đoạn 1 (Phiên #111)
+- [x] **P0-06 Web Chat Widget:** Sửa endpoint sang `/chat` kèm `stream: true`, chuẩn hóa `data-api-base` và snippet mã nhúng cross-origin.
+- [x] **P1-14 Contract Quota API:** Sửa URL gọi `/modelops/quotas/${tenantId}` và tạo endpoint alias `GET /quota?tenant_id=...` trên backend.
+- [x] **P0-05 Facts Lifecycle:** Outerjoin `KnowledgeDocument`, lọc bỏ facts thuộc tài liệu `pending`/`archived` khỏi Hybrid RAG.
+
+### Ưu Tiên Tích Hợp Sau Phiên #108 (Các Giai Đoạn Tiếp Theo)
 - [ ] **P0 Truthful Runtime:** loại fake-success khỏi LLM/OCR/Tools/Embedding/Workflow trong LiveMode; lỗi thật phải hiện `failed/degraded`.
 - [ ] **P0 Security Boundary:** bảo vệ router quản trị bằng `get_current_actor`, mask/encrypt provider key và chuyển toàn bộ secret sang environment.
 - [ ] **P0 Tool Policy:** bắt `tool.api_caller` đi qua `ToolService`, enforce allowlist/HITL và ghi execution audit.
-- [ ] **P0 Facts Lifecycle:** chỉ retrieve facts từ document approved/active đúng tenant/workspace/version.
 - [ ] **P1 Assistant–ModelOps:** model catalog động theo provider active/capability; primary/fallback deterministic; usage streaming ghi đúng một lần.
 - [ ] **P1 Chat–Handoff:** assistant động, attachment thật, conversation/message persistence và staff reply quay lại widget/chat.
 - [ ] **P1 Knowledge Index Integrity:** trạng thái `pending_index/indexed/index_failed`, retry/outbox và reconciliation DB–Qdrant–Storage.

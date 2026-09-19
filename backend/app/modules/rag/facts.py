@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.knowledge.models import KnowledgeFact
+from app.modules.knowledge.models import KnowledgeDocument, KnowledgeFact
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +36,24 @@ class FactLayer:
         if not conditions:
             return []
 
+        lifecycle_filter = or_(
+            and_(
+                KnowledgeDocument.id.is_not(None),
+                KnowledgeDocument.is_active.is_(True),
+                KnowledgeDocument.status.in_(["approved", "completed", "processed", "ready"]),
+            ),
+            KnowledgeDocument.id.is_(None),
+        )
+
         query = (
             select(KnowledgeFact)
+            .outerjoin(
+                KnowledgeDocument,
+                KnowledgeFact.document_id == KnowledgeDocument.id,
+            )
             .where(
                 KnowledgeFact.collection_id == collection_id,
+                lifecycle_filter,
                 or_(*conditions),
             )
             .limit(limit)

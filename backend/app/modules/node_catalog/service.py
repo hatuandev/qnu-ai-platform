@@ -117,6 +117,18 @@ class NodeCatalogService:
         filtered_records.sort(key=lambda record: (record.category, record.display_name, record.type))
         return [_to_response(record) for record in filtered_records]
 
+    def get_manifests_map(self) -> dict[str, NodeManifestRecord]:
+        """Return a mapping of node_type -> NodeManifestRecord for synchronous runtime validation."""
+        if not self.nodes_dir.is_dir():
+            return {}
+        manifest_paths = sorted(self.nodes_dir.glob("*.json"))
+        records: dict[str, NodeManifestRecord] = {}
+        for path in manifest_paths:
+            rec = _load_manifest_file(path)
+            if rec:
+                records[rec.type] = rec
+        return records
+
 
 def _normalize_filter(value: str | None) -> str | None:
     if value is None or not value.strip():

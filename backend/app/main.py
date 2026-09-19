@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Response, status
+from fastapi import Depends, FastAPI, Response, status
 from sqlalchemy import text
 
 from app.core.config import get_settings
@@ -185,8 +185,9 @@ def create_app() -> FastAPI:
         }
 
     # 6. Mount Feature Modules Routers
-    from app.modules.assistants import assistants_router
+    from app.modules.assistants import assistant_chat_router, assistants_router
     from app.modules.auth import auth_router
+    from app.modules.auth.dependencies import get_current_actor
     from app.modules.conversations.router import router as conversations_router
     from app.modules.document_types.router import router as document_types_router
     from app.modules.evaluation import evaluation_router
@@ -199,19 +200,24 @@ def create_app() -> FastAPI:
     from app.modules.tools import tools_router
     from app.modules.workflows import workflow_router
 
+    # Public Routes (Auth, Health, and Public Chat Widget)
     app.include_router(auth_router, prefix=settings.API_PREFIX)
-    app.include_router(jobs_router, prefix=settings.API_PREFIX)
-    app.include_router(document_types_router, prefix=settings.API_PREFIX)
-    app.include_router(knowledge_router, prefix=settings.API_PREFIX)
-    app.include_router(rag_router, prefix=settings.API_PREFIX)
-    app.include_router(modelops_router, prefix=settings.API_PREFIX)
-    app.include_router(node_catalog_router, prefix=settings.API_PREFIX)
-    app.include_router(workflow_router, prefix=settings.API_PREFIX)
-    app.include_router(assistants_router, prefix=settings.API_PREFIX)
-    app.include_router(conversations_router, prefix=settings.API_PREFIX)
-    app.include_router(tools_router, prefix=settings.API_PREFIX)
-    app.include_router(ocr_router, prefix=settings.API_PREFIX)
-    app.include_router(evaluation_router, prefix=settings.API_PREFIX)
+    app.include_router(assistant_chat_router, prefix=settings.API_PREFIX)
+
+    # Secured Admin Routes (Protected by Dev Access Gate)
+    auth_guard = [Depends(get_current_actor)]
+    app.include_router(jobs_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(document_types_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(knowledge_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(rag_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(modelops_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(node_catalog_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(workflow_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(assistants_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(conversations_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(tools_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(ocr_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(evaluation_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
 
     return app
 

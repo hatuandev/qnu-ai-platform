@@ -679,3 +679,284 @@ def test_build_studio_pages_rejects_synthetic_placeholders():
     assert "Bảng biểu số liệu" not in pages[0]["markdown_content"]
     assert pages[0]["markdown_content"] == ""
 
+
+@pytest.mark.asyncio
+async def test_approve_document_sets_index_status_and_records_job(monkeypatch):
+    """Approving a document should set status='approved', index_status='indexed' and record vector_indexing job."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.service import knowledge_service
+
+    db = AsyncMock()
+    doc = KnowledgeDocument(
+        id="doc_app_01",
+        collection_id="col_test_app",
+        status="pending",
+        index_status="pending",
+        title="Van ban test",
+        file_name="test.pdf",
+        file_type="pdf",
+        file_size_bytes=1024,
+        file_hash="hash123",
+        storage_path="knowledge/test.pdf",
+        doc_metadata={},
+        is_active=True,
+    )
+    col = KnowledgeCollection(
+        id="col_test_app",
+        name="Kho Test",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        workspace_id="workspace_qnu",
+    )
+    chunk = KnowledgeChunk(
+        id="chk_app_01",
+        document_id="doc_app_01",
+        collection_id="col_test_app",
+        chunk_index=0,
+        content="Noi dung quy che tuyen sinh",
+        chunk_hash="chash1",
+        token_count=10,
+    )
+
+    async def mock_get_doc(session, document_id):
+        return doc
+
+    async def mock_get_col(session, collection_id):
+        return col
+
+    monkeypatch.setattr(knowledge_service, "get_document", mock_get_doc)
+    monkeypatch.setattr(knowledge_service, "get_collection", mock_get_col)
+
+    # Mock DB query for chunks
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = [chunk]
+    scalars_mock.first.return_value = None
+    exec_res = MagicMock()
+    exec_res.scalars.return_value = scalars_mock
+    db.execute.return_value = exec_res
+
+    # Mock vector_indexer
+    from app.modules.rag.vector_indexer import vector_indexer
+    monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
+
+    res = await knowledge_service.approve_document(db, "doc_app_01")
+    assert res["status"] == "approved"
+    assert res["index_status"] == "indexed"
+    assert res["indexed_chunks"] == 1
+    assert doc.status == "approved"
+    assert doc.index_status == "indexed"
+
+
+@pytest.mark.asyncio
+async def test_approve_document_index_failed_gracefully(monkeypatch):
+    """When vector_indexer fails during approval, document should have index_status='index_failed' with error recorded."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.service import knowledge_service
+
+    db = AsyncMock()
+    doc = KnowledgeDocument(
+        id="doc_fail_01",
+        collection_id="col_test_fail",
+        status="pending",
+        index_status="pending",
+        title="Van ban loi",
+        file_name="loi.pdf",
+        file_type="pdf",
+        file_size_bytes=1024,
+        file_hash="hashfail",
+        storage_path="knowledge/loi.pdf",
+        doc_metadata={},
+        is_active=True,
+    )
+    col = KnowledgeCollection(
+        id="col_test_fail",
+        name="Kho Loi",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        workspace_id="workspace_qnu",
+    )
+    chunk = KnowledgeChunk(
+        id="chk_fail_01",
+        document_id="doc_fail_01",
+        collection_id="col_test_fail",
+        chunk_index=0,
+        content="Noi dung loi",
+        chunk_hash="chashfail",
+        token_count=10,
+    )
+
+    async def mock_get_doc(session, document_id):
+        return doc
+
+    async def mock_get_col(session, collection_id):
+        return col
+
+    monkeypatch.setattr(knowledge_service, "get_document", mock_get_doc)
+    monkeypatch.setattr(knowledge_service, "get_collection", mock_get_col)
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = [chunk]
+    scalars_mock.first.return_value = None
+    exec_res = MagicMock()
+    exec_res.scalars.return_value = scalars_mock
+    db.execute.return_value = exec_res
+
+    from app.modules.rag.vector_indexer import vector_indexer
+    monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(side_effect=RuntimeError("Qdrant connection refused")))
+
+    res = await knowledge_service.approve_document(db, "doc_fail_01")
+    assert res["status"] == "approved"
+    assert res["index_status"] == "index_failed"
+    assert res["indexed_chunks"] == 0
+    assert doc.status == "approved"
+    assert doc.index_status == "index_failed"
+    assert "Qdrant connection refused" in (doc.index_error or "")
+
+
+@pytest.mark.asyncio
+async def test_reindex_document_endpoint_recovers_vector(monkeypatch):
+    """reindex_document should recover vector for a document and update index_status to 'indexed'."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.service import knowledge_service
+
+    db = AsyncMock()
+    doc = KnowledgeDocument(
+        id="doc_reindex_01",
+        collection_id="col_test_reindex",
+        status="approved",
+        index_status="index_failed",
+        index_error="Previous error",
+        title="Van ban reindex",
+        file_name="reindex.pdf",
+        file_type="pdf",
+        file_size_bytes=1024,
+        file_hash="hashreindex",
+        storage_path="knowledge/reindex.pdf",
+        doc_metadata={},
+    )
+    col = KnowledgeCollection(
+        id="col_test_reindex",
+        name="Kho Reindex",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        workspace_id="workspace_qnu",
+    )
+    chunk = KnowledgeChunk(
+        id="chk_reindex_01",
+        document_id="doc_reindex_01",
+        collection_id="col_test_reindex",
+        chunk_index=0,
+        content="Noi dung phuc hoi",
+        chunk_hash="chashreindex",
+        token_count=10,
+    )
+
+    async def mock_get_doc(session, document_id):
+        return doc
+
+    async def mock_get_col(session, collection_id):
+        return col
+
+    monkeypatch.setattr(knowledge_service, "get_document", mock_get_doc)
+    monkeypatch.setattr(knowledge_service, "get_collection", mock_get_col)
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = [chunk]
+    exec_res = MagicMock()
+    exec_res.scalars.return_value = scalars_mock
+    db.execute.return_value = exec_res
+
+    from app.modules.rag.vector_indexer import vector_indexer
+    monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
+
+    res = await knowledge_service.reindex_document(db, "doc_reindex_01")
+    assert res["status"] == "approved"
+    assert res["index_status"] == "indexed"
+    assert res["indexed_chunks"] == 1
+    assert doc.index_status == "indexed"
+    assert doc.index_error is None
+
+
+@pytest.mark.asyncio
+async def test_reconcile_collection_audits_parity(monkeypatch):
+    """reconcile_collection should return accurate counts and discrepancy reports."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.service import knowledge_service
+
+    db = AsyncMock()
+    col = KnowledgeCollection(
+        id="col_test_reconcile",
+        name="Kho Reconcile",
+        module_code="admissions",
+    )
+    doc_ok = KnowledgeDocument(
+        id="doc_rec_01",
+        collection_id="col_test_reconcile",
+        status="approved",
+        index_status="indexed",
+        title="Doc OK",
+        file_name="ok.pdf",
+        file_type="pdf",
+        file_size_bytes=1024,
+        file_hash="hashok",
+        storage_path="knowledge/ok.pdf",
+        doc_metadata={"chunk_count": 5},
+    )
+    doc_missing_vec = KnowledgeDocument(
+        id="doc_rec_02",
+        collection_id="col_test_reconcile",
+        status="approved",
+        index_status="index_failed",
+        title="Doc Missing Vector",
+        file_name="missing.pdf",
+        file_type="pdf",
+        file_size_bytes=1024,
+        file_hash="hashmissing",
+        storage_path="knowledge/missing.pdf",
+        doc_metadata={"chunk_count": 3},
+    )
+
+    async def mock_get_col(session, collection_id):
+        return col
+
+    monkeypatch.setattr(knowledge_service, "get_collection", mock_get_col)
+
+    # Mock storage_service.exists
+    from app.core.storage import storage_service
+    monkeypatch.setattr(storage_service, "exists", AsyncMock(return_value=True))
+
+    # Mock db.execute for docs and chunks count
+    doc_scalars = MagicMock()
+    doc_scalars.all.return_value = [doc_ok, doc_missing_vec]
+    doc_exec = MagicMock()
+    doc_exec.scalars.return_value = doc_scalars
+
+    chunk_count_exec = MagicMock()
+    chunk_count_exec.scalar.return_value = 8
+
+    db.execute.side_effect = [doc_exec, chunk_count_exec]
+
+    # Mock vector_indexer count
+    from app.modules.rag.vector_indexer import vector_indexer
+    count_res = MagicMock()
+    count_res.count = 5
+    vector_indexer.client.count = AsyncMock(return_value=count_res)
+
+    res = await knowledge_service.reconcile_collection(db, "col_test_reconcile")
+    assert res["collection_id"] == "col_test_reconcile"
+    assert res["db_documents_count"] == 2
+    assert res["indexed_documents_count"] == 1
+    assert res["failed_documents_count"] == 1
+    assert res["db_chunks_count"] == 8
+    assert res["qdrant_points_count"] == 5
+    assert res["is_consistent"] is False
+    assert len(res["discrepancies"]) >= 1
+

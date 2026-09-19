@@ -147,4 +147,20 @@ flowchart TD
   3. Bóc tách từng dòng thành các cặp `(entity_name, entity_type, attribute_name, attribute_value)` với độ tin cậy tuyệt đối (`confidence = 1.0`).
   4. Lưu trữ bền vững vào bảng PostgreSQL `knowledge_facts`, tự động liên kết với `collection_id`.
   5. Khi Trợ lý AI nhận câu hỏi có chứa số liệu (như "Điểm chuẩn ngành Công nghệ thông tin năm 2024?"), hệ thống RAG ưu tiên tra cứu trực tiếp từ tầng Facts số hóa trước khi truy xuất văn bản thô, bảo đảm **Zero Hallucination** 100%.
-
+### Bước 11: Vòng Đời Lập Chỉ Mục Kép, Tách Bạch Hàng Đợi & Đối Soát Bền Vững 4 Tầng (P1-09 đến P1-13)
+- **Chuẩn hóa vòng đời trạng thái lập chỉ mục (`index_status`)**:
+  - Mỗi tài liệu `KnowledgeDocument` sở hữu 2 trạng thái độc lập:
+    * `status`: Vòng đời phê duyệt nghiệp vụ (`pending` -> `approved` -> `archived`).
+    * `index_status`: Vòng đời kỹ thuật của vector embeddings (`pending` -> `indexing` -> `indexed` / `index_failed`).
+  - Khi người dùng bấm phê duyệt (`approve_document`), `index_status` chuyển sang `indexing`. Sau khi hoàn tất nạp vector vào Qdrant an toàn, trạng thái chuyển thành `indexed`. Nếu Qdrant hoặc dịch vụ Embedding gặp sự cố, tài liệu chuyển sang `index_failed` kèm lý do lỗi chi tiết tại `index_error` (không bao giờ nuốt lỗi).
+- **Tách bạch Job Type trong hàng đợi nền (Job Queue Separation)**:
+  - Tách bạch dứt khoát giữa `job_type="ingestion_extract"` (bóc tách văn bản, OCR, sinh chunks khi upload) và `job_type="vector_indexing"` (tính toán embeddings, nạp vectors vào Qdrant khi phê duyệt hoặc reindex), khắc phục triệt để nhầm lẫn hàng đợi và nghẽn tiến trình.
+- **Bổ sung siêu dữ liệu cô lập đa người thuê (Multi-tenant Vector Metadata)**:
+  - Mọi point vector nạp vào Qdrant bắt buộc mang đầy đủ metadata: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_status="approved"`, `is_retrievable=True`, `chunk_index`, `page_number`, `header_path`. Ngăn ngừa rò rỉ dữ liệu chéo giữa các khoa/phòng ban.
+- **Cơ chế Khôi phục Lập chỉ mục đơn lẻ (`reindex_document`)**:
+  - Cung cấp API `POST /knowledge/documents/{id}/reindex` và nút bấm trực quan `[⚡ Thử lại Index]` trên giao diện bảng danh sách tài liệu, cho phép cán bộ tái nạp vector ngay lập tức khi phát hiện tài liệu `approved` nhưng ở trạng thái `index_failed`.
+- **Thanh tra Đối Soát Bền Vững 4 Tầng (`reconcile_collection` & `reconcile_fix_collection`)**:
+  - Cung cấp API `GET /knowledge/collections/{id}/reconcile` và nút `[Đối soát Kho]` trên thanh công cụ:
+    1. Quét đối soát số lượng và ID giữa 4 tầng: PostgreSQL DB, Qdrant Vector Points, MinIO/Local Storage Files, và Redis Semantic Cache.
+    2. Phát hiện chính xác các sai lệch: `ghost_vectors` (vector mồ côi trong Qdrant nhưng DB đã mất), `missing_vectors` (tài liệu đã duyệt nhưng thiếu vector trong Qdrant), `missing_storage_file` (thiếu file vật lý), `empty_chunks`.
+    3. Cung cấp nút `[Đồng bộ tất cả]` (`POST /knowledge/collections/{id}/reconcile-fix`) để tự động lập chỉ mục lại toàn bộ tài liệu bị thiếu vector mà không cần can thiệp thủ công vào cơ sở dữ liệu.

@@ -652,7 +652,7 @@ class SmartLayoutDetector:
                 continue
             txt = tb["text"]
             t = tb["top"]
-            l = tb["left"]
+            left_val = tb["left"]
             w = tb["width"]
             h = tb["height"]
 
@@ -674,7 +674,7 @@ class SmartLayoutDetector:
                 "label": lbl,
                 "text": txt,
                 "top": t,
-                "left": l,
+                "left": left_val,
                 "width": w,
                 "height": h,
             })
@@ -735,7 +735,7 @@ class SmartLayoutDetector:
             for b in content_boxes:
                 if float(b["top"]) < 15.0 and b["type"] == "header":
                     w = float(b["width"])
-                    l = float(b["left"])
+                    left_val = float(b["left"])
                     if w > 60.0:
                         txt = b.get("text", "")
                         if "ngày" in txt or "tháng" in txt:
@@ -752,7 +752,7 @@ class SmartLayoutDetector:
                             })
                         else:
                             left_headers.append(b)
-                    elif l < 42.0:
+                    elif left_val < 42.0:
                         left_headers.append(b)
                     else:
                         right_headers.append(b)
@@ -761,7 +761,7 @@ class SmartLayoutDetector:
 
             if left_headers:
                 t = min(float(b["top"]) for b in left_headers)
-                l = min(float(b["left"]) for b in left_headers)
+                left_val = min(float(b["left"]) for b in left_headers)
                 r = max(float(b["left"]) + float(b["width"]) for b in left_headers)
                 bt = max(float(b["top"]) + float(b["height"]) for b in left_headers)
                 merged_content.append({
@@ -769,14 +769,14 @@ class SmartLayoutDetector:
                     "label": "header",
                     "text": "\n".join(b.get("text", "").strip() for b in left_headers if b.get("text", "").strip()),
                     "top": round(t, 1),
-                    "left": round(l, 1),
-                    "width": round(min(50.0, r - l), 1),
+                    "left": round(left_val, 1),
+                    "width": round(min(50.0, r - left_val), 1),
                     "height": round(bt - t, 1),
                 })
 
             if right_headers:
                 t = min(float(b["top"]) for b in right_headers)
-                l = min(float(b["left"]) for b in right_headers)
+                left_val = min(float(b["left"]) for b in right_headers)
                 r = max(float(b["left"]) + float(b["width"]) for b in right_headers)
                 bt = max(float(b["top"]) + float(b["height"]) for b in right_headers)
                 merged_content.append({
@@ -784,8 +784,8 @@ class SmartLayoutDetector:
                     "label": "header",
                     "text": "\n".join(b.get("text", "").strip() for b in right_headers if b.get("text", "").strip()),
                     "top": round(t, 1),
-                    "left": round(max(40.0, l), 1),
-                    "width": round(min(55.0, r - max(40.0, l)), 1),
+                    "left": round(max(40.0, left_val), 1),
+                    "width": round(min(55.0, r - max(40.0, left_val)), 1),
                     "height": round(bt - t, 1),
                 })
 

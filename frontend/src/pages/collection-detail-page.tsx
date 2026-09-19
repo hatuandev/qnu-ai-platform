@@ -15,6 +15,7 @@ import {
   Scan,
   Search,
   Settings,
+  ShieldCheck,
   Table2,
   Terminal,
   Trash2,
@@ -52,6 +53,7 @@ import {
   type IngestionTask,
   type KnowledgeCollection,
   type KnowledgeDocument,
+  type KnowledgeReconciliationReport,
   apiClient,
 } from "../services/api-client";
 import { knowledgeApi } from "../services/knowledge-api";
@@ -98,6 +100,15 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   // Reindex state
   const [isReindexing, setIsReindexing] = useState<boolean>(false);
   const [reindexJobId, setReindexJobId] = useState<string | null>(null);
+
+  // Reconcile state
+  const [isReconcileOpen, setIsReconcileOpen] = useState<boolean>(false);
+  const [reconcileReport, setReconcileReport] = useState<KnowledgeReconciliationReport | null>(
+    null
+  );
+  const [isLoadingReconcile, setIsLoadingReconcile] = useState<boolean>(false);
+  const [isFixingReconcile, setIsFixingReconcile] = useState<boolean>(false);
+  const [reindexingDocId, setReindexingDocId] = useState<string | null>(null);
 
   // Row-level + header action states
   const [actionError, setActionError] = useState<string | null>(null);
@@ -444,6 +455,51 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   };
 
+  const handleOpenReconcile = async () => {
+    setIsReconcileOpen(true);
+    setIsLoadingReconcile(true);
+    try {
+      const report = await apiClient.reconcileCollection(currentCollection.id);
+      setReconcileReport(report);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được báo cáo đối soát.");
+    } finally {
+      setIsLoadingReconcile(false);
+    }
+  };
+
+  const handleFixReconciliation = async () => {
+    setIsFixingReconcile(true);
+    try {
+      const res = await apiClient.fixReconciliation(currentCollection.id);
+      toast.success(res.message);
+      const report = await apiClient.reconcileCollection(currentCollection.id);
+      setReconcileReport(report);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Đồng bộ đối soát thất bại.");
+    } finally {
+      setIsFixingReconcile(false);
+    }
+  };
+
+  const handleReindexDoc = async (docId: string) => {
+    setReindexingDocId(docId);
+    try {
+      const res = await apiClient.reindexDocument(docId);
+      if (res.index_status === "indexed") {
+        toast.success(`Lập chỉ mục thành công ${res.indexed_chunks} chunks.`);
+      } else {
+        toast.error(`Lỗi: ${res.message}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Lập chỉ mục thất bại.");
+    } finally {
+      setReindexingDocId(null);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
@@ -516,6 +572,16 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenReconcile}
+              className="h-8 text-xs gap-1.5"
+            >
+              <ShieldCheck className="size-3.5 text-primary" />
+              <span>Đối soát Kho</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -748,17 +814,67 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-[11px] ${
-                            STATUS_BADGE[doc.status]?.className || STATUS_BADGE.pending.className
-                          }`}
-                        >
-                          {STATUS_BADGE[doc.status]?.label || doc.status}
-                        </Badge>
+                        <div className="flex flex-col gap-1 items-start">
+                          <Badge
+                            variant="outline"
+                            className={`text-[11px] ${
+                              STATUS_BADGE[doc.status]?.className || STATUS_BADGE.pending.className
+                            }`}
+                          >
+                            {STATUS_BADGE[doc.status]?.label || doc.status}
+                          </Badge>
+                          {doc.status === "approved" &&
+                            (doc.index_status === "indexed" ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/30 gap-1 font-mono"
+                              >
+                                <CheckCircle2 className="size-2.5" />
+                                <span>Đã index</span>
+                              </Badge>
+                            ) : doc.index_status === "indexing" ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30 gap-1 font-mono animate-pulse"
+                              >
+                                <RefreshCw className="size-2.5 animate-spin" />
+                                <span>Đang index</span>
+                              </Badge>
+                            ) : doc.index_status === "index_failed" ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-rose-500/10 text-rose-600 border-rose-500/30 gap-1 font-mono"
+                                title={doc.index_error || "Lỗi chỉ mục vector"}
+                              >
+                                <CircleAlert className="size-2.5" />
+                                <span>Lỗi index</span>
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/30 gap-1 font-mono"
+                              >
+                                <span>Chờ index</span>
+                              </Badge>
+                            ))}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {doc.status === "approved" && doc.index_status !== "indexed" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleReindexDoc(doc.id)}
+                              disabled={reindexingDocId === doc.id}
+                              className="size-7 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                              title="Thử lại lập chỉ mục vector (Reindex)"
+                            >
+                              <Zap
+                                className={`size-3.5 ${reindexingDocId === doc.id ? "animate-spin" : ""}`}
+                              />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1451,6 +1567,148 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
                 </>
               )}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reconciliation Audit Dialog */}
+      <Dialog open={isReconcileOpen} onOpenChange={setIsReconcileOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold">
+              <ShieldCheck className="size-5 text-primary" />
+              <span>Đối Soát Kiểm Toán Dữ Liệu 4 Tầng (Reconciliation Audit)</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {isLoadingReconcile ? (
+            <div className="py-12 text-center space-y-3">
+              <RefreshCw className="size-8 animate-spin mx-auto text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Đang đối soát dữ liệu giữa PostgreSQL, Qdrant, MinIO và Redis...
+              </p>
+            </div>
+          ) : reconcileReport ? (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-foreground">Trạng thái toàn vẹn:</span>
+                  {reconcileReport.is_consistent ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 gap-1"
+                    >
+                      <CheckCircle2 className="size-3" />
+                      <span>Nhất quán 100% (Zero Ghost Vectors)</span>
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="bg-rose-500/10 text-rose-600 border-rose-500/30 gap-1"
+                    >
+                      <CircleAlert className="size-3" />
+                      <span>
+                        Phát hiện sai lệch ({reconcileReport.discrepancies.length} vấn đề)
+                      </span>
+                    </Badge>
+                  )}
+                </div>
+                <span className="font-mono text-muted-foreground">{currentCollection.code}</span>
+              </div>
+
+              {/* 4 Cards metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-lg border bg-card text-center space-y-1">
+                  <p className="text-[11px] text-muted-foreground font-medium">Tài liệu DB</p>
+                  <p className="text-lg font-bold font-mono text-foreground">
+                    {reconcileReport.db_documents_count}
+                  </p>
+                  <p className="text-[10px] text-emerald-600">
+                    {reconcileReport.indexed_documents_count} đã index
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border bg-card text-center space-y-1">
+                  <p className="text-[11px] text-muted-foreground font-medium">Chunks DB</p>
+                  <p className="text-lg font-bold font-mono text-foreground">
+                    {reconcileReport.db_chunks_count}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Đoạn văn bản</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-card text-center space-y-1">
+                  <p className="text-[11px] text-muted-foreground font-medium">Qdrant Points</p>
+                  <p className="text-lg font-bold font-mono text-primary">
+                    {reconcileReport.qdrant_points_count}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Vectors 1024-dim</p>
+                </div>
+                <div className="p-3 rounded-lg border bg-card text-center space-y-1">
+                  <p className="text-[11px] text-muted-foreground font-medium">Storage Files</p>
+                  <p className="text-lg font-bold font-mono text-foreground">
+                    {reconcileReport.storage_files_count}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Tệp vật lý S3/Local</p>
+                </div>
+              </div>
+
+              {/* Discrepancies list */}
+              {reconcileReport.discrepancies.length > 0 && (
+                <div className="space-y-2">
+                  <p className="font-semibold text-foreground text-xs">
+                    Chi tiết sai lệch phát hiện:
+                  </p>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 p-2.5 bg-rose-500/5 rounded-lg border border-rose-500/20">
+                    {reconcileReport.discrepancies.map((d, idx) => (
+                      <div
+                        key={`${d.type}-${d.document_id || idx}`}
+                        className="flex items-start gap-2 text-[11px] text-rose-600"
+                      >
+                        <CircleAlert className="size-3.5 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-mono font-medium">[{d.type}]</span>: {d.details}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-between pt-3 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setIsReconcileOpen(false)}
+            >
+              Đóng
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                disabled={isLoadingReconcile || isFixingReconcile}
+                onClick={handleOpenReconcile}
+              >
+                <RefreshCw className={`size-3.5 ${isLoadingReconcile ? "animate-spin" : ""}`} />
+                <span>Quét lại</span>
+              </Button>
+              {reconcileReport && !reconcileReport.is_consistent && (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground"
+                  disabled={isFixingReconcile}
+                  onClick={handleFixReconciliation}
+                >
+                  <Zap className={`size-3.5 ${isFixingReconcile ? "animate-spin" : ""}`} />
+                  <span>{isFixingReconcile ? "Đang đồng bộ..." : "Đồng bộ tất cả"}</span>
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -20,10 +20,11 @@ import {
   generateAssistantSpec,
   listAssistantTemplates,
 } from "@/services/assistants-api";
+import { modelopsApi } from "@/services/modelops-api";
 import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Bot, Loader2, Save, ShieldCheck, Sparkles } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 interface AssistantCreatePageProps {
@@ -37,16 +38,6 @@ const CATEGORY_OPTIONS = [
   { value: "administration", label: "Soạn thảo Văn bản NĐ 30" },
   { value: "examination", label: "Khảo thí & Đề thi Bloom" },
   { value: "general", label: "Hỗ trợ Đa năng" },
-];
-
-const STANDARD_MODELS = [
-  { value: "gpt-4o-mini", label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)" },
-  { value: "gpt-4o", label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)" },
-  { value: "gemini-1.5-flash", label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)" },
-  { value: "gemini-1.5-pro", label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)" },
-  { value: "deepseek-chat", label: "DeepSeek V3 (Thông minh & tiết kiệm)" },
-  { value: "mistral-small-latest", label: "Mistral Small (Chính xác & bảo mật)" },
-  { value: "qwen2.5-7b-instruct", label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)" },
 ];
 
 const DEFAULT_CONFIG: AssistantLifecycleConfig = {
@@ -191,6 +182,69 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
     queryKey: ["workflow-definitions"],
     queryFn: () => workflowsApi.listDefinitions(),
   });
+  const providersQuery = useQuery({
+    queryKey: ["modelops", "providers"],
+    queryFn: () => modelopsApi.getModelProviders(),
+  });
+
+  const availableModels = useMemo(() => {
+    const providers = providersQuery.data ?? [];
+    const list: { value: string; label: string; providerName: string }[] = [];
+    const seen = new Set<string>();
+    for (const prov of providers) {
+      if (!prov.is_active) continue;
+      for (const m of prov.models ?? []) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          list.push({
+            value: m,
+            label: `${m} (${prov.name})`,
+            providerName: prov.name,
+          });
+        }
+      }
+    }
+    if (list.length === 0) {
+      return [
+        {
+          value: "gpt-4o-mini",
+          label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)",
+          providerName: "OpenAI",
+        },
+        {
+          value: "gpt-4o",
+          label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)",
+          providerName: "OpenAI",
+        },
+        {
+          value: "gemini-1.5-flash",
+          label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)",
+          providerName: "Google",
+        },
+        {
+          value: "gemini-1.5-pro",
+          label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)",
+          providerName: "Google",
+        },
+        {
+          value: "deepseek-chat",
+          label: "DeepSeek V3 (Thông minh & tiết kiệm)",
+          providerName: "DeepSeek",
+        },
+        {
+          value: "mistral-small-latest",
+          label: "Mistral Small (Chính xác & bảo mật)",
+          providerName: "Mistral",
+        },
+        {
+          value: "qwen2.5-7b-instruct",
+          label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)",
+          providerName: "vLLM",
+        },
+      ];
+    }
+    return list;
+  }, [providersQuery.data]);
   const createMutation = useMutation({
     mutationFn: createAssistant,
     onSuccess: (assistant) => {
@@ -603,7 +657,7 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
                   <SelectValue placeholder="Chọn mô hình chính" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STANDARD_MODELS.map((m) => (
+                  {availableModels.map((m) => (
                     <SelectItem key={m.value} value={m.value}>
                       {m.label}
                     </SelectItem>
@@ -629,7 +683,7 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
                   <SelectValue placeholder="Chọn mô hình dự phòng" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STANDARD_MODELS.map((m) => (
+                  {availableModels.map((m) => (
                     <SelectItem key={m.value} value={m.value}>
                       {m.label}
                     </SelectItem>

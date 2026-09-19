@@ -270,3 +270,84 @@ async def test_chat_stream_sse_endpoint():
     assert "event: done" in content
     assert "24.50" in content
 
+
+@pytest.mark.asyncio
+async def test_chat_with_attachments_and_conversation_recording():
+    """Verify chat incorporates attachments into workflow input and records thread messages."""
+    mock_db = AsyncMock()
+    found_result = MagicMock()
+    found_result.scalar_one_or_none.return_value = _assistant_record()
+    mock_db.execute.return_value = found_result
+
+    workflow_response = WorkflowExecuteResponse(
+        execution_id="run-attach-1",
+        workflow_id="admissions-assistant",
+        status="completed",
+        outputs={"answer": "Nội dung tệp đính kèm đã được phân tích.", "citations": []},
+        latency_ms=20.0,
+    )
+
+    with (
+        patch("app.modules.assistants.service.workflow_service.execute", new=AsyncMock(return_value=workflow_response)) as mock_wf,
+        patch("app.modules.conversations.service.conversation_service.record_message", new=AsyncMock()) as mock_rec,
+    ):
+        req = AssistantChatRequest(
+            message="Xem tệp này giúp tôi",
+            conversation_id="conv_custom_123",
+            attachments=[
+                {"name": "bang_diem.pdf", "text_content": "Điểm Toán: 9.0, Tin học: 9.5"}
+            ],
+        )
+        res = await assistant_service.chat(mock_db, "admissions", req)
+
+    assert res.conversation_id == "conv_custom_123"
+    assert res.answer == "Nội dung tệp đính kèm đã được phân tích."
+
+    # Check workflow input received attachment content
+    wf_req = mock_wf.await_args.args[1]
+    msg_input = wf_req.inputs["message"]
+    assert "bang_diem.pdf" in msg_input
+    assert "Điểm Toán: 9.0" in msg_input
+    assert "Xem tệp này giúp tôi" in msg_input
+
+    # Check conversation recording was called for both user and assistant
+    assert mock_rec.await_count == 2
+    user_call = mock_rec.await_args_list[0].args[1]
+    asst_call = mock_rec.await_args_list[1].args[1]
+    assert user_call.sender == "user"
+    assert user_call.thread_id == "conv_custom_123"
+    assert asst_call.sender == "assistant"
+    assert asst_call.text == "Nội dung tệp đính kèm đã được phân tích."
+
+
+@pytest.mark.asyncio
+async def test_chat_records_primary_model_from_config():
+    """Verify usage tracking logs config.model_policy.primary_model instead of non-existent attribute."""
+    mock_db = AsyncMock()
+    found_result = MagicMock()
+    record = _assistant_record()
+    # Explicitly set primary_model in config
+    record.config["model_policy"]["primary_model"] = "qwen2.5-7b-instruct"
+    found_result.scalar_one_or_none.return_value = record
+    mock_db.execute.return_value = found_result
+
+    workflow_response = WorkflowExecuteResponse(
+        execution_id="run-model-1",
+        workflow_id="admissions-assistant",
+        status="completed",
+        outputs={"answer": "Phản hồi thử nghiệm.", "citations": []},
+        latency_ms=15.0,
+    )
+
+    with (
+        patch("app.modules.assistants.service.workflow_service.execute", new=AsyncMock(return_value=workflow_response)),
+        patch("app.modules.modelops.service.modelops_service.record_usage_log", new=AsyncMock()) as mock_usage,
+    ):
+        await assistant_service.chat(
+            mock_db, "admissions", AssistantChatRequest(message="Chào bạn")
+        )
+
+    assert mock_usage.await_count == 1
+    usage_kwargs = mock_usage.await_args.kwargs
+    assert usage_kwargs["model_name"] == "qwen2.5-7b-instruct"
+

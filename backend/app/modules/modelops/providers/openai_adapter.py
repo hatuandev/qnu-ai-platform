@@ -75,8 +75,8 @@ class OpenAIAdapter(BaseLLMAdapter):
                 else:
                     lines = [line.strip() for line in best_chunk.split("\n") if line.strip()]
                     relevant_lines = [
-                        l for l in lines
-                        if len(target_words.intersection(set(re.findall(r"\b\w{2,}\b", l.lower())))) >= 1
+                        ln for ln in lines
+                        if len(target_words.intersection(set(re.findall(r"\b\w{2,}\b", ln.lower())))) >= 1
                     ]
                     if not relevant_lines:
                         relevant_lines = lines[:15]

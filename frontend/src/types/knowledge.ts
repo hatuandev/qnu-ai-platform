@@ -24,6 +24,8 @@ export interface KnowledgeDocument {
   page_count: number;
   chunk_count: number;
   status: "completed" | "processing" | "pending" | "failed" | "approved" | "archived";
+  index_status?: "pending" | "indexing" | "indexed" | "index_failed";
+  index_error?: string | null;
   ocr_method: string;
   document_type?: string;
   document_type_code?: string;
@@ -153,5 +155,39 @@ export interface FactExcelImportResponse {
   collection_id: string;
   imported_count: number;
   document_id: string;
+  message: string;
+}
+
+export interface ReindexDocumentResponse {
+  document_id: string;
+  status: string;
+  index_status: "indexed" | "index_failed" | "indexing";
+  indexed_chunks: number;
+  message: string;
+}
+
+export interface KnowledgeReconciliationDiscrepancy {
+  type: string;
+  document_id?: string | null;
+  details: string;
+}
+
+export interface KnowledgeReconciliationReport {
+  collection_id: string;
+  db_documents_count: number;
+  indexed_documents_count: number;
+  failed_documents_count: number;
+  db_chunks_count: number;
+  qdrant_points_count: number;
+  storage_files_count: number;
+  is_consistent: boolean;
+  discrepancies: KnowledgeReconciliationDiscrepancy[];
+}
+
+export interface ReconcileFixResponse {
+  collection_id: string;
+  reindexed_documents: string[];
+  failed_documents: string[];
+  total_reindexed_chunks: number;
   message: string;
 }

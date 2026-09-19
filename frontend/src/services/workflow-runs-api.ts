@@ -1,4 +1,5 @@
 import type {
+  WorkflowApproval,
   WorkflowExecuteRequest,
   WorkflowExecuteResponse,
   WorkflowRun,
@@ -65,6 +66,33 @@ export const workflowRunsApi = {
     });
     if (!res.ok) {
       throw new Error(`Thực thi workflow thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as WorkflowExecuteResponse;
+  },
+
+  async getPendingApprovals(): Promise<WorkflowApproval[]> {
+    const res = await fetch(`${BASE_URL}/workflows/approvals`);
+    if (!res.ok) {
+      throw new Error(`Không tải được danh sách phê duyệt (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as WorkflowApproval[];
+  },
+
+  async decideApproval(
+    executionId: string,
+    approvalId: string,
+    payload: { approved: boolean; decided_by: string; decision_reason?: string }
+  ): Promise<WorkflowExecuteResponse> {
+    const res = await fetch(
+      `${BASE_URL}/workflows/executions/${executionId}/approvals/${approvalId}/decision`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (!res.ok) {
+      throw new Error(`Xử lý phê duyệt thất bại (HTTP ${res.status}).`);
     }
     return (await res.json()) as WorkflowExecuteResponse;
   },

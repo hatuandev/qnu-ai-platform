@@ -224,6 +224,7 @@ class AssistantChatRequest(BaseModel):
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
     stream: bool = False
     is_approved: bool = False
+    attachments: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AssistantChatResponse(BaseModel):
@@ -236,6 +237,7 @@ class AssistantChatResponse(BaseModel):
     latency_ms: float = 0.0
     execution_id: str | None = None
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    conversation_id: str | None = None
 
 
 class AssistantGenerateRequest(BaseModel):

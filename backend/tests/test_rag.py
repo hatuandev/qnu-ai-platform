@@ -365,3 +365,48 @@ async def test_rag_ask_dynamic_fallback_model():
     # ModelOps was called twice: 1st for primary (failed), 2nd for fallback (succeeded)
     assert mock_gen.await_count == 2
 
+
+@pytest.mark.asyncio
+async def test_fact_layer_filters_by_document_approval_lifecycle():
+    """Verify FactLayer constructs query with KnowledgeDocument outerjoin and lifecycle filters."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeFact
+    from app.modules.rag.facts import FactLayer
+
+    layer = FactLayer()
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+
+    fake_fact = KnowledgeFact(
+        id="fct_test",
+        collection_id="col_admissions",
+        document_id="doc_approved_1",
+        entity_name="Công nghệ thông tin",
+        entity_type="major",
+        attribute_name="điểm chuẩn",
+        attribute_value="24.5",
+        confidence=1.0,
+    )
+    mock_res.scalars.return_value.all.return_value = [fake_fact]
+    mock_db.execute.return_value = mock_res
+
+    results = await layer.lookup_facts(
+        db=mock_db,
+        collection_id="col_admissions",
+        keywords=["Công nghệ thông tin"],
+    )
+
+    assert len(results) == 1
+    assert results[0].entity_name == "Công nghệ thông tin"
+
+    assert mock_db.execute.called
+    called_query = mock_db.execute.call_args[0][0]
+    compiled_sql = str(called_query.compile())
+
+    # Verify KnowledgeDocument outerjoin and status filters exist in compiled SQL
+    assert "knowledge_documents" in compiled_sql
+    assert "knowledge_facts.document_id = knowledge_documents.id" in compiled_sql
+    assert "knowledge_documents.is_active" in compiled_sql
+
+

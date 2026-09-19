@@ -553,7 +553,6 @@ class ModelOpsService:
                             "failure_rate": 0.0,
                             "is_active": c.is_active,
                             "api_base_url": c.api_base_url,
-                            "api_key": c.api_key_encrypted,
                             "api_key_masked": masked_key,
                             "account_id": extra.get("account_id"),
                             "timeout_seconds": c.timeout_seconds,

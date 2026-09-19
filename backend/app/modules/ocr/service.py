@@ -350,7 +350,7 @@ class OCRService:
 
                     p_info = pages_dict.get(pnum)
                     page_md = p_info["extracted_text"] if p_info else ""
-                    lines = [l.strip() for l in page_md.splitlines() if l.strip() and not l.strip().startswith("|")]
+                    lines = [ln.strip() for ln in page_md.splitlines() if ln.strip() and not ln.strip().startswith("|")]
                     title = lines[0] if lines else f"Trang {pnum}"
 
                     cv_regions = smart_layout_detector.detect_layout_regions(
@@ -404,7 +404,7 @@ class OCRService:
 
                 p_info = pages_dict.get(pnum)
                 page_md = p_info["extracted_text"] if p_info else ocr_res.get("raw_text", "")
-                lines = [l.strip() for l in page_md.splitlines() if l.strip() and not l.strip().startswith("|")]
+                lines = [ln.strip() for ln in page_md.splitlines() if ln.strip() and not ln.strip().startswith("|")]
                 title = lines[0] if lines else f"Trang {pnum}"
 
                 img_url = f"/api/v1/ocr/studio/page-image/{file_hash}/{img_filename}"

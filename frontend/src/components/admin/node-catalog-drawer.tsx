@@ -25,9 +25,11 @@ export interface NodeCatalogItem {
   label: string;
   description: string;
   defaultConfigSummary: string;
+  defaultConfig?: Record<string, unknown>;
   timeoutSeconds: number;
   status?: string;
   version?: string;
+  manifest?: NodeManifest;
 }
 
 function toCatalogCategory(cat: string): NodeCatalogItem["category"] {
@@ -51,6 +53,21 @@ function summarizeConfigSchema(configSchema: Record<string, unknown> | undefined
   return keys.length > 0 ? keys.join(", ") : "Mặc định chuẩn";
 }
 
+function extractDefaultConfig(
+  configSchema: Record<string, unknown> | undefined
+): Record<string, unknown> {
+  if (!configSchema || typeof configSchema !== "object") return {};
+  const props = configSchema.properties as Record<string, Record<string, unknown>> | undefined;
+  if (!props || typeof props !== "object") return {};
+  const defaults: Record<string, unknown> = {};
+  for (const [key, propSpec] of Object.entries(props)) {
+    if (propSpec && typeof propSpec === "object" && "default" in propSpec) {
+      defaults[key] = propSpec.default;
+    }
+  }
+  return defaults;
+}
+
 export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
   {
     type: "input.chat",
@@ -59,6 +76,7 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     description:
       "Tiếp nhận và tiền xử lý câu hỏi từ người dùng (loại bỏ ký tự đặc biệt, trim, kiểm tra độ dài).",
     defaultConfigSummary: "trim: true, max_length: 10000",
+    defaultConfig: { trim: true, max_length: 10000 },
     timeoutSeconds: 2,
     status: "active",
     version: "1.0.0",
@@ -69,7 +87,13 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     label: "Rẽ Nhánh Điều Kiện (Intent Route)",
     description:
       "Phân loại ý định hội thoại (intent matching / regex keyword) để chuyển tiếp tới nhánh RAG, Tool hoặc Chào hỏi.",
-    defaultConfigSummary: "rules: intent(greeting) -> greet, intent(query) -> rag",
+    defaultConfigSummary: "rules: greeting -> greeting_output",
+    defaultConfig: {
+      rules: [
+        { id: "greeting_rule", match: { intent: "xin chào|hello|chào" }, to: "greeting_output" },
+      ],
+      default_node: "knowledge_answer",
+    },
     timeoutSeconds: 5,
     status: "active",
     version: "1.0.0",
@@ -80,18 +104,28 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     label: "Truy Xuất Tri Thức (Hybrid RAG)",
     description:
       "Truy vấn Qdrant Dense Vector 1024D kết hợp PostgreSQL FTS Lexical Search và thuật toán RRF k=60.",
-    defaultConfigSummary: "collection_id: col_admissions, top_k: 8, rrf_k: 60",
+    defaultConfigSummary: "module_code: admissions, profile: rag_fast",
+    defaultConfig: {
+      module_code: "admissions",
+      profile: "rag_fast",
+      require_citations: true,
+      retrieval_limit: 10,
+    },
     timeoutSeconds: 30,
     status: "active",
     version: "1.0.0",
   },
   {
-    type: "core.llm.generate",
+    type: "core.drafting.compose",
     category: "llm",
-    label: "Mô Hình Ngôn Ngữ Lớn (LLM Core)",
+    label: "Soạn Thảo Văn Bản LLM (Drafting)",
     description:
-      "Tổng hợp dữ liệu và sinh văn bản câu trả lời với các mô hình GPT-4o, Gemini Flash hoặc Qwen2.5.",
-    defaultConfigSummary: "provider: openai, model: gpt-4o-mini, temperature: 0.2",
+      "Tổng hợp dữ liệu và soạn thảo văn bản hành chính theo Nghị định 30/2020/NĐ-CP hoặc ngân hàng câu hỏi.",
+    defaultConfigSummary: "module_code: drafting, document_type: quyet_dinh",
+    defaultConfig: {
+      module_code: "drafting",
+      document_type: "quyet_dinh",
+    },
     timeoutSeconds: 45,
     status: "active",
     version: "1.0.0",
@@ -102,18 +136,27 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     label: "Gọi Công Cụ Ngoại Vi (API Caller)",
     description:
       "Truy vấn dữ liệu thời gian thực từ Cổng UIS Đào tạo, Trích xuất biểu mẫu Word NĐ 30, Excel Bloom.",
-    defaultConfigSummary: "tool_id: uis_admissions_query, method: POST",
+    defaultConfigSummary: "tool_id: uis_admissions_query, method: GET",
+    defaultConfig: {
+      tool_id: "uis_admissions_query",
+      http_method: "GET",
+      timeout_seconds: 15,
+    },
     timeoutSeconds: 15,
     status: "active",
     version: "1.0.0",
   },
   {
-    type: "guard.citation",
+    type: "guard.citation_policy",
     category: "guard",
     label: "Kiểm Định Trích Dẫn (Citation Guard)",
     description:
       "Đối soát câu trả lời với tài liệu gốc của ĐH Quy Nhơn, chống bịa đặt (Anti-Hallucination) và No-Answer Policy.",
-    defaultConfigSummary: "groundedness_threshold: 0.85, pii_mask: true",
+    defaultConfigSummary: "require_citation_for_answer: true",
+    defaultConfig: {
+      require_citation_for_answer: true,
+      invalid_route: "ungrounded",
+    },
     timeoutSeconds: 10,
     status: "active",
     version: "1.0.0",
@@ -124,8 +167,28 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     label: "Phê Duyệt Nhân Sự (Human Checkpoint)",
     description:
       "Điểm dừng chờ cán bộ chuyên trách duyệt trước khi xuất văn bản chính thức hoặc cấp phát tài liệu mật.",
-    defaultConfigSummary: "role: admin, required_approval: true",
+    defaultConfigSummary: "required_permission: run.resume, separation: true",
+    defaultConfig: {
+      required_permission: "run.resume",
+      separation_of_duties: true,
+      wait_timeout_seconds: 86400,
+    },
     timeoutSeconds: 86400,
+    status: "active",
+    version: "1.0.0",
+  },
+  {
+    type: "artifact.export",
+    category: "tool",
+    label: "Kết Xuất Tệp Tài Liệu (Artifact Export)",
+    description:
+      "Đóng gói và kết xuất văn bản kết quả thành các định dạng tệp tải về như DOCX, PDF, XLSX.",
+    defaultConfigSummary: "format: docx, filename_template: qnu-{run_id}.docx",
+    defaultConfig: {
+      format: "docx",
+      filename_template: "qnu-van-ban-{run_id}.docx",
+    },
+    timeoutSeconds: 30,
     status: "active",
     version: "1.0.0",
   },
@@ -135,7 +198,26 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     label: "Đầu Ra Trò Chuyện (Chat Output)",
     description:
       "Định dạng câu trả lời chuẩn Markdown, gắn thẻ bảng biểu, checklist và trích dẫn Điều/Khoản gốc.",
-    defaultConfigSummary: "format: markdown, stream: true",
+    defaultConfigSummary: "format: markdown, include_citations: true",
+    defaultConfig: {
+      format: "markdown",
+      include_citations: true,
+    },
+    timeoutSeconds: 5,
+    status: "active",
+    version: "1.0.0",
+  },
+  {
+    type: "output.no_answer",
+    category: "output",
+    label: "Phản Hồi Từ Chối (No Answer)",
+    description:
+      "Thông báo chính sách No-Answer khi thiếu căn cứ tài liệu và điều hướng tới hotline/phòng ban phụ trách.",
+    defaultConfigSummary: "status: insufficient_context",
+    defaultConfig: {
+      status: "insufficient_context",
+      message: "Thông tin này hiện chưa có trong văn bản chính thức của Trường Đại học Quy Nhơn.",
+    },
     timeoutSeconds: 5,
     status: "active",
     version: "1.0.0",
@@ -170,9 +252,11 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
         label: m.display_name || m.type,
         description: m.description || "",
         defaultConfigSummary: summarizeConfigSchema(m.config_schema),
+        defaultConfig: extractDefaultConfig(m.config_schema),
         timeoutSeconds: 30,
         status: m.status,
         version: m.version,
+        manifest: m,
       }));
     }
     return CATALOG_NODE_ITEMS;

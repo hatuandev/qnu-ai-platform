@@ -4,12 +4,37 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 
+from app.modules.node_catalog.models import NodeManifestRecord
+from app.modules.node_catalog.service import node_catalog_service
 from app.modules.workflows.registry import node_registry
 from app.modules.workflows.schemas import (
     WorkflowDagSpec,
+    WorkflowNodeSpec,
     WorkflowValidationIssue,
     WorkflowValidationReport,
 )
+
+_CANONICAL_TYPE_ALIASES: dict[str, str] = {
+    "chat_input": "input.chat",
+    "router": "condition.route",
+    "knowledge_answer": "core.knowledge.answer",
+    "rag.answer": "core.knowledge.answer",
+    "rag.knowledge": "core.knowledge.answer",
+    "rag.retrieval": "core.knowledge.answer",
+    "llm.generate": "core.drafting.compose",
+    "modelops.generate": "core.drafting.compose",
+    "drafting.generate": "core.drafting.compose",
+    "question_bank.generate": "core.drafting.compose",
+    "export.artifact": "artifact.export",
+    "document.docx_export": "artifact.export",
+    "chat_output": "output.chat",
+    "tool.human_approval": "human.approval",
+    "api_caller": "tool.api_caller",
+    "guard.citation": "guard.citation_policy",
+    "citation_guard": "guard.citation_policy",
+    "no_answer_output": "output.no_answer",
+    "extract_fields": "extract.fields",
+}
 
 _TERMINAL_NODE_TYPES = frozenset(
     {
@@ -99,16 +124,167 @@ class WorkflowCompiler:
                 )
             )
 
+        manifests = node_catalog_service.get_manifests_map()
+
         for node in dag_spec.nodes:
-            if node_registry.get(node.type):
-                continue
-            issues.append(
-                WorkflowValidationIssue(
-                    code="workflow_node_type_unsupported",
-                    message=f"Node '{node.id}' dùng loại chưa được runtime hỗ trợ: '{node.type}'.",
-                    node_id=node.id,
+            if not node_registry.get(node.type):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_type_unsupported",
+                        message=f"Node '{node.id}' dùng loại chưa được runtime hỗ trợ: '{node.type}'.",
+                        node_id=node.id,
+                    )
                 )
-            )
+                continue
+
+            canonical_type = _CANONICAL_TYPE_ALIASES.get(node.type, node.type)
+            manifest = manifests.get(canonical_type) or manifests.get(node.type)
+            if not manifest:
+                continue
+
+            if manifest.status in ("deprecated", "obsolete"):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_deprecated",
+                        severity="warning",
+                        message=f"Node '{node.id}' dùng loại '{node.type}' đã lỗi thời (deprecated). Khuyến nghị nâng cấp.",
+                        node_id=node.id,
+                    )
+                )
+            elif manifest.status == "inactive":
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_inactive",
+                        severity="error",
+                        message=f"Node '{node.id}' dùng loại '{node.type}' đang ở trạng thái không hoạt động (inactive).",
+                        node_id=node.id,
+                    )
+                )
+
+            self._validate_node_config_schema(node, manifest, issues)
+
+    @staticmethod
+    def _validate_node_config_schema(
+        node: WorkflowNodeSpec,
+        manifest: NodeManifestRecord,
+        issues: list[WorkflowValidationIssue],
+    ) -> None:
+        config = node.config or {}
+        config_schema = manifest.config_schema or {}
+        required_fields = config_schema.get("required", [])
+
+        for req_field in required_fields:
+            if req_field == "tool_id" and ("tool_id" in config or "tool_name" in config):
+                val = config.get("tool_id") or config.get("tool_name")
+                if val and str(val).strip():
+                    continue
+
+            val = config.get(req_field)
+            if val is None or (isinstance(val, (str, list, dict)) and len(val) == 0):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_required_missing",
+                        severity="error",
+                        message=f"Node '{node.id}' ({node.type}) thiếu trường cấu hình bắt buộc: '{req_field}'.",
+                        node_id=node.id,
+                    )
+                )
+
+        properties = config_schema.get("properties", {})
+        for field_name, field_val in config.items():
+            if field_name not in properties or field_val is None:
+                continue
+            prop_spec = properties[field_name]
+            prop_type = prop_spec.get("type")
+
+            if prop_type == "string" and not isinstance(field_val, str):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là chuỗi (string).",
+                        node_id=node.id,
+                    )
+                )
+            elif prop_type == "integer" and (
+                not isinstance(field_val, int) or isinstance(field_val, bool)
+            ):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là số nguyên (integer).",
+                        node_id=node.id,
+                    )
+                )
+            elif prop_type == "number" and (
+                not isinstance(field_val, (int, float)) or isinstance(field_val, bool)
+            ):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là số (number).",
+                        node_id=node.id,
+                    )
+                )
+            elif prop_type == "boolean" and not isinstance(field_val, bool):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là boolean.",
+                        node_id=node.id,
+                    )
+                )
+            elif prop_type == "array" and not isinstance(field_val, list):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là danh sách (array).",
+                        node_id=node.id,
+                    )
+                )
+            elif prop_type == "object" and not isinstance(field_val, dict):
+                issues.append(
+                    WorkflowValidationIssue(
+                        code="workflow_node_config_type_mismatch",
+                        severity="error",
+                        message=f"Trường '{field_name}' của node '{node.id}' phải là đối tượng (object).",
+                        node_id=node.id,
+                    )
+                )
+
+            if "enum" in prop_spec:
+                allowed = prop_spec["enum"]
+                if isinstance(field_val, str) and "," in field_val:
+                    parts = [p.strip() for p in field_val.split(",") if p.strip()]
+                    invalid_parts = [p for p in parts if p not in allowed]
+                    if invalid_parts:
+                        issues.append(
+                            WorkflowValidationIssue(
+                                code="workflow_node_config_enum_invalid",
+                                severity="error",
+                                message=(
+                                    f"Giá trị '{field_val}' của trường '{field_name}' (node '{node.id}') "
+                                    f"chứa phần tử không hợp lệ: {invalid_parts}. Danh sách cho phép: {allowed}."
+                                ),
+                                node_id=node.id,
+                            )
+                        )
+                elif field_val not in allowed:
+                    issues.append(
+                        WorkflowValidationIssue(
+                            code="workflow_node_config_enum_invalid",
+                            severity="error",
+                            message=(
+                                f"Giá trị '{field_val}' của trường '{field_name}' (node '{node.id}') "
+                                f"không hợp lệ. Danh sách cho phép: {allowed}."
+                            ),
+                            node_id=node.id,
+                        )
+                    )
 
     @staticmethod
     def _validate_edges(

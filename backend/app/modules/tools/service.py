@@ -92,7 +92,9 @@ class ToolService:
             if asyncio.iscoroutine(assistant_rec):
                 assistant_rec = await assistant_rec
 
-            if isinstance(assistant_rec, AssistantModel):
+            if assistant_rec is not None and (
+                isinstance(assistant_rec, AssistantModel) or hasattr(assistant_rec, "config")
+            ):
                 config_data = assistant_rec.config or {}
                 tools_config = (
                     config_data.get("tools")
@@ -176,3 +178,7 @@ class ToolService:
             latency_ms=latency_ms,
             error_message=error_message,
         )
+
+
+tool_service = ToolService()
+

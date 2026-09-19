@@ -26,6 +26,7 @@ from app.modules.assistants.schemas import (
 from app.modules.assistants.service import assistant_service
 
 router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU"])
+chat_router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU - Chat Runtime"])
 
 
 @router.get("/templates", response_model=list[AssistantTemplateResponse])
@@ -98,7 +99,7 @@ async def export_assistant_bundle(
     return await assistant_service.export_bundle(db, reference)
 
 
-@router.post("/{reference}/chat")
+@chat_router.post("/{reference}/chat")
 async def chat_with_assistant(
     reference: str,
     body: AssistantChatRequest,

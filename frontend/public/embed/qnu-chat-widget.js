@@ -1,23 +1,29 @@
 /**
  * QNU AI Platform — Standalone Web Chat Widget
  * Trường Đại học Quy Nhơn (QNU)
- * 
+ *
  * Mã nhúng độc lập dành cho Cổng thông tin (qnu.edu.vn, tuyensinh.qnu.edu.vn, daotao.qnu.edu.vn)
  * Nhúng với 1 dòng script:
  * <script src="https://ai.qnu.edu.vn/embed/qnu-chat-widget.js" data-assistant="ast_admissions" defer></script>
  */
 
-(function () {
+(() => {
   if (window.__QNU_CHAT_WIDGET_LOADED__) return;
   window.__QNU_CHAT_WIDGET_LOADED__ = true;
 
   // Lấy cấu hình từ thẻ script
-  const scriptTag = document.currentScript || document.querySelector('script[src*="qnu-chat-widget"]');
+  const scriptTag =
+    document.currentScript || document.querySelector('script[src*="qnu-chat-widget"]');
   const ASSISTANT_ID = scriptTag?.getAttribute("data-assistant") || "ast_admissions";
   const WIDGET_TITLE = scriptTag?.getAttribute("data-title") || "Trợ lý AI ĐH Quy Nhơn";
-  const WELCOME_MSG = scriptTag?.getAttribute("data-welcome") || "Xin chào! Tôi là Trợ lý AI của Trường Đại học Quy Nhơn. Tôi có thể hỗ trợ gì cho bạn hôm nay?";
+  const WELCOME_MSG =
+    scriptTag?.getAttribute("data-welcome") ||
+    "Xin chào! Tôi là Trợ lý AI của Trường Đại học Quy Nhơn. Tôi có thể hỗ trợ gì cho bạn hôm nay?";
   const POSITION = scriptTag?.getAttribute("data-position") || "bottom-right";
-  const API_BASE = scriptTag?.getAttribute("data-api-base") || window.location.origin;
+  const API_BASE = (scriptTag?.getAttribute("data-api-base") || window.location.origin).replace(
+    /\/+$/,
+    ""
+  );
 
   // Khởi tạo container
   const container = document.createElement("div");
@@ -311,11 +317,11 @@
     btnSend.disabled = true;
 
     try {
-      const streamUrl = `${API_BASE}/platform/v1alpha1/assistants/${ASSISTANT_ID}/chat_stream`;
+      const streamUrl = `${API_BASE}/platform/v1alpha1/assistants/${ASSISTANT_ID}/chat`;
       const response = await fetch(streamUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question }),
+        body: JSON.stringify({ message: question, stream: true }),
       });
 
       if (!response.ok) {
@@ -342,6 +348,9 @@
                 fullAnswer += data.delta;
                 botMsgEl.textContent = fullAnswer;
                 boxMessages.scrollTop = boxMessages.scrollHeight;
+              } else if (data.error) {
+                botMsgEl.textContent = data.error;
+                boxMessages.scrollTop = boxMessages.scrollHeight;
               }
             } catch {
               // ignore parse errors
@@ -363,7 +372,7 @@
   }
 
   btnSend.addEventListener("click", handleSend);
-  inputMsg.addEventListener("keydown", function (e) {
+  inputMsg.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();

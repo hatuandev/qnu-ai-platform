@@ -28,3 +28,16 @@ export interface WorkflowExecuteResponse {
   latency_ms: number;
   error_message?: string | null;
 }
+
+export interface WorkflowApproval {
+  id: string;
+  execution_id: string;
+  checkpoint_id: string;
+  node_id: string;
+  description?: string | null;
+  status: "pending" | "approved" | "rejected";
+  decided_by?: string | null;
+  decision_reason?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+}

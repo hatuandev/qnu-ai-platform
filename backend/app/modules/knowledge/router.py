@@ -18,7 +18,10 @@ from app.modules.knowledge.schemas import (
     DocumentResponse,
     FactExcelImportResponse,
     FactListResponse,
+    KnowledgeReconciliationResponse,
     ParsePreviewResponse,
+    ReconcileFixResponse,
+    ReindexDocumentResponse,
     StudioViewResponse,
 )
 from app.modules.knowledge.service import knowledge_service
@@ -375,4 +378,43 @@ async def get_collection_facts(
         limit=limit,
         offset=offset,
     )
+
+
+@router.post(
+    "/documents/{document_id}/reindex",
+    response_model=ReindexDocumentResponse,
+    summary="Lập chỉ mục lại Vector cho một Tài liệu",
+)
+async def reindex_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ReindexDocumentResponse:
+    res = await knowledge_service.reindex_document(db, document_id)
+    return ReindexDocumentResponse(**res)
+
+
+@router.get(
+    "/collections/{collection_id}/reconcile",
+    response_model=KnowledgeReconciliationResponse,
+    summary="Đối soát Kiểm toán Dữ liệu 4 Tầng (DB, Qdrant, Storage, Cache)",
+)
+async def reconcile_collection(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeReconciliationResponse:
+    res = await knowledge_service.reconcile_collection(db, collection_id)
+    return KnowledgeReconciliationResponse(**res)
+
+
+@router.post(
+    "/collections/{collection_id}/reconcile-fix",
+    response_model=ReconcileFixResponse,
+    summary="Tự động đồng bộ phục hồi các vector thiếu trong Kho Tri Thức",
+)
+async def reconcile_fix_collection(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ReconcileFixResponse:
+    res = await knowledge_service.reconcile_fix_collection(db, collection_id)
+    return ReconcileFixResponse(**res)
 

@@ -51,7 +51,7 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=settings.ENVIRONMENT not in ("development", "test"),
     )
     return AuthStatusResponse(
         authenticated=True,

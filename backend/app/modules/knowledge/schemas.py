@@ -88,6 +88,8 @@ class DocumentResponse(BaseModel):
     file_hash: str
     version: int
     status: str
+    index_status: str = "pending"
+    index_error: str | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -111,6 +113,7 @@ class ApproveDocumentRequest(BaseModel):
 class ApproveDocumentResponse(BaseModel):
     document_id: str
     status: str
+    index_status: str = "indexed"
     total_chunks: int
     indexed_chunks: int
 
@@ -213,5 +216,42 @@ class FactExcelImportResponse(BaseModel):
     collection_id: str
     imported_count: int
     document_id: str
+    message: str
+
+
+# ==============================================================================
+# 4. Reindex & Reconciliation Schemas
+# ==============================================================================
+class ReindexDocumentResponse(BaseModel):
+    document_id: str
+    status: str
+    index_status: str
+    indexed_chunks: int
+    message: str
+
+
+class KnowledgeReconciliationDiscrepancy(BaseModel):
+    type: str  # missing_qdrant_vector, orphan_qdrant_point, missing_storage_file
+    document_id: str | None = None
+    details: str
+
+
+class KnowledgeReconciliationResponse(BaseModel):
+    collection_id: str
+    db_documents_count: int
+    indexed_documents_count: int
+    failed_documents_count: int
+    db_chunks_count: int
+    qdrant_points_count: int
+    storage_files_count: int
+    is_consistent: bool
+    discrepancies: list[KnowledgeReconciliationDiscrepancy] = Field(default_factory=list)
+
+
+class ReconcileFixResponse(BaseModel):
+    collection_id: str
+    reindexed_documents: list[str] = Field(default_factory=list)
+    failed_documents: list[str] = Field(default_factory=list)
+    total_reindexed_chunks: int = 0
     message: str
 

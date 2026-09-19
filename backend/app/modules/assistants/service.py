@@ -10,6 +10,7 @@ import unicodedata
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +52,43 @@ def _clean_text(value: str | None) -> str | None:
     if value is None:
         return None
     return unicodedata.normalize("NFC", value.strip())
+
+
+def _extract_primary_model(assistant: Any) -> str:
+    config = getattr(assistant, "config", None)
+    if not config:
+        return "gpt-4o-mini"
+    if hasattr(config, "model_policy"):
+        mp = config.model_policy
+        if hasattr(mp, "primary_model"):
+            return mp.primary_model or "gpt-4o-mini"
+        if isinstance(mp, dict):
+            return mp.get("primary_model") or "gpt-4o-mini"
+    elif isinstance(config, dict):
+        mp = config.get("model_policy", {})
+        if isinstance(mp, dict):
+            return mp.get("primary_model") or "gpt-4o-mini"
+        if hasattr(mp, "primary_model"):
+            return mp.primary_model or "gpt-4o-mini"
+    return "gpt-4o-mini"
+
+
+def _format_message_with_attachments(message: str, attachments: list[dict[str, Any]]) -> str:
+    if not attachments:
+        return message
+    snippets: list[str] = []
+    for att in attachments:
+        t_name = att.get("name") or "tài liệu"
+        t_text = (att.get("text_content") or att.get("raw_text") or "").strip()
+        if t_text:
+            snippets.append(f"--- Tệp '{t_name}' ---\n{t_text[:4000]}")
+    if snippets:
+        return (
+            "[NỘI DUNG TÀI LIỆU ĐÍNH KÈM TỪ NGƯỜI DÙNG]:\n"
+            + "\n\n".join(snippets)
+            + f"\n\n[CÂU HỎI CỦA NGƯỜI DÙNG]:\n{message}"
+        )
+    return message
 
 
 def _to_response(record: AssistantModel) -> AssistantResponse:
@@ -262,8 +300,31 @@ class AssistantService:
                 status_code=409,
                 details={"assistant_code": assistant.code},
             )
+
+        conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
+
+        # Record user question in persistent conversation thread
+        try:
+            from app.modules.conversations.schemas import ConversationCreateMessageRequest
+            from app.modules.conversations.service import conversation_service
+
+            await conversation_service.record_message(
+                db,
+                ConversationCreateMessageRequest(
+                    thread_id=conversation_id,
+                    assistant_code=assistant.code,
+                    assistant_name=assistant.name,
+                    sender="user",
+                    text=request.message,
+                    user_name="Thí sinh / Sinh viên",
+                ),
+            )
+        except Exception as conv_user_err:
+            logger.warning("failed_to_record_user_message_in_chat: %s", conv_user_err)
+
         runtime_profile = build_runtime_profile(assistant)
-        sanitized_message = prepare_user_message(request.message, runtime_profile)
+        prepared_message = _format_message_with_attachments(request.message, request.attachments)
+        sanitized_message = prepare_user_message(prepared_message, runtime_profile)
         workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
             inputs={
@@ -272,7 +333,7 @@ class AssistantService:
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,
-            conversation_id=request.conversation_id,
+            conversation_id=conversation_id,
         )
         workflow_response = await workflow_service.execute(
             db,
@@ -286,6 +347,24 @@ class AssistantService:
             answer = getattr(guardrails, "no_answer_message", "Xin lỗi, hiện tại tôi chưa có dữ liệu chính thức để trả lời câu hỏi này.")
         citations = workflow_response.outputs.get("citations", [])
         artifacts = workflow_response.outputs.get("artifacts", [])
+
+        # Record assistant answer in persistent conversation thread
+        try:
+            from app.modules.conversations.schemas import ConversationCreateMessageRequest
+            from app.modules.conversations.service import conversation_service
+
+            await conversation_service.record_message(
+                db,
+                ConversationCreateMessageRequest(
+                    thread_id=conversation_id,
+                    assistant_code=assistant.code,
+                    assistant_name=assistant.name,
+                    sender="assistant",
+                    text=answer,
+                ),
+            )
+        except Exception as conv_asst_err:
+            logger.warning("failed_to_record_assistant_message_in_chat: %s", conv_asst_err)
 
         sample_questions = getattr(assistant, "sample_questions", None)
         if not sample_questions:
@@ -315,14 +394,14 @@ class AssistantService:
         try:
             from app.modules.modelops.service import modelops_service
 
-            model_name = getattr(assistant, "preferred_model_name", None) or "gpt-4o-mini"
+            model_name = _extract_primary_model(assistant)
             prompt_toks = max(1, len(request.message) // 4 + 80)
             comp_toks = max(1, len(answer) // 4)
             await modelops_service.record_usage_log(
                 db,
                 tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
                 assistant_id=assistant.code,
-                conversation_id=request.conversation_id,
+                conversation_id=conversation_id,
                 provider="qnu_workflow",
                 model_name=model_name,
                 prompt_tokens=prompt_toks,
@@ -343,6 +422,7 @@ class AssistantService:
             latency_ms=workflow_response.latency_ms,
             execution_id=workflow_response.execution_id,
             artifacts=artifacts if isinstance(artifacts, list) else [],
+            conversation_id=conversation_id,
         )
 
     async def chat_stream(
@@ -360,10 +440,32 @@ class AssistantService:
             yield f"event: error\ndata: {err_data}\n\n"
             return
 
-        yield f"event: status\ndata: {json.dumps({'stage': 'retrieving', 'message': 'Đang tìm kiếm tài liệu đối soát...'}, ensure_ascii=False)}\n\n"
+        conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
+
+        # Record user question in persistent conversation thread
+        try:
+            from app.modules.conversations.schemas import ConversationCreateMessageRequest
+            from app.modules.conversations.service import conversation_service
+
+            await conversation_service.record_message(
+                db,
+                ConversationCreateMessageRequest(
+                    thread_id=conversation_id,
+                    assistant_code=assistant.code,
+                    assistant_name=assistant.name,
+                    sender="user",
+                    text=request.message,
+                    user_name="Thí sinh / Sinh viên",
+                ),
+            )
+        except Exception as conv_user_err:
+            logger.warning("failed_to_record_user_message_in_chat_stream: %s", conv_user_err)
+
+        yield f"event: status\ndata: {json.dumps({'stage': 'retrieving', 'message': 'Đang tìm kiếm tài liệu đối soát...', 'conversation_id': conversation_id}, ensure_ascii=False)}\n\n"
 
         runtime_profile = build_runtime_profile(assistant)
-        sanitized_message = prepare_user_message(request.message, runtime_profile)
+        prepared_message = _format_message_with_attachments(request.message, request.attachments)
+        sanitized_message = prepare_user_message(prepared_message, runtime_profile)
         workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
             inputs={
@@ -372,7 +474,7 @@ class AssistantService:
                 "format": "docx,pdf",
             },
             tenant_id=request.tenant_id,
-            conversation_id=request.conversation_id,
+            conversation_id=conversation_id,
         )
 
         try:
@@ -411,6 +513,24 @@ class AssistantService:
             yield f"event: token\ndata: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.012)
 
+        # Record assistant answer in persistent conversation thread
+        try:
+            from app.modules.conversations.schemas import ConversationCreateMessageRequest
+            from app.modules.conversations.service import conversation_service
+
+            await conversation_service.record_message(
+                db,
+                ConversationCreateMessageRequest(
+                    thread_id=conversation_id,
+                    assistant_code=assistant.code,
+                    assistant_name=assistant.name,
+                    sender="assistant",
+                    text=answer,
+                ),
+            )
+        except Exception as conv_asst_err:
+            logger.warning("failed_to_record_assistant_message_in_chat_stream: %s", conv_asst_err)
+
         sample_questions = getattr(assistant, "sample_questions", None)
         if not sample_questions:
             config = getattr(assistant, "config", None)
@@ -439,14 +559,14 @@ class AssistantService:
         try:
             from app.modules.modelops.service import modelops_service
 
-            model_name = getattr(assistant, "preferred_model_name", None) or "gpt-4o-mini"
+            model_name = _extract_primary_model(assistant)
             prompt_toks = max(1, len(request.message) // 4 + 80)
             comp_toks = max(1, len(answer) // 4)
             await modelops_service.record_usage_log(
                 db,
                 tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
                 assistant_id=assistant.code,
-                conversation_id=request.conversation_id,
+                conversation_id=conversation_id,
                 provider="qnu_workflow",
                 model_name=model_name,
                 prompt_tokens=prompt_toks,
@@ -458,6 +578,7 @@ class AssistantService:
             logger.warning("failed_to_record_usage_in_chat_stream: %s", u_err)
 
         done_payload = {
+            "conversation_id": conversation_id,
             "latency_ms": workflow_response.latency_ms,
             "suggested_questions": (sample_questions or [])[:3],
             "execution_id": workflow_response.execution_id,

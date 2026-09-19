@@ -309,6 +309,18 @@ async def get_tenant_quota(
 
 
 @router.get(
+    "/quota",
+    response_model=TenantQuotaResponse,
+    summary="Tra cứu trạng thái hạn ngạch token qua query parameter (tương thích ngược)",
+)
+async def get_tenant_quota_query(
+    tenant_id: str = "tenant_qnu",
+    db: AsyncSession = Depends(get_db),
+) -> TenantQuotaResponse:
+    return await get_tenant_quota(tenant_id=tenant_id, db=db)
+
+
+@router.get(
     "/usage-stats",
     response_model=UsageStatsResponse,
     summary="Thống kê thực tế lượng token tiêu thụ, chi phí USD và breakdown theo mô hình",

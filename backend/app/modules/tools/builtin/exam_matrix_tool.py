@@ -34,6 +34,11 @@ class ExamMatrixExporterTool(BaseTool):
     def category(self) -> str:
         return "question_bank"
 
+    @property
+    def requires_approval(self) -> bool:
+        """Kích hoạt phê duyệt Human-in-the-loop trước khi xuất ma trận đề thi chính thức."""
+        return True
+
     def get_openapi_schema(self) -> dict[str, Any]:
         return {
             "name": self.name,

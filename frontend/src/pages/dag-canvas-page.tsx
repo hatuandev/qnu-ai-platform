@@ -406,6 +406,7 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
     if (!workflow) return;
     const mapping = nodeTypeForCatalogItem(catalogItem);
     const nodeId = `${catalogItem.category}_${crypto.randomUUID().slice(0, 8)}`;
+    const initialConfig = catalogItem.defaultConfig ? { ...catalogItem.defaultConfig } : {};
     const newNode: Node<WorkflowNodeData> = {
       id: nodeId,
       type: mapping.kind,
@@ -415,11 +416,11 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
         label: catalogItem.label,
         category: toNodeCategory(mapping.kind),
         description: catalogItem.description,
-        configSummary: catalogItem.defaultConfigSummary,
+        configSummary: catalogItem.defaultConfigSummary || summarizeConfig(initialConfig),
         timeoutSeconds: catalogItem.timeoutSeconds,
         workflowNodeType: mapping.workflowNodeType,
-        workflowNodeVersion: "1.0.0",
-        workflowConfig: {},
+        workflowNodeVersion: catalogItem.version || "1.0.0",
+        workflowConfig: initialConfig,
         workflowPolicy: { timeout_seconds: catalogItem.timeoutSeconds },
       },
     };

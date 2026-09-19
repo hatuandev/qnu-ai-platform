@@ -204,6 +204,10 @@ export const workflowsApi = {
     return requestWorkflow<WorkflowExecutionResponse>("/execute", jsonRequest("POST", payload));
   },
 
+  listPendingApprovals(): Promise<WorkflowApproval[]> {
+    return requestWorkflow<WorkflowApproval[]>("/approvals");
+  },
+
   decideApproval(
     executionId: string,
     approvalId: string,

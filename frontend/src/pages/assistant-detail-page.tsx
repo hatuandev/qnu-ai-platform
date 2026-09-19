@@ -1,27 +1,25 @@
-import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { Field } from "@/components/admin/field";
-import { Badge } from "@/components/ui/badge";
+import { AssistantHeader } from "@/components/assistants/assistant-header";
+import {
+  type AssistantSubView,
+  AssistantWorkspaceNav,
+} from "@/components/assistants/assistant-workspace-nav";
+import { AssistantCloneDialog } from "@/components/assistants/dialogs/assistant-clone-dialog";
+import { AssistantEmbedDialog } from "@/components/assistants/dialogs/assistant-embed-dialog";
+import { AssistantVersionHistoryDialog } from "@/components/assistants/dialogs/assistant-version-history-dialog";
+import { AssistantDangerZone } from "@/components/assistants/sections/assistant-danger-zone";
+import { AssistantGuardrailsSection } from "@/components/assistants/sections/assistant-guardrails-section";
+import { AssistantKnowledgeSection } from "@/components/assistants/sections/assistant-knowledge-section";
+import { AssistantModelSection } from "@/components/assistants/sections/assistant-model-section";
+import { AssistantPersonaSection } from "@/components/assistants/sections/assistant-persona-section";
+import { AssistantToolsSection } from "@/components/assistants/sections/assistant-tools-section";
+import type { AssistantEditForm } from "@/components/assistants/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChannelsPage } from "@/pages/channels-page";
+import { ChatStudioPage } from "@/pages/chat-studio-page";
+import { DAGCanvasPage } from "@/pages/dag-canvas-page";
+import { EvaluationPage } from "@/pages/evaluation-page";
+import { RunsPage } from "@/pages/runs-page";
 import { type AssistantItem, apiClient } from "@/services/api-client";
 import {
   activateAssistant,
@@ -36,90 +34,18 @@ import {
   rollbackAssistantVersion,
   updateAssistant,
 } from "@/services/assistants-api";
+import { modelopsApi } from "@/services/modelops-api";
 import { workflowsApi } from "@/services/workflows-api";
-import type { AssistantVersionItem } from "@/types/assistants";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  AlertCircle,
-  AlertTriangle,
-  ArrowLeft,
-  Bot,
-  Check,
-  CheckCircle2,
-  Clock,
-  Code,
-  Copy,
-  Download,
-  ExternalLink,
-  History,
-  Library,
-  Loader2,
-  MessageSquare,
-  Network,
-  Plus,
-  Power,
-  RefreshCw,
-  Rocket,
-  RotateCcw,
-  Save,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 interface AssistantDetailPageProps {
   currentPath: string;
   onNavigate: (path: string) => void;
+  subView?: AssistantSubView;
 }
-
-interface SampleQuestionItem {
-  id: string;
-  text: string;
-}
-
-interface AssistantEditForm {
-  name: string;
-  description: string;
-  category: string;
-  system_prompt: string;
-  workflow_id: string;
-  collection_id: string;
-  sample_questions: SampleQuestionItem[];
-  primary_model: string;
-  fallback_model: string;
-  temperature: number;
-  max_tokens: number;
-  block_prompt_injection: boolean;
-  mask_pii: boolean;
-  require_grounded_answer: boolean;
-  protect_system_prompt: boolean;
-  human_approval_required: boolean;
-  require_citations: boolean;
-  no_answer_message: string;
-}
-
-const CATEGORY_OPTIONS = [
-  { value: "admissions", label: "Tuyển sinh & Hướng nghiệp" },
-  { value: "academic", label: "Quy chế & Học vụ" },
-  { value: "resources", label: "Thư viện & Học liệu Số" },
-  { value: "administration", label: "Soạn thảo Văn bản NĐ 30" },
-  { value: "examination", label: "Khảo thí & Đề thi Bloom" },
-  { value: "general", label: "Hỗ trợ Đa năng" },
-];
-
-const STANDARD_MODELS = [
-  { value: "gpt-4o-mini", label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)" },
-  { value: "gpt-4o", label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)" },
-  { value: "gemini-1.5-flash", label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)" },
-  { value: "gemini-1.5-pro", label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)" },
-  { value: "deepseek-chat", label: "DeepSeek V3 (Thông minh & tiết kiệm)" },
-  { value: "mistral-small-latest", label: "Mistral Small (Chính xác & bảo mật)" },
-  { value: "qwen2.5-7b-instruct", label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)" },
-];
 
 function getReferenceFromPath(currentPath: string): string {
   return decodeURIComponent(currentPath.split("/").filter(Boolean).at(-1) ?? "");
@@ -171,32 +97,18 @@ function downloadBundle(filename: string, bundle: object) {
   URL.revokeObjectURL(url);
 }
 
-export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetailPageProps) {
+export function AssistantDetailPage({
+  currentPath,
+  onNavigate,
+  subView = "overview",
+}: AssistantDetailPageProps) {
   const reference = getReferenceFromPath(currentPath);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssistantEditForm | null>(null);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isEmbedOpen, setIsEmbedOpen] = useState(false);
-  const [embedCopied, setEmbedCopied] = useState(false);
-
-  const handleGeneratePrompt = async () => {
-    if (!form) return;
-    const idea = form.description.trim() || form.name.trim();
-    if (!idea) {
-      toast.warning("Vui lòng nhập Tên hoặc Mô tả để AI viết System Prompt phù hợp.");
-      return;
-    }
-    setIsGeneratingPrompt(true);
-    try {
-      const spec = await generateAssistantSpec(idea, form.category);
-      setForm((prev) => (prev ? { ...prev, system_prompt: spec.system_prompt } : null));
-      toast.success("AI đã tối ưu và viết lại System Prompt chuẩn 5 phần ĐH Quy Nhơn!");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không thể tự sinh prompt.");
-    } finally {
-      setIsGeneratingPrompt(false);
-    }
-  };
+  const [isCloneOpen, setIsCloneOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const assistantQuery = useQuery({
     queryKey: ["assistants", reference],
@@ -218,6 +130,70 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
     queryKey: ["workflow-runs"],
     queryFn: () => apiClient.getWorkflowRuns(),
   });
+
+  const providersQuery = useQuery({
+    queryKey: ["modelops", "providers"],
+    queryFn: () => modelopsApi.getModelProviders(),
+  });
+
+  const availableModels = useMemo(() => {
+    const providers = providersQuery.data ?? [];
+    const list: { value: string; label: string; providerName: string }[] = [];
+    const seen = new Set<string>();
+    for (const prov of providers) {
+      if (!prov.is_active) continue;
+      for (const m of prov.models ?? []) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          list.push({
+            value: m,
+            label: `${m} (${prov.name})`,
+            providerName: prov.name,
+          });
+        }
+      }
+    }
+    if (list.length === 0) {
+      return [
+        {
+          value: "gpt-4o-mini",
+          label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)",
+          providerName: "OpenAI",
+        },
+        {
+          value: "gpt-4o",
+          label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)",
+          providerName: "OpenAI",
+        },
+        {
+          value: "gemini-1.5-flash",
+          label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)",
+          providerName: "Google",
+        },
+        {
+          value: "gemini-1.5-pro",
+          label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)",
+          providerName: "Google",
+        },
+        {
+          value: "deepseek-chat",
+          label: "DeepSeek V3 (Thông minh & tiết kiệm)",
+          providerName: "DeepSeek",
+        },
+        {
+          value: "mistral-small-latest",
+          label: "Mistral Small (Chính xác & bảo mật)",
+          providerName: "Mistral",
+        },
+        {
+          value: "qwen2.5-7b-instruct",
+          label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)",
+          providerName: "vLLM",
+        },
+      ];
+    }
+    return list;
+  }, [providersQuery.data]);
 
   useEffect(() => {
     if (assistantQuery.data) {
@@ -309,44 +285,10 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
 
   const item = assistantQuery.data;
 
-  // Clone assistant state & mutation
-  const [isCloneOpen, setIsCloneOpen] = useState(false);
-  const [cloneCode, setCloneCode] = useState("");
-  const [cloneName, setCloneName] = useState("");
-  const [cloneDescription, setCloneDescription] = useState("");
-  const [cloneCollectionId, setCloneCollectionId] = useState("");
-
-  const handleOpenClone = () => {
-    if (!item) return;
-    setCloneCode(`${item.code}_copy`);
-    setCloneName(`${item.name} (Bản sao)`);
-    setCloneDescription(`Bản sao nhân bản từ ${item.name} chuyên trách phục vụ đơn vị.`);
-    setCloneCollectionId(item.collection_id);
-    setIsCloneOpen(true);
-  };
-
-  const cloneMutation = useMutation({
-    mutationFn: () =>
-      cloneAssistant(reference, {
-        new_code: cloneCode.trim(),
-        new_name: cloneName.trim(),
-        new_description: cloneDescription.trim() || undefined,
-        target_collection_id: cloneCollectionId || undefined,
-      }),
-    onSuccess: (cloned) => {
-      queryClient.invalidateQueries({ queryKey: ["assistants"] });
-      toast.success(`Đã nhân bản thành công Trợ lý "${cloned.name}"!`);
-      setIsCloneOpen(false);
-      onNavigate(`/assistants/${encodeURIComponent(cloned.code)}`);
-    },
-    onError: (err: Error) => toast.error(`Nhân bản thất bại: ${err.message}`),
-  });
-
-  // 5-Layer Publish Gate Readiness Query & Publish Mutation
   const readinessQuery = useQuery({
     queryKey: ["assistant-readiness", item?.code],
     queryFn: () => getAssistantReadiness(item?.code as string),
-    enabled: !!item?.code,
+    enabled: Boolean(item?.code),
     staleTime: 30_000,
   });
 
@@ -361,9 +303,21 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
     onError: (err: Error) => toast.error(`Xuất bản thất bại: ${err.message}`),
   });
 
-  // Version History & Rollback
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [rollbackTarget, setRollbackTarget] = useState<AssistantVersionItem | null>(null);
+  const cloneMutation = useMutation({
+    mutationFn: (data: {
+      new_code: string;
+      new_name: string;
+      new_description?: string;
+      target_collection_id?: string;
+    }) => cloneAssistant(reference, data),
+    onSuccess: (cloned) => {
+      queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      toast.success(`Đã nhân bản thành công Trợ lý "${cloned.name}"!`);
+      setIsCloneOpen(false);
+      onNavigate(`/assistants/${encodeURIComponent(cloned.code)}`);
+    },
+    onError: (err: Error) => toast.error(`Nhân bản thất bại: ${err.message}`),
+  });
 
   const versionsQuery = useQuery({
     queryKey: ["assistant-versions", item?.code],
@@ -378,15 +332,14 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
       queryClient.invalidateQueries({ queryKey: ["assistant-versions", item?.code] });
       queryClient.invalidateQueries({ queryKey: ["assistant-readiness", item?.code] });
       toast.success(`Đã khôi phục thành công về phiên bản ${res.restored_version}`);
-      setRollbackTarget(null);
       setIsHistoryOpen(false);
     },
     onError: (err: Error) => toast.error(`Khôi phục thất bại: ${err.message}`),
   });
 
-  // Tính toán KPI Metrics thời gian thực
   const kpiStats = useMemo(() => {
-    if (!item) return { totalRuns: 0, avgLatency: 0, collectionName: "", workflowName: "" };
+    if (!item)
+      return { totalRuns: 0, avgLatency: 0, collectionName: "", docCount: 0, workflowName: "" };
     const runs = runsQuery.data || [];
     const matchedRuns = runs.filter(
       (r) => r.workflow_id === item.workflow_id || r.workflow_name.includes(item.name)
@@ -412,39 +365,29 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
     };
   }, [item, runsQuery.data, collectionsQuery.data, workflowsQuery.data]);
 
+  const handleGeneratePrompt = async () => {
+    if (!form) return;
+    const idea = form.description.trim() || form.name.trim();
+    if (!idea) {
+      toast.warning("Vui lòng nhập Tên hoặc Mô tả để AI viết System Prompt phù hợp.");
+      return;
+    }
+    setIsGeneratingPrompt(true);
+    try {
+      const spec = await generateAssistantSpec(idea, form.category);
+      setForm((prev) => (prev ? { ...prev, system_prompt: spec.system_prompt } : null));
+      toast.success("AI đã tối ưu và viết lại System Prompt chuẩn 5 phần ĐH Quy Nhơn!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tự sinh prompt.");
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form) return;
     updateMutation.mutate(form);
-  };
-
-  const handleAddQuestion = () => {
-    if (!form) return;
-    setForm({
-      ...form,
-      sample_questions: [
-        ...form.sample_questions,
-        { id: `sq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: "" },
-      ],
-    });
-  };
-
-  const handleUpdateQuestion = (id: string, text: string) => {
-    if (!form) return;
-    setForm({
-      ...form,
-      sample_questions: form.sample_questions.map((item) =>
-        item.id === id ? { ...item, text } : item
-      ),
-    });
-  };
-
-  const handleRemoveQuestion = (id: string) => {
-    if (!form) return;
-    setForm({
-      ...form,
-      sample_questions: form.sample_questions.filter((item) => item.id !== id),
-    });
   };
 
   if (assistantQuery.isLoading) {
@@ -476,1126 +419,147 @@ export function AssistantDetailPage({ currentPath, onNavigate }: AssistantDetail
   const workflows = workflowsQuery.data || [];
 
   return (
-    <form className="space-y-6" onSubmit={handleSubmit}>
-      {/* Top Header & Action Toolbar */}
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <Button
-            className="mb-2 -ml-2.5 h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-            size="sm"
-            type="button"
-            variant="ghost"
-            onClick={() => onNavigate("/assistants")}
-          >
-            <ArrowLeft className="size-3.5" />
-            Danh mục trợ lý
-          </Button>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Bot className="size-4 text-primary" />
-            <span>Trợ lý AI / {item.code}</span>
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{item.name}</h1>
-            <Badge variant={item.is_active ? "success" : "secondary"}>
-              {item.is_active ? "Hoạt động" : "Đã tắt"}
-            </Badge>
-            <Badge variant="outline" className="capitalize">
-              {item.category}
-            </Badge>
-          </div>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{item.id}</p>
-        </div>
+    <div className="space-y-6">
+      {/* Top Header & Action Toolbar & KPI Strip */}
+      <AssistantHeader
+        assistant={item}
+        onNavigate={onNavigate}
+        subView={subView}
+        onOpenClone={() => setIsCloneOpen(true)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenEmbed={() => setIsEmbedOpen(true)}
+        onExport={() => exportMutation.mutate()}
+        isExporting={exportMutation.isPending}
+        onSave={() => form && updateMutation.mutate(form)}
+        isSaving={updateMutation.isPending}
+        onPublish={() => publishMutation.mutate()}
+        isPublishing={publishMutation.isPending}
+        readiness={readinessQuery.data}
+        isReadinessLoading={readinessQuery.isLoading}
+        isReadinessFetching={readinessQuery.isFetching}
+        onRefetchReadiness={() => readinessQuery.refetch()}
+        kpiStats={kpiStats}
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => onNavigate(`/chat?assistant=${encodeURIComponent(item.code)}`)}
-          >
-            <MessageSquare className="size-3.5 text-primary" />
-            Thử chat
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => onNavigate(`/workflows/${encodeURIComponent(form.workflow_id)}`)}
-          >
-            <Network className="size-3.5 text-primary" />
-            Mở DAG
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={handleOpenClone}
-          >
-            <Copy className="size-3.5 text-primary" />
-            Nhân bản
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => setIsHistoryOpen(true)}
-          >
-            <History className="size-3.5 text-primary" />
-            Lịch sử phiên bản
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => setIsEmbedOpen(true)}
-          >
-            <Code className="size-3.5 text-primary" />
-            Mã nhúng Web
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            disabled={exportMutation.isPending}
-            onClick={() => exportMutation.mutate()}
-          >
-            <Download className="size-3.5" />
-            Xuất bundle
-          </Button>
-          <Button
-            disabled={updateMutation.isPending}
-            type="submit"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-          >
-            <Save className="size-3.5" />
-            {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
-          </Button>
-        </div>
-      </div>
+      {/* Local Workspace Sub-Navigation Pills */}
+      <AssistantWorkspaceNav
+        assistantId={item.code || item.id}
+        activeSubView={subView}
+        onNavigate={onNavigate}
+      />
 
-      {/* KPI Metrics Strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="p-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Lượt Hội Thoại</span>
-            <Activity className="size-3.5 text-primary" />
-          </div>
-          <p className="mt-1 text-xl font-bold font-mono text-foreground">
-            {kpiStats.totalRuns.toLocaleString()}
-          </p>
-          <span className="text-[10px] text-muted-foreground">Tổng phiên thực thi</span>
-        </Card>
-
-        <Card className="p-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Độ Trễ Trung Bình</span>
-            <Clock className="size-3.5 text-warning" />
-          </div>
-          <p className="mt-1 text-xl font-bold font-mono text-primary">{kpiStats.avgLatency} ms</p>
-          <span className="text-[10px] text-muted-foreground">Thời gian sinh token</span>
-        </Card>
-
-        <Card className="p-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Kho Tri Thức</span>
-            <Library className="size-3.5 text-success" />
-          </div>
-          <p
-            className="mt-1 text-sm font-semibold truncate text-foreground"
-            title={kpiStats.collectionName}
-          >
-            {kpiStats.collectionName}
-          </p>
-          <span className="text-[10px] text-muted-foreground">
-            {kpiStats.docCount} tài liệu số hóa
-          </span>
-        </Card>
-
-        <Card className="p-3.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Chuẩn Ragas TM-08</span>
-            <ShieldCheck className="size-3.5 text-success" />
-          </div>
-          <p className="mt-1 text-sm font-bold text-success">Đạt Chuẩn QNU</p>
-          <span className="text-[10px] text-muted-foreground">Faithfulness ≥ 0.90</span>
-        </Card>
-      </div>
-
-      {/* Main 2-Column Grid */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
-        {/* Left Column: Persona, ModelOps, Sample Questions */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-bold">Thông tin & Persona</CardTitle>
-              <CardDescription className="text-xs">
-                Cấu hình nhận diện, phạm vi chuyên môn và system prompt của Trợ lý.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field htmlFor="detail-assistant-name" label="Tên trợ lý" required>
-                <Input
-                  id="detail-assistant-name"
-                  required
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                />
-              </Field>
-
-              <Field htmlFor="detail-assistant-category" label="Lĩnh vực chuyên môn" required>
-                <Select
-                  value={form.category}
-                  onValueChange={(val) => setForm({ ...form, category: val })}
-                >
-                  <SelectTrigger id="detail-assistant-category">
-                    <SelectValue placeholder="Chọn lĩnh vực" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field
-                className="sm:col-span-2"
-                htmlFor="detail-assistant-description"
-                label="Mô tả chức năng"
-              >
-                <Textarea
-                  id="detail-assistant-description"
-                  rows={2}
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                />
-              </Field>
-
-              <div className="sm:col-span-2 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="detail-assistant-prompt"
-                    className="text-xs font-semibold text-foreground"
-                  >
-                    System Prompt (Chỉ thị hệ thống)
-                  </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs text-primary hover:bg-primary/10 gap-1 font-medium"
-                    disabled={isGeneratingPrompt || (!form.name.trim() && !form.description.trim())}
-                    onClick={handleGeneratePrompt}
-                  >
-                    {isGeneratingPrompt ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="size-3" />
-                    )}
-                    Viết hộ tôi
-                  </Button>
-                </div>
-                <Textarea
-                  className="min-h-40 font-mono text-xs leading-relaxed"
-                  id="detail-assistant-prompt"
-                  value={form.system_prompt}
-                  onChange={(event) => setForm({ ...form, system_prompt: event.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ModelOps & Fallback Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-bold">ModelOps & Phân Tuyến Dự Phòng</CardTitle>
-              <CardDescription className="text-xs">
-                Cấu hình mô hình ngôn ngữ chính, mô hình dự phòng khi 429/timeout và tham số sinh.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field htmlFor="detail-primary-model" label="Mô hình chính (Primary)">
-                <Select
-                  value={form.primary_model}
-                  onValueChange={(val) => setForm({ ...form, primary_model: val })}
-                >
-                  <SelectTrigger id="detail-primary-model">
-                    <SelectValue placeholder="Chọn mô hình chính" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STANDARD_MODELS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field htmlFor="detail-fallback-model" label="Mô hình dự phòng (Fallback)">
-                <Select
-                  value={form.fallback_model}
-                  onValueChange={(val) => setForm({ ...form, fallback_model: val })}
-                >
-                  <SelectTrigger id="detail-fallback-model">
-                    <SelectValue placeholder="Chọn mô hình dự phòng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STANDARD_MODELS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field htmlFor="detail-temperature" label="Temperature (Nhiệt độ)">
-                <Input
-                  id="detail-temperature"
-                  max="2"
-                  min="0"
-                  step="0.1"
-                  type="number"
-                  value={form.temperature}
-                  onChange={(event) =>
-                    setForm({ ...form, temperature: Number(event.target.value) })
-                  }
-                />
-              </Field>
-
-              <Field htmlFor="detail-max-tokens" label="Max Tokens (Hạn mức sinh)">
-                <Input
-                  id="detail-max-tokens"
-                  min="128"
-                  type="number"
-                  value={form.max_tokens}
-                  onChange={(event) => setForm({ ...form, max_tokens: Number(event.target.value) })}
-                />
-              </Field>
-            </CardContent>
-          </Card>
-
-          {/* Editable Sample Questions */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div>
-                <CardTitle className="text-sm font-bold">Câu Hỏi Gợi Ý Cho Người Dùng</CardTitle>
-                <CardDescription className="text-xs">
-                  Các câu hỏi mẫu hiển thị trên khung chat giúp sinh viên / giảng viên tra cứu
-                  nhanh.
-                </CardDescription>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1"
-                onClick={handleAddQuestion}
-              >
-                <Plus className="size-3.5 text-primary" />
-                Thêm câu hỏi
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-2.5">
-              {form.sample_questions.length === 0 ? (
-                <p className="p-4 text-center text-xs text-muted-foreground border border-dashed rounded-md">
-                  Chưa có câu hỏi gợi ý nào. Nhấn “Thêm câu hỏi” để bổ sung.
-                </p>
-              ) : (
-                form.sample_questions.map((questionItem, idx) => (
-                  <div key={questionItem.id} className="flex items-center gap-2">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
-                      {idx + 1}
-                    </span>
-                    <Input
-                      value={questionItem.text}
-                      onChange={(e) => handleUpdateQuestion(questionItem.id, e.target.value)}
-                      placeholder="Nhập nội dung câu hỏi gợi ý…"
-                      className="h-9 text-xs"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveQuestion(questionItem.id)}
-                      title="Xóa câu hỏi này"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Operational Binding, Guardrails & Quality */}
-        <div className="space-y-6">
-          {/* Operational Binding */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-bold">Liên Kết Vận Hành</CardTitle>
-              <CardDescription className="text-xs">
-                Kho tri thức RAG và Đồ thị DAG phục vụ thực thi nghiệp vụ.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Field htmlFor="detail-assistant-collection" label="Kho Tri Thức (Collection)">
-                <div className="space-y-2">
-                  <Select
-                    value={form.collection_id}
-                    onValueChange={(val) => setForm({ ...form, collection_id: val })}
-                  >
-                    <SelectTrigger id="detail-assistant-collection">
-                      <SelectValue placeholder="Chọn kho tri thức" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {collections.map((col) => (
-                        <SelectItem key={col.id} value={col.id}>
-                          {col.name} ({col.document_count} tài liệu)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    className="w-full h-8 text-xs gap-1.5"
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      onNavigate(`/knowledge/${encodeURIComponent(form.collection_id)}`)
-                    }
-                  >
-                    <Library className="size-3.5 text-primary" />
-                    Mở chi tiết kho tri thức
-                    <ExternalLink className="size-3 ml-auto opacity-50" />
-                  </Button>
-                </div>
-              </Field>
-
-              <Field htmlFor="detail-assistant-workflow" label="Quy Trình Điều Phối (Workflow DAG)">
-                <div className="space-y-2">
-                  <Select
-                    value={form.workflow_id}
-                    onValueChange={(val) => setForm({ ...form, workflow_id: val })}
-                  >
-                    <SelectTrigger id="detail-assistant-workflow">
-                      <SelectValue placeholder="Chọn quy trình workflow" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workflows.map((wf) => (
-                        <SelectItem key={wf.id} value={wf.id}>
-                          {wf.display_name} ({wf.id})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    className="w-full h-8 text-xs gap-1.5"
-                    type="button"
-                    variant="outline"
-                    onClick={() => onNavigate(`/workflows/${encodeURIComponent(form.workflow_id)}`)}
-                  >
-                    <Network className="size-3.5 text-primary" />
-                    Mở đồ thị DAG Studio
-                    <ExternalLink className="size-3 ml-auto opacity-50" />
-                  </Button>
-                </div>
-              </Field>
-            </CardContent>
-          </Card>
-
-          {/* 5-Layer Publish Gate Card */}
-          <Card className="border-primary/30 shadow-xs">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Rocket className="size-4 text-primary" />
-                  <CardTitle className="text-sm font-bold">
-                    Cổng Kiểm Định Xuất Bản (Publish Gate)
-                  </CardTitle>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-                  disabled={readinessQuery.isFetching}
-                  onClick={() => readinessQuery.refetch()}
-                >
-                  <RefreshCw
-                    className={cn("size-3", readinessQuery.isFetching && "animate-spin")}
-                  />
-                  Kiểm tra lại
-                </Button>
-              </div>
-              <CardDescription className="text-xs">
-                Đánh giá mức độ sẵn sàng 5 lớp trước khi kích hoạt phục vụ sinh viên/cán bộ.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3.5">
-              {readinessQuery.isLoading ? (
-                <div className="flex h-28 items-center justify-center text-xs text-muted-foreground gap-2">
-                  <Loader2 className="size-4 animate-spin text-primary" />
-                  Đang thẩm định 5 tiêu chí sẵn sàng...
-                </div>
-              ) : readinessQuery.data ? (
-                <>
-                  {/* Score progress overview */}
-                  <div className="rounded-lg border p-3 bg-muted/20 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-foreground font-semibold flex items-center gap-1.5">
-                        Điểm Sẵn Sàng:
-                        <span
-                          className={cn(
-                            "font-bold font-mono text-sm",
-                            readinessQuery.data.overall_readiness_score >= 80
-                              ? "text-success"
-                              : readinessQuery.data.overall_readiness_score >= 65
-                                ? "text-warning"
-                                : "text-destructive"
-                          )}
-                        >
-                          {readinessQuery.data.overall_readiness_score}%
-                        </span>
-                      </span>
-                      <Badge
-                        variant={
-                          readinessQuery.data.is_ready_for_publish
-                            ? "success"
-                            : readinessQuery.data.blockers.length > 0
-                              ? "destructive"
-                              : "warning"
-                        }
-                        className="text-[10px]"
-                      >
-                        {readinessQuery.data.is_ready_for_publish
-                          ? "Đủ chuẩn xuất bản"
-                          : readinessQuery.data.blockers.length > 0
-                            ? "Có lỗi chặn xuất bản"
-                            : "Khuyến nghị bổ sung"}
-                      </Badge>
-                    </div>
-
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={cn(
-                          "h-full transition-all duration-300",
-                          readinessQuery.data.overall_readiness_score >= 80
-                            ? "bg-success"
-                            : readinessQuery.data.overall_readiness_score >= 65
-                              ? "bg-warning"
-                              : "bg-destructive"
-                        )}
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.max(0, readinessQuery.data.overall_readiness_score)
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 5 Criteria Items */}
-                  <div className="space-y-2">
-                    {readinessQuery.data.checks.map((check) => (
-                      <div
-                        key={check.name}
-                        className="flex items-start justify-between gap-2 rounded-md border p-2 text-xs bg-card hover:bg-muted/10 transition-colors"
-                      >
-                        <div className="flex items-start gap-2 min-w-0">
-                          {check.status === "passed" ? (
-                            <CheckCircle2 className="size-4 shrink-0 text-success mt-0.5" />
-                          ) : check.status === "warning" ? (
-                            <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
-                          ) : (
-                            <XCircle className="size-4 shrink-0 text-destructive mt-0.5" />
-                          )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground">{check.name}</span>
-                              <span
-                                className={cn(
-                                  "text-[10px] font-mono font-bold",
-                                  check.score >= 80
-                                    ? "text-success"
-                                    : check.score >= 60
-                                      ? "text-warning"
-                                      : "text-destructive"
-                                )}
-                              >
-                                {check.score}/100
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                              {check.message}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Blockers Alert Banner */}
-                  {readinessQuery.data.blockers.length > 0 && (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2.5 text-xs text-destructive space-y-1">
-                      <div className="flex items-center gap-1.5 font-semibold">
-                        <AlertCircle className="size-3.5" />
-                        Lỗi chặn xuất bản (Cần khắc phục trước khi kích hoạt):
-                      </div>
-                      <ul className="list-disc list-inside space-y-0.5 text-[11px]">
-                        {readinessQuery.data.blockers.map((blocker) => (
-                          <li key={blocker}>{blocker}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Publish Trigger Button */}
-                  <div className="pt-1">
-                    <Button
-                      type="button"
-                      className="w-full h-9 text-xs gap-1.5"
-                      variant={item.is_active ? "outline" : "default"}
-                      disabled={
-                        publishMutation.isPending ||
-                        (!item.is_active && !readinessQuery.data.is_ready_for_publish)
-                      }
-                      onClick={() => publishMutation.mutate()}
-                    >
-                      <Rocket className="size-3.5" />
-                      {publishMutation.isPending
-                        ? "Đang xuất bản..."
-                        : item.is_active
-                          ? "Tái xuất bản (Đang hoạt động)"
-                          : "Xuất Bản Trợ Lý Chính Thức"}
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">Không thể tải thông tin kiểm định.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Interactive Guardrails Switch */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-primary" />
-                <CardTitle className="text-sm font-bold">
-                  Chốt An Toàn Guardrails & Đánh Giá
-                </CardTitle>
-              </div>
-              <CardDescription className="text-xs">
-                Chính sách bảo vệ an ninh và chuẩn mực chống bịa đặt (Anti-Hallucination).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Ngăn Chặn Prompt Injection</p>
-                    <p className="text-[11px] text-muted-foreground">Khử lệnh can thiệp độc hại</p>
-                  </div>
-                  <Switch
-                    checked={form.block_prompt_injection}
-                    onCheckedChange={(val) => setForm({ ...form, block_prompt_injection: val })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Che Dữ Liệu Cá Nhân (PII)</p>
-                    <p className="text-[11px] text-muted-foreground">Tự động ẩn CCCD, SĐT, Email</p>
-                  </div>
-                  <Switch
-                    checked={form.mask_pii}
-                    onCheckedChange={(val) => setForm({ ...form, mask_pii: val })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Chống Bịa Đặt (Groundedness)</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Chỉ trả lời khi có căn cứ RAG
-                    </p>
-                  </div>
-                  <Switch
-                    checked={form.require_grounded_answer}
-                    onCheckedChange={(val) => setForm({ ...form, require_grounded_answer: val })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Bảo Vệ System Prompt</p>
-                    <p className="text-[11px] text-muted-foreground">Chống rò rỉ chỉ thị nội bộ</p>
-                  </div>
-                  <Switch
-                    checked={form.protect_system_prompt}
-                    onCheckedChange={(val) => setForm({ ...form, protect_system_prompt: val })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Phê Duyệt Thủ Công (HITL)</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Cán bộ duyệt tác vụ nhạy cảm
-                    </p>
-                  </div>
-                  <Switch
-                    checked={form.human_approval_required}
-                    onCheckedChange={(val) => setForm({ ...form, human_approval_required: val })}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between rounded-md border p-2.5 text-xs">
-                  <div>
-                    <p className="font-semibold text-foreground">Bắt Buộc Trích Dẫn Nguồn</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Kèm Điều, Khoản, Tên Văn Bản
-                    </p>
-                  </div>
-                  <Switch
-                    checked={form.require_citations}
-                    onCheckedChange={(val) => setForm({ ...form, require_citations: val })}
-                  />
-                </div>
-              </div>
-
-              <Field htmlFor="detail-no-answer" label="Thông Điệp Từ Chối (No-Answer Policy)">
-                <Textarea
-                  id="detail-no-answer"
-                  rows={3}
-                  className="text-xs"
-                  value={form.no_answer_message}
-                  onChange={(event) => setForm({ ...form, no_answer_message: event.target.value })}
-                />
-              </Field>
-
-              {/* TM-08 Quality Evaluation Panel */}
-              <div className="rounded-md border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-primary" />
-                    Chuẩn Kiểm Định Ragas TM-08
-                  </span>
-                  <Badge variant="success" className="text-[10px]">
-                    Đạt Chuẩn
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
-                  <div className="rounded bg-card p-2 border border-border">
-                    <span className="text-muted-foreground block text-[10px]">Faithfulness</span>
-                    <span className="font-bold text-success font-mono">≥ 0.90</span>
-                  </div>
-                  <div className="rounded bg-card p-2 border border-border">
-                    <span className="text-muted-foreground block text-[10px]">Relevance</span>
-                    <span className="font-bold text-success font-mono">≥ 0.85</span>
-                  </div>
-                  <div className="rounded bg-card p-2 border border-border">
-                    <span className="text-muted-foreground block text-[10px]">Precision</span>
-                    <span className="font-bold text-success font-mono">≥ 0.80</span>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full h-7 text-[11px] gap-1"
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    onNavigate(`/evaluation?assistant=${encodeURIComponent(item.code)}`)
-                  }
-                >
-                  <ShieldCheck className="size-3 text-primary" />
-                  Xem báo cáo kiểm định benchmark
-                  <ExternalLink className="size-3 ml-auto opacity-50" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Danger Zone */}
-          <Card className={item.is_active ? "border-destructive/30" : "border-success/30"}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-bold">
-                {item.is_active ? "Vùng Nguy Hiểm" : "Khôi Phục Trạng Thái Hoạt Động"}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                {item.is_active
-                  ? "Vô hiệu hóa trợ lý nhưng bảo lưu toàn bộ đồ thị workflow và lịch sử kiểm toán."
-                  : "Kích hoạt lại trợ lý để tiếp tục tiếp nhận các phiên hội thoại và phục vụ người dùng."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {item.is_active ? (
-                <ConfirmDialog
-                  confirmText="Vô hiệu hóa"
-                  description={`Trợ lý “${item.name}” sẽ dừng nhận các phiên hội thoại mới cho đến khi được kích hoạt lại.`}
-                  isPending={deactivateMutation.isPending}
-                  title="Vô hiệu hóa trợ lý?"
-                  trigger={
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="text-xs gap-1.5"
-                    >
-                      <Power className="size-3.5" />
-                      Vô hiệu hóa trợ lý
-                    </Button>
-                  }
-                  onConfirm={() => deactivateMutation.mutate()}
-                />
-              ) : (
-                <ConfirmDialog
-                  confirmText="Kích hoạt lại"
-                  description={`Trợ lý “${item.name}” sẽ mở lại trạng thái hoạt động bình thường trên kênh Chat và Widget.`}
-                  isPending={activateMutation.isPending}
-                  title="Kích hoạt lại trợ lý?"
-                  trigger={
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      className="text-xs gap-1.5 bg-success hover:bg-success/90 text-success-foreground"
-                    >
-                      <RotateCcw className="size-3.5" />
-                      Kích hoạt lại trợ lý
-                    </Button>
-                  }
-                  onConfirm={() => activateMutation.mutate()}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* 1-Click Clone Assistant Dialog */}
-      <Dialog open={isCloneOpen} onOpenChange={setIsCloneOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Copy className="size-4 text-primary" />
-              Nhân Bản Trợ Lý AI Chuyên Trách
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Sao chép toàn bộ cấu hình 7 lớp từ “{item.name}” để tùy biến cho khoa, phòng ban hoặc
-              viện nghiên cứu.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3.5 py-2 text-xs">
-            <Field htmlFor="clone-assistant-code" label="Mã định danh mới (Slug code)" required>
-              <Input
-                id="clone-assistant-code"
-                className="font-mono text-xs"
-                placeholder="vi_du: admissions_cntt"
-                value={cloneCode}
-                onChange={(e) => setCloneCode(e.target.value)}
+      {/* Sub-view Content Switcher */}
+      {subView === "playground" ? (
+        <ChatStudioPage initialAssistant={item.code} />
+      ) : subView === "workflow" ? (
+        <DAGCanvasPage
+          currentPath={`/workflows/${form.workflow_id}`}
+          onNavigate={onNavigate}
+          onNavigateToChat={(code) =>
+            onNavigate(`/assistants/${encodeURIComponent(code)}/playground`)
+          }
+        />
+      ) : subView === "channels" ? (
+        <ChannelsPage />
+      ) : subView === "quality" ? (
+        <EvaluationPage onNavigateToKnowledge={() => onNavigate("/knowledge")} />
+      ) : subView === "runs" ? (
+        <RunsPage
+          currentPath={currentPath}
+          onNavigate={onNavigate}
+          onNavigateToCanvas={() =>
+            onNavigate(`/assistants/${encodeURIComponent(item.code)}/workflow`)
+          }
+        />
+      ) : (
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          {/* Main 2-Column Grid */}
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
+            {/* Left Column: Persona, ModelOps */}
+            <div className="space-y-6">
+              <AssistantPersonaSection
+                form={form}
+                onChange={setForm}
+                onGeneratePrompt={handleGeneratePrompt}
+                isGeneratingPrompt={isGeneratingPrompt}
               />
-              <span className="text-[10px] text-muted-foreground">
-                Chỉ gồm chữ thường, số, gạch dưới (_) hoặc gạch ngang (-).
-              </span>
-            </Field>
-
-            <Field htmlFor="clone-assistant-name" label="Tên trợ lý mới" required>
-              <Input
-                id="clone-assistant-name"
-                placeholder="Ví dụ: Trợ lý Tuyển sinh Khoa CNTT"
-                value={cloneName}
-                onChange={(e) => setCloneName(e.target.value)}
+              <AssistantModelSection
+                form={form}
+                onChange={setForm}
+                availableModels={availableModels}
               />
-            </Field>
-
-            <Field htmlFor="clone-assistant-desc" label="Mô tả chức năng">
-              <Textarea
-                id="clone-assistant-desc"
-                rows={2}
-                placeholder="Mô tả ngắn gọn phạm vi phục vụ của trợ lý nhân bản..."
-                value={cloneDescription}
-                onChange={(e) => setCloneDescription(e.target.value)}
-              />
-            </Field>
-
-            <Field htmlFor="clone-assistant-col" label="Kho Tri Thức Liên Kết">
-              <Select value={cloneCollectionId} onValueChange={setCloneCollectionId}>
-                <SelectTrigger id="clone-assistant-col">
-                  <SelectValue placeholder="Chọn kho tri thức" />
-                </SelectTrigger>
-                <SelectContent>
-                  {collections.map((col) => (
-                    <SelectItem key={col.id} value={col.id}>
-                      {col.name} ({col.document_count} tài liệu)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setIsCloneOpen(false)}
-            >
-              Hủy bỏ
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 text-xs gap-1.5"
-              disabled={cloneMutation.isPending || !cloneCode.trim() || !cloneName.trim()}
-              onClick={() => cloneMutation.mutate()}
-            >
-              {cloneMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
-              {cloneMutation.isPending ? "Đang nhân bản..." : "Xác nhận nhân bản"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Mã Nhúng Web Widget */}
-      <Dialog open={isEmbedOpen} onOpenChange={setIsEmbedOpen}>
-        <DialogContent className="max-w-md sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2">
-              <Code className="size-4 text-primary" />
-              Mã Nhúng Web Widget Cho Trợ Lý
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Nhúng Trợ lý <strong className="text-foreground">{item.name}</strong> vào Cổng thông
-              tin trường qua 1 dòng thẻ script.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 py-2 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-foreground">
-                Mã nhúng HTML (Dán trước thẻ &lt;/body&gt;)
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs text-primary gap-1"
-                onClick={async () => {
-                  const originUrl =
-                    typeof window !== "undefined"
-                      ? window.location.origin
-                      : "https://ai.qnu.edu.vn";
-                  const script = `<!-- QNU AI Platform — Web Chat Widget -->\n<script\n  src="${originUrl}/embed/qnu-chat-widget.js"\n  data-assistant="${item.code}"\n  data-title="${item.name}"\n  data-position="bottom-right"\n  defer>\n</script>`;
-                  await navigator.clipboard.writeText(script);
-                  setEmbedCopied(true);
-                  toast.success("Đã sao chép mã nhúng Web Widget!");
-                  setTimeout(() => setEmbedCopied(false), 2000);
-                }}
-              >
-                {embedCopied ? (
-                  <Check className="size-3.5 text-success" />
-                ) : (
-                  <Copy className="size-3.5" />
-                )}
-                <span>{embedCopied ? "Đã sao chép" : "Sao chép"}</span>
-              </Button>
             </div>
 
-            <pre className="p-3 rounded-control bg-muted font-mono text-[11px] text-foreground overflow-x-auto border border-border leading-relaxed select-text">
-              {`<!-- QNU AI Platform — Web Chat Widget -->
-<script
-  src="${typeof window !== "undefined" ? window.location.origin : "https://ai.qnu.edu.vn"}/embed/qnu-chat-widget.js"
-  data-assistant="${item.code}"
-  data-title="${item.name}"
-  data-position="bottom-right"
-  defer>
-</script>`}
-            </pre>
-
-            <p className="text-[11px] text-muted-foreground">
-              Widget hoạt động độc lập, tự động đồng bộ câu trả lời và trích dẫn quy chế theo thời
-              gian thực.
-            </p>
+            {/* Right Column: Knowledge, Tools, Guardrails, Danger Zone */}
+            <div className="space-y-6">
+              <AssistantKnowledgeSection
+                form={form}
+                onChange={setForm}
+                collections={collections}
+                onNavigate={onNavigate}
+              />
+              <AssistantToolsSection
+                form={form}
+                onChange={setForm}
+                workflows={workflows}
+                onNavigate={onNavigate}
+              />
+              <AssistantGuardrailsSection
+                form={form}
+                onChange={setForm}
+                assistantCode={item.code}
+                onNavigate={onNavigate}
+              />
+              <AssistantDangerZone
+                assistant={item}
+                isActivating={activateMutation.isPending}
+                isDeactivating={deactivateMutation.isPending}
+                onActivate={() => activateMutation.mutate()}
+                onDeactivate={() => deactivateMutation.mutate()}
+              />
+            </div>
           </div>
+        </form>
+      )}
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setIsEmbedOpen(false)}
-            >
-              Đóng
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 text-xs gap-1.5"
-              onClick={() => {
-                setIsEmbedOpen(false);
-                onNavigate("/channels");
-              }}
-            >
-              <ExternalLink className="size-3.5" />
-              Tùy biến tại Kênh phân phối
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assistant Version History & Rollback Dialog */}
-      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-bold">
-              <History className="size-4 text-primary" />
-              Lịch Sử Phiên Bản & Khôi Phục (Rollback)
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Xem lại các mốc cấu hình đã lưu của Trợ lý{" "}
-              <strong className="text-foreground">{item.name}</strong>. Mỗi lần lưu hoặc xuất bản
-              đều tự động tạo một snapshot.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 py-2 text-xs">
-            {versionsQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span>Đang tải lịch sử phiên bản...</span>
-              </div>
-            ) : !versionsQuery.data || versionsQuery.data.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
-                <History className="size-8 mx-auto mb-2 opacity-30" />
-                <p className="font-medium text-foreground">Chưa có bản ghi phiên bản nào</p>
-                <p className="text-[11px] mt-1">
-                  Khi bạn lưu thay đổi hoặc xuất bản, hệ thống sẽ tự động tạo mốc phiên bản tại đây.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {versionsQuery.data.map((ver, idx) => (
-                  <div
-                    key={ver.id}
-                    className="p-3.5 rounded-lg border border-border bg-card/60 hover:bg-card transition-colors flex items-start justify-between gap-4"
-                  >
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-primary bg-primary/10 border-primary/30"
-                        >
-                          {ver.version_number}
-                        </Badge>
-                        {idx === 0 && (
-                          <Badge
-                            variant="default"
-                            className="text-[10px] bg-primary text-primary-foreground"
-                          >
-                            Hiện tại
-                          </Badge>
-                        )}
-                        <span className="text-muted-foreground text-[11px] flex items-center gap-1">
-                          <Clock className="size-3" />
-                          {ver.created_at
-                            ? new Date(ver.created_at).toLocaleString("vi-VN")
-                            : "Gần đây"}
-                        </span>
-                        <span className="text-muted-foreground text-[11px]">
-                          • bởi <strong className="text-foreground">{ver.created_by}</strong>
-                        </span>
-                      </div>
-                      <p className="text-foreground font-medium">{ver.change_summary}</p>
-                      {ver.snapshot_data && (
-                        <div className="text-[11px] text-muted-foreground flex items-center gap-3">
-                          <span>
-                            Workflow:{" "}
-                            <code className="text-primary font-mono">
-                              {String(ver.snapshot_data.workflow_id || "N/A")}
-                            </code>
-                          </span>
-                          <span>
-                            Kho:{" "}
-                            <code className="text-primary font-mono">
-                              {String(ver.snapshot_data.collection_id || "N/A")}
-                            </code>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs gap-1.5 shrink-0 hover:border-primary hover:text-primary"
-                      disabled={rollbackMutation.isPending || idx === 0}
-                      onClick={() => setRollbackTarget(ver)}
-                    >
-                      <RotateCcw className="size-3.5" />
-                      {idx === 0 ? "Bản hiện hành" : "Khôi phục"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setIsHistoryOpen(false)}
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirm Rollback Dialog */}
-      <ConfirmDialog
-        open={Boolean(rollbackTarget)}
-        title={`Khôi phục về phiên bản ${rollbackTarget?.version_number}?`}
-        description={`Toàn bộ 7 lớp cấu hình hiện tại (Persona, ModelOps, Guardrails, Workflow, Kho tri thức) sẽ được khôi phục về trạng thái của mốc "${rollbackTarget?.change_summary}". Bạn có chắc chắn muốn thực hiện?`}
-        confirmText="Xác nhận khôi phục"
-        variant="default"
-        isPending={rollbackMutation.isPending}
-        onConfirm={() => {
-          if (rollbackTarget) {
-            rollbackMutation.mutate(rollbackTarget.id);
-          }
-        }}
-        onOpenChange={(open) => {
-          if (!open) setRollbackTarget(null);
+      {/* 1-Click Clone Assistant Dialog */}
+      <AssistantCloneDialog
+        open={isCloneOpen}
+        onOpenChange={setIsCloneOpen}
+        originalName={item.name}
+        initialCode={`${item.code}_copy`}
+        initialName={`${item.name} (Bản sao)`}
+        initialDescription={`Bản sao nhân bản từ ${item.name} chuyên trách phục vụ đơn vị.`}
+        initialCollectionId={item.collection_id}
+        isPending={cloneMutation.isPending}
+        onConfirm={(data) => {
+          cloneMutation.mutate({
+            new_code: data.code,
+            new_name: data.name,
+            new_description: data.description || undefined,
+            target_collection_id: data.collectionId || undefined,
+          });
         }}
       />
-    </form>
+
+      {/* Dialog Mã Nhúng Web Widget */}
+      <AssistantEmbedDialog
+        open={isEmbedOpen}
+        onOpenChange={setIsEmbedOpen}
+        assistantCode={item.code}
+        assistantName={item.name}
+      />
+
+      {/* Assistant Version History & Rollback Dialog */}
+      <AssistantVersionHistoryDialog
+        open={isHistoryOpen}
+        onOpenChange={setIsHistoryOpen}
+        assistantName={item.name}
+        versions={versionsQuery.data}
+        isLoading={versionsQuery.isLoading}
+        onRollback={(versionId) => rollbackMutation.mutate(versionId)}
+        isRollbacking={rollbackMutation.isPending}
+      />
+    </div>
   );
 }

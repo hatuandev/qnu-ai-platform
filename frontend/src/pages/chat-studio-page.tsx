@@ -1,9 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen,
+  Bot,
   FileText,
   GraduationCap,
   HelpCircle,
   Library,
+  Loader2,
   Paperclip,
   Send,
   SlidersHorizontal,
@@ -12,7 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Attachment } from "../components/ai/attachment";
 import { ChatMessage } from "../components/ai/chat-message";
 import { CitationSheet } from "../components/ai/citation-sheet";
@@ -22,6 +26,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { type ChatAttachment, useRAGStream } from "../hooks/use-rag-stream";
+import { listAssistants } from "../services/assistants-api";
 
 interface AssistantInfo {
   code: string;
@@ -32,7 +37,48 @@ interface AssistantInfo {
   quickPrompts: string[];
 }
 
-const ASSISTANTS: AssistantInfo[] = [
+function getAssistantIcon(category: string, code: string): React.ReactNode {
+  const normCategory = (category || "").toLowerCase();
+  const normCode = (code || "").toLowerCase();
+  if (
+    normCode.includes("admission") ||
+    normCategory.includes("tuyển sinh") ||
+    normCategory === "admissions"
+  ) {
+    return <GraduationCap className="h-4 w-4" />;
+  }
+  if (
+    normCode.includes("regulation") ||
+    normCategory.includes("học vụ") ||
+    normCategory === "academic"
+  ) {
+    return <BookOpen className="h-4 w-4" />;
+  }
+  if (
+    normCode.includes("library") ||
+    normCategory.includes("thư viện") ||
+    normCategory === "resources"
+  ) {
+    return <Library className="h-4 w-4" />;
+  }
+  if (
+    normCode.includes("draft") ||
+    normCategory.includes("soạn thảo") ||
+    normCategory === "administration"
+  ) {
+    return <FileText className="h-4 w-4" />;
+  }
+  if (
+    normCode.includes("question") ||
+    normCategory.includes("đề thi") ||
+    normCategory === "examination"
+  ) {
+    return <HelpCircle className="h-4 w-4" />;
+  }
+  return <Bot className="h-4 w-4" />;
+}
+
+const FALLBACK_STARTERS: AssistantInfo[] = [
   {
     code: "admissions",
     name: "Trợ lý Tuyển sinh QNU",
@@ -95,19 +141,70 @@ const ASSISTANTS: AssistantInfo[] = [
   },
 ];
 
-export const ChatStudioPage: React.FC = () => {
-  const [selectedCode, setSelectedCode] = useState<string>(() => {
-    const requestedCode = new URLSearchParams(window.location.search).get("assistant");
-    return ASSISTANTS.some((assistant) => assistant.code === requestedCode)
-      ? (requestedCode as string)
-      : "admissions";
+interface ChatStudioPageProps {
+  initialAssistant?: string;
+}
+
+export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant }) => {
+  const assistantsQuery = useQuery({
+    queryKey: ["assistants", "chat-studio"],
+    queryFn: () => listAssistants({ includeInactive: false }),
   });
+
+  const assistantsList: AssistantInfo[] = useMemo(() => {
+    const data = assistantsQuery.data;
+    if (!data || data.length === 0) return FALLBACK_STARTERS;
+    return data.map((ast) => {
+      const sampleQ =
+        Array.isArray(ast.sample_questions) && ast.sample_questions.length > 0
+          ? ast.sample_questions
+          : Array.isArray(ast.config?.sample_questions) && ast.config.sample_questions.length > 0
+            ? ast.config.sample_questions
+            : [];
+      return {
+        code: ast.code,
+        name: ast.name,
+        category: ast.category,
+        icon: getAssistantIcon(ast.category, ast.code),
+        description: ast.description,
+        quickPrompts:
+          sampleQ.length > 0
+            ? sampleQ
+            : [
+                `Xin chào! Tôi có thể giúp gì về ${ast.name}?`,
+                "Thông tin chính sách và quy định liên quan?",
+              ],
+      };
+    });
+  }, [assistantsQuery.data]);
+
+  const [selectedCode, setSelectedCode] = useState<string>(() => {
+    if (initialAssistant) return initialAssistant;
+    const requestedCode = new URLSearchParams(window.location.search).get("assistant");
+    return requestedCode || "admissions";
+  });
+
+  useEffect(() => {
+    const requestedCode = new URLSearchParams(window.location.search).get("assistant");
+    if (requestedCode && assistantsList.some((a) => a.code === requestedCode)) {
+      if (selectedCode !== requestedCode) {
+        setSelectedCode(requestedCode);
+      }
+    } else if (assistantsList.length > 0 && !assistantsList.some((a) => a.code === selectedCode)) {
+      setSelectedCode(assistantsList[0].code);
+    }
+  }, [assistantsList, selectedCode]);
+
   const [inputPrompt, setInputPrompt] = useState<string>("");
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [isUploadingFile, setIsUploadingFile] = useState<boolean>(false);
   const [showQuestionnaireDemo, setShowQuestionnaireDemo] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeAssistant = ASSISTANTS.find((a) => a.code === selectedCode) || ASSISTANTS[0];
+  const activeAssistant =
+    assistantsList.find((a) => a.code === selectedCode) ||
+    assistantsList[0] ||
+    FALLBACK_STARTERS[0];
 
   const {
     messages,
@@ -121,8 +218,16 @@ export const ChatStudioPage: React.FC = () => {
     assistantCode: selectedCode,
   });
 
+  const handleSelectAssistant = (code: string) => {
+    setSelectedCode(code);
+    clearMessages();
+    const url = new URL(window.location.href);
+    url.searchParams.set("assistant", code);
+    window.history.replaceState({}, "", url.toString());
+  };
+
   const handleSend = async () => {
-    if (!inputPrompt.trim() && pendingAttachments.length === 0) return;
+    if ((!inputPrompt.trim() && pendingAttachments.length === 0) || isUploadingFile) return;
     const promptToSend = inputPrompt;
     const attachmentsToSend = [...pendingAttachments];
 
@@ -139,21 +244,72 @@ export const ChatStudioPage: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newAttachments: ChatAttachment[] = Array.from(files).map((file, idx) => ({
-      id: `att_${Date.now()}_${idx}`,
-      name: file.name,
-      size: file.size,
-      type: file.type || "application/octet-stream",
-      ocrStatus: "completed",
-    }));
-
-    setPendingAttachments((prev) => [...prev, ...newAttachments]);
+    const fileList = Array.from(files);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+
+    for (let idx = 0; idx < fileList.length; idx++) {
+      const file = fileList[idx];
+      const attachmentId = `att_${Date.now()}_${idx}`;
+      const initialAttachment: ChatAttachment = {
+        id: attachmentId,
+        name: file.name,
+        size: file.size,
+        type: file.type || "application/octet-stream",
+        ocrStatus: "processing",
+      };
+      setPendingAttachments((prev) => [...prev, initialAttachment]);
+
+      try {
+        setIsUploadingFile(true);
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/platform/v1alpha1/ocr/extract", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error(`OCR thất bại (${res.status})`);
+        }
+
+        const data = await res.json();
+        const extractedText = data.raw_text || "";
+
+        setPendingAttachments((prev) =>
+          prev.map((att) =>
+            att.id === attachmentId
+              ? {
+                  ...att,
+                  ocrStatus: "completed",
+                  textContent: extractedText,
+                }
+              : att
+          )
+        );
+        toast.success(`Đã trích xuất văn bản tệp "${file.name}" thành công!`);
+      } catch (uploadErr) {
+        console.error("Lỗi trích xuất OCR:", uploadErr);
+        setPendingAttachments((prev) =>
+          prev.map((att) =>
+            att.id === attachmentId
+              ? {
+                  ...att,
+                  ocrStatus: "failed",
+                }
+              : att
+          )
+        );
+        toast.error(`Không thể trích xuất nội dung từ tệp "${file.name}".`);
+      } finally {
+        setIsUploadingFile(false);
+      }
     }
   };
 
@@ -169,7 +325,7 @@ export const ChatStudioPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             <h2 className="font-bold text-xs uppercase tracking-wider text-foreground">
-              05 Trợ lý Chuyên trách
+              {assistantsList.length.toString().padStart(2, "0")} Trợ lý AI
             </h2>
           </div>
           <Badge variant="outline" className="text-[10px] font-mono">
@@ -178,16 +334,13 @@ export const ChatStudioPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-1.5 flex-1 overflow-y-auto pr-1">
-          {ASSISTANTS.map((ast) => {
+          {assistantsList.map((ast) => {
             const isSelected = ast.code === selectedCode;
             return (
               <button
                 key={ast.code}
                 type="button"
-                onClick={() => {
-                  setSelectedCode(ast.code);
-                  clearMessages();
-                }}
+                onClick={() => handleSelectAssistant(ast.code)}
                 className={`w-full text-left p-2.5 rounded-control border text-xs transition-all cursor-pointer flex items-start gap-2.5 ${
                   isSelected
                     ? "bg-primary/10 border-primary text-foreground font-semibold shadow-xs"
@@ -364,6 +517,7 @@ export const ChatStudioPage: React.FC = () => {
               ref={fileInputRef}
               onChange={handleFileUpload}
               multiple
+              disabled={isUploadingFile}
               className="hidden"
               accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg"
             />
@@ -372,11 +526,20 @@ export const ChatStudioPage: React.FC = () => {
               type="button"
               variant="ghost"
               size="sm"
+              disabled={isUploadingFile}
               onClick={() => fileInputRef.current?.click()}
               className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground shrink-0 rounded-micro"
-              title="Đính kèm tài liệu (PDF, Word, Excel, Ảnh)"
+              title={
+                isUploadingFile
+                  ? "Đang trích xuất OCR..."
+                  : "Đính kèm tài liệu (PDF, Word, Excel, Ảnh)"
+              }
             >
-              <Paperclip className="h-4 w-4" />
+              {isUploadingFile ? (
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
             </Button>
 
             <textarea
@@ -405,7 +568,9 @@ export const ChatStudioPage: React.FC = () => {
                 variant="default"
                 size="sm"
                 onClick={handleSend}
-                disabled={!inputPrompt.trim() && pendingAttachments.length === 0}
+                disabled={
+                  (!inputPrompt.trim() && pendingAttachments.length === 0) || isUploadingFile
+                }
                 className="h-8 px-3 text-xs gap-1.5 shrink-0 rounded-control"
               >
                 <Send className="h-3.5 w-3.5" />
@@ -416,8 +581,8 @@ export const ChatStudioPage: React.FC = () => {
 
           <div className="flex items-center justify-between text-[10px] text-muted-foreground px-1">
             <span>
-              Mô hình chính: <strong className="text-foreground">GPT-4o Mini</strong> • Dự phòng:{" "}
-              <strong className="text-foreground">Gemini 1.5 Flash</strong>
+              Trợ lý: <strong className="text-foreground">{activeAssistant.name}</strong> • Chuyên
+              môn: <strong className="text-foreground">{activeAssistant.category}</strong>
             </span>
             <span className="hidden sm:inline">
               Trích dẫn căn cứ xác thực 100% tài liệu ĐH Quy Nhơn

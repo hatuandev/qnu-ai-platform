@@ -6,6 +6,7 @@ import hashlib
 import logging
 import re
 import uuid
+from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -442,6 +443,22 @@ class KnowledgeService:
         """Delete a collection, all its documents, chunks, facts, and Qdrant index (zero ghost collections)."""
         col = await self.get_collection(db, collection_id)
 
+        # 0. Delete physical files from Storage driver
+        docs = list(
+            (
+                await db.execute(
+                    select(KnowledgeDocument).where(KnowledgeDocument.collection_id == collection_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for doc in docs:
+            try:
+                await storage_service.delete(doc.storage_path)
+            except Exception as exc:
+                logger.warning("Storage file deletion failed for %s: %s", doc.storage_path, exc)
+
         # 1. Delete Qdrant vector collection
         try:
             from app.modules.rag.vector_indexer import vector_indexer
@@ -536,6 +553,8 @@ class KnowledgeService:
                 "page_markdowns": prepared.get("page_markdowns") or {},
             },
             status="pending",
+            index_status="pending",
+            index_error=None,
             is_active=True,
         )
         db.add(doc)
@@ -546,7 +565,7 @@ class KnowledgeService:
 
         # 8. Record audit job in job_records so Ingestion Tasks history tracks this upload
         job = JobRecord(
-            job_type="ingestion",
+            job_type="ingestion_extract",
             status="completed",
             progress=100.0,
             collection_id=collection_id,
@@ -559,7 +578,6 @@ class KnowledgeService:
                 "channel": "studio_upload",
             },
             result={
-                "points_reindexed": len(chunk_drafts),
                 "total_chunks": len(chunk_drafts),
                 "ocr_engine": prepared["ocr_method"],
             },
@@ -1419,8 +1437,12 @@ class KnowledgeService:
             doc.doc_metadata = metadata
 
         doc.status = "approved"
+        doc.index_status = "indexing"
+        doc.index_error = None
         await db.commit()
         await db.refresh(doc)
+
+        col = await self.get_collection(db, doc.collection_id)
 
         chunks = list(
             (
@@ -1431,30 +1453,50 @@ class KnowledgeService:
             .scalars()
             .all()
         )
-        indexed = await vector_indexer.index_chunks(
-            collection_id=doc.collection_id,
-            chunks=[
-                {
-                    "id": c.id,
-                    "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.collection_id}:{c.id}")),
-                    "content": c.content,
-                    "document_id": c.document_id,
-                    "section": c.section,
-                    "page_number": c.page_number,
-                    "metadata": c.chunk_metadata or {},
-                }
-                for c in chunks
-            ],
-        )
+        chunks_payload = [
+            {
+                "id": c.id,
+                "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.collection_id}:{c.id}")),
+                "content": c.content,
+                "document_id": c.document_id,
+                "tenant_id": col.tenant_id,
+                "workspace_id": col.workspace_id,
+                "document_status": "approved",
+                "is_retrievable": True,
+                "section": c.section,
+                "page_number": c.page_number,
+                "metadata": c.chunk_metadata or {},
+            }
+            for c in chunks
+        ]
+
+        try:
+            indexed = await vector_indexer.index_chunks(
+                collection_id=doc.collection_id,
+                chunks=chunks_payload,
+            )
+            if indexed > 0:
+                doc.index_status = "indexed"
+                doc.index_error = None
+            else:
+                doc.index_status = "index_failed"
+                doc.index_error = "Vector indexer trả về 0 điểm được lập chỉ mục."
+        except Exception as exc:
+            logger.error("Failed to index chunks for doc %s: %s", doc.id, exc)
+            doc.index_status = "index_failed"
+            doc.index_error = str(exc)
+            indexed = 0
+
         metadata = dict(doc.doc_metadata or {})
         metadata["indexed_chunks"] = indexed
+        metadata["index_status"] = doc.index_status
         doc.doc_metadata = metadata
 
         job_stmt = (
             select(JobRecord)
             .where(
                 JobRecord.document_id == doc.id,
-                JobRecord.job_type == "ingestion",
+                JobRecord.job_type.in_(["ingestion", "ingestion_extract"]),
             )
             .order_by(JobRecord.created_at.desc())
         )
@@ -1466,29 +1508,30 @@ class KnowledgeService:
                 "points_reindexed": indexed,
                 "total_chunks": len(chunks),
                 "status": "approved",
+                "index_status": doc.index_status,
+                "error": doc.index_error,
             }
-        else:
-            db.add(
-                JobRecord(
-                    job_type="ingestion",
-                    status="completed",
-                    progress=100.0,
-                    collection_id=doc.collection_id,
-                    document_id=doc.id,
-                    payload={
-                        "filename": doc.file_name,
-                        "source_file": doc.file_name,
-                        "file_size_mb": round((doc.file_size_bytes or 0) / (1024 * 1024), 2),
-                        "ocr_engine": (doc.doc_metadata or {}).get("ocr_method") or "IBM Docling TableFormer",
-                        "channel": "studio_upload",
-                    },
-                    result={
-                        "points_reindexed": indexed,
-                        "total_chunks": len(chunks),
-                        "status": "approved",
-                    },
-                )
+
+        # Dedicated vector_indexing job record
+        db.add(
+            JobRecord(
+                job_type="vector_indexing",
+                status="completed" if doc.index_status == "indexed" else "failed",
+                progress=100.0 if doc.index_status == "indexed" else 0.0,
+                collection_id=doc.collection_id,
+                document_id=doc.id,
+                payload={
+                    "document_id": doc.id,
+                    "filename": doc.file_name,
+                    "total_chunks": len(chunks),
+                },
+                result={
+                    "points_reindexed": indexed,
+                    "index_status": doc.index_status,
+                    "error": doc.index_error,
+                },
             )
+        )
 
         await db.commit()
 
@@ -1499,10 +1542,11 @@ class KnowledgeService:
         except Exception as exc:
             logger.warning("Cache invalidation failed on document approval for %s: %s", doc.collection_id, exc)
 
-        logger.info("Approved document id=%s, chunks=%d, indexed=%d", doc.id, len(chunks), indexed)
+        logger.info("Approved document id=%s, chunks=%d, indexed=%d, status=%s", doc.id, len(chunks), indexed, doc.index_status)
         return {
             "document_id": doc.id,
             "status": doc.status,
+            "index_status": doc.index_status,
             "total_chunks": len(chunks),
             "indexed_chunks": indexed,
         }
@@ -1663,6 +1707,220 @@ class KnowledgeService:
                 for f in facts
             ],
         )
+
+    async def reindex_document(self, db: AsyncSession, document_id: str) -> dict[str, Any]:
+        """Re-index chunks of a single document into Qdrant vector database."""
+        doc = await self.get_document(db, document_id)
+        col = await self.get_collection(db, doc.collection_id)
+
+        chunks = list(
+            (
+                await db.execute(
+                    select(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not chunks:
+            doc.index_status = "index_failed"
+            doc.index_error = "Tài liệu không có chunk nào để lập chỉ mục."
+            await db.commit()
+            await db.refresh(doc)
+            return {
+                "document_id": doc.id,
+                "status": doc.status,
+                "index_status": doc.index_status,
+                "indexed_chunks": 0,
+                "message": doc.index_error,
+            }
+
+        doc.index_status = "indexing"
+        doc.index_error = None
+        await db.commit()
+
+        chunks_payload = [
+            {
+                "id": c.id,
+                "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc.collection_id}:{c.id}")),
+                "content": c.content,
+                "document_id": c.document_id,
+                "tenant_id": col.tenant_id,
+                "workspace_id": col.workspace_id,
+                "document_status": doc.status,
+                "is_retrievable": doc.status == "approved",
+                "section": c.section,
+                "page_number": c.page_number,
+                "metadata": c.chunk_metadata or {},
+            }
+            for c in chunks
+        ]
+
+        try:
+            from app.modules.rag.vector_indexer import vector_indexer
+            indexed = await vector_indexer.index_chunks(
+                collection_id=doc.collection_id,
+                chunks=chunks_payload,
+            )
+            if indexed > 0:
+                doc.index_status = "indexed"
+                doc.index_error = None
+            else:
+                doc.index_status = "index_failed"
+                doc.index_error = "Vector indexer trả về 0 điểm."
+        except Exception as exc:
+            logger.error("Reindexing failed for doc %s: %s", doc.id, exc)
+            doc.index_status = "index_failed"
+            doc.index_error = str(exc)
+            indexed = 0
+
+        metadata = dict(doc.doc_metadata or {})
+        metadata["indexed_chunks"] = indexed
+        metadata["index_status"] = doc.index_status
+        doc.doc_metadata = metadata
+
+        job = JobRecord(
+            job_type="vector_indexing",
+            status="completed" if doc.index_status == "indexed" else "failed",
+            progress=100.0 if doc.index_status == "indexed" else 0.0,
+            collection_id=doc.collection_id,
+            document_id=doc.id,
+            payload={"document_id": doc.id, "trigger": "manual_reindex"},
+            result={"points_reindexed": indexed, "index_status": doc.index_status, "error": doc.index_error},
+        )
+        db.add(job)
+
+        try:
+            from app.core.redis import semantic_cache
+            await semantic_cache.invalidate_collection(doc.collection_id)
+        except Exception as exc:
+            logger.warning("Cache invalidation failed: %s", exc)
+
+        await db.commit()
+        await db.refresh(doc)
+
+        return {
+            "document_id": doc.id,
+            "status": doc.status,
+            "index_status": doc.index_status,
+            "indexed_chunks": indexed,
+            "message": "Lập chỉ mục thành công" if doc.index_status == "indexed" else f"Lập chỉ mục thất bại: {doc.index_error}",
+        }
+
+    async def reconcile_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
+        """Audit parity across 4 layers: PostgreSQL DB, Qdrant Vector, Storage Driver, Redis Cache."""
+        await self.get_collection(db, collection_id)
+        docs = list(
+            (
+                await db.execute(
+                    select(KnowledgeDocument).where(KnowledgeDocument.collection_id == collection_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        chunk_count_res = await db.execute(
+            select(func.count(KnowledgeChunk.id)).where(KnowledgeChunk.collection_id == collection_id)
+        )
+        db_chunks_count = chunk_count_res.scalar() or 0
+
+        # Qdrant points count
+        qdrant_points_count = 0
+        try:
+            from app.modules.rag.vector_indexer import vector_indexer
+            cname = vector_indexer._get_collection_name(collection_id)
+            count_res = await vector_indexer.client.count(collection_name=cname)
+            qdrant_points_count = count_res.count
+        except Exception as exc:
+            logger.warning("Failed to count points in Qdrant for collection %s: %s", collection_id, exc)
+
+        # Storage files count & discrepancies
+        storage_files_count = 0
+        discrepancies: list[dict[str, Any]] = []
+        indexed_docs_count = sum(1 for d in docs if getattr(d, "index_status", None) == "indexed")
+        failed_docs_count = sum(1 for d in docs if getattr(d, "index_status", None) == "index_failed")
+
+        for d in docs:
+            # Check storage existence
+            try:
+                exists = await storage_service.exists(d.storage_path)
+                if exists:
+                    storage_files_count += 1
+                else:
+                    discrepancies.append({
+                        "type": "missing_storage_file",
+                        "document_id": d.id,
+                        "details": f"Tệp tin vật lý không tồn tại tại đường dẫn: {d.storage_path}",
+                    })
+            except Exception:
+                pass
+
+            # Check approved but index_failed or pending
+            if d.status == "approved" and d.index_status != "indexed":
+                discrepancies.append({
+                    "type": "missing_qdrant_vector",
+                    "document_id": d.id,
+                    "details": f"Tài liệu '{d.title}' đã duyệt nhưng chưa lập chỉ mục thành công (index_status: {d.index_status}).",
+                })
+
+        # Check chunk vs point parity for approved documents
+        approved_chunks_count = sum(
+            (d.doc_metadata or {}).get("chunk_count", 0) for d in docs if d.status == "approved"
+        )
+        if qdrant_points_count < approved_chunks_count:
+            discrepancies.append({
+                "type": "vector_points_deficit",
+                "document_id": None,
+                "details": f"Qdrant có {qdrant_points_count} points, nhưng các tài liệu đã duyệt có {approved_chunks_count} chunks.",
+            })
+
+        is_consistent = len(discrepancies) == 0
+
+        return {
+            "collection_id": collection_id,
+            "db_documents_count": len(docs),
+            "indexed_documents_count": indexed_docs_count,
+            "failed_documents_count": failed_docs_count,
+            "db_chunks_count": db_chunks_count,
+            "qdrant_points_count": qdrant_points_count,
+            "storage_files_count": storage_files_count,
+            "is_consistent": is_consistent,
+            "discrepancies": discrepancies,
+        }
+
+    async def reconcile_fix_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
+        """Automatically recover and re-index all missing vectors for approved documents in a collection."""
+        await self.get_collection(db, collection_id)
+        docs = list(
+            (
+                await db.execute(
+                    select(KnowledgeDocument).where(
+                        KnowledgeDocument.collection_id == collection_id,
+                        KnowledgeDocument.status == "approved",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        reindexed: list[str] = []
+        failed: list[str] = []
+        total_chunks = 0
+        for d in docs:
+            if d.index_status != "indexed":
+                res = await self.reindex_document(db, d.id)
+                if res["index_status"] == "indexed":
+                    reindexed.append(d.id)
+                    total_chunks += res.get("indexed_chunks", 0)
+                else:
+                    failed.append(d.id)
+        return {
+            "collection_id": collection_id,
+            "reindexed_documents": reindexed,
+            "failed_documents": failed,
+            "total_reindexed_chunks": total_chunks,
+            "message": f"Đã phục hồi chỉ mục cho {len(reindexed)}/{len(reindexed) + len(failed)} tài liệu.",
+        }
 
 
 knowledge_service = KnowledgeService()

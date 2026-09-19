@@ -38,6 +38,11 @@ class DocumentExporterTool(BaseTool):
     def category(self) -> str:
         return "drafting"
 
+    @property
+    def requires_approval(self) -> bool:
+        """Kích hoạt phê duyệt Human-in-the-loop trước khi xuất tệp văn bản chính thức."""
+        return True
+
     def get_openapi_schema(self) -> dict[str, Any]:
         return {
             "name": self.name,

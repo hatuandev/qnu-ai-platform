@@ -96,6 +96,10 @@ class KnowledgeDocument(Base):
     status: Mapped[str] = mapped_column(
         String(32), default="pending", nullable=False
     )  # pending, processed, approved, archived
+    index_status: Mapped[str] = mapped_column(
+        String(32), default="pending", nullable=False, index=True
+    )  # pending, indexing, indexed, index_failed
+    index_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
 

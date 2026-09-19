@@ -1,12 +1,10 @@
 import {
   BookOpen,
   Bot,
-  Code2,
   Cpu,
   FileText,
   History,
   LayoutDashboard,
-  MessageSquare,
   MessagesSquare,
   Network,
   Palette,
@@ -26,18 +24,20 @@ export interface NavItem {
   badge?: string;
   badgeVariant?: "default" | "secondary" | "outline" | "success" | "warning" | "info";
   description?: string;
+  isDevOnly?: boolean;
 }
 
 export interface NavSection {
   id: string;
   title: string;
   items: NavItem[];
+  isAdvancedSection?: boolean;
 }
 
 export const NAVIGATION_CONFIG: NavSection[] = [
   {
-    id: "operations",
-    title: "Vận Hành & Trợ Lý",
+    id: "overview",
+    title: "Tổng Quan",
     items: [
       {
         id: "dashboard",
@@ -46,9 +46,15 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         icon: LayoutDashboard,
         description: "Thống kê Tokens, chi phí FinOps USD và trạng thái các services",
       },
+    ],
+  },
+  {
+    id: "ai_builder",
+    title: "Xây Dựng AI",
+    items: [
       {
         id: "assistants",
-        title: "05 Trợ Lý Chuẩn QNU",
+        title: "Trợ Lý AI",
         path: "/assistants",
         icon: Bot,
         badge: "5 Trợ lý",
@@ -56,14 +62,29 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         description: "Tuyển sinh, Quy chế, Thư viện, Soạn thảo NĐ 30, Ngân hàng đề thi Bloom",
       },
       {
-        id: "chat",
-        title: "Studio Chat Toàn Năng",
-        path: "/chat",
-        icon: MessageSquare,
-        badge: "SSE",
-        badgeVariant: "info",
-        description: "Hỏi đáp trực tiếp với Trợ lý AI kèm token streaming và dẫn chứng",
+        id: "knowledge",
+        title: "Kho Tri Thức",
+        path: "/knowledge",
+        icon: BookOpen,
+        badge: "RAG",
+        badgeVariant: "success",
+        description: "Collections tài liệu, Ingestion wizard, OCR đa tầng và Facts số hóa",
       },
+      {
+        id: "models",
+        title: "Mô Hình & Provider",
+        path: "/models",
+        icon: Cpu,
+        badge: "Providers",
+        badgeVariant: "default",
+        description: "OpenAI, Gemini, Mistral, Cloudflare, Local vLLM/Ollama và Circuit Breaker",
+      },
+    ],
+  },
+  {
+    id: "operations",
+    title: "Vận Hành",
+    items: [
       {
         id: "conversations",
         title: "Hội Thoại & Handoff",
@@ -72,114 +93,90 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         description: "Lịch sử tương tác đa kênh và bàn giao trực tiếp cho Cán bộ tư vấn",
       },
       {
-        id: "channels",
-        title: "Kênh & Mã Nhúng",
-        path: "/channels",
-        icon: Share2,
-        description: "Cấu hình Web Chat Widget nhúng và CDN script cho Cổng thông tin trường",
+        id: "quality",
+        title: "Chất Lượng & Lỗ Hổng",
+        path: "/quality",
+        icon: ShieldCheck,
+        badge: "TM-08",
+        badgeVariant: "warning",
+        description: "Kiểm định Ragas TM-08, Hòm thư lỗ hổng tri thức và cải tiến liên tục",
       },
       {
-        id: "runs",
-        title: "Lịch Sử Thực Thi DAG",
-        path: "/runs",
+        id: "operations_runs",
+        title: "Giám Sát Thực Thi",
+        path: "/operations/runs",
         icon: History,
-        description: "Truy vết chi tiết từng bước chạy node, input/output và độ trễ",
+        description: "Lịch sử thực thi DAG runs, thời gian xử lý và Hộp thư phê duyệt HITL",
       },
     ],
   },
   {
-    id: "knowledge_hub",
-    title: "Kho Tri Thức & Quy Trình",
+    id: "system",
+    title: "Hệ Thống",
     items: [
       {
-        id: "knowledge",
-        title: "Quản Trị Tri Thức",
-        path: "/knowledge",
-        icon: BookOpen,
-        badge: "RAG",
-        badgeVariant: "success",
-        description: "Collections tài liệu, Ingestion wizard, OCR đa tầng và Hybrid Playground",
+        id: "integrations",
+        title: "Tích Hợp & Kênh",
+        path: "/settings/integrations",
+        icon: Share2,
+        description: "Cấu hình Web Chat Widget nhúng, CDN script và Khóa API phòng ban",
       },
-      {
-        id: "scan-studio",
-        title: "Scan & OCR Studio",
-        path: "/ocr",
-        icon: Scan,
-        badge: "Studio",
-        badgeVariant: "success",
-        description:
-          "Bóc tách văn bản scan, nhận diện bảng biểu, con dấu và xem trước Split-Screen",
-      },
-      {
-        id: "document-types",
-        title: "Loại Văn Bản",
-        path: "/document-types",
-        icon: FileText,
-        description: "Quy chuẩn mẫu biểu hành chính: Quyết định, Quy chế, Tờ trình, Thông báo",
-      },
+    ],
+  },
+  {
+    id: "advanced",
+    title: "Nâng Cao",
+    isAdvancedSection: true,
+    items: [
       {
         id: "workflows",
-        title: "Quy Trình Workflow DAG",
-        path: "/workflows",
+        title: "Thư Viện Workflow",
+        path: "/advanced/workflows",
         icon: Workflow,
         badge: "5 DAGs",
-        badgeVariant: "default",
+        badgeVariant: "outline",
         description: "Điều phối luồng xử lý thông minh 05 Trợ lý AI qua đồ thị topo",
       },
       {
         id: "nodes",
-        title: "Thư Viện DAG Nodes",
-        path: "/nodes",
+        title: "Thư Viện Nodes",
+        path: "/advanced/capabilities/nodes",
         icon: Network,
         description: "Danh mục đặc tả các Node: Input, Route, Approval, RAG, Export",
       },
       {
         id: "tools",
-        title: "Cổng Công Cụ & Tools",
-        path: "/tools",
+        title: "Cổng Công Cụ",
+        path: "/advanced/capabilities/tools",
         icon: Wrench,
         badge: "3 Tools",
         badgeVariant: "secondary",
         description: "Tra cứu UIS điểm chuẩn, xuất Word NĐ 30, xuất bảng tính Excel Bloom",
       },
       {
-        id: "evaluation",
-        title: "Kiểm Định Ragas TM-08",
-        path: "/evaluation",
-        icon: ShieldCheck,
-        badge: "TM-08",
-        badgeVariant: "warning",
-        description: "Đo lường độ trung thực (>=0.90), độ liên quan (>=0.85), Gap Inbox",
-      },
-    ],
-  },
-  {
-    id: "system",
-    title: "Hệ Thống & Quản Trị",
-    items: [
-      {
-        id: "models",
-        title: "Quản Lý Provider",
-        path: "/models",
-        icon: Cpu,
-        badge: "Providers",
-        badgeVariant: "default",
-        description: "OpenAI, Gemini, Claude, Local vLLM/Ollama, DeepSeek và cấu hình mô hình",
+        id: "document_types",
+        title: "Loại Văn Bản",
+        path: "/knowledge/settings/document-types",
+        icon: FileText,
+        description: "Quy chuẩn mẫu biểu hành chính: Quyết định, Quy chế, Tờ trình, Thông báo",
       },
       {
-        id: "developer",
-        title: "Cổng Developer & API",
-        path: "/developer",
-        icon: Code2,
-        description: "Quản lý khóa API các phòng ban, Webhooks và tài liệu tích hợp",
+        id: "ocr_lab",
+        title: "OCR Studio Lab",
+        path: "/knowledge/ocr-lab",
+        icon: Scan,
+        badge: "Lab",
+        badgeVariant: "info",
+        description: "Phòng thử nghiệm bóc tách scan, nhận diện bảng biểu và con dấu độc lập",
       },
       {
-        id: "design-system",
-        title: "Design System QNU",
+        id: "design_system",
+        title: "Design System",
         path: "/design-system",
         icon: Palette,
-        badge: "Showcase",
+        badge: "Dev",
         badgeVariant: "secondary",
+        isDevOnly: true,
         description: "Kiểm tra UI Primitives, bảng màu OKLCH, typography và linh kiện",
       },
     ],

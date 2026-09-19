@@ -20,6 +20,7 @@ export interface ChatAttachment {
   type: string;
   url?: string;
   ocrStatus?: "idle" | "processing" | "completed" | "failed";
+  textContent?: string;
 }
 
 export interface ChatMessageItem {
@@ -58,6 +59,15 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeCitation, setActiveCitation] = useState<ChatCitation | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(
+    conversationId
+  );
+
+  useEffect(() => {
+    if (conversationId) {
+      setCurrentConversationId(conversationId);
+    }
+  }, [conversationId]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -83,6 +93,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
     setMessages([]);
     setError(null);
     setActiveCitation(null);
+    setCurrentConversationId(undefined);
   }, [stopStreaming]);
 
   const sendMessage = useCallback(
@@ -135,9 +146,16 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
           },
           body: JSON.stringify({
             message: trimmed,
-            conversation_id: conversationId,
+            conversation_id: currentConversationId || conversationId,
             tenant_id: tenantId,
             stream: true,
+            attachments: (attachments || []).map((a) => ({
+              id: a.id,
+              name: a.name,
+              size: a.size,
+              type: a.type,
+              text_content: a.textContent,
+            })),
           }),
           signal: controller.signal,
         });
@@ -219,11 +237,23 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                 } catch {
                   // ignore malformed artifact chunk
                 }
+              } else if (event.event === "status") {
+                try {
+                  const statusObj = JSON.parse(event.data);
+                  if (statusObj.conversation_id) {
+                    setCurrentConversationId(statusObj.conversation_id);
+                  }
+                } catch {
+                  // ignore status payload error
+                }
               } else if (event.event === "done" || event.event === "end") {
                 try {
                   const doneData = JSON.parse(event.data);
                   if (doneData.suggested_questions && Array.isArray(doneData.suggested_questions)) {
                     finalSuggestions = doneData.suggested_questions;
+                  }
+                  if (doneData.conversation_id) {
+                    setCurrentConversationId(doneData.conversation_id);
                   }
                 } catch {
                   // ignore
@@ -270,6 +300,9 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
         } else {
           // Standard JSON response fallback (when stream=false or non-SSE)
           const data = await response.json();
+          if (data.conversation_id) {
+            setCurrentConversationId(data.conversation_id);
+          }
           const latencyMs = data.latency_ms || Math.round(performance.now() - startTime);
           const answer = data.answer || "Đã xử lý xong yêu cầu của bạn.";
           const citations: ChatCitation[] = (data.citations || []).map(
@@ -354,7 +387,15 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
         abortControllerRef.current = null;
       }
     },
-    [assistantCode, conversationId, tenantId, stopStreaming, onFinish, onError]
+    [
+      assistantCode,
+      conversationId,
+      currentConversationId,
+      tenantId,
+      stopStreaming,
+      onFinish,
+      onError,
+    ]
   );
 
   return {
@@ -364,6 +405,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
     error,
     activeCitation,
     setActiveCitation,
+    conversationId: currentConversationId,
     sendMessage,
     stopStreaming,
     clearMessages,

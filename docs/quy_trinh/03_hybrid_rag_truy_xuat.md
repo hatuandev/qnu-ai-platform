@@ -50,8 +50,9 @@ flowchart TD
 - **Input Safety Guardrail**: Quét phát hiện tấn công Prompt Injection (`Ignore all previous instructions...`, `Reveal system prompt...`).
 - **PII Data Redaction**: Tự động nhận diện và che mờ các thông tin nhạy cảm của thí sinh/sinh viên trước khi gửi sang LLM (CCCD thành `077******988`, SĐT thành `0912***678`, Email thành `sin***@qnu.edu.vn`).
 
-### Bước 3: Ưu Tiên Tuyệt Đối Bảng Sự Thật (Structured Fact Layer)
-- Tra cứu bảng `knowledge_facts` trên PostgreSQL.
+### Bước 3: Ưu Tiên Tuyệt Đối Bảng Sự Thật (Structured Fact Layer) & Ràng Buộc Vòng Đời Tài Liệu
+- Tra cứu bảng `knowledge_facts` trên PostgreSQL kết hợp `outerjoin` với `knowledge_documents`.
+- **Ràng buộc Vòng đời Phê duyệt (Document Lifecycle Binding)**: Chỉ trích xuất facts gắn với tài liệu ở trạng thái đã kiểm duyệt và hiệu lực (`status in ["approved", "completed", "processed", "ready"]` và `is_active = True`) hoặc các facts số liệu độc lập không gắn tệp (nhập qua bảng tính Excel/CSV). Tuyệt đối loại trừ 100% facts từ tài liệu đang chờ duyệt (`pending`) hoặc đã lưu trữ/thu hồi (`archived`), bảo vệ tính trung thực của dữ liệu điểm chuẩn/học phí.
 - Khi người dùng hỏi các câu hỏi thông số cụ thể: *"Điểm chuẩn ngành Công nghệ thông tin 2024?"*, Fact Layer trả về ngay dữ liệu bảng `24.5 điểm (tổ hợp A00, A01, D01, D07)`.
 - Thông số này được gắn vào đầu Prompt dưới dạng Markdown Table bắt buộc LLM phải tuân thủ, triệt tiêu bịa đặt.
 

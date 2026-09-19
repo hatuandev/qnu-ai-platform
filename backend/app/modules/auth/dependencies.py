@@ -14,9 +14,11 @@ settings = get_settings()
 
 async def get_current_actor(request: Request) -> AuthActor:
     """Extract authenticated actor from HttpOnly cookie or Authorization header."""
+    current_settings = get_settings()
+
     token = request.cookies.get("qnu_session")
     if not token:
-        auth_header = request.headers.get("Authorization")
+        auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header[7:].strip()
 
@@ -31,10 +33,21 @@ async def get_current_actor(request: Request) -> AuthActor:
                 authenticated=True,
             )
         except Exception:
-            pass
+            raise AppException(
+                "Mã xác thực hoặc phiên làm việc không hợp lệ.",
+                code="invalid_token",
+                status_code=401,
+            )
 
-    # If dev auth is disabled or in testing mode without auth header, provide default dev actor
-    if not settings.DEV_AUTH_ENABLED or settings.ENVIRONMENT == "test":
+    enforce_auth = (
+        request.headers.get("x-enforce-auth", "").lower() in ("true", "1")
+        or request.headers.get("X-Enforce-Auth", "").lower() in ("true", "1")
+    )
+
+    # In test mode without explicit auth enforcement, provide default dev actor
+    if not current_settings.DEV_AUTH_ENABLED or (
+        current_settings.ENVIRONMENT == "test" and not enforce_auth
+    ):
         return AuthActor(
             username="admin",
             tenant_id="tenant_qnu",
@@ -48,3 +61,5 @@ async def get_current_actor(request: Request) -> AuthActor:
         code="unauthorized",
         status_code=401,
     )
+
+

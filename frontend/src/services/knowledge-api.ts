@@ -5,7 +5,10 @@ import type {
   KnowledgeCollection,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
+  KnowledgeReconciliationReport,
   ParsePreviewResult,
+  ReconcileFixResponse,
+  ReindexDocumentResponse,
 } from "@/types/knowledge";
 import { BASE_URL } from "./http-client";
 
@@ -190,7 +193,12 @@ export const knowledgeApi = {
           | "completed"
           | "processing"
           | "pending"
-          | "failed",
+          | "failed"
+          | "approved"
+          | "archived",
+        index_status:
+          (d.index_status as "pending" | "indexing" | "indexed" | "index_failed") || "pending",
+        index_error: (d.index_error as string | null) || null,
         ocr_method: (d.ocr_method as string) || "Docling Table Parser",
         document_type_code: (d.document_type_code as string) || undefined,
         document_type: (d.document_type_code as string) || undefined,
@@ -392,5 +400,34 @@ export const knowledgeApi = {
       throw new Error(`Nạp bảng biểu số liệu thất bại (HTTP ${res.status}).`);
     }
     return (await res.json()) as FactExcelImportResponse;
+  },
+
+  async reindexDocument(documentId: string): Promise<ReindexDocumentResponse> {
+    const res = await fetch(`${BASE_URL}/knowledge/documents/${documentId}/reindex`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Lỗi kết nối" }));
+      throw new Error(err.detail || `Lập chỉ mục lại thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as ReindexDocumentResponse;
+  },
+
+  async reconcileCollection(collectionId: string): Promise<KnowledgeReconciliationReport> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/reconcile`);
+    if (!res.ok) {
+      throw new Error(`Đối soát kho tri thức thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as KnowledgeReconciliationReport;
+  },
+
+  async fixReconciliation(collectionId: string): Promise<ReconcileFixResponse> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/reconcile-fix`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      throw new Error(`Đồng bộ sửa lỗi chỉ mục thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as ReconcileFixResponse;
   },
 };

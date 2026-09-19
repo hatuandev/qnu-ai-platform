@@ -40,6 +40,7 @@ export const ChannelsPage: React.FC = () => {
   data-title="${widgetTitle}"
   data-position="${position}"
   data-welcome="${welcomeMessage}"
+  data-api-base="${originUrl}"
   defer>
 </script>`;
 

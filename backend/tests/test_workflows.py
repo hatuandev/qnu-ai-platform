@@ -719,3 +719,203 @@ async def test_api_caller_node_handler_execution():
     assert res_fail.status == "failed"
     assert "không tồn tại" in res_fail.error
 
+    # 4. Test tool with requires_approval pauses workflow when is_approved is missing
+    spec_hitl = WorkflowNodeSpec(
+        id="api_exporter",
+        type="tool.api_caller",
+        config={
+            "tool_id": "export_administrative_document",
+            "params": {"title": "Quyết định khen thưởng", "document_type": "decision"},
+        },
+    )
+    ctx_unapproved = WorkflowContext(
+        workflow_id="wf_drafting",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"query": "Tạo văn bản"},
+    )
+    res_hitl = await handler.execute(spec_hitl, ctx_unapproved)
+    assert res_hitl.status == "paused_for_approval"
+    assert res_hitl.output.get("pending_approval") is True
+    assert res_hitl.output.get("tool_name") == "export_administrative_document"
+    assert "phê duyệt" in res_hitl.output.get("action_required", "")
+
+    # 5. Test tool with requires_approval proceeds when is_approved is True
+    ctx_approved = WorkflowContext(
+        workflow_id="wf_drafting",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"query": "Tạo văn bản", "is_approved": True, "approved_by": "supervisor_01"},
+    )
+    res_approved = await handler.execute(spec_hitl, ctx_approved)
+    assert res_approved.status == "completed"
+    assert res_approved.output.get("status") in ("success", "generated")
+
+    # 6. Test assistant allowlist rejects unauthorized tool
+    mock_db = AsyncMock()
+    mock_assistant_rec = MagicMock()
+    mock_assistant_rec.config = {"tools": {"enabled_tools": ["lookup_admission_score"]}}
+    mock_exec = MagicMock()
+    mock_exec.scalar_one_or_none.return_value = mock_assistant_rec
+    mock_db.execute.return_value = mock_exec
+
+    ctx_disallowed = WorkflowContext(
+        workflow_id="wf_admissions",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"query": "Tạo văn bản", "is_approved": True},
+        db=mock_db,
+        assistant_profile=MagicMock(assistant_code="admissions"),
+    )
+    spec_disallowed = WorkflowNodeSpec(
+        id="api_disallowed",
+        type="tool.api_caller",
+        config={
+            "tool_id": "export_administrative_document",
+            "on_error_behavior": "fail_workflow",
+        },
+    )
+    res_disallowed = await handler.execute(spec_disallowed, ctx_disallowed)
+    assert res_disallowed.status == "failed"
+    assert "không được kích hoạt cho trợ lý" in res_disallowed.error
+
+
+def test_compiler_validates_node_config_schema_missing_required_field():
+    """Compiler must reject DAGs where a node is missing required fields in its config_schema."""
+    spec = WorkflowDagSpec(
+        entry_node_id="in_1",
+        nodes=[
+            WorkflowNodeSpec(id="in_1", type="input.chat"),
+            WorkflowNodeSpec(
+                id="rag_1",
+                type="core.knowledge.answer",
+                config={"module_code": "admissions"},
+            ),
+            WorkflowNodeSpec(
+                id="guard_1",
+                type="guard.citation_policy",
+                config={"require_citation_for_answer": True},
+            ),
+            WorkflowNodeSpec(id="out_1", type="output.chat"),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="in_1", target="rag_1"),
+            WorkflowEdgeSpec(source="rag_1", target="guard_1"),
+            WorkflowEdgeSpec(source="guard_1", target="out_1"),
+        ],
+    )
+    report = workflow_compiler.validate(spec)
+    assert report.is_valid is False
+    codes = {issue.code for issue in report.issues}
+    assert "workflow_node_config_required_missing" in codes
+    missing_issues = [i for i in report.issues if i.code == "workflow_node_config_required_missing"]
+    messages = " ".join(i.message for i in missing_issues)
+    assert "profile" in messages or "require_citations" in messages
+
+
+def test_compiler_validates_node_config_schema_success():
+    """Compiler passes when node configurations strictly conform to manifest config_schema."""
+    spec = WorkflowDagSpec(
+        entry_node_id="in_1",
+        nodes=[
+            WorkflowNodeSpec(id="in_1", type="input.chat", config={"trim": True, "max_length": 5000}),
+            WorkflowNodeSpec(
+                id="rag_1",
+                type="core.knowledge.answer",
+                config={
+                    "module_code": "admissions",
+                    "profile": "rag_fast",
+                    "require_citations": True,
+                    "retrieval_limit": 8,
+                },
+            ),
+            WorkflowNodeSpec(
+                id="guard_1",
+                type="guard.citation_policy",
+                config={"require_citation_for_answer": True},
+            ),
+            WorkflowNodeSpec(
+                id="out_1",
+                type="output.chat",
+                config={"format": "markdown", "include_citations": True},
+            ),
+        ],
+        edges=[
+            WorkflowEdgeSpec(source="in_1", target="rag_1"),
+            WorkflowEdgeSpec(source="rag_1", target="guard_1"),
+            WorkflowEdgeSpec(source="guard_1", target="out_1"),
+        ],
+    )
+    report = workflow_compiler.validate(spec)
+    assert report.is_valid is True
+    assert len([i for i in report.issues if i.severity == "error"]) == 0
+
+
+def test_compiler_validates_node_config_type_mismatch_and_enum():
+    """Compiler catches invalid property types and invalid enum options."""
+    spec = WorkflowDagSpec(
+        entry_node_id="in_1",
+        nodes=[
+            WorkflowNodeSpec(
+                id="in_1",
+                type="input.chat",
+                config={"max_length": "not_an_int"},
+            ),
+            WorkflowNodeSpec(
+                id="out_1",
+                type="output.chat",
+                config={"format": "unsupported_format"},
+            ),
+        ],
+        edges=[WorkflowEdgeSpec(source="in_1", target="out_1")],
+    )
+    report = workflow_compiler.validate(spec)
+    assert report.is_valid is False
+    codes = {issue.code for issue in report.issues}
+    assert "workflow_node_config_type_mismatch" in codes
+    assert "workflow_node_config_enum_invalid" in codes
+
+
+@pytest.mark.asyncio
+async def test_workflow_approval_api_endpoints():
+    """Verify GET /approvals lists pending checkpoints with authenticated actor."""
+    from datetime import UTC, datetime
+
+    from app.modules.auth.dependencies import get_current_actor
+    from app.modules.workflows.models import WorkflowApprovalRequest
+
+    app.dependency_overrides[get_current_actor] = lambda: {"sub": "staff_01", "role": "admin"}
+    mock_db = AsyncMock()
+    mock_req = WorkflowApprovalRequest(
+        id="appr_123",
+        execution_id="exec_123",
+        checkpoint_id="chk_123",
+        node_id="approval_node",
+        description="Duyệt xuất quyết định",
+        status="pending",
+        created_at=datetime.now(UTC),
+    )
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = [mock_req]
+    mock_db.execute.return_value = mock_res
+
+    async def override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            res_list = await ac.get("/platform/v1alpha1/workflows/approvals")
+            assert res_list.status_code == 200
+            items = res_list.json()
+            assert len(items) == 1
+            assert items[0]["id"] == "appr_123"
+            assert items[0]["status"] == "pending"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_current_actor, None)
+
+
+
+
+

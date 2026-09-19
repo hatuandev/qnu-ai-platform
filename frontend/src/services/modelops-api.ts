@@ -302,7 +302,7 @@ export const modelopsApi = {
   },
 
   async getTokenQuota(tenantId = "tenant_qnu"): Promise<TokenQuota> {
-    const res = await fetch(`${BASE_URL}/models/quota?tenant_id=${tenantId}`);
+    const res = await fetch(`${BASE_URL}/modelops/quotas/${tenantId}`);
     if (!res.ok) {
       throw new Error(`Không tải được thông tin hạn ngạch token (HTTP ${res.status}).`);
     }
