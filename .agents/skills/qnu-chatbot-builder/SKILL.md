@@ -1,9 +1,7 @@
 ---
 name: qnu-chatbot-builder
 description: >-
-  Use this skill whenever creating, configuring, tuning, or deploying an AI Chatbot / Assistant
-  on the QNU AI Platform. Enforces the enterprise 7-step chatbot creation lifecycle: Persona & Scope,
-  Knowledge Binding, ModelOps & Fallback, Tool Gateway, Guardrails & Anti-Hallucination, Output Formatting, and Evaluation.
+  Use this skill whenever creating, configuring, tuning, or deploying an AI Chatbot / Assistant on QNU AI Platform following the enterprise 7-step chatbot creation lifecycle (Persona & Scope, Knowledge Binding, ModelOps & Fallback, Tool Gateway, Guardrails, Output Formatting, Evaluation). Do NOT use for routine document upload or simple conversation questions.
 ---
 
 # Quy Trình Chuẩn Tạo Chatbot AI Trên QNU AI Platform

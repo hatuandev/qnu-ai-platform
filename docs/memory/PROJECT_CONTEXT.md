@@ -7,10 +7,31 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-19 13:55 (UTC+7)
-- **Phiên số**: #104
+- **Thời gian cập nhật**: 2026-09-19 15:26 (UTC+7)
+- **Phiên số**: #109
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Lập Kế Hoạch Tái Cấu Trúc Chức Năng Và Điều Hướng (phiên #109)**:
+     - Tạo [`docs/ke_hoach/06_ke_hoach_tai_cau_truc_chuc_nang_va_dieu_huong.md`](../ke_hoach/06_ke_hoach_tai_cau_truc_chuc_nang_va_dieu_huong.md).
+     - Chốt nguyên tắc “gộp trải nghiệm, giữ domain”: đưa Workflow/Playground/Channels/Quality/Runs vào Assistant Workspace; đưa OCR/Loại văn bản vào Knowledge Workspace; giữ Provider, Conversations và runtime entities độc lập.
+     - Đề xuất giảm sidebar từ khoảng 16 mục xuống 7–8 mục, có khu vực Advanced cho Workflow Library, Nodes, Tools và Design System dev-only.
+     - Lập route map cũ → mới, chiến lược private/shared workflow, pin immutable workflow version, sáu đợt triển khai, kiểm thử E2E, rollback và Definition of Done.
+     - Chỉ tạo tài liệu kế hoạch; không sửa code, runtime, dữ liệu hay Provider credentials.
+  1. **Rà Soát Khoảng Hở Kết Nối Toàn Ứng Dụng (phiên #108)**:
+     - Tạo báo cáo [`nhan_xet_khoang_ho_ket_noi_toan_app_2026-09-19.md`](../nhan_xet_khoang_ho_ket_noi_toan_app_2026-09-19.md), đối chiếu toàn chuỗi Frontend ↔ API ↔ Assistant ↔ ModelOps ↔ Workflow/Nodes/Tools ↔ Knowledge/RAG/OCR ↔ Conversations/Widget ↔ Evaluation/Dashboard.
+     - Xác định 6 khoảng hở P0: API chưa được password gate bảo vệ, raw provider key/secret chưa an toàn, fake-success ở LLM/OCR/Tools/Embedding/Workflow, DAG tool bypass ToolService/HITL, facts không tuân lifecycle tài liệu và widget gọi sai endpoint/API base.
+     - Xác định 14 khoảng hở P1 và 8 khoảng hở P2; ưu tiên nối Assistant với Provider thật, thống nhất usage/quota, khép kín Chat–Conversation–Handoff, biến Node Catalog thành contract và siết Knowledge index lifecycle.
+     - Đề xuất lộ trình 6 đợt cùng 15 acceptance tests xuyên tầng. Không sửa runtime hoặc dữ liệu trong phiên này.
+     - Kiểm chứng live bị giới hạn vì cả Frontend `:3001` và Backend `:8001` đều không hoạt động tại thời điểm rà soát.
+  1. **Tối Ưu Hóa An Toàn Hệ Thống 7 Skills QNU & Chốt Điểm Dừng An Toàn (phiên #107)**:
+     - Thực thi trọn vẹn Kế hoạch 05 theo hướng bảo thủ: sửa sai lệch trước, thu hẹp trigger sau, kiểm thử nghiêm ngặt và chốt safe checkpoint.
+     - Sửa triệt để 10 liên kết tuyệt đối `DeTaiAI` sang đường dẫn repository chuẩn trong `qnu-rag-pipeline`, `qnu-knowledge-ingestion`, `qnu-modelops-resilience`.
+     - Phân định rõ **Demo / Sample Mode** vs **LiveMode** trong `qnu-frontend-architect`, cấm Frontend nạp mock data bịa đặt khi Backend lỗi.
+     - Cập nhật payload filter Qdrant thực tế (`tenant_id`, `workspace_id`, `document_status == "ready"`, `is_retrievable == true`) và công thức RRF Legal Priority Weighting trong `qnu-rag-pipeline`.
+     - Chuẩn hóa lệnh pytest `uv run --extra dev pytest -v` trong `qnu-backend-architect` và giới hạn scope `ruff check <tệp> --fix` trong `qnu-clean-code-architect`.
+     - Tạo `.agents/skills/qnu-clean-code-architect/agents/openai.yaml` (`policy.allow_implicit_invocation: false`), chuyển sang manual invocation.
+     - Thu hẹp `description` của 6 skills domain với ranh giới rõ ràng, tránh kích hoạt chéo lãng phí token.
+     - Kiểm thử: Backend 216/216 passed (100%), Frontend Biome 0 lỗi, TypeScript 0 lỗi, Build thành công 7.90s, 0 Mojibake. Chốt Điểm Dừng An Toàn tại Giai đoạn 3 (không vội tách progressive disclosure để bảo toàn tính toàn vẹn 100%).
   1. **Rà Soát Hệ Thống Skills Và Nguyên Nhân Kích Hoạt Tốn Token (phiên #104)**:
      - Rà soát đầy đủ 7 skill QNU với tổng dung lượng 47.067 byte, ước tính khoảng 10.300 token khi cùng được nạp; `qnu-frontend-architect` lớn nhất (14.705 byte) và `qnu-clean-code-architect` lớn thứ hai (9.878 byte).
      - Xác định `qnu-clean-code-architect` có trigger quá rộng (`whenever writing, refactoring, or reviewing code`) nên gần như mọi task code đều có thể nạp thêm hơn 2.000 token dù quy tắc đã trùng với `AGENTS.md`.
@@ -672,6 +693,16 @@
 ---
 
 ## 5. Backlog & Kế Hoạch Tiếp Theo
+
+### Ưu Tiên Tích Hợp Sau Phiên #108
+- [ ] **P0 Truthful Runtime:** loại fake-success khỏi LLM/OCR/Tools/Embedding/Workflow trong LiveMode; lỗi thật phải hiện `failed/degraded`.
+- [ ] **P0 Security Boundary:** bảo vệ router quản trị bằng `get_current_actor`, mask/encrypt provider key và chuyển toàn bộ secret sang environment.
+- [ ] **P0 Tool Policy:** bắt `tool.api_caller` đi qua `ToolService`, enforce allowlist/HITL và ghi execution audit.
+- [ ] **P0 Facts Lifecycle:** chỉ retrieve facts từ document approved/active đúng tenant/workspace/version.
+- [ ] **P1 Assistant–ModelOps:** model catalog động theo provider active/capability; primary/fallback deterministic; usage streaming ghi đúng một lần.
+- [ ] **P1 Chat–Handoff:** assistant động, attachment thật, conversation/message persistence và staff reply quay lại widget/chat.
+- [ ] **P1 Knowledge Index Integrity:** trạng thái `pending_index/indexed/index_failed`, retry/outbox và reconciliation DB–Qdrant–Storage.
+- [ ] **P1 Workflow Contract:** validate manifest JSON Schema/version/status và schema-driven Property Inspector.
 
 ### Đã Hoàn Thành Trong Đợt 1 (Phiên #101)
 - [x] **Cổng Kiểm Định Xuất Bản 5 Lớp (Publish Gate Engine)**: Thẩm định 5 tiêu chí (Knowledge doc ready, ModelOps 2 tầng, Tool Gateway allowlist, Guardrails chống jailbreak/che PII/hotline No-Answer, TM-08 Ragas) trước khi kích hoạt Trợ lý AI.

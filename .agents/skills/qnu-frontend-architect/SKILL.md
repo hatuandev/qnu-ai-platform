@@ -1,10 +1,7 @@
 ---
 name: qnu-frontend-architect
 description: >-
-  Use this skill when developing, refactoring, or extending Frontend components, pages, hooks,
-  and UI interfaces on the QNU AI Platform. Enforces Vite 6 + React 19 architecture, OKLCH Design Tokens
-  (Academic Teal), 3-tier component hierarchy (Primitives, Admin Helpers, AI Suite), Biome linting standards,
-  TanStack Query caching, and AI streaming UX patterns.
+  Use this skill when developing, refactoring, or extending Frontend components, pages, hooks, and UI interfaces on QNU AI Platform (Vite + React 19, OKLCH Academic Teal design tokens, 3-tier component hierarchy, Biome, TanStack Query, Master-Detail Deep Routing). Do NOT use for backend Python code or database schema changes.
 ---
 
 # Hướng Dẫn Kiến Trúc & Quy Chuẩn Giao Diện Frontend QNU AI Platform
@@ -163,9 +160,10 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
      - `['knowledge', 'documents', collectionId]`
      - `['modelops', 'providers']`
      - `['modelops', 'providers', providerId]`
-2. **Cơ Chế Offline Seed Fallback**:
-   - Khi Backend chưa bật hoặc ngắt kết nối, `api-client.ts` tự động nạp dữ liệu mẫu chất lượng cao (Seed Data).
-   - Component không được sập (`crash`) khi dữ liệu trả về rỗng; luôn hiển thị `EmptyState` hoặc `Skeleton` khi `isLoading`.
+2. **Cơ Chế Phân Định Demo vs LiveMode (Tuân Thủ Anti-Mock Rule)**:
+   - **Demo / Sample Mode**: Chỉ kích hoạt khi người dùng chủ động yêu cầu xem trước giao diện mẫu (thông qua công tắc bật/tắt Demo hoặc tham số URL `?mode=demo`).
+   - **LiveMode (Chế độ sản xuất mặc định)**: Tuân thủ nghiêm ngặt **Anti-Mock Rule** của `AGENTS.md`. Khi Backend mất kết nối hoặc API trả lỗi, Frontend **tuyệt đối không âm thầm nạp số liệu giả/mock bịa đặt** cho dữ liệu nghiệp vụ (điểm chuẩn, học phí, chỉ tiêu, nội dung quy chế); thay vào đó phải hiển thị Error State / Empty State trung thực hoặc kích hoạt No-Answer Policy để hướng dẫn người dùng liên hệ phòng ban phụ trách.
+   - Component không được sập (`crash`) khi dữ liệu trả về rỗng hoặc lỗi; luôn hiển thị `EmptyState`, `Alert` hoặc `Skeleton` khi `isLoading`.
 3. **Optimistic Updates & Invalidation**:
    - Khi thực hiện `mutation` (tạo/sửa/xóa), luôn gọi `queryClient.invalidateQueries({ queryKey: [...] })` để đồng bộ lại dữ liệu mới nhất.
    - Hiển thị thông báo kết quả qua `sonner` (`toast.success()`, `toast.error()`).

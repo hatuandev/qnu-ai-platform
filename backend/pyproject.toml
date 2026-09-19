@@ -31,6 +31,7 @@ dependencies = [
     "easyocr>=1.7.2",
     "sentence-transformers>=6.0.1",
     "docxtpl",
+    "cryptography>=50.0.1",
 ]
 
 [project.optional-dependencies]

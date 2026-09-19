@@ -1,13 +1,12 @@
 ---
 name: qnu-modelops-resilience
 description: >-
-  Use this skill when implementing, configuring, or testing LLM Provider Adapters (OpenAI, Gemini, Local vLLM/Ollama),
-  Circuit Breaker resilience policies, Dynamic Fallback routing, Token Quota limits, and Cost Tracking on QNU AI Platform.
+  Use this skill when configuring or extending LLM Provider Adapters (OpenAI, Gemini, Local vLLM/Ollama), Circuit Breaker resilience policies, dynamic fallback routing, token quota limits, or cost tracking. Do NOT use for general frontend UI styling or document parsing.
 ---
 
 # Hướng Dẫn ModelOps & Cơ Chế Chịu Lỗi Multi-LLM QNU AI Platform
 
-Tài liệu hướng dẫn quản trị mô hình ngôn ngữ lớn (LLM), cơ chế tự phục hồi (Resilience) và giám sát chi phí tại **QNU AI Platform** ([app/modules/modelops/](file:///d:/DuAnPhanMem/DeTaiAI/qnu-ai-platform/backend/app/modules/modelops)).
+Tài liệu hướng dẫn quản trị mô hình ngôn ngữ lớn (LLM), cơ chế tự phục hồi (Resilience) và giám sát chi phí tại **QNU AI Platform** ([backend/app/modules/modelops](backend/app/modules/modelops)).
 
 ---
 
@@ -49,3 +48,4 @@ graph TD
 3. **Theo Dõi Hạn Ngạch & Chi Phí (CostTracker)**:
    - Tính toán chính xác giá USD/token dựa trên bảng giá định kỳ.
    - Kiểm tra hạn mức tiêu thụ (Quota) của Tenant/Phòng ban trước khi gửi request. Nếu vượt hạn mức tháng, trả về lỗi mã `QUOTA_EXCEEDED` (RFC 7807).
+

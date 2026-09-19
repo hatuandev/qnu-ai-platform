@@ -1,10 +1,7 @@
 ---
 name: qnu-clean-code-architect
 description: >-
-  Use this skill whenever writing, refactoring, or reviewing code across Frontend and Backend
-  on the QNU AI Platform during Vibe Coding sessions. Enforces strict clean code principles:
-  Boy Scout Rule, Zero Dead Code, Zero 'any', Self-Documenting Naming, Single Responsibility (SRP),
-  Guard Clauses / Early Return, No Swallowed Exceptions, and Clean-As-You-Go lint/typecheck loops.
+  Use this skill ONLY when explicitly requested by the user (or via $qnu-clean-code-architect) for deep architectural reviews, major refactoring audits, or code quality retrospectives across Frontend and Backend. Routine code tasks already enforce basic clean code standards via AGENTS.md.
 ---
 
 # Hướng Dẫn Kỹ Thuật Clean Code Khi Vibe Coding (QNU AI Platform)
@@ -163,10 +160,11 @@ except S3StorageError as exc:
 ```
 
 ### 3.3. Dọn Dẹp Imports và Tự Động Định Dạng Bằng Ruff
-- Trước khi hoàn thành, luôn chạy:
+- Trước khi hoàn thành, kiểm tra và dọn dẹp định dạng có phạm vi trong các tệp vừa sửa:
   ```bash
-  uv run ruff check . --fix
+  uv run ruff check <tệp_hoặc_thư_mục_vừa_sửa> --fix
   ```
+  *(Lưu ý: Chỉ chạy trên phạm vi tệp/thư mục thuộc task hiện tại, tránh dùng cờ `--fix` trên toàn bộ repository `.` gây sửa lan ngoài ý muốn).*
 
 ---
 

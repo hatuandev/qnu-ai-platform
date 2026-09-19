@@ -1,9 +1,7 @@
 ---
 name: qnu-backend-architect
 description: >-
-  Use this skill when developing, refactoring, or extending Backend modules on the QNU AI Platform.
-  Enforces Modular Monolith architecture, standard 4-file module structure, Design Patterns (Strategy, Pipeline,
-  Adapter, Command, Registry), RFC 7807 Error handling, and async SQLAlchemy best practices.
+  Use this skill when developing, refactoring, or extending Backend modules on QNU AI Platform (FastAPI, Modular Monolith 4-file structure, SQLAlchemy async, RFC 7807 exceptions, Pytest). Do NOT use for pure frontend UI tasks or document parsing logic.
 ---
 
 # Hướng Dẫn Kiến Trúc & Quy Chuẩn Phát Triển Backend QNU AI Platform
@@ -74,5 +72,5 @@ Nếu module có các logic phức tạp chuyên biệt, tách thành các file 
    - Trước khi tạo commit hoặc kết thúc task, bắt buộc phải chạy thành công 100%:
      ```bash
      uv run ruff check .
-     uv run pytest -v
+     uv run --extra dev pytest -v
      ```
