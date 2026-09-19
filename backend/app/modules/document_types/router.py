@@ -72,6 +72,18 @@ async def deactivate_document_type(
 
 
 @router.post(
+    "/{code}/activate",
+    response_model=DocumentTypeResponse,
+    summary="Kích hoạt lại loại văn bản",
+)
+async def activate_document_type(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentTypeResponse:
+    return await document_types_service.activate_document_type(db, code)
+
+
+@router.post(
     "/sync", response_model=DocumentTypeSyncResponse, summary="Đồng bộ taxonomy từ qnu-ai-core"
 )
 async def sync_document_types(

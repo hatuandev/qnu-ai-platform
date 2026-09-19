@@ -221,12 +221,32 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           {/* Grid: Loại văn bản & Năm ban hành */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label
-                htmlFor="document-type-select"
-                className="text-xs font-semibold text-foreground"
-              >
-                Loại văn bản
-              </label>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="document-type-select"
+                  className="text-xs font-semibold text-foreground"
+                >
+                  Loại văn bản
+                </label>
+                {docType && documentTypesQuery.data ? (
+                  (() => {
+                    const currentType = documentTypesQuery.data.find((t) => t.code === docType);
+                    const prio = getPriorityForDocumentType(docType, currentType?.priority);
+                    return (
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] px-1.5 py-0 ${prio.badgeClass}`}
+                      >
+                        {prio.scoreText} • {prio.label}
+                      </Badge>
+                    );
+                  })()
+                ) : (
+                  <span className="text-[10px] text-amber-500 font-medium">
+                    Chưa xác định — Vui lòng chọn
+                  </span>
+                )}
+              </div>
               <Select value={docType} onValueChange={setDocType}>
                 <SelectTrigger id="document-type-select" className="w-full h-10 text-xs">
                   <SelectValue placeholder="Chọn loại văn bản" />
@@ -234,7 +254,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 <SelectContent>
                   {(documentTypesQuery.data || []).map((type) => (
                     <SelectItem key={type.code} value={type.code}>
-                      {type.name} ({type.category_name})
+                      {type.name} ({type.category_name} — Ưu tiên {type.priority}/10)
                     </SelectItem>
                   ))}
                 </SelectContent>

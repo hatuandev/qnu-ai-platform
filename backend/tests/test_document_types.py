@@ -93,3 +93,53 @@ async def test_document_exporter_rejects_unknown_document_type(tmp_path, monkeyp
             {"document_type": "not_a_document_type", "title": "Test", "body_paragraphs": []}
         )
     assert error.value.code == "document_type_invalid"
+
+
+@pytest.mark.asyncio
+async def test_document_type_activate_deactivate_and_sync_override() -> None:
+    from datetime import UTC, datetime
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.document_types.models import DocumentType
+    from app.modules.document_types.service import document_types_service
+
+    now = datetime.now(UTC)
+    mock_db = AsyncMock()
+    existing_record = DocumentType(
+        code="quyet_dinh",
+        name="Quyết định",
+        category="administrative",
+        priority=10,
+        nd30=True,
+        is_active=True,
+        is_system_default=True,
+        is_custom=False,
+        source_system="qnu-ai-core",
+        created_at=now,
+        updated_at=now,
+    )
+    mock_db.get.return_value = existing_record
+    mock_exec = MagicMock()
+    mock_exec.scalar_one.return_value = 0
+    mock_exec.scalars.return_value.all.return_value = []
+    mock_db.execute.return_value = mock_exec
+
+    # Deactivate
+    deactivated = await document_types_service.deactivate_document_type(mock_db, "quyet_dinh")
+    assert deactivated.is_active is False
+    assert existing_record.is_active is False
+
+    # Activate
+    activated = await document_types_service.activate_document_type(mock_db, "quyet_dinh")
+    assert activated.is_active is True
+    assert existing_record.is_active is True
+
+    # 2. Test sync_from_catalog does not overwrite an existing deactivated record
+    existing_record.is_active = False
+    mock_db.get.return_value = existing_record
+
+    res = await document_types_service.sync_from_catalog(mock_db)
+    assert res.total == 37
+    # Crucial assertion: is_active must stay False (preserved user override)
+    assert existing_record.is_active is False
+

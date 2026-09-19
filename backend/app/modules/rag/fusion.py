@@ -69,9 +69,27 @@ def reciprocal_rank_fusion(
         else:
             candidates[cid].sparse_rank = rank
 
-    # 3. Assign merged RRF scores and sort descending
+    # 3. Assign merged RRF scores with legal priority weighting and sort descending
     for cid, cand in candidates.items():
-        cand.rrf_score = scores[cid]
+        base_score = scores[cid]
+        # Legal priority weighting: priority ranges 1-10 (default 5).
+        # Priority 10 (e.g. Quy chế, Quyết định) receives an intentional boost (+10%),
+        # ensuring authoritative regulatory documents rank higher when relevance is close.
+        priority = 5
+        if cand.metadata and isinstance(cand.metadata, dict):
+            raw_p = (
+                cand.metadata.get("priority")
+                or cand.metadata.get("document_priority")
+                or cand.metadata.get("doc_priority")
+            )
+            if raw_p is not None:
+                try:
+                    priority = int(raw_p)
+                except (ValueError, TypeError):
+                    priority = 5
+        priority = max(1, min(10, priority))
+        priority_multiplier = 1.0 + (priority - 5) * 0.02
+        cand.rrf_score = base_score * priority_multiplier
 
     sorted_candidates = sorted(candidates.values(), key=lambda x: x.rrf_score, reverse=True)
     return sorted_candidates

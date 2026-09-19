@@ -235,17 +235,11 @@ function nodeTypeForCatalogItem(item: NodeCatalogItem): {
   kind: CanvasNodeKind;
   workflowNodeType: string;
 } {
-  const mappings: Record<string, { kind: CanvasNodeKind; workflowNodeType: string }> = {
-    input: { kind: "chatInput", workflowNodeType: "input.chat" },
-    route: { kind: "conditionRoute", workflowNodeType: "condition.route" },
-    rag: { kind: "ragKnowledge", workflowNodeType: "core.knowledge.answer" },
-    llm: { kind: "llmGenerate", workflowNodeType: "llm.generate" },
-    tool: { kind: "toolCall", workflowNodeType: "tool.human_approval" },
-    guard: { kind: "guardrail", workflowNodeType: "guard.citation_policy" },
-    human: { kind: "humanApproval", workflowNodeType: "tool.human_approval" },
-    output: { kind: "chatOutput", workflowNodeType: "output.chat" },
+  const kind = toCanvasNodeKind(item.type);
+  return {
+    kind,
+    workflowNodeType: item.type,
   };
-  return mappings[item.category] || mappings.llm;
 }
 
 export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({

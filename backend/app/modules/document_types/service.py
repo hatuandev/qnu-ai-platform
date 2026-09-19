@@ -184,6 +184,14 @@ class DocumentTypeService:
         logger.info("Deactivated document type code=%s", record.code)
         return await self.get_document_type(db, record.code)
 
+    async def activate_document_type(self, db: AsyncSession, code: str) -> DocumentTypeResponse:
+        record = await self._get_record(db, code)
+        record.is_active = True
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Activated document type code=%s", record.code)
+        return await self.get_document_type(db, record.code)
+
     async def validate_active_code(self, db: AsyncSession, code: str | None) -> str | None:
         """Validate a user-supplied code before a document is persisted."""
         if code is None or not code.strip():
@@ -221,7 +229,7 @@ class DocumentTypeService:
                 skipped += 1
                 continue
             if not record:
-                record = DocumentType(code=definition["code"])
+                record = DocumentType(code=definition["code"], is_active=definition["is_active"])
                 db.add(record)
                 added += 1
             else:
@@ -234,7 +242,6 @@ class DocumentTypeService:
                         "priority",
                         "retention_period",
                         "nd30",
-                        "is_active",
                         "is_system_default",
                         "is_custom",
                         "source_system",
@@ -250,7 +257,9 @@ class DocumentTypeService:
             record.priority = definition["priority"]
             record.retention_period = definition["retention_period"]
             record.nd30 = definition["nd30"]
-            record.is_active = definition["is_active"]
+            # Preserve local user override for is_active if record already existed
+            if record.is_active is None:
+                record.is_active = definition["is_active"]
             record.is_system_default = definition["is_system_default"]
             record.is_custom = definition["is_custom"]
             record.source_system = definition["source_system"]

@@ -675,3 +675,47 @@ async def test_workflow_execution_fail_closed_on_missing_version():
     assert exc_info.value.code == "workflow_version_not_found"
     assert exc_info.value.status_code == 404
     assert "ver_missing_999" in exc_info.value.message
+
+
+@pytest.mark.asyncio
+async def test_api_caller_node_handler_execution():
+    """Verify APICallerNodeHandler executes tool or handles fallback safely."""
+    from app.modules.workflows.nodes.api_caller_node import APICallerNodeHandler
+    from app.modules.workflows.registry import node_registry
+
+    handler = node_registry.get("tool.api_caller")
+    assert handler is not None
+    assert isinstance(handler, APICallerNodeHandler)
+
+    # 1. Test missing tool_id gracefully skips
+    spec_empty = WorkflowNodeSpec(id="api_1", type="tool.api_caller", config={})
+    ctx = WorkflowContext(
+        workflow_id="wf_test",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"query": "test"},
+    )
+    res_empty = await handler.execute(spec_empty, ctx)
+    assert res_empty.status == "completed"
+    assert res_empty.output.get("status") == "skipped"
+
+    # 2. Test nonexistent tool with return_empty fallback
+    spec_not_found = WorkflowNodeSpec(
+        id="api_2",
+        type="tool.api_caller",
+        config={"tool_id": "nonexistent_tool_xyz", "on_error_behavior": "return_empty"},
+    )
+    res_nf = await handler.execute(spec_not_found, ctx)
+    assert res_nf.status == "completed"
+    assert res_nf.output.get("status") == "error"
+
+    # 3. Test nonexistent tool with fail_workflow
+    spec_fail = WorkflowNodeSpec(
+        id="api_3",
+        type="tool.api_caller",
+        config={"tool_id": "nonexistent_tool_xyz", "on_error_behavior": "fail_workflow"},
+    )
+    res_fail = await handler.execute(spec_fail, ctx)
+    assert res_fail.status == "failed"
+    assert "không tồn tại" in res_fail.error
+

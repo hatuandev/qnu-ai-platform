@@ -99,14 +99,28 @@ async def test_get_usage_statistics_aggregation():
 
 @pytest.mark.asyncio
 async def test_api_usage_stats_endpoint():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/platform/v1alpha1/modelops/usage-stats?days=30")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "total_requests" in data
-        assert "total_tokens" in data
-        assert "total_cost_usd" in data
-        assert "avg_latency_ms" in data
-        assert "models_breakdown" in data
-        assert "daily_usage" in data
+    from app.core.database import get_db
+
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = []
+    mock_db.execute.return_value = mock_res
+
+    async def _override_get_db():
+        yield mock_db
+
+    app.dependency_overrides[get_db] = _override_get_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/platform/v1alpha1/modelops/usage-stats?days=30")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "total_requests" in data
+            assert "total_tokens" in data
+            assert "total_cost_usd" in data
+            assert "avg_latency_ms" in data
+            assert "models_breakdown" in data
+            assert "daily_usage" in data
+    finally:
+        app.dependency_overrides.pop(get_db, None)

@@ -300,7 +300,27 @@ Nhằm bảo đảm an toàn vận hành khi cập nhật cấu hình Trợ lý 
 
 ---
 
-## 10. Giám Sát Hội Thoại Thời Gian Thực & Bàn Giao Cán Bộ (Live Conversations & Staff Handoff)
+## 10. Thư Viện Node Động & Bộ Xử Lý Công Cụ Ngoại Vi (Dynamic Node Catalog & API Caller Handler)
+
+Nhằm hỗ trợ mở rộng không giới hạn các loại Node trong quy trình làm việc tự động hóa và tích hợp phần mềm nhà trường:
+
+### 10.1. Bộ Xử Lý Node Gọi Công Cụ (`APICallerNodeHandler`)
+- Định danh loại Node: `tool.api_caller` (phiên bản `1.0.0`).
+- Đăng ký chính thức trong `WorkflowNodeRegistry` và sẵn sàng thực thi trên `WorkflowDAGEngine`.
+- **Cơ chế vận hành**:
+  1. Trích xuất `tool_id` từ cấu hình Node (ví dụ `uis_admissions_query`, `document_exporter`).
+  2. Kiểm tra quyền và tính khả dụng của công cụ trong `ToolRegistry`.
+  3. Tổng hợp tham số đầu vào từ `context.inputs` và kết quả của các node tiền nhiệm.
+  4. Thực thi công cụ bất đồng bộ và đóng gói kết quả vào `result.output["tool_result"]`, đồng thời cập nhật `context.inputs["tool_result"]` cho các node xử lý tiếp theo (như `core.llm.generate` hoặc `output.chat`).
+
+### 10.2. Tải Động Thư Viện Node từ Server (Dynamic Manifest-Driven Node Catalog)
+- Giao diện `NodeCatalogDrawer` (`node-catalog-drawer.tsx`) kết nối trực tiếp với API `/platform/v1alpha1/system/nodes` thay vì dựa vào hằng số gán cứng cục bộ.
+- Mỗi `NodeManifest` từ backend được chuẩn hóa về danh mục trực quan (`input`, `route`, `rag`, `llm`, `tool`, `guard`, `human`, `output`), hiển thị đầy đủ phiên bản và huy hiệu trạng thái (Active / Experimental).
+- Khi cán bộ bấm "Thêm Node", động cơ Canvas gán chính xác `workflowNodeType` từ manifest mà không bị méo mó sang các loại mặc định.
+
+---
+
+## 11. Giám Sát Hội Thoại Thời Gian Thực & Bàn Giao Cán Bộ (Live Conversations & Staff Handoff)
 
 Khi Trợ lý AI gặp các câu hỏi vượt ngoài phạm vi tri thức hoặc có độ nhạy cảm cao, luồng xử lý tự động chuyển tiếp tới bàn trực của cán bộ chuyên trách:
 1. **Kích Hoạt Yêu Cầu Handoff**: Khi Guardrail hoặc RAG phát hiện ngữ cảnh thiếu hụt, câu hỏi được gom vào `knowledge_gaps` và đồng thời phiên hội thoại được cập nhật trạng thái `handoff_requested`.

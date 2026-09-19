@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   Bot,
   GitBranch,
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
+import { systemApi } from "../../services/system-api";
+import type { NodeManifest } from "../../types/common";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 
@@ -23,6 +26,29 @@ export interface NodeCatalogItem {
   description: string;
   defaultConfigSummary: string;
   timeoutSeconds: number;
+  status?: string;
+  version?: string;
+}
+
+function toCatalogCategory(cat: string): NodeCatalogItem["category"] {
+  const normalized = cat.toLowerCase();
+  if (normalized === "input") return "input";
+  if (normalized === "route" || normalized === "router") return "route";
+  if (normalized === "rag" || normalized === "knowledge") return "rag";
+  if (normalized === "llm" || normalized === "drafting") return "llm";
+  if (normalized === "tool" || normalized === "export") return "tool";
+  if (normalized === "guard") return "guard";
+  if (normalized === "human") return "human";
+  if (normalized === "output") return "output";
+  return "llm";
+}
+
+function summarizeConfigSchema(configSchema: Record<string, unknown> | undefined): string {
+  if (!configSchema || typeof configSchema !== "object") return "Mặc định chuẩn";
+  const props = configSchema.properties as Record<string, unknown> | undefined;
+  if (!props || typeof props !== "object") return "Mặc định chuẩn";
+  const keys = Object.keys(props).slice(0, 3);
+  return keys.length > 0 ? keys.join(", ") : "Mặc định chuẩn";
 }
 
 export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
@@ -34,6 +60,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Tiếp nhận và tiền xử lý câu hỏi từ người dùng (loại bỏ ký tự đặc biệt, trim, kiểm tra độ dài).",
     defaultConfigSummary: "trim: true, max_length: 10000",
     timeoutSeconds: 2,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "condition.route",
@@ -43,6 +71,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Phân loại ý định hội thoại (intent matching / regex keyword) để chuyển tiếp tới nhánh RAG, Tool hoặc Chào hỏi.",
     defaultConfigSummary: "rules: intent(greeting) -> greet, intent(query) -> rag",
     timeoutSeconds: 5,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "core.knowledge.answer",
@@ -52,6 +82,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Truy vấn Qdrant Dense Vector 1024D kết hợp PostgreSQL FTS Lexical Search và thuật toán RRF k=60.",
     defaultConfigSummary: "collection_id: col_admissions, top_k: 8, rrf_k: 60",
     timeoutSeconds: 30,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "core.llm.generate",
@@ -61,6 +93,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Tổng hợp dữ liệu và sinh văn bản câu trả lời với các mô hình GPT-4o, Gemini Flash hoặc Qwen2.5.",
     defaultConfigSummary: "provider: openai, model: gpt-4o-mini, temperature: 0.2",
     timeoutSeconds: 45,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "tool.api_caller",
@@ -70,6 +104,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Truy vấn dữ liệu thời gian thực từ Cổng UIS Đào tạo, Trích xuất biểu mẫu Word NĐ 30, Excel Bloom.",
     defaultConfigSummary: "tool_id: uis_admissions_query, method: POST",
     timeoutSeconds: 15,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "guard.citation",
@@ -79,6 +115,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Đối soát câu trả lời với tài liệu gốc của ĐH Quy Nhơn, chống bịa đặt (Anti-Hallucination) và No-Answer Policy.",
     defaultConfigSummary: "groundedness_threshold: 0.85, pii_mask: true",
     timeoutSeconds: 10,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "human.approval",
@@ -88,6 +126,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Điểm dừng chờ cán bộ chuyên trách duyệt trước khi xuất văn bản chính thức hoặc cấp phát tài liệu mật.",
     defaultConfigSummary: "role: admin, required_approval: true",
     timeoutSeconds: 86400,
+    status: "active",
+    version: "1.0.0",
   },
   {
     type: "output.chat",
@@ -97,6 +137,8 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
       "Định dạng câu trả lời chuẩn Markdown, gắn thẻ bảng biểu, checklist và trích dẫn Điều/Khoản gốc.",
     defaultConfigSummary: "format: markdown, stream: true",
     timeoutSeconds: 5,
+    status: "active",
+    version: "1.0.0",
   },
 ];
 
@@ -114,8 +156,30 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
+  const catalogQuery = useQuery({
+    queryKey: ["node-catalog-manifests"],
+    queryFn: () => systemApi.getNodeCatalog(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const allItems = useMemo<NodeCatalogItem[]>(() => {
+    if (catalogQuery.data && catalogQuery.data.length > 0) {
+      return catalogQuery.data.map((m: NodeManifest) => ({
+        type: m.type,
+        category: toCatalogCategory(m.category),
+        label: m.display_name || m.type,
+        description: m.description || "",
+        defaultConfigSummary: summarizeConfigSchema(m.config_schema),
+        timeoutSeconds: 30,
+        status: m.status,
+        version: m.version,
+      }));
+    }
+    return CATALOG_NODE_ITEMS;
+  }, [catalogQuery.data]);
+
   const filteredItems = useMemo(() => {
-    return CATALOG_NODE_ITEMS.filter((item) => {
+    return allItems.filter((item) => {
       const matchQuery =
         item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -123,7 +187,7 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
       const matchCat = selectedCategory === "all" || item.category === selectedCategory;
       return matchQuery && matchCat;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [allItems, searchQuery, selectedCategory]);
 
   if (!isOpen) return null;
 
@@ -139,7 +203,12 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
             <Layers className="size-3.5" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-foreground">Thư Viện Nodes (Catalog)</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-xs font-bold text-foreground">Thư Viện Nodes (Catalog)</h3>
+              <Badge variant="outline" className="text-[9px] px-1 py-0">
+                {allItems.length} nodes
+              </Badge>
+            </div>
             <p className="text-[11px] text-muted-foreground">Kéo thả hoặc thêm Node vào đồ thị</p>
           </div>
         </div>
@@ -202,9 +271,16 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
                 {item.category === "output" && <Send className="size-3 text-emerald-500" />}
                 <span>{item.label}</span>
               </span>
-              <Badge variant="outline" className="text-[9px] font-mono">
-                {item.type}
-              </Badge>
+              <div className="flex items-center gap-1">
+                {item.status === "active" && (
+                  <Badge variant="success" className="text-[8px] px-1 py-0">
+                    Active
+                  </Badge>
+                )}
+                <Badge variant="outline" className="text-[9px] font-mono">
+                  {item.type}
+                </Badge>
+              </div>
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">

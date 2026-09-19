@@ -7,10 +7,27 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-18 23:30 (UTC+7)
-- **Phiên số**: #102
+- **Thời gian cập nhật**: 2026-09-19 13:55 (UTC+7)
+- **Phiên số**: #104
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Rà Soát Hệ Thống Skills Và Nguyên Nhân Kích Hoạt Tốn Token (phiên #104)**:
+     - Rà soát đầy đủ 7 skill QNU với tổng dung lượng 47.067 byte, ước tính khoảng 10.300 token khi cùng được nạp; `qnu-frontend-architect` lớn nhất (14.705 byte) và `qnu-clean-code-architect` lớn thứ hai (9.878 byte).
+     - Xác định `qnu-clean-code-architect` có trigger quá rộng (`whenever writing, refactoring, or reviewing code`) nên gần như mọi task code đều có thể nạp thêm hơn 2.000 token dù quy tắc đã trùng với `AGENTS.md`.
+     - Xác nhận cả 7 skill chưa có `agents/openai.yaml`; vì vậy chưa skill nào chủ động tắt implicit invocation. Khuyến nghị tắt implicit cho Clean Code và thu hẹp mô tả của Chatbot/Frontend theo ranh giới tệp và loại tác vụ.
+     - Phát hiện 10 liên kết `file:///` còn trỏ về repo cũ `D:/DuAnPhanMem/DeTaiAI/qnu-ai-platform`, quy tắc Offline Seed Fallback của skill Frontend xung đột với LiveMode fail-closed, lệnh test Backend không thống nhất và skill RAG còn mô tả payload `is_active` đã cũ.
+     - Đề xuất giới hạn 1 skill chính + tối đa 1 skill hỗ trợ mỗi task; giữ ModelOps/Knowledge/Backend tương đối gọn, rút Frontend/Clean Code, và dùng progressive disclosure qua `references/` cho ví dụ chi tiết.
+  1. **Đánh Giá Hiệu Quả Token Của Agent Vibe Coding (phiên #103)**:
+     - Định lượng `AGENTS.md` khoảng 31 KB / 6.700 token ước tính và `PROJECT_CONTEXT.md` khoảng 108 KB / 24.000 token ước tính; riêng hai nguồn này tạo khoảng 31.000 token ngữ cảnh trước khi đọc code, lịch sử chat và tool output.
+     - Xác nhận cấu hình cục bộ dùng `gpt-5.6-sol` với `model_reasoning_effort = "xhigh"`, phù hợp bài khó nhưng quá tốn cho các turn hỏi đáp, chỉnh UI nhỏ hoặc cập nhật tài liệu.
+     - Xác định nguyên nhân chính: instruction trùng lặp, memory chứa toàn bộ lịch sử thay vì current state, trigger skill quá rộng, bắt buộc snapshot/work log cho mọi turn, full test quá thường xuyên, thread kéo dài và output công cụ quá lớn.
+     - Đề xuất chuyển sang cơ chế hai chế độ Fast/Full, rút gọn AGENTS và PROJECT_CONTEXT, chỉ nạp 1-2 skill liên quan, dùng reasoning medium mặc định và chỉ chạy full suite tại checkpoint/commit.
+  1. **Khắc Phục Toàn Diện 5 Lỗ Hổng Kỹ Thuật (Remediation Execution - Phiên #105)**:
+     - **Hiện thực Node Handler `tool.api_caller`**: Tạo `APICallerNodeHandler` (`backend/app/modules/workflows/nodes/api_caller_node.py`), đăng ký trong `WorkflowNodeRegistry`, xử lý gọi công cụ qua `tool_registry.execute_tool` và cập nhật kết quả vào context execution.
+     - **Kích Hoạt Lại Loại Văn Bản & Bảo Toàn Cấu Hình User**: Bổ sung phương thức `activate_document_type`, endpoint `POST /platform/v1alpha1/document-types/{code}/activate`, và chỉnh sửa `sync_from_catalog` để không ghi đè `is_active=False` do cán bộ tùy biến; Frontend tích hợp nút `[Kích hoạt lại]`.
+     - **Thư Viện Node Động (Dynamic Node Catalog)**: `NodeCatalogDrawer` (`node-catalog-drawer.tsx`) tải danh mục `NodeManifest` động từ API `/platform/v1alpha1/system/nodes`; sửa logic mapping type trong `dag-canvas-page.tsx` bảo toàn chính xác loại node và phiên bản.
+     - **Trọng Số Pháp Lý RRF (Legal Priority Boosting)**: Áp dụng công thức `priority_multiplier = 1.0 + (priority - 5) * 0.02` trong `reciprocal_rank_fusion` (`backend/app/modules/rag/fusion.py`), bảo đảm văn bản có `priority = 10` (Quy chế, Quyết định) được boost $+10\%$ điểm tương quan khi đối soát.
+     - **File Inspector Trả Về Undefined Khi Không Có Căn Cứ**: Xóa bỏ fallback mặc định `thong_bao` trong `detectDocumentTypeFromFilename`; mở rộng `getPriorityForDocumentType` hỗ trợ `priorityScore` động 1-10; hiển thị trực quan badge ưu tiên pháp lý trên `document-ingest-page.tsx`.
   1. **Triển Khai Hoàn Tất Đợt 2: Quản Trị Phiên Bản Snapshot Trợ Lý AI, Nạp Bảng Biểu Số Liệu Excel/CSV & Bàn Giao Cán Bộ Trực Tiếp (phiên #102)**:
      - **Quản Trị Phiên Bản Snapshot Trợ Lý AI (Assistant Versioning & 1-Click Rollback)**:
        * Khởi tạo bảng SQLAlchemy `AssistantVersionRecord`: lưu trữ snapshot JSON 7 lớp bất biến (`persona`, `model_config`, `guardrails`, `workflow_id`, `collection_id`), `version_number` tự động tăng dần `v1.0`, `v1.1`,...

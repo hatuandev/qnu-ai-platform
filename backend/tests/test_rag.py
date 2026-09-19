@@ -34,6 +34,25 @@ def test_reciprocal_rank_fusion():
     assert fused[0].rrf_score > fused[1].rrf_score
 
 
+def test_reciprocal_rank_fusion_legal_priority_boost():
+    """Verify legal priority weighting (priority 10 vs 5) breaks ties and boosts authoritative docs."""
+    # c1 (standard, priority 5) and c2 (core regulation, priority 10) both appear at rank 1 in their respective lists
+    dense = [
+        {"chunk_id": "c1", "content": "Tin tức chung", "document_id": "d1", "metadata": {"priority": 5}},
+    ]
+    sparse = [
+        {"chunk_id": "c2", "content": "Quy chế Đào tạo", "document_id": "d2", "metadata": {"priority": 10}},
+    ]
+    fused = reciprocal_rank_fusion(dense, sparse, k=60)
+    # Both have base RRF score 1/(60+1) = 0.016393...
+    # But c2 has priority 10 -> multiplier 1.0 + (10-5)*0.02 = 1.10 (+10%)
+    # Thus c2 MUST rank first over c1!
+    assert fused[0].chunk_id == "c2"
+    assert fused[0].rrf_score > fused[1].rrf_score
+    assert fused[0].rrf_score == pytest.approx(fused[1].rrf_score * 1.10)
+
+
+
 @pytest.mark.asyncio
 async def test_reranker_fallback():
     """Verify Reranker falls back to RRF ordering when external service is offline."""

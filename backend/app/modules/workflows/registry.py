@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.modules.workflows.nodes import (
+    APICallerNodeHandler,
     ArtifactExportNodeHandler,
     BaseNodeHandler,
     ChatInputNodeHandler,
@@ -64,6 +65,10 @@ class NodeHandlerRegistry:
         human_app = HumanApprovalNodeHandler()
         self.register("tool.human_approval", human_app)
         self.register("human.approval", human_app)
+
+        api_caller = APICallerNodeHandler()
+        self.register("tool.api_caller", api_caller)
+        self.register("api_caller", api_caller)
 
         citation_guard = CitationGuardNodeHandler()
         self.register("guard.citation_policy", citation_guard)

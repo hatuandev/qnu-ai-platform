@@ -120,6 +120,10 @@ export function deactivateDocumentType(code: string): Promise<DocumentTypeItem> 
   return request<DocumentTypeItem>(`/${encodeURIComponent(code)}/deactivate`, { method: "POST" });
 }
 
+export function activateDocumentType(code: string): Promise<DocumentTypeItem> {
+  return request<DocumentTypeItem>(`/${encodeURIComponent(code)}/activate`, { method: "POST" });
+}
+
 export function syncDocumentTypes(): Promise<DocumentTypeSyncResult> {
   return request<DocumentTypeSyncResult>("/sync", { method: "POST" });
 }

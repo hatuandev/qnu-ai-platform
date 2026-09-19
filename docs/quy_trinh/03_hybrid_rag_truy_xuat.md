@@ -60,8 +60,10 @@ flowchart TD
 - **Ràng buộc Vòng đời & Phân quyền Đa người thuê (Lifecycle & Tenant Parity)**:
   * Qdrant payload lưu trữ đầy đủ: `tenant_id`, `workspace_id`, `document_status`, `is_retrievable`, `chunk_id`, `document_id`.
   * `search_dense` áp dụng bộ lọc nghiêm ngặt tương đồng 100% với PostgreSQL FTS: lọc bắt buộc `tenant_id` và `workspace_id`, đồng thời cấm triệt để (`must_not`) các tài liệu có `is_retrievable=False` hoặc `document_status in ["pending", "archived", "rejected", "failed", "processing"]`. Ngăn chặn hoàn toàn hiện tượng tài liệu dự thảo, nháp hoặc đã lưu trữ lọt vào kết quả dense search.
-- **Công thức Reciprocal Rank Fusion**:
-  $$RRF\_Score(d) = \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \quad (\text{với } k = 60)$$
+- **Công thức Reciprocal Rank Fusion kết hợp Trọng số Pháp lý (Legal Priority Weighted RRF)**:
+  $$RRF\_Score(d) = \left( \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \right) \times \left(1.0 + (\text{priority} - 5) \times 0.02\right) \quad (\text{với } k = 60)$$
+  * Điểm `priority` (1-10) phản ánh giá trị pháp lý của 37 loại văn bản theo chuẩn ĐH Quy Nhơn (Quy chế, Quyết định có priority=10 được nhân hệ số boost $+10\%$; Thông báo/Tin tức có priority=5 giữ nguyên hệ số $1.0$).
+  * Giúp các văn bản quy phạm pháp luật cốt lõi tự động bứt phá lên vị trí đầu bảng kết quả khi điểm tương quan ngữ nghĩa tương đương với các văn bản tin tức/hướng dẫn phụ trợ.
 - Cân bằng tối ưu giữa khả năng hiểu ngữ nghĩa sâu sắc của Vector BGE-M3 và độ chính xác tuyệt đối của từ khóa FTS tiếng Việt.
 
 ### Bước 6: Tái xếp hạng (Cross-Encoder Reranker) kèm Fallback

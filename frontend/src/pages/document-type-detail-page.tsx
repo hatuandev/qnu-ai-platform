@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   type DocumentTypeInput,
   type DocumentTypeItem,
+  activateDocumentType,
   deactivateDocumentType,
   getDocumentType,
   updateDocumentType,
@@ -74,8 +75,21 @@ export function DocumentTypeDetailPage({ currentPath, onNavigate }: DocumentType
     },
   });
 
+  const activateMutation = useMutation({
+    mutationFn: () => activateDocumentType(code),
+    onSuccess: (item) => {
+      queryClient.setQueryData(["document-types", code], item);
+      setFeedback("Đã kích hoạt lại loại văn bản.");
+      queryClient.invalidateQueries({ queryKey: ["document-types"] });
+    },
+  });
+
   const item = documentTypeQuery.data;
-  const error = documentTypeQuery.error || updateMutation.error || deactivateMutation.error;
+  const error =
+    documentTypeQuery.error ||
+    updateMutation.error ||
+    deactivateMutation.error ||
+    activateMutation.error;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -140,14 +154,26 @@ export function DocumentTypeDetailPage({ currentPath, onNavigate }: DocumentType
           <p className="mt-1 font-mono text-xs text-muted-foreground">{item.code}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={!item.is_active || deactivateMutation.isPending}
-            variant="destructive"
-            onClick={() => deactivateMutation.mutate()}
-          >
-            <Power className="size-4" />
-            {deactivateMutation.isPending ? "Đang tắt..." : "Vô hiệu hóa"}
-          </Button>
+          {item.is_active ? (
+            <Button
+              disabled={deactivateMutation.isPending}
+              variant="destructive"
+              onClick={() => deactivateMutation.mutate()}
+            >
+              <Power className="size-4" />
+              {deactivateMutation.isPending ? "Đang tắt..." : "Vô hiệu hóa"}
+            </Button>
+          ) : (
+            <Button
+              disabled={activateMutation.isPending}
+              variant="outline"
+              className="border-success/50 text-success hover:bg-success/10 hover:text-success"
+              onClick={() => activateMutation.mutate()}
+            >
+              <Power className="size-4" />
+              {activateMutation.isPending ? "Đang bật..." : "Kích hoạt lại"}
+            </Button>
+          )}
           <Button disabled={updateMutation.isPending} form="edit-document-type" type="submit">
             <Save className="size-4" />
             {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}

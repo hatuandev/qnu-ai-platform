@@ -261,12 +261,8 @@ export function detectDocumentTypeFromFilename(
     }
   }
 
-  // 3. Dự phòng chung hệ thống
-  const fallback = "thong_bao";
-  if (!availableCodes || availableCodes.length === 0 || availableCodes.includes(fallback)) {
-    return fallback;
-  }
-  return availableCodes[0];
+  // 3. Không ép fallback giả mạo nếu không có căn cứ từ khóa hoặc ngữ cảnh kho
+  return undefined;
 }
 
 /**
@@ -286,20 +282,57 @@ export function cleanTitleFromFilename(fileName: string): string {
 }
 
 /**
- * Tính toán mức độ ưu tiên pháp lý chuẩn QNU theo mã loại văn bản.
+ * Tính toán mức độ ưu tiên pháp lý chuẩn QNU theo mã loại văn bản hoặc điểm priority (1-10).
  */
-export function getPriorityForDocumentType(documentTypeCode?: string): {
+export function getPriorityForDocumentType(
+  documentTypeCode?: string,
+  priorityScore?: number
+): {
   scoreText: string;
   label: string;
   multiplierText: string;
   badgeClass: string;
 } {
+  if (typeof priorityScore === "number" && !Number.isNaN(priorityScore)) {
+    const score = Math.max(1, Math.min(10, Math.round(priorityScore)));
+    if (score >= 9) {
+      return {
+        scoreText: `Điểm: ${score}/10`,
+        label: "Ưu tiên Cao (Cốt lõi) (x100)",
+        multiplierText: "x100",
+        badgeClass: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
+      };
+    }
+    if (score >= 7) {
+      return {
+        scoreText: `Điểm: ${score}/10`,
+        label: "Ưu tiên Tiêu chuẩn (x50)",
+        multiplierText: "x50",
+        badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+      };
+    }
+    if (score >= 5) {
+      return {
+        scoreText: `Điểm: ${score}/10`,
+        label: "Ưu tiên Cơ bản (x25)",
+        multiplierText: "x25",
+        badgeClass: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+      };
+    }
+    return {
+      scoreText: `Điểm: ${score}/10`,
+      label: "Ưu tiên Tham khảo (x10)",
+      multiplierText: "x10",
+      badgeClass: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    };
+  }
+
   if (!documentTypeCode) {
     return {
-      scoreText: "Điểm: 8/10",
-      label: "Ưu tiên Tiêu chuẩn (x50)",
-      multiplierText: "x50",
-      badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+      scoreText: "Điểm: 5/10",
+      label: "Chưa phân loại (x25)",
+      multiplierText: "x25",
+      badgeClass: "bg-muted text-muted-foreground border-border",
     };
   }
 

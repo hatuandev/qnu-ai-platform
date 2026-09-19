@@ -10,3 +10,6 @@ for env_var in ("no_proxy", "NO_PROXY"):
     if val:
         cleaned = [item.strip() for item in val.split(",") if not item.strip().startswith("::")]
         os.environ[env_var] = ",".join(cleaned)
+
+# Enforce local storage driver for unit tests to prevent network dependencies on offline MinIO
+os.environ["STORAGE_DRIVER"] = "local"
