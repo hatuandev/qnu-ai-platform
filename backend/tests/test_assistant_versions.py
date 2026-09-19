@@ -41,6 +41,7 @@ def _sample_assistant(code: str = "admissions") -> AssistantModel:
 async def test_create_version_snapshot() -> None:
     assistant = _sample_assistant()
     db = AsyncMock()
+    db.add = MagicMock()
 
     count_result = MagicMock()
     count_result.scalar.return_value = 0
@@ -122,6 +123,7 @@ async def test_rollback_version_restores_state() -> None:
     )
 
     db = AsyncMock()
+    db.add = MagicMock()
     record_result = MagicMock()
     record_result.scalar_one_or_none.return_value = assistant
 

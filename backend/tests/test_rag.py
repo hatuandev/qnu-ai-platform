@@ -404,9 +404,64 @@ async def test_fact_layer_filters_by_document_approval_lifecycle():
     called_query = mock_db.execute.call_args[0][0]
     compiled_sql = str(called_query.compile())
 
-    # Verify KnowledgeDocument outerjoin and status filters exist in compiled SQL
+    # Verify KnowledgeDocument join and status filters exist in compiled SQL
     assert "knowledge_documents" in compiled_sql
     assert "knowledge_facts.document_id = knowledge_documents.id" in compiled_sql
     assert "knowledge_documents.is_active" in compiled_sql
+    assert "knowledge_collections" in compiled_sql
+
+
+@pytest.mark.asyncio
+async def test_sparse_fts_handles_empty_or_short_query_without_unbound_local():
+    """Verify search_sparse_fts never crashes with UnboundLocalError on short or stop-word-only queries."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.rag.retriever import hybrid_retriever
+
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = []
+    mock_db.execute.return_value = mock_res
+
+    # Query with 1 character (meaningful_tokens is empty)
+    res_short = await hybrid_retriever.search_sparse_fts(
+        db=mock_db,
+        collection_id="col_admissions",
+        query="a",
+        top_k=5,
+    )
+    assert isinstance(res_short, list)
+    assert len(res_short) == 0
+
+    # Query with only stop syllables
+    res_stop = await hybrid_retriever.search_sparse_fts(
+        db=mock_db,
+        collection_id="col_admissions",
+        query="như thế nào",
+        top_k=5,
+    )
+    assert isinstance(res_stop, list)
+
+
+@pytest.mark.asyncio
+async def test_search_dense_gracefully_degrades_when_embedding_fails():
+    """Verify search_dense catches embedding exceptions and returns empty list for graceful degradation."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.rag.vector_indexer import vector_indexer
+
+    with patch.object(
+        vector_indexer,
+        "embed_texts",
+        new_callable=AsyncMock,
+        side_effect=Exception("Embedding model offline / GPU out of memory"),
+    ):
+        results = await vector_indexer.search_dense(
+            collection_id="col_admissions",
+            query="Điểm chuẩn ngành công nghệ thông tin",
+            top_k=5,
+        )
+        assert results == []
+
 
 

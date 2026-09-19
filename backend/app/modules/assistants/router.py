@@ -12,6 +12,7 @@ from app.modules.assistants.schemas import (
     AssistantChatRequest,
     AssistantCloneRequest,
     AssistantCreateRequest,
+    AssistantForkWorkflowResponse,
     AssistantGenerateRequest,
     AssistantGenerateResponse,
     AssistantPublishResponse,
@@ -202,4 +203,14 @@ async def rollback_assistant_version(
 ) -> AssistantRollbackResponse:
     """Khôi phục cấu hình Trợ lý AI về một phiên bản snapshot trước đó."""
     return await assistant_service.rollback_version(db, reference, version_id)
+
+
+@router.post("/{reference}/fork-workflow", response_model=AssistantForkWorkflowResponse)
+async def fork_assistant_workflow(
+    reference: str,
+    db: AsyncSession = Depends(get_db),
+) -> AssistantForkWorkflowResponse:
+    """Tách quy trình workflow hiện tại thành một quy trình riêng biệt (Private Workflow)."""
+    return await assistant_service.fork_workflow(db, reference)
+
 

@@ -38,6 +38,8 @@ class RagService:
             query=req.query,
             top_k=req.top_k,
             rerank_top_k=req.rerank_top_k,
+            tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
         )
 
         items = [
@@ -83,6 +85,7 @@ class RagService:
             req.question,
             req.preferred_model_name or "default",
             tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
         )
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
@@ -91,7 +94,14 @@ class RagService:
 
         # 3. Lookup Structured Fact Layer (Extract numerical facts)
         keywords = [w.strip() for w in req.question.split() if len(w.strip()) >= 3]
-        facts = await fact_layer.lookup_facts(db, req.collection_id, keywords=keywords, limit=5)
+        facts = await fact_layer.lookup_facts(
+            db,
+            req.collection_id,
+            keywords=keywords,
+            limit=5,
+            tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
+        )
         fact_markdown = fact_layer.format_facts_as_markdown(facts)
 
         # 4. Hybrid Retrieval (Dense + Sparse + Rerank)
@@ -102,6 +112,7 @@ class RagService:
             top_k=8,
             rerank_top_k=5,
             tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
         )
 
         # 5. No-Answer Policy if context is empty
@@ -158,10 +169,14 @@ class RagService:
             for i, text in enumerate(context_texts, 1):
                 user_content += f"--- Đoạn trích [{i}] ---\n{text}\n\n"
 
-        llm_messages = [
-            ChatMessage(role="system", content=system_instruction),
-            ChatMessage(role="user", content=user_content),
-        ]
+        llm_messages = [ChatMessage(role="system", content=system_instruction)]
+        if req.history and isinstance(req.history, list):
+            for h_msg in req.history[-6:]:
+                h_role = h_msg.get("role", "user")
+                h_text = h_msg.get("content", "")
+                if h_role in ("user", "assistant") and h_text:
+                    llm_messages.append(ChatMessage(role=h_role, content=h_text))
+        llm_messages.append(ChatMessage(role="user", content=user_content))
 
         try:
             llm_req = LLMGenerateRequest(
@@ -255,6 +270,7 @@ class RagService:
             resp.model_dump(),
             req.preferred_model_name or "default",
             tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
         )
 
         return resp

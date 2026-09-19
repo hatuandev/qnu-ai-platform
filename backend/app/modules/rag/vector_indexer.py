@@ -7,12 +7,14 @@ import hashlib
 import importlib.util
 import logging
 import math
+import uuid
 from typing import Any
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
 from app.core.config import get_settings
+from app.core.exceptions import AppException
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -180,6 +182,12 @@ class VectorIndexer:
         # 2. Local SentenceTransformer BGE-M3 (with timeout & thread offload)
         model = await _get_embedding_model_async()
         if model is None:
+            if settings.ENVIRONMENT not in ("test", "testing"):
+                raise AppException(
+                    "Mô hình embedding (BGE-M3/Cloudflare) không khả dụng. Hệ thống từ chối nạp dữ liệu giả mạo.",
+                    code="EMBEDDING_UNAVAILABLE",
+                    status_code=503,
+                )
             return [self.mock_embedding(t, self.vector_size) for t in texts]
         try:
             # Protect event loop with thread offload and timeout guard (30s)
@@ -195,6 +203,13 @@ class VectorIndexer:
             )
             return [self._fit_dim([float(x) for x in row]) for row in vectors]
         except Exception as exc:
+            if settings.ENVIRONMENT not in ("test", "testing"):
+                logger.error("Embedding inference failed or timed out: %s", exc)
+                raise AppException(
+                    f"Trích xuất vector embedding thất bại: {exc}",
+                    code="EMBEDDING_FAILED",
+                    status_code=500,
+                )
             logger.warning("Embedding inference failed or timed out, using mock vectors: %s", exc)
             return [self.mock_embedding(t, self.vector_size) for t in texts]
 
@@ -212,27 +227,75 @@ class VectorIndexer:
         encoded_iter = iter(encoded)
 
         for c in chunks:
-            chunk_id = str(c["id"])
-            # Qdrant point IDs must be UUID/uint: use explicit point_id when given
-            # (e.g. deterministic uuid5), keep business chunk_id in the payload.
-            point_id: Any = c.get("point_id") or chunk_id
-            content = str(c["content"])
+            chunk_id = str(c.get("id") or c.get("chunk_id", ""))
+            raw_point_id = c.get("point_id") or chunk_id
+            if isinstance(raw_point_id, int):
+                point_id: Any = raw_point_id
+            else:
+                try:
+                    uuid.UUID(str(raw_point_id))
+                    point_id = str(raw_point_id)
+                except (ValueError, TypeError):
+                    point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{collection_id}:{chunk_id}"))
+            content = str(c.get("content", ""))
             vector = c.get("vector") or next(encoded_iter)
+
+            tenant_id = c.get("tenant_id")
+            workspace_id = c.get("workspace_id")
+            document_id = c.get("document_id")
+            document_revision = c.get("document_revision")
+            document_status = c.get("document_status")
+            is_retrievable = c.get("is_retrievable")
+            content_hash = c.get("content_hash")
+            embedding_model = c.get("embedding_model") or settings.EMBEDDING_MODEL
+            payload_schema_version = c.get("payload_schema_version") or "v1"
+
+            missing_fields = []
+            if not tenant_id:
+                missing_fields.append("tenant_id")
+            if not workspace_id:
+                missing_fields.append("workspace_id")
+            if not collection_id:
+                missing_fields.append("collection_id")
+            if not document_id:
+                missing_fields.append("document_id")
+            if document_revision is None:
+                missing_fields.append("document_revision")
+            if not chunk_id:
+                missing_fields.append("chunk_id")
+            if not document_status:
+                missing_fields.append("document_status")
+            if is_retrievable is None:
+                missing_fields.append("is_retrievable")
+            if not content_hash:
+                missing_fields.append("content_hash")
+
+            if missing_fields:
+                raise AppException(
+                    f"Thiếu các trường metadata bắt buộc cho chunk '{chunk_id}': {', '.join(missing_fields)}.",
+                    code="INVALID_POINT_PAYLOAD",
+                    status_code=400,
+                    details={"chunk_id": chunk_id, "missing_fields": missing_fields},
+                )
 
             payload = {
                 "chunk_id": chunk_id,
-                "document_id": str(c.get("document_id", "")),
+                "document_id": str(document_id),
                 "collection_id": collection_id,
-                "tenant_id": str(c.get("tenant_id") or "tenant_qnu"),
-                "workspace_id": str(c.get("workspace_id") or "workspace_qnu"),
-                "document_status": str(c.get("document_status") or "completed"),
-                "is_retrievable": bool(c.get("is_retrievable", True)),
+                "tenant_id": str(tenant_id),
+                "workspace_id": str(workspace_id),
+                "document_revision": int(document_revision),
+                "document_status": str(document_status),
+                "is_retrievable": bool(is_retrievable),
+                "content_hash": str(content_hash),
+                "embedding_model": str(embedding_model),
+                "payload_schema_version": str(payload_schema_version),
                 "content": content,
                 "section": c.get("section"),
                 "page_number": c.get("page_number"),
                 "is_active": bool(c.get("is_active", True)),
             }
-            if "metadata" in c:
+            if "metadata" in c and isinstance(c["metadata"], dict):
                 payload.update(c["metadata"])
 
             points.append(
@@ -312,51 +375,48 @@ class VectorIndexer:
         tenant_id: str | None = None,
         workspace_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform dense cosine similarity search in Qdrant with lifecycle, tenant, and score threshold filtering."""
+        """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, and score threshold filtering."""
         cname = self._get_collection_name(collection_id)
-        if query_vector is not None:
-            vec = query_vector
-        else:
-            vec = (await self.embed_texts([query]))[0]
-
-        must_conditions: list[Any] = [
-            qmodels.FieldCondition(
-                key="is_active",
-                match=qmodels.MatchValue(value=True),
-            )
-        ]
-        if tenant_id:
-            must_conditions.append(
-                qmodels.FieldCondition(
-                    key="tenant_id",
-                    match=qmodels.MatchValue(value=tenant_id),
-                )
-            )
-        if workspace_id:
-            must_conditions.append(
-                qmodels.FieldCondition(
-                    key="workspace_id",
-                    match=qmodels.MatchValue(value=workspace_id),
-                )
-            )
-
-        must_not_conditions: list[Any] = [
-            qmodels.FieldCondition(
-                key="is_retrievable",
-                match=qmodels.MatchValue(value=False),
-            ),
-            qmodels.FieldCondition(
-                key="document_status",
-                match=qmodels.MatchAny(any=["pending", "archived", "rejected", "failed", "processing"]),
-            ),
-        ]
-
-        qfilter = qmodels.Filter(
-            must=must_conditions,
-            must_not=must_not_conditions,
-        )
-
         try:
+            if query_vector is not None:
+                vec = query_vector
+            else:
+                embedded = await self.embed_texts([query])
+                if not embedded:
+                    return []
+                vec = embedded[0]
+
+            must_conditions: list[Any] = [
+                qmodels.FieldCondition(
+                    key="is_active",
+                    match=qmodels.MatchValue(value=True),
+                ),
+                qmodels.FieldCondition(
+                    key="is_retrievable",
+                    match=qmodels.MatchValue(value=True),
+                ),
+                qmodels.FieldCondition(
+                    key="document_status",
+                    match=qmodels.MatchAny(any=["ready", "approved"]),
+                ),
+            ]
+            if tenant_id:
+                must_conditions.append(
+                    qmodels.FieldCondition(
+                        key="tenant_id",
+                        match=qmodels.MatchValue(value=tenant_id),
+                    )
+                )
+            if workspace_id:
+                must_conditions.append(
+                    qmodels.FieldCondition(
+                        key="workspace_id",
+                        match=qmodels.MatchValue(value=workspace_id),
+                    )
+                )
+
+            qfilter = qmodels.Filter(must=must_conditions)
+
             if hasattr(self.client, "query_points"):
                 res = await self.client.query_points(
                     collection_name=cname,

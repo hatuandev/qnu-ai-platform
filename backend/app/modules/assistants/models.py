@@ -30,6 +30,12 @@ class AssistantModel(Base):
     category: Mapped[str] = mapped_column(String(50), default="academic", index=True)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     workflow_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    published_workflow_version_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, default=None
+    )
+    workflow_ownership: Mapped[str] = mapped_column(
+        String(20), default="private", index=True
+    )  # 'private' | 'shared'
     collection_id: Mapped[str] = mapped_column(String(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     tenant_id: Mapped[str] = mapped_column(String(100), default="tenant_qnu", index=True)

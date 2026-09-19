@@ -172,7 +172,15 @@ function AppContent() {
       case "knowledge":
         return <KnowledgePage currentPath={currentPath} onNavigate={handleNavigate} />;
       case "knowledge_ocr_lab":
-        return <ScanStudioPage />;
+        return (
+          <ScanStudioPage
+            documentId={resolved.params.documentId}
+            collectionId={resolved.searchParams.get("collectionId") || undefined}
+            onNavigate={handleNavigate}
+            onBack={() => handleNavigate("/knowledge")}
+            onApproveSuccess={() => handleNavigate("/knowledge")}
+          />
+        );
       case "document_types_list":
         return <DocumentTypesPage currentPath={currentPath} onNavigate={handleNavigate} />;
       case "document_type_detail":

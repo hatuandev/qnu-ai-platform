@@ -10,10 +10,13 @@ class DevLoginRequest(BaseModel):
 
 
 class AuthActor(BaseModel):
-    username: str = "admin"
+    username: str
+    actor_id: str = "act_admin_qnu"
+    display_name: str = "Cán bộ Quản trị QNU"
     tenant_id: str = "tenant_qnu"
     workspace_id: str = "workspace_qnu"
     role: str = "admin"
+    session_version: str = "v1"
     authenticated: bool = True
 
 

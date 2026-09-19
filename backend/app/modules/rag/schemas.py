@@ -20,6 +20,8 @@ class SearchRequest(BaseModel):
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Bộ lọc payload metadata"
     )
+    tenant_id: str | None = Field(default=None, description="Mã tenant cô lập dữ liệu")
+    workspace_id: str | None = Field(default=None, description="Mã workspace cô lập dữ liệu")
 
 
 class SearchResultItem(BaseModel):
@@ -63,6 +65,10 @@ class AskRequest(BaseModel):
     preferred_provider_id: str | None = None
     fallback_model: str | None = None
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
+    workspace_id: str = Field("workspace_qnu", min_length=2, max_length=100)
+    history: list[dict[str, str]] | None = Field(
+        default=None, description="Lịch sử các lượt hội thoại gần nhất [{'role': 'user'|'assistant', 'content': '...'}]"
+    )
 
 
 class AskResponse(BaseModel):

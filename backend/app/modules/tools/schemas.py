@@ -30,6 +30,7 @@ class ToolDefinitionResponse(BaseModel):
 class ToolExecuteRequest(BaseModel):
     tool_name: str = Field(..., description="Tên tool cần thực thi")
     parameters: dict[str, Any] = Field(default_factory=dict, description="Tham số truyền vào tool")
+    approval_id: str | None = Field(None, description="Mã phê duyệt HITL hợp lệ từ CSDL khi gọi tool có tác dụng phụ")
     tenant_id: str = Field("tenant_qnu", description="Mã người thuê")
     assistant_code: str | None = Field(None, description="Mã trợ lý gọi tool")
     conversation_id: str | None = Field(None, description="Mã phiên trao đổi")

@@ -33,6 +33,7 @@ def test_pricing_calculation():
 @pytest.mark.asyncio
 async def test_record_usage_log():
     db = AsyncMock()
+    db.add = MagicMock()
     mock_quota = MagicMock()
     mock_quota.tokens_used = 100
     mock_quota.cost_used_usd = 0.05

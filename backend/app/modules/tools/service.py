@@ -122,13 +122,92 @@ class ToolService:
                     )
 
         # 2. Check approval requirement if tool has side-effects
-        if tool.requires_approval and not request.parameters.get("is_approved"):
-            raise AppException(
-                f"Công cụ '{request.tool_name}' yêu cầu phê duyệt nhân sự (Human-in-the-loop) trước khi thực thi.",
-                code="tool_requires_approval",
-                status_code=403,
-                details={"tool_name": request.tool_name},
+        approval_rec = None
+        if tool.requires_approval:
+            approval_id = getattr(request, "approval_id", None) or request.parameters.get("approval_id")
+            if not approval_id:
+                raise AppException(
+                    f"Công cụ '{request.tool_name}' yêu cầu phê duyệt nhân sự (Human-in-the-loop) với mã approval_id hợp lệ trước khi thực thi.",
+                    code="tool_requires_approval",
+                    status_code=403,
+                    details={"tool_name": request.tool_name},
+                )
+
+            import hashlib
+            import json
+            from datetime import UTC, datetime
+
+            from sqlalchemy import select
+
+            from app.modules.workflows.models import WorkflowApprovalRequest
+
+            stmt = select(WorkflowApprovalRequest).where(WorkflowApprovalRequest.id == str(approval_id).strip())
+            exec_res = await session.execute(stmt)
+            approval_rec = (
+                exec_res.scalar_one_or_none()
+                if hasattr(exec_res, "scalar_one_or_none")
+                else None
             )
+            if hasattr(approval_rec, "__await__"):
+                approval_rec = await approval_rec
+
+            if not approval_rec:
+                raise AppException(
+                    f"Không tìm thấy bản ghi phê duyệt với mã '{approval_id}'.",
+                    code="approval_not_found",
+                    status_code=404,
+                    details={"approval_id": approval_id},
+                )
+
+            if approval_rec.status == "consumed":
+                raise AppException(
+                    "Yêu cầu phê duyệt này đã được thực thi trước đó (chống lặp tác vụ).",
+                    code="approval_already_consumed",
+                    status_code=409,
+                    details={"approval_id": approval_id},
+                )
+
+            if approval_rec.status != "approved":
+                approval_code = "approval_pending" if approval_rec.status == "pending" else "approval_not_approved"
+                raise AppException(
+                    f"Yêu cầu phê duyệt '{approval_id}' chưa được chấp thuận (trạng thái hiện tại: '{approval_rec.status}').",
+                    code=approval_code,
+                    status_code=403,
+                    details={"approval_id": approval_id, "status": approval_rec.status},
+                )
+
+            now_utc = datetime.now(UTC).replace(tzinfo=None)
+            if approval_rec.expires_at:
+                exp = approval_rec.expires_at
+                if exp.tzinfo is not None:
+                    exp = exp.astimezone(UTC).replace(tzinfo=None)
+                if exp < now_utc:
+                    approval_rec.status = "expired"
+                    await session.commit()
+                    raise AppException(
+                        "Yêu cầu phê duyệt đã hết hạn.",
+                        code="approval_expired",
+                        status_code=403,
+                        details={"approval_id": approval_id, "expires_at": approval_rec.expires_at.isoformat()},
+                    )
+
+            # Check payload_hash if present
+            if approval_rec.payload_hash:
+                clean_params = {
+                    k: v
+                    for k, v in request.parameters.items()
+                    if k not in ("approval_id", "is_approved", "approved_by")
+                }
+                computed_hash = hashlib.sha256(
+                    json.dumps(clean_params, sort_keys=True, ensure_ascii=False).encode("utf-8")
+                ).hexdigest()
+                if approval_rec.payload_hash != computed_hash:
+                    raise AppException(
+                        "Tham số gọi công cụ không khớp với nội dung đã được cán bộ phê duyệt.",
+                        code="approval_payload_mismatch",
+                        status_code=403,
+                        details={"approval_id": approval_id, "expected_hash": approval_rec.payload_hash},
+                    )
 
         start_time = time.perf_counter()
         status = "success"
@@ -144,6 +223,11 @@ class ToolService:
                     "conversation_id": request.conversation_id,
                 },
             )
+            # Atomic Consumption upon successful execution
+            if approval_rec is not None:
+                from datetime import UTC, datetime
+                approval_rec.status = "consumed"
+                approval_rec.decided_at = datetime.now(UTC).replace(tzinfo=None)
         except Exception as exc:
             logger.error("tool_execution_failed", tool_name=request.tool_name, error=str(exc))
             status = "failed"

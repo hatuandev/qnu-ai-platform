@@ -58,9 +58,10 @@ export const toolsApi = {
   },
 
   /**
-   * Thực thi công cụ ngoại vi (Function Calling Execution) với smart offline fallback.
+   * Thực thi công cụ ngoại vi (Function Calling Execution) trung thực qua Tool Gateway.
    */
   async executeTool(payload: ToolExecuteRequest): Promise<ToolExecuteResponse> {
+    const startTs = Date.now();
     try {
       const res = await fetch("/platform/v1alpha1/tools/execute", {
         method: "POST",
@@ -70,89 +71,28 @@ export const toolsApi = {
       if (res.ok) {
         return await res.json();
       }
-    } catch (_err) {
-      // Graceful offline fallback
-    }
-
-    const startTs = Date.now();
-    const tool = payload.tool_name;
-    const params = payload.parameters || {};
-
-    if (tool === "export_administrative_document" || tool === "docx_nd30_exporter") {
-      const docType = String(params.document_type || "THÔNG BÁO").toUpperCase();
-      const title = String(params.title || "Về việc triển khai công tác đào tạo");
-      const filename = `${docType.toLowerCase()}_${title.slice(0, 30).trim().replace(/\s+/g, "_")}.docx`;
-
+      const errData = await res.json().catch(() => ({}));
+      const errorMsg =
+        errData.detail ||
+        errData.message ||
+        `Lỗi thực thi công cụ ngoại vi '${payload.tool_name}' (HTTP ${res.status}).`;
       return {
-        tool_name: tool,
-        status: "success",
-        result: {
-          status: "generated",
-          file_name: filename,
-          file_path: `D:/DuAnPhanMem/qnu-ai-platform/data/artifacts/${filename}`,
-          document_type: docType,
-          title,
-          standard: "Decree 30/2020/ND-CP",
-          margins: { top_mm: 20, bottom_mm: 20, left_mm: 30, right_mm: 15 },
-          font: "Times New Roman (12-13pt)",
-          signer: {
-            title: String(params.signer_title || "HIỆU TRƯỞNG"),
-            name: String(params.signer_name || "PGS.TS. Đỗ Ngọc Mỹ"),
-          },
-          recipients: (params.recipients as string[]) || ["Như Điều 3", "Lưu: VT, ĐT."],
-          minio_s3_uri: `s3://knowledge-processed/administrative/${filename}`,
-          size_bytes: 28450,
-          created_at: new Date().toISOString(),
-        },
-        latency_ms: Date.now() - startTs + 120,
+        tool_name: payload.tool_name,
+        status: "failed",
+        error_message: errorMsg,
+        result: { error: errorMsg },
+        latency_ms: Date.now() - startTs,
+      };
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Mất kết nối tới dịch vụ Tool Gateway máy chủ.";
+      return {
+        tool_name: payload.tool_name,
+        status: "failed",
+        error_message: errorMsg,
+        result: { error: errorMsg },
+        latency_ms: Date.now() - startTs,
       };
     }
-
-    if (tool === "export_exam_matrix" || tool === "xlsx_bloom_matrix_exporter") {
-      const courseName = String(params.course_name || "Học phần mẫu");
-      const courseCode = String(params.course_code || "QNU101");
-      const filename = `Exam_Matrix_${courseCode}_Bloom.xlsx`;
-
-      return {
-        tool_name: tool,
-        status: "success",
-        result: {
-          status: "generated",
-          file_name: filename,
-          file_path: `D:/DuAnPhanMem/qnu-ai-platform/data/artifacts/${filename}`,
-          course_name: courseName,
-          course_code: courseCode,
-          duration_minutes: Number(params.exam_duration_minutes || 60),
-          bloom_levels: {
-            level_1_remember_percent: 30,
-            level_2_understand_percent: 30,
-            level_3_apply_percent: 25,
-            level_4_advanced_apply_percent: 15,
-          },
-          total_questions: 20,
-          max_score: 10.0,
-          minio_s3_uri: `s3://knowledge-processed/exams/${filename}`,
-          size_bytes: 18720,
-          created_at: new Date().toISOString(),
-        },
-        latency_ms: Date.now() - startTs + 150,
-      };
-    }
-
-    // Default: UIS admissions query
-    const code = String(params.major_code || "7480201");
-    const major = UIS_MAJORS_DATABASE.find((m) => m.major_code === code) || UIS_MAJORS_DATABASE[0];
-
-    return {
-      tool_name: tool,
-      status: "success",
-      result: {
-        status: "found",
-        source: "Cổng Thông Tin Đào Tạo & Tuyển Sinh UIS Trường ĐH Quy Nhơn",
-        major_info: major,
-        sync_timestamp: new Date().toISOString(),
-      },
-      latency_ms: Date.now() - startTs + 85,
-    };
   },
 };

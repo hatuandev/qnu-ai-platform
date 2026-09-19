@@ -4,7 +4,9 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  Cpu,
   ExternalLink,
+  Eye,
   HelpCircle,
   Inbox,
   Play,
@@ -13,11 +15,14 @@ import {
   ShieldCheck,
   Sparkles,
   XCircle,
+  Zap,
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/admin/empty-state";
+import { EvaluationRunDetailSheet } from "../components/evaluation/evaluation-run-detail-sheet";
+import { RunBenchmarkDialog } from "../components/evaluation/run-benchmark-dialog";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -37,7 +42,9 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
 }) => {
   const [activeTab, setActiveTab] = useState<string>("gauges");
   const [resolvedGaps, setResolvedGaps] = useState<string[]>([]);
-  const [isRunningEval, setIsRunningEval] = useState(false);
+  const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: metrics } = useQuery({
@@ -79,25 +86,14 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
           : "Đã bỏ qua lỗ hổng tri thức."
       );
     },
-    onError: (err: Error) => toast.error(`Xử lý lỗ hổng thất bại: ${err.message}`),
+    onError: (err: Error) => {
+      toast.error(`Xử lý lỗ hổng thất bại: ${err.message}`);
+    },
   });
 
-  const handleRunEvaluation = async () => {
-    try {
-      setIsRunningEval(true);
-      await apiClient.runEvaluation({
-        assistant_code: "admissions",
-        dataset_id: "qnu_admissions_benchmark",
-        sample_size: 5,
-      });
-      await queryClient.invalidateQueries({ queryKey: ["evaluation-runs"] });
-      await queryClient.invalidateQueries({ queryKey: ["evaluation-metrics"] });
-      await queryClient.invalidateQueries({ queryKey: ["gap-inbox"] });
-    } catch (err) {
-      console.error("Lỗi khi chạy benchmark kiểm định:", err);
-    } finally {
-      setIsRunningEval(false);
-    }
+  const handleOpenDetail = (runId: string) => {
+    setSelectedRunId(runId);
+    setIsDetailSheetOpen(true);
   };
 
   const handleResolve = (id: string, status: "resolved" | "dismissed" = "resolved") => {
@@ -143,16 +139,11 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
 
         <Button
           size="sm"
-          onClick={handleRunEvaluation}
-          disabled={isRunningEval}
+          onClick={() => setIsRunDialogOpen(true)}
           className="h-9 gap-1.5 text-xs self-start sm:self-auto shrink-0"
         >
-          {isRunningEval ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-          <span>{isRunningEval ? "Đang Kiểm Định..." : "Chạy Benchmark TM-08"}</span>
+          <Play className="h-4 w-4" />
+          <span>Chạy Benchmark TM-08</span>
         </Button>
       </div>
 
@@ -270,15 +261,10 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                 action={
                   <Button
                     size="sm"
-                    onClick={handleRunEvaluation}
-                    disabled={isRunningEval}
+                    onClick={() => setIsRunDialogOpen(true)}
                     className="h-8 gap-1.5 text-xs"
                   >
-                    {isRunningEval ? (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Play className="h-3.5 w-3.5" />
-                    )}
+                    <Play className="h-3.5 w-3.5" />
                     <span>Kích Hoạt Kiểm Định Ngay</span>
                   </Button>
                 }
@@ -290,6 +276,7 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                     <TableRow>
                       <TableHead>Tập Dữ Liệu Benchmark</TableHead>
                       <TableHead>Trợ Lý</TableHead>
+                      <TableHead>Phương Pháp</TableHead>
                       <TableHead>Số Câu Test</TableHead>
                       <TableHead>Tỷ Lệ Đạt</TableHead>
                       <TableHead>Faithfulness</TableHead>
@@ -297,15 +284,31 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                       <TableHead>Precision</TableHead>
                       <TableHead>Chuẩn TM-08</TableHead>
                       <TableHead>Thời Gian</TableHead>
+                      <TableHead className="text-right">Thao Tác</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {runs.map((r: EvaluationRunItem) => (
-                      <TableRow key={r.id}>
+                      <TableRow
+                        key={r.id}
+                        onClick={() => handleOpenDetail(r.id)}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      >
                         <TableCell className="font-medium text-xs font-mono">
                           {r.dataset_id}
                         </TableCell>
                         <TableCell className="text-xs">{r.assistant_code}</TableCell>
+                        <TableCell>
+                          {r.evaluation_method === "llm_judge" ? (
+                            <Badge variant="outline" className="text-[10px] gap-1 font-mono">
+                              <Cpu className="h-2.5 w-2.5 text-primary" /> LLM-Judge
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] gap-1 font-mono">
+                              <Zap className="h-2.5 w-2.5 text-amber-500" /> Heuristic
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">
                           {r.passed_cases}/{r.total_cases} câu
                         </TableCell>
@@ -334,6 +337,20 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                         </TableCell>
                         <TableCell className="text-[11px] text-muted-foreground font-mono">
                           {r.created_at ? new Date(r.created_at).toLocaleDateString("vi-VN") : ""}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDetail(r.id);
+                            }}
+                            className="h-7 px-2 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>Chi tiết</span>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -472,6 +489,16 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
           </div>
         )}
       </Tabs>
+
+      {/* Dialog Cấu Hình Chạy Benchmark TM-08 */}
+      <RunBenchmarkDialog open={isRunDialogOpen} onOpenChange={setIsRunDialogOpen} />
+
+      {/* Sheet Xem Chi Tiết Từng Câu Hỏi Phiên Kiểm Định */}
+      <EvaluationRunDetailSheet
+        runId={selectedRunId}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+      />
     </div>
   );
 };

@@ -6,7 +6,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 15
     DB_MAX_OVERFLOW: int = 10
     DB_TIMEOUT_SECONDS: float = 30.0
+    DEV_AUTO_MIGRATE: bool = False
+    DEV_AUTO_SEED: bool = False
 
     # --- Qdrant Vector DB ---
     QDRANT_URL: str = "http://localhost:6333"
@@ -107,6 +109,8 @@ class Settings(BaseSettings):
 
     # --- Security & Auth ---
     SECRET_KEY: str = "qnu-ai-platform-super-secret-key-change-in-production-2026"
+    PROVIDER_ENCRYPTION_KEY: str | None = None
+    OLD_PROVIDER_ENCRYPTION_KEYS: list[str] = []
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     INTERNAL_API_KEY: str = "qnu_internal_secret_key_2026"
@@ -118,6 +122,32 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     JSON_LOGGING: bool = True
     ENABLE_PROMETHEUS: bool = True
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> Settings:
+        """Enforce strict fail-fast validation on secrets in production environment."""
+        if self.ENVIRONMENT.lower() in ("production", "prod"):
+            insecure_defaults = [
+                ("SECRET_KEY", self.SECRET_KEY, "change-in-production"),
+                ("INTERNAL_API_KEY", self.INTERNAL_API_KEY, "qnu_internal_secret_key_2026"),
+                ("DEV_ACCESS_PASSWORD", self.DEV_ACCESS_PASSWORD, "QNU@2026"),
+                ("DATABASE_URL", self.DATABASE_URL, "qnu_password_secure_2026"),
+                ("S3_SECRET_KEY", self.S3_SECRET_KEY, "qnu_minio_secret_2026"),
+            ]
+            violations = [
+                name for name, val, pattern in insecure_defaults
+                if val and pattern in val
+            ]
+            if violations:
+                raise ValueError(
+                    f"Production security violation: Default/insecure secrets detected for {violations}. "
+                    "You MUST override these variables in production environment."
+                )
+            if not self.PROVIDER_ENCRYPTION_KEY:
+                raise ValueError(
+                    "Production security violation: PROVIDER_ENCRYPTION_KEY must be configured in production."
+                )
+        return self
 
 
 @lru_cache

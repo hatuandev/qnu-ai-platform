@@ -15,6 +15,9 @@ export interface IngestionProgressModalProps {
   fileSize: number;
   ocrEngine: string;
   chunkingStrategy: string;
+  activeStage?: number;
+  isComplete?: boolean;
+  stageDurations?: Record<number, number>;
   onFinished?: () => void;
 }
 
@@ -36,11 +39,24 @@ export const IngestionProgressModal: React.FC<IngestionProgressModalProps> = ({
   fileSize,
   ocrEngine,
   chunkingStrategy,
+  activeStage = 1,
+  isComplete = false,
+  stageDurations = {},
   onFinished,
 }) => {
-  const [currentStage, setCurrentStage] = useState<number>(1);
-  const [isDone, setIsDone] = useState<boolean>(false);
-  const [stageDurations, setStageDurations] = useState<Record<number, number>>({});
+  const [currentStage, setCurrentStage] = useState<number>(activeStage);
+  const [isDone, setIsDone] = useState<boolean>(isComplete);
+
+  useEffect(() => {
+    setCurrentStage(activeStage);
+  }, [activeStage]);
+
+  useEffect(() => {
+    setIsDone(isComplete);
+    if (isComplete && onFinished) {
+      onFinished();
+    }
+  }, [isComplete, onFinished]);
 
   const formatFileSize = (bytes: number) => {
     if (!bytes) return "0.0 MB";
@@ -77,58 +93,6 @@ export const IngestionProgressModal: React.FC<IngestionProgressModalProps> = ({
       detail: `Collection: ${collectionCode || "knowledge"}_dense — Sẵn sàng cho Hybrid RRF (k=60)`,
     },
   ];
-
-  // Pipeline simulation sequence
-  useEffect(() => {
-    if (!isOpen) {
-      setCurrentStage(1);
-      setIsDone(false);
-      setStageDurations({});
-      return;
-    }
-
-    let isSubscribed = true;
-
-    // Stage 1: MinIO Upload (~350ms)
-    const t1 = setTimeout(() => {
-      if (!isSubscribed) return;
-      setStageDurations((prev) => ({ ...prev, 1: 128 }));
-      setCurrentStage(2);
-
-      // Stage 2: OCR / Parsing (~500ms)
-      const t2 = setTimeout(() => {
-        if (!isSubscribed) return;
-        setStageDurations((prev) => ({ ...prev, 2: 435 }));
-        setCurrentStage(3);
-
-        // Stage 3: Chunking (~400ms)
-        const t3 = setTimeout(() => {
-          if (!isSubscribed) return;
-          setStageDurations((prev) => ({ ...prev, 3: 172 }));
-          setCurrentStage(4);
-
-          // Stage 4: Indexing (~450ms)
-          const t4 = setTimeout(() => {
-            if (!isSubscribed) return;
-            setStageDurations((prev) => ({ ...prev, 4: 215 }));
-            setCurrentStage(5);
-            setIsDone(true);
-            if (onFinished) {
-              onFinished();
-            }
-          }, 450);
-          return () => clearTimeout(t4);
-        }, 400);
-        return () => clearTimeout(t3);
-      }, 500);
-      return () => clearTimeout(t2);
-    }, 350);
-
-    return () => {
-      isSubscribed = false;
-      clearTimeout(t1);
-    };
-  }, [isOpen, onFinished]);
 
   const progressPercent = Math.min(100, Math.round(((currentStage - 1) / 4) * 100));
 

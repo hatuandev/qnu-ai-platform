@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.modules.evaluation.schemas import (
     DatasetResponse,
+    EvaluationResultItemResponse,
+    EvaluationRunDetailResponse,
     EvaluationRunRequest,
     EvaluationRunResponse,
     KnowledgeGapResolveRequest,
@@ -50,6 +52,24 @@ async def list_evaluation_runs(
 ) -> list[EvaluationRunResponse]:
     """Xem lịch sử các lần kiểm định chất lượng định kỳ và sự suy giảm độ chính xác (Drift)."""
     return await service.list_runs(session=session, assistant_code=assistant_code)
+
+
+@router.get("/runs/{run_id}", response_model=EvaluationRunDetailResponse, summary="Chi tiết đầy đủ một phiên kiểm định kèm từng câu hỏi")
+async def get_evaluation_run_detail(
+    run_id: str,
+    session: AsyncSession = Depends(get_db),
+) -> EvaluationRunDetailResponse:
+    """Xem chi tiết một phiên kiểm định gồm điểm số tổng thể và từng câu hỏi đánh giá."""
+    return await service.get_run_detail(session=session, run_id=run_id)
+
+
+@router.get("/runs/{run_id}/items", response_model=list[EvaluationResultItemResponse], summary="Danh sách kết quả từng câu hỏi trong phiên kiểm định")
+async def get_evaluation_run_items(
+    run_id: str,
+    session: AsyncSession = Depends(get_db),
+) -> list[EvaluationResultItemResponse]:
+    """Lấy danh sách các câu hỏi, câu trả lời sinh ra, citations và điểm số chi tiết của phiên kiểm định."""
+    return await service.get_run_items(session=session, run_id=run_id)
 
 
 @router.get("/metrics", summary="Lấy tổng quan các chỉ số chất lượng Ragas TM-08")

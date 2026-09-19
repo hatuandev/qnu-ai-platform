@@ -61,3 +61,13 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "--basetemp=.pytest_temp"
+filterwarnings = [
+    "ignore::DeprecationWarning:torch.*",
+    "ignore::DeprecationWarning:easyocr.*",
+    "ignore::DeprecationWarning:docling.*",
+    "ignore::DeprecationWarning:pydantic.*",
+    "ignore::UserWarning:torch.*",
+    "ignore::UserWarning:app.modules.rag.vector_indexer.*",
+    "ignore:coroutine 'Connection._cancel' was never awaited:RuntimeWarning",
+    "ignore:coroutine 'AsyncMockMixin._execute_mock_call' was never awaited:RuntimeWarning",
+]

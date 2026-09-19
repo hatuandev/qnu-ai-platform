@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Response, status
-from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import check_db_health, engine
@@ -40,72 +39,60 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         port=settings.PORT,
     )
 
-    # Automatically ensure PostgreSQL schema exists on startup
+    # Verify database schema readiness & storage bucket
+    from app.core.storage import storage_service
+
+    await storage_service.ensure_bucket()
+
     try:
-        import app.modules.assistants.models
-        import app.modules.conversations.models
-        import app.modules.document_types.models
-        import app.modules.evaluation.models
-        import app.modules.knowledge.models
-        import app.modules.modelops.models
-        import app.modules.node_catalog.models
-        import app.modules.ocr.models
-        import app.modules.tools.models
-        import app.modules.workflows.models  # noqa: F401
-        from app.core.database import Base
+        from sqlalchemy import inspect, text
 
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            await conn.execute(
-                text(
-                    "ALTER TABLE IF EXISTS knowledge_documents "
-                    "ADD COLUMN IF NOT EXISTS document_type_code VARCHAR(64)"
-                )
-            )
-            await conn.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_knowledge_documents_document_type_code "
-                    "ON knowledge_documents (document_type_code)"
-                )
-            )
-            await conn.execute(
-                text(
-                    "ALTER TABLE IF EXISTS workflow_definitions "
-                    "ADD COLUMN IF NOT EXISTS published_version_id VARCHAR(36)"
-                )
-            )
-            for column_definition in (
-                "workflow_version_id VARCHAR(36)",
-                "assistant_id VARCHAR(36)",
-                "assistant_revision VARCHAR(64)",
-                "correlation_id VARCHAR(128)",
-                "runtime_profile JSONB",
-            ):
-                await conn.execute(
-                    text(
-                        "ALTER TABLE IF EXISTS workflow_executions "
-                        f"ADD COLUMN IF NOT EXISTS {column_definition}"
-                    )
-                )
-        from app.core.database import AsyncSessionFactory
-        from app.modules.assistants.seeder import seed_standard_assistants
-        from app.modules.document_types.service import document_types_service
-        from app.modules.knowledge.seeder import seed_default_knowledge
-        from app.modules.knowledge.service import knowledge_service
-        from app.modules.modelops.service import modelops_service
-        from app.modules.workflows.service import workflow_service
+        async with engine.connect() as conn:
+            # 1. Connection check
+            await conn.execute(text("SELECT 1"))
 
-        async with AsyncSessionFactory() as db:
-            await document_types_service.sync_from_catalog(db)
-            await workflow_service.sync_default_workflows(db)
-            await seed_standard_assistants(db)
-            await seed_default_knowledge(db)
-            await modelops_service.get_system_model_defaults(db)
-            await knowledge_service.sync_ingestion_job_records(db)
-        logger.info(
-            "Database schema, workflows, assistants, knowledge, system model defaults, and ingestion jobs initialized."
-        )
+            # 2. Schema readiness check (Alembic & Core tables)
+            has_alembic = await conn.run_sync(
+                lambda sync_conn: inspect(sync_conn).has_table("alembic_version")
+            )
+            tables = await conn.run_sync(
+                lambda sync_conn: set(inspect(sync_conn).get_table_names())
+            )
+            required_tables = {
+                "assistants",
+                "knowledge_documents",
+                "workflow_definitions",
+                "model_provider_configs",
+            }
+            missing = required_tables - tables
+
+            if not has_alembic or missing:
+                err_msg = (
+                    f"Database schema is not ready. Missing tables: {missing or 'alembic_version'}. "
+                    "Run 'python -m app.cli db migrate' to initialize schema."
+                )
+                if settings.ENVIRONMENT == "production":
+                    logger.error(err_msg)
+                    raise RuntimeError(err_msg)
+
+                if settings.DEV_AUTO_MIGRATE:
+                    logger.info("DEV_AUTO_MIGRATE is enabled. Running migrations...")
+                    from app.cli import run_db_migrate
+                    run_db_migrate()
+                else:
+                    logger.warning(err_msg)
+            else:
+                logger.info("Database schema readiness verified: OK")
+
+        # Optional dev auto-seed (default disabled in production)
+        if settings.DEV_AUTO_SEED:
+            logger.info("DEV_AUTO_SEED is enabled. Running seed...")
+            from app.cli import run_db_seed
+            await run_db_seed(seed_all=True)
+
     except Exception as exc:
+        if settings.ENVIRONMENT == "production":
+            raise
         logger.warning("Database schema check warning: %s", exc)
 
     yield
@@ -183,6 +170,23 @@ def create_app() -> FastAPI:
                 "redis": "connected",
             },
         }
+
+    # 5.1 Prometheus Metrics Endpoint
+    from app.core.observability import metrics_registry
+
+    @app.get("/metrics", tags=["Observability"])
+    async def get_metrics(format: str | None = None) -> Response:
+        if format == "json":
+            import json
+
+            return Response(
+                content=json.dumps(metrics_registry.get_summary(), indent=2),
+                media_type="application/json",
+            )
+        return Response(
+            content=metrics_registry.export_prometheus(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     # 6. Mount Feature Modules Routers
     from app.modules.assistants import assistant_chat_router, assistants_router

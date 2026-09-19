@@ -66,6 +66,23 @@ export const evaluationApi = {
     return await res.json();
   },
 
+  async getDatasets(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      description: string;
+      assistant_code: string;
+      total_test_cases: number;
+    }>
+  > {
+    const res = await fetch(`${BASE_URL}/evaluation/datasets`);
+    if (!res.ok) {
+      throw new Error(`Không tải được danh sách tập dữ liệu kiểm định (HTTP ${res.status}).`);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  },
+
   async getEvaluationRuns(assistantCode?: string): Promise<EvaluationRunItem[]> {
     const url = assistantCode
       ? `${BASE_URL}/evaluation/runs?assistant_code=${encodeURIComponent(assistantCode)}`
@@ -73,6 +90,23 @@ export const evaluationApi = {
     const res = await fetch(url);
     if (!res.ok) {
       throw new Error(`Không tải được lịch sử kiểm định (HTTP ${res.status}).`);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getRunDetail(runId: string): Promise<import("@/types/evaluation").EvaluationRunDetail> {
+    const res = await fetch(`${BASE_URL}/evaluation/runs/${encodeURIComponent(runId)}`);
+    if (!res.ok) {
+      throw new Error(`Không tải được chi tiết phiên kiểm định (HTTP ${res.status}).`);
+    }
+    return await res.json();
+  },
+
+  async getRunItems(runId: string): Promise<import("@/types/evaluation").EvaluationResultItem[]> {
+    const res = await fetch(`${BASE_URL}/evaluation/runs/${encodeURIComponent(runId)}/items`);
+    if (!res.ok) {
+      throw new Error(`Không tải được danh sách câu hỏi kiểm định (HTTP ${res.status}).`);
     }
     const data = await res.json();
     return Array.isArray(data) ? data : [];

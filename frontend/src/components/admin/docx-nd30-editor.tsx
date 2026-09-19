@@ -163,7 +163,7 @@ export const DocxNd30Editor: React.FC<DocxNd30EditorProps> = ({
       });
 
       setLastResponse(response);
-      if (onGeneratedSuccess) {
+      if (response.status === "success" && onGeneratedSuccess) {
         onGeneratedSuccess(response);
       }
     } finally {

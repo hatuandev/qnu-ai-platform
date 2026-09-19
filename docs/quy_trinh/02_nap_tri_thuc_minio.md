@@ -147,20 +147,42 @@ flowchart TD
   3. Bóc tách từng dòng thành các cặp `(entity_name, entity_type, attribute_name, attribute_value)` với độ tin cậy tuyệt đối (`confidence = 1.0`).
   4. Lưu trữ bền vững vào bảng PostgreSQL `knowledge_facts`, tự động liên kết với `collection_id`.
   5. Khi Trợ lý AI nhận câu hỏi có chứa số liệu (như "Điểm chuẩn ngành Công nghệ thông tin năm 2024?"), hệ thống RAG ưu tiên tra cứu trực tiếp từ tầng Facts số hóa trước khi truy xuất văn bản thô, bảo đảm **Zero Hallucination** 100%.
-### Bước 11: Vòng Đời Lập Chỉ Mục Kép, Tách Bạch Hàng Đợi & Đối Soát Bền Vững 4 Tầng (P1-09 đến P1-13)
-- **Chuẩn hóa vòng đời trạng thái lập chỉ mục (`index_status`)**:
-  - Mỗi tài liệu `KnowledgeDocument` sở hữu 2 trạng thái độc lập:
-    * `status`: Vòng đời phê duyệt nghiệp vụ (`pending` -> `approved` -> `archived`).
-    * `index_status`: Vòng đời kỹ thuật của vector embeddings (`pending` -> `indexing` -> `indexed` / `index_failed`).
-  - Khi người dùng bấm phê duyệt (`approve_document`), `index_status` chuyển sang `indexing`. Sau khi hoàn tất nạp vector vào Qdrant an toàn, trạng thái chuyển thành `indexed`. Nếu Qdrant hoặc dịch vụ Embedding gặp sự cố, tài liệu chuyển sang `index_failed` kèm lý do lỗi chi tiết tại `index_error` (không bao giờ nuốt lỗi).
+### Bước 11: Vòng Đời Lập Chỉ Mục Kép, Tách Bạch Hàng Đợi & Đối Soát Bền Vững 4 Tầng (Giai Đoạn D - P1-09 đến P1-13)
+- **Chuẩn hóa Document Lifecycle State Machine (Máy Trạng Thái Vòng Đời Tài Liệu)**:
+  - Vòng đời tài liệu tuân thủ nghiêm ngặt cỗ máy trạng thái 7 bước:
+    `uploaded` $\rightarrow$ `extracting` $\rightarrow$ `review_pending` $\rightarrow$ `approved` $\rightarrow$ `indexing` $\rightarrow$ `ready`, và `ready` $\rightarrow$ `archived`.
+  - **Tách bạch dứt khoát giữa `approved` và `ready`**:
+    * `approved`: Trạng thái nghiệp vụ — Cán bộ kiểm duyệt con người đã xác nhận nội dung bóc tách/OCR là sạch sẽ và chính xác.
+    * `ready`: Trạng thái kỹ thuật toàn vẹn — Tất cả chunks đã được tính toán embeddings và nạp thành công vào Qdrant Vector DB (`index_status = "indexed"`). Chỉ khi đạt `status = "ready"` (hoặc `ready`/`approved`), tài liệu mới được phép xuất hiện trong kết quả truy vấn RAG.
+    * Nếu xảy ra lỗi vector indexing (mất mạng, Qdrant offline), tài liệu giữ nguyên `status = "approved"`, ghi nhận `index_status = "index_failed"` kèm `index_error` chi tiết để cán bộ reindex mà không làm mất công sức kiểm duyệt của con người.
+- **Quy Chuẩn Bắt Buộc 11 Metadata Fields Cho Qdrant Point Payload (Schema Version v1)**:
+  - Mọi điểm vector nạp vào Qdrant bắt buộc phải có đủ 11 trường metadata, cơ chế **Fail-Fast** (`AppException(code="INVALID_POINT_PAYLOAD", status_code=400)`) sẽ từ chối ngay lập tức nếu thiếu bất kỳ trường nào:
+    1. `tenant_id`: Mã định danh đơn vị thuê (ví dụ: `tenant_qnu`).
+    2. `workspace_id`: Mã không gian làm việc (ví dụ: `workspace_qnu` hoặc `ws_default`).
+    3. `collection_id`: Mã bộ sưu tập tri thức.
+    4. `document_id`: Mã tài liệu nguồn.
+    5. `document_revision`: Số phiên bản hiệu chỉnh của tài liệu (`int`).
+    6. `chunk_id`: Mã phân đoạn tri thức.
+    7. `document_status`: Trạng thái vòng đời (`ready` hoặc `approved`).
+    8. `is_retrievable`: Cờ cho phép truy xuất RAG (`bool`, bắt buộc `True` đối với point hợp lệ).
+    9. `content_hash`: Mã băm SHA-256 nội dung của chunk.
+    10. `embedding_model`: Tên mô hình embedding đã sinh vector (ví dụ: `text-embedding-3-small`, `@cf/baai/bge-m3`).
+    11. `payload_schema_version`: Phiên bản cấu trúc payload (bắt buộc `"v1"`).
 - **Tách bạch Job Type trong hàng đợi nền (Job Queue Separation)**:
   - Tách bạch dứt khoát giữa `job_type="ingestion_extract"` (bóc tách văn bản, OCR, sinh chunks khi upload) và `job_type="vector_indexing"` (tính toán embeddings, nạp vectors vào Qdrant khi phê duyệt hoặc reindex), khắc phục triệt để nhầm lẫn hàng đợi và nghẽn tiến trình.
-- **Bổ sung siêu dữ liệu cô lập đa người thuê (Multi-tenant Vector Metadata)**:
-  - Mọi point vector nạp vào Qdrant bắt buộc mang đầy đủ metadata: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_status="approved"`, `is_retrievable=True`, `chunk_index`, `page_number`, `header_path`. Ngăn ngừa rò rỉ dữ liệu chéo giữa các khoa/phòng ban.
 - **Cơ chế Khôi phục Lập chỉ mục đơn lẻ (`reindex_document`)**:
   - Cung cấp API `POST /knowledge/documents/{id}/reindex` và nút bấm trực quan `[⚡ Thử lại Index]` trên giao diện bảng danh sách tài liệu, cho phép cán bộ tái nạp vector ngay lập tức khi phát hiện tài liệu `approved` nhưng ở trạng thái `index_failed`.
-- **Thanh tra Đối Soát Bền Vững 4 Tầng (`reconcile_collection` & `reconcile_fix_collection`)**:
-  - Cung cấp API `GET /knowledge/collections/{id}/reconcile` và nút `[Đối soát Kho]` trên thanh công cụ:
-    1. Quét đối soát số lượng và ID giữa 4 tầng: PostgreSQL DB, Qdrant Vector Points, MinIO/Local Storage Files, và Redis Semantic Cache.
-    2. Phát hiện chính xác các sai lệch: `ghost_vectors` (vector mồ côi trong Qdrant nhưng DB đã mất), `missing_vectors` (tài liệu đã duyệt nhưng thiếu vector trong Qdrant), `missing_storage_file` (thiếu file vật lý), `empty_chunks`.
-    3. Cung cấp nút `[Đồng bộ tất cả]` (`POST /knowledge/collections/{id}/reconcile-fix`) để tự động lập chỉ mục lại toàn bộ tài liệu bị thiếu vector mà không cần can thiệp thủ công vào cơ sở dữ liệu.
+- **Thanh tra Đối Soát Bền Vững 4 Tầng (`reconcile_collection` & CLI Quản Trị)**:
+  - Cung cấp API `GET /knowledge/collections/{id}/reconcile`, nút `[Đối soát Kho]` trên UI, và lệnh CLI chuyên dụng:
+    ```bash
+    # Đối soát toàn bộ kho tri thức hoặc 1 collection cụ thể
+    python -m app.cli knowledge reconcile [--collection-id col_admissions] [--fix]
+
+    # Lập chỉ mục lại cho 1 collection hoặc 1 tài liệu cụ thể
+    python -m app.cli knowledge reindex [--collection-id col_admissions] [--document-id doc_123]
+    ```
+  - Kiểm tra đối soát 4 tầng thực sự:
+    1. **Tầng CSDL Quan hệ (PostgreSQL)**: Đếm tổng số documents, chunks và kiểm tra tính toàn vẹn trạng thái.
+    2. **Tầng Vector DB (Qdrant)**: Đếm tổng số points, kiểm tra schema version v1, phát hiện `orphan_qdrant_point` (point tham chiếu chunk không còn trong DB), `scope_mismatch` (tenant/workspace lệch pha), `unretrievable_point_active` (point thuộc doc chưa sẵn sàng nhưng vẫn mở `is_retrievable=True`).
+    3. **Tầng Lưu trữ Đối tượng (MinIO/Local Storage)**: Kiểm tra sự tồn tại của tệp tin vật lý gốc `storage_path` thông qua `storage_service.exists()`.
+    4. **Tầng Bộ nhớ Đệm (Redis Semantic Cache)**: Hỗ trợ xóa cache phân vùng theo collection (`invalidate_collection`) bao quát cả tiền tố v1 lẫn legacy.

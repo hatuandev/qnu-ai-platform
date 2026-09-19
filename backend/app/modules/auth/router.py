@@ -29,18 +29,24 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
         )
 
     actor = AuthActor(
+        actor_id="act_admin_qnu",
         username="admin",
+        display_name="Cán bộ Quản trị QNU",
         tenant_id="tenant_qnu",
         workspace_id="workspace_qnu",
         role="admin",
         authenticated=True,
+        session_version="v1",
     )
     token = create_access_token(
         subject=actor.username,
         claims={
+            "actor_id": actor.actor_id,
+            "display_name": actor.display_name,
             "tenant_id": actor.tenant_id,
             "workspace_id": actor.workspace_id,
             "role": actor.role,
+            "session_version": actor.session_version,
         },
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
@@ -80,11 +86,14 @@ async def get_current_user(request: Request) -> AuthStatusResponse:
         try:
             payload = decode_access_token(token)
             actor = AuthActor(
+                actor_id=str(payload.get("actor_id", "act_admin_qnu")),
                 username=str(payload.get("sub", "admin")),
+                display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
                 tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
                 workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
                 role=str(payload.get("role", "admin")),
                 authenticated=True,
+                session_version=str(payload.get("session_version", "v1")),
             )
             return AuthStatusResponse(authenticated=True, actor=actor)
         except Exception:

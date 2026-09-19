@@ -386,6 +386,7 @@ class AssistantReadinessEngine:
                     "Khuyến nghị chạy kiểm định Benchmark Ragas TM-08 tại trang /evaluation trước khi xuất bản chính thức.",
                 )
 
+            eval_method = getattr(latest_run, "evaluation_method", "heuristic") or "heuristic"
             if latest_run.meets_tm08_standard:
                 return (
                     ReadinessCheckItem(
@@ -393,13 +394,17 @@ class AssistantReadinessEngine:
                         name="Kiểm định chất lượng Ragas TM-08",
                         status="passed",
                         score=100,
-                        message=f"Đạt chuẩn TM-08: Faithfulness {latest_run.faithfulness_avg:.2f} (>=0.90), Relevance {latest_run.answer_relevance_avg:.2f} (>=0.85), Pass rate {int(latest_run.pass_rate * 100)}%.",
+                        message=f"Đạt chuẩn TM-08: Faithfulness {latest_run.faithfulness_avg:.2f} (>=0.90), Relevance {latest_run.answer_relevance_avg:.2f} (>=0.85), Pass rate {int(latest_run.pass_rate * 100)}% ({latest_run.passed_cases}/{latest_run.total_cases} câu, {eval_method}).",
                         details={
                             "run_id": latest_run.id,
+                            "dataset_id": latest_run.dataset_id,
                             "faithfulness": latest_run.faithfulness_avg,
                             "relevance": latest_run.answer_relevance_avg,
                             "precision": latest_run.context_precision_avg,
                             "pass_rate": latest_run.pass_rate,
+                            "passed_cases": latest_run.passed_cases,
+                            "total_cases": latest_run.total_cases,
+                            "evaluation_method": eval_method,
                         },
                     ),
                     None,
@@ -411,14 +416,18 @@ class AssistantReadinessEngine:
                     category="evaluation",
                     name="Kiểm định chất lượng Ragas TM-08",
                     status="warning",
-                    score=max(50, int(latest_run.pass_rate * 100)),
-                    message=f"Phiên kiểm định gần nhất chưa đạt toàn bộ chuẩn TM-08: Faithfulness {latest_run.faithfulness_avg:.2f}, Pass rate {int(latest_run.pass_rate * 100)}%.",
+                    score=max(40, int(latest_run.pass_rate * 100)),
+                    message=f"Phiên kiểm định gần nhất chưa đạt toàn bộ chuẩn TM-08: Faithfulness {latest_run.faithfulness_avg:.2f}, Relevance {latest_run.answer_relevance_avg:.2f}, Pass rate {int(latest_run.pass_rate * 100)}% ({latest_run.passed_cases}/{latest_run.total_cases} câu, {eval_method}).",
                     details={
                         "run_id": latest_run.id,
+                        "dataset_id": latest_run.dataset_id,
                         "faithfulness": latest_run.faithfulness_avg,
                         "relevance": latest_run.answer_relevance_avg,
                         "precision": latest_run.context_precision_avg,
                         "pass_rate": latest_run.pass_rate,
+                        "passed_cases": latest_run.passed_cases,
+                        "total_cases": latest_run.total_cases,
+                        "evaluation_method": eval_method,
                     },
                 ),
                 None,

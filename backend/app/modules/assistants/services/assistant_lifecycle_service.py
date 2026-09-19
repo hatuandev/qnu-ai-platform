@@ -1,0 +1,850 @@
+"""Assistant Lifecycle Service — Administration, versioning, snapshots, bundles, and templates."""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import unicodedata
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
+from app.modules.assistants.models import AssistantModel, AssistantVersionModel
+from app.modules.assistants.readiness import readiness_engine
+from app.modules.assistants.schemas import (
+    AssistantBundle,
+    AssistantBundleWorkflow,
+    AssistantCloneRequest,
+    AssistantCreateRequest,
+    AssistantForkWorkflowResponse,
+    AssistantGenerateRequest,
+    AssistantGenerateResponse,
+    AssistantLifecycleConfig,
+    AssistantPublishResponse,
+    AssistantReadinessResponse,
+    AssistantResponse,
+    AssistantRollbackResponse,
+    AssistantSeedResponse,
+    AssistantTemplateResponse,
+    AssistantUpdateRequest,
+    AssistantVersionResponse,
+)
+from app.modules.assistants.seeder import STANDARD_ASSISTANTS, seed_standard_assistants
+from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
+from app.modules.modelops.service import modelops_service
+from app.modules.workflows.models import WorkflowDefinition
+from app.modules.workflows.schemas import WorkflowPublishRequest
+from app.modules.workflows.service import workflow_service
+
+logger = logging.getLogger(__name__)
+
+
+def _clean_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return unicodedata.normalize("NFC", value.strip())
+
+
+def _to_response(record: AssistantModel) -> AssistantResponse:
+    config = AssistantLifecycleConfig.model_validate(record.config or {})
+    return AssistantResponse(
+        id=record.id,
+        code=record.code,
+        name=record.name,
+        description=record.description,
+        avatar_url=record.avatar_url,
+        category=record.category,
+        system_prompt=record.system_prompt,
+        workflow_id=record.workflow_id,
+        published_workflow_version_id=getattr(record, "published_workflow_version_id", None),
+        workflow_ownership=getattr(record, "workflow_ownership", None) or "private",
+        collection_id=record.collection_id,
+        is_active=record.is_active,
+        tenant_id=record.tenant_id,
+        sample_questions=config.sample_questions,
+        config=config,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
+def _extract_json(text: str) -> dict[str, object] | None:
+    text = text.strip()
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            pass
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    return None
+
+
+def _build_fallback_spec(idea: str, category_hint: str | None = None) -> AssistantGenerateResponse:
+    lower = idea.lower()
+    if any(k in lower for k in ["tuyển sinh", "xét tuyển", "ngành học", "điểm chuẩn"]):
+        name = "Trợ lý Tuyển sinh & Hướng nghiệp Số"
+        category = category_hint or "admissions"
+        workflow_id = "admissions-assistant"
+        questions = [
+            "Phương thức xét tuyển đại học năm nay gồm những gì?",
+            "Mức học phí và chính sách học bổng của trường như thế nào?",
+            "Thời gian và thủ tục nộp hồ sơ xét tuyển?",
+        ]
+    elif any(k in lower for k in ["văn bản", "soạn thảo", "nghị định 30", "công văn", "tờ trình"]):
+        name = "Trợ lý Soạn thảo Văn bản Hành chính NĐ 30"
+        category = category_hint or "administration"
+        workflow_id = "drafting-assistant"
+        questions = [
+            "Hướng dẫn thể thức trình bày Tờ trình theo Nghị định 30?",
+            "Mẫu Thông báo kết luận cuộc họp chuẩn Đại học Quy Nhơn?",
+            "Quy tắc ghi số hiệu và trích yếu văn bản hành chính?",
+        ]
+    elif any(k in lower for k in ["đề thi", "khảo thí", "bloom", "câu hỏi", "ma trận"]):
+        name = "Trợ lý Khảo thí & Ngân hàng Đề thi Bloom"
+        category = category_hint or "examination"
+        workflow_id = "question-bank-assistant"
+        questions = [
+            "Cách phân loại câu hỏi thi theo 4 mức độ nhận thức Bloom?",
+            "Xuất ma trận đề thi trắc nghiệm kết hợp tự luận?",
+            "Quy trình thẩm định và bảo mật ngân hàng câu hỏi thi?",
+        ]
+    elif any(k in lower for k in ["thư viện", "sách", "giáo trình", "tài liệu", "học liệu"]):
+        name = "Trợ lý Thư viện & Học liệu Số QNU"
+        category = category_hint or "resources"
+        workflow_id = "library-assistant"
+        questions = [
+            "Cách tra cứu giáo trình và tài liệu tham khảo theo mã DDC?",
+            "Hướng dẫn truy cập cơ sở dữ liệu bài báo khoa học trực tuyến?",
+            "Quy định về thời hạn mượn và gia hạn sách thư viện?",
+        ]
+    elif any(k in lower for k in ["ký túc xá", "nội trú", "tiền phòng", "ktx"]):
+        name = "Trợ lý Quản lý Ký túc xá & Đời sống Sinh viên"
+        category = category_hint or "resources"
+        workflow_id = "regulations-assistant"
+        questions = [
+            "Thủ tục đăng ký nội trú Ký túc xá cho tân sinh viên?",
+            "Mức phí lưu trú Ký túc xá và các chế độ ưu tiên, miễn giảm?",
+            "Nội quy sinh hoạt và quy định an ninh trật tự Ký túc xá?",
+        ]
+    else:
+        name = f"Trợ lý Chuyên trách {idea[:35].strip()}"
+        category = category_hint or "academic"
+        workflow_id = "regulations-assistant"
+        questions = [
+            f"Quy trình thực hiện đối với {idea[:30]}?",
+            "Các văn bản quy định và thủ tục cần chuẩn bị?",
+            "Thời hạn giải quyết và đơn vị phụ trách trực tiếp?",
+        ]
+
+    system_prompt = (
+        f"Bạn là {name}, Trợ lý Trí tuệ Nhân tạo chính thức thuộc Trường Đại học Quy Nhơn (QNU).\n\n"
+        f"1. VAI TRÒ & PHẠM VI:\n"
+        f"- Nhiệm vụ cốt lõi: Hỗ trợ cán bộ, giảng viên và người học về: {idea}.\n"
+        f"- Giới hạn phạm vi: Chỉ giải đáp các nội dung thuộc chuyên môn được giao. Tuyệt đối từ chối lịch sự và điều hướng các chủ đề nằm ngoài thẩm quyền.\n\n"
+        f"2. NGUYÊN TẮC CĂN CỨ TRI THỨC (ZERO HALLUCINATION):\n"
+        f"- Mọi câu trả lời bắt buộc phải dựa 100% trên các văn bản, quy chế và thông báo chính thức của Trường Đại học Quy Nhơn.\n"
+        f"- Luôn chỉ rõ căn cứ trích dẫn: Tên văn bản, Điều/Khoản và số trang (nếu có).\n"
+        f"- Tuyệt đối KHÔNG suy diễn số liệu, không đưa ra thông tin giả định.\n\n"
+        f"3. PHONG THÁI & QUY TẮC ỨNG XỬ:\n"
+        f"- Sử dụng tiếng Việt chuẩn mực, xưng hô 'Tôi/Em' và 'Bạn/Sinh viên/Quý Thầy Cô'.\n"
+        f"- Trình bày mạch lạc, sử dụng gạch đầu dòng hoặc bảng biểu rõ ràng khi có số liệu.\n\n"
+        f"4. CHÍNH SÁCH KHI THIẾU CĂN CỨ (NO-ANSWER POLICY):\n"
+        f"- Khi thông tin chưa có trong tài liệu chính thức, thông báo rõ ràng và hướng dẫn người dùng liên hệ:\n"
+        f"  * Đơn vị phụ trách chuyên môn Trường Đại học Quy Nhơn.\n"
+        f"  * Hotline hỗ trợ chính thức: 0256.3846.156 | Email: hotro@qnu.edu.vn | Cổng TT: https://qnu.edu.vn"
+    )
+
+    return AssistantGenerateResponse(
+        name=name,
+        description=f"Trợ lý AI chuyên trách hỗ trợ: {idea[:150]}.",
+        category=category,
+        system_prompt=system_prompt,
+        sample_questions=questions,
+        temperature=0.2,
+        no_answer_message="Thông tin này chưa có trong văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ Hotline: 0256.3846.156 để được hướng dẫn chi tiết.",
+        suggested_workflow_id=workflow_id,
+    )
+
+
+class AssistantLifecycleService:
+    """Service handling Assistant CRUD, cloning, version snapshots, templates, and specs."""
+
+    def __init__(self) -> None:
+        self._facade = None
+
+    @property
+    def facade(self):
+        return self._facade
+
+    @facade.setter
+    def facade(self, val):
+        self._facade = val
+
+    async def _call_get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
+        if self._facade and hasattr(self._facade, "_get_record"):
+            res = self._facade._get_record(db, reference)
+            import inspect
+
+            if inspect.isawaitable(res):
+                return await res
+            return res
+        return await self._get_record(db, reference)
+
+    async def list_assistants(
+        self,
+        db: AsyncSession,
+        *,
+        search: str | None = None,
+        category: str | None = None,
+        include_inactive: bool = False,
+    ) -> list[AssistantResponse]:
+        query = select(AssistantModel).order_by(AssistantModel.name)
+        if not include_inactive:
+            query = query.where(AssistantModel.is_active.is_(True))
+        if category:
+            query = query.where(AssistantModel.category == category)
+        if search and search.strip():
+            pattern = f"%{_clean_text(search).casefold()}%"
+            query = query.where(
+                func.lower(AssistantModel.code).like(pattern)
+                | func.lower(AssistantModel.name).like(pattern)
+                | func.lower(AssistantModel.description).like(pattern)
+            )
+        records = list((await db.execute(query)).scalars().all())
+        return [_to_response(record) for record in records]
+
+    async def get_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
+        return _to_response(await self._call_get_record(db, reference))
+
+    async def create_assistant(
+        self, db: AsyncSession, request: AssistantCreateRequest
+    ) -> AssistantResponse:
+        code = _clean_text(request.code)
+        if not code:
+            raise AppException("Mã trợ lý không được để trống.", code="assistant_invalid")
+        existing = await db.execute(
+            select(AssistantModel.id).where(func.lower(AssistantModel.code) == code.casefold())
+        )
+        if existing.scalar_one_or_none():
+            raise EntityAlreadyExistsError(
+                f"Mã trợ lý '{code}' đã tồn tại.",
+                details={"assistant_code": code},
+            )
+
+        workflow_id = _clean_text(request.workflow_id) or request.workflow_id
+        workflow_ownership = request.workflow_ownership or "private"
+
+        if workflow_ownership == "private":
+            private_wf_id = f"wf_ast_{code}"
+            try:
+                forked = await workflow_service.fork_workflow(
+                    db,
+                    source_workflow_id=workflow_id,
+                    new_workflow_id=private_wf_id,
+                    new_name=f"Quy trình {request.name}",
+                )
+                workflow_id = forked.id
+            except Exception as fork_err:
+                logger.warning("failed_to_fork_private_workflow_on_create: %s, fallback to %s", fork_err, workflow_id)
+
+        record = AssistantModel(
+            code=code,
+            name=_clean_text(request.name) or request.name,
+            description=_clean_text(request.description) or request.description,
+            avatar_url=_clean_text(request.avatar_url),
+            category=_clean_text(request.category) or request.category,
+            system_prompt=_clean_text(request.system_prompt) or request.system_prompt,
+            workflow_id=workflow_id,
+            published_workflow_version_id=request.published_workflow_version_id,
+            workflow_ownership=workflow_ownership,
+            collection_id=_clean_text(request.collection_id) or request.collection_id,
+            is_active=request.is_active,
+            tenant_id=_clean_text(request.tenant_id) or request.tenant_id,
+            config=request.config.model_dump(mode="json"),
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Created assistant code=%s workflow=%s (ownership=%s)", record.code, record.workflow_id, record.workflow_ownership)
+        return _to_response(record)
+
+    async def update_assistant(
+        self, db: AsyncSession, reference: str, request: AssistantUpdateRequest
+    ) -> AssistantResponse:
+        record = await self._call_get_record(db, reference)
+        updates = request.model_dump(exclude_unset=True)
+
+        for field in [
+            "name",
+            "description",
+            "avatar_url",
+            "category",
+            "system_prompt",
+            "workflow_id",
+            "published_workflow_version_id",
+            "workflow_ownership",
+            "collection_id",
+            "tenant_id",
+        ]:
+            if field in updates:
+                setattr(record, field, _clean_text(updates[field]) if isinstance(updates[field], str) else updates[field])
+
+        if "is_active" in updates:
+            record.is_active = updates["is_active"]
+
+        if "config" in updates and updates["config"] is not None:
+            new_config = updates["config"]
+            if hasattr(new_config, "model_dump"):
+                record.config = new_config.model_dump(mode="json")
+            elif isinstance(new_config, dict):
+                record.config = new_config
+
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Updated assistant code=%s", record.code)
+        return _to_response(record)
+
+    async def delete_assistant(self, db: AsyncSession, reference: str) -> None:
+        record = await self._call_get_record(db, reference)
+        await db.delete(record)
+        await db.commit()
+        logger.info("Deleted assistant code=%s", record.code)
+
+    async def activate_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
+        record = await self._call_get_record(db, reference)
+        record.is_active = True
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Activated assistant code=%s", record.code)
+        return _to_response(record)
+
+    async def deactivate_assistant(self, db: AsyncSession, reference: str) -> AssistantResponse:
+        record = await self._call_get_record(db, reference)
+        record.is_active = False
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+        logger.info("Deactivated assistant code=%s", record.code)
+        return _to_response(record)
+
+    def list_templates(self) -> list[AssistantTemplateResponse]:
+        templates = [
+            AssistantTemplateResponse(
+                code=item["code"],
+                name=item["name"],
+                description=item["description"],
+                category=item["category"],
+                recommended_collection_id=item["collection_id"],
+                recommended_workflow_id=item["workflow_id"],
+                sample_questions=item["config"]["sample_questions"],
+                config=AssistantLifecycleConfig.model_validate(item["config"]),
+            )
+            for item in STANDARD_ASSISTANTS
+        ]
+        return templates
+
+    async def seed_defaults(self, db: AsyncSession) -> AssistantSeedResponse:
+        created, updated = await seed_standard_assistants(db)
+        return AssistantSeedResponse(
+            created=created,
+            updated=updated,
+            total=len(STANDARD_ASSISTANTS),
+            message=f"Đã khởi tạo {created} và cập nhật {updated} trợ lý mẫu chuẩn ĐH Quy Nhơn.",
+        )
+
+    async def export_bundle(self, db: AsyncSession, reference: str) -> AssistantBundle:
+        record = await self._call_get_record(db, reference)
+        response = _to_response(record)
+        workflow_def = None
+        if record.workflow_id:
+            try:
+                wf = await workflow_service.get_definition(db, record.workflow_id)
+                workflow_def = AssistantBundleWorkflow(
+                    id=wf.id,
+                    name=wf.name,
+                    description=wf.description,
+                    module_code=wf.module_code,
+                    version=wf.version,
+                    dag_spec=wf.dag_spec,
+                )
+            except Exception as e:
+                logger.warning("Could not export workflow for assistant %s: %s", record.code, e)
+
+        return AssistantBundle(
+            assistant=AssistantCreateRequest(
+                code=response.code,
+                name=response.name,
+                description=response.description,
+                avatar_url=response.avatar_url,
+                category=response.category,
+                system_prompt=response.system_prompt,
+                workflow_id=response.workflow_id,
+                collection_id=response.collection_id,
+                is_active=response.is_active,
+                tenant_id=response.tenant_id,
+                config=response.config,
+            ),
+            workflow=workflow_def,
+        )
+
+    async def import_bundle(self, db: AsyncSession, bundle: AssistantBundle) -> AssistantResponse:
+        if bundle.workflow:
+            workflow = bundle.workflow
+            existing_wf = await db.execute(
+                select(WorkflowDefinition).where(WorkflowDefinition.id == workflow.id)
+            )
+            if not existing_wf.scalar_one_or_none():
+                db.add(
+                    WorkflowDefinition(
+                        id=workflow.id,
+                        name=workflow.name,
+                        description=workflow.description,
+                        module_code=workflow.module_code,
+                        version=workflow.version,
+                        is_active=True,
+                        dag_spec=workflow.dag_spec,
+                    )
+                )
+        return await self.create_assistant(db, bundle.assistant)
+
+    async def generate_spec(
+        self, db: AsyncSession, request: AssistantGenerateRequest
+    ) -> AssistantGenerateResponse:
+        """AI Auto-Creator: Synthesizes a complete professional assistant specification from natural language."""
+        idea = _clean_text(request.idea) or request.idea.strip()
+        system_architect_prompt = (
+            "Bạn là Chuyên gia Thiết kế Trợ lý AI (Senior AI Agent Architect) của Trường Đại học Quy Nhơn (QNU).\n"
+            "Nhiệm vụ: Phân tích ý tưởng mong muốn của cán bộ và sinh ra một bản đặc tả hoàn chỉnh cho Trợ lý AI chuyên trách.\n\n"
+            "YÊU CẦU BẮT BUỘC:\n"
+            "1. Phản hồi CHỈ BẰNG một JSON Object hợp lệ (không kèm bất kỳ văn bản giải thích thừa nào).\n"
+            "2. JSON có đúng các trường sau:\n"
+            "{\n"
+            '  "name": "Tên trợ lý chuẩn phong thái học thuật ĐH Quy Nhơn (tối đa 60 ký tự)",\n'
+            '  "description": "Mô tả ngắn gọn 1-2 câu về nhiệm vụ chính",\n'
+            '  "category": "Một trong các mã: admissions | academic | resources | administration | examination | general",\n'
+            '  "system_prompt": "Toàn văn chỉ thị hệ thống chi tiết 5 phần: 1. Vai trò chính thức QNU; 2. Phạm vi & Giới hạn; 3. Căn cứ văn bản RAG (Zero Hallucination); 4. Tác phong sư phạm & Xưng hô; 5. No-answer hotline 0256.3846.156",\n'
+            '  "sample_questions": ["Câu hỏi thực tế 1 mà sinh viên/giảng viên hay hỏi?", "Câu hỏi thực tế 2?", "Câu hỏi thực tế 3?"],\n'
+            '  "temperature": 0.2,\n'
+            '  "no_answer_message": "Thông điệp cứu cánh khi không có tài liệu đối soát chính thức (kèm Hotline 0256.3846.156)",\n'
+            '  "suggested_workflow_id": "Mã workflow phù hợp: admissions-assistant | regulations-assistant | library-assistant | drafting-assistant | question-bank-assistant"\n'
+            "}"
+        )
+
+        user_content = f"Ý tưởng mong muốn của cán bộ: '{idea}'."
+        if request.category_hint:
+            user_content += f"\nGợi ý phân loại lĩnh vực: '{request.category_hint}'."
+
+        messages = [
+            ChatMessage(role="system", content=system_architect_prompt),
+            ChatMessage(role="user", content=user_content),
+        ]
+        gen_req = LLMGenerateRequest(
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2500,
+        )
+
+        try:
+            llm_resp = await modelops_service.generate(db, gen_req)
+            parsed = _extract_json(llm_resp.content)
+            if parsed and isinstance(parsed, dict) and "name" in parsed and "system_prompt" in parsed:
+                category = str(parsed.get("category") or request.category_hint or "academic").strip()
+                if category not in ["admissions", "academic", "resources", "administration", "examination", "general"]:
+                    category = "academic"
+
+                raw_questions = parsed.get("sample_questions", [])
+                questions = (
+                    [str(q).strip() for q in raw_questions if isinstance(q, str) and q.strip()]
+                    if isinstance(raw_questions, list)
+                    else []
+                )
+                if not questions:
+                    questions = [
+                        f"Quy trình thực hiện đối với {idea[:30]}?",
+                        "Các văn bản quy chế và hồ sơ cần chuẩn bị?",
+                        "Thời hạn giải quyết và đơn vị phụ trách trực tiếp?",
+                    ]
+
+                temp = parsed.get("temperature", 0.2)
+                try:
+                    temp_float = float(temp)
+                except (ValueError, TypeError):
+                    temp_float = 0.2
+
+                return AssistantGenerateResponse(
+                    name=str(parsed.get("name", f"Trợ lý Chuyên trách {idea[:30]}")).strip(),
+                    description=str(parsed.get("description", f"Trợ lý AI hỗ trợ {idea[:100]}")).strip(),
+                    category=category,
+                    system_prompt=str(parsed.get("system_prompt")).strip(),
+                    sample_questions=questions[:4],
+                    temperature=max(0.0, min(1.0, temp_float)),
+                    no_answer_message=str(
+                        parsed.get(
+                            "no_answer_message",
+                            "Thông tin này chưa có trong văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ Hotline: 0256.3846.156 để được hướng dẫn chi tiết.",
+                        )
+                    ).strip(),
+                    suggested_workflow_id=str(
+                        parsed.get("suggested_workflow_id", "regulations-assistant")
+                    ).strip(),
+                )
+        except Exception as exc:
+            logger.warning(
+                "ModelOps generate spec failed or returned unparseable output (%s). Using fallback template generator.",
+                exc,
+            )
+
+        return _build_fallback_spec(idea, request.category_hint)
+
+    async def get_readiness(
+        self,
+        db: AsyncSession,
+        reference: str,
+    ) -> AssistantReadinessResponse:
+        """Evaluate 5-layer publish gate readiness for this assistant."""
+        record = await self._call_get_record(db, reference)
+        return await readiness_engine.evaluate_readiness(db, record)
+
+    async def publish_assistant(
+        self,
+        db: AsyncSession,
+        reference: str,
+        *,
+        version_name: str | None = None,
+        change_log: str | None = None,
+    ) -> AssistantPublishResponse:
+        """Publish an assistant to production if it passes the publish gate."""
+        record = await self._call_get_record(db, reference)
+        readiness = await readiness_engine.evaluate_readiness(db, record)
+        if not readiness.is_ready_for_publish:
+            blocker_text = (
+                "; ".join(readiness.blockers)
+                if readiness.blockers
+                else f"Điểm sẵn sàng {readiness.overall_readiness_score}% chưa đạt yêu cầu tối thiểu (>=65%)."
+            )
+            raise AppException(
+                f"Không thể xuất bản trợ lý '{record.name}': {blocker_text}",
+                code="assistant_not_ready_for_publish",
+                status_code=422,
+                details={
+                    "blockers": readiness.blockers,
+                    "warnings": readiness.warnings,
+                    "readiness_score": readiness.overall_readiness_score,
+                },
+            )
+
+        record.is_active = True
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+        try:
+            wf_res = await db.execute(
+                select(WorkflowDefinition).where(WorkflowDefinition.id == record.workflow_id)
+            )
+            wf_def = wf_res.scalar_one_or_none()
+            if wf_def:
+                if wf_def.published_version_id:
+                    record.published_workflow_version_id = wf_def.published_version_id
+                else:
+                    pub_res = await workflow_service.publish_workflow(
+                        db,
+                        record.workflow_id,
+                        WorkflowPublishRequest(published_by="Hệ thống (Publish Assistant)"),
+                    )
+                    record.published_workflow_version_id = pub_res.id
+        except Exception as pin_err:
+            logger.warning("failed_to_pin_workflow_version_on_publish: %s", pin_err)
+
+        await db.commit()
+        await db.refresh(record)
+
+        try:
+            summary = (
+                change_log
+                or f"Xuất bản chính thức (Điểm kiểm định: {readiness.overall_readiness_score}%, Workflow Version: {record.published_workflow_version_id or 'draft'})"
+            )
+            await self._create_version_snapshot(
+                db,
+                record,
+                change_summary=summary,
+            )
+        except Exception as v_err:
+            logger.warning("failed_to_create_version_snapshot_on_publish: %s", v_err)
+
+        return AssistantPublishResponse(
+            assistant_code=record.code,
+            assistant_name=record.name,
+            is_active=record.is_active,
+            readiness_score=readiness.overall_readiness_score,
+            published_at=datetime.now(UTC),
+            message=f"Trợ lý '{record.name}' đã vượt qua kiểm định và được xuất bản thành công.",
+        )
+
+    async def clone_assistant(
+        self,
+        db: AsyncSession,
+        reference: str,
+        request: AssistantCloneRequest,
+    ) -> AssistantResponse:
+        """Clone an existing assistant to create a specialized departmental variation."""
+        source = await self._call_get_record(db, reference)
+
+        new_code = _clean_text(request.new_code) or request.new_code.strip()
+        existing = (
+            await db.execute(select(AssistantModel).where(func.lower(AssistantModel.code) == new_code.casefold()))
+        ).scalar_one_or_none()
+        if existing:
+            raise EntityAlreadyExistsError(
+                f"Mã trợ lý '{new_code}' đã tồn tại.",
+                details={"assistant_code": new_code},
+            )
+
+        new_name = _clean_text(request.new_name) or request.new_name.strip()
+        new_desc = (
+            _clean_text(request.new_description)
+            if request.new_description
+            else f"Bản sao từ {source.name}. Chuyên trách phục vụ đơn vị."
+        )
+
+        cloned_config = dict(source.config or {})
+
+        new_wf_id = f"wf_ast_{new_code}"
+        try:
+            forked = await workflow_service.fork_workflow(
+                db,
+                source_workflow_id=source.workflow_id,
+                new_workflow_id=new_wf_id,
+                new_name=f"Quy trình {new_name}",
+            )
+            cloned_workflow_id = forked.id
+            workflow_ownership = "private"
+        except Exception as fork_err:
+            logger.warning("failed_to_fork_workflow_on_clone: %s, fallback to shared", fork_err)
+            cloned_workflow_id = source.workflow_id
+            workflow_ownership = "shared"
+
+        now_ts = datetime.now(UTC).replace(tzinfo=None)
+        new_record = AssistantModel(
+            id=f"ast_{uuid.uuid4().hex[:12]}",
+            code=new_code,
+            name=new_name,
+            description=new_desc,
+            avatar_url=source.avatar_url,
+            category=source.category,
+            system_prompt=source.system_prompt,
+            workflow_id=cloned_workflow_id,
+            published_workflow_version_id=None,
+            workflow_ownership=workflow_ownership,
+            collection_id=request.target_collection_id or source.collection_id,
+            is_active=False,
+            tenant_id=source.tenant_id,
+            config=cloned_config,
+            created_at=now_ts,
+            updated_at=now_ts,
+        )
+
+        db.add(new_record)
+        await db.commit()
+        await db.refresh(new_record)
+        logger.info("Cloned assistant source=%s new_code=%s workflow=%s (ownership=%s)", source.code, new_code, cloned_workflow_id, workflow_ownership)
+        return _to_response(new_record)
+
+    async def fork_workflow(self, db: AsyncSession, reference: str) -> AssistantForkWorkflowResponse:
+        """Fork the current assistant workflow into an isolated private workflow."""
+        record = await self._call_get_record(db, reference)
+        prev_wf_id = record.workflow_id
+        new_wf_id = f"wf_ast_{record.code}"
+
+        forked = await workflow_service.fork_workflow(
+            db,
+            source_workflow_id=prev_wf_id,
+            new_workflow_id=new_wf_id,
+            new_name=f"Quy trình {record.name}",
+            assistant_id=record.id,
+        )
+
+        record.workflow_id = forked.id
+        record.workflow_ownership = "private"
+        record.published_workflow_version_id = None
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+
+        try:
+            await self._create_version_snapshot(
+                db,
+                record,
+                change_summary=f"Tách thành quy trình riêng biệt ({new_wf_id})",
+                created_by="Cán bộ quản trị (Fork Workflow)",
+            )
+        except Exception as v_err:
+            logger.warning("failed_to_create_snapshot_on_fork_workflow: %s", v_err)
+
+        return AssistantForkWorkflowResponse(
+            assistant_code=record.code,
+            assistant_name=record.name,
+            previous_workflow_id=prev_wf_id,
+            new_workflow_id=new_wf_id,
+            workflow_ownership="private",
+            message=f"Đã tách thành công quy trình riêng '{new_wf_id}' cho trợ lý '{record.name}'.",
+        )
+
+    async def _create_version_snapshot(
+        self,
+        db: AsyncSession,
+        record: AssistantModel,
+        change_summary: str,
+        created_by: str = "cán bộ quản trị",
+    ) -> AssistantVersionModel:
+        """Create a version snapshot of an assistant configuration."""
+        count_res = await db.execute(
+            select(func.count(AssistantVersionModel.id)).where(
+                AssistantVersionModel.assistant_id == record.id
+            )
+        )
+        total = count_res.scalar() or 0
+        version_number = f"v1.{total}"
+
+        snapshot_payload = {
+            "name": record.name,
+            "description": record.description,
+            "category": record.category,
+            "system_prompt": record.system_prompt,
+            "workflow_id": record.workflow_id,
+            "published_workflow_version_id": getattr(record, "published_workflow_version_id", None),
+            "workflow_ownership": getattr(record, "workflow_ownership", "private"),
+            "collection_id": record.collection_id,
+            "is_active": record.is_active,
+            "tenant_id": record.tenant_id,
+            "config": dict(record.config or {}),
+        }
+
+        now_ts = datetime.now(UTC).replace(tzinfo=None)
+        ver = AssistantVersionModel(
+            id=f"asv_{uuid.uuid4().hex[:12]}",
+            assistant_id=record.id,
+            assistant_code=record.code,
+            version_number=version_number,
+            change_summary=change_summary,
+            snapshot_data=snapshot_payload,
+            created_by=created_by,
+            created_at=now_ts,
+        )
+        db.add(ver)
+        await db.commit()
+        await db.refresh(ver)
+        logger.info("Saved assistant version %s for %s", version_number, record.code)
+        return ver
+
+    async def get_versions(
+        self, db: AsyncSession, reference: str
+    ) -> list[AssistantVersionResponse]:
+        """List all version snapshots for an assistant."""
+        record = await self._call_get_record(db, reference)
+        res = await db.execute(
+            select(AssistantVersionModel)
+            .where(AssistantVersionModel.assistant_id == record.id)
+            .order_by(AssistantVersionModel.created_at.desc())
+        )
+        versions = list(res.scalars().all())
+        return [
+            AssistantVersionResponse(
+                id=v.id,
+                assistant_id=v.assistant_id,
+                assistant_code=v.assistant_code,
+                version_number=v.version_number,
+                change_summary=v.change_summary,
+                snapshot_data=v.snapshot_data or {},
+                created_by=v.created_by,
+                created_at=v.created_at,
+            )
+            for v in versions
+        ]
+
+    async def rollback_version(
+        self, db: AsyncSession, reference: str, version_id: str
+    ) -> AssistantRollbackResponse:
+        """Rollback an assistant configuration to a selected previous version snapshot."""
+        record = await self._call_get_record(db, reference)
+        ver_res = await db.execute(
+            select(AssistantVersionModel).where(
+                AssistantVersionModel.id == version_id,
+                AssistantVersionModel.assistant_id == record.id,
+            )
+        )
+        target_version = ver_res.scalar_one_or_none()
+        if not target_version:
+            raise EntityNotFoundError(
+                f"Phiên bản '{version_id}' không tồn tại cho trợ lý '{record.code}'.",
+                details={"version_id": version_id, "assistant_code": record.code},
+            )
+
+        snap = target_version.snapshot_data or {}
+        if "name" in snap:
+            record.name = snap["name"]
+        if "description" in snap:
+            record.description = snap["description"]
+        if "category" in snap:
+            record.category = snap["category"]
+        if "system_prompt" in snap:
+            record.system_prompt = snap["system_prompt"]
+        if "workflow_id" in snap:
+            record.workflow_id = snap["workflow_id"]
+        if "published_workflow_version_id" in snap:
+            record.published_workflow_version_id = snap["published_workflow_version_id"]
+        if "workflow_ownership" in snap:
+            record.workflow_ownership = snap["workflow_ownership"]
+        if "collection_id" in snap:
+            record.collection_id = snap["collection_id"]
+        if "config" in snap and isinstance(snap["config"], dict):
+            record.config = dict(snap["config"])
+
+        record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        await db.commit()
+        await db.refresh(record)
+
+        new_ver = await self._create_version_snapshot(
+            db,
+            record,
+            change_summary=f"Khôi phục về phiên bản {target_version.version_number}",
+            created_by="Cán bộ quản trị (Rollback)",
+        )
+
+        return AssistantRollbackResponse(
+            assistant_code=record.code,
+            assistant_name=record.name,
+            restored_version=target_version.version_number,
+            current_version=new_ver.version_number,
+            message=f"Đã khôi phục thành công về phiên bản {target_version.version_number}.",
+            restored_at=new_ver.created_at,
+        )
+
+    async def _get_record(self, db: AsyncSession, reference: str) -> AssistantModel:
+        normalized_reference = _clean_text(reference) or reference
+        result = await db.execute(
+            select(AssistantModel).where(
+                or_(
+                    AssistantModel.id == normalized_reference,
+                    func.lower(AssistantModel.code) == normalized_reference.casefold(),
+                )
+            )
+        )
+        record = result.scalar_one_or_none()
+        if not record:
+            raise EntityNotFoundError(
+                f"Trợ lý AI '{reference}' không tồn tại.",
+                details={"assistant_reference": reference},
+            )
+        return record
+
+
+assistant_lifecycle_service = AssistantLifecycleService()

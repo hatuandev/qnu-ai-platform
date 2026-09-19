@@ -26,22 +26,28 @@ export function isNodeManifest(value: unknown): value is NodeManifest {
 export const systemApi = {
   async getHealth(): Promise<BackendHealth> {
     try {
-      const res = await fetch("/health/live");
+      const res = await fetch("/health/ready");
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
         return {
           status: "ok",
           service: data.service || "qnu-ai-platform",
           version: data.version || "0.1.0",
-          dependencies: { database: "connected", redis: "connected" },
+          dependencies: data.dependencies || { database: "connected", redis: "connected" },
         };
       }
+      return {
+        status: "degraded",
+        service: data.service || "qnu-ai-platform",
+        version: data.version || "0.1.0",
+        dependencies: data.degraded_services || { database: "disconnected" },
+      };
     } catch {
-      // Fallback
+      // Backend completely unreachable
     }
     return {
       status: "offline",
-      service: "qnu-ai-platform (Simulation)",
+      service: "qnu-ai-platform",
       version: "0.1.0",
     };
   },

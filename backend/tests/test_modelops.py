@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.exceptions import AppException
 from app.main import app
 from app.modules.modelops.circuit_breaker import CircuitBreaker, CircuitBreakerState
-from app.modules.modelops.models import ModelProviderConfig, TenantQuota
+from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import (
     CloudflareAdapter,
     GeminiAdapter,
@@ -692,6 +692,170 @@ async def test_api_get_quota_endpoints():
                 assert data_query["monthly_token_limit"] == 5_000_000
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_generate_stream_records_usage_and_deducts_quota():
+    """Verify generate_stream accumulates token counts, updates tenant quota and records LLMUsageLog."""
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+
+    mock_quota = TenantQuota(
+        tenant_id="tenant_qnu",
+        month_period="2026-09",
+        monthly_token_limit=1_000_000,
+        monthly_cost_limit_usd=50.0,
+        tokens_used=1000,
+        cost_used_usd=0.05,
+        is_blocked=False,
+    )
+
+    mock_provider = {
+        "id": "prov_openai",
+        "name": "OpenAI",
+        "provider_type": "openai",
+        "model_name": "gpt-4o-mini",
+        "api_key": "sk-proj-test",
+        "api_base_url": "https://api.openai.com/v1",
+        "timeout_seconds": 30,
+        "is_active": True,
+        "models": ["gpt-4o-mini"],
+        "api_keys": [{"id": "k1", "api_key": "sk-proj-test", "is_active": True, "status": "active"}],
+    }
+
+    class FakeAdapter:
+        async def stream(self, messages, temperature, max_tokens):
+            for token in ["Trường ", "Đại học ", "Quy Nhơn"]:
+                yield token
+
+    req = LLMGenerateRequest(
+        messages=[ChatMessage(role="user", content="Giới thiệu về trường QNU")],
+        tenant_id="tenant_qnu",
+        assistant_code="admissions",
+        preferred_model_name="gpt-4o-mini",
+    )
+
+    with (
+        patch.object(modelops_service, "check_quota_available", new_callable=AsyncMock) as mock_chk,
+        patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_prov,
+        patch("app.modules.modelops.service.get_llm_adapter", return_value=FakeAdapter()),
+    ):
+        mock_chk.return_value = mock_quota
+        mock_prov.return_value = [mock_provider]
+
+        chunks = []
+        async for chunk in modelops_service.generate_stream(mock_db, req):
+            chunks.append(chunk)
+
+        assert chunks == ["Trường ", "Đại học ", "Quy Nhơn"]
+        # Verify quota was updated
+        assert mock_quota.tokens_used > 1000
+        assert mock_quota.cost_used_usd >= 0.05
+        # Verify LLMUsageLog was added to DB
+        assert mock_db.add.called
+        added_objs = [call[0][0] for call in mock_db.add.call_args_list]
+        usage_logs = [obj for obj in added_objs if isinstance(obj, LLMUsageLog)]
+        assert len(usage_logs) == 1
+        assert usage_logs[0].tenant_id == "tenant_qnu"
+        assert usage_logs[0].status == "success"
+        assert usage_logs[0].total_tokens > 0
+
+
+@pytest.mark.asyncio
+async def test_generate_prioritizes_fallback_model_when_primary_unavailable():
+    """Verify generate attempts fallback_model_name when primary model fails or is unavailable."""
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+
+    mock_quota = TenantQuota(
+        tenant_id="tenant_qnu",
+        month_period="2026-09",
+        monthly_token_limit=1_000_000,
+        monthly_cost_limit_usd=50.0,
+        tokens_used=0,
+        cost_used_usd=0.0,
+        is_blocked=False,
+    )
+
+    # Provider 1 has primary model but fails (HTTP 500)
+    # Provider 2 has fallback model and succeeds
+    p1 = {
+        "id": "prov_openai",
+        "name": "OpenAI Primary",
+        "provider_type": "openai",
+        "model_name": "gpt-4o",
+        "api_key": "sk-proj-test",
+        "api_base_url": "https://api.openai.com/v1",
+        "timeout_seconds": 30,
+        "is_active": True,
+        "models": ["gpt-4o"],
+        "api_keys": [{"id": "k1", "api_key": "sk-proj-test", "is_active": True, "status": "active"}],
+    }
+    p2 = {
+        "id": "prov_gemini",
+        "name": "Gemini Fallback",
+        "provider_type": "gemini",
+        "model_name": "gemini-1.5-flash",
+        "api_key": "gemini-key",
+        "api_base_url": None,
+        "timeout_seconds": 30,
+        "is_active": True,
+        "models": ["gemini-1.5-flash"],
+        "api_keys": [{"id": "k2", "api_key": "gemini-key", "is_active": True, "status": "active"}],
+    }
+
+    class FailingAdapter:
+        async def generate(self, messages, temperature, max_tokens):
+            raise RuntimeError("Provider 1 500 Server Error")
+
+    class SuccessfulFallbackAdapter:
+        async def generate(self, messages, temperature, max_tokens):
+            from app.modules.modelops.providers.base import LLMResponse
+
+            return LLMResponse(
+                content="Câu trả lời từ Gemini Fallback",
+                provider="gemini",
+                model="gemini-1.5-flash",
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+                latency_ms=120.0,
+            )
+
+    def adapter_factory(provider_type, model_name, **kwargs):
+        if provider_type == "openai":
+            return FailingAdapter()
+        return SuccessfulFallbackAdapter()
+
+    req = LLMGenerateRequest(
+        messages=[ChatMessage(role="user", content="Tra cứu quy chế")],
+        tenant_id="tenant_qnu",
+        assistant_code="regulations",
+        preferred_model_name="gpt-4o",
+        fallback_model_name="gemini-1.5-flash",
+    )
+
+    with (
+        patch.object(modelops_service, "check_quota_available", new_callable=AsyncMock) as mock_chk,
+        patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_prov,
+        patch("app.modules.modelops.service.get_llm_adapter", side_effect=adapter_factory),
+    ):
+        mock_chk.return_value = mock_quota
+        mock_prov.return_value = [p1, p2]
+
+        response = await modelops_service.generate(mock_db, req)
+
+        assert response.model == "gemini-1.5-flash"
+        assert response.provider == "gemini"
+        assert response.is_fallback is True
+        assert "Gemini Fallback" in response.content
+
 
 
 

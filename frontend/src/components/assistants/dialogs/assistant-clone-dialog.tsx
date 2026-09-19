@@ -26,6 +26,7 @@ interface AssistantCloneDialogProps {
     name: string;
     description: string;
     collectionId: string;
+    forkWorkflow?: boolean;
   }) => void;
   isPending: boolean;
 }
@@ -45,6 +46,7 @@ export function AssistantCloneDialog({
   const [name, setName] = React.useState(initialName);
   const [description, setDescription] = React.useState(initialDescription);
   const [collectionId, setCollectionId] = React.useState(initialCollectionId);
+  const [forkWorkflow, setForkWorkflow] = React.useState(true);
 
   React.useEffect(() => {
     if (open) {
@@ -52,6 +54,7 @@ export function AssistantCloneDialog({
       setName(initialName);
       setDescription(initialDescription);
       setCollectionId(initialCollectionId);
+      setForkWorkflow(true);
     }
   }, [open, initialCode, initialName, initialDescription, initialCollectionId]);
 
@@ -63,6 +66,7 @@ export function AssistantCloneDialog({
       name: name.trim(),
       description: description.trim(),
       collectionId: collectionId.trim(),
+      forkWorkflow,
     });
   };
 
@@ -113,6 +117,22 @@ export function AssistantCloneDialog({
                 placeholder="Mô tả phạm vi hỗ trợ của bản sao..."
               />
             </Field>
+
+            <div className="rounded-lg border p-3 bg-muted/20 space-y-1.5">
+              <label className="flex items-center gap-2 font-medium cursor-pointer text-foreground">
+                <input
+                  type="checkbox"
+                  checked={forkWorkflow}
+                  onChange={(e) => setForkWorkflow(e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary size-4"
+                />
+                <span>Tách quy trình xử lý riêng (Fork Private Workflow)</span>
+              </label>
+              <p className="text-[11px] text-muted-foreground pl-6 leading-relaxed">
+                Khuyến nghị bật: Trợ lý bản sao sẽ sở hữu một bản sao Workflow độc lập, cho phép tùy
+                biến luồng DAG mà không ảnh hưởng đến trợ lý gốc.
+              </p>
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

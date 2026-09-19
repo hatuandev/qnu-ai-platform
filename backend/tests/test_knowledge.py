@@ -346,7 +346,7 @@ async def test_office_convert_failure_raises_422():
 async def test_studio_view_reports_size_and_chunks():
     """Studio view must carry real file size and chunk counts (no more 0 MB)."""
     from types import SimpleNamespace
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock, MagicMock, patch
 
     from app.modules.knowledge.service import knowledge_service
 
@@ -358,10 +358,12 @@ async def test_studio_view_reports_size_and_chunks():
         id="doc_sz", collection_id="col_1", title="Ke hoach", file_name="kh.docx",
         file_size_bytes=58320, doc_metadata={"ocr_method": "DocxParser"}, chunks=chunks,
     )
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     with patch.object(
         knowledge_service, "get_document", new=AsyncMock(return_value=fake_doc)
     ):
-        view = await knowledge_service.get_studio_view(AsyncMock(), "doc_sz")
+        view = await knowledge_service.get_studio_view(mock_db, "doc_sz")
     assert view["file_size_bytes"] == 58320
     assert view["total_chunks"] == 2
     assert view["pages"][0]["word_count"] > 0
@@ -370,7 +372,7 @@ async def test_studio_view_reports_size_and_chunks():
 @pytest.mark.asyncio
 async def test_batch_approve_partial_failure():
     """Batch approve must report per-item results without aborting the batch."""
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock, MagicMock, patch
 
     from app.core.exceptions import EntityNotFoundError
     from app.modules.knowledge.service import knowledge_service
@@ -381,11 +383,13 @@ async def test_batch_approve_partial_failure():
                     "total_chunks": 4, "indexed_chunks": 4}
         raise EntityNotFoundError(f"Tài liệu '{document_id}' không tồn tại.")
 
+    mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     with patch.object(
         knowledge_service, "approve_document", new=AsyncMock(side_effect=fake_approve)
     ):
         result = await knowledge_service.batch_approve_documents(
-            AsyncMock(), ["doc_ok", "doc_ok", "doc_missing"]
+            mock_db, ["doc_ok", "doc_ok", "doc_missing"]
         )
     assert result["approved"] == ["doc_ok"]
     assert len(result["failed"]) == 1
@@ -447,7 +451,7 @@ async def test_download_missing_original_returns_404():
 async def test_api_reindex_enqueues_job():
     """POST reindex must enqueue a tracked job instead of faking success."""
     from types import SimpleNamespace
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import AsyncMock, MagicMock, patch
 
     from app.core.database import get_db
     from app.modules.knowledge.service import knowledge_service
@@ -455,7 +459,9 @@ async def test_api_reindex_enqueues_job():
     fake_col = SimpleNamespace(id="col_1", module_code="admissions")
 
     async def override_get_db():
-        yield AsyncMock()
+        m_db = AsyncMock()
+        m_db.add = MagicMock()
+        yield m_db
 
     app.dependency_overrides[get_db] = override_get_db
     try:
@@ -689,6 +695,7 @@ async def test_approve_document_sets_index_status_and_records_job(monkeypatch):
     from app.modules.knowledge.service import knowledge_service
 
     db = AsyncMock()
+    db.add = MagicMock()
     doc = KnowledgeDocument(
         id="doc_app_01",
         collection_id="col_test_app",
@@ -742,10 +749,10 @@ async def test_approve_document_sets_index_status_and_records_job(monkeypatch):
     monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
 
     res = await knowledge_service.approve_document(db, "doc_app_01")
-    assert res["status"] == "approved"
+    assert res["status"] == "ready"
     assert res["index_status"] == "indexed"
     assert res["indexed_chunks"] == 1
-    assert doc.status == "approved"
+    assert doc.status == "ready"
     assert doc.index_status == "indexed"
 
 
@@ -758,6 +765,7 @@ async def test_approve_document_index_failed_gracefully(monkeypatch):
     from app.modules.knowledge.service import knowledge_service
 
     db = AsyncMock()
+    db.add = MagicMock()
     doc = KnowledgeDocument(
         id="doc_fail_01",
         collection_id="col_test_fail",
@@ -826,6 +834,7 @@ async def test_reindex_document_endpoint_recovers_vector(monkeypatch):
     from app.modules.knowledge.service import knowledge_service
 
     db = AsyncMock()
+    db.add = MagicMock()
     doc = KnowledgeDocument(
         id="doc_reindex_01",
         collection_id="col_test_reindex",
@@ -876,7 +885,7 @@ async def test_reindex_document_endpoint_recovers_vector(monkeypatch):
     monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
 
     res = await knowledge_service.reindex_document(db, "doc_reindex_01")
-    assert res["status"] == "approved"
+    assert res["status"] == "ready"
     assert res["index_status"] == "indexed"
     assert res["indexed_chunks"] == 1
     assert doc.index_status == "indexed"

@@ -286,6 +286,26 @@ class WorkflowCompiler:
                         )
                     )
 
+        # Check if node uses a tool requiring HITL approval
+        if node.type in ("api_caller", "tool.api_caller"):
+            tool_name = config.get("tool_name") or config.get("tool_id")
+            if tool_name:
+                from app.modules.tools.registry import tool_registry
+
+                tool_instance = tool_registry.get(str(tool_name).strip())
+                if tool_instance and getattr(tool_instance, "requires_approval", False):
+                    issues.append(
+                        WorkflowValidationIssue(
+                            code="workflow_tool_requires_approval_info",
+                            severity="warning",
+                            message=(
+                                f"Node '{node.id}' sử dụng công cụ '{tool_name}' có tác động hệ thống (side-effect) "
+                                f"và sẽ yêu cầu phê duyệt nhân sự (Human-in-the-loop) khi thực thi."
+                            ),
+                            node_id=node.id,
+                        )
+                    )
+
     @staticmethod
     def _validate_edges(
         dag_spec: WorkflowDagSpec,

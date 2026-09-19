@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.modules.workflows.schemas import (
     WorkflowApprovalDecisionRequest,
     WorkflowApprovalResponse,
+    WorkflowAssistantsUsageResponse,
     WorkflowDagSpec,
     WorkflowDefinitionResponse,
     WorkflowDraftResponse,
@@ -22,7 +23,7 @@ from app.modules.workflows.schemas import (
 )
 from app.modules.workflows.service import workflow_service
 
-router = APIRouter(prefix="/workflows", tags=["Workflow DAG Engine"])
+router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
 
 @router.post(
@@ -63,6 +64,18 @@ async def get_workflow_definition(
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowDagSpec:
     return await workflow_service.get_workflow_spec(db, workflow_id)
+
+
+@router.get(
+    "/definitions/{workflow_id}/assistants",
+    response_model=WorkflowAssistantsUsageResponse,
+    summary="Tra cứu danh sách các trợ lý AI đang gắn với quy trình này",
+)
+async def get_workflow_assistants(
+    workflow_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> WorkflowAssistantsUsageResponse:
+    return await workflow_service.get_workflow_assistants(db, workflow_id)
 
 
 @router.get(
@@ -179,4 +192,3 @@ async def decide_workflow_approval(
     db: AsyncSession = Depends(get_db),
 ) -> WorkflowExecuteResponse:
     return await workflow_service.decide_approval(db, execution_id, approval_id, body)
-

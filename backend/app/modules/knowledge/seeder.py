@@ -74,17 +74,28 @@ async def _ensure_seed_storage(storage_path: str, raw_text: str) -> None:
 async def _ensure_qdrant_points(db: AsyncSession, collection_id: str) -> None:
     """Check if Qdrant points exist for collection; if 0, re-index existing chunks from DB (P1.2 self-recovery)."""
     try:
+        from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
 
+        app_settings = get_settings()
         points = await vector_indexer.count_points(collection_id)
         if points == 0:
             logger.info(
                 "Self-recovery: 0 Qdrant points found for %s, re-indexing chunks from DB...",
                 collection_id,
             )
+            col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
+            col = (await db.execute(col_stmt)).scalar_one_or_none()
+            tenant_id = col.tenant_id if col else "tenant_qnu"
+            workspace_id = col.workspace_id if col else "workspace_qnu"
+
             chunk_stmt = select(KnowledgeChunk).where(KnowledgeChunk.collection_id == collection_id)
             chunks = (await db.execute(chunk_stmt)).scalars().all()
             if chunks:
+                doc_ids = {c.document_id for c in chunks}
+                docs_res = (await db.execute(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(doc_ids)))).scalars().all()
+                doc_map = {d.id: d for d in docs_res}
+
                 await vector_indexer.index_chunks(
                     collection_id=collection_id,
                     chunks=[
@@ -93,6 +104,15 @@ async def _ensure_qdrant_points(db: AsyncSession, collection_id: str) -> None:
                             "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{collection_id}:{c.id}")),
                             "chunk_id": c.id,
                             "document_id": c.document_id,
+                            "collection_id": collection_id,
+                            "tenant_id": tenant_id,
+                            "workspace_id": workspace_id,
+                            "document_revision": (doc_map.get(c.document_id).version if doc_map.get(c.document_id) else 1),
+                            "document_status": "ready",
+                            "is_retrievable": True,
+                            "content_hash": c.chunk_hash,
+                            "embedding_model": app_settings.EMBEDDING_MODEL,
+                            "payload_schema_version": "v1",
                             "content": c.content,
                             "section": c.section,
                             "page_number": c.page_number,
@@ -166,7 +186,8 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
             "table_count": 4,
             "decision_no": "1688/QĐ-ĐHQN",
         },
-        status="completed",
+        status="ready",
+        index_status="indexed",
         is_active=True,
     )
     db.add(doc)
@@ -203,7 +224,7 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
             attribute_name=f["attribute_name"],
             attribute_value=f["value"],
             confidence=1.0,
-            raw_data=f.get("fact_metadata", {}),
+            raw_data=f,
         )
         fact_objs.append(fact_obj)
         db.add(fact_obj)
@@ -218,8 +239,10 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
 
     # 6. Index into Qdrant
     try:
+        from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
 
+        app_settings = get_settings()
         await vector_indexer.index_chunks(
             collection_id=REGULATIONS_COLLECTION_ID,
             chunks=[
@@ -228,6 +251,15 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
                     "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{REGULATIONS_COLLECTION_ID}:{c.id}")),
                     "chunk_id": c.id,
                     "document_id": c.document_id,
+                    "collection_id": REGULATIONS_COLLECTION_ID,
+                    "tenant_id": col.tenant_id,
+                    "workspace_id": col.workspace_id,
+                    "document_revision": doc.version,
+                    "document_status": "ready",
+                    "is_retrievable": True,
+                    "content_hash": c.chunk_hash,
+                    "embedding_model": app_settings.EMBEDDING_MODEL,
+                    "payload_schema_version": "v1",
                     "content": c.content,
                     "section": c.section,
                     "page_number": c.page_number,
@@ -302,7 +334,8 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
             "chunk_count": len(DECREE_30_CHUNKS),
             "table_count": 2,
         },
-        status="processed",
+        status="ready",
+        index_status="indexed",
         is_active=True,
     )
     db.add(doc)
@@ -353,8 +386,10 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
 
     # 6. Optional: Index into Qdrant if online
     try:
+        from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
 
+        app_settings = get_settings()
         await vector_indexer.index_chunks(
             collection_id=DECREE_30_COLLECTION_ID,
             chunks=[
@@ -363,6 +398,15 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
                     "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{DECREE_30_COLLECTION_ID}:{c.id}")),
                     "chunk_id": c.id,
                     "document_id": c.document_id,
+                    "collection_id": DECREE_30_COLLECTION_ID,
+                    "tenant_id": col.tenant_id,
+                    "workspace_id": col.workspace_id,
+                    "document_revision": doc.version,
+                    "document_status": "ready",
+                    "is_retrievable": True,
+                    "content_hash": c.chunk_hash,
+                    "embedding_model": app_settings.EMBEDDING_MODEL,
+                    "payload_schema_version": "v1",
                     "content": c.content,
                     "section": c.section,
                     "page_number": c.page_number,
@@ -438,7 +482,8 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
             "table_count": 5,
             "year": 2024,
         },
-        status="completed",
+        status="ready",
+        index_status="indexed",
         is_active=True,
     )
     db.add(doc)
@@ -490,8 +535,10 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
 
     # 6. Index into Qdrant
     try:
+        from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
 
+        app_settings = get_settings()
         await vector_indexer.index_chunks(
             collection_id=ADMISSIONS_COLLECTION_ID,
             chunks=[
@@ -500,6 +547,15 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
                     "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{ADMISSIONS_COLLECTION_ID}:{c.id}")),
                     "chunk_id": c.id,
                     "document_id": c.document_id,
+                    "collection_id": ADMISSIONS_COLLECTION_ID,
+                    "tenant_id": col.tenant_id,
+                    "workspace_id": col.workspace_id,
+                    "document_revision": doc.version,
+                    "document_status": "ready",
+                    "is_retrievable": True,
+                    "content_hash": c.chunk_hash,
+                    "embedding_model": app_settings.EMBEDDING_MODEL,
+                    "payload_schema_version": "v1",
                     "content": c.content,
                     "section": c.section,
                     "page_number": c.page_number,
@@ -575,7 +631,8 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
             "fact_count": len(LIBRARY_FACTS),
             "year": 2024,
         },
-        status="completed",
+        status="ready",
+        index_status="indexed",
         is_active=True,
     )
     db.add(doc)
@@ -627,8 +684,10 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
 
     # 6. Index into Qdrant
     try:
+        from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
 
+        app_settings = get_settings()
         await vector_indexer.index_chunks(
             collection_id=LIBRARY_COLLECTION_ID,
             chunks=[
@@ -637,6 +696,15 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
                     "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{LIBRARY_COLLECTION_ID}:{c.id}")),
                     "chunk_id": c.id,
                     "document_id": c.document_id,
+                    "collection_id": LIBRARY_COLLECTION_ID,
+                    "tenant_id": col.tenant_id,
+                    "workspace_id": col.workspace_id,
+                    "document_revision": doc.version,
+                    "document_status": "ready",
+                    "is_retrievable": True,
+                    "content_hash": c.chunk_hash,
+                    "embedding_model": app_settings.EMBEDDING_MODEL,
+                    "payload_schema_version": "v1",
                     "content": c.content,
                     "section": c.section,
                     "page_number": c.page_number,
@@ -711,7 +779,8 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
                 "fact_count": len(QUESTION_BANK_FACTS),
                 "year": 2024,
             },
-            status="completed",
+            status="ready",
+            index_status="indexed",
             is_active=True,
         )
         db.add(doc)
@@ -773,8 +842,10 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
     # 6. Index into Qdrant if new chunks were created
     if chunk_objs:
         try:
+            from app.core.config import get_settings
             from app.modules.rag.vector_indexer import vector_indexer
 
+            app_settings = get_settings()
             await vector_indexer.index_chunks(
                 collection_id=QUESTION_BANK_COLLECTION_ID,
                 chunks=[
@@ -783,6 +854,15 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
                         "point_id": str(uuid.uuid5(uuid.NAMESPACE_URL, f"{QUESTION_BANK_COLLECTION_ID}:{c.id}")),
                         "chunk_id": c.id,
                         "document_id": c.document_id,
+                        "collection_id": QUESTION_BANK_COLLECTION_ID,
+                        "tenant_id": col.tenant_id,
+                        "workspace_id": col.workspace_id,
+                        "document_revision": 1,
+                        "document_status": "ready",
+                        "is_retrievable": True,
+                        "content_hash": c.chunk_hash,
+                        "embedding_model": app_settings.EMBEDDING_MODEL,
+                        "payload_schema_version": "v1",
                         "content": c.content,
                         "section": c.section,
                         "page_number": c.page_number,

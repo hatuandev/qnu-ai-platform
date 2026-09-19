@@ -28,7 +28,7 @@ import {
 } from "../services/api-client";
 import { knowledgeApi } from "../services/knowledge-api";
 import { DocumentIngestPage } from "./document-ingest-page";
-import { DocumentVerificationStudioPage } from "./document-verification-studio-page";
+import { ScanStudioPage } from "./scan-studio-page";
 
 export interface CollectionDetailPageProps {
   collectionId: string;
@@ -434,15 +434,16 @@ export function CollectionDetailPage({
   // SUBVIEW 2: SPLIT-PANE VERIFICATION STUDIO
   if (subView === "verify") {
     return (
-      <DocumentVerificationStudioPage
+      <ScanStudioPage
         collectionId={currentCollection.id}
         documentId={verifyDocId || allDocuments[0]?.id || "doc_ts_2026"}
-        onBackToConfig={() => setSubView("ingest")}
-        onCommitSuccess={() => {
+        onBack={() => setSubView("list")}
+        onApproveSuccess={() => {
           setSubView("list");
           queryClient.invalidateQueries({ queryKey: ["documents"] });
           queryClient.invalidateQueries({ queryKey: ["collections"] });
         }}
+        onNavigate={_onNavigate}
       />
     );
   }
@@ -521,8 +522,14 @@ export function CollectionDetailPage({
             downloadingId={downloadingId}
             onReindexDoc={handleReindexDoc}
             onStartVerify={(docId: string) => {
-              setVerifyDocId(docId);
-              setSubView("verify");
+              if (_onNavigate) {
+                _onNavigate(
+                  `/knowledge/documents/${encodeURIComponent(docId)}/ocr?collectionId=${encodeURIComponent(currentCollection.id)}`
+                );
+              } else {
+                setVerifyDocId(docId);
+                setSubView("verify");
+              }
             }}
             onPreviewDoc={setPreviewDoc}
             onDownloadDoc={handleDownloadDocument}

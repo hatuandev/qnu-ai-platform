@@ -175,7 +175,7 @@ export const BloomMatrixEditor: React.FC<BloomMatrixEditorProps> = ({ onGenerate
       });
 
       setLastResponse(res);
-      if (onGeneratedSuccess) {
+      if (res.status === "success" && onGeneratedSuccess) {
         onGeneratedSuccess(res);
       }
     } finally {

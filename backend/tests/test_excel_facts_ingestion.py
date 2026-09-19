@@ -59,6 +59,7 @@ def test_parse_csv_facts() -> None:
 async def test_import_facts_from_excel_service() -> None:
     excel_bytes = _create_sample_excel_bytes()
     db = AsyncMock()
+    db.add = MagicMock()
 
     col = KnowledgeCollection(
         id="col_admissions_test",
@@ -89,6 +90,7 @@ async def test_import_facts_from_excel_service() -> None:
 @pytest.mark.asyncio
 async def test_get_collection_facts_service() -> None:
     db = AsyncMock()
+    db.add = MagicMock()
     timestamp = datetime.now(UTC)
 
     col = KnowledgeCollection(

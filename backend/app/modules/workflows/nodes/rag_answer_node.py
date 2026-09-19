@@ -51,6 +51,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
             preferred_model_name=primary_model,
             fallback_model=fallback_model,
+            history=context.inputs.get("conversation_history"),
         )
 
         if context.db:

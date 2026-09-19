@@ -41,3 +41,17 @@ export interface WorkflowApproval {
   created_at: string;
   decided_at?: string | null;
 }
+
+export interface WorkflowAssistantsUsageItem {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+  published_workflow_version_id?: string | null;
+}
+
+export interface WorkflowAssistantsUsageResponse {
+  workflow_id: string;
+  count: number;
+  assistants: WorkflowAssistantsUsageItem[];
+}

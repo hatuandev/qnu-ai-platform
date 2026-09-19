@@ -52,5 +52,6 @@ export const apiClient = {
   ...evaluationApi,
   ...toolsApi,
   ...workflowRunsApi,
+  ...workflowsApi,
   ...ocrStudioApi,
 };

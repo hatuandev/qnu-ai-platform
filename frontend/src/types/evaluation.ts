@@ -23,15 +23,38 @@ export interface EvaluationRunItem {
   answer_relevance_avg: number;
   context_precision_avg: number;
   meets_tm08_standard: boolean;
+  evaluation_method?: string;
   metadata_info?: Record<string, unknown>;
   created_at: string;
   completed_at?: string;
+}
+
+export interface EvaluationResultItem {
+  id: string;
+  test_case_id: string;
+  query: string;
+  generated_answer: string;
+  contexts: string[];
+  faithfulness_score: number;
+  answer_relevance_score: number;
+  context_precision_score: number;
+  is_hallucinated: boolean;
+  is_refusal: boolean;
+  passed_all_criteria: boolean;
+  execution_path: string;
+  reasoning?: string | null;
+  ground_truth?: string | null;
+}
+
+export interface EvaluationRunDetail extends EvaluationRunItem {
+  items: EvaluationResultItem[];
 }
 
 export interface EvaluationRunRequest {
   assistant_code: string;
   dataset_id: string;
   sample_size?: number;
+  evaluation_method?: "heuristic" | "llm_judge";
 }
 
 export interface GapInboxItem {

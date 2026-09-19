@@ -11,10 +11,12 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import all module models to register on Base.metadata for autogenerate
 import app.modules.assistants.models
+import app.modules.conversations.models
 import app.modules.document_types.models
 import app.modules.evaluation.models
 import app.modules.knowledge.models
 import app.modules.modelops.models
+import app.modules.node_catalog.models
 import app.modules.ocr.models
 import app.modules.tools.models
 import app.modules.workflows.models  # noqa: F401
@@ -42,6 +44,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_num_length=64,
     )
 
     with context.begin_transaction():
@@ -49,7 +52,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_num_length=64,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -219,21 +220,61 @@ async def test_tool_service_requires_approval_enforcement():
     service.registry.register(SensitiveTool())
 
     mock_session = AsyncMock()
+    mock_session.add = MagicMock()
 
-    # Attempt 1: Not approved -> Must fail with 403
+    # Attempt 1: No approval_id -> Must fail with 403
     req_unapproved = ToolExecuteRequest(
         tool_name="sensitive_action_tool",
-        parameters={"is_approved": False},
+        parameters={},
     )
     with pytest.raises(AppException) as exc_info:
         await service.execute_tool(mock_session, req_unapproved)
     assert exc_info.value.status_code == 403
+    assert exc_info.value.code == "tool_requires_approval"
 
-    # Attempt 2: Approved -> Must succeed
+    # Attempt 2: Client sends is_approved=True in body without valid approval_id -> Must still fail
+    req_bypass_attempt = ToolExecuteRequest(
+        tool_name="sensitive_action_tool",
+        parameters={"is_approved": True, "approved_by": "can_bo_phong_dao_tao"},
+    )
+    with pytest.raises(AppException) as exc_info_bypass:
+        await service.execute_tool(mock_session, req_bypass_attempt)
+    assert exc_info_bypass.value.status_code == 403
+    assert exc_info_bypass.value.code == "tool_requires_approval"
+
+    # Attempt 3: Valid approval_id with matching hash and approved status -> Must succeed and consume
+    import hashlib
+    import json
+    from datetime import datetime, timedelta
+
+    from app.modules.workflows.models import WorkflowApprovalRequest
+
+    valid_params = {"action": "do_something"}
+    payload_str = json.dumps(valid_params, sort_keys=True, ensure_ascii=False)
+    p_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
+
+    mock_approval = WorkflowApprovalRequest(
+        id="appr_mock_123",
+        execution_id="exec_1",
+        checkpoint_id="chk_1",
+        node_id="node_1",
+        tool_name="sensitive_action_tool",
+        payload_hash=p_hash,
+        status="approved",
+        requested_by="admin",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+    )
+    mock_exec_res = MagicMock()
+    mock_exec_res.scalar_one_or_none.return_value = mock_approval
+    mock_session.execute.return_value = mock_exec_res
+
     req_approved = ToolExecuteRequest(
         tool_name="sensitive_action_tool",
-        parameters={"is_approved": True},
+        parameters=valid_params,
+        approval_id="appr_mock_123",
     )
     resp = await service.execute_tool(mock_session, req_approved)
     assert resp.status == "success"
+    assert mock_approval.status == "consumed"
+
 

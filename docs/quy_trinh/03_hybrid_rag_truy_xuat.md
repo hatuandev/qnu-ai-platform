@@ -52,15 +52,16 @@ flowchart TD
 
 ### Bước 3: Ưu Tiên Tuyệt Đối Bảng Sự Thật (Structured Fact Layer) & Ràng Buộc Vòng Đời Tài Liệu
 - Tra cứu bảng `knowledge_facts` trên PostgreSQL kết hợp `outerjoin` với `knowledge_documents`.
-- **Ràng buộc Vòng đời Phê duyệt (Document Lifecycle Binding)**: Chỉ trích xuất facts gắn với tài liệu ở trạng thái đã kiểm duyệt và hiệu lực (`status in ["approved", "completed", "processed", "ready"]` và `is_active = True`) hoặc các facts số liệu độc lập không gắn tệp (nhập qua bảng tính Excel/CSV). Tuyệt đối loại trừ 100% facts từ tài liệu đang chờ duyệt (`pending`) hoặc đã lưu trữ/thu hồi (`archived`), bảo vệ tính trung thực của dữ liệu điểm chuẩn/học phí.
-- Khi người dùng hỏi các câu hỏi thông số cụ thể: *"Điểm chuẩn ngành Công nghệ thông tin 2024?"*, Fact Layer trả về ngay dữ liệu bảng `24.5 điểm (tổ hợp A00, A01, D01, D07)`.
-- Thông số này được gắn vào đầu Prompt dưới dạng Markdown Table bắt buộc LLM phải tuân thủ, triệt tiêu bịa đặt.
-
-### Bước 4 & 5: Tìm kiếm lai song song (Concurrent Hybrid Retrieval) & Dung hợp thứ hạng RRF ($k=60$)
+- **Ràng buộc Vòng đời Phê duyệt (Document Lifecycle Binding)**: Chỉ trích xuất facts gắn với tài liệu ở trạng thái đã kiểm duyệt và hiệu lực (`status in ["approved", "completed", "processed", "ready"]` và `is_active = True`) hoặc các facts số liệu độc lập không gắn tệp (nhập qua bảng tính Excel/CSV). Tuyệt đối loại trừ 100% facts từ tài liệu đ### Bước 4 & 5: Tìm kiếm lai song song (Concurrent Hybrid Retrieval) & Dung hợp thứ hạng RRF ($k=60$)
 - **Thực thi song song phi phong tỏa**: Động cơ `retriever.py` kích hoạt đồng thời Dense Vector Search trên Qdrant và Sparse FTS Lexical Search trên PostgreSQL thông qua `asyncio.gather`, giảm tối đa 50% độ trễ (latency) so với truy vấn tuần tự.
-- **Ràng buộc Vòng đời & Phân quyền Đa người thuê (Lifecycle & Tenant Parity)**:
-  * Qdrant payload lưu trữ đầy đủ: `tenant_id`, `workspace_id`, `document_status`, `is_retrievable`, `chunk_id`, `document_id`.
-  * `search_dense` áp dụng bộ lọc nghiêm ngặt tương đồng 100% với PostgreSQL FTS: lọc bắt buộc `tenant_id` và `workspace_id`, đồng thời cấm triệt để (`must_not`) các tài liệu có `is_retrievable=False` hoặc `document_status in ["pending", "archived", "rejected", "failed", "processing"]`. Ngăn chặn hoàn toàn hiện tượng tài liệu dự thảo, nháp hoặc đã lưu trữ lọt vào kết quả dense search.
+- **Ràng buộc Vòng đời & Phân quyền Đa người thuê theo Positive Allowlist (Giai Đoạn D)**:
+  * Qdrant payload lưu trữ đầy đủ 11 trường: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_revision`, `chunk_id`, `document_status`, `is_retrievable`, `content_hash`, `embedding_model`, `payload_schema_version`.
+  * `search_dense` áp dụng bộ lọc **Positive Allowlist** tuyệt đối (loại bỏ hoàn toàn cơ chế blacklist `must_not`):
+    - `is_active = True`
+    - `is_retrievable = True`
+    - `document_status in ["ready", "approved"]`
+    - `tenant_id` và `workspace_id` khớp chính xác với ngữ cảnh truy vấn.
+  * Tương tự, `search_sparse_fts` và `lookup_facts` trên PostgreSQL cũng chỉ truy xuất các bản ghi thuộc tài liệu có `status.in_(["ready", "approved"])`, `is_active=True`, bảo đảm tính đồng thuận và nhất quán 100% giữa 3 nguồn dữ liệu.
 - **Công thức Reciprocal Rank Fusion kết hợp Trọng số Pháp lý (Legal Priority Weighted RRF)**:
   $$RRF\_Score(d) = \left( \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \right) \times \left(1.0 + (\text{priority} - 5) \times 0.02\right) \quad (\text{với } k = 60)$$
   * Điểm `priority` (1-10) phản ánh giá trị pháp lý của 37 loại văn bản theo chuẩn ĐH Quy Nhơn (Quy chế, Quyết định có priority=10 được nhân hệ số boost $+10\%$; Thông báo/Tin tức có priority=5 giữ nguyên hệ số $1.0$).
@@ -78,12 +79,15 @@ flowchart TD
   * **Tuyệt đối không cấp Citation giả**: Khi không có trích dẫn nào vượt qua ngưỡng kiểm định bằng chứng, hệ thống trả về danh sách rỗng (`[]`) và chuyển trạng thái câu trả lời sang `insufficient_context` (chấm dứt hoàn toàn cơ chế fallback trả ngẫu nhiên 2 citation đầu).
 - **Phản hồi từ chối chuẩn mực (No-Answer Policy)**: Khi thiếu căn cứ, phản hồi hướng dẫn lịch sự kèm hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
 
-### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Theo Tenant & Model (Tenant & Model-Partitioned Semantic Cache)
-- Lớp cache ngữ nghĩa trên Redis sử dụng khóa phân vùng bảo vệ đa khách thuê: `rag:cache:{tenant_id}:{collection_id}:{preferred_model}:{hash(query)}`.
-- Việc phân tách kép theo cả `tenant_id` và `preferred_model` đảm bảo:
-  1. Không rò rỉ dữ liệu hoặc câu trả lời giữa các tenant.
+### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Đa Tầng (Multi-Tenant & Policy Partitioned Semantic Cache)
+- Lớp cache ngữ nghĩa trên Redis (`SemanticCache`) sử dụng khóa phân vùng bảo vệ chặt chẽ:
+  `rag:cache:{tenant_id}:{workspace_id}:{collection_id}:{preferred_model}:{policy_version}:{hash(query)}`
+  với `policy_version = "v1"`.
+- Việc phân tách 5 lớp (`tenant_id`, `workspace_id`, `collection_id`, `model`, `policy_version`) bảo đảm:
+  1. Tuyệt đối không rò rỉ dữ liệu hoặc câu trả lời giữa các tenant và workspace.
   2. Khi người dùng đổi mô hình (`gpt-4o-mini`, `gemini-1.5-flash`, `qwen2.5-7b`), cache không trả kết quả lệch lạc do định dạng của model trước đó sinh ra.
-- Hỗ trợ cơ chế vô hiệu hóa cache chủ động theo mẫu wildcard (`clear()`, `invalidate_collection()`) ngay khi có tài liệu mới được phê duyệt hoặc tài liệu cũ bị xóa/lưu trữ.
+  3. Khi chính sách retrieval thay đổi (`policy_version`), cache tự động phân tách mà không bị ô nhiễm bởi kết quả từ chính sách cũ.
+- Hỗ trợ cơ chế vô hiệu hóa cache chủ động theo mẫu wildcard (`invalidate_collection`) bao quát cả mẫu khóa mới `rag:cache:*:*:{collection_id}:*` và mẫu khóa kế thừa `rag:cache:*:{collection_id}:*` ngay khi có tài liệu mới được duyệt/lập chỉ mục hoặc bị xóa.
 
 ### Bước 10: Định dạng thông minh (Answer Format Planner)
 Tự động lập kế hoạch trình bày câu trả lời:

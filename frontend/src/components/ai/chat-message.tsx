@@ -185,6 +185,41 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
+        {/* HITL Approval Pending Banner */}
+        {message.status === "paused_for_approval" && (
+          <div className="mt-2 p-3 rounded-surface border border-amber-500/30 bg-amber-500/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span>Tác vụ đang chờ cán bộ phê duyệt (Human-in-the-loop)</span>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-[10px] font-mono border-amber-500/40 text-amber-600 dark:text-amber-400"
+              >
+                Pending Approval
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Yêu cầu đã được ghi nhận vào hàng đợi kiểm duyệt an toàn. Cán bộ quản trị có thể xem
+              xét và phê duyệt tại Hộp thư Phê duyệt.
+            </p>
+            {message.approvalId && (
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  Mã phê duyệt: <strong className="text-foreground">{message.approvalId}</strong>
+                </span>
+                <a
+                  href="/runs"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                >
+                  Mở Hộp thư Phê duyệt &rarr;
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Citation Badges */}
         {message.citations && message.citations.length > 0 && (
           <div className="mt-1 space-y-1.5">

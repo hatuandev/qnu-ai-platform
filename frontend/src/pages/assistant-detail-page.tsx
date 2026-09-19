@@ -26,6 +26,7 @@ import {
   cloneAssistant,
   deactivateAssistant,
   exportAssistantBundle,
+  forkAssistantWorkflow,
   generateAssistantSpec,
   getAssistant,
   getAssistantReadiness,
@@ -153,45 +154,6 @@ export function AssistantDetailPage({
         }
       }
     }
-    if (list.length === 0) {
-      return [
-        {
-          value: "gpt-4o-mini",
-          label: "OpenAI GPT-4o Mini (Tối ưu tốc độ & chi phí)",
-          providerName: "OpenAI",
-        },
-        {
-          value: "gpt-4o",
-          label: "OpenAI GPT-4o (Đỉnh cao suy luận & lập luận)",
-          providerName: "OpenAI",
-        },
-        {
-          value: "gemini-1.5-flash",
-          label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)",
-          providerName: "Google",
-        },
-        {
-          value: "gemini-1.5-pro",
-          label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)",
-          providerName: "Google",
-        },
-        {
-          value: "deepseek-chat",
-          label: "DeepSeek V3 (Thông minh & tiết kiệm)",
-          providerName: "DeepSeek",
-        },
-        {
-          value: "mistral-small-latest",
-          label: "Mistral Small (Chính xác & bảo mật)",
-          providerName: "Mistral",
-        },
-        {
-          value: "qwen2.5-7b-instruct",
-          label: "Qwen 2.5 7B (Mã nguồn mở máy chủ nội bộ)",
-          providerName: "vLLM",
-        },
-      ];
-    }
     return list;
   }, [providersQuery.data]);
 
@@ -303,12 +265,29 @@ export function AssistantDetailPage({
     onError: (err: Error) => toast.error(`Xuất bản thất bại: ${err.message}`),
   });
 
+  const forkWorkflowMutation = useMutation({
+    mutationFn: () => forkAssistantWorkflow(reference),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["assistants", reference] });
+      queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-definitions"] });
+      toast.success("Tách quy trình thành công!", {
+        description: `Đã tạo workflow riêng: ${res.new_workflow_name} (${res.new_workflow_id})`,
+      });
+      if (form) {
+        setForm({ ...form, workflow_id: res.new_workflow_id });
+      }
+    },
+    onError: (err: Error) => toast.error(`Tách quy trình thất bại: ${err.message}`),
+  });
+
   const cloneMutation = useMutation({
     mutationFn: (data: {
       new_code: string;
       new_name: string;
       new_description?: string;
       target_collection_id?: string;
+      fork_workflow?: boolean;
     }) => cloneAssistant(reference, data),
     onSuccess: (cloned) => {
       queryClient.invalidateQueries({ queryKey: ["assistants"] });
@@ -503,6 +482,9 @@ export function AssistantDetailPage({
                 onChange={setForm}
                 workflows={workflows}
                 onNavigate={onNavigate}
+                assistant={item}
+                onForkWorkflow={() => forkWorkflowMutation.mutate()}
+                isForkingWorkflow={forkWorkflowMutation.isPending}
               />
               <AssistantGuardrailsSection
                 form={form}
@@ -538,6 +520,7 @@ export function AssistantDetailPage({
             new_name: data.name,
             new_description: data.description || undefined,
             target_collection_id: data.collectionId || undefined,
+            fork_workflow: data.forkWorkflow,
           });
         }}
       />

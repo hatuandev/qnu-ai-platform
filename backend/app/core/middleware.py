@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import get_settings
+from app.core.observability import metrics_registry
 
 settings = get_settings()
 logger = structlog.get_logger(__name__)
@@ -45,6 +46,13 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
         response: Response = await call_next(request)
         process_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
         response.headers["X-Process-Time-Ms"] = str(process_time_ms)
+
+        metrics_registry.record_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=process_time_ms,
+        )
 
         # Log slow requests (> 3.0 seconds) for observability
         if process_time_ms > 3000:

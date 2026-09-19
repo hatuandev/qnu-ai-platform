@@ -25,3 +25,13 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên kế hoạch**: Tái cấu trúc chức năng và điều hướng QNU AI Platform theo Assistant Workspace và Knowledge Workspace.
    - **Mục tiêu**: Giảm sidebar, gộp trải nghiệm đúng hành trình người dùng nhưng giữ độc lập các domain Backend, versioning và runtime.
    - **Trạng thái**: Bản kế hoạch, chờ phê duyệt triển khai.
+
+5. [**`07_ke_hoach_cai_thien_toan_dien_sau_code_review.md`**](./07_ke_hoach_cai_thien_toan_dien_sau_code_review.md):
+   - **Tên kế hoạch**: Cải thiện toàn diện QNU AI Platform sau code review.
+   - **Mục tiêu**: Đưa dự án từ Internal Beta mạnh lên Production Candidate qua 10 đợt ưu tiên Security, Truthful Runtime, Database Integrity, RAG, ModelOps, Workflow, Evaluation, Testing, Observability và Deployment.
+   - **Trạng thái**: Bản kế hoạch đề xuất; ưu tiên bắt đầu từ baseline xanh, secret/auth boundary và loại fake-success trong LiveMode.
+
+6. [**`08_huong_dan_cai_thien_code_tang_diem_danh_gia.md`**](./08_huong_dan_cai_thien_code_tang_diem_danh_gia.md):
+   - **Tên tài liệu**: Hướng dẫn cải thiện code QNU AI Platform để đạt Production Candidate.
+   - **Mục tiêu**: Chuyển Kế hoạch 07 thành hướng dẫn triển khai có thứ tự, nguyên tắc code, acceptance criteria, failure tests, Definition of Done và ma trận bằng chứng để nâng mức đánh giá từ khoảng 6,5/10 lên 8,5+/10.
+   - **Trạng thái**: Hướng dẫn thực thi; ưu tiên ba phiên đầu là Schema Truth, RAG Data Truth và Secret/Trusted Approval.

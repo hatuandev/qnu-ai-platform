@@ -17,6 +17,7 @@ import {
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { EmptyState } from "../components/admin/empty-state";
 import { Attachment } from "../components/ai/attachment";
 import { ChatMessage } from "../components/ai/chat-message";
 import { CitationSheet } from "../components/ai/citation-sheet";
@@ -78,69 +79,6 @@ function getAssistantIcon(category: string, code: string): React.ReactNode {
   return <Bot className="h-4 w-4" />;
 }
 
-const FALLBACK_STARTERS: AssistantInfo[] = [
-  {
-    code: "admissions",
-    name: "Trợ lý Tuyển sinh QNU",
-    category: "Đào tạo & Tuyển sinh",
-    icon: <GraduationCap className="h-4 w-4" />,
-    description: "Giải đáp chỉ tiêu, điểm chuẩn, phương thức xét tuyển & học phí năm 2025.",
-    quickPrompts: [
-      "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là bao nhiêu?",
-      "Học phí ngành Sư phạm Toán và chính sách hỗ trợ NĐ 116?",
-      "Chỉ tiêu và các tổ hợp xét tuyển ngành Kỹ thuật phần mềm?",
-    ],
-  },
-  {
-    code: "regulations",
-    name: "Trợ lý Quy chế Học vụ",
-    category: "Đào tạo & Khảo thí",
-    icon: <BookOpen className="h-4 w-4" />,
-    description: "Tra cứu quy chế tín chỉ, đăng ký học phần, cảnh báo học vụ và xét tốt nghiệp.",
-    quickPrompts: [
-      "Số tín chỉ tối thiểu sinh viên cần đăng ký trong một học kỳ chính?",
-      "Điều kiện và tiêu chuẩn nhận học bổng khuyến khích loại Xuất sắc?",
-      "Quy định về chuẩn đầu ra tiếng Anh B1 (VSTEP) tốt nghiệp?",
-    ],
-  },
-  {
-    code: "library",
-    name: "Trợ lý Thư viện Số QNU",
-    category: "Học liệu & Nghiên cứu",
-    icon: <Library className="h-4 w-4" />,
-    description: "Tra cứu giáo trình, bài báo khoa học Scopus, ScienceDirect & quy định mượn trả.",
-    quickPrompts: [
-      "Quy định về thời hạn mượn và số lượng sách tối đa cho sinh viên?",
-      "Cách truy cập cơ sở dữ liệu ScienceDirect từ ngoài trường?",
-      "Thời gian mở cửa khu tự học tầng 2 Thư viện?",
-    ],
-  },
-  {
-    code: "drafting",
-    name: "Trợ lý Soạn thảo Văn bản",
-    category: "Hành chính & Pháp chế",
-    icon: <FileText className="h-4 w-4" />,
-    description: "Hỗ trợ soạn thảo tờ trình, quyết định, công văn chuẩn Nghị định 30/2020/NĐ-CP.",
-    quickPrompts: [
-      "Quy cách căn lề và định dạng tiêu ngữ theo Nghị định 30/2020/NĐ-CP?",
-      "Mẫu quyết định khen thưởng sinh viên đạt thành tích xuất sắc?",
-      "Soạn thảo thông báo triệu tập cuộc họp giao ban đơn vị?",
-    ],
-  },
-  {
-    code: "question_bank",
-    name: "Trợ lý Ngân hàng Đề thi",
-    category: "Khảo thí & Đảm bảo chất lượng",
-    icon: <HelpCircle className="h-4 w-4" />,
-    description: "Biên soạn câu hỏi trắc nghiệm theo 4 mức Bloom, ma trận CLO và xuất Excel.",
-    quickPrompts: [
-      "Biên soạn 1 câu hỏi trắc nghiệm Bloom mức Vận dụng học phần CSDL?",
-      "Tạo câu hỏi trắc nghiệm về kiến trúc Microservices và RESTful API?",
-      "Giải thích ma trận tương quan giữa chuẩn đầu ra CLO và Bloom?",
-    ],
-  },
-];
-
 interface ChatStudioPageProps {
   initialAssistant?: string;
 }
@@ -153,7 +91,7 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
 
   const assistantsList: AssistantInfo[] = useMemo(() => {
     const data = assistantsQuery.data;
-    if (!data || data.length === 0) return FALLBACK_STARTERS;
+    if (!data || data.length === 0) return [];
     return data.map((ast) => {
       const sampleQ =
         Array.isArray(ast.sample_questions) && ast.sample_questions.length > 0
@@ -181,7 +119,7 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
   const [selectedCode, setSelectedCode] = useState<string>(() => {
     if (initialAssistant) return initialAssistant;
     const requestedCode = new URLSearchParams(window.location.search).get("assistant");
-    return requestedCode || "admissions";
+    return requestedCode || "";
   });
 
   useEffect(() => {
@@ -202,9 +140,7 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeAssistant =
-    assistantsList.find((a) => a.code === selectedCode) ||
-    assistantsList[0] ||
-    FALLBACK_STARTERS[0];
+    assistantsList.find((a) => a.code === selectedCode) || assistantsList[0] || null;
 
   const {
     messages,
@@ -316,6 +252,39 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
   const handleRemoveAttachment = (id: string) => {
     setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
   };
+
+  if (assistantsQuery.isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-var(--topbar-height)-2rem)] items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p className="text-xs text-muted-foreground">Đang tải cấu hình Trợ lý AI...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (assistantsList.length === 0 || !activeAssistant) {
+    return (
+      <div className="flex h-[calc(100vh-var(--topbar-height)-2rem)] items-center justify-center p-6">
+        <EmptyState
+          icon={Bot}
+          title="Chưa có Trợ lý AI nào được kích hoạt"
+          description="Hệ thống chưa tìm thấy trợ lý nào khả dụng. Vui lòng tạo Trợ lý AI mới hoặc kích hoạt trợ lý trong trang Quản trị Trợ lý."
+          action={
+            <Button
+              className="mt-2"
+              onClick={() => {
+                window.location.href = "/assistants";
+              }}
+            >
+              Quản lý Trợ lý AI
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[calc(100vh-var(--topbar-height)-2rem)] flex-col lg:flex-row gap-4">

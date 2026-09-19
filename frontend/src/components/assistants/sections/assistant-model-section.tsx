@@ -30,20 +30,34 @@ export function AssistantModelSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
+        {availableModels.length === 0 && (
+          <div className="col-span-full rounded-control border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning-foreground">
+            Chưa có Nhà cung cấp AI nào đang hoạt động. Vui lòng bật ít nhất một Provider trong danh
+            mục ModelOps để chọn mô hình chính và dự phòng.
+          </div>
+        )}
         <Field htmlFor="detail-primary-model" label="Mô hình chính (Primary)">
           <Select
             value={form.primary_model}
             onValueChange={(val) => onChange({ ...form, primary_model: val })}
           >
             <SelectTrigger id="detail-primary-model">
-              <SelectValue placeholder="Chọn mô hình chính" />
+              <SelectValue
+                placeholder={availableModels.length > 0 ? "Chọn mô hình chính" : "Không có mô hình"}
+              />
             </SelectTrigger>
             <SelectContent>
-              {availableModels.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
+              {availableModels.length > 0 ? (
+                availableModels.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-center text-xs text-muted-foreground">
+                  Chưa có mô hình nào khả dụng
+                </div>
+              )}
             </SelectContent>
           </Select>
         </Field>
@@ -54,14 +68,24 @@ export function AssistantModelSection({
             onValueChange={(val) => onChange({ ...form, fallback_model: val })}
           >
             <SelectTrigger id="detail-fallback-model">
-              <SelectValue placeholder="Chọn mô hình dự phòng" />
+              <SelectValue
+                placeholder={
+                  availableModels.length > 0 ? "Chọn mô hình dự phòng" : "Không có mô hình"
+                }
+              />
             </SelectTrigger>
             <SelectContent>
-              {availableModels.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
+              {availableModels.length > 0 ? (
+                availableModels.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-2 text-center text-xs text-muted-foreground">
+                  Chưa có mô hình nào khả dụng
+                </div>
+              )}
             </SelectContent>
           </Select>
         </Field>

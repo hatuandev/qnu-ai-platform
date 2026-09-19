@@ -27,13 +27,15 @@ export interface ChatMessageItem {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  status?: "streaming" | "completed" | "error";
+  status?: "streaming" | "completed" | "error" | "paused_for_approval";
   timestamp: string;
   citations?: ChatCitation[];
   suggestedQuestions?: string[];
   attachments?: ChatAttachment[];
   artifacts?: ChatAttachment[];
   latencyMs?: number;
+  approvalId?: string;
+  toolName?: string;
 }
 
 export interface UseRAGStreamOptions {
@@ -246,6 +248,26 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                 } catch {
                   // ignore status payload error
                 }
+              } else if (event.event === "approval_required") {
+                try {
+                  const apprObj = JSON.parse(event.data);
+                  const approvalId = apprObj.approval_id || apprObj.checkpoint;
+                  const toolName = apprObj.tool_name;
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            status: "paused_for_approval",
+                            approvalId,
+                            toolName,
+                          }
+                        : msg
+                    )
+                  );
+                } catch {
+                  // ignore malformed approval chunk
+                }
               } else if (event.event === "done" || event.event === "end") {
                 try {
                   const doneData = JSON.parse(event.data);
@@ -254,6 +276,19 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                   }
                   if (doneData.conversation_id) {
                     setCurrentConversationId(doneData.conversation_id);
+                  }
+                  if (doneData.status === "paused_for_approval") {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessageId
+                          ? {
+                              ...msg,
+                              status: "paused_for_approval",
+                              approvalId: doneData.approval_id || msg.approvalId,
+                            }
+                          : msg
+                      )
+                    );
                   }
                 } catch {
                   // ignore

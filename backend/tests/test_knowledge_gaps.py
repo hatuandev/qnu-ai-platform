@@ -18,6 +18,7 @@ from app.modules.evaluation.service import evaluation_service
 @pytest.mark.asyncio
 async def test_record_gap_creates_new_record():
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     exec_res = MagicMock()
     exec_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = exec_res
@@ -40,6 +41,7 @@ async def test_record_gap_creates_new_record():
 @pytest.mark.asyncio
 async def test_record_gap_increments_frequency_for_duplicate():
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     existing_gap = KnowledgeGapRecord(
         id="gap_123",
         assistant_code="admissions",

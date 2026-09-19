@@ -26,11 +26,14 @@ async def get_current_actor(request: Request) -> AuthActor:
         try:
             payload = decode_access_token(token)
             return AuthActor(
+                actor_id=str(payload.get("actor_id", "act_admin_qnu")),
                 username=str(payload.get("sub", "admin")),
+                display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
                 tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
                 workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
                 role=str(payload.get("role", "admin")),
                 authenticated=True,
+                session_version=str(payload.get("session_version", "v1")),
             )
         except Exception:
             raise AppException(
@@ -49,11 +52,14 @@ async def get_current_actor(request: Request) -> AuthActor:
         current_settings.ENVIRONMENT == "test" and not enforce_auth
     ):
         return AuthActor(
+            actor_id="act_admin_qnu",
             username="admin",
+            display_name="Cán bộ Quản trị QNU",
             tenant_id="tenant_qnu",
             workspace_id="workspace_qnu",
             role="admin",
             authenticated=True,
+            session_version="v1",
         )
 
     raise AppException(

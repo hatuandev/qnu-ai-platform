@@ -31,6 +31,12 @@ class WorkflowDefinition(Base):
     workspace_id: Mapped[str] = mapped_column(String(100), default="workspace_default")
     version: Mapped[str] = mapped_column(String(20), default="1.0.0")
     published_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    ownership: Mapped[str] = mapped_column(
+        String(20), default="shared", index=True
+    )  # 'private' | 'shared' | 'template'
+    assistant_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     dag_spec: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -144,6 +150,10 @@ class WorkflowApprovalRequest(Base):
     execution_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     checkpoint_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     node_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    tool_name: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    payload_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    requested_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
     decided_by: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -37,6 +37,9 @@ class WorkflowDagSpec(BaseModel):
 
 class WorkflowExecuteRequest(BaseModel):
     workflow_id: str = Field(..., description="Mã workflow hoặc tên tệp định nghĩa")
+    workflow_version_id: str | None = Field(
+        None, description="Mã phiên bản bất biến cụ thể cần thực thi"
+    )
     inputs: dict[str, Any] = Field(..., description="Dữ liệu đầu vào (ví dụ: {'message': '...'})")
     tenant_id: str = Field("tenant_qnu", description="Mã người thuê")
     conversation_id: str | None = Field(None, description="Mã phiên hội thoại")
@@ -126,6 +129,10 @@ class WorkflowApprovalResponse(BaseModel):
     execution_id: str
     checkpoint_id: str
     node_id: str
+    tool_name: str | None = None
+    payload_hash: str | None = None
+    requested_by: str | None = None
+    expires_at: str | None = None
     description: str | None = None
     status: str
     decided_by: str | None = None
@@ -145,5 +152,22 @@ class WorkflowDefinitionResponse(BaseModel):
     nodes_count: int = 0
     edges_count: int = 0
     published_version_id: str | None = None
+    ownership: str = "shared"
+    assistant_id: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class WorkflowAssistantItem(BaseModel):
+    id: str
+    code: str
+    name: str
+    is_active: bool
+    workflow_ownership: str
+
+
+class WorkflowAssistantsUsageResponse(BaseModel):
+    workflow_id: str
+    ownership: str
+    total_assistants: int
+    assistants: list[WorkflowAssistantItem] = Field(default_factory=list)

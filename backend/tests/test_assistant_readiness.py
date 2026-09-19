@@ -106,6 +106,7 @@ async def test_publish_assistant_raises_422_when_blocked():
 @pytest.mark.asyncio
 async def test_clone_assistant_creates_new_record():
     mock_db = AsyncMock()
+    mock_db.add = MagicMock()
     source = _sample_assistant("admissions")
 
     # Mock _get_record -> returns source

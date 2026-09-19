@@ -110,3 +110,59 @@ async def test_local_storage_driver(tmp_path):
     deleted = await driver.delete(rel_path)
     assert deleted is True
     assert await driver.exists(rel_path) is False
+
+
+def test_fernet_crypto_and_secret_encryption():
+    """Verify Fernet encryption/decryption and format integrity."""
+    from app.core.crypto import decrypt_secret, encrypt_secret, is_encrypted
+
+    raw_secret = "sk-proj-qnu-super-secret-key-1234567890"
+    encrypted = encrypt_secret(raw_secret)
+
+    assert encrypted.startswith("enc:v1:")
+    assert is_encrypted(encrypted) is True
+    assert is_encrypted(raw_secret) is False
+
+    decrypted = decrypt_secret(encrypted)
+    assert decrypted == raw_secret
+
+    # Empty / None handling
+    assert encrypt_secret("") == ""
+    assert decrypt_secret("") == ""
+    assert decrypt_secret("plain-text-key") == "plain-text-key"
+
+
+def test_production_security_validation_fails_on_default_secrets():
+    """Verify Settings raises ValueError in production if default secrets or missing encryption key."""
+    # Production with default SECRET_KEY should fail
+    with pytest.raises(ValueError, match="Production security violation: Default/insecure secrets detected"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="dev-secret-key-qnu-ai-platform-change-in-production-2026",
+            PROVIDER_ENCRYPTION_KEY="custom-prod-key-12345678901234567890123456789012",
+        )
+
+    # Production without PROVIDER_ENCRYPTION_KEY should fail
+    with pytest.raises(ValueError, match="Production security violation: PROVIDER_ENCRYPTION_KEY must be configured"):
+        Settings(
+            ENVIRONMENT="production",
+            SECRET_KEY="a-secure-production-secret-key-that-is-long-enough",
+            INTERNAL_API_KEY="a-secure-internal-api-key-production-0987654321",
+            DEV_ACCESS_PASSWORD="a-secure-dev-access-password-production-09876",
+            DATABASE_URL="postgresql+asyncpg://user:pass@prod-db.qnu.edu.vn:5432/qnudb",
+            S3_SECRET_KEY="a-secure-s3-secret-key-production-098765432109876",
+            PROVIDER_ENCRYPTION_KEY=None,
+        )
+
+    # Production with valid non-default secrets should succeed
+    valid_settings = Settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="a-secure-production-secret-key-that-is-long-enough",
+        INTERNAL_API_KEY="a-secure-internal-api-key-production-0987654321",
+        DEV_ACCESS_PASSWORD="a-secure-dev-access-password-production-09876",
+        DATABASE_URL="postgresql+asyncpg://user:pass@prod-db.qnu.edu.vn:5432/qnudb",
+        S3_SECRET_KEY="a-secure-s3-secret-key-production-098765432109876",
+        PROVIDER_ENCRYPTION_KEY="another-secure-key-for-providers-fernet-encryption",
+    )
+    assert valid_settings.ENVIRONMENT == "production"
+

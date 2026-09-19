@@ -50,6 +50,8 @@ export interface AssistantItem {
   category: string;
   system_prompt: string;
   workflow_id: string;
+  published_workflow_version_id?: string | null;
+  workflow_ownership?: "private" | "shared";
   collection_id: string;
   is_active: boolean;
   tenant_id: string;
@@ -85,6 +87,17 @@ export interface AssistantCloneRequest {
   new_name: string;
   new_description?: string;
   target_collection_id?: string;
+  fork_workflow?: boolean;
+}
+
+export interface AssistantForkWorkflowResponse {
+  assistant_id: string;
+  assistant_code: string;
+  previous_workflow_id: string;
+  new_workflow_id: string;
+  new_workflow_name: string;
+  ownership: "private" | "shared";
+  message: string;
 }
 
 export interface AssistantPublishResponse {

@@ -63,6 +63,7 @@ class EvaluationRun(Base):
     context_precision_avg: Mapped[float] = mapped_column(Float, default=0.0)
     meets_tm08_standard: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    evaluation_method: Mapped[str] = mapped_column(String(30), default="heuristic")
     metadata_info: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -89,7 +90,10 @@ class EvaluationResultItem(Base):
     answer_relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
     context_precision_score: Mapped[float] = mapped_column(Float, default=0.0)
     is_hallucinated: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_refusal: Mapped[bool] = mapped_column(Boolean, default=False)
     passed_all_criteria: Mapped[bool] = mapped_column(Boolean, default=False)
+    execution_path: Mapped[str] = mapped_column(String(50), default="assistant_workflow")
+    reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

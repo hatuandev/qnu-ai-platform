@@ -58,10 +58,12 @@ class SemanticCache:
         query: str,
         preferred_model: str = "default",
         tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        policy_version: str = "v1",
     ) -> str:
         h = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()
         model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
-        return f"rag:cache:{tenant_id}:{collection_id}:{model_part}:{h}"
+        return f"rag:cache:{tenant_id}:{workspace_id}:{collection_id}:{model_part}:{policy_version}:{h}"
 
     async def get(
         self,
@@ -69,9 +71,18 @@ class SemanticCache:
         query: str,
         preferred_model: str = "default",
         tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        policy_version: str = "v1",
     ) -> dict[str, Any] | None:
         try:
-            key = self._make_key(collection_id, query, preferred_model, tenant_id)
+            key = self._make_key(
+                collection_id,
+                query,
+                preferred_model,
+                tenant_id,
+                workspace_id,
+                policy_version,
+            )
             val = await self.client.get(key)
             if val:
                 return json.loads(val)
@@ -86,20 +97,30 @@ class SemanticCache:
         data: dict[str, Any],
         preferred_model: str = "default",
         tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        policy_version: str = "v1",
     ) -> None:
         try:
-            key = self._make_key(collection_id, query, preferred_model, tenant_id)
+            key = self._make_key(
+                collection_id,
+                query,
+                preferred_model,
+                tenant_id,
+                workspace_id,
+                policy_version,
+            )
             await self.client.setex(key, self.ttl, json.dumps(data, ensure_ascii=False))
         except Exception as exc:
             logger.warning("Failed to write to SemanticCache: %s", exc)
 
     async def invalidate_collection(self, collection_id: str) -> None:
-        """Invalidate all cached queries for a modified collection across all tenants."""
+        """Invalidate all cached queries for a modified collection across all tenants and workspaces."""
         try:
-            pattern = f"rag:cache:*:{collection_id}:*"
-            keys = await self.client.keys(pattern)
-            legacy_keys = await self.client.keys(f"rag:cache:{collection_id}:*")
-            all_keys = list(set(keys + legacy_keys))
+            pattern_v1 = f"rag:cache:*:*:{collection_id}:*"
+            pattern_legacy = f"rag:cache:*:{collection_id}:*"
+            keys_v1 = await self.client.keys(pattern_v1)
+            keys_legacy = await self.client.keys(pattern_legacy)
+            all_keys = list(set(keys_v1 + keys_legacy))
             if all_keys:
                 await self.client.delete(*all_keys)
                 logger.info("Invalidated %d cache keys for collection %s", len(all_keys), collection_id)

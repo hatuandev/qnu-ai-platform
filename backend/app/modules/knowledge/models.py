@@ -118,6 +118,9 @@ class KnowledgeDocument(Base):
     chunks: Mapped[list[KnowledgeChunk]] = relationship(
         "KnowledgeChunk", back_populates="document", cascade="all, delete-orphan"
     )
+    facts: Mapped[list[KnowledgeFact]] = relationship(
+        "KnowledgeFact", back_populates="document", cascade="all, delete-orphan"
+    )
 
     @property
     def ocr_method(self) -> str | None:
@@ -177,7 +180,12 @@ class KnowledgeFact(Base):
         nullable=False,
         index=True,
     )
-    document_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    document_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     entity_name: Mapped[str] = mapped_column(
         String(255), nullable=False, index=True
@@ -199,4 +207,7 @@ class KnowledgeFact(Base):
     # Relationships
     collection: Mapped[KnowledgeCollection] = relationship(
         "KnowledgeCollection", back_populates="facts"
+    )
+    document: Mapped[KnowledgeDocument] = relationship(
+        "KnowledgeDocument", back_populates="facts"
     )

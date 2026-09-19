@@ -6,7 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +33,8 @@ from app.modules.workflows.nodes.base import WorkflowContext
 from app.modules.workflows.schemas import (
     WorkflowApprovalDecisionRequest,
     WorkflowApprovalResponse,
+    WorkflowAssistantItem,
+    WorkflowAssistantsUsageResponse,
     WorkflowDagSpec,
     WorkflowDefinitionResponse,
     WorkflowDraftResponse,
@@ -449,12 +451,17 @@ class WorkflowService:
         correlation_id: str | None = None,
     ) -> WorkflowExecuteResponse:
         """Run workflow DAG end-to-end and audit execution trace."""
-        version_result = await db.execute(
-            select(WorkflowDefinition.published_version_id).where(
-                WorkflowDefinition.id == req.workflow_id
+        # Check if caller requested an exact immutable workflow version (e.g. pinned by assistant)
+        target_version_id = req.workflow_version_id
+        if not target_version_id:
+            version_result = await db.execute(
+                select(WorkflowDefinition.published_version_id).where(
+                    WorkflowDefinition.id == req.workflow_id
+                )
             )
-        )
-        workflow_version_id = version_result.scalar_one_or_none()
+            target_version_id = version_result.scalar_one_or_none()
+
+        workflow_version_id = target_version_id
 
         # Exact-version resolution: read immutable dag_spec from published version if present
         if workflow_version_id:
@@ -556,10 +563,27 @@ class WorkflowService:
         )
         db.add(checkpoint)
         await db.flush()
+        node_id = response.paused_node_id or ""
+        node_output = response.outputs.get(node_id, {})
+        params = node_output.get("parameters") or node_output.get("inputs") or {}
+        import hashlib
+        import json
+        clean_params = {k: v for k, v in params.items() if k not in ("approval_id", "is_approved", "approved_by")}
+        payload_hash = (
+            hashlib.sha256(json.dumps(clean_params, sort_keys=True).encode("utf-8")).hexdigest()
+            if clean_params
+            else None
+        )
+        expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
+
         approval = WorkflowApprovalRequest(
             execution_id=execution_id,
             checkpoint_id=checkpoint.id,
-            node_id=response.paused_node_id or "",
+            node_id=node_id,
+            tool_name=response.outputs.get("tool_name"),
+            payload_hash=payload_hash,
+            requested_by=context.inputs.get("actor_id") or context.inputs.get("username") or "user",
+            expires_at=expires_at,
             description=str(response.outputs.get("action_required", "Cần phê duyệt thủ công.")),
         )
         db.add(approval)
@@ -573,6 +597,10 @@ class WorkflowService:
             execution_id=record.execution_id,
             checkpoint_id=record.checkpoint_id,
             node_id=record.node_id,
+            tool_name=record.tool_name,
+            payload_hash=record.payload_hash,
+            requested_by=record.requested_by,
+            expires_at=(record.expires_at.replace(tzinfo=UTC).isoformat() if record.expires_at else None),
             description=record.description,
             status=record.status,
             decided_by=record.decided_by,
@@ -621,6 +649,21 @@ class WorkflowService:
                 status_code=409,
                 details={"approval_id": approval_id, "status": approval.status},
             )
+
+        if approval.expires_at:
+            exp = approval.expires_at
+            if exp.tzinfo is not None:
+                exp = exp.astimezone(UTC).replace(tzinfo=None)
+            now_utc = datetime.now(UTC).replace(tzinfo=None)
+            if exp < now_utc:
+                approval.status = "expired"
+                await db.commit()
+                raise AppException(
+                    f"Yêu cầu phê duyệt '{approval_id}' đã hết hạn.",
+                    code="approval_expired",
+                    status_code=403,
+                    details={"approval_id": approval_id, "expires_at": approval.expires_at.isoformat()},
+                )
 
         execution_result = await db.execute(
             select(WorkflowExecution).where(WorkflowExecution.id == execution_id)
@@ -890,6 +933,123 @@ class WorkflowService:
 
         await db.commit()
         return synced
+
+    async def get_workflow_assistants(
+        self, db: AsyncSession, workflow_id: str
+    ) -> WorkflowAssistantsUsageResponse:
+        """Query assistants currently bound to this workflow to audit shared mutable usage."""
+        from app.modules.assistants.models import AssistantModel
+
+        wf_res = await db.execute(
+            select(WorkflowDefinition).where(WorkflowDefinition.id == workflow_id)
+        )
+        wf = wf_res.scalar_one_or_none()
+        ownership = getattr(wf, "ownership", "shared") if wf else "shared"
+
+        asst_res = await db.execute(
+            select(AssistantModel).where(AssistantModel.workflow_id == workflow_id)
+        )
+        assistants = asst_res.scalars().all()
+
+        items = [
+            WorkflowAssistantItem(
+                id=a.id,
+                code=a.code,
+                name=a.name,
+                is_active=a.is_active,
+                workflow_ownership=getattr(a, "workflow_ownership", "private"),
+            )
+            for a in assistants
+        ]
+        return WorkflowAssistantsUsageResponse(
+            workflow_id=workflow_id,
+            ownership=ownership,
+            total_assistants=len(items),
+            assistants=items,
+        )
+
+    async def fork_workflow(
+        self,
+        db: AsyncSession,
+        source_workflow_id: str,
+        new_workflow_id: str,
+        new_name: str,
+        assistant_id: str | None = None,
+    ) -> WorkflowDefinitionResponse:
+        """Fork an existing or template workflow into an isolated private workflow for an assistant."""
+        existing = (
+            await db.execute(
+                select(WorkflowDefinition).where(WorkflowDefinition.id == new_workflow_id)
+            )
+        ).scalar_one_or_none()
+        if existing:
+            return WorkflowDefinitionResponse(
+                id=existing.id,
+                name=existing.name,
+                display_name=existing.display_name,
+                description=existing.description,
+                module_code=existing.module_code,
+                version=existing.version,
+                is_active=existing.is_active,
+                nodes_count=len(self._parse_spec_from_json(existing.dag_spec).nodes),
+                edges_count=len(self._parse_spec_from_json(existing.dag_spec).edges),
+                published_version_id=existing.published_version_id,
+                ownership=existing.ownership,
+                assistant_id=existing.assistant_id,
+            )
+
+        source_draft = (
+            await db.execute(
+                select(WorkflowDraft).where(WorkflowDraft.workflow_id == source_workflow_id)
+            )
+        ).scalar_one_or_none()
+        if source_draft:
+            dag_spec = WorkflowDagSpec.model_validate(source_draft.dag_spec)
+        else:
+            dag_spec = await self.get_workflow_spec(db, source_workflow_id)
+
+        serialized_spec = self._serialize_dag_spec(dag_spec)
+        new_record = WorkflowDefinition(
+            id=new_workflow_id,
+            name=new_workflow_id,
+            display_name=new_name,
+            description=f"Quy trình riêng tạo lập cho trợ lý {new_name}.",
+            module_code="custom",
+            version="1.0.0",
+            published_version_id=None,
+            ownership="private",
+            assistant_id=assistant_id,
+            is_active=True,
+            dag_spec=serialized_spec,
+        )
+        db.add(new_record)
+        await db.flush()
+
+        new_draft = WorkflowDraft(
+            workflow_id=new_workflow_id,
+            dag_spec=serialized_spec,
+            revision=1,
+            updated_by="Hệ thống (Fork)",
+        )
+        db.add(new_draft)
+        await db.commit()
+        await db.refresh(new_record)
+
+        return WorkflowDefinitionResponse(
+            id=new_record.id,
+            name=new_record.name,
+            display_name=new_record.display_name,
+            description=new_record.description,
+            module_code=new_record.module_code,
+            version=new_record.version,
+            is_active=new_record.is_active,
+            nodes_count=len(dag_spec.nodes),
+            edges_count=len(dag_spec.edges),
+            published_version_id=None,
+            ownership=new_record.ownership,
+            assistant_id=new_record.assistant_id,
+        )
+
 
 
 workflow_service = WorkflowService()

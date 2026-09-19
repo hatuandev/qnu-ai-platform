@@ -12,10 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundException
 from app.modules.evaluation.dataset_seeder import QNU_BENCHMARK_DATASETS
-from app.modules.evaluation.evaluator import tm08_evaluator
-from app.modules.evaluation.models import EvaluationRun, KnowledgeGapRecord
+from app.modules.evaluation.evaluator import LLMJudgeTM08Evaluator, get_evaluator, tm08_evaluator
+from app.modules.evaluation.models import EvaluationResultItem, EvaluationRun, KnowledgeGapRecord
 from app.modules.evaluation.schemas import (
     DatasetResponse,
+    EvaluationResultItemResponse,
+    EvaluationRunDetailResponse,
     EvaluationRunRequest,
     EvaluationRunResponse,
     KnowledgeGapResolveRequest,
@@ -78,14 +80,19 @@ class EvaluationService:
             test_cases = test_cases[: request.sample_size]
 
         run_id = str(uuid.uuid4())
+        eval_method = request.evaluation_method or "heuristic"
+        evaluator = get_evaluator(eval_method)
+
         logger.info(
             "evaluation_run_started",
             run_id=run_id,
             assistant_code=request.assistant_code,
+            method=eval_method,
             total_cases=len(test_cases),
         )
 
         item_scores: list[dict[str, Any]] = []
+        item_records: list[EvaluationResultItem] = []
         passed_count = 0
 
         for tc in test_cases:
@@ -94,6 +101,7 @@ class EvaluationService:
 
             actual_answer = ""
             actual_contexts: list[str] = []
+            execution_path = "assistant_workflow"
 
             # Execute real Assistant or RAG retrieval
             try:
@@ -111,6 +119,7 @@ class EvaluationService:
                     for c in chat_res.citations
                     if isinstance(c, dict) and c.get("quote")
                 ]
+                execution_path = "assistant_workflow"
             except Exception as chat_err:
                 logger.debug("assistant_chat_eval_fallback", error=str(chat_err))
                 try:
@@ -123,23 +132,55 @@ class EvaluationService:
                     )
                     actual_answer = rag_res.answer
                     actual_contexts = [c.quote for c in rag_res.citations if c.quote]
+                    execution_path = "rag_service_fallback"
                 except Exception:
                     actual_answer = ""
                     actual_contexts = []
+                    execution_path = "failed_no_response"
 
             actual_answer = actual_answer or ""
             actual_contexts = actual_contexts or []
 
-            eval_res = self.evaluator.evaluate_item(
-                query=query,
-                ground_truth=ground_truth,
-                answer=actual_answer,
-                contexts=actual_contexts,
-                keywords=tc.get("keywords"),
-            )
+            if isinstance(evaluator, LLMJudgeTM08Evaluator):
+                eval_res = await evaluator.evaluate_item_async(
+                    session=session,
+                    query=query,
+                    ground_truth=ground_truth,
+                    answer=actual_answer,
+                    contexts=actual_contexts,
+                    keywords=tc.get("keywords"),
+                )
+            else:
+                eval_res = evaluator.evaluate_item(
+                    query=query,
+                    ground_truth=ground_truth,
+                    answer=actual_answer,
+                    contexts=actual_contexts,
+                    keywords=tc.get("keywords"),
+                )
+
             item_scores.append(eval_res)
             if eval_res["passed"]:
                 passed_count += 1
+
+            item_record = EvaluationResultItem(
+                id=str(uuid.uuid4()),
+                run_id=run_id,
+                test_case_id=str(tc.get("id", f"tc_{uuid.uuid4().hex[:8]}")),
+                query=query,
+                generated_answer=actual_answer,
+                contexts=actual_contexts,
+                faithfulness_score=eval_res["faithfulness"],
+                answer_relevance_score=eval_res["answer_relevance"],
+                context_precision_score=eval_res["context_precision"],
+                is_hallucinated=eval_res["is_hallucinated"],
+                is_refusal=eval_res.get("is_refusal", False),
+                passed_all_criteria=eval_res["passed"],
+                execution_path=execution_path,
+                reasoning=eval_res.get("reasoning"),
+                created_at=datetime.now(UTC).replace(tzinfo=None),
+            )
+            item_records.append(item_record)
 
         total_cases = len(test_cases)
         pass_rate = round(passed_count / max(total_cases, 1), 3)
@@ -149,9 +190,9 @@ class EvaluationService:
         prec_avg = round(sum(s["context_precision"] for s in item_scores) / max(total_cases, 1), 3)
 
         meets_tm08 = (
-            faith_avg >= self.evaluator.FAITHFULNESS_THRESHOLD
-            and rel_avg >= self.evaluator.ANSWER_RELEVANCE_THRESHOLD
-            and prec_avg >= self.evaluator.CONTEXT_PRECISION_THRESHOLD
+            faith_avg >= evaluator.FAITHFULNESS_THRESHOLD
+            and rel_avg >= evaluator.ANSWER_RELEVANCE_THRESHOLD
+            and prec_avg >= evaluator.CONTEXT_PRECISION_THRESHOLD
             and pass_rate >= 0.80
         )
 
@@ -167,16 +208,19 @@ class EvaluationService:
             answer_relevance_avg=rel_avg,
             context_precision_avg=prec_avg,
             meets_tm08_standard=meets_tm08,
-            metadata_info={"item_count": total_cases},
+            evaluation_method=eval_method,
+            metadata_info={"item_count": total_cases, "evaluation_method": eval_method},
             created_at=datetime.now(UTC).replace(tzinfo=None),
             completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
 
         try:
             session.add(run_record)
+            for item in item_records:
+                session.add(item)
             await session.commit()
         except Exception as db_exc:
-            logger.warning("failed_to_save_evaluation_run", error=str(db_exc))
+            logger.warning("failed_to_save_evaluation_run_and_items", error=str(db_exc))
             await session.rollback()
 
         return EvaluationRunResponse(
@@ -191,7 +235,8 @@ class EvaluationService:
             answer_relevance_avg=rel_avg,
             context_precision_avg=prec_avg,
             meets_tm08_standard=meets_tm08,
-            metadata_info={"sample_size": total_cases},
+            evaluation_method=eval_method,
+            metadata_info={"sample_size": total_cases, "evaluation_method": eval_method},
             created_at=run_record.created_at,
             completed_at=run_record.completed_at,
         )
@@ -222,11 +267,100 @@ class EvaluationService:
                 answer_relevance_avg=r.answer_relevance_avg,
                 context_precision_avg=r.context_precision_avg,
                 meets_tm08_standard=r.meets_tm08_standard,
+                evaluation_method=getattr(r, "evaluation_method", "heuristic") or "heuristic",
                 metadata_info=r.metadata_info or {},
                 created_at=r.created_at,
                 completed_at=r.completed_at,
             )
             for r in runs
+        ]
+
+    async def get_run_detail(
+        self,
+        session: AsyncSession,
+        run_id: str,
+    ) -> EvaluationRunDetailResponse:
+        """Get comprehensive evaluation run details including all question items."""
+        run_stmt = select(EvaluationRun).where(EvaluationRun.id == run_id)
+        run_res = await session.execute(run_stmt)
+        run = run_res.scalar_one_or_none()
+        if not run:
+            raise NotFoundException(f"Không tìm thấy phiên kiểm định '{run_id}'")
+
+        items_stmt = (
+            select(EvaluationResultItem)
+            .where(EvaluationResultItem.run_id == run_id)
+            .order_by(EvaluationResultItem.created_at.asc())
+        )
+        items_res = await session.execute(items_stmt)
+        items = items_res.scalars().all()
+
+        return EvaluationRunDetailResponse(
+            id=run.id,
+            dataset_id=run.dataset_id,
+            assistant_code=run.assistant_code,
+            status=run.status,
+            total_cases=run.total_cases,
+            passed_cases=run.passed_cases,
+            pass_rate=run.pass_rate,
+            faithfulness_avg=run.faithfulness_avg,
+            answer_relevance_avg=run.answer_relevance_avg,
+            context_precision_avg=run.context_precision_avg,
+            meets_tm08_standard=run.meets_tm08_standard,
+            evaluation_method=getattr(run, "evaluation_method", "heuristic") or "heuristic",
+            metadata_info=run.metadata_info or {},
+            created_at=run.created_at or datetime.now(UTC).replace(tzinfo=None),
+            completed_at=run.completed_at,
+            items=[
+                EvaluationResultItemResponse(
+                    id=it.id,
+                    test_case_id=it.test_case_id,
+                    query=it.query,
+                    generated_answer=it.generated_answer,
+                    contexts=it.contexts or [],
+                    faithfulness_score=it.faithfulness_score,
+                    answer_relevance_score=it.answer_relevance_score,
+                    context_precision_score=it.context_precision_score,
+                    is_hallucinated=it.is_hallucinated,
+                    is_refusal=getattr(it, "is_refusal", False),
+                    passed_all_criteria=it.passed_all_criteria,
+                    execution_path=getattr(it, "execution_path", "assistant_workflow"),
+                    reasoning=it.reasoning,
+                )
+                for it in items
+            ],
+        )
+
+    async def get_run_items(
+        self,
+        session: AsyncSession,
+        run_id: str,
+    ) -> list[EvaluationResultItemResponse]:
+        """Get granular test items for an evaluation run."""
+        stmt = (
+            select(EvaluationResultItem)
+            .where(EvaluationResultItem.run_id == run_id)
+            .order_by(EvaluationResultItem.created_at.asc())
+        )
+        res = await session.execute(stmt)
+        items = res.scalars().all()
+        return [
+            EvaluationResultItemResponse(
+                id=it.id,
+                test_case_id=it.test_case_id,
+                query=it.query,
+                generated_answer=it.generated_answer,
+                contexts=it.contexts or [],
+                faithfulness_score=it.faithfulness_score,
+                answer_relevance_score=it.answer_relevance_score,
+                context_precision_score=it.context_precision_score,
+                is_hallucinated=it.is_hallucinated,
+                is_refusal=getattr(it, "is_refusal", False),
+                passed_all_criteria=it.passed_all_criteria,
+                execution_path=getattr(it, "execution_path", "assistant_workflow"),
+                reasoning=it.reasoning,
+            )
+            for it in items
         ]
 
     async def get_summary_metrics(self, session: AsyncSession | None = None) -> dict[str, Any]:

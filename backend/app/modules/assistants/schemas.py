@@ -110,6 +110,8 @@ class AssistantCreateRequest(BaseModel):
     category: str = Field("academic", min_length=2, max_length=50)
     system_prompt: str = Field(..., min_length=20, max_length=12000)
     workflow_id: str = Field(..., min_length=2, max_length=100)
+    published_workflow_version_id: str | None = Field(None, max_length=36)
+    workflow_ownership: str = Field("private", max_length=20)
     collection_id: str = Field(..., min_length=2, max_length=100)
     is_active: bool = True
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
@@ -123,6 +125,7 @@ class AssistantCreateRequest(BaseModel):
         "category",
         "system_prompt",
         "workflow_id",
+        "workflow_ownership",
         "collection_id",
         "tenant_id",
         mode="before",
@@ -141,6 +144,8 @@ class AssistantUpdateRequest(BaseModel):
     category: str | None = Field(None, min_length=2, max_length=50)
     system_prompt: str | None = Field(None, min_length=20, max_length=12000)
     workflow_id: str | None = Field(None, min_length=2, max_length=100)
+    published_workflow_version_id: str | None = Field(None, max_length=36)
+    workflow_ownership: str | None = Field(None, max_length=20)
     collection_id: str | None = Field(None, min_length=2, max_length=100)
     is_active: bool | None = None
     config: AssistantLifecycleConfig | None = None
@@ -152,6 +157,7 @@ class AssistantUpdateRequest(BaseModel):
         "category",
         "system_prompt",
         "workflow_id",
+        "workflow_ownership",
         "collection_id",
         mode="before",
     )
@@ -171,6 +177,8 @@ class AssistantResponse(BaseModel):
     category: str
     system_prompt: str
     workflow_id: str
+    published_workflow_version_id: str | None = None
+    workflow_ownership: str = "private"
     collection_id: str
     is_active: bool
     tenant_id: str
@@ -180,6 +188,15 @@ class AssistantResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AssistantForkWorkflowResponse(BaseModel):
+    assistant_code: str
+    assistant_name: str
+    previous_workflow_id: str
+    new_workflow_id: str
+    workflow_ownership: str
+    message: str
 
 
 class AssistantTemplateResponse(BaseModel):

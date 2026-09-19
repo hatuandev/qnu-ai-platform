@@ -279,6 +279,12 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
   });
   const definitions = definitionsQuery.data ?? [];
 
+  const assistantsUsageQuery = useQuery({
+    queryKey: ["workflow-assistants", selectedWorkflowId],
+    queryFn: () => workflowsApi.getWorkflowAssistants(selectedWorkflowId),
+    enabled: Boolean(selectedWorkflowId),
+  });
+
   useEffect(() => {
     if (pathWorkflowId && pathWorkflowId !== selectedWorkflowId) {
       setSelectedWorkflowId(pathWorkflowId);
@@ -536,6 +542,16 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
               </SelectContent>
             </Select>
 
+            {selectedDefinition?.ownership === "private" ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary shrink-0">
+                Riêng tư
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
+                Dùng chung
+              </span>
+            )}
+
             {isDirty && (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 animate-pulse shrink-0">
                 <AlertCircle className="size-3" />
@@ -673,6 +689,19 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Banner cảnh báo nếu workflow dùng chung cho nhiều trợ lý */}
+      {assistantsUsageQuery.data && assistantsUsageQuery.data.count > 1 && (
+        <div className="z-10 flex items-center gap-2 bg-amber-500/10 border-b border-amber-500/30 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-300 shrink-0">
+          <AlertCircle className="size-3.5 shrink-0" />
+          <span>
+            <strong>Quy trình dùng chung:</strong> Đang được liên kết bởi{" "}
+            {assistantsUsageQuery.data.count} trợ lý (
+            {assistantsUsageQuery.data.assistants.map((a) => a.name).join(", ")}
+            ). Mọi thay đổi xuất bản sẽ áp dụng cho tất cả trợ lý này.
+          </span>
+        </div>
+      )}
 
       {validationSummary && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/40 px-5 py-1.5 text-xs text-muted-foreground">

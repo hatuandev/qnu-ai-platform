@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.tools.registry import tool_registry
 from app.modules.tools.schemas import ToolExecuteRequest
@@ -195,23 +196,33 @@ class APICallerNodeHandler(BaseNodeHandler):
                 )
 
         # Fallback when context has no DB session (e.g., isolated in-memory unit tests)
-        if tool.requires_approval and not params.get("is_approved"):
-            logger.info(
-                "APICallerNodeHandler pausing for approval on node %s (tool: %s)",
-                node_spec.id,
-                clean_tool_name,
+        if context.db is None and settings.ENVIRONMENT not in ("test", "testing"):
+            raise AppException(
+                "Không thể thực thi Tool Gateway: Thiếu phiên kết nối cơ sở dữ liệu bảo mật (Database Session Missing).",
+                code="database_session_required",
+                status_code=500,
             )
-            return NodeExecutionResult(
-                node_id=node_spec.id,
-                status="paused_for_approval",
-                output={
-                    "checkpoint": node_spec.id,
-                    "action_required": f"Công cụ '{clean_tool_name}' yêu cầu phê duyệt nhân sự (Human-in-the-loop) trước khi thực thi.",
-                    "pending_approval": True,
-                    "tool_name": clean_tool_name,
-                    "parameters": params,
-                },
-            )
+
+        if tool.requires_approval:
+            is_approved = bool(params.get("is_approved"))
+            approved_by = params.get("approved_by")
+            if not is_approved or not approved_by:
+                logger.info(
+                    "APICallerNodeHandler pausing for approval on node %s (tool: %s)",
+                    node_spec.id,
+                    clean_tool_name,
+                )
+                return NodeExecutionResult(
+                    node_id=node_spec.id,
+                    status="paused_for_approval",
+                    output={
+                        "checkpoint": node_spec.id,
+                        "action_required": f"Công cụ '{clean_tool_name}' yêu cầu phê duyệt nhân sự (Human-in-the-loop) với danh tính người phê duyệt hợp lệ trước khi thực thi.",
+                        "pending_approval": True,
+                        "tool_name": clean_tool_name,
+                        "parameters": params,
+                    },
+                )
 
         try:
             tool_result = await tool.execute(

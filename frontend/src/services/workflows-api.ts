@@ -1,5 +1,7 @@
 /** Typed client for persisted workflow drafts, publications, execution, and approvals. */
 
+import type { WorkflowAssistantsUsageResponse } from "@/types/workflows";
+
 const WORKFLOWS_API_BASE_URL = "/platform/v1alpha1/workflows";
 
 export interface WorkflowNodeSpec {
@@ -41,6 +43,8 @@ export interface WorkflowDefinition {
   nodes_count: number;
   edges_count: number;
   published_version_id?: string | null;
+  ownership?: "private" | "shared";
+  assistant_id?: string | null;
 }
 
 export interface WorkflowDraft {
@@ -216,6 +220,12 @@ export const workflowsApi = {
     return requestWorkflow<WorkflowExecutionResponse>(
       `/executions/${executionId}/approvals/${approvalId}/decision`,
       jsonRequest("POST", payload)
+    );
+  },
+
+  getWorkflowAssistants(workflowId: string): Promise<WorkflowAssistantsUsageResponse> {
+    return requestWorkflow<WorkflowAssistantsUsageResponse>(
+      `/definitions/${encodeURIComponent(workflowId)}/assistants`
     );
   },
 };

@@ -107,7 +107,31 @@ export function resolveRoute(pathname: string, searchStr = ""): ResolvedRoute {
       shouldRedirect: false,
     };
   }
-  if (cleanPath === "/ocr" || cleanPath.startsWith("/ocr/")) {
+  // OCR Verification for specific document
+  if (cleanPath.startsWith("/knowledge/documents/") && cleanPath.endsWith("/ocr")) {
+    const docId = decodeURIComponent(
+      cleanPath.replace("/knowledge/documents/", "").replace(/\/ocr$/, "")
+    );
+    return {
+      viewType: "knowledge_ocr_lab",
+      canonicalPath: `/knowledge/documents/${encodeURIComponent(docId)}/ocr`,
+      searchParams,
+      params: { documentId: docId },
+      shouldRedirect: false,
+    };
+  }
+
+  if (cleanPath.startsWith("/ocr/") && cleanPath !== "/ocr/") {
+    const docId = decodeURIComponent(cleanPath.replace("/ocr/", ""));
+    return {
+      viewType: "knowledge_ocr_lab",
+      canonicalPath: `/knowledge/documents/${encodeURIComponent(docId)}/ocr`,
+      searchParams,
+      params: { documentId: docId },
+      shouldRedirect: true,
+    };
+  }
+  if (cleanPath === "/ocr") {
     return {
       viewType: "knowledge_ocr_lab",
       canonicalPath: "/knowledge/ocr-lab",

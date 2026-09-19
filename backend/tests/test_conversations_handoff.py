@@ -19,6 +19,7 @@ from app.modules.conversations.service import conversation_service
 @pytest.mark.asyncio
 async def test_record_message_creates_thread_and_message() -> None:
     db = AsyncMock()
+    db.add = MagicMock()
 
     # Thread lookup returns None (new thread)
     t_res = MagicMock()
@@ -43,6 +44,7 @@ async def test_record_message_creates_thread_and_message() -> None:
 @pytest.mark.asyncio
 async def test_record_message_detects_handoff_intent() -> None:
     db = AsyncMock()
+    db.add = MagicMock()
     t_res = MagicMock()
     t_res.scalar_one_or_none.return_value = None
     db.execute.return_value = t_res
@@ -60,6 +62,7 @@ async def test_record_message_detects_handoff_intent() -> None:
 @pytest.mark.asyncio
 async def test_staff_reply_updates_thread_status() -> None:
     db = AsyncMock()
+    db.add = MagicMock()
     timestamp = datetime.now(UTC).replace(tzinfo=None)
 
     thread = ConversationThreadModel(
@@ -93,6 +96,7 @@ async def test_staff_reply_updates_thread_status() -> None:
 @pytest.mark.asyncio
 async def test_update_thread_status_to_resolved() -> None:
     db = AsyncMock()
+    db.add = MagicMock()
     timestamp = datetime.now(UTC).replace(tzinfo=None)
 
     thread = ConversationThreadModel(

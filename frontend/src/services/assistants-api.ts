@@ -1,5 +1,6 @@
 import type {
   AssistantCloneRequest,
+  AssistantForkWorkflowResponse,
   AssistantItem,
   AssistantLifecycleConfig,
   AssistantPublishResponse,
@@ -222,6 +223,15 @@ export function rollbackAssistantVersion(
   );
 }
 
+export function forkAssistantWorkflow(reference: string): Promise<AssistantForkWorkflowResponse> {
+  return requestJson<AssistantForkWorkflowResponse>(
+    `${ASSISTANTS_URL}/${encodeURIComponent(reference)}/fork-workflow`,
+    {
+      method: "POST",
+    }
+  );
+}
+
 export const assistantsApi = {
   getAssistants: listAssistants,
   getAssistant,
@@ -240,4 +250,5 @@ export const assistantsApi = {
   cloneAssistant,
   getAssistantVersions,
   rollbackAssistantVersion,
+  forkAssistantWorkflow,
 };

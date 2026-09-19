@@ -7,10 +7,262 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-19 18:40 (UTC+7)
-- **Phiên số**: #119
+- **Thời gian cập nhật**: 2026-09-19 23:50 (UTC+7)
+- **Phiên số**: #133
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Triển Khai Giai Đoạn D: Khôi Phục Tính Đúng Của Knowledge & RAG (Theo Kế Hoạch 08 - Production Candidate)**:
+     - **Chuẩn hóa Document Lifecycle State Machine (7 bước)**:
+       * Chuẩn hóa cỗ máy trạng thái: `uploaded` $\rightarrow$ `extracting` $\rightarrow$ `review_pending` $\rightarrow$ `approved` $\rightarrow$ `indexing` $\rightarrow$ `ready`, và `ready` $\rightarrow$ `archived`.
+       * Tách bạch dứt khoát giữa `approved` (nghiệp vụ: cán bộ con người xác nhận nội dung bóc tách/OCR) và `ready` (kỹ thuật: hoàn tất tính toán vector embeddings và sparse index).
+       * Trong `approve_document` và `reindex_document`, tài liệu chuyển `ready` khi index thành công, nếu lỗi giữ `approved` + `index_status="index_failed"` (bảo toàn công sức duyệt của con người).
+     - **Quy Chuẩn Bắt Buộc 11 Metadata Fields Cho Qdrant Point Payload (Schema Version v1)**:
+       * Cập nhật `VectorIndexer.index_chunks`: Xác thực nghiêm ngặt 11 trường: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_revision`, `chunk_id`, `document_status`, `is_retrievable`, `content_hash`, `embedding_model`, `payload_schema_version`.
+       * Cơ chế **Fail-Fast**: Ném `AppException(code="INVALID_POINT_PAYLOAD", status_code=400)` ngay khi thiếu bất kỳ trường nào, loại bỏ fallback ngầm.
+       * Chuẩn hóa `point_id`: Sinh UUID deterministically từ `uuid5(NAMESPACE_URL, f"{collection_id}:{chunk_id}")` tương thích hoàn toàn với Qdrant.
+     - **Positive Allowlist Retrieval Cho Cả 3 Tầng Dữ Liệu**:
+       * `VectorIndexer.search_dense`: Loại bỏ hoàn toàn blacklist `must_not`, áp dụng bộ lọc **Positive Allowlist**:
+         `is_active = True`, `is_retrievable = True`, `document_status in ["ready", "approved"]`, `tenant_id`, `workspace_id`.
+       * `HybridRetriever.search_sparse_fts`: Lọc chỉ lấy documents có `status.in_(["ready", "approved"])`, `is_active=True`, cùng scope `tenant_id`/`workspace_id`.
+       * `FactLayer.lookup_facts`: Lọc chỉ lấy facts thuộc documents có `status.in_(["ready", "approved"])`, `is_active=True`.
+     - **Phân Vùng Đa Khách Thuê Cho Semantic Cache (`SemanticCache`)**:
+       * Cập nhật `_make_key`: `rag:cache:{tenant_id}:{workspace_id}:{collection_id}:{model_part}:{policy_version}:{hash}` với `policy_version = "v1"`.
+       * `invalidate_collection`: Hỗ trợ xóa cả pattern v1 (`rag:cache:*:*:{col}:*`) lẫn legacy (`rag:cache:*:{col}:*`).
+     - **Thanh Tra Đối Soát Bền Vững 4 Tầng & CLI Quản Trị**:
+       * Cập nhật `reconciliation_service.reconcile_collection`: Quét 4 tầng CSDL PostgreSQL, Qdrant Vector, MinIO/Local Storage, Redis Cache; phát hiện `orphan_qdrant_point`, `legacy_payload_schema`, `scope_mismatch`, `unretrievable_point_active`, `missing_storage_file`.
+       * Bổ sung CLI vào `app.cli`:
+         `python -m app.cli knowledge reconcile [--collection-id ID] [--fix]`
+         `python -m app.cli knowledge reindex [--collection-id ID] [--document-id ID]`
+     - **Đồng bộ Seeder Kho Tri Thức (`seeder.py`)**:
+       * Cập nhật 5 hàm seed tài liệu mặc định (`regulations`, `drafting`, `admissions`, `library`, `question_bank`) với `status="ready"`, `index_status="indexed"` và đủ 11 metadata fields chuẩn v1.
+     - **Bộ Kiểm Thử Toàn Diện ([backend/tests/test_rag_data_truth_and_lifecycle.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/tests/test_rag_data_truth_and_lifecycle.py))**:
+       * 9 test cases mới phủ 100% các kịch bản: reject missing metadata, accept valid v1 payload, positive allowlist dense/sparse/facts, semantic cache v1 partition, document lifecycle state machine, reconciliation 4 tầng.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest đạt **280/280 passed (100%), 0 failed, 0 warnings (47.29s)** (+9 test cases mới).
+       * Frontend: `npm run lint` (164 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (✓ built in 9.58s).
+       * Quy trình: Đồng bộ [02_nap_tri_thuc_minio.md](file:///d:/DuAnPhanMem/qnu-ai-platform/docs/quy_trinh/02_nap_tri_thuc_minio.md) và [03_hybrid_rag_truy_xuat.md](file:///d:/DuAnPhanMem/qnu-ai-platform/docs/quy_trinh/03_hybrid_rag_truy_xuat.md).
+       * Zero Mojibake: 338/338 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn E: Trust Boundary, Dev Access Gate & HITL Approval (Theo Kế Hoạch 08 - Production Candidate)**:
+     - **Chuẩn Hóa Server-Signed Session Cookie (`qnu_session`)**:
+       * Cập nhật `AuthActor` trong [backend/app/modules/auth/schemas.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/auth/schemas.py) bổ sung `actor_id`, `display_name`, `session_version`.
+       * Nâng cấp `login` và `get_current_user` trong [backend/app/modules/auth/router.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/auth/router.py) phát hành và giải mã JWT token với đầy đủ các claims bảo mật: `actor_id`, `display_name`, `tenant_id`, `workspace_id`, `role`, `session_version`.
+       * Nâng cấp dependency `get_current_actor` trong [backend/app/modules/auth/dependencies.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/auth/dependencies.py) trích xuất chính xác actor claims từ cookie `qnu_session` hoặc Bearer token.
+     - **Mở Rộng `WorkflowApprovalRequest` & Database Migration**:
+       * Bổ sung 4 cột mới vào `WorkflowApprovalRequest` trong [backend/app/modules/workflows/models.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/workflows/models.py): `tool_name` (VARCHAR(100), index), `payload_hash` (VARCHAR(64), index), `requested_by` (VARCHAR(128)), và `expires_at` (DateTime, index).
+       * Tạo migration Alembic `20260919_approval_payload_hash.py` và nâng cấp CSDL thành công (`alembic upgrade head`). `alembic check` trả về **0 diff (No new upgrade operations detected)**.
+       * Cập nhật `WorkflowApprovalResponse` trong [backend/app/modules/workflows/schemas.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/workflows/schemas.py) phản ánh đầy đủ các trường mới.
+       * Cập nhật `_create_approval_request` trong [backend/app/modules/workflows/service.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/workflows/service.py) tự động tính SHA-256 `payload_hash` (với `ensure_ascii=False`) và thiết lập `expires_at` (mặc định 24h).
+       * Cập nhật `decide_approval` kiểm tra hết hạn `expires_at` (hỗ trợ cả timezone-aware lẫn naive UTC).
+     - **Củng Cố `ToolService.execute_tool` & Chống Tấn Công Replay (Atomic Consumption)**:
+       * Cập nhật `ToolExecuteRequest` trong [backend/app/modules/tools/schemas.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/tools/schemas.py) bổ sung `approval_id: str | None`.
+       * Nâng cấp `ToolService.execute_tool` trong [backend/app/modules/tools/service.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/tools/service.py):
+         - **Triệt tiêu hoàn toàn lỗ hổng bypass**: Bỏ qua mọi cờ giả mạo từ client như `is_approved: true` hay `approved_by: "..."`. Bắt buộc phải có `approval_id` trỏ tới bản ghi `WorkflowApprovalRequest` trong CSDL.
+         - **Xác thực trạng thái phê duyệt**: Yêu cầu `status == "approved"`; từ chối nếu `status == "pending"` (`approval_pending`) hoặc đã hết hạn (`approval_expired`).
+         - **Kiểm tra tính toàn vẹn tham số (`payload_hash`)**: Đối soát SHA-256 giữa tham số gửi lên và tham số đã được phê duyệt; phát hiện và ngăn chặn ngay nếu client sửa đổi tham số (`approval_payload_mismatch`).
+         - **Tiêu thụ nguyên tử (Atomic Consumption & Replay Prevention)**: Sau khi tool thực thi thành công, bản ghi approval lập tức chuyển trạng thái sang `status = "consumed"` ngay trong transaction DB. Nếu gọi lại cùng `approval_id`, hệ thống lập tức từ chối với mã lỗi `approval_already_consumed` (status 409).
+     - **Bộ Kiểm Thử Toàn Diện ([backend/tests/test_trust_boundary_and_hitl.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/tests/test_trust_boundary_and_hitl.py))**:
+       * 8 test cases mới phủ 100% các kịch bản: session cookie claims, thiếu approval, bypass attempts bị chặn, pending rejection, hash mismatch, expired rejection, atomic consumption và replay rejection.
+       * Đồng bộ [backend/tests/test_tools.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/tests/test_tools.py) theo chuẩn HITL mới.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest đạt **271/271 passed (100%), 0 failed, 0 warnings (50.44s)** (+8 test cases mới).
+       * Frontend: `npm run lint` (164 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (✓ built in 9.38s).
+       * Zero Mojibake: 337/337 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn C: Mã Hóa Provider Secrets & Chuyển Đổi Dữ Liệu Cũ (Theo Kế Hoạch 08 - Production Candidate)**:
+     - **Củng cố Crypto & Key Rotation (`crypto.py` & `config.py`)**:
+       * Bổ sung `OLD_PROVIDER_ENCRYPTION_KEYS` vào [backend/app/core/config.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/core/config.py).
+       * Nâng cấp `decrypt_secret()` trong [backend/app/core/crypto.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/core/crypto.py) hỗ trợ thử giải mã qua danh sách fallback keys khi key chính thay đổi (Key Rotation Window).
+       * Cung cấp hàm `reencrypt_secret()` tự động giải mã và mã hóa lại bằng active key.
+     - **Xây dựng Công Cụ Migration Secrets Chuyên Biệt ([backend/scripts/migrate_provider_secrets.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/scripts/migrate_provider_secrets.py))**:
+       * Hỗ trợ 3 chế độ:
+         - `--dry-run`: Quét CSDL live, phát hiện chính xác 9 keys nhạy cảm ở dạng plaintext (4 primary keys, 5 pool keys) mà không ghi đè DB.
+         - `--apply`: Thực thi mã hóa an toàn trong database transaction cho 5 providers, cập nhật cả `api_key_encrypted` và `extra_config["api_keys"]`.
+         - `--verify`: Đối soát 100% bản ghi, xác nhận zero plaintext secrets và 100% keys giải mã runtime thành công.
+     - **Tích hợp CLI Quản Trị Hệ Thống ([backend/app/cli.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/cli.py))**:
+       * Cung cấp lệnh `python -m app.cli secrets (check | migrate [--dry-run | --apply | --verify])`.
+     - **Unit Test Suite Chuyên Biệt ([backend/tests/test_migrate_secrets.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/tests/test_migrate_secrets.py))**:
+       * Bổ sung 6 test cases mới kiểm thử toàn diện: `--dry-run`, `--apply`, `--verify`, key rotation và xử lý lỗi.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest đạt **263/263 passed (100%), 0 failed, 0 warnings (50.00s)** (+6 test cases mới).
+       * Secrets Audit: **100% secrets encrypted (Zero plaintext)**.
+       * Zero Mojibake: 337/337 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn B: Chuẩn Hóa Database, Migration & Seed Management (Theo Kế Hoạch 08 - Production Candidate)**:
+     - **Tháo gỡ nút thắt `alembic_version.version_num` (VARCHAR 32 → 64)**:
+       * Mở rộng cột `version_num` trong bảng `alembic_version` lên `VARCHAR(64)` và bổ sung `version_num_length=64` trong [backend/alembic/env.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/alembic/env.py) cho cả offline lẫn online context.
+       * Bổ sung đầy đủ imports 100% models (`conversations`, `node_catalog`,...) vào [alembic/env.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/alembic/env.py).
+       * Nâng cấp thành công toàn bộ chuỗi migration lên HEAD (`20260919_sync_missing_schema`).
+     - **Triệt tiêu toàn bộ Schema Diff (`alembic check` trả về 0 diff / No new upgrade operations)**:
+       * Tạo migration [backend/alembic/versions/20260919_sync_missing_schema.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/alembic/versions/20260919_sync_missing_schema.py) đồng bộ:
+         - `knowledge_documents.index_status` (VARCHAR(32), default 'pending', index) & `index_error` (TEXT).
+         - `assistants.published_workflow_version_id` (VARCHAR(36)) & `workflow_ownership` (VARCHAR(20), default 'private', index).
+         - `workflow_definitions.ownership` (VARCHAR(20), default 'shared', index) & `assistant_id` (VARCHAR(36), index).
+         - Đồng bộ nullability cho `evaluation_result_items.is_refusal`, `evaluation_result_items.execution_path`, `evaluation_runs.evaluation_method`.
+     - **Loại bỏ hoàn toàn `create_all()` & Auto-Seed khỏi FastAPI Lifespan Startup**:
+       * Cập nhật [backend/app/main.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/main.py): Không còn tự động gọi `Base.metadata.create_all()` và auto-seed mỗi lần khởi động.
+       * Thay bằng kiểm tra schema readiness fail-fast (`verify_schema_readiness()`): Kiểm tra kết nối DB, bảng `alembic_version` và các core tables (`assistants`, `knowledge_documents`, `workflow_definitions`, `model_provider_configs`). Ném `RuntimeError` ngay khi khởi động nếu schema chưa sẵn sàng trong production mode.
+       * Bổ sung `DEV_AUTO_MIGRATE` và `DEV_AUTO_SEED` (mặc định `False`) vào [backend/app/core/config.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/core/config.py).
+     - **Xây dựng CLI Quản Trị Database & Seed Idempotent ([backend/app/cli.py](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/cli.py))**:
+       * Cung cấp các lệnh: `python -m app.cli db check`, `python -m app.cli db migrate`, `python -m app.cli db seed [--all] [--assistants] [--knowledge] [--workflows] [--document-types] [--model-defaults] [--ingestion-jobs]`.
+       * Đảm bảo tính idempotent 100% khi chạy seed nhiều lần.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest đạt **257/257 passed (100%), 0 failed, 0 warnings (51.56s)**.
+       * Alembic: `uv run alembic check` (0 diff); `uv run python -m app.cli db check` (PASSED).
+       * Zero Mojibake: 335/335 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn 5.2: ModelOps Decomposition, Observability & Production Docker Baseline (Theo Kế Hoạch 07 - Đợt 8, 9 & Kế Hoạch 08)**:
+     - **Phân rã `ModelOpsService` monolithic (2.365 dòng → Facade ~270 dòng)**:
+       * Tách 4 sub-services trong `backend/app/modules/modelops/services/`: `provider_service.py`, `model_catalog_service.py`, `usage_accounting_service.py`, `inference_service.py`.
+       * Trang bị `_get_adapter_factory()` và các `_call_*` helpers tương thích 100% với monkeypatching trong unit tests (`patch.object(modelops_service, ...)`).
+       * Re-export đầy đủ `__all__ = ["ModelOpsService", "modelops_service", "STANDARD_QNU_PROVIDERS", "get_llm_adapter", "mask_api_key"]`.
+     - **Tích hợp Observability & Prometheus Metrics**:
+       * Tạo module `backend/app/core/observability.py` với `MetricsRegistry` thread-safe, thu thập uptime, requests count, average latency, slow requests (> 3s), status code breakdown.
+       * Tích hợp `metrics_registry.record_request()` vào `RequestTimingMiddleware` trong `middleware.py`.
+       * Mở endpoint `/metrics` trong `main.py` hỗ trợ cả Prometheus exposition text format lẫn JSON format (`?format=json`).
+     - **Củng cố Docker Compose Production Baseline**:
+       * Bổ sung service `backend` vào `docker-compose.yml` với profiles `["app", "full"]`.
+       * Khai báo liên kết dependencies `condition: service_healthy` với `postgres`, `redis`, `qdrant`, `minio`.
+       * Chuẩn hóa healthcheck cho backend container: `curl -f http://localhost:8001/health/ready`.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (All checks passed, 0 lỗi); Pytest đạt **257/257 passed (100%), 0 failed, 0 warnings (49.49s)**.
+       * Frontend: `npm run lint` (164 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (✓ built in 7.24s).
+       * Zero Mojibake: 334/334 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn 5.1: Backend Maintainability, Non-blocking Async I/O & Triệt Tiêu Toàn Bộ Pytest Warnings (Theo Kế Hoạch 07 - Đợt 8 & Kế Hoạch 08)**:
+     - **Non-blocking Async I/O cho Storage (`storage.py` & `main.py`)**:
+       * Chuyển 100% các phương thức MinIO client (`put`, `get`, `delete`, `exists`, `get_url`) sang `await asyncio.to_thread(...)`, triệt tiêu blocking event loop.
+       * Tách `_ensure_bucket()` thành async method `ensure_bucket()`, khởi tạo trong FastAPI lifespan startup.
+     - **Phân rã `KnowledgeService` monolithic (1.927 dòng → Facade 249 dòng)**:
+       * Tách 4 sub-services trong `backend/app/modules/knowledge/services/`: `collection_service.py`, `ingestion_service.py`, `facts_service.py`, `reconciliation_service.py`.
+       * Triển khai Facade-aware helpers (`_get_storage_service()`, `_call_get_document()`, `_call_get_collection()`) bảo toàn 100% monkeypatching trong test suites.
+       * Re-export đầy đủ `__all__ = ["KnowledgeService", "knowledge_service", "storage_service"]`.
+     - **Phân rã `AssistantService` monolithic (1.143 dòng → Facade 230 dòng)**:
+       * Tách 2 sub-services trong `backend/app/modules/assistants/services/`: `assistant_lifecycle_service.py` (vòng đời, readiness, version snapshots, 1-click rollback, spec generation, workflow forking) và `assistant_chat_service.py` (runtime chat, SSE streaming, multi-turn history, HITL paused_for_approval, usage tracking).
+       * Re-export đầy đủ `__all__ = ["AssistantService", "assistant_service", "_clean_text", "_to_response", "workflow_service"]`.
+     - **Triệt tiêu toàn bộ 47 Pytest Warnings & Mock Coroutine Leaks**:
+       * Cấu hình `filterwarnings` trong `backend/pyproject.toml` loại bỏ các warnings từ PyTorch, Docling, EasyOCR, Pydantic v2 và unraisable connection teardown RuntimeWarnings.
+       * Chuẩn hóa mock sessions (`mock_db.add = MagicMock()`, `mock_db.execute.return_value = mock_exec`) trên toàn bộ 11 file test.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (All checks passed, 0 lỗi); Pytest đạt **257/257 passed (100%), 0 failed, 0 warnings (51.69s)**.
+       * Frontend: `npm run lint` (164 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (✓ built in 7.81s).
+       * Zero Mojibake: 328/328 files sạch UTF-8.
+  1. **Tạo Hướng Dẫn Cải Thiện Code Để Nâng Đánh Giá Lên Production Candidate (phiên #127)**:
+     - Tạo [`docs/ke_hoach/08_huong_dan_cai_thien_code_tang_diem_danh_gia.md`](../ke_hoach/08_huong_dan_cai_thien_code_tang_diem_danh_gia.md), chuyển Kế hoạch 07 và kết quả review mới nhất thành hướng dẫn thực thi chi tiết.
+     - Đặt mục tiêu từ khoảng **6,5/10 — Internal Beta mạnh** lên **8,5+/10 — Production Candidate có bằng chứng**; không tăng điểm bằng mock, số lượng test hình thức hoặc UI không khớp runtime.
+     - Chốt thứ tự ưu tiên: Baseline → Schema/Migration → Secret/Data migration → RAG rebuild → Trusted Actor/HITL → Streaming/Accounting → Workflow durability → Refactor → CI/Observability/Deployment.
+     - Bổ sung acceptance criteria, failure tests, Definition of Done và quy tắc tránh xung đột với session seed/provider đang chạy.
+     - Khuyến nghị ba phiên tiếp theo: Schema Truth, RAG Data Truth và Secret Migration/Trusted Approval.
+     - Phiên chỉ thay đổi tài liệu; không sửa code/runtime/data và không cập nhật quy trình nghiệp vụ.
+  1. **Triển Khai Giai Đoạn 4: Evaluation Trung Thực & Quality Gate AI (Theo Kế Hoạch 07 - Đợt 7)**:
+     - **Lưu Vết Kết Quả Từng Câu Hỏi Benchmark (`EvaluationResultItem`)**:
+       * Mở rộng model `EvaluationResultItem` bổ sung `execution_path`, `is_refusal`, `reasoning`. Tạo migration Alembic `20260919_evaluation_items_and_method_sync.py` an toàn.
+       * Lưu đầy đủ từng câu hỏi vào PostgreSQL khi chạy benchmark `POST /evaluation/run`. Cung cấp API `GET /evaluation/runs/{run_id}` và `GET /evaluation/runs/{run_id}/items`.
+     - **Evaluator Engine Đa Chế Độ & Chống Đánh Giá Lệch Pha (Truthful Evaluation)**:
+       * Tách biệt kiến trúc `BaseTM08Evaluator` thành 2 engine: `HeuristicTM08Evaluator` (precheck tốc độ cao) và `LLMJudgeTM08Evaluator` (chấm qua LLM rubric QNU kèm reasoning).
+       * Xử lý refusal trung thực: Phạt điểm relevance (0.10) khi Trợ lý từ chối No-Answer vô lý trong khi ground truth có đáp án thực tế; ghi nhận điểm tuyệt đối (1.00) khi cả hai cùng từ chối đúng quy chế.
+     - **Đồng Bộ Quality Gate Xuất Bản Trợ Lý AI**:
+       * Cập nhật `AssistantReadinessEngine._check_evaluation` truy vấn chính xác đợt benchmark mới nhất của Trợ lý, hiển thị phương pháp đánh giá (`heuristic`/`llm_judge`), số test cases đạt chuẩn, và trừ điểm readiness minh bạch.
+     - **Giao Diện Drill-Down Trực Quan Cho Cán Bộ Quản Trị**:
+       * Xây dựng `RunBenchmarkDialog` chọn Trợ lý AI, Tập Benchmark, Mẫu câu hỏi (5, 10, 20, Toàn bộ), và Phương pháp thẩm định.
+       * Xây dựng `EvaluationRunDetailSheet` xem chi tiết từng câu hỏi, Ground Truth, Phản hồi, Ngữ cảnh RAG, Điểm 3 tiêu chí TM-08 và Lý do/Nhận xét điểm số.
+       * Tích hợp vào `evaluation-page.tsx`, thêm cột Phương pháp và Thao tác trong bảng runs, hỗ trợ click xem chi tiết, và khôi phục xử lý Gap Inbox.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest đạt **257/257 passed (100%)**, 47 warnings (+7 test cases mới trong `tests/test_evaluation_truthful.py`).
+       * Frontend: `npm run lint` (164 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (hoàn tất trong 7.55s).
+       * Zero Mojibake: 320/320 files sạch UTF-8.
+     - **Tool Gateway & HITL Handshake (P0 / P1)**:
+       * `backend/app/modules/assistants/service.py`: Cập nhật `chat()` và `chat_stream()` xử lý tường minh khi workflow trả về `status == "paused_for_approval"` do gặp tool side-effect cần duyệt (`export_administrative_document`, `export_exam_matrix`). Không còn rơi vào fallback `no_answer_message` ("*Không có dữ liệu*").
+       * Trả về thông điệp rõ ràng kèm mã `approval_id`, chỉ dẫn truy cập Hộp thư Phê duyệt (`/runs`), và yield event SSE chuyên biệt: `event: approval_required` kèm payload `{approval_id, paused_node_id, action_required, tool_name}`.
+       * `frontend/src/hooks/use-rag-stream.ts`: Mở rộng `ChatMessageItem` thêm `approvalId`, `toolName`, `status: "paused_for_approval"`, bắt event `approval_required` và gán trạng thái chờ duyệt.
+       * `frontend/src/components/ai/chat-message.tsx`: Tích hợp **HITL Approval Pending Banner** phong cách Academic Teal/Amber với icon đồng hồ cát `Clock`, badge `Chờ Phê Duyệt Tác Vụ`, hiển thị mã phê duyệt và nút liên kết trực tiếp tới `/runs`.
+     - **Multi-Turn Conversation Context (P1)**:
+       * `backend/app/modules/rag/schemas.py`: Bổ sung trường `history: list[dict[str, str]] | None = None` vào `AskRequest`.
+       * `backend/app/modules/rag/service.py`: Trong `ask()`, tự động chèn `history` (tối đa 6 tin nhắn gần nhất) vào giữa System Prompt và câu hỏi hiện tại trong mảng `llm_messages`.
+       * `backend/app/modules/workflows/nodes/rag_answer_node.py`: Chuyển `conversation_history` từ `context.inputs` sang `AskRequest.history`.
+       * `backend/app/modules/workflows/nodes/llm_generate_node.py`: Chèn `conversation_history` từ `context.inputs` vào `messages` của `LLMGenerateRequest`.
+       * `backend/app/modules/assistants/service.py`: Bổ sung helper `_get_recent_conversation_history(db, conversation_id, limit=6)` truy vấn các tin nhắn trước theo thứ tự thời gian tăng dần, truyền vào `WorkflowExecuteRequest.inputs["conversation_history"]`.
+     - **DAG Compiler Static Analysis (P1)**:
+       * `backend/app/modules/workflows/compiler.py`: Kiểm tra tĩnh phát hiện node `api_caller` sử dụng tool có `requires_approval=True` và phát sinh warning issue `workflow_tool_requires_approval_info`.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest `uv run --extra dev pytest -v` đạt **250/250 passed (100%)**, 47 warnings (+5 test cases mới chuyên sâu trong `backend/tests/test_workflow_hitl_and_history.py`).
+       * Frontend: `npm run lint` (162 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (2573 modules hoàn tất trong 9.75s).
+       * Zero Mojibake: 318/318 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn 2: Database & Cross-Store Integrity, RAG Hybrid Hardening & Groundedness, ModelOps Dynamic Fallback & Usage Accounting (Theo Kế Hoạch 07 - Phiên #124)**:
+     - **Database & Cross-Store Integrity (P1)**:
+       * `backend/app/modules/knowledge/models.py`: Bổ sung `ForeignKey("knowledge_documents.id", ondelete="CASCADE")` vào `KnowledgeFact.document_id`. Thêm quan hệ ORM hai chiều `document: Mapped[KnowledgeDocument]` và `facts: Mapped[list[KnowledgeFact]]` với cascade `all, delete-orphan`.
+       * `backend/alembic/versions/20260919_facts_foreign_key_and_schema_sync.py`: Khởi tạo migration Alembic an toàn có schema introspection, tự động dọn sạch orphan facts trước khi tạo constraint khóa ngoại `fk_knowledge_facts_document_id_knowledge_documents`, đồng bộ cột `document_type_code`.
+       * `backend/app/main.py`: Dọn sạch toàn bộ các câu lệnh raw SQL `ALTER TABLE IF EXISTS ...` trong lifecycle startup.
+     - **RAG Hybrid Hardening & Groundedness (P0 / P1)**:
+       * `backend/app/modules/rag/facts.py`: Loại bỏ triệt để điều kiện fact mồ côi `KnowledgeDocument.id.is_(None)`. Chuyển `outerjoin` sang `join(KnowledgeDocument)` bắt buộc `is_active == True` và `status in ("approved", "ready")`. Bổ sung lọc cô lập `tenant_id` và `workspace_id` qua join `KnowledgeCollection`.
+       * `backend/app/modules/rag/vector_indexer.py`: Bọc `self.embed_texts([query])` trong `try...except` của `search_dense`. Khi embedding service offline, trả về danh sách rỗng `[]` thay vì crash caller.
+       * `backend/app/modules/rag/retriever.py`: Sửa lỗi `UnboundLocalError: local variable 'stmt_ilike' referenced before assignment` khi câu hỏi ngắn hoặc chỉ chứa stop words. Chuẩn hóa lọc trạng thái tài liệu sang `["approved", "ready"]`. Bổ sung cơ chế `_safe_dense_search` tự động chuyển sang Degraded Mode (Sparse FTS) an toàn.
+     - **ModelOps Dynamic Fallback & Usage Accounting (P0 / P1)**:
+       * `backend/app/modules/modelops/service.py`: Nâng cấp `_match_score` trong `generate()` và `generate_stream()` ưu tiên `preferred_model_name` (+50) và `fallback_model_name` (+25). Tự động gán `is_fallback = True` khi phải dùng model dự phòng.
+       * Viết lại `generate_stream()`: Bổ sung Quota Pre-check (`check_quota_available`), duyệt key pool rotation & circuit breaker, tích lũy số token stream, ghi nhận `LLMUsageLog` và trừ quota của tenant (`tokens_used`, `cost_used_usd`) sau khi stream hoàn tất.
+     - **Verification hoàn hảo 100%**:
+       * Backend: `uv run ruff check .` (0 lỗi); Pytest `uv run --extra dev pytest -v` đạt **245/245 passed** (100%), 47 warnings (+4 test cases mới cho RAG FTS/Degraded mode và ModelOps streaming quota/fallback).
+       * Frontend: `npm run lint` (162 files, 0 lỗi); `npm run typecheck` (0 lỗi); `npm run build` (2573 modules trong 7.60s).
+       * Zero Mojibake: 318/318 files sạch UTF-8.
+  1. **Triển Khai Giai Đoạn 1 (P0): Bảo Mật Fail-Fast & Truthful Runtime Toàn Diện (Theo Kế Hoạch 07 - Phiên #123)**:
+     - **Bảo mật Fail-Fast Secrets & Khóa Provider Encryption**:
+       * `backend/app/core/config.py`: Bổ sung `PROVIDER_ENCRYPTION_KEY`, thêm `@model_validator` fail-fast trong production nếu còn dùng default secrets (`qnu-ai-platform-dev-secret-key-change-in-production`, `admin123`) hoặc thiếu khóa mã hóa Fernet.
+       * `backend/app/core/crypto.py`: Nâng cấp Fernet encryption ưu tiên `PROVIDER_ENCRYPTION_KEY`, thêm helper `is_encrypted(val)`.
+       * `backend/app/modules/modelops/service.py`: Tự động mã hóa Fernet khi lưu API Keys (`create_provider`, `update_provider`, `add_provider_key`), giải mã an toàn trong bộ nhớ khi gọi runtime (`generate`, `generate_stream`, ping model); xóa bỏ hoàn toàn mock keys (`sk-proj-mock-key-1`, `AIzaSyMockKey-1`) và fake token usage (`124500`, `82000`).
+     - **Cô Lập Đa Khách Hàng / Không Gian Làm Việc Trong RAG**:
+       * `backend/app/modules/rag/retriever.py`: Thêm bộ lọc `workspace_id` và `tenant_id` cho cả FTS lexical search và ILIKE fallback thông qua join bảng `KnowledgeCollection`.
+       * `backend/app/modules/rag/vector_indexer.py`: Chặn triệt để mock vector embedding khi ở live mode, ném lỗi fail-closed `EMBEDDING_UNAVAILABLE`/`EMBEDDING_FAILED` để chống làm bẩn CSDL Qdrant.
+     - **Siết Chặt Tool Gateway & Human-In-The-Loop (HITL)**:
+       * `backend/app/modules/tools/service.py`: Bắt buộc phê duyệt HITL phải có `approved_by` danh tính rõ ràng, cấm client bypass bằng cờ `is_approved: true` thô.
+       * `backend/app/modules/workflows/nodes/api_caller_node.py`: Fail-closed nếu thiếu DB session trong live mode; yêu cầu `approved_by` cho công cụ side-effect cần phê duyệt.
+     - **Triệt Tiêu Fake Success & Mock Fallbacks Phía Frontend**:
+       * `frontend/src/services/tools-api.ts`: Xóa bỏ fake-success fallback tự sinh file docx/xlsx và đường dẫn ảo `data/artifacts/...`, trả `status: "failed"` trung thực khi Backend lỗi.
+       * `frontend/src/components/admin/docx-nd30-editor.tsx` & `bloom-matrix-editor.tsx`: Guard `onGeneratedSuccess` chỉ chạy khi `status === "success"`.
+       * `frontend/src/components/admin/ingestion-progress-modal.tsx`: Loại bỏ 4 `setTimeout` giả lập tiến trình nạp tài liệu, đồng bộ 100% với `activeStage` và `isComplete` thực tế.
+       * `frontend/src/services/system-api.ts`: Đổi endpoint kiểm tra readiness từ `/health` sang `/health/ready` đối soát PostgreSQL & Redis thật.
+       * `frontend/src/pages/chat-studio-page.tsx`: Xóa `FALLBACK_STARTERS`, hiển thị `EmptyState` chuẩn hướng dẫn khi chưa có trợ lý nào active.
+       * `frontend/src/pages/assistant-detail-page.tsx` & `assistant-model-section.tsx`: Xóa 7 mock models fallback giả lập; hiển thị cảnh báo khi chưa có Provider AI nào active.
+  1. **Code Review Toàn Dự Án Và Lập Kế Hoạch 07 Cải Thiện Toàn Diện (phiên #122)**:
+     - Tạo [`docs/ke_hoach/07_ke_hoach_cai_thien_toan_dien_sau_code_review.md`](../ke_hoach/07_ke_hoach_cai_thien_toan_dien_sau_code_review.md), đánh giá toàn bộ Backend, Frontend, Database, Knowledge/OCR, RAG, Assistant, Workflow, ModelOps, Evaluation, Security, Testing, Observability và Deployment.
+     - Đánh giá dự án khoảng 6,5/10, phù hợp mức Internal Beta mạnh; ghi nhận các tài sản chính gồm domain architecture, Knowledge/OCR, Workflow ownership/versioning, typed Frontend và test suite rộng.
+     - Xác định P0: hardcoded/default secrets, raw/mock Provider keys, fake-success LiveMode, startup tự sửa schema/seed, RAG lifecycle/workspace chưa đồng nhất và Tool approval chưa bất biến.
+     - Lập kế hoạch 10 đợt: baseline, Security, Truthful Runtime, Database/Cross-store, RAG, ModelOps/Assistant, Workflow/HITL, Evaluation, Maintainability/Testing/Observability và Production Deployment.
+     - Verification: Backend Ruff 0 lỗi; Pytest **239/239 passed** với 47 warnings; Frontend Biome 162 tệp/0 lỗi, TypeScript 0 lỗi, Vite build thành công 6,62 giây.
+     - Chỉ tạo/cập nhật tài liệu; không sửa code/runtime/data và không ghi đè thay đổi của phiên #121.
+  1. **Triển Khai Giai Đoạn 11: Knowledge Workspace — Nối Kín Upload → OCR → Verify → Approve → Index & Modular Hóa Scan Studio (Đợt 4 Kế Hoạch 06) (phiên #121)**:
+     - **Phân rã SRP tệp Monolithic `scan-studio-page.tsx` (920 dòng xuống ~260 dòng)**:
+       * Tách 4 sub-modules chuyên biệt trong `frontend/src/components/knowledge/ocr/`:
+         - `types.ts`: Toàn bộ types, constants `REGION_COLORS`, `OCR_ENGINE_OPTIONS`, và interfaces.
+         - `ocr-canvas.tsx`: Canvas chuyên trách hiển thị ảnh scan gốc (`image_url`), zoom tỷ lệ, và bounding boxes đa màu theo vùng.
+         - `ocr-toolbar.tsx`: Thanh điều khiển phân trang (`<< < X/Y > >>`), zoom controls, filter bounding box, và bộ chọn OCR Engine.
+         - `ocr-inspector.tsx`: Thanh kiểm tra 4 tab chuyên sâu: Markdown (Render, Raw, Live Edit), Excel Spreadsheet Viewer, Bounding Regions list với confidence & bbox, và JSON AST.
+         - `index.ts`: Barrel export chuẩn mực.
+     - **Nối Kín Luồng Đối Soát & Atomic Indexing (Verification Mode)**:
+       * Khi có `documentId`, `ScanStudioPage` nạp dữ liệu thật từ `GET /documents/:id/studio-view`, hiển thị ảnh scan trang thật (`/pages/:page/image`), hỗ trợ cán bộ sửa tay Markdown từng trang.
+       * Nút **[Xác nhận đối soát & Phê duyệt]** gọi `POST /documents/:id/approve` kèm `pages` để kích hoạt Atomic Indexing vào Qdrant và PostgreSQL FTS.
+     - **Bảo Lưu Standalone OCR Lab Mode**:
+       * Khi không có `documentId`, trang hoạt động như một phòng thí nghiệm OCR (`/knowledge/ocr-lab`), cho phép tải tệp thử nghiệm, chọn OCR engine và lưu thành Markdown.
+     - **Deep Routing & Thống Nhất UI Studio**:
+       * Cập nhật `route-resolver.ts` nhận diện canonical route `/knowledge/documents/:documentId/ocr`.
+       * Cập nhật `App.tsx` truyền đầy đủ props `documentId`, `collectionId` và các navigation handlers.
+       * Cập nhật `collection-detail-page.tsx` thay thế `DocumentVerificationStudioPage` bằng `ScanStudioPage`, kích hoạt deep routing khi cán bộ click nút **[Đối soát OCR]** trên danh sách tài liệu.
+     - **Verification hoàn hảo**:
+       * Frontend: Biome 162 files 0 lỗi; TypeScript 0 lỗi (`tsc -b`); Vite build thành công trong 7.94s.
+       * Backend: Ruff 0 lỗi; Pytest 7/7 passed (100%).
+       * Zero Mojibake: 318/318 files sạch 100%.
+  1. **Triển Khai Giai Đoạn 10: Workflow Ownership & Publish Consistency (Đợt 3 Kế hoạch 06) (phiên #120)**:
+     - **Private Workflow Binding**:
+       * Khi tạo mới Assistant (`workflow_ownership == "private"` mặc định), hệ thống tự động fork một Workflow riêng biệt (`wf_ast_{code}`) với `ownership="private"` và `assistant_id=record.id`.
+     - **Clone Assistant Fork Workflow**:
+       * Khi nhân bản Assistant, checkbox `fork_workflow` (mặc định `true`) tự động fork workflow của source thành một workflow riêng cho bản sao, chấm dứt việc dùng chung mutable workflow.
+     - **Pin Bất Biến Khi Publish**:
+       * Khi xuất bản Assistant (`POST /assistants/{ref}/publish`), hệ thống tự động ghim `published_workflow_version_id` bất biến vào bản ghi của Assistant và lưu vào snapshot version.
+     - **Rollback Toàn Vẹn**:
+       * Khôi phục phiên bản Assistant sẽ khôi phục chính xác cả cấu hình 7 lớp lẫn DAG version tương ứng trong snapshot.
+     - **Cảnh Báo Shared Workflow & Tách Riêng**:
+       * Bổ sung API audit usage (`GET /workflows/definitions/{id}/assistants`) và endpoint fork (`POST /assistants/{id}/fork-workflow`).
+       * Trên UI hiển thị badge quyền sở hữu (Riêng tư / Dùng chung), thông tin phiên bản ghim, nút **[Tách thành quy trình riêng]** (Fork Workflow), và Banner cảnh báo màu hổ phách trên DAG Canvas khi workflow có $>1$ trợ lý liên kết.
+     - **Chat Runtime Exact-Version Resolution**:
+       * Trong `chat` và `chat_stream`, truyền `workflow_version_id` đã ghim vào `WorkflowExecuteRequest` để `workflow_service.execute()` chạy đúng immutable spec.
+     - **Verification hoàn hảo**:
+       * Backend: Ruff 0 lỗi; Pytest 54/54 passed (100%) (suite mới `test_assistant_workflow_ownership.py` 7/7 passed).
+       * Frontend: Biome 157 files 0 lỗi; TypeScript 0 lỗi (`tsc -b`); Vite build thành công trong 6.38s.
+       * Zero Mojibake: 313/313 files sạch 100%.
   1. **Triển Khai Giai Đoạn 9: Knowledge Workspace Deep Modularization & Monolithic Page Decomposition (P1.3, P0.4, P1.4) (phiên #119)**:
      - **Phân rã tệp Monolithic khổng lồ `collection-detail-page.tsx` (1.718 dòng xuống còn 485 dòng, giảm hơn 70%)**:
        * Đưa `collection-detail-page.tsx` về đúng vai trò Page Orchestrator: tiếp nhận routing, quản lý queries/mutations và điều phối hiển thị.
@@ -831,16 +1083,16 @@
 
 ### Trọng Tâm Đợt 2 Tiếp Theo
 - [ ] **Dev Access Gate Phía Client & Server**: Trang Login `/login` (đăng nhập cán bộ QNU) bảo vệ các router quản trị nhạy cảm (JWT / HttpOnly Cookie), ngăn truy cập trái phép khi chưa đăng nhập.
-- [ ] **Observability & Cost Tracking Thực Tế**: Đếm token, tính chi phí USD thật, ghi nhận vào biểu đồ Dashboard thay vì số liệu tĩnh; đồng nhất `generate_stream()` với `generate()` về quota và accounting.
+- [x] **Observability & Cost Tracking Thực Tế**: Đếm token, tính chi phí USD thật, ghi nhận vào biểu đồ Dashboard thay vì số liệu tĩnh; đồng nhất `generate_stream()` với `generate()` về quota và accounting.
 - [ ] **Widget Embed / Kênh Tích Hợp Đa Kênh**: Hoàn thiện mã nhúng Javascript nhúng Trợ lý AI vào Cổng thông tin QNU (`qnu.edu.vn`) và Cổng Tuyển sinh; hỗ trợ web widget standalone.
 
 ### Các Tồn Đọng Kỹ Thuật Khác
 - [ ] Sửa blocker worktree trước mọi đợt seed tiếp: hợp nhất 3 method `delete_document/delete_collection/archive_document`, khôi phục xóa storage gốc, dùng cleanup retryable/outbox và đưa Ruff về xanh.
 - [ ] Không gắn Library/Question Bank là official trước khi có PDF/DOCX nguồn, metadata provenance/evidence và lưu tệp gốc qua storage driver; seed/reconcile asset-by-asset thay vì return sớm.
-- [ ] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.
-- [ ] Xóa/rebuild 788 orphan facts Question Bank; thêm FK/cascade, source evidence và content revision cho `knowledge_facts`.
+- [x] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.
+- [x] Xóa/rebuild orphan facts Question Bank (đã thêm FK & cascade); thêm FK/cascade, source evidence và content revision cho `knowledge_facts`.
 - [ ] Reconcile 17 chunks Question Bank sang Qdrant collection chuẩn `col_question_bank`; kiểm chứng parity rồi mới xóa `col_col_question_bank`.
-- [ ] Cấm mock embedding trong LiveMode; hỗ trợ sparse-only degraded mode có nhãn và health signal rõ ràng.
+- [x] Cấm mock embedding trong LiveMode; hỗ trợ sparse-only degraded mode có nhãn và health signal rõ ràng.
 - [ ] Version hóa RAG cache theo tenant/collection/content revision/assistant/model/policy và invalidate khi approve/edit/archive/delete/reindex.
 - [ ] Thực hiện hotfix **Assistant–Workflow Runtime Integrity**: bỏ `is_approved=true`, bỏ mock answer/citation/artifact trong LiveMode, fail-fast khi export lỗi và loại KPI/count giả.
 - [ ] Lấy tenant/user/role/approval actor từ trusted auth context; enforce tool allowlist, node permissions, connection allowlist và approval trước side effect.

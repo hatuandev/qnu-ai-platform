@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,6 +15,9 @@ settings = get_settings()
 
 class StorageDriver(ABC):
     """Abstract base class for storage drivers."""
+
+    async def ensure_bucket(self) -> None:
+        """Ensure the storage container/bucket exists (called on startup)."""
 
     @abstractmethod
     async def save(self, relative_path: str, data: bytes) -> str:
@@ -46,29 +50,34 @@ class LocalStorageDriver(StorageDriver):
             raise ValueError(f"Path traversal detected: {relative_path}")
         return target
 
+    async def ensure_bucket(self) -> None:
+        await asyncio.to_thread(self.base_path.mkdir, parents=True, exist_ok=True)
+
     async def save(self, relative_path: str, data: bytes) -> str:
         target = self._resolve(relative_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
+        await asyncio.to_thread(target.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(target.write_bytes, data)
         logger.debug("Saved %d bytes locally to %s", len(data), target)
         return relative_path
 
     async def get(self, relative_path: str) -> bytes | None:
         target = self._resolve(relative_path)
-        if not target.is_file():
+        is_file = await asyncio.to_thread(target.is_file)
+        if not is_file:
             return None
-        return target.read_bytes()
+        return await asyncio.to_thread(target.read_bytes)
 
     async def delete(self, relative_path: str) -> bool:
         target = self._resolve(relative_path)
-        if target.is_file():
-            target.unlink()
+        is_file = await asyncio.to_thread(target.is_file)
+        if is_file:
+            await asyncio.to_thread(target.unlink)
             return True
         return False
 
     async def exists(self, relative_path: str) -> bool:
         target = self._resolve(relative_path)
-        return target.is_file()
+        return await asyncio.to_thread(target.is_file)
 
 
 class S3StorageDriver(StorageDriver):
@@ -97,21 +106,25 @@ class S3StorageDriver(StorageDriver):
             region_name=region,
             use_ssl=secure,
         )
-        self._ensure_bucket()
 
-    def _ensure_bucket(self) -> None:
-        try:
-            self.s3_client.head_bucket(Bucket=self.bucket)
-        except Exception:
+    async def ensure_bucket(self) -> None:
+        """Check or create S3 bucket asynchronously without blocking startup."""
+        def _check():
             try:
-                self.s3_client.create_bucket(Bucket=self.bucket)
-                logger.info("Created S3 bucket: %s", self.bucket)
-            except Exception as exc:
-                logger.warning("Could not auto-create S3 bucket %s: %s", self.bucket, exc)
+                self.s3_client.head_bucket(Bucket=self.bucket)
+            except Exception:
+                try:
+                    self.s3_client.create_bucket(Bucket=self.bucket)
+                    logger.info("Created S3 bucket: %s", self.bucket)
+                except Exception as exc:
+                    logger.warning("Could not auto-create S3 bucket %s: %s", self.bucket, exc)
+
+        await asyncio.to_thread(_check)
 
     async def save(self, relative_path: str, data: bytes) -> str:
         clean_key = relative_path.lstrip("/\\")
-        self.s3_client.put_object(
+        await asyncio.to_thread(
+            self.s3_client.put_object,
             Bucket=self.bucket,
             Key=clean_key,
             Body=data,
@@ -121,29 +134,41 @@ class S3StorageDriver(StorageDriver):
 
     async def get(self, relative_path: str) -> bytes | None:
         clean_key = relative_path.lstrip("/\\")
-        try:
-            response = self.s3_client.get_object(Bucket=self.bucket, Key=clean_key)
-            return response["Body"].read()
-        except Exception as exc:
-            logger.debug("S3 object not found %s: %s", clean_key, exc)
-            return None
+
+        def _fetch():
+            try:
+                response = self.s3_client.get_object(Bucket=self.bucket, Key=clean_key)
+                return response["Body"].read()
+            except Exception as exc:
+                logger.debug("S3 object not found %s: %s", clean_key, exc)
+                return None
+
+        return await asyncio.to_thread(_fetch)
 
     async def delete(self, relative_path: str) -> bool:
         clean_key = relative_path.lstrip("/\\")
-        try:
-            self.s3_client.delete_object(Bucket=self.bucket, Key=clean_key)
-            return True
-        except Exception as exc:
-            logger.error("Failed to delete S3 object %s: %s", clean_key, exc)
-            return False
+
+        def _delete():
+            try:
+                self.s3_client.delete_object(Bucket=self.bucket, Key=clean_key)
+                return True
+            except Exception as exc:
+                logger.error("Failed to delete S3 object %s: %s", clean_key, exc)
+                return False
+
+        return await asyncio.to_thread(_delete)
 
     async def exists(self, relative_path: str) -> bool:
         clean_key = relative_path.lstrip("/\\")
-        try:
-            self.s3_client.head_object(Bucket=self.bucket, Key=clean_key)
-            return True
-        except Exception:
-            return False
+
+        def _check():
+            try:
+                self.s3_client.head_object(Bucket=self.bucket, Key=clean_key)
+                return True
+            except Exception:
+                return False
+
+        return await asyncio.to_thread(_check)
 
 
 def get_storage_driver() -> StorageDriver:
@@ -161,3 +186,4 @@ def get_storage_driver() -> StorageDriver:
 
 
 storage_service = get_storage_driver()
+

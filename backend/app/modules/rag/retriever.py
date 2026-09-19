@@ -27,6 +27,7 @@ class HybridRetriever:
         query: str,
         top_k: int = 10,
         tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Perform lexical keyword search in PostgreSQL using full-text search with ts_rank and ILIKE fallback."""
         from app.modules.knowledge.models import KnowledgeCollection
@@ -45,13 +46,15 @@ class HybridRetriever:
                 .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
                 .where(
                     KnowledgeChunk.collection_id == collection_id,
-                    KnowledgeDocument.status.in_(["completed", "approved", "processed"]),
+                    KnowledgeDocument.status.in_(["approved", "ready"]),
                     KnowledgeDocument.is_active.is_(True),
                     ts_vector.op("@@")(ts_query),
                 )
             )
             if tenant_id:
                 stmt = stmt.where(KnowledgeCollection.tenant_id == tenant_id)
+            if workspace_id:
+                stmt = stmt.where(KnowledgeCollection.workspace_id == workspace_id)
             stmt = stmt.order_by(desc(rank_expr)).limit(top_k)
             res = await db.execute(stmt)
             scalars = res.scalars()
@@ -72,6 +75,7 @@ class HybridRetriever:
             if meaningful_tokens:
                 if not fts_chunks and len(meaningful_tokens) >= 2:
                     from sqlalchemy import and_
+
                     match_expr = and_(
                         KnowledgeChunk.content.ilike(f"%{meaningful_tokens[0]}%"),
                         KnowledgeChunk.content.ilike(f"%{meaningful_tokens[1]}%"),
@@ -83,25 +87,31 @@ class HybridRetriever:
                 stmt_ilike = (
                     select(KnowledgeChunk)
                     .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                    .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
                     .where(
                         KnowledgeChunk.collection_id == collection_id,
-                        KnowledgeDocument.status.in_(["completed", "approved", "processed"]),
+                        KnowledgeDocument.status.in_(["approved", "ready"]),
                         KnowledgeDocument.is_active.is_(True),
                         match_expr,
                     )
-                    .limit(top_k)
                 )
-            try:
-                res_ilike = await db.execute(stmt_ilike)
-                scalars_ilike = res_ilike.scalars()
-                for c in list(scalars_ilike.all()) if hasattr(scalars_ilike, "all") else []:
-                    if c.id not in seen_ids:
-                        chunks.append(c)
-                        seen_ids.add(c.id)
-                        if len(chunks) >= top_k:
-                            break
-            except Exception as e_ilike:
-                logger.debug("Sparse ILIKE fallback query failed: %s", e_ilike)
+                if tenant_id:
+                    stmt_ilike = stmt_ilike.where(KnowledgeCollection.tenant_id == tenant_id)
+                if workspace_id:
+                    stmt_ilike = stmt_ilike.where(KnowledgeCollection.workspace_id == workspace_id)
+                stmt_ilike = stmt_ilike.limit(top_k)
+
+                try:
+                    res_ilike = await db.execute(stmt_ilike)
+                    scalars_ilike = res_ilike.scalars()
+                    for c in list(scalars_ilike.all()) if hasattr(scalars_ilike, "all") else []:
+                        if c.id not in seen_ids:
+                            chunks.append(c)
+                            seen_ids.add(c.id)
+                            if len(chunks) >= top_k:
+                                break
+                except Exception as e_ilike:
+                    logger.debug("Sparse ILIKE fallback query failed: %s", e_ilike)
 
         results: list[dict[str, Any]] = []
         for idx, c in enumerate(chunks, start=1):
@@ -126,22 +136,32 @@ class HybridRetriever:
         top_k: int = 8,
         rerank_top_k: int = 5,
         tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker."""
+        async def _safe_dense_search() -> list[dict[str, Any]]:
+            try:
+                return await vector_indexer.search_dense(
+                    collection_id=collection_id,
+                    query=query,
+                    top_k=top_k,
+                    tenant_id=tenant_id,
+                    workspace_id=workspace_id,
+                )
+            except Exception as exc:
+                logger.warning("Dense search encountered error, falling back to sparse degraded: %s", exc)
+                return []
+
         # 1. Concurrent Dense & Sparse Search (Non-blocking asyncio.gather)
         dense_hits, sparse_hits = await asyncio.gather(
-            vector_indexer.search_dense(
-                collection_id=collection_id,
-                query=query,
-                top_k=top_k,
-                tenant_id=tenant_id,
-            ),
+            _safe_dense_search(),
             self.search_sparse_fts(
                 db=db,
                 collection_id=collection_id,
                 query=query,
                 top_k=top_k,
                 tenant_id=tenant_id,
+                workspace_id=workspace_id,
             ),
         )
 

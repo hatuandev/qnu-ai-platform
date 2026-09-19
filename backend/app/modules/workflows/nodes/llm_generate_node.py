@@ -31,10 +31,15 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             or context.inputs.get("message", "")
         )
 
-        messages = [
-            ChatMessage(role="system", content=system_prompt),
-            ChatMessage(role="user", content=user_message),
-        ]
+        messages = [ChatMessage(role="system", content=system_prompt)]
+        conv_history = context.inputs.get("conversation_history")
+        if conv_history and isinstance(conv_history, list):
+            for h_msg in conv_history[-6:]:
+                h_role = h_msg.get("role", "user")
+                h_text = h_msg.get("content", "")
+                if h_role in ("user", "assistant") and h_text:
+                    messages.append(ChatMessage(role=h_role, content=h_text))
+        messages.append(ChatMessage(role="user", content=user_message))
 
         gen_req = LLMGenerateRequest(
             messages=messages,
