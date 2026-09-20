@@ -166,6 +166,11 @@ class KnowledgeService:
     ) -> bytes:
         return await self._ingestion.render_page_image(db, document_id, page_number)
 
+    async def get_preview_pdf(
+        self, db: AsyncSession, document_id: str
+    ) -> tuple[bytes, str]:
+        return await self._ingestion.get_preview_pdf(db, document_id)
+
     async def _convert_office_to_pdf(self, file_bytes: bytes, file_name: str) -> bytes:
         return await self._ingestion._convert_office_to_pdf(file_bytes, file_name)
 
@@ -196,8 +201,11 @@ class KnowledgeService:
         page_blocks: dict,
         document_id: str,
         page_markdowns: dict[int, str] | None = None,
+        page_dimensions: dict[int, dict] | None = None,
     ) -> list[dict]:
-        return self._ingestion.build_studio_pages(chunks, page_blocks, document_id, page_markdowns)
+        return self._ingestion.build_studio_pages(
+            chunks, page_blocks, document_id, page_markdowns, page_dimensions
+        )
 
     async def prepare_ingestion(
         self,

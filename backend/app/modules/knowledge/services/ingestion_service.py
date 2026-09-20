@@ -557,6 +557,7 @@ class IngestionService:
         page_blocks: dict,
         document_id: str,
         page_markdowns: dict[int, str] | None = None,
+        page_dimensions: dict[int, dict] | None = None,
     ) -> list[dict]:
         """Pure builder: chunks + stored geometry -> per-page studio views."""
         by_page: dict[int, list[dict]] = {}
@@ -581,7 +582,21 @@ class IngestionService:
         page_numbers = sorted(set(by_page) | set(blocks_by_page)) or [1]
         is_clumped = len(page_numbers) > 1 and set(by_page.keys()) <= {1}
         pages: list[dict] = []
-        for page_number in page_numbers:
+        for p_idx, page_number in enumerate(page_numbers):
+            prev_boxes = pages[p_idx - 1]["bounding_boxes"] if p_idx > 0 and pages else []
+            prev_table_coords: dict[str, float] | None = None
+            for b in prev_boxes:
+                if b.get("type") == "table":
+                    coords = b.get("coordinates", {})
+                    y = float(coords.get("y", 0))
+                    h = float(coords.get("height", 0))
+                    if y + h >= 60.0:
+                        prev_table_coords = {
+                            "x": float(coords.get("x", 0)),
+                            "width": float(coords.get("width", 0)),
+                        }
+            prev_has_bottom_table = prev_table_coords is not None
+
             if page_markdowns and page_number in page_markdowns:
                 markdown = page_markdowns[page_number] or ""
             elif is_clumped and page_number in blocks_by_page:
@@ -601,25 +616,53 @@ class IngestionService:
             for idx, block in enumerate(blocks_by_page.get(page_number, []), start=1):
                 box_type = str(block.get("type", "text"))
                 coords = block.get("coordinates") or {}
+                bx_y = float(coords.get("y", 0))
+                bx_h = float(coords.get("height", 0))
+                bx_x = float(coords.get("x", 0))
+                bx_w = float(coords.get("width", 0))
+                snippet = str(block.get("content_snippet") or block.get("text") or "")[:160]
+
+                # Table continuation rescue: nếu là text nhưng ở đầu trang và là hàng bảng ngắt trang
+                has_tbl_signals = bool(
+                    re.search(r"\b7\d{6}\b", snippet)
+                    or re.search(
+                        r"\b(?:A00|A01|A02|B00|B08|C00|C01|D01|D07|D08|D14|D15)\b",
+                        snippet,
+                    )
+                )
+                if box_type == "text" and (
+                    (prev_has_bottom_table and bx_y <= 30.0 and (bx_h <= 15.0 or has_tbl_signals))
+                    or (bx_y <= 25.0 and bx_h <= 12.0 and has_tbl_signals)
+                ):
+                    box_type = "table"
+                    block_label = "Bảng dữ liệu (tiếp nối)"
+                    if prev_table_coords:
+                        bx_x = prev_table_coords["x"]
+                        bx_w = prev_table_coords["width"]
+                        bx_y = max(0.0, bx_y - 0.4)
+                        bx_h = bx_h + 0.8
+                else:
+                    block_label = str(block.get("label", f"Khối {idx}"))
+
                 boxes.append(
                     {
                         "id": f"box_{document_id}_p{page_number}_{idx}",
                         "page_number": page_number,
                         "type": box_type,
                         "coordinates": {
-                            "x": float(coords.get("x", 0)),
-                            "y": float(coords.get("y", 0)),
-                            "width": float(coords.get("width", 0)),
-                            "height": float(coords.get("height", 0)),
+                            "x": bx_x,
+                            "y": bx_y,
+                            "width": bx_w,
+                            "height": bx_h,
                         },
-                        "label": str(block.get("label", f"Khối {idx}")),
+                        "label": block_label,
                         "confidence": float(
                             block.get(
                                 "confidence",
                                 self.DEFAULT_BOX_CONFIDENCE.get(box_type, 0.90),
                             )
                         ),
-                        "content_snippet": str(block.get("content_snippet") or block.get("text") or "")[:160],
+                        "content_snippet": snippet,
                     }
                 )
             regions = [
@@ -635,6 +678,9 @@ class IngestionService:
                 for idx, box in enumerate(boxes, start=1)
             ]
             words = markdown.split() if markdown else []
+            dim = (page_dimensions or {}).get(page_number) or (page_dimensions or {}).get(str(page_number))
+            if not dim:
+                dim = {"width": 800, "height": 1131, "orientation": "portrait"}
             pages.append(
                 {
                     "page_number": page_number,
@@ -645,6 +691,7 @@ class IngestionService:
                     "image_url": None,
                     "bounding_boxes": boxes,
                     "regions": regions,
+                    "dimensions": dim,
                 }
             )
         return pages
@@ -742,8 +789,16 @@ class IngestionService:
                     pdf = fitz.open(stream=pdf_bytes, filetype=filetype)
                     detector = SmartLayoutDetector()
 
+                    page_dimensions_map: dict[str, dict] = {}
                     for p_idx, page in enumerate(pdf):
                         p_num = p_idx + 1
+                        page_w = float(page.rect.width)
+                        page_h = float(page.rect.height)
+                        page_dimensions_map[str(p_num)] = {
+                            "width": round(page_w, 1),
+                            "height": round(page_h, 1),
+                            "orientation": "landscape" if page_w > page_h else "portrait",
+                        }
                         page_text = page.get_text() or ""
                         cv_regions: list[dict] = []
 
@@ -904,6 +959,8 @@ class IngestionService:
         if extracted_blocks:
             meta = dict(doc.doc_metadata or {})
             meta["page_blocks"] = extracted_blocks
+            if "page_dimensions_map" in locals() and page_dimensions_map:
+                meta["page_dimensions"] = page_dimensions_map
             doc.doc_metadata = meta
             try:
                 db.add(doc)
@@ -961,11 +1018,13 @@ class IngestionService:
         )
         metadata = doc.doc_metadata or {}
         page_markdowns = metadata.get("page_markdowns") or None
+        page_dimensions = metadata.get("page_dimensions") or None
         pages = self.build_studio_pages(
             chunks=chunks,
             page_blocks=page_blocks,
             document_id=doc.id,
             page_markdowns=page_markdowns,
+            page_dimensions=page_dimensions,
         )
         total_pages = max(
             [p["page_number"] for p in pages] + [int(metadata.get("page_count", 0) or 0), 1]
@@ -979,8 +1038,67 @@ class IngestionService:
             "total_pages": total_pages,
             "file_size_bytes": doc.file_size_bytes or 0,
             "total_chunks": len(chunks),
+            "pdf_url": f"/platform/v1alpha1/knowledge/documents/{doc.id}/preview-pdf",
             "pages": pages,
         }
+
+    async def get_preview_pdf(
+        self, db: AsyncSession, document_id: str
+    ) -> tuple[bytes, str]:
+        """Return PDF bytes for studio preview. Auto-converts DOCX/images if needed."""
+        doc = await self._call_get_document(db, document_id)
+        if not doc.storage_path:
+            raise AppException(
+                f"Tài liệu '{document_id}' không có tệp lưu trữ.",
+                code="file_not_found",
+                status_code=404,
+            )
+        file_bytes = await _get_storage_service().get(doc.storage_path)
+        if not file_bytes:
+            raise AppException(
+                f"Không tìm thấy nội dung tệp tại '{doc.storage_path}'.",
+                code="storage_file_missing",
+                status_code=404,
+            )
+
+        file_type = (doc.file_type or "").lower()
+        file_name = doc.file_name or "document.pdf"
+
+        # 1. Đã là PDF thuần
+        if file_type == "pdf" or file_name.lower().endswith(".pdf"):
+            return file_bytes, file_name
+
+        # 2. File Office (Word DOCX, DOC, ODT, RTF)
+        if file_type in self.OFFICE_CONVERTIBLE or file_name.lower().endswith((".docx", ".doc", ".odt", ".rtf")):
+            cache_key = f"previews/{doc.id}/converted.pdf"
+            cached = await _get_storage_service().get(cache_key)
+            if cached:
+                return cached, file_name
+            try:
+                pdf_bytes = await self._convert_office_to_pdf(file_bytes, file_name)
+                try:
+                    await _get_storage_service().put(cache_key, pdf_bytes, "application/pdf")
+                except Exception as save_err:
+                    logger.debug("Failed caching converted PDF: %s", save_err)
+                return pdf_bytes, file_name
+            except Exception as conv_err:
+                logger.warning("Office to PDF conversion failed: %s", conv_err)
+                raise
+
+        # 3. File ảnh (PNG, JPG, JPEG, BMP, WEBP, TIFF) -> convert sang PDF 1 trang qua PyMuPDF
+        try:
+            import pymupdf as fitz
+            img_doc = fitz.open(stream=file_bytes, filetype=file_type or "png")
+            pdf_bytes = img_doc.convert_to_pdf()
+            img_doc.close()
+            return pdf_bytes, file_name
+        except Exception as img_err:
+            logger.warning("Image to PDF conversion failed: %s", img_err)
+            raise AppException(
+                f"Không thể chuyển đổi định dạng '{file_type}' sang PDF: {img_err}",
+                code="pdf_conversion_failed",
+                status_code=422,
+            )
 
     async def _convert_office_to_pdf(self, file_bytes: bytes, file_name: str) -> bytes:
         """Convert an office document to PDF bytes via Gotenberg LibreOffice."""

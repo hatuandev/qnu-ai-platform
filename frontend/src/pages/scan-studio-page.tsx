@@ -4,6 +4,7 @@ import {
   type OcrRegionFilter,
   type OcrRightTab,
   OcrToolbar,
+  type OcrViewLayoutMode,
   type OcrViewMode,
 } from "@/components/knowledge/ocr";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +40,6 @@ import {
   Check,
   Code,
   Loader2,
-  Scan,
   ShieldCheck,
   Upload,
 } from "lucide-react";
@@ -56,6 +56,78 @@ export interface ScanStudioPageProps {
   onApproveSuccess?: () => void;
 }
 
+function classifyStudioRegion(
+  text: string,
+  top: number,
+  height: number,
+  currentType?: string,
+  prevHasBottomTable = false
+): { type: string; label: string } {
+  const clean = text.trim();
+  const existingType = currentType?.toLowerCase();
+
+  // Giữ nguyên bảng và con dấu nếu backend đã định danh chuẩn
+  if (existingType === "table") {
+    return { type: "table", label: "Bảng dữ liệu" };
+  }
+  if (existingType === "stamp") {
+    return { type: "stamp", label: "Con dấu" };
+  }
+
+  // 1. Header (chỉ ở đầu trang <= 16% và BẮT ĐẦU bằng từ khóa hành chính / số hiệu)
+  if (top <= 16) {
+    if (
+      /^(?:bộ giáo dục|trường đại học|cộng hòa xã hội|độc lập\s*-\s*tự do|số\s*[:\/])/i.test(clean)
+    ) {
+      return { type: "header", label: "Phần đầu văn bản" };
+    }
+  }
+
+  // 2. Signature (chỉ ở cuối trang >= 65% và BẮT ĐẦU bằng chức danh người ký / nơi nhận)
+  if (top + height >= 68 || top >= 65) {
+    if (
+      /^(?:hiệu trưởng|kt\.\s*hiệu trưởng|phó hiệu trưởng|trưởng phòng|giám đốc|chủ tịch|tl\.\s*hiệu trưởng|nơi nhận\s*[:\/])/i.test(
+        clean
+      )
+    ) {
+      return { type: "signature", label: "Chữ ký / Nơi nhận" };
+    }
+  }
+
+  // 3. Title (tiêu đề số La Mã lớn, THÔNG BÁO, QUYẾT ĐỊNH, in hoa)
+  // 3.1. Số La Mã: "I. THÔNG TIN CHUNG", "II. TUYỂN SINH..."
+  if (/^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s+[A-ZÀ-Ỹ]/i.test(clean)) {
+    return { type: "title", label: "Tiêu đề" };
+  }
+  // 3.2. Tiêu đề văn bản chỉ đạo
+  if (/^(?:THÔNG BÁO|QUYẾT ĐỊNH|KẾ HOẠCH|QUY ĐỊNH|HƯỚNG DẪN)\b/i.test(clean)) {
+    return { type: "title", label: "Tiêu đề" };
+  }
+  // 3.3. Dòng in hoa toàn bộ ngắn (< 120 ký tự, có ít nhất 8 chữ cái)
+  const firstLine = clean.split("\n")[0].trim();
+  const letters = firstLine.replace(/[^a-zA-ZÀ-ỹ]/g, "");
+  if (letters.length >= 8 && letters.length <= 100 && firstLine.length <= 120) {
+    const upperCount = (letters.match(/[A-ZÀ-Ỹ]/g) || []).length;
+    if (upperCount / letters.length >= 0.8) {
+      return { type: "title", label: "Tiêu đề" };
+    }
+  }
+
+  // 4. Table continuation rescue (hàng bảng rớt sang trang sau do ngắt trang)
+  const hasTableSignals =
+    /\b7\d{6}\b/.test(clean) ||
+    /\b(?:A00|A01|A02|B00|B08|C00|C01|D01|D07|D08|D14|D15|H00|M00|M01|N00|T00|V00)\b/.test(clean);
+  if (
+    (prevHasBottomTable && top <= 30 && (height <= 15 || hasTableSignals)) ||
+    (top <= 25 && height <= 12 && hasTableSignals)
+  ) {
+    return { type: "table", label: "Bảng dữ liệu (tiếp nối)" };
+  }
+
+  // 5. Mặc định là Text (Bao gồm cả các đoạn văn xuôi, căn cứ, danh mục, thuyết minh)
+  return { type: "text", label: "Khối văn bản" };
+}
+
 function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioOCRDocument {
   return {
     filename: data.filename,
@@ -64,30 +136,133 @@ function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioO
     provider: "QNU Vision OCR",
     model: data.engine,
     latencyMs: 120,
-    pages: data.pages.map((p) => ({
-      pageNumber: p.page_number,
-      title: `Trang ${p.page_number}`,
-      isSigned: p.regions.some((r) => r.type === "signature"),
-      hasTable: p.regions.some((r) => r.type === "table"),
-      imageUrl:
-        p.image_url ||
-        `/platform/v1alpha1/knowledge/documents/${data.document_id}/pages/${p.page_number}/image`,
-      markdown: p.markdown_content,
-      rawText: p.raw_text,
-      regions: p.regions.map((r, idx) => ({
-        type: r.type,
-        label: r.title,
-        text: r.details,
-        top: 10 + ((idx * 60) % 600),
-        left: 10,
-        width: 780,
-        height: 50,
-        confidence: r.confidence,
-      })),
-      dimensions: { width: 800, height: 1131 },
-      wordCount: p.word_count,
-      lineCount: p.line_count,
-    })),
+    pdfUrl:
+      data.pdf_url || `/platform/v1alpha1/knowledge/documents/${data.document_id}/preview-pdf`,
+    pages: data.pages.map((p, pageIdx) => {
+      const prevPage = pageIdx > 0 ? data.pages[pageIdx - 1] : null;
+      let prevTableCoords: { left: number; width: number } | null = null;
+      if (prevPage) {
+        for (const b of prevPage.bounding_boxes || []) {
+          const bType = b.type?.toLowerCase();
+          const rawY = b.coordinates?.y ?? 0;
+          const rawH = b.coordinates?.height ?? 0;
+          const bottom = rawY > 100 ? ((rawY + rawH) / 1131) * 100 : rawY + rawH;
+          if (bType === "table" && bottom >= 60) {
+            const rawX = b.coordinates?.x ?? 0;
+            const rawW = b.coordinates?.width ?? 0;
+            const left = rawX > 100 ? (rawX / 800) * 100 : rawX;
+            const width = rawW > 100 ? (rawW / 800) * 100 : rawW;
+            prevTableCoords = { left, width };
+          }
+        }
+      }
+      const prevHasBottomTable = prevTableCoords !== null;
+
+      const isLandscapePage = p.dimensions ? p.dimensions.width > p.dimensions.height : false;
+      const pageBaseW = isLandscapePage ? 1131 : 800;
+      const pageBaseH = isLandscapePage ? 800 : 1131;
+
+      const hasBoundingBoxes = Array.isArray(p.bounding_boxes) && p.bounding_boxes.length > 0;
+      const mappedRegions: StudioOCRRegion[] = hasBoundingBoxes
+        ? p.bounding_boxes.map((b) => {
+            const rawX = b.coordinates?.x ?? 10;
+            const rawY = b.coordinates?.y ?? 10;
+            const rawW = b.coordinates?.width ?? 80;
+            const rawH = b.coordinates?.height ?? 8;
+
+            // Nếu tọa độ là pixel (> 100) thì quy đổi về %, nếu đã là % thì clamp [0, 100]
+            const left = Math.max(0, Math.min(98, rawX > 100 ? (rawX / pageBaseW) * 100 : rawX));
+            const top = Math.max(0, Math.min(98, rawY > 100 ? (rawY / pageBaseH) * 100 : rawY));
+            const width = Math.max(
+              2,
+              Math.min(100 - left, rawW > 100 ? (rawW / pageBaseW) * 100 : rawW)
+            );
+            const height = Math.max(
+              1.5,
+              Math.min(100 - top, rawH > 100 ? (rawH / pageBaseH) * 100 : rawH)
+            );
+
+            const classified = classifyStudioRegion(
+              b.content_snippet || b.label || "",
+              top,
+              height,
+              b.type,
+              prevHasBottomTable
+            );
+
+            const isContinuation = classified.label.includes("tiếp nối");
+            const finalLeft = isContinuation && prevTableCoords ? prevTableCoords.left : left;
+            const finalWidth = isContinuation && prevTableCoords ? prevTableCoords.width : width;
+            const finalTop = isContinuation ? Math.max(0, top - 0.4) : top;
+            const finalHeight = isContinuation ? height + 0.8 : height;
+
+            return {
+              type: classified.type,
+              label: b.label || classified.label,
+              text: b.content_snippet || "",
+              top: finalTop,
+              left: finalLeft,
+              width: finalWidth,
+              height: finalHeight,
+              confidence: b.confidence ?? 0.95,
+            };
+          })
+        : (p.regions || []).map((r, idx) => {
+            // Fallback an toàn: dàn đều các vùng trên trang với tọa độ % hợp lệ
+            const top = Math.min(88, 8 + idx * 9);
+            const left = 8;
+            const width = 84;
+            const height = 7;
+
+            const classified = classifyStudioRegion(
+              r.details || r.title || "",
+              top,
+              height,
+              r.type,
+              prevHasBottomTable
+            );
+
+            const isContinuation = classified.label.includes("tiếp nối");
+            const finalLeft = isContinuation && prevTableCoords ? prevTableCoords.left : left;
+            const finalWidth = isContinuation && prevTableCoords ? prevTableCoords.width : width;
+            const finalTop = isContinuation ? Math.max(0, top - 0.4) : top;
+            const finalHeight = isContinuation ? height + 0.8 : height;
+
+            return {
+              type: classified.type,
+              label: r.title || classified.label,
+              text: r.details || "",
+              top: finalTop,
+              left: finalLeft,
+              width: finalWidth,
+              height: finalHeight,
+              confidence: r.confidence ?? 0.95,
+            };
+          });
+
+      return {
+        pageNumber: p.page_number,
+        title: `Trang ${p.page_number}`,
+        isSigned:
+          (p.regions || []).some((r) => r.type === "signature") ||
+          (p.bounding_boxes || []).some((b) => b.type === "signature"),
+        hasTable:
+          (p.regions || []).some((r) => r.type === "table") ||
+          (p.bounding_boxes || []).some((b) => b.type === "table"),
+        imageUrl:
+          p.image_url ||
+          `/platform/v1alpha1/knowledge/documents/${data.document_id}/pages/${p.page_number}/image`,
+        markdown: p.markdown_content,
+        rawText: p.raw_text,
+        regions: mappedRegions,
+        dimensions: p.dimensions || {
+          width: isLandscapePage ? 1131 : 800,
+          height: isLandscapePage ? 800 : 1131,
+        },
+        wordCount: p.word_count,
+        lineCount: p.line_count,
+      };
+    }),
   };
 }
 
@@ -115,7 +290,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
   const [showBoxes, setShowBoxes] = useState<boolean>(true);
   const [regionFilter, setRegionFilter] = useState<OcrRegionFilter>("all");
   const [selectedRegion, setSelectedRegion] = useState<StudioOCRRegion | null>(null);
-  const [rightTab, setRightTab] = useState<OcrRightTab>("markdown");
+  const [rightTab, setRightTab] = useState<OcrRightTab>("entities");
   const [markdownViewMode, setMarkdownViewMode] = useState<OcrViewMode>("rendered");
 
   // Editable markdown state per page
@@ -313,16 +488,36 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
     }
   };
 
+  const [layoutMode, setLayoutMode] = useState<OcrViewLayoutMode>("continuous");
+
+  const handleDownloadResults = () => {
+    if (!doc) return;
+    const fullMarkdown = doc.pages
+      .map((p) =>
+        editedPages[p.pageNumber] !== undefined ? editedPages[p.pageNumber] : p.markdown
+      )
+      .join("\n\n---\n\n");
+    const blob = new Blob([fullMarkdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(doc.filename || "ocr_export").replace(/\.[^/.]+$/, "")}_boc_tach.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Đã tải xuống tệp Markdown bóc tách!");
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] bg-background">
-      {/* 1. Header Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+      {/* 1. Header Toolbar: Chuẩn Mistral Document AI + QNU Academic Teal */}
+      <div className="flex flex-wrap items-center justify-between px-4 py-2 border-b border-border bg-card shrink-0 gap-2">
+        {/* Left: Document Info & KPI Pills */}
+        <div className="flex items-center gap-3 min-w-0">
           {isDocumentVerificationMode && (
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 text-muted-foreground hover:text-foreground shrink-0"
+              className="size-8 text-muted-foreground hover:text-foreground shrink-0 rounded-md"
               onClick={() => {
                 if (onBack) {
                   onBack();
@@ -339,34 +534,41 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
             </Button>
           )}
 
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Scan className="size-4" />
+          {/* PDF Document Icon */}
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary font-mono text-[11px] font-bold">
+            PDF
           </div>
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-foreground truncate">
-                {isDocumentVerificationMode
-                  ? "Đối Soát & Hiệu Chỉnh OCR"
-                  : "Phòng Thí Nghiệm OCR (Lab)"}
-              </h1>
-              <Badge
-                variant={isDocumentVerificationMode ? "default" : "outline"}
-                className="text-[10px] uppercase font-bold"
-              >
-                {isDocumentVerificationMode ? "Verification Mode" : "Lab Sandbox"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {doc?.filename
-                ? `Tài liệu: ${doc.filename} (${doc.size || `${totalPages} trang`})`
-                : "Phân tích cấu trúc phân cấp, nhận diện bảng biểu và bóc tách tài liệu scan."}
-            </p>
+          <div className="min-w-0 flex items-center gap-2">
+            <h1
+              className="text-sm font-semibold text-foreground truncate max-w-[280px] sm:max-w-md"
+              title={doc?.filename || "Tài liệu OCR"}
+            >
+              {doc?.filename || "Tài liệu bóc tách"}
+            </h1>
+            <Badge
+              variant={isDocumentVerificationMode ? "info" : "secondary"}
+              className="text-[10px] font-medium shrink-0"
+            >
+              {isDocumentVerificationMode ? "Đối soát OCR" : "Phòng Lab"}
+            </Badge>
           </div>
         </div>
 
-        {/* Right Actions */}
+        {/* Right Actions: Download & Approve */}
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleDownloadResults}
+            disabled={!doc}
+            className="size-8 text-muted-foreground hover:text-foreground"
+            title="Tải xuống tài liệu Markdown"
+            aria-label="Tải xuống Markdown"
+          >
+            <Upload className="size-3.5 rotate-180" />
+          </Button>
+
           {isDocumentVerificationMode ? (
             <Button
               size="sm"
@@ -411,17 +613,6 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
                 <BookOpen className="size-3.5" />
                 <span>Lưu vào Kho</span>
               </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCodeModalOpen(true)}
-                className="size-8 text-muted-foreground hover:text-foreground"
-                title="Mã API tích hợp"
-                aria-label="Mã API tích hợp"
-              >
-                <Code className="size-4" />
-              </Button>
             </>
           )}
         </div>
@@ -451,10 +642,10 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
         </div>
       )}
 
-      {/* 2. Main Studio Split Grid */}
+      {/* 2. Main Studio Split Grid: 60% Canvas / 40% Inspector */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 min-h-0 overflow-hidden">
-        {/* Left Column: Canvas & Toolbar (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-xs min-h-0">
+        {/* Left Column: Canvas & Floating Pill Toolbar (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-xs min-h-0 relative">
           <OcrToolbar
             currentPage={currentPage}
             totalPages={totalPages}
@@ -465,8 +656,11 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
             onZoomIn={() => setZoomLevel((prev) => Math.min(200, prev + 15))}
             onZoomOut={() => setZoomLevel((prev) => Math.max(50, prev - 15))}
             onZoomReset={() => setZoomLevel(100)}
+            onFitWidth={() => setZoomLevel(90)}
             showBoxes={showBoxes}
             onToggleBoxes={setShowBoxes}
+            layoutMode={layoutMode}
+            onToggleLayoutMode={setLayoutMode}
             regionFilter={regionFilter}
             onRegionFilterChange={setRegionFilter}
             selectedEngine={selectedEngine}
@@ -476,12 +670,16 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
 
           <OcrCanvas
             pageData={currentPageData}
+            allPages={doc?.pages || []}
+            layoutMode={layoutMode}
             zoomLevel={zoomLevel}
             showBoxes={showBoxes}
             filteredRegions={filteredRegions}
             selectedRegion={selectedRegion}
             onSelectRegion={setSelectedRegion}
             documentTitle={doc?.filename}
+            pdfUrl={doc?.pdfUrl}
+            onPageChange={handlePageChange}
           />
         </div>
 
@@ -489,6 +687,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
         <div className="lg:col-span-5 flex flex-col min-h-0 overflow-hidden">
           <OcrInspector
             pageData={currentPageData}
+            allPages={doc?.pages || []}
             rightTab={rightTab}
             onTabChange={setRightTab}
             markdownViewMode={markdownViewMode}
@@ -500,6 +699,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
             onCopyContent={handleCopyContent}
             isCopied={isCopied}
             isEditable={isDocumentVerificationMode}
+            onJumpToPage={handlePageChange}
           />
         </div>
       </div>

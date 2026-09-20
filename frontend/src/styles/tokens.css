@@ -47,6 +47,24 @@
   --control-height: 2.25rem; /* 36px */
   --control-height-sm: 2rem; /* 32px */
   --table-row-height: 2.75rem; /* 44px */
+
+  --motion-fast: 140ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --ease-out-standard: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-standard: cubic-bezier(0.7, 0, 0.84, 0);
+
+  --font-size-page-title: 1.875rem;
+  --font-size-page-title-mobile: 1.625rem;
+  --font-size-section-title: 1.125rem;
+  --font-size-body: 0.875rem;
+  --font-size-control: 0.875rem;
+  --font-size-table: 0.875rem;
+  --font-size-table-header: 0.8125rem;
+  --font-size-caption: 0.875rem;
+  --font-size-field-help: 0.8125rem;
+  --font-size-supporting: 0.875rem;
+  --font-size-metadata: 0.6875rem;
 }
 
 /* Chế độ Dark Mode */

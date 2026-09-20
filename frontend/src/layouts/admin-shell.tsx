@@ -16,12 +16,13 @@ interface AdminShellProps {
 }
 
 export function getLayoutVariant(pathname: string): LayoutVariant {
-  // Full-bleed: Canvas studio, Workflows builder, OCR lab split-screen, Chat playground, Conversations desk
+  // Full-bleed: Canvas studio, Workflows builder, OCR lab split-screen & verification studio, Chat playground, Conversations desk
   if (
     pathname === "/canvas" ||
     pathname.startsWith("/canvas/") ||
     (pathname.startsWith("/workflows/") && pathname !== "/workflows") ||
     pathname.startsWith("/knowledge/ocr-lab") ||
+    pathname.includes("/ocr") ||
     pathname.includes("/playground") ||
     pathname.includes("/workflow") ||
     pathname.startsWith("/conversations")

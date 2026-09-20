@@ -35,3 +35,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Hướng dẫn cải thiện code QNU AI Platform để đạt Production Candidate.
    - **Mục tiêu**: Chuyển Kế hoạch 07 thành hướng dẫn triển khai có thứ tự, nguyên tắc code, acceptance criteria, failure tests, Definition of Done và ma trận bằng chứng để nâng mức đánh giá từ khoảng 6,5/10 lên 8,5+/10.
    - **Trạng thái**: Hướng dẫn thực thi; ưu tiên ba phiên đầu là Schema Truth, RAG Data Truth và Secret/Trusted Approval.
+
+7. [**`09_danh_gia_sau_vibe_coding_va_huong_dan_cai_thien.md`**](./09_danh_gia_sau_vibe_coding_va_huong_dan_cai_thien.md):
+   - **Tên tài liệu**: Đánh giá sau vibe coding và hướng dẫn cải thiện tiếp.
+   - **Mục tiêu**: Kiểm chứng việc triển khai Kế hoạch 08 bằng code, test, migration và dữ liệu live; chỉ ra khoảng cách giữa unit test và runtime, đồng thời lập lộ trình P0/P1 để đạt Production Candidate thật.
+   - **Trạng thái**: Đánh giá độc lập hoàn tất; điểm hiện tại đề xuất 7,1/10, ưu tiên sửa reconciliation, RAG live data, worker payload v1 và ModelOps fake-success.

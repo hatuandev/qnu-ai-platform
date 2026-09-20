@@ -94,6 +94,15 @@ frontend/src/
 - **Microcopy & Citations**: 11px (`text-[11px]`, `text-muted-foreground`).
 - **Page Titles**: 20px–24px (`text-xl` hoặc `text-2xl`, `font-semibold`, `tracking-tight`).
 
+### 3.5. Quy Chuẩn Lucide Icons & Cấm Tuyệt Đối Emoji Trong Giao Diện Quản Trị
+- **100% `lucide-react`**: Toàn bộ icon trong toàn bộ dự án bắt buộc phải nhập từ thư viện `lucide-react`. Tuyệt đối cấm tự tạo icon SVG ad-hoc hoặc sử dụng thư viện icon khác (FontAwesome, Material Icons, v.v.).
+- **Tuyệt đối CẤM Emoji trong UI**: Cấm sử dụng các emoji ký tự (`⚡`, `📖`, `🔤`, `💾`, `⚙️`, `✓`, `❌`, `🔥`, v.v.) trên các thành phần giao diện quản trị (topbar, buttons, badges, KPI chips, table cells). Mọi chỉ số và hành động phải dùng icon Lucide thanh lịch tương ứng (`Zap`, `BookOpen`, `Type`, `HardDrive`, `Cpu`, `Check`, `X`, `Flame`).
+- **Quy chuẩn kích thước & độ dày nét (Stroke & Size)**:
+  - Navigation / Sidebar items: `size-4` (16px), `strokeWidth={1.5}` hoặc `1.75`.
+  - Compact toolbar / Table actions: `size-3.5` (14px).
+  - Feature headers / Hero tiles: `size-5` (20px) đặt trong container nền bo tròn `size-8 rounded-lg bg-primary/10 text-primary`.
+- **Màu sắc ngữ nghĩa**: Luôn áp dụng semantic classes (`text-muted-foreground`, `text-primary`, `text-success`, `text-destructive`).
+
 ---
 
 ## 4. Quy Tắc Biome Linter & Chất Lượng Mã Nguồn

@@ -7,10 +7,106 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-19 23:50 (UTC+7)
-- **Phiên số**: #133
+- **Thời gian cập nhật**: 2026-09-20 15:20 (UTC+7)
+- **Phiên số**: #149
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Khắc Phục Triệt Để Lỗi Che Khuất Lề Trang PDF Trong Scan Studio Bằng Cơ Chế Fit-To-Width Đồng Bộ & Chống Flexbox Centering Scroll Inaccessibility (phiên #149)**:
+     - **Nguyên nhân gốc rễ lỗi che lề**: Trang A4 nằm ngang ở trang 3 bị cắt mất phần bên trái (mất cột "TT") và bên phải (mất cột "Sản phẩm kết quả") do `<Page width={1131} />` vẽ to hơn container 700px và `overflow-hidden` xén 2 bên. Đồng thời `items-center` trên scroll container khiến lề trái bị đẩy vào tọa độ âm khi nội dung lớn hơn container (Flexbox centering scroll inaccessibility).
+     - **Cơ chế Fit-To-Width Đồng Bộ**: Sử dụng `ResizeObserver` đo chính xác `containerWidth`, tính toán `pageRenderWidth = Math.round((idealBaseWidth * zoomLevel) / 100)` với `idealBaseWidth = isLandscape ? Math.min(containerWidth, 1200) : Math.min(containerWidth, 800)`. Khóa đồng bộ chiều rộng giữa `page-wrapper`, `page-canvas` và `<Page width={pageRenderWidth} />`.
+     - **Chống lỗi Scroll Inaccessibility**: Bọc nội dung trong `<div className="w-fit min-w-full flex flex-col items-center">`. Khi nhỏ hơn khung thì căn giữa; khi lớn hơn khung thì bắt đầu từ 0 và cuộn ngang xem trọn vẹn 100% từ lề trái sang lề phải.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 9.61s.
+  2. **Nâng Cấp Trình Xem Tài Liệu Tương Tác Visual Document AI Bằng react-pdf (Mozilla PDF.js) & Tự Động Hóa Pipeline Word DOCX (phiên #148)**:
+     - **react-pdf v9 Engine**: Thay thế thẻ `<img>` bằng `react-pdf` (`<Document>`, `<Page>`), render tài liệu vector sắc nét vô cực trực tiếp trên trình duyệt bằng Web Workers, tự động xoay trang A4 ngang/dọc theo `originalWidth/Height`.
+     - **Bảo toàn 100% Visual Document AI**: Lớp Bounding Boxes ngữ nghĩa (hộp cam `table`, tím `text`, xanh `title`) phủ bên trên với `pointer-events-none` cho container và `pointer-events-auto` cho từng box; Two-Way Sync mượt mà với Inspector.
+     - **Selectable Text Layer**: Bật `renderTextLayer={true}` cho phép bôi đen copy chữ/số trực tiếp trên từng ô bảng của PDF gốc.
+     - **Word DOCX Auto-Convert Pipeline**: Backend cung cấp endpoint `GET /documents/{id}/preview-pdf` tự động chuyển đổi file DOCX sang PDF qua Gotenberg/LibreOffice, lưu cache và stream cho Scan Studio dùng chung một trình xem duy nhất.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 9.47s.
+  2. **Tự Động Nhận Diện & Thích Ứng Khổ Giấy A4 Nằm Ngang (Landscape) & Đứng (Portrait) Trong Scan Studio (phiên #147)**:
+     - **Bản chất Chế độ Review**: Khẳng định Scan Studio không phải là iframe PDF thuần mà là Visual Document AI Studio (như Mistral OCR Playground / AWS Textract) phục vụ đối soát, gán nhãn thực thể Bounding Boxes và phê duyệt Human-in-the-loop.
+     - **Nguyên nhân lỗi méo ảnh**: Khung giấy trước đó bị gán cứng tỷ lệ A4 đứng `aspect-[1/1.414]` và ép `object-fill`, khiến các trang bảng biểu phụ lục nằm ngang (trang 3-22) bị bóp dẹp chiều ngang và kéo dài chiều dọc.
+     - **Cơ chế Dynamic Aspect-Ratio & Orientation Matching**:
+       * Tự động đo đạc `naturalWidth/Height` từ ảnh thực tế để xác định `isLandscape`, tính `aspectRatio` động (`Math.SQRT2` cho Landscape, `1/Math.SQRT2` cho Portrait).
+       * Khung giấy `page-canvas` áp dụng `style={{ aspectRatio: `${aspectRatio}` }}` linh hoạt.
+       * Tự động mở rộng độ rộng hiển thị `baseWidth * Math.SQRT2` khi là trang Landscape, giúp bảng biểu dàn trải thênh thang như file gốc.
+       * Thẻ `<img>` dùng `object-contain w-full h-full`, triệt tiêu 100% hiện tượng méo ảnh.
+       * Backend (`ingestion_service.py`) lưu và trả về `page_dimensions` từ `page.rect`.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 6.36s.
+  2. **Kế Thừa Tọa Độ Hình Học Bảng Đáy Trang Trước Cho Hàng Bảng Tiếp Nối (Table Geometry Inheritance & Full Bounding Box Coverage - phiên #146)**:
+     - **Nguyên nhân gốc rễ**: Sau khi cứu được hàng ngắt trang `Tiếng Trung | Ngôn ngữ Trung Quốc | 7220204` ở trang 14 thành nhãn `table`, Bounding Box chỉ bao quanh phần chữ (text glyphs) do `get_text("blocks")` chỉ đo khung chữ, không đo được viền kẻ bảng và padding ô bảng.
+     - **Cơ chế Table Geometry Inheritance**:
+       * Kế thừa trực tiếp `left` (`x`) và `width` từ bảng ở đáy trang trước (`prev_table_coords`), do các bảng ngắt trang trong văn bản hành chính luôn duy trì cùng độ rộng và căn lề giữa các trang.
+       * Mở rộng nhẹ trục dọc `top - 0.4%`, `height + 0.8%` để bao trọn cả đường kẻ viền ngang trên và dưới của ô bảng.
+       * Triển khai đồng bộ ở cả Backend (`ingestion_service.py`) và Frontend (`scan-studio-page.tsx`).
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 7.17s.
+  2. **Triển Khai Cơ Chế Cứu Bảng Nối Trang (Multi-Page Table Continuation Rescue - phiên #145)**:
+     - **Nguyên nhân gốc rễ**: Các hàng mồ côi (Orphan Rows) bị rớt sang trang sau khi ngắt trang (như `Tiếng Trung | Ngôn ngữ Trung Quốc | 7220204` ở trang 14) bị thuật toán PyMuPDF `find_tables()` bỏ qua do thiếu dòng tiêu đề và số hàng < 2, dẫn đến bị gán nhãn nhầm thành `text` (tím).
+     - **Cơ chế Table Continuation Rescue**:
+       * Backend (`blocks.py`, `ingestion_service.py`): Nhận diện mối liên hệ ngắt trang giữa bảng ở đáy trang trước (`bottom >= 60%`) và hàng dữ liệu ở đầu trang sau (`top <= 30%`), đối soát tín hiệu mã ngành 7 chữ số `\b7\d{6}\b`, mã tổ hợp môn $\rightarrow$ tự động giải cứu thành `type: "table"`, `label: "Bảng dữ liệu (tiếp nối)"`.
+       * Frontend (`scan-studio-page.tsx`): Bổ sung `prevHasBottomTable` và logic Table Continuation Rescue trong `classifyStudioRegion` $\rightarrow$ dữ liệu hiện tại đang hiển thị lập tức chuyển sang viền cam `table` chuẩn Mistral.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 6.76s.
+  2. **Khắc Phục Triệt Để Lỗi Sụp Đổ Chiều Cao (Height Collapse) & Thêm Shimmer Loading Cho OCR Canvas (phiên #144)**:
+     - **Khóa tỷ lệ khổ A4 `aspect-[1/1.414]`**: Bổ sung `aspect-[1/1.414] overflow-hidden` cho khung `page-canvas`, chấm dứt hoàn toàn hiện tượng khi ảnh chưa nạp xong làm khung bị xẹp về 0px khiến các Bounding Boxes bị dồn ép thành vạch chỉ đen trên nền tối.
+     - **Shimmer Loading Placeholder**: Hiển thị placeholder nhẹ nhàng (`animate-pulse`) với thông báo `Đang nạp trang X...` trong lúc ảnh scan đang tải về từ Backend; khi ảnh tải xong, ảnh hiện mượt mà (`transition-opacity duration-300`).
+     - **Verification**: Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 6.39s.
+  2. **Loại Bỏ Phân Loại List Tràn Lan & Chuẩn Hóa Nhãn Nhận Diện Mistral OCR Không Đè Chữ (phiên #143)**:
+     - **Loại bỏ phân loại `list`**: Xóa bỏ hoàn toàn nhãn `list` màu xanh ngọc, đưa toàn bộ văn bản, danh mục, căn cứ, phương thức về `text` (tím pastel) như ban đầu chuẩn Mistral Document AI OCR Playground.
+     - **Siết chặt `header`**: Chỉ nhận diện ở đỉnh trang ($\le 16\%$) và BẮT ĐẦU bằng từ khóa hành chính/số hiệu; chấm dứt hoàn toàn việc gán nhầm các đoạn ở giữa trang (như "Phương thức 2... theo quy định của Bộ Giáo dục và Đào tạo") thành header.
+     - **Siết chặt `title`**: Chỉ nhận diện số La Mã lớn (`I. THÔNG TIN CHUNG`, `II. TUYỂN SINH...`), loại văn bản (`THÔNG BÁO`, `QUYẾT ĐỊNH`), hoặc dòng in hoa ngắn.
+     - **Pill Badge ngoài viền hộp**: Đặt Pill Badge ở `-top-[13px] left-[-1px]` với kích thước siêu nhỏ `text-[8px] h-[13px] px-1 py-0 leading-[13px]`, bảo đảm 100% không bao giờ đè lên chữ bên trong hộp (`ÔNG TIN CHUNG`, `YỂN SINH`).
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 6.56s.
+  2. **Phân Loại Ngữ Nghĩa Khối Văn Bản & Khắc Phục Lỗi Đè Chữ Của Pill Badge Chuẩn Mistral (phiên #142)**:
+     - **Heuristic Classifier Backend & Frontend**: Triển khai `classify_text_block` (`blocks.py`) và `classifyStudioRegion` (`scan-studio-page.tsx`), tự động phân loại chính xác các khối văn bản thành:
+       * `title` (xanh dương): số La Mã (`I.`, `II.`), `Điều \d+`, `Chương \d+`, văn bản in hoa $\ge 75\%$, hoặc tiêu đề ngắn kết thúc bằng `:`.
+       * `list` (xanh ngọc): dấu `+` (như `+ Phương thức 1`, `+ Phương thức 2`), `-`, `•`, số thứ tự `1.`, `2.`, `a)`, `b)`.
+       * `header` (xám): tọa độ đầu trang $\le 18\%$ và chứa từ khóa hành chính ("BỘ GIÁO DỤC", "CỘNG HÒA XÃ HỘI...", "TRƯỜNG ĐẠI HỌC...", "Số:", "ngày...tháng...năm").
+       * `signature` (hồng đỏ): tọa độ cuối trang $\ge 65\%$ và chứa chức danh ("HIỆU TRƯỞNG", "TRƯỞNG PHÒNG", "GIÁM ĐỐC", "Nơi nhận:").
+       * `text` (tím): các đoạn văn xuôi mặc định.
+     - **Khắc phục triệt để lỗi đè chữ của Pill Badge**: Chuyển vị trí từ `-top-2.5 left-1` (nhô lên ngoài khung che mất dòng chữ của khối bên trên) sang `top-0 left-0 rounded-tl-[1px] rounded-br-[3px] text-[9px] px-1.5 py-0.5` nằm gọn gàng bên trong góc trên bên trái khung viền.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi, `pytest tests/test_knowledge.py` **31/31 passed (100%)**; Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 12.15s.
+  2. **Bổ Sung Màu Nền Nhẹ (Subtle Pastel Tint) Cho Bounding Boxes Chuẩn Mistral Document AI (phiên #141)**:
+     - **Màu nền nhẹ cho từng loại khối**: Khai báo `bg` dạng `rgba(..., 0.07-0.08)` trong `REGION_COLORS` (`types.ts`) cho từng thực thể (`header` xám khói, `title` xanh dương pastel, `text` tím pastel, `table` cam pastel, `signature` hồng đỏ pastel).
+     - **Áp dụng trực tiếp vào Canvas**: Gán `backgroundColor` vào inline style của Bounding Box trong `ocr-canvas.tsx`, giúp người dùng phân biệt trực quan các vùng văn bản bằng mảng màu nhẹ nhàng, tự nhiên mà không che mờ chữ scan.
+     - **Verification**: Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 8.85s.
+  2. **Khắc Phục Triệt Để Lỗi AttributeError 'tuple' object has no attribute 'x0' Khi Upload PDF (phiên #140)**:
+     - **Nguyên nhân**: Khi tải lên PDF chứa bảng biểu qua endpoint `/platform/v1alpha1/knowledge/collections/{id}/upload`, `tab.bbox` trả về dạng `tuple` 4 phần tử. Việc truy cập trực tiếp `.x0` tại dòng 137 của `blocks.py` gây lỗi crash 500 `AttributeError: 'tuple' object has no attribute 'x0'`.
+     - **Giải pháp**: Xây dựng hàm helper `_get_bbox_coords` an toàn đa hình xử lý cả `fitz.Rect`, `tuple`, `list`, `dict`; chuẩn hóa danh sách `table_bboxes` dạng `tuple[float, float, float, float]` nhất quán; unpack `(tx0, ty0, tx1, ty1)` khi kiểm tra va chạm vùng bảng biểu.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi, `uv run --extra dev pytest tests/test_knowledge.py -v` **31/31 passed (100%)**.
+  2. **Tinh Giản Giao Diện OCR Studio & Chuẩn Hóa Nhận Dạng Theo Mistral Document AI (phiên #139)**:
+     - **Decluttering & Giải phóng không gian**: Lược bỏ các tính năng nhỏ thừa thãi chiếm dụng không gian (bỏ dải KPI meta strip, bỏ nút `<> Mã API`, thu gọn nút `Tải xuống` thành icon button nhỏ gọn); tập trung vào nút hành động chính `[Xác nhận đối soát & Phê duyệt]`.
+     - **Xóa bỏ dải đen đầu trang giấy**: Bỏ dải đen ngang chứa dòng chữ `Trang 1 / 351 từ` trong `ocr-canvas.tsx`, giúp trang scan A4 nổi bật tự nhiên và phẳng phiu trên nền tối `#18181b`.
+     - **Chuẩn hóa Bounding Boxes chuẩn Mistral**: Thay thế cơ chế ẩn nhãn cũ bằng **Pill Badge nhãn hiển thị liên tục (`opacity-100`)** ở góc trên bên trái từng hộp (`-top-2.5 left-1`); chữ thường, font monospace (`header`, `title`, `text`, `table`), viền mảnh 1.5px và nền trong suốt không che chữ.
+     - **Tinh giản Toolbar Canvas**: Thu gọn còn 3 cụm căn giữa tối giản như Mistral (`[ < ] 1 / 14 [ > ] | [ - ] 100% [ + ] | [ Khung scan ]`); bỏ toggle chế độ xem, bỏ dropdown lọc vùng và dropdown engine.
+     - **Tinh giản Cột Inspector**: Chỉ giữ lại 3 tab thiết yếu (Thực thể, Markdown và Bảng tính); xóa bỏ hoàn toàn tab Regions và JSON AST.
+     - **Verification**: Frontend `npm run lint` 165 files 0 lỗi/cảnh báo, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 9.07s.
+  2. **Chuẩn Hóa Design System UI & Lucide Icons Toàn Diện Cho OCR Studio (phiên #138)**:
+     - **Quy Chuẩn Lucide Icons & Triệt Tiêu Emoji**: Cập nhật `AGENTS.md` (Mục 4.8) và skill `qnu-frontend-architect` (Mục 3.5), cấm tuyệt đối Emoji (`⚡`, `📖`, `🔤`, `💾`, `⚙️`) trên toàn bộ giao diện quản trị; thay thế toàn bộ Emoji trên KPI meta strip của `scan-studio-page.tsx` bằng các Lucide icons chuyên nghiệp: `Zap`, `FileText`, `Type`, `HardDrive`, `Cpu`.
+     - **Docked Sub-Header Toolbar**: Chuyển `OcrToolbar` thành Docked Sub-Header Toolbar cố định trên đỉnh Canvas (`h-10 border-b border-border bg-card dark:bg-zinc-900/90`), điều khiển phân trang, zoom, continuous scroll toggle, và bounding box toggle.
+     - **Khắc phục triệt để lỗi lệch tọa độ Bounding Box**: Bỏ `object-contain` trên thẻ `<img>` của `ocr-canvas.tsx`, sử dụng `w-full h-auto block` để khung bao khớp 100% tỷ lệ thực của ảnh, nền tối `#18181b` chuẩn Mistral Document AI hỗ trợ cuộn liên tục tất cả các trang.
+     - **Cột Inspector Chuẩn QLKTX (`Card` & `Field`)**: Tích hợp Tab Thực thể bóc tách (`entities`) làm tab mặc định với cấu trúc `Card` & `Field` sang trọng: Cơ quan ban hành, Số hiệu văn bản, Loại văn bản, Trích yếu nội dung, Hình thức đào tạo, Năm áp dụng, kèm các nút sao chép nhanh (`Copy`) và danh mục Bảng biểu số hóa.
+     - **Verification**: Frontend `npm run lint` 165 files 0 lỗi/cảnh báo, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 9.72s; Backend `uv run ruff check .` 0 lỗi.
+  2. **Chuẩn Hóa Toàn Diện Design System UI Theo Chuẩn QLKTX (`qnu-ktx/src/Web/ClientApp`) & Khắc Phục Giao Diện OCR Studio (phiên #137)**:
+     - **Cốt lõi Design System (Tokens & Typography)**: Bổ sung trọn bộ biến `--font-size-*` typography tokens và `--motion-*` tokens vào `tokens.css`; khai báo `@layer utilities` các lớp kiểu chữ tiêu chuẩn `.type-page-title`, `.type-section-title`, `.type-control`, `.type-table`, `.type-table-header`, `.type-caption`, `.type-supporting`, `.type-metadata` trong `globals.css`; gán `font-size: var(--font-size-body)` cho `body`.
+     - **Admin Compositions & Primitives**: Port component `PageHeader` chuẩn mực từ QLKTX; chuẩn hóa `Button` (`type-control`, control height 36px/32px) và `Badge` (`/12` tint thanh lịch).
+     - **Layout & Trải nghiệm OCR Studio**:
+       * Đưa route OCR `/knowledge/documents/:documentId/ocr` vào **`full-bleed`** trong `admin-shell.tsx`, xóa bỏ co cụm `max-w-7xl` và lề thừa.
+       * Thay thế nền đen kịt cứng bằng desk canvas thích ứng theo theme (`bg-muted/40` ở Light mode, `dark:bg-[#121214]` ở Dark mode); trang A4 trắng sáng nổi bật với bóng đổ mềm `shadow-md border border-border/80`.
+       * Chuyển Floating Toolbar xuống đáy canvas (`bottom-4`), áp dụng semantic tokens `bg-background/95 dark:bg-card/95`, compact controls `size-6` và icon `size-3.5`, không che khuất đầu văn bản.
+       * Bounding Boxes 1px thanh mảnh trong suốt 100%, nhãn tag ẩn mặc định (`opacity-0`) và chỉ hiện lên (`opacity-100`) khi hover hoặc khi box được chọn, loại bỏ hoàn toàn đè lấn chữ.
+       * Cột Inspector: Chuẩn hóa Tabs `h-8`, loại bỏ `whitespace-pre-wrap` trên thẻ `<p>` của ReactMarkdown khắc phục triệt để lỗi double line break làm rời rạc các dòng văn bản.
+     - **Verification**: Frontend `npm run lint` 165 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 6.94s; Backend `uv run ruff check .` 0 lỗi, Pytest `tests/test_knowledge.py` **31/31 passed (100%)**.
+  1. **Khắc Phục Triệt Để Lỗi Bể Trang & Lệch Vùng Nhận Diện Scan OCR Studio (phiên #135)**:
+     - **Triệt tiêu lỗi Bounding Box tràn lề 780%**: Sửa hàm `mapVerificationDataToStudioDoc` trong [`frontend/src/pages/scan-studio-page.tsx`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/pages/scan-studio-page.tsx), ưu tiên sử dụng `p.bounding_boxes` thực tế từ backend mang tọa độ percent `[0, 100%]`. Xóa bỏ hoàn toàn hardcode `width: 780` và `height: 50` làm khung nhận diện bị kéo dài gấp 7.8 lần (~6240px) đâm xuyên ra ngoài canvas. Bổ sung fallback an toàn cho `p.regions` với tọa độ percent phân bổ đều trang (`left: 8%`, `width: 84%`, `height: 7%`).
+     - **Chuẩn hóa Safe Coordinate Normalization & Responsive Canvas**: Cập nhật [`frontend/src/components/knowledge/ocr/ocr-canvas.tsx`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/components/knowledge/ocr/ocr-canvas.tsx) với cơ chế bảo vệ 2 lớp: tự động nhận diện nếu tọa độ gửi lên dạng pixel (> 100) thì quy đổi về %, clamp nghiêm ngặt không cho bất kỳ box nào vượt quá lề trang giấy. Bố cục canvas căn giữa `items-start`, `maxWidth: 100%` chống tràn lề và không sinh thanh cuộn ngang ở zoom mặc định. Tag labels hiển thị sắc nét với semantic colors.
+     - **Nâng cấp Hiển Thị Cột Markdown Văn Bản Hành Chính**: Cập nhật [`frontend/src/components/knowledge/ocr/ocr-inspector.tsx`](file:///d:/DuAnPhanMem/qnu-ai-platform/frontend/src/components/knowledge/ocr/ocr-inspector.tsx) với `formattedMarkdown` tự động chuyển đổi ngắt dòng đơn `\n` thành Markdown hard line breaks (`  \n`) giúp giữ nguyên phân đoạn tiêu đề, căn cứ, điều khoản; trang bị custom components cho `ReactMarkdown` chuẩn Academic Teal.
+     - **Verification**: Frontend `npm run lint` 164 files 0 lỗi, `npm run typecheck` 0 lỗi, `npm run build` thành công trong 7.72s; Backend `uv run ruff check .` 0 lỗi, Pytest `tests/test_knowledge.py` **31/31 passed (100%)**.
+  1. **Review Độc Lập Sau Vibe Coding Kế Hoạch 08 (phiên #134)**:
+     - Tạo [`docs/ke_hoach/09_danh_gia_sau_vibe_coding_va_huong_dan_cai_thien.md`](../ke_hoach/09_danh_gia_sau_vibe_coding_va_huong_dan_cai_thien.md), đánh giá dự án ở mức **7,1/10 — Engineering Beta mạnh, chưa Production Candidate**.
+     - Xác nhận cải thiện thật: Alembic head/check sạch; database 30 bảng; 100% Provider secrets live được mã hóa; Ruff/Pytest/Biome/TypeScript/Build đều xanh.
+     - Phát hiện P0 runtime: reconciliation báo sai DB chunks do tiêu thụ SQLAlchemy Result hai lần; lifecycle/data live chưa migrate; worker reindex thiếu payload v1; LLM adapters còn fake-success; HITL chưa atomic và vẫn tin `decided_by` từ body.
+     - Phát hiện P1: streaming giả + usage có thể ghi trùng; public chat tin tenant body/chưa rate limit; upload Knowledge chưa giới hạn; LocalStorage còn prefix traversal; test warning bị suppress; thiếu Frontend unit tests, CI và E2E full-stack.
+     - Chốt thứ tự xử lý: sửa reconciliation → migrate/reindex dữ liệu live → truthful ModelOps/streaming/accounting → atomic HITL/trusted public boundary → upload/storage → CI/observability/release drill.
+     - Phiên chỉ review và cập nhật tài liệu, không sửa code/schema/data live.
   1. **Triển Khai Giai Đoạn D: Khôi Phục Tính Đúng Của Knowledge & RAG (Theo Kế Hoạch 08 - Production Candidate)**:
      - **Chuẩn hóa Document Lifecycle State Machine (7 bước)**:
        * Chuẩn hóa cỗ máy trạng thái: `uploaded` $\rightarrow$ `extracting` $\rightarrow$ `review_pending` $\rightarrow$ `approved` $\rightarrow$ `indexing` $\rightarrow$ `ready`, và `ready` $\rightarrow$ `archived`.

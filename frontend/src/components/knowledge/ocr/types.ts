@@ -3,8 +3,9 @@
 import type { StudioOCRPage, StudioOCRRegion } from "@/services/api-client";
 
 export type OcrViewMode = "rendered" | "raw" | "edit";
-export type OcrRightTab = "markdown" | "excel" | "regions" | "json";
+export type OcrRightTab = "entities" | "text" | "markdown" | "excel" | "regions" | "json";
 export type OcrRegionFilter = "all" | "table" | "signature" | "text";
+export type OcrViewLayoutMode = "continuous" | "single";
 
 export interface OcrRegionStyle {
   bg: string;
@@ -15,40 +16,46 @@ export interface OcrRegionStyle {
 
 export const REGION_COLORS: Record<string, OcrRegionStyle> = {
   header: {
-    bg: "rgba(59, 130, 246, 0.12)",
-    border: "#3b82f6",
-    text: "#1d4ed8",
-    badge: "#2563eb",
+    bg: "rgba(100, 116, 139, 0.08)",
+    border: "#475569",
+    text: "#334155",
+    badge: "#334155",
   },
   title: {
-    bg: "rgba(139, 92, 246, 0.14)",
-    border: "#8b5cf6",
-    text: "#6d28d9",
-    badge: "#7c3aed",
+    bg: "rgba(2, 132, 199, 0.08)",
+    border: "#0284c7",
+    text: "#0369a1",
+    badge: "#0284c7",
   },
   text: {
-    bg: "rgba(168, 85, 247, 0.10)",
-    border: "#a855f7",
+    bg: "rgba(147, 51, 234, 0.07)",
+    border: "#9333ea",
     text: "#7e22ce",
     badge: "#9333ea",
   },
   list: {
-    bg: "rgba(16, 185, 129, 0.12)",
-    border: "#10b981",
+    bg: "rgba(16, 185, 129, 0.07)",
+    border: "#059669",
     text: "#047857",
     badge: "#059669",
   },
   table: {
-    bg: "rgba(245, 158, 11, 0.16)",
-    border: "#f59e0b",
+    bg: "rgba(217, 119, 6, 0.08)",
+    border: "#d97706",
     text: "#b45309",
     badge: "#d97706",
   },
   signature: {
-    bg: "rgba(244, 63, 94, 0.18)",
-    border: "#f43f5e",
+    bg: "rgba(225, 29, 72, 0.08)",
+    border: "#e11d48",
     text: "#be123c",
     badge: "#e11d48",
+  },
+  stamp: {
+    bg: "rgba(220, 38, 38, 0.08)",
+    border: "#dc2626",
+    text: "#b91c1c",
+    badge: "#dc2626",
   },
 };
 
@@ -83,12 +90,16 @@ export const OCR_ENGINE_OPTIONS: OcrEngineOption[] = [
 
 export interface OcrCanvasProps {
   pageData: StudioOCRPage | null;
+  allPages?: StudioOCRPage[];
+  layoutMode?: OcrViewLayoutMode;
   zoomLevel: number;
   showBoxes: boolean;
   filteredRegions: StudioOCRRegion[];
   selectedRegion: StudioOCRRegion | null;
   onSelectRegion: (region: StudioOCRRegion | null) => void;
   documentTitle?: string;
+  pdfUrl?: string;
+  onPageChange?: (newPage: number) => void;
 }
 
 export interface OcrToolbarProps {
@@ -101,8 +112,11 @@ export interface OcrToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoomReset: () => void;
+  onFitWidth?: () => void;
   showBoxes: boolean;
   onToggleBoxes: (show: boolean) => void;
+  layoutMode: OcrViewLayoutMode;
+  onToggleLayoutMode: (mode: OcrViewLayoutMode) => void;
   regionFilter: OcrRegionFilter;
   onRegionFilterChange: (filter: OcrRegionFilter) => void;
   selectedEngine: string;
@@ -112,6 +126,7 @@ export interface OcrToolbarProps {
 
 export interface OcrInspectorProps {
   pageData: StudioOCRPage | null;
+  allPages?: StudioOCRPage[];
   rightTab: OcrRightTab;
   onTabChange: (tab: OcrRightTab) => void;
   markdownViewMode: OcrViewMode;
@@ -123,4 +138,5 @@ export interface OcrInspectorProps {
   onCopyContent: (text: string) => void;
   isCopied: boolean;
   isEditable?: boolean;
+  onJumpToPage?: (pageNumber: number) => void;
 }

@@ -120,6 +120,7 @@ export interface DocumentVerificationData {
   engine: string;
   total_chars: number;
   estimated_chunks: number;
+  pdf_url?: string;
   pages: {
     page_number: number;
     word_count: number;
@@ -129,6 +130,11 @@ export interface DocumentVerificationData {
     raw_text: string;
     bounding_boxes: DocumentBoundingBox[];
     regions: DocumentRegion[];
+    dimensions?: {
+      width: number;
+      height: number;
+      orientation?: "portrait" | "landscape";
+    };
   }[];
 }
 

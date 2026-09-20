@@ -286,6 +286,30 @@ async def page_image(
     return Response(content=png_bytes, media_type="image/png")
 
 
+@router.get(
+    "/documents/{document_id}/preview-pdf",
+    summary="Stream file PDF preview phục vụ Scan Studio (hỗ trợ cả PDF gốc, Word DOCX và ảnh)",
+    response_class=Response,
+)
+async def preview_pdf(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    pdf_bytes, filename = await knowledge_service.get_preview_pdf(db, document_id)
+    from urllib.parse import quote
+
+    clean_filename = filename.rsplit(".", 1)[0]
+    safe_ascii_name = f"{document_id}.pdf"
+    encoded_filename = quote(f"{clean_filename}.pdf")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename=\"{safe_ascii_name}\"; filename*=UTF-8''{encoded_filename}"
+        },
+    )
+
+
 @router.post(
     "/documents/batch-approve",
     response_model=BatchApproveResponse,
@@ -309,10 +333,16 @@ async def download_document(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     content, filename, media_type = await knowledge_service.download_document(db, document_id)
+    from urllib.parse import quote
+
+    safe_ascii = "downloaded_document"
+    encoded_filename = quote(filename)
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_ascii}"; filename*=UTF-8\'\'{encoded_filename}'
+        },
     )
 
 

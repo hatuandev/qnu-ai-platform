@@ -61,6 +61,7 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    font-size: var(--font-size-body);
   }
 
   /* Custom Modern Sleek Scrollbar */
@@ -99,4 +100,56 @@
 
 .animate-scan-beam {
   animation: scanBeam 2.8s ease-in-out infinite alternate;
+}
+
+@layer utilities {
+  .type-page-title {
+    font-size: var(--font-size-page-title);
+    line-height: 1.15;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+  }
+
+  .type-section-title {
+    font-size: var(--font-size-section-title);
+    line-height: 1.35;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .type-control {
+    font-size: var(--font-size-control);
+    line-height: 1.35rem;
+  }
+
+  .type-table {
+    font-size: var(--font-size-table);
+    line-height: 1.35rem;
+  }
+
+  .type-table-header {
+    font-size: var(--font-size-table-header);
+    line-height: 1.35rem;
+  }
+
+  .type-caption {
+    font-size: var(--font-size-caption);
+    line-height: 1.2rem;
+  }
+
+  .type-supporting {
+    font-size: var(--font-size-supporting);
+    line-height: 1.2rem;
+  }
+
+  .type-metadata {
+    font-size: var(--font-size-metadata);
+    line-height: 1rem;
+  }
+
+  @media (max-width: 767px) {
+    .type-page-title {
+      font-size: var(--font-size-page-title-mobile);
+    }
+  }
 }
