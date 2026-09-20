@@ -1,9 +1,20 @@
 import { cn } from "@/lib/utils";
-import { Bot, History, MessageSquare, Network, Share2, ShieldCheck } from "lucide-react";
+import {
+  Bot,
+  Cpu,
+  History,
+  MessageSquare,
+  Network,
+  Share2,
+  ShieldCheck,
+  Wrench,
+} from "lucide-react";
 import type * as React from "react";
 
 export type AssistantSubView =
   | "overview"
+  | "models"
+  | "tools"
   | "playground"
   | "workflow"
   | "channels"
@@ -27,9 +38,21 @@ interface WorkspaceTab {
 const WORKSPACE_TABS: WorkspaceTab[] = [
   {
     id: "overview",
-    label: "Tổng quan & Cấu hình",
+    label: "Thông tin & Tri thức",
     subPath: "",
     icon: Bot,
+  },
+  {
+    id: "models",
+    label: "Mô hình & An toàn",
+    subPath: "/models",
+    icon: Cpu,
+  },
+  {
+    id: "tools",
+    label: "Quy trình & Công cụ",
+    subPath: "/tools",
+    icon: Wrench,
   },
   {
     id: "playground",
@@ -39,15 +62,9 @@ const WORKSPACE_TABS: WorkspaceTab[] = [
   },
   {
     id: "workflow",
-    label: "Quy trình DAG",
+    label: "Đồ thị DAG",
     subPath: "/workflow",
     icon: Network,
-  },
-  {
-    id: "channels",
-    label: "Mã nhúng Kênh",
-    subPath: "/channels",
-    icon: Share2,
   },
   {
     id: "quality",
@@ -60,6 +77,12 @@ const WORKSPACE_TABS: WorkspaceTab[] = [
     label: "Lịch sử Chạy",
     subPath: "/runs",
     icon: History,
+  },
+  {
+    id: "channels",
+    label: "Mã nhúng Kênh",
+    subPath: "/channels",
+    icon: Share2,
   },
 ];
 

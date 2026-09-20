@@ -72,7 +72,16 @@ export function resolveRoute(pathname: string, searchStr = ""): ResolvedRoute {
     const assistantId = decodeURIComponent(parts[1] || "");
     const subRoute = parts[2] || "overview";
 
-    const validSubViews = ["overview", "playground", "workflow", "channels", "quality", "runs"];
+    const validSubViews = [
+      "overview",
+      "models",
+      "tools",
+      "playground",
+      "workflow",
+      "channels",
+      "quality",
+      "runs",
+    ];
     const subView = validSubViews.includes(subRoute) ? subRoute : "overview";
 
     return {

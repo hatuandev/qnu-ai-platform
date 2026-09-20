@@ -129,6 +129,7 @@ Agent có thể kích hoạt và tuân thủ các hướng dẫn chuyên sâu t�
 | **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng (PyMuPDF, Docling, EasyOCR), Chunking |
 | **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Dynamic Fallback, Quota |
 | **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Dead Code/Any, Guard Clauses, SRP |
+| **`diagram-design`** | [`.agents/skills/diagram-design/SKILL.md`](.agents/skills/diagram-design/SKILL.md) | Thiết kế sơ đồ kỹ thuật chuẩn Editorial HTML/SVG (Architecture, Sequence, State Machine, ERD, Flowchart, Medallion, Sankey) |
 
 ---
 

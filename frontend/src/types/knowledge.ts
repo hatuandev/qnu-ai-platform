@@ -115,6 +115,8 @@ export interface DocumentVerificationData {
   collection_id: string;
   title: string;
   filename: string;
+  status?: string;
+  index_status?: string;
   file_size_mb: number;
   total_pages: number;
   engine: string;

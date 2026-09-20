@@ -170,9 +170,12 @@ class StudioViewResponse(BaseModel):
     title: str
     filename: str
     engine: str
+    status: str = "pending"
+    index_status: str | None = None
     total_pages: int
     file_size_bytes: int = 0
     total_chunks: int = 0
+    pdf_url: str | None = None
     pages: list[StudioPageView] = Field(default_factory=list)
 
 

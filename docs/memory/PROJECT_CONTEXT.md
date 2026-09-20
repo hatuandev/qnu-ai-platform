@@ -7,10 +7,71 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-20 20:15 (UTC+7)
-- **Phiên số**: #161
+- **Thời gian cập nhật**: 2026-09-20 23:10 (UTC+7)
+- **Phiên số**: #166
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Khắc Phục Triệt Để Lỗi Điều Hướng Tabs Trong Assistant Workspace (`/assistants/:id/*`) (phiên #166)**:
+     - **Nguyên nhân**: Trong `assistant-detail-page.tsx`, hàm `getReferenceFromPath` sử dụng `.at(-1)` để lấy ID trợ lý từ URL. Khi người dùng click vào các sub-tabs (`/assistants/admissions/models`, `tools`, `playground`, `workflow`, `channels`, `quality`, `runs`), hàm này lấy nhầm đoạn đuôi `models` làm mã trợ lý và gọi API `GET /assistants/models`, gây lỗi HTTP 404 "Không tìm thấy Trợ lý AI".
+     - **Giải pháp**: Chuẩn hóa hàm `getReferenceFromPath` lấy đúng phần tử ngay sau `/assistants/` (`parts[assistantsIndex + 1]`), đồng thời truyền trực tiếp prop `assistantId={resolved.params.assistantId}` từ `App.tsx` vào `AssistantDetailPage`.
+     - **Kiểm thử**: `npm run typecheck` 0 lỗi, `npm run lint` 0 lỗi trên 167 files, `npm run build` thành công.
+  2. **Khắc Phục Triệt Để Lỗi Nhân Đôi Điểm Vector (Zero Duplicate Qdrant Points) & Tối Ưu UX Phê Duyệt Scan Studio (phiên #165)**:
+     - **Triệt tiêu 100% hiện tượng duplicate vector trong Qdrant**:
+       * Phân tích nguyên nhân: Khi người dùng bấm phê duyệt lại từ Scan Studio (kèm `pages`), backend xóa chunk cũ trong DB và tạo chunk mới với UUID mới $\rightarrow$ sinh Point ID mới trong Qdrant. Tuy nhiên `doc.version` không tăng và `purge_stale_revisions` chỉ lọc `< current_revision` nên điểm cũ không bị xóa, làm số lượng vector tăng gấp đôi (16 $\rightarrow$ 32 $\rightarrow$ 48);
+       * Giải pháp Backend: Tự động tăng `doc.version` khi phê duyệt lại/có `pages`. Đồng thời gọi `await vector_indexer.delete_by_document(col_id, doc_id)` trước khi `index_chunks()`, bảo đảm tính Idempotent 100% (Qdrant chỉ chứa đúng số lượng chunks hiện có trong DB);
+       * Đồng bộ gọi `delete_by_document` trong `reindex_document` (`reconciliation_service.py`);
+       * Mở rộng `StudioViewResponse` và `get_studio_view()`: trả về đầy đủ `status` và `index_status` của tài liệu;
+       * Thêm unit test `test_approve_document_with_pages_increments_revision_and_purges_old_vectors`;
+     - **Tối ưu UX Trạng thái Nút Bấm trong Scan Studio (`scan-studio-page.tsx`)**:
+       * Nhận diện `isAlreadyApproved` và `hasEdits` (phát hiện có chỉnh sửa Markdown thực tế hay không);
+       * Nếu tài liệu đã duyệt và không có sửa đổi: Hiển thị badge nút `[✓ Đã duyệt & Lập chỉ mục]` (disabled/outline với tint nhẹ Academic Teal) kèm nút phụ `[↻ Tái lập chỉ mục]` (outline, an toàn). Người dùng không bao giờ bấm nhầm làm nạp lại dữ liệu;
+       * Nếu người dùng chỉnh sửa Markdown: Nút chính chuyển thành `[↻ Cập nhật & Tái lập chỉ mục]` (màu Academic Teal, icon `RefreshCw`);
+       * Nếu tài liệu mới: Giữ nguyên `[✓ Xác nhận đối soát & Phê duyệt]`;
+     - **Verification**:
+       * Live Qdrant: 16 points $\rightarrow$ Re-approve $\rightarrow$ Vẫn chính xác 16 points (Zero Duplicate Points);
+       * Backend: Ruff 0 lỗi; Pytest 53/53 passed (100%);
+       * Frontend: Biome 167 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 10.99s;
+  1. **Redesign Toàn Diện Giao Diện Trang Chi Tiết Trợ Lý AI: Tối Ưu Hóa UI/UX, Progressive Disclosure Sub-Tabs, Cân Bằng 2 Cột & Tinh Gọn Header (phiên #164)**:
+     - **Tách cấu hình thành 3 Sub-tabs chuyên biệt (Progressive Disclosure)**:
+       * Mở rộng route resolver `/assistants/:id/:subView` và `AssistantWorkspaceNav` hỗ trợ thêm `"models"` và `"tools"`;
+       * Tab 1 `overview` (Thông tin & Tri thức): Persona, Prompt hệ thống (kèm AI Re-write), Câu hỏi gợi ý và Kho Tri Thức RAG liên kết. Bố cục 2 cột cân bằng (60% trái / 40% phải), triệt tiêu hoàn toàn khoảng trắng thừa ở đáy;
+       * Tab 2 `models` (Mô hình & An toàn): Cấu hình ModelOps (Primary, Fallback, Temperature, Max tokens) song song cùng 6 công tắc Guardrails (Chống injection, che PII, Groundedness check, System prompt shield, No-answer policy, Ragas TM-08);
+       * Tab 3 `tools` (Quy trình & Công cụ): Workflow DAG, Tách workflow riêng, Chốt chặn Tool Gateway, Quản lý Tool Registry và Vùng nguy hiểm;
+       * Các tab chuyên sâu `playground` (Thử chat), `workflow` (Đồ thị DAG), `quality` (Ragas TM-08), `runs` (Lịch sử Chạy), `channels` (Mã nhúng) giữ nguyên;
+       * Đồng bộ state `form` liên tục xuyên suốt các tabs, hỗ trợ lưu thay đổi từ bất kỳ tab cấu hình nào;
+     - **Tinh gọn Action Toolbar & Header**:
+       * Giữ 2 nút hành động chính: `[Thử chat]` (outline) và `[Lưu thay đổi]` (màu Academic Teal, xuất hiện trên cả 3 tabs cấu hình);
+       * Gom 5 nút phụ vào Dropdown Menu `[Thao tác khác ▾]`: Mở đồ thị DAG Studio, Nhân bản Trợ lý, Lịch sử phiên bản & Rollback, Lấy mã nhúng Web, Xuất bundle JSON;
+     - **Thu gọn Banner Publish Gate (Collapsible Compact Alert)**:
+       * Mặc định hiển thị thanh tóm tắt 1 hàng mỏng, thông báo điểm sẵn sàng (`71% - 3/5 Tiêu chí`) và lỗi chính;
+       * Nút `[Chi tiết (N lỗi) ▾]` mở rộng/thu nhỏ hiển thị 5 chips tiêu chí và danh sách hướng dẫn khắc phục chi tiết;
+     - **Verification**:
+       * Biome Linter: `npm run lint` đạt **0 errors (167 files checked in 183ms)**;
+       * TypeScript Typecheck: `npm run typecheck` đạt **0 errors**;
+       * Vite Build: `npm run build` thành công xuất sắc trong **9.87s** (2660 modules transformed);
+  1. **Tháo Gỡ Nút Thắt & Cải Thiện Toàn Diện Trải Nghiệm Kho Tri Thức: Chế Độ Nạp Nhanh (Fast-Track), Phê Duyệt Nhanh 1-Click & Thao Tác Hàng Loạt (Bulk Operations) (phiên #163)**:
+     - **Chế độ Nạp Nhanh (Fast-Track / Auto-Approve)**:
+       * Mở rộng Backend router `POST /collections/{collection_id}/upload` hỗ trợ query/form parameter `auto_approve: bool = Form(False)`;
+       * Chuyển tiếp qua `IngestionService.ingest_document`: Khi `auto_approve=True` VÀ `quality_blocked=False` (vượt qua Data Quality Gate 100%), tự động gọi `approve_document`, tính toán hash kiểm duyệt, sinh chunk vector, đẩy lên Qdrant và chuyển tài liệu sang `approved` ngay tức thì mà không cần qua Scan Studio;
+       * Bảo vệ Zero Hallucination: Nếu Quality Gate phát hiện mâu thuẫn dữ liệu hoặc lỗi cấu trúc bảng, cờ `auto_approve` tự động bị vô hiệu, giữ nguyên trạng thái `review_pending` buộc con người đối soát;
+       * Frontend `document-ingest-page.tsx`: Thêm Card toggle Chế độ Nạp Nhanh (Fast-Track) với icon `Zap`, tự động điều hướng về màn hình kho khi nạp thành công;
+     - **Thanh Tiến Trình Đa Pha (Multi-Stage Progress Indicator)**:
+       * Hiển thị thanh tiến trình 5 chặng có phần trăm thực tế và animation mượt mà (Lưu trữ MinIO S3 -> Trích xuất văn bản PyMuPDF/OCR -> Nhận diện Layout & Cấu trúc OpenCV -> Kiểm tra Data Quality Gate -> Đánh chỉ mục Vector Qdrant & Trích xuất Facts);
+     - **Duyệt Nhanh 1-Click & Thao Tác Hàng Loạt (Bulk Batch Operations)**:
+       * API client: bổ sung `batchApproveDocuments(documentIds: string[])`;
+       * Bảng danh sách tài liệu (`collection-documents-tab.tsx`):
+         + Nút **Duyệt nhanh 1-Click** (`[✓ Duyệt nhanh]`) ngay tại từng hàng tài liệu `pending`/`review_pending` đủ điều kiện, phê duyệt trực tiếp không cần mở Scan Studio;
+         + Checkbox đa chọn tại header và từng hàng tài liệu;
+         + **Bulk Action Bar** floating nổi bật khi chọn tài liệu: `Phê duyệt N tài liệu`, `Xóa N tài liệu`, `Bỏ chọn`;
+         + **Mini Stepper Guide** thu gọn/mở rộng giải thích 3 chặng vòng đời tài liệu (1. Nạp thô & Bóc tách -> 2. Thẩm định & Quality Gate -> 3. Sẵn sàng AI);
+     - **Verification**:
+       * Backend: `uv run ruff check .` 0 lỗi; Pytest `tests/test_knowledge.py` đạt **32/32 passed (100%) in 68.27s** (bao gồm unit test mới `test_ingest_document_fast_track_auto_approve`);
+       * Frontend: Biome `npm run lint` đạt **0 errors** (167 files); `npm run typecheck` đạt **0 errors**; Vite `npm run build` thành công trong 14.23s;
+  1. **Định Tuyến Markdown Qua Parser Chuẩn & Đóng Quality Gate Trước Qdrant (phiên #162)**:
+     - Định tuyến extension `.md` từ `PlainTextParser` sang `MarkdownParser`, hỗ trợ UTF-8/NFC, nhận diện bảng GFM nhiều block và chuyển block `Kế hoạch nhiệm vụ X.Y` thành bản ghi nghiệp vụ có cấu trúc.
+     - Kiểm tra thực tế file Kế hoạch triển khai 2025-2026: 76 nhiệm vụ hợp lệ, tạo 76 record-aware chunks và 152 Facts sau khi Quality Gate đạt.
+     - Kiểm tra thực tế file Tuyển sinh 2026: nhận diện 53 ngành nhưng giữ trạng thái `review_pending` vì mâu thuẫn mã ngành AI `7480207`/`7480107`; không tạo chunks/Facts và không gửi dữ liệu lỗi sang Qdrant.
+     - Bổ sung test parser/reconstruction; toàn bộ Backend đạt Ruff 0 lỗi và Pytest 328/328 passed.
   1. **Hỗ Trợ Đa Tài Khoản Cloudflare (Multi-Account Key Pool) & Tính Năng Import/Export Provider Bằng File JSON (Đơn Lẻ & Hàng Loạt) (phiên #161)**:
      - **Cloudflare Multi-Account Key Pool**:
        * Mở rộng `ProviderKeyCreate`, `ProviderKeyUpdate`, `ProviderKeyItem` tại backend và `ProviderApiKey` tại frontend với trường tùy chọn `account_id: str | None`;

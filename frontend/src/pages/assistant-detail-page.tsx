@@ -46,10 +46,16 @@ interface AssistantDetailPageProps {
   currentPath: string;
   onNavigate: (path: string) => void;
   subView?: AssistantSubView;
+  assistantId?: string;
 }
 
 function getReferenceFromPath(currentPath: string): string {
-  return decodeURIComponent(currentPath.split("/").filter(Boolean).at(-1) ?? "");
+  const parts = currentPath.split("/").filter(Boolean);
+  const assistantsIndex = parts.indexOf("assistants");
+  if (assistantsIndex !== -1 && parts[assistantsIndex + 1]) {
+    return decodeURIComponent(parts[assistantsIndex + 1]);
+  }
+  return decodeURIComponent(parts.at(-1) ?? "");
 }
 
 function toEditForm(item: AssistantItem): AssistantEditForm {
@@ -102,8 +108,9 @@ export function AssistantDetailPage({
   currentPath,
   onNavigate,
   subView = "overview",
+  assistantId,
 }: AssistantDetailPageProps) {
-  const reference = getReferenceFromPath(currentPath);
+  const reference = assistantId || getReferenceFromPath(currentPath);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<AssistantEditForm | null>(null);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
@@ -450,33 +457,32 @@ export function AssistantDetailPage({
             onNavigate(`/assistants/${encodeURIComponent(item.code)}/workflow`)
           }
         />
-      ) : (
+      ) : subView === "models" ? (
+        /* TAB 2: MÔ HÌNH & AN TOÀN */
         <form className="space-y-6" onSubmit={handleSubmit}>
-          {/* Main 2-Column Grid */}
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.85fr)]">
-            {/* Left Column: Persona, ModelOps */}
+          <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
-              <AssistantPersonaSection
-                form={form}
-                onChange={setForm}
-                onGeneratePrompt={handleGeneratePrompt}
-                isGeneratingPrompt={isGeneratingPrompt}
-              />
               <AssistantModelSection
                 form={form}
                 onChange={setForm}
                 availableModels={availableModels}
               />
             </div>
-
-            {/* Right Column: Knowledge, Tools, Guardrails, Danger Zone */}
             <div className="space-y-6">
-              <AssistantKnowledgeSection
+              <AssistantGuardrailsSection
                 form={form}
                 onChange={setForm}
-                collections={collections}
+                assistantCode={item.code}
                 onNavigate={onNavigate}
               />
+            </div>
+          </div>
+        </form>
+      ) : subView === "tools" ? (
+        /* TAB 3: QUY TRÌNH & CÔNG CỤ */
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+            <div className="space-y-6">
               <AssistantToolsSection
                 form={form}
                 onChange={setForm}
@@ -486,18 +492,36 @@ export function AssistantDetailPage({
                 onForkWorkflow={() => forkWorkflowMutation.mutate()}
                 isForkingWorkflow={forkWorkflowMutation.isPending}
               />
-              <AssistantGuardrailsSection
-                form={form}
-                onChange={setForm}
-                assistantCode={item.code}
-                onNavigate={onNavigate}
-              />
+            </div>
+            <div className="space-y-6">
               <AssistantDangerZone
                 assistant={item}
                 isActivating={activateMutation.isPending}
                 isDeactivating={deactivateMutation.isPending}
                 onActivate={() => activateMutation.mutate()}
                 onDeactivate={() => deactivateMutation.mutate()}
+              />
+            </div>
+          </div>
+        </form>
+      ) : (
+        /* TAB 1: THÔNG TIN & TRI THỨC (Mặc định overview) */
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
+            <div className="space-y-6">
+              <AssistantPersonaSection
+                form={form}
+                onChange={setForm}
+                onGeneratePrompt={handleGeneratePrompt}
+                isGeneratingPrompt={isGeneratingPrompt}
+              />
+            </div>
+            <div className="space-y-6">
+              <AssistantKnowledgeSection
+                form={form}
+                onChange={setForm}
+                collections={collections}
+                onNavigate={onNavigate}
               />
             </div>
           </div>

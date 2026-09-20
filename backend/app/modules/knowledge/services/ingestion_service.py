@@ -417,6 +417,7 @@ class IngestionService:
         title: str | None = None,
         ocr_engine: str | None = None,
         document_type_code: str | None = None,
+        auto_approve: bool = False,
     ) -> KnowledgeDocument:
         col = await collection_service.get_collection(db, collection_id)
         normalized_document_type_code = await document_types_service.validate_active_code(
@@ -508,6 +509,21 @@ class IngestionService:
         await db.commit()
         await db.refresh(doc)
         logger.info("Ingested document id=%s, chunks=%d", doc.id, len(chunk_drafts))
+
+        # Fast-Track Auto-Approve: if requested and no blocking quality errors, approve immediately
+        if auto_approve and not prepared.get("quality_blocked"):
+            approve_fn = (
+                self._facade.approve_document
+                if self._facade and hasattr(self._facade, "approve_document")
+                else self.approve_document
+            )
+            try:
+                await approve_fn(db, doc.id, pages=None)
+                await db.refresh(doc)
+                logger.info("Auto-approved (Fast-Track) document id=%s", doc.id)
+            except Exception as approve_err:
+                logger.warning("Auto-approve failed for doc id=%s: %s", doc.id, approve_err)
+
         return doc
 
     async def parse_preview(
@@ -1159,6 +1175,8 @@ class IngestionService:
             "title": doc.title,
             "filename": doc.file_name,
             "engine": str(metadata.get("ocr_method", "PyMuPdfParser")),
+            "status": doc.status,
+            "index_status": doc.index_status,
             "total_pages": total_pages,
             "file_size_bytes": doc.file_size_bytes or 0,
             "total_chunks": len(chunks),
@@ -1405,6 +1423,11 @@ class IngestionService:
                 details={"quality_report": quality_report},
             )
 
+        if doc.version is None:
+            doc.version = 1
+        elif pages or doc.status in ("approved", "ready"):
+            doc.version = int(doc.version) + 1
+
         if pages:
             await db.execute(
                 delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
@@ -1490,6 +1513,11 @@ class IngestionService:
         ]
 
         try:
+            # Delete any existing points for this document to prevent duplicate points in Qdrant
+            await vector_indexer.delete_by_document(
+                collection_id=doc.collection_id,
+                document_id=doc.id,
+            )
             indexed = await vector_indexer.index_chunks(
                 collection_id=doc.collection_id,
                 chunks=chunks_payload,

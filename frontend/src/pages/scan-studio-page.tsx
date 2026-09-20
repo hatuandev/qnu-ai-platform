@@ -40,6 +40,7 @@ import {
   Check,
   Code,
   Loader2,
+  RefreshCw,
   ShieldCheck,
   Upload,
 } from "lucide-react";
@@ -213,6 +214,8 @@ function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioO
     provider: "QNU Vision OCR",
     model: data.engine,
     latencyMs: 120,
+    status: data.status,
+    indexStatus: data.index_status,
     pdfUrl:
       data.pdf_url || `/platform/v1alpha1/knowledge/documents/${data.document_id}/preview-pdf`,
     pages: data.pages.map((p, pageIdx) => {
@@ -470,6 +473,18 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
 
   const totalPages = doc?.totalPages || doc?.pages?.length || 1;
 
+  const isAlreadyApproved = useMemo(() => {
+    return doc?.status === "ready" || doc?.status === "approved";
+  }, [doc?.status]);
+
+  const hasEdits = useMemo(() => {
+    if (!doc?.pages) return false;
+    return doc.pages.some((p) => {
+      const edited = editedPages[p.pageNumber];
+      return edited !== undefined && edited !== p.markdown;
+    });
+  }, [doc?.pages, editedPages]);
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -525,7 +540,11 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
 
       await ocrStudioApi.saveDocumentVerification(effectiveDocId, { pages: pagesPayload });
       toast.success(
-        "Đối soát thành công! Tài liệu đã được phê duyệt và chuyển sang chỉ mục Vector."
+        isAlreadyApproved
+          ? hasEdits
+            ? "Cập nhật thành công! Đã làm mới chỉ mục Vector DB đồng bộ (không bị trùng lặp)."
+            : "Tái lập chỉ mục thành công! Dữ liệu Vector DB đồng bộ 100%."
+          : "Đối soát thành công! Tài liệu đã được phê duyệt và chuyển sang chỉ mục Vector."
       );
 
       if (onApproveSuccess) {
@@ -670,19 +689,66 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
           </Button>
 
           {isDocumentVerificationMode ? (
-            <Button
-              size="sm"
-              onClick={handleApproveDocument}
-              disabled={isApproving || isProcessing}
-              className="h-8 text-xs gap-1.5 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
-            >
-              {isApproving ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <ShieldCheck className="size-3.5" />
-              )}
-              <span>{isApproving ? "Đang phê duyệt..." : "Xác nhận đối soát & Phê duyệt"}</span>
-            </Button>
+            isAlreadyApproved && !hasEdits ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  className="h-8 text-xs gap-1.5 font-medium border-primary/30 bg-primary/10 text-primary cursor-default opacity-95"
+                  title="Tài liệu đã được đối soát, phê duyệt và lập chỉ mục Vector DB"
+                >
+                  <Check className="size-3.5 text-primary" strokeWidth={2.5} />
+                  <span>Đã duyệt & Lập chỉ mục</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleApproveDocument}
+                  disabled={isApproving || isProcessing}
+                  className="h-8 text-xs gap-1.5 font-medium text-muted-foreground hover:text-foreground"
+                  title="Tái lập chỉ mục sạch vào Vector DB (loại bỏ hoàn toàn nguy cơ trùng lặp)"
+                >
+                  {isApproving ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-3.5" />
+                  )}
+                  <span>{isApproving ? "Đang xử lý..." : "Tái lập chỉ mục"}</span>
+                </Button>
+              </div>
+            ) : hasEdits ? (
+              <Button
+                size="sm"
+                onClick={handleApproveDocument}
+                disabled={isApproving || isProcessing}
+                className="h-8 text-xs gap-1.5 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
+                title="Lưu các nội dung đã hiệu đính và tái lập chỉ mục Vector DB sạch sẽ"
+              >
+                {isApproving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-3.5" />
+                )}
+                <span>
+                  {isApproving ? "Đang lưu & Tái lập chỉ mục..." : "Cập nhật & Tái lập chỉ mục"}
+                </span>
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleApproveDocument}
+                disabled={isApproving || isProcessing}
+                className="h-8 text-xs gap-1.5 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs"
+              >
+                {isApproving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="size-3.5" />
+                )}
+                <span>{isApproving ? "Đang phê duyệt..." : "Xác nhận đối soát & Phê duyệt"}</span>
+              </Button>
+            )
           ) : (
             <>
               <input

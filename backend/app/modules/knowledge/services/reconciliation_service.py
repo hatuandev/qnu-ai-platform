@@ -120,6 +120,11 @@ class ReconciliationService:
 
         try:
             from app.modules.rag.vector_indexer import vector_indexer
+            # Delete any existing points for this document to prevent duplicate points in Qdrant
+            await vector_indexer.delete_by_document(
+                collection_id=doc.collection_id,
+                document_id=doc.id,
+            )
             indexed = await vector_indexer.index_chunks(
                 collection_id=doc.collection_id,
                 chunks=chunks_payload,

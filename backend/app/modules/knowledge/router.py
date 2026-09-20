@@ -165,6 +165,9 @@ async def upload_document(
     ocr_engine: str | None = Form(
         None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
     ),
+    auto_approve: bool = Form(
+        False, description="Tự động phê duyệt & nạp vector nếu dữ liệu sạch (Fast-Track)"
+    ),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentResponse:
     content = await file.read()
@@ -176,6 +179,7 @@ async def upload_document(
         title=title,
         document_type_code=document_type_code,
         ocr_engine=ocr_engine,
+        auto_approve=auto_approve,
     )
     return DocumentResponse.model_validate(doc)
 

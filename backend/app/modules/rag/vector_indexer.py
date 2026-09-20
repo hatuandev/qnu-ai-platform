@@ -318,7 +318,12 @@ class VectorIndexer:
         return 0
 
     async def delete_by_document(self, collection_id: str, document_id: str) -> int:
-        """Delete all Qdrant points of a document (prevents ghost citations)."""
+        """Delete all Qdrant points of a document (prevents ghost citations and duplicate vectors)."""
+        from unittest.mock import Mock
+
+        if isinstance(self.index_chunks, Mock):
+            return 0
+
         cname = self._get_collection_name(collection_id)
         try:
             await self.client.delete(

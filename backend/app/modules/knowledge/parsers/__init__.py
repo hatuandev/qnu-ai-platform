@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.modules.knowledge.parsers.base import BaseDocumentParser, ExtractedTable, ParsedContent
+from app.modules.knowledge.parsers.markdown_parser import MarkdownParser
 from app.modules.knowledge.parsers.office_parser import DocxParser, PlainTextParser, XlsxParser
 from app.modules.knowledge.parsers.pdf_parser import PyMuPdfParser
 
@@ -13,7 +14,7 @@ _PARSERS: dict[str, BaseDocumentParser] = {
     "xlsx": XlsxParser(),
     "xls": XlsxParser(),
     "txt": PlainTextParser(),
-    "md": PlainTextParser(),
+    "md": MarkdownParser(),
     "csv": PlainTextParser(),
 }
 
@@ -31,6 +32,7 @@ __all__ = [
     "BaseDocumentParser",
     "DocxParser",
     "ExtractedTable",
+    "MarkdownParser",
     "ParsedContent",
     "PlainTextParser",
     "PyMuPdfParser",

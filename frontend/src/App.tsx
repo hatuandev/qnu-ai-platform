@@ -160,6 +160,7 @@ function AppContent() {
           <AssistantDetailPage
             currentPath={resolved.canonicalPath}
             onNavigate={handleNavigate}
+            assistantId={resolved.params.assistantId}
             subView={
               resolved.params.subView as import(
                 "@/components/assistants/assistant-workspace-nav"

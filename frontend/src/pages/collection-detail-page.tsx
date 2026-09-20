@@ -269,6 +269,45 @@ export function CollectionDetailPage({
     }
   };
 
+  const handleQuickApproveDoc = async (docId: string) => {
+    try {
+      await apiClient.approveDocument(docId);
+      toast.success("Đã phê duyệt và lập chỉ mục Vector thành công!");
+      refreshDocuments();
+      refreshTasks();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Phê duyệt tài liệu thất bại.");
+    }
+  };
+
+  const handleBatchApproveDocs = async (docIds: string[]) => {
+    try {
+      const res = await apiClient.batchApproveDocuments(docIds);
+      toast.success(
+        `Đã phê duyệt thành công ${res.approved.length} tài liệu (${res.indexed_chunks} chunks).`
+      );
+      if (res.failed.length > 0) {
+        toast.warning(`${res.failed.length} tài liệu cần thẩm định do có cảnh báo.`);
+      }
+      refreshDocuments();
+      refreshTasks();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Phê duyệt hàng loạt thất bại.");
+    }
+  };
+
+  const handleBatchDeleteDocs = async (docIds: string[]) => {
+    try {
+      for (const id of docIds) {
+        await apiClient.deleteDocument(id);
+      }
+      toast.success(`Đã xóa ${docIds.length} tài liệu thành công.`);
+      refreshDocuments();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Xóa hàng loạt thất bại.");
+    }
+  };
+
   const handleTaskAction = async (taskId: string, action: "retry" | "cancel") => {
     setTaskActionId(taskId);
     try {
@@ -534,6 +573,9 @@ export function CollectionDetailPage({
             onPreviewDoc={setPreviewDoc}
             onDownloadDoc={handleDownloadDocument}
             onDeleteDoc={setDeleteTarget}
+            onQuickApprove={handleQuickApproveDoc}
+            onBatchApprove={handleBatchApproveDocs}
+            onBatchDelete={handleBatchDeleteDocs}
           />
         </TabsContent>
 

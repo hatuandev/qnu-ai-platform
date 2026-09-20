@@ -112,6 +112,7 @@ class KnowledgeService:
         title: str | None = None,
         ocr_engine: str | None = None,
         document_type_code: str | None = None,
+        auto_approve: bool = False,
     ) -> KnowledgeDocument:
         return await self._ingestion.ingest_document(
             db=db,
@@ -121,6 +122,7 @@ class KnowledgeService:
             title=title,
             ocr_engine=ocr_engine,
             document_type_code=document_type_code,
+            auto_approve=auto_approve,
         )
 
     async def parse_preview(

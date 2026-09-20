@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from app.modules.knowledge.chunker import (
     AdmissionsRecordChunker,
     get_chunker,
@@ -27,6 +29,7 @@ from app.modules.knowledge.normalization.text_normalizer import (
     normalize_encoding,
     normalize_whitespace,
 )
+from app.modules.knowledge.parsers import MarkdownParser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.services.ingestion_service import IngestionService
 
@@ -359,3 +362,51 @@ def test_fact_extractor_rebuilds_facts_from_verified_markdown_table():
     attributes = {fact["attribute_name"]: fact["attribute_value"] for fact in facts}
     assert attributes["Mã ngành"] == "7140114"
     assert attributes["Chỉ tiêu"] == "50"
+
+
+def test_markdown_parser_reconstructs_split_admissions_table():
+    markdown = """# Thông tin tuyển sinh đại học 2026
+
+| STT | Mã xét tuyển | Tên ngành | Phương thức | Chỉ tiêu | Tổ hợp môn |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| 1 | 7140114 | Quản lý giáo dục | 1,2 | 50 | Toán, Văn, Anh |
+|  |  |  |  |  | Toán, Lý, Hóa |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| 2 | 7480107 | Trí tuệ nhân tạo | 1,2 | 60 | Toán, Lý, Hóa |
+"""
+
+    parsed = asyncio.run(MarkdownParser().parse(markdown.encode("utf-8"), "tuyen_sinh.md"))
+
+    assert parsed.canonical_document is not None
+    assert len(parsed.canonical_document.tables) == 1
+    table = parsed.canonical_document.tables[0]
+    assert len(table.rows) == 2
+    assert table.rows[0].cells[5].raw_value == "Toán, Văn, Anh Toán, Lý, Hóa"
+    assert table.rows[1].cells[1].raw_value == "7480107"
+
+
+def test_markdown_parser_converts_plan_sections_to_atomic_records():
+    markdown = """# Kế hoạch triển khai nhiệm vụ
+
+Kế hoạch nhiệm vụ 1.1 (Công tác đào tạo):
+- Nội dung nhiệm vụ: Triển khai kế hoạch đào tạo.
+- Đơn vị chủ trì: Phòng Đào tạo
+- Đơn vị phối hợp: Các khoa
+- Thời gian thực hiện: Trong năm học 2025 - 2026
+- Sản phẩm kết quả: Kế hoạch được ban hành
+
+Kế hoạch nhiệm vụ 1.2 (Công tác đào tạo):
+- Nội dung nhiệm vụ: Tổ chức khảo sát.
+- Đơn vị chủ trì: Phòng Khảo thí
+- Đơn vị phối hợp: Các đơn vị liên quan
+- Thời gian thực hiện: Tháng 10/2025
+- Sản phẩm kết quả: Báo cáo khảo sát
+"""
+
+    parsed = asyncio.run(MarkdownParser().parse(markdown.encode("utf-8"), "ke_hoach.md"))
+    prepared = IngestionService._prepare_domain_records(parsed)
+
+    assert prepared["quality_blocked"] is False
+    assert prepared["domain_record_count"] == 2
+    assert len(prepared["chunk_drafts"]) == 2
+    assert len(prepared["facts_data"]) == 4

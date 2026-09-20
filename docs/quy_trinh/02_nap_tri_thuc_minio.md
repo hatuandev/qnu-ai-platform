@@ -113,6 +113,15 @@ flowchart TD
 - **Bảo tồn Markdown từng trang (`page_markdowns`)**: Lưu trữ nội dung Markdown sạch độc lập cho từng trang trong `doc_metadata["page_markdowns"]` để khắc phục triệt để lỗi "chunks dồn hết vào trang 1 khiến trang 2..N bị trắng tinh". `CanonicalDocument` chỉ tồn tại trong phiên xử lý để kiểm định và không được tuần tự hóa vào metadata.
 - **Không phát minh tiêu đề cột**: Markdown renderer không tự đặt tên kiểu `Cột N`. Bảng có header rỗng, header giả hoặc không tái dựng được sẽ không được render như dữ liệu hợp lệ.
 
+#### Bước 4A: Tiếp nhận trực tiếp Markdown đã bóc tách
+- Tệp `.md` được định tuyến qua [`MarkdownParser`](../../backend/app/modules/knowledge/parsers/markdown_parser.py), không đi qua `PlainTextParser`. Parser đọc UTF-8, chuẩn hóa Unicode/whitespace, nhận diện bảng GFM và giữ nguyên hàng tiếp nối khi bảng bị tách thành nhiều block.
+- Với tài liệu dạng kế hoạch nhiệm vụ, các block `Kế hoạch nhiệm vụ X.Y` được chuyển thành bản ghi nghiệp vụ có cấu trúc gồm mã nhiệm vụ, nội dung, đơn vị chủ trì/phối hợp, thời gian và sản phẩm kết quả. Mỗi mã nhiệm vụ tạo một record-aware chunk và các Facts tương ứng.
+- Với tài liệu tuyển sinh, các bảng GFM được tái dựng thành các bản ghi ngành học. Các dòng header lặp, separator và dòng tiếp nối đầu trang không được coi là dữ liệu. Mã ngành mâu thuẫn giữa các bảng vẫn được giữ nguyên để Quality Gate phát hiện, tuyệt đối không tự sửa theo suy đoán.
+- Markdown chỉ được đi tiếp sang tầng Record-aware Chunking/Facts khi `DataQualityGate.passed = true`. Nếu có lỗi blocking như mã ngành mâu thuẫn, tài liệu chuyển `review_pending`, không tạo chunk/fact và không gửi dữ liệu sang Qdrant.
+- Kết quả kiểm tra hai tệp Markdown hiện tại:
+  - **Kế hoạch triển khai 2025-2026**: 1 bảng chuẩn hóa, 76/76 mã nhiệm vụ hợp lệ, 76 chunks và 152 Facts, Quality Gate đạt.
+  - **Thông tin tuyển sinh 2026**: 5 block bảng, 53 ngành được nhận diện nhưng Quality Gate chặn do mâu thuẫn mã ngành AI `7480207` và `7480107`; chưa tạo chunk/fact/Qdrant point cho đến khi cán bộ đối chiếu nguồn PDF chính thức.
+
 ### Bước 5: Chiến lược phân đoạn tri thức (Chunking Strategy)
 - **`ClauseBasedChunker`**: Dành riêng cho Quy chế đào tạo, Quyết định, Thông tư, Quy định học vụ. Quét biểu thức chính quy `(?:Điều|Chương|Phần)\s+\d+` để cắt độc lập từng Điều, Khoản, gắn nhãn trích dẫn chính xác.
 - **`SemanticChunker`**: Dành cho cẩm nang sinh viên, đề án tuyển sinh, giáo trình. Cắt theo ranh giới đoạn văn ngữ nghĩa với kích thước `max_tokens = 500`.

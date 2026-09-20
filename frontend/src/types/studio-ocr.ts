@@ -37,6 +37,8 @@ export interface StudioOCRDocument {
   provider: string;
   model: string;
   latencyMs: number;
+  status?: string;
+  indexStatus?: string;
   pdfUrl?: string;
   pages: StudioOCRPage[];
   sheetsData?: {

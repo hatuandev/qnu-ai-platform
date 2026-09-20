@@ -4,9 +4,11 @@ import {
   ArrowRight,
   CircleAlert,
   FileCheck2,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   UploadCloud,
+  Zap,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -58,7 +60,10 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
   const [ocrEngine, setOcrEngine] = useState<string>("auto");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recommendation, setRecommendation] = useState<FileRecommendation | null>(null);
+  const [isFastTrack, setIsFastTrack] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [processingStage, setProcessingStage] = useState<string>("Đang kết nối...");
+  const [progressPercent, setProgressPercent] = useState<number>(10);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const documentTypesQuery = useQuery({
     queryKey: ["document-types", "active"],
@@ -126,19 +131,45 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
     }
     setIsProcessing(true);
     setSubmitError(null);
+    setProgressPercent(15);
+    setProcessingStage("Đang tải tệp lên máy chủ & lưu trữ MinIO S3...");
+
+    const stages = [
+      { p: 35, msg: "Thanh tra cấu trúc văn bản & bóc tách nội dung..." },
+      { p: 60, msg: "Nhận diện bố cục OpenCV & tái dựng bảng biểu đa trang..." },
+      { p: 80, msg: "Kiểm tra Data Quality Gate & số hóa Fact Layer..." },
+      {
+        p: 92,
+        msg: isFastTrack
+          ? "Tự động phê duyệt & đánh chỉ mục Vector DB (Fast-Track)..."
+          : "Hoàn tất bóc tách, chuẩn bị dữ liệu Studio...",
+      },
+    ];
+    let stageIdx = 0;
+    const timer = setInterval(() => {
+      if (stageIdx < stages.length) {
+        setProgressPercent(stages[stageIdx].p);
+        setProcessingStage(stages[stageIdx].msg);
+        stageIdx++;
+      }
+    }, 1200);
+
     try {
+      let uploadedDocId: string;
+      let uploadedStatus: string | undefined;
+
       if (selectedFile) {
-        // Tải lên tệp thực tế kèm bộ máy OCR đã chọn, nhận document ID động
         const uploaded = await apiClient.uploadDocument(
           collection.id,
           selectedFile,
           docTitle.trim() || undefined,
           OCR_ENGINE_PARAM[ocrEngine],
-          docType
+          docType,
+          isFastTrack
         );
-        onStartVerification(uploaded.id);
+        uploadedDocId = uploaded.id;
+        uploadedStatus = uploaded.status;
       } else {
-        // Tạo tài liệu văn bản mới từ tiêu đề đã nhập (upload thật qua API)
         const title = docTitle.trim();
         const textBlob = new File(
           [`# ${title}\n\n*Khởi tạo ngày ${new Date().toLocaleDateString("vi-VN")}*`],
@@ -150,13 +181,32 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           textBlob,
           title,
           undefined,
-          docType
+          docType,
+          isFastTrack
         );
-        onStartVerification(created.id);
+        uploadedDocId = created.id;
+        uploadedStatus = created.status;
       }
+
+      clearInterval(timer);
+      setProgressPercent(100);
+      setProcessingStage(
+        isFastTrack && uploadedStatus === "approved"
+          ? "Đã nạp và lập chỉ mục Vector thành công!"
+          : "Bóc tách thành công! Đang chuyển hướng..."
+      );
+
+      // Điều hướng thông minh: Nếu Fast-Track thành công và đã approved, quay về danh sách tài liệu
+      setTimeout(() => {
+        if (isFastTrack && uploadedStatus === "approved") {
+          onBack();
+        } else {
+          onStartVerification(uploadedDocId);
+        }
+      }, 600);
     } catch (err) {
+      clearInterval(timer);
       setSubmitError(err instanceof Error ? err.message : "Tải lên thất bại. Vui lòng thử lại.");
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -473,6 +523,60 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
             </p>
           </div>
 
+          {/* Fast-Track Mode Toggle Card */}
+          <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="size-8 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                <Zap className="size-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-xs text-foreground">
+                    Chế độ Nạp Nhanh (Fast-Track)
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-primary/10 text-primary border-primary/30"
+                  >
+                    Khuyên dùng cho tệp chuẩn
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
+                  Tự động duyệt và nạp vào Vector DB ngay nếu dữ liệu sạch và Quality Gate không
+                  phát hiện lỗi. Tiết kiệm 80% thời gian cho văn bản thông thường.
+                </p>
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={isFastTrack}
+                onChange={(e) => setIsFastTrack(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+            </label>
+          </div>
+
+          {/* Multi-Stage Processing Indicator */}
+          {isProcessing && (
+            <div className="p-4 rounded-lg bg-card border border-primary/30 shadow-xs space-y-2 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-primary flex items-center gap-1.5">
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  {processingStage}
+                </span>
+                <span className="font-mono font-semibold text-primary">{progressPercent}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Submission Error Banner */}
           {submitError && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
@@ -513,7 +617,15 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
               {isProcessing ? (
                 <>
                   <div className="size-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Đang tải lên & bóc tách...</span>
+                  <span>
+                    {isFastTrack ? "Đang nạp Fast-Track..." : "Đang tải lên & bóc tách..."}
+                  </span>
+                </>
+              ) : isFastTrack ? (
+                <>
+                  <Zap className="size-3.5" />
+                  <span>Bóc tách & Nạp tự động (Fast-Track)</span>
+                  <ArrowRight className="size-3.5" />
                 </>
               ) : (
                 <>

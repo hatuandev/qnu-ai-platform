@@ -28,6 +28,8 @@ export const ocrStudioApi = {
       title: string;
       filename: string;
       engine: string;
+      status?: string;
+      index_status?: string;
       total_pages: number;
       file_size_bytes?: number;
       total_chunks?: number;
@@ -49,6 +51,8 @@ export const ocrStudioApi = {
       collection_id: v.collection_id,
       title: v.title,
       filename: v.filename,
+      status: v.status,
+      index_status: v.index_status,
       file_size_mb: Math.round((sizeBytes / 1048576) * 100) / 100,
       total_pages: v.total_pages,
       engine: v.engine,
@@ -101,6 +105,8 @@ export const ocrStudioApi = {
       collection_id: detail.collection_id,
       title: detail.title,
       filename: detail.filename,
+      status: detail.status,
+      index_status: detail.index_status,
       file_size_mb: Math.round((detail.file_size / 1048576) * 100) / 100,
       total_pages: Math.max(pageNumbers.length, 1),
       engine,

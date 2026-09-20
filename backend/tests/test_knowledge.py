@@ -969,3 +969,132 @@ async def test_reconcile_collection_audits_parity(monkeypatch):
     assert res["is_consistent"] is False
     assert len(res["discrepancies"]) >= 1
 
+
+@pytest.mark.asyncio
+async def test_ingest_document_fast_track_auto_approve(monkeypatch):
+    """Verify auto_approve=True automatically approves document and indexes vectors if quality passed."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.core.storage import storage_service
+    from app.modules.knowledge.models import KnowledgeCollection
+    from app.modules.knowledge.service import knowledge_service
+
+    db = AsyncMock()
+    mock_col = KnowledgeCollection(
+        id="col_auto_approve",
+        name="Kho Thu Nghiem",
+        module_code="general",
+    )
+
+    from app.modules.knowledge.services.collection_service import collection_service
+
+    monkeypatch.setattr(collection_service, "get_collection", AsyncMock(return_value=mock_col))
+    monkeypatch.setattr(storage_service, "save", AsyncMock())
+
+    # Mock dup_query scalar_one_or_none -> None (no duplicate)
+    mock_dup_exec = MagicMock()
+    mock_dup_exec.scalar_one_or_none.return_value = None
+    db.execute.return_value = mock_dup_exec
+
+    # Mock approve_document
+    mock_approve = AsyncMock(return_value={"document_id": "doc_auto", "indexed_chunks": 3})
+    monkeypatch.setattr(
+        knowledge_service._ingestion,
+        "approve_document",
+        mock_approve,
+    )
+
+    # 1. Test with auto_approve = True
+    doc = await knowledge_service.ingest_document(
+        db=db,
+        collection_id="col_auto_approve",
+        file_bytes=b"Day la van ban thong bao don gian khong co bang bieu hay loi chat luong.",
+        file_name="thong_bao_fast_track.txt",
+        title="Thong bao Fast Track",
+        auto_approve=True,
+    )
+    assert doc is not None
+    assert mock_approve.await_count == 1
+
+    # 2. Test with auto_approve = False
+    mock_approve.reset_mock()
+    doc_standard = await knowledge_service.ingest_document(
+        db=db,
+        collection_id="col_auto_approve",
+        file_bytes=b"Van ban binh thuong cho can bo mo studio de kiem duyet.",
+        file_name="thong_bao_standard.txt",
+        title="Thong bao Standard",
+        auto_approve=False,
+    )
+    assert doc_standard is not None
+    assert mock_approve.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_approve_document_with_pages_increments_revision_and_purges_old_vectors(monkeypatch):
+    """Re-approving with pages increments revision and invokes delete_by_document to prevent duplicates."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.service import knowledge_service
+    from app.modules.rag.vector_indexer import vector_indexer
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    doc = KnowledgeDocument(
+        id="doc_idempotent_01",
+        collection_id="col_admissions",
+        status="ready",
+        index_status="indexed",
+        version=1,
+        title="Thong bao tuyen sinh",
+        file_name="ts2026.pdf",
+        file_type="pdf",
+        file_size_bytes=2048,
+        file_hash="hash_idem_123",
+        storage_path="knowledge/ts2026.pdf",
+        doc_metadata={},
+        is_active=True,
+    )
+    col = KnowledgeCollection(
+        id="col_admissions",
+        name="Kho Tuyen Sinh",
+        module_code="admissions",
+        tenant_id="tenant_qnu",
+        workspace_id="workspace_qnu",
+    )
+    new_chunk = KnowledgeChunk(
+        id="chk_new_01",
+        document_id="doc_idempotent_01",
+        collection_id="col_admissions",
+        chunk_index=0,
+        content="Noi dung tuyen sinh da sua",
+        chunk_hash="hash_new_chunk",
+        token_count=12,
+    )
+
+    monkeypatch.setattr(knowledge_service, "get_document", AsyncMock(return_value=doc))
+    monkeypatch.setattr(knowledge_service, "get_collection", AsyncMock(return_value=col))
+
+    scalars_mock = MagicMock()
+    scalars_mock.all.return_value = [new_chunk]
+    exec_res = MagicMock()
+    exec_res.scalars.return_value = scalars_mock
+    db.execute.return_value = exec_res
+
+    mock_delete = AsyncMock(return_value=1)
+    mock_index = AsyncMock(return_value=1)
+    monkeypatch.setattr(vector_indexer, "delete_by_document", mock_delete)
+    monkeypatch.setattr(vector_indexer, "index_chunks", mock_index)
+
+    pages = [{"page_number": 1, "markdown_content": "# Thong tin tuyen sinh moi"}]
+    res = await knowledge_service.approve_document(db, "doc_idempotent_01", pages=pages)
+
+    assert doc.version == 2
+    assert mock_delete.await_count == 1
+    assert mock_delete.await_args[1] == {"collection_id": "col_admissions", "document_id": "doc_idempotent_01"}
+    assert res["status"] == "ready"
+    assert res["index_status"] == "indexed"
+
+
+

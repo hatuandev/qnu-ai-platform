@@ -212,7 +212,8 @@ export const knowledgeApi = {
     file: File,
     title?: string,
     ocrEngine?: string,
-    documentTypeCode?: string
+    documentTypeCode?: string,
+    autoApprove?: boolean
   ): Promise<KnowledgeDocument> {
     const formData = new FormData();
     formData.append("file", file);
@@ -224,6 +225,9 @@ export const knowledgeApi = {
     }
     if (documentTypeCode) {
       formData.append("document_type_code", documentTypeCode);
+    }
+    if (autoApprove) {
+      formData.append("auto_approve", "true");
     }
     let res: Response;
     try {
@@ -327,6 +331,31 @@ export const knowledgeApi = {
       throw new Error(`Phê duyệt tài liệu thất bại (HTTP ${res.status}).`);
     }
     return (await res.json()) as ApproveDocumentResult;
+  },
+
+  async batchApproveDocuments(documentIds: string[]): Promise<{
+    approved: string[];
+    failed: { document_id: string; error: string }[];
+    indexed_chunks: number;
+  }> {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/knowledge/documents/batch-approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document_ids: documentIds }),
+      });
+    } catch {
+      throw new Error("Không kết nối được máy chủ Backend (kiểm tra service port 8001).");
+    }
+    if (!res.ok) {
+      throw new Error(`Phê duyệt hàng loạt thất bại (HTTP ${res.status}).`);
+    }
+    return (await res.json()) as {
+      approved: string[];
+      failed: { document_id: string; error: string }[];
+      indexed_chunks: number;
+    };
   },
 
   async downloadDocument(documentId: string, filename: string): Promise<void> {
