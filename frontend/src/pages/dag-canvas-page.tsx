@@ -69,6 +69,9 @@ export interface DAGCanvasPageProps {
   currentPath?: string;
   onNavigate?: (path: string) => void;
   onNavigateToChat?: (assistantCode: string) => void;
+  backPath?: string;
+  backLabel?: string;
+  initialWorkflowId?: string;
 }
 
 function toCanvasNodeKind(nodeType: string): CanvasNodeKind {
@@ -246,8 +249,12 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
   currentPath,
   onNavigate,
   onNavigateToChat,
+  backPath,
+  backLabel,
+  initialWorkflowId,
 }) => {
   const pathWorkflowId = useMemo(() => {
+    if (initialWorkflowId) return initialWorkflowId;
     if (currentPath?.startsWith("/workflows/")) {
       return decodeURIComponent(currentPath.replace("/workflows/", ""));
     }
@@ -260,7 +267,17 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
     const requestedAssistant = searchParams.get("assistant");
     if (requestedAssistant) return `${requestedAssistant}-assistant`;
     return null;
-  }, [currentPath]);
+  }, [currentPath, initialWorkflowId]);
+
+  const returnTo = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get("returnTo");
+  }, []);
+
+  const effectiveBackPath = backPath || returnTo || "/workflows";
+  const effectiveBackLabel =
+    backLabel || (backPath || returnTo ? "Quay lại Trợ lý" : "Danh mục Quy trình");
 
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(pathWorkflowId ?? "");
   const [workflow, setWorkflow] = useState<WorkflowCanvasState | null>(null);
@@ -511,15 +528,34 @@ export const DAGCanvasPage: FC<DAGCanvasPageProps> = ({
             className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
             onClick={() => {
               if (onNavigate) {
-                onNavigate("/workflows");
+                onNavigate(effectiveBackPath);
               } else {
-                window.location.href = "/workflows";
+                window.location.href = effectiveBackPath;
               }
             }}
-            title="Quay lại danh mục Quy trình"
+            title={effectiveBackLabel}
           >
             <ArrowLeft className="size-4" />
           </Button>
+
+          {(backPath || returnTo) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2.5 text-xs font-medium text-primary hover:bg-primary/10 hidden sm:flex items-center gap-1.5 -ml-1 border border-primary/20 rounded-md"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate(effectiveBackPath);
+                } else {
+                  window.location.href = effectiveBackPath;
+                }
+              }}
+              title={effectiveBackLabel}
+            >
+              <ArrowLeft className="size-3" />
+              <span>{effectiveBackLabel}</span>
+            </Button>
+          )}
 
           <div className="flex size-8 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
             <Network className="size-4" />

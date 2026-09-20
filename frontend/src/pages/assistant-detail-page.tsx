@@ -38,7 +38,7 @@ import {
 import { modelopsApi } from "@/services/modelops-api";
 import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Network } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -132,11 +132,6 @@ export function AssistantDetailPage({
   const workflowsQuery = useQuery({
     queryKey: ["workflow-definitions"],
     queryFn: () => workflowsApi.listDefinitions(),
-  });
-
-  const runsQuery = useQuery({
-    queryKey: ["workflow-runs"],
-    queryFn: () => apiClient.getWorkflowRuns(),
   });
 
   const providersQuery = useQuery({
@@ -323,34 +318,6 @@ export function AssistantDetailPage({
     onError: (err: Error) => toast.error(`Khôi phục thất bại: ${err.message}`),
   });
 
-  const kpiStats = useMemo(() => {
-    if (!item)
-      return { totalRuns: 0, avgLatency: 0, collectionName: "", docCount: 0, workflowName: "" };
-    const runs = runsQuery.data || [];
-    const matchedRuns = runs.filter(
-      (r) => r.workflow_id === item.workflow_id || r.workflow_name.includes(item.name)
-    );
-    const avgLatency = matchedRuns.length
-      ? Math.round(matchedRuns.reduce((sum, r) => sum + r.duration_ms, 0) / matchedRuns.length)
-      : 240;
-
-    const collections = collectionsQuery.data || [];
-    const matchedCol = collections.find(
-      (c) => c.id === item.collection_id || c.code === item.collection_id
-    );
-
-    const workflows = workflowsQuery.data || [];
-    const matchedWf = workflows.find((w) => w.id === item.workflow_id);
-
-    return {
-      totalRuns: matchedRuns.length || 128,
-      avgLatency,
-      collectionName: matchedCol?.name || item.collection_id,
-      docCount: matchedCol?.document_count ?? 3,
-      workflowName: matchedWf?.display_name || item.workflow_id,
-    };
-  }, [item, runsQuery.data, collectionsQuery.data, workflowsQuery.data]);
-
   const handleGeneratePrompt = async () => {
     if (!form) return;
     const idea = form.description.trim() || form.name.trim();
@@ -403,6 +370,21 @@ export function AssistantDetailPage({
 
   const collections = collectionsQuery.data || [];
   const workflows = workflowsQuery.data || [];
+  // Khi ở subView workflow, hiển thị trực tiếp màn hình DAG Studio độc lập toàn màn hình
+  if (subView === "workflow") {
+    return (
+      <DAGCanvasPage
+        currentPath={`/workflows/${form?.workflow_id || item.workflow_id}`}
+        initialWorkflowId={form?.workflow_id || item.workflow_id}
+        onNavigate={onNavigate}
+        onNavigateToChat={(code) =>
+          onNavigate(`/assistants/${encodeURIComponent(code)}/playground`)
+        }
+        backPath={`/assistants/${encodeURIComponent(item.code || item.id)}`}
+        backLabel={`Trợ lý ${item.name}`}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -424,7 +406,7 @@ export function AssistantDetailPage({
         isReadinessLoading={readinessQuery.isLoading}
         isReadinessFetching={readinessQuery.isFetching}
         onRefetchReadiness={() => readinessQuery.refetch()}
-        kpiStats={kpiStats}
+        workflowId={form?.workflow_id || item.workflow_id}
       />
 
       {/* Local Workspace Sub-Navigation Pills */}
@@ -437,14 +419,6 @@ export function AssistantDetailPage({
       {/* Sub-view Content Switcher */}
       {subView === "playground" ? (
         <ChatStudioPage initialAssistant={item.code} />
-      ) : subView === "workflow" ? (
-        <DAGCanvasPage
-          currentPath={`/workflows/${form.workflow_id}`}
-          onNavigate={onNavigate}
-          onNavigateToChat={(code) =>
-            onNavigate(`/assistants/${encodeURIComponent(code)}/playground`)
-          }
-        />
       ) : subView === "channels" ? (
         <ChannelsPage />
       ) : subView === "quality" ? (

@@ -1,6 +1,5 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,6 @@ import { cn } from "@/lib/utils";
 import type { AssistantItem } from "@/services/api-client";
 import type { AssistantReadinessResponse } from "@/types/assistants";
 import {
-  Activity,
   AlertCircle,
   AlertTriangle,
   ArrowLeft,
@@ -20,12 +18,10 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
   Code,
   Copy,
   Download,
   History,
-  Library,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -33,7 +29,6 @@ import {
   RefreshCw,
   Rocket,
   Save,
-  ShieldCheck,
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
@@ -55,13 +50,7 @@ interface AssistantHeaderProps {
   isReadinessLoading?: boolean;
   isReadinessFetching?: boolean;
   onRefetchReadiness?: () => void;
-  kpiStats: {
-    totalRuns: number;
-    avgLatency: number;
-    collectionName: string;
-    docCount: number;
-    workflowName: string;
-  };
+  workflowId?: string;
 }
 
 export function AssistantHeader({
@@ -81,10 +70,11 @@ export function AssistantHeader({
   isReadinessLoading,
   isReadinessFetching,
   onRefetchReadiness,
-  kpiStats,
+  workflowId,
 }: AssistantHeaderProps) {
   const [isReadinessExpanded, setIsReadinessExpanded] = useState(false);
   const assistantCode = assistant.code || assistant.id;
+  const targetWorkflowId = workflowId || assistant.workflow_id;
 
   const passedChecksCount = readiness?.checks?.filter((c) => c.status === "passed").length ?? 0;
   const totalChecksCount = readiness?.checks?.length ?? 5;
@@ -117,11 +107,27 @@ export function AssistantHeader({
               {assistant.category}
             </Badge>
           </div>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">{assistant.id}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action 1: Primary Chat Test */}
+          {/* Action 1: Direct Full-Screen DAG Studio Link */}
+          {targetWorkflowId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() =>
+                onNavigate(`/assistants/${encodeURIComponent(assistantCode)}/workflow`)
+              }
+              title="Mở đồ thị điều phối DAG trong màn hình Studio riêng biệt"
+            >
+              <Network className="size-3.5" />
+              <span>Sơ đồ DAG Studio</span>
+            </Button>
+          )}
+
+          {/* Action 2: Primary Chat Test */}
           <Button
             type="button"
             variant="outline"
@@ -132,10 +138,10 @@ export function AssistantHeader({
             }
           >
             <MessageSquare className="size-3.5 text-primary" />
-            Thử chat
+            <span>Thử chat</span>
           </Button>
 
-          {/* Action 2: Save Changes (Shown on all config tabs) */}
+          {/* Action 3: Save Changes (Shown on all config tabs) */}
           {["overview", "models", "tools"].includes(subView) && onSave && (
             <Button
               disabled={isSaving}
@@ -149,7 +155,7 @@ export function AssistantHeader({
             </Button>
           )}
 
-          {/* Action 3: More Actions Dropdown Menu */}
+          {/* Action 4: More Actions Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="h-9 text-xs gap-1.5">
@@ -159,14 +165,16 @@ export function AssistantHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem
-                onClick={() =>
-                  onNavigate(`/assistants/${encodeURIComponent(assistantCode)}/workflow`)
-                }
-              >
-                <Network className="size-3.5 mr-2 text-primary" />
-                <span>Mở đồ thị DAG Studio</span>
-              </DropdownMenuItem>
+              {targetWorkflowId && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    onNavigate(`/assistants/${encodeURIComponent(assistantCode)}/workflow`)
+                  }
+                >
+                  <Network className="size-3.5 mr-2 text-primary" />
+                  <span>Mở đồ thị DAG Studio</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={onOpenClone}>
                 <Copy className="size-3.5 mr-2 text-primary" />
                 <span>Nhân bản Trợ lý</span>
@@ -189,58 +197,6 @@ export function AssistantHeader({
         </div>
       </div>
 
-      {/* KPI Metrics Strip (Shown on overview subview) */}
-      {subView === "overview" && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card className="p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Lượt Hội Thoại</span>
-              <Activity className="size-3.5 text-primary" />
-            </div>
-            <p className="mt-1 text-xl font-bold font-mono text-foreground">
-              {kpiStats.totalRuns.toLocaleString()}
-            </p>
-            <span className="text-xs text-muted-foreground">Tổng phiên thực thi</span>
-          </Card>
-
-          <Card className="p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Độ Trễ Phản Hồi</span>
-              <Clock className="size-3.5 text-primary" />
-            </div>
-            <p className="mt-1 text-xl font-bold font-mono text-foreground">
-              {kpiStats.avgLatency} ms
-            </p>
-            <span className="text-xs text-muted-foreground">Thời gian sinh token</span>
-          </Card>
-
-          <Card className="p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Kho Tri Thức</span>
-              <Library className="size-3.5 text-primary" />
-            </div>
-            <p
-              className="mt-1 text-sm font-semibold truncate text-foreground"
-              title={kpiStats.collectionName}
-            >
-              {kpiStats.collectionName}
-            </p>
-            <span className="text-xs text-muted-foreground">
-              {kpiStats.docCount} tài liệu bóc tách
-            </span>
-          </Card>
-
-          <Card className="p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Chuẩn Ragas TM-08</span>
-              <ShieldCheck className="size-3.5 text-success" />
-            </div>
-            <p className="mt-1 text-sm font-bold text-success">Đạt Chuẩn QNU</p>
-            <span className="text-xs text-muted-foreground">Faithfulness ≥ 0.90</span>
-          </Card>
-        </div>
-      )}
-
       {/* 5-Layer Publish Gate Readiness Banner (Collapsible Compact Alert) */}
       {isReadinessLoading ? (
         <div className="flex h-12 items-center justify-center text-xs text-muted-foreground gap-2 rounded-lg border border-dashed px-4">
@@ -250,12 +206,12 @@ export function AssistantHeader({
       ) : readiness ? (
         <div
           className={cn(
-            "rounded-lg border transition-colors",
+            "rounded-lg border bg-card transition-colors",
             readiness.is_ready_for_publish
-              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-950 dark:text-emerald-200"
+              ? "border-emerald-500/40 shadow-xs"
               : readiness.blockers.length > 0
-                ? "border-destructive/30 bg-destructive/5 text-destructive"
-                : "border-amber-500/30 bg-amber-500/5 text-amber-950 dark:text-amber-200"
+                ? "border-border"
+                : "border-amber-500/30"
           )}
         >
           {/* 1-Row Summary Header */}

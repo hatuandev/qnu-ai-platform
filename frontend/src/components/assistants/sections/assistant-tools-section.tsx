@@ -109,7 +109,11 @@ export function AssistantToolsSection({
                   className="flex-1 h-8 text-xs gap-1.5"
                   type="button"
                   variant="outline"
-                  onClick={() => onNavigate(`/workflows/${encodeURIComponent(form.workflow_id)}`)}
+                  onClick={() =>
+                    onNavigate(
+                      `/assistants/${encodeURIComponent(assistant?.code || assistant?.id || "")}/workflow`
+                    )
+                  }
                 >
                   <Network className="size-3.5 text-primary" />
                   Mở đồ thị DAG Studio: {selectedWorkflow?.display_name || form.workflow_id}

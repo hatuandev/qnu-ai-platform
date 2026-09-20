@@ -1,14 +1,5 @@
 import { cn } from "@/lib/utils";
-import {
-  Bot,
-  Cpu,
-  History,
-  MessageSquare,
-  Network,
-  Share2,
-  ShieldCheck,
-  Wrench,
-} from "lucide-react";
+import { Bot, Cpu, Network, Wrench } from "lucide-react";
 import type * as React from "react";
 
 export type AssistantSubView =
@@ -55,34 +46,10 @@ const WORKSPACE_TABS: WorkspaceTab[] = [
     icon: Wrench,
   },
   {
-    id: "playground",
-    label: "Thử nghiệm Chat",
-    subPath: "/playground",
-    icon: MessageSquare,
-  },
-  {
     id: "workflow",
-    label: "Đồ thị DAG",
+    label: "Sơ đồ DAG Studio",
     subPath: "/workflow",
     icon: Network,
-  },
-  {
-    id: "quality",
-    label: "Chất lượng TM-08",
-    subPath: "/quality",
-    icon: ShieldCheck,
-  },
-  {
-    id: "runs",
-    label: "Lịch sử Chạy",
-    subPath: "/runs",
-    icon: History,
-  },
-  {
-    id: "channels",
-    label: "Mã nhúng Kênh",
-    subPath: "/channels",
-    icon: Share2,
   },
 ];
 

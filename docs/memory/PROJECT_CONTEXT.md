@@ -7,11 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-20 23:10 (UTC+7)
-- **Phiên số**: #166
+- **Thời gian cập nhật**: 2026-09-20 23:25 (UTC+7)
+- **Phiên số**: #167
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Khắc Phục Triệt Để Lỗi Điều Hướng Tabs Trong Assistant Workspace (`/assistants/:id/*`) (phiên #166)**:
+  1. **Tinh Giản Giao Diện Trợ Lý AI & Tách Biệt DAG Visual Studio Thành Màn Hình Độc Lập (phiên #167)**:
+     - **Dọn sạch thông tin dư thừa & dữ liệu giả trên trang Chi tiết Trợ lý AI (`/assistants/:id`)**:
+       * Xóa 4 thẻ KPI thô/giả (128 lượt chạy, 240ms độ trễ, thẻ kho tri thức trùng lặp, thẻ Ragas TM-08 trùng lặp);
+       * Xóa chuỗi ID kỹ thuật `assistant.id` (`ast_admissions`) nằm dưới tiêu đề gây rối mắt;
+       * Tinh chỉnh container Publish Gate với nền phẳng tinh tế (`bg-card border`), không còn nhuộm đỏ chói toàn màn hình khi có blocker;
+       * Xóa hộp văn bản khuyến nghị chiến lược chunking lý thuyết tĩnh trong phần Gắn kết Tri thức RAG.
+     - **Tách DAG Visual Studio thành màn hình Studio độc lập (`/workflows/:id`) chuẩn Master-Detail Deep Routing (AGENTS.md 4.5)**:
+       * Bổ sung nút hành động nổi bật `[Sơ đồ DAG Studio ↗]` tại Header và phần Cấu hình Quy trình, đính kèm tham số `returnTo=/assistants/:code`;
+       * Cập nhật trang `dag-canvas-page.tsx` đọc `returnTo` và bổ sung nút điều hướng trực quan `[Quay lại Trợ lý]`;
+       * Rút gọn thanh Workspace Nav chỉ còn **3 tabs cấu hình trọng tâm**: `overview` (Thông tin & Tri thức), `models` (Mô hình & An toàn), `tools` (Quy trình & Công cụ);
+       * Loại bỏ component lồng `DAGCanvasPage` bên trong subtab `workflow` của Assistant Detail Page (tự động chuyển hướng sang `/workflows/:id?returnTo=...`), triệt tiêu việc vỡ layout margin âm và giảm mạnh kích thước bundle.
+     - **Gia cố tính an toàn Backend**: Dùng `getattr` truy xuất an toàn `doc.status` và `doc.index_status` trong `ingestion_service.py`.
+     - **Verification**: `npm run typecheck` 0 lỗi, `npm run lint` 0 lỗi trên 167 files, `npm run build` thành công trong 13.54s, `uv run ruff check .` pass, backend pytest 329/329 passed.
+  2. **Khắc Phục Triệt Để Lỗi Điều Hướng Tabs Trong Assistant Workspace (`/assistants/:id/*`) (phiên #166)**:
      - **Nguyên nhân**: Trong `assistant-detail-page.tsx`, hàm `getReferenceFromPath` sử dụng `.at(-1)` để lấy ID trợ lý từ URL. Khi người dùng click vào các sub-tabs (`/assistants/admissions/models`, `tools`, `playground`, `workflow`, `channels`, `quality`, `runs`), hàm này lấy nhầm đoạn đuôi `models` làm mã trợ lý và gọi API `GET /assistants/models`, gây lỗi HTTP 404 "Không tìm thấy Trợ lý AI".
      - **Giải pháp**: Chuẩn hóa hàm `getReferenceFromPath` lấy đúng phần tử ngay sau `/assistants/` (`parts[assistantsIndex + 1]`), đồng thời truyền trực tiếp prop `assistantId={resolved.params.assistantId}` từ `App.tsx` vào `AssistantDetailPage`.
      - **Kiểm thử**: `npm run typecheck` 0 lỗi, `npm run lint` 0 lỗi trên 167 files, `npm run build` thành công.

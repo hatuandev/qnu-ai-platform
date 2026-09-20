@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { KnowledgeCollection } from "@/types";
-import { ExternalLink, Library, Sparkles } from "lucide-react";
+import { ExternalLink, Library } from "lucide-react";
 
 interface AssistantKnowledgeSectionProps {
   form: AssistantEditForm;
@@ -68,21 +68,6 @@ export function AssistantKnowledgeSection({
             )}
           </div>
         </Field>
-
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs space-y-1.5">
-          <div className="flex items-center gap-1.5 font-semibold text-foreground">
-            <Sparkles className="size-3.5 text-primary" />
-            Khuyến nghị Chiến lược Chunking & RAG
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            - <strong>ClauseBasedChunker</strong>: Phù hợp cho văn bản quy phạm, quy chế đào tạo, đề
-            án tuyển sinh (bảo toàn trọn vẹn Điều, Khoản, Mục).
-          </p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            - <strong>SemanticChunker</strong>: Phù hợp cho cẩm nang sinh viên, giới thiệu khoa
-            viện, tài liệu văn xuôi mô tả tổng quan.
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
