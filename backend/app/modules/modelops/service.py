@@ -22,6 +22,7 @@ from app.modules.modelops.schemas import (
     LLMGenerateResponse,
     ProviderConfigCreate,
     ProviderConfigUpdate,
+    ProviderImportRequest,
     ProviderKeyCreate,
     ProviderKeyUpdate,
     SystemModelDefaultsResponse,
@@ -185,6 +186,23 @@ class ModelOpsService:
         return await self._provider.simulate_key_rotation(
             db, provider_id, tokens_consumed, trigger_rate_limit, cooldown_seconds
         )
+
+    # ---------------- Import / Export Providers ----------------
+
+    async def export_provider(
+        self, db: AsyncSession, provider_id: str, include_secrets: bool = True
+    ) -> dict[str, Any]:
+        return await self._provider.export_provider(db, provider_id, include_secrets=include_secrets)
+
+    async def export_all_providers(
+        self, db: AsyncSession, include_secrets: bool = True
+    ) -> dict[str, Any]:
+        return await self._provider.export_all_providers(db, include_secrets=include_secrets)
+
+    async def import_providers(
+        self, db: AsyncSession, payload: ProviderImportRequest
+    ) -> dict[str, Any]:
+        return await self._provider.import_providers(db, payload)
 
     # ---------------- Model Catalog & System Defaults ----------------
 

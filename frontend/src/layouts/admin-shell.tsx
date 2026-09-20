@@ -77,6 +77,7 @@ export function AdminShell({
       {/* 1. Collapsible Desktop Sidebar (Hidden on mobile < lg) */}
       <AppSidebar
         open={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
         currentPath={currentPath}
         onNavigate={onNavigate}
         backendOnline={backendOnline}
@@ -100,11 +101,12 @@ export function AdminShell({
         </SheetContent>
       </Sheet>
 
-      {/* 3. Main Wrapper (pl-0 on mobile, shifted right on lg screens) */}
+      {/* 3. Main Wrapper (pl-0 on mobile, shifted right on lg screens chuẩn QLKTX) */}
       <div
+        data-state={sidebarOpen ? "expanded" : "collapsed"}
         className={cn(
-          "flex min-h-screen flex-col transition-all duration-300 ease-in-out pl-0",
-          sidebarOpen ? "lg:pl-64" : "lg:pl-16"
+          "min-h-svh min-w-0 flex-1 transition-[padding] duration-200 pl-0 flex flex-col",
+          sidebarOpen ? "lg:pl-[var(--sidebar-width)]" : "lg:pl-16"
         )}
       >
         {/* Top Header */}
@@ -119,16 +121,16 @@ export function AdminShell({
 
         {/* Page Content with Layout Variants */}
         {activeVariant === "full-bleed" ? (
-          <main className="flex-1 h-[calc(100vh-3.5rem)] p-0 overflow-hidden flex flex-col">
+          <main className="flex-1 h-[calc(100vh-var(--topbar-height))] p-0 overflow-hidden flex flex-col">
             {children}
           </main>
         ) : activeVariant === "wide" ? (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-[1600px]">{children}</div>
+          <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 sm:py-7 lg:px-8">
+            {children}
           </main>
         ) : (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">{children}</div>
+          <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 sm:py-7 lg:px-8">
+            {children}
           </main>
         )}
       </div>

@@ -100,4 +100,3 @@ docker compose logs -f backend
 - **`qnu_redis`**: Redis 7 làm Semantic Cache & Job Queue Broker (cổng 6379).
 - **`qnu_minio`**: MinIO S3-compatible Object Storage lưu trữ tệp tài liệu thô (cổng 9000, 9001).
 - **`qnu_gotenberg`**: Gotenberg 8 chuyển đổi tài liệu Word NĐ 30 sang PDF để xem trước trực tiếp trên web (cổng 3005).
-

@@ -9,7 +9,7 @@ export function PageHeader({
   className,
 }: {
   eyebrow?: string;
-  title: string;
+  title: React.ReactNode;
   description?: string;
   actions?: React.ReactNode;
   className?: string;
@@ -19,12 +19,14 @@ export function PageHeader({
       className={cn("flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between", className)}
     >
       <div className="min-w-0">
-        <div className="type-metadata mb-2 font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {eyebrow ?? "Quản trị AI"}
         </div>
-        <h1 className="type-page-title m-0">{title}</h1>
+        <h1 className="type-page-title m-0 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+          {title}
+        </h1>
         {description ? (
-          <p className="mt-1.5 max-w-2xl text-[length:var(--font-size-body)] leading-6 text-muted-foreground">
+          <p className="mt-1.5 max-w-3xl text-sm sm:text-base leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}

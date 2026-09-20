@@ -24,6 +24,13 @@ from app.modules.knowledge.models import (
     KnowledgeDocument,
     KnowledgeFact,
 )
+from app.modules.knowledge.normalization.quality_gate import DataQualityGate
+from app.modules.knowledge.normalization.record_normalizer import (
+    AdmissionProgramRecord,
+    AdmissionsRecordNormalizer,
+    ImplementationPlanRecordNormalizer,
+    ImplementationTaskRecord,
+)
 from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.schemas import ParsePreviewResponse
@@ -161,6 +168,65 @@ class IngestionService:
         """Clause-based chunking for regulations, semantic otherwise."""
         return "clause" if module_code == "regulations" else "semantic"
 
+    @staticmethod
+    def _prepare_domain_records(parsed: ParsedContent) -> dict:
+        """Validate canonical tables and build verified record chunks for supported domains."""
+        canonical_doc = parsed.canonical_document
+        if canonical_doc is None:
+            return {
+                "chunk_drafts": None,
+                "facts_data": None,
+                "quality_report": None,
+                "quality_blocked": False,
+                "domain_record_count": 0,
+            }
+
+        quality_report = DataQualityGate().evaluate(canonical_doc)
+        canonical_doc.issues = quality_report.issues
+        serialized_report = quality_report.model_dump(mode="json")
+        if not quality_report.passed:
+            return {
+                "chunk_drafts": [],
+                "facts_data": [],
+                "quality_report": serialized_report,
+                "quality_blocked": True,
+                "domain_record_count": 0,
+            }
+
+        admissions_normalizer = AdmissionsRecordNormalizer()
+        plan_normalizer = ImplementationPlanRecordNormalizer()
+        records = []
+        chunk_strategy: str | None = None
+        chunk_records = []
+        if admissions_normalizer.supports(canonical_doc):
+            records = admissions_normalizer.normalize(canonical_doc)
+            chunk_records = [record for record in records if isinstance(record, AdmissionProgramRecord)]
+            chunk_strategy = "admissions"
+        elif plan_normalizer.supports(canonical_doc):
+            records = plan_normalizer.normalize(canonical_doc)
+            chunk_records = [record for record in records if isinstance(record, ImplementationTaskRecord)]
+            chunk_strategy = "implementation_task"
+
+        if chunk_strategy is None:
+            return {
+                "chunk_drafts": None,
+                "facts_data": None,
+                "quality_report": serialized_report,
+                "quality_blocked": False,
+                "domain_record_count": 0,
+            }
+
+        chunks = get_chunker(chunk_strategy).chunk("", records=chunk_records)
+        return {
+            "chunk_drafts": chunks,
+            "facts_data": fact_extractor.extract_facts_from_domain_records(
+                records, "", ""
+            ),
+            "quality_report": serialized_report,
+            "quality_blocked": False,
+            "domain_record_count": len(chunk_records),
+        }
+
     async def prepare_ingestion(
         self,
         db: AsyncSession,
@@ -241,8 +307,11 @@ class IngestionService:
         elif parsed.page_count == 1:
             page_markdowns[1] = cleaned_text.strip()
 
-        chunker = get_chunker(self.chunk_strategy_for(module_code))
-        chunk_drafts = chunker.chunk(cleaned_text)
+        domain_result = self._prepare_domain_records(parsed)
+        chunk_drafts = domain_result["chunk_drafts"]
+        if chunk_drafts is None:
+            chunker = get_chunker(self.chunk_strategy_for(module_code))
+            chunk_drafts = chunker.chunk(cleaned_text)
         return {
             "ext": ext,
             "parsed": parsed,
@@ -251,6 +320,10 @@ class IngestionService:
             "page_markdowns": page_markdowns,
             "ocr_method": ocr_method,
             "ocr_fallback": ocr_fallback,
+            "facts_data": domain_result["facts_data"],
+            "quality_report": domain_result["quality_report"],
+            "quality_blocked": domain_result["quality_blocked"],
+            "domain_record_count": domain_result["domain_record_count"],
         }
 
     async def persist_chunks_facts(
@@ -261,7 +334,6 @@ class IngestionService:
         prepared: dict,
     ) -> int:
         """Persist chunks + facts for a document (no commit; caller commits)."""
-        parsed = prepared["parsed"]
         chunk_drafts = prepared["chunk_drafts"]
         for draft in chunk_drafts:
             db.add(
@@ -277,11 +349,23 @@ class IngestionService:
                     chunk_metadata=draft.metadata,
                 )
             )
-        for fact_data in fact_extractor.extract(
-            tables=parsed.tables,
-            collection_id=collection_id,
-            document_id=doc.id,
-        ):
+        fact_data_list = prepared.get("facts_data")
+        if fact_data_list is None:
+            fact_data_list = fact_extractor.extract(
+                tables=prepared["parsed"].tables,
+                collection_id=collection_id,
+                document_id=doc.id,
+            )
+        else:
+            fact_data_list = [
+                {
+                    **fact_data,
+                    "collection_id": collection_id,
+                    "document_id": doc.id,
+                }
+                for fact_data in fact_data_list
+            ]
+        for fact_data in fact_data_list:
             db.add(KnowledgeFact(**fact_data))
         return len(chunk_drafts)
 
@@ -308,10 +392,18 @@ class IngestionService:
                 "ocr_fallback": prepared["ocr_fallback"],
                 "page_blocks": self._group_blocks_by_page(prepared["parsed"].blocks),
                 "page_markdowns": prepared.get("page_markdowns") or {},
+                "quality_report": prepared.get("quality_report"),
+                "domain_record_count": prepared.get("domain_record_count", 0),
             }
         )
         doc.doc_metadata = metadata
-        doc.status = "pending"
+        doc.status = "review_pending" if prepared.get("quality_blocked") else "pending"
+        doc.index_status = "pending"
+        doc.index_error = (
+            "Tài liệu có lỗi chất lượng cần cán bộ hiệu đính trước khi lập chỉ mục."
+            if prepared.get("quality_blocked")
+            else None
+        )
         await db.commit()
         await db.refresh(doc)
         return count
@@ -375,10 +467,16 @@ class IngestionService:
                 "document_type_source": "user" if normalized_document_type_code else "unknown",
                 "page_blocks": self._group_blocks_by_page(parsed.blocks),
                 "page_markdowns": prepared.get("page_markdowns") or {},
+                "quality_report": prepared.get("quality_report"),
+                "domain_record_count": prepared.get("domain_record_count", 0),
             },
-            status="pending",
+            status="review_pending" if prepared.get("quality_blocked") else "pending",
             index_status="pending",
-            index_error=None,
+            index_error=(
+                "Tài liệu có lỗi chất lượng cần cán bộ hiệu đính trước khi lập chỉ mục."
+                if prepared.get("quality_blocked")
+                else None
+            ),
             is_active=True,
         )
         db.add(doc)
@@ -402,6 +500,7 @@ class IngestionService:
             result={
                 "total_chunks": len(chunk_drafts),
                 "ocr_engine": prepared["ocr_method"],
+                "quality_status": "blocked" if prepared.get("quality_blocked") else "passed",
             },
         )
         db.add(job)
@@ -623,6 +722,15 @@ class IngestionService:
                 snippet = str(block.get("content_snippet") or block.get("text") or "")[:160]
 
                 # Table continuation rescue: nếu là text nhưng ở đầu trang và là hàng bảng ngắt trang
+                # BẮT BUỘC PHẢI CÓ tín hiệu dữ liệu bảng (mã ngành 7 số, mã tổ hợp)
+                # và TUYỆT ĐỐI KHÔNG PHẢI là đoạn văn bản quy chế / hành chính (a., b., c., Trường hợp...)
+                is_admin_paragraph = bool(
+                    re.match(
+                        r"^(?:[a-z]\.|\d+\.|\+|-\s|Trường hợp|Theo quy định|Căn cứ|Riêng đối với)\b",
+                        snippet.strip(),
+                        re.IGNORECASE,
+                    )
+                )
                 has_tbl_signals = bool(
                     re.search(r"\b7\d{6}\b", snippet)
                     or re.search(
@@ -630,9 +738,14 @@ class IngestionService:
                         snippet,
                     )
                 )
-                if box_type == "text" and (
-                    (prev_has_bottom_table and bx_y <= 30.0 and (bx_h <= 15.0 or has_tbl_signals))
-                    or (bx_y <= 25.0 and bx_h <= 12.0 and has_tbl_signals)
+                if (
+                    box_type == "text"
+                    and not is_admin_paragraph
+                    and has_tbl_signals
+                    and (
+                        (prev_has_bottom_table and bx_y <= 30.0 and bx_h <= 15.0)
+                        or (bx_y <= 25.0 and bx_h <= 12.0)
+                    )
                 ):
                     box_type = "table"
                     block_label = "Bảng dữ liệu (tiếp nối)"
@@ -641,6 +754,17 @@ class IngestionService:
                         bx_w = prev_table_coords["width"]
                         bx_y = max(0.0, bx_y - 0.4)
                         bx_h = bx_h + 0.8
+                elif box_type == "table":
+                    block_label = str(block.get("label", f"Bảng {idx}"))
+                    if prev_has_bottom_table and bx_y <= 12.0:
+                        block_label = "Bảng dữ liệu (tiếp nối)"
+                        if prev_table_coords:
+                            bx_x = prev_table_coords["x"]
+                            bx_w = prev_table_coords["width"]
+                        if bx_y > 6.5 and bx_y <= 10.0 and bx_h <= 3.5:
+                            expanded_y = max(5.0, bx_y - 2.1)
+                            bx_h = bx_h + (bx_y - expanded_y)
+                            bx_y = expanded_y
                 else:
                     block_label = str(block.get("label", f"Khối {idx}"))
 
@@ -1269,6 +1393,18 @@ class IngestionService:
                 status_code=409,
             )
 
+        quality_report = (doc.doc_metadata or {}).get("quality_report") or {}
+        has_blocking_quality_issue = bool(quality_report) and not bool(
+            quality_report.get("passed")
+        )
+        if has_blocking_quality_issue and not pages:
+            raise AppException(
+                "Tài liệu còn lỗi chất lượng dữ liệu. Hãy hiệu đính trong Studio trước khi phê duyệt.",
+                code="document_review_required",
+                status_code=409,
+                details={"quality_report": quality_report},
+            )
+
         if pages:
             await db.execute(
                 delete(KnowledgeChunk).where(KnowledgeChunk.document_id == doc.id)
@@ -1301,8 +1437,16 @@ class IngestionService:
                         )
                     )
                     chunk_index += 1
+            verified_facts = fact_extractor.extract_from_verified_markdown_pages(
+                pages,
+                doc.collection_id,
+                doc.id,
+            )
+            for fact_data in verified_facts:
+                db.add(KnowledgeFact(**fact_data))
             metadata = dict(doc.doc_metadata or {})
             metadata["human_verified"] = True
+            metadata["human_verified_fact_count"] = len(verified_facts)
             doc.doc_metadata = metadata
 
         doc.status = "approved"
@@ -1333,8 +1477,8 @@ class IngestionService:
                 "tenant_id": col.tenant_id,
                 "workspace_id": col.workspace_id,
                 "document_revision": doc.version,
-                "document_status": "ready",
-                "is_retrievable": True,
+                "document_status": "indexing",
+                "is_retrievable": False,
                 "content_hash": c.chunk_hash,
                 "embedding_model": settings.EMBEDDING_MODEL,
                 "payload_schema_version": "v1",
@@ -1351,9 +1495,30 @@ class IngestionService:
                 chunks=chunks_payload,
             )
             if indexed > 0:
-                doc.status = "ready"
-                doc.index_status = "indexed"
-                doc.index_error = None
+                is_parity, parity_reason = await vector_indexer.verify_revision_parity(
+                    collection_id=doc.collection_id,
+                    document_id=doc.id,
+                    target_revision=doc.version,
+                    expected_count=len(chunks),
+                )
+                if is_parity:
+                    await vector_indexer.activate_document_revision(
+                        collection_id=doc.collection_id,
+                        document_id=doc.id,
+                        target_revision=doc.version,
+                    )
+                    await vector_indexer.purge_stale_revisions(
+                        collection_id=doc.collection_id,
+                        document_id=doc.id,
+                        current_revision=doc.version,
+                    )
+                    doc.status = "ready"
+                    doc.index_status = "indexed"
+                    doc.index_error = None
+                else:
+                    doc.status = "approved"
+                    doc.index_status = "index_failed"
+                    doc.index_error = parity_reason
             else:
                 doc.status = "approved"
                 doc.index_status = "index_failed"

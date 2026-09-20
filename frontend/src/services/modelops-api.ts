@@ -1,8 +1,12 @@
 import type {
+  ConflictStrategy,
   ModelProvider,
   ProviderApiKey,
+  ProviderBulkExportResponse,
+  ProviderImportResponse,
   ProviderModelsTestResponse,
   ProviderPreset,
+  ProviderSingleExportResponse,
   SystemModelDefaults,
   SystemModelDefaultsResponse,
   TokenQuota,
@@ -176,6 +180,7 @@ export const modelopsApi = {
     payload: {
       name: string;
       api_key: string;
+      account_id?: string;
       priority?: number;
       quota_limit?: number;
     }
@@ -194,10 +199,11 @@ export const modelopsApi = {
     keyId: string,
     payload: Partial<{
       name: string;
+      account_id: string | null;
       priority: number;
       is_active: boolean;
       status: string;
-      quota_limit: number;
+      quota_limit: number | null;
     }>
   ): Promise<ProviderApiKey> {
     const res = await fetch(`${BASE_URL}/modelops/providers/${providerId}/keys/${keyId}`, {
@@ -350,5 +356,40 @@ export const modelopsApi = {
       throw new Error(`Không tải được thống kê sử dụng (HTTP ${res.status}).`);
     }
     return res.json();
+  },
+
+  async exportProvider(
+    providerId: string,
+    includeSecrets = true
+  ): Promise<ProviderSingleExportResponse> {
+    const res = await fetch(
+      `${BASE_URL}/modelops/providers/${providerId}/export?include_secrets=${includeSecrets}`
+    );
+    if (!res.ok) throw new Error(`Xuất cấu hình Provider thất bại (HTTP ${res.status})`);
+    return await res.json();
+  },
+
+  async exportAllProviders(includeSecrets = true): Promise<ProviderBulkExportResponse> {
+    const res = await fetch(
+      `${BASE_URL}/modelops/providers/export?include_secrets=${includeSecrets}`
+    );
+    if (!res.ok) throw new Error(`Xuất toàn bộ Provider thất bại (HTTP ${res.status})`);
+    return await res.json();
+  },
+
+  async importProviders(
+    data: unknown,
+    conflictStrategy: ConflictStrategy = "overwrite"
+  ): Promise<ProviderImportResponse> {
+    const res = await fetch(`${BASE_URL}/modelops/providers/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data, conflict_strategy: conflictStrategy }),
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || `Nhập cấu hình thất bại (HTTP ${res.status})`);
+    }
+    return await res.json();
   },
 };

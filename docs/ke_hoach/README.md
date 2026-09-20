@@ -40,3 +40,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Đánh giá sau vibe coding và hướng dẫn cải thiện tiếp.
    - **Mục tiêu**: Kiểm chứng việc triển khai Kế hoạch 08 bằng code, test, migration và dữ liệu live; chỉ ra khoảng cách giữa unit test và runtime, đồng thời lập lộ trình P0/P1 để đạt Production Candidate thật.
    - **Trạng thái**: Đánh giá độc lập hoàn tất; điểm hiện tại đề xuất 7,1/10, ưu tiên sửa reconciliation, RAG live data, worker payload v1 và ModelOps fake-success.
+
+8. [**`10_ke_hoach_chuan_hoa_markdown_qdrant_va_chat_luong_rag.md`**](./10_ke_hoach_chuan_hoa_markdown_qdrant_va_chat_luong_rag.md):
+   - **Tên tài liệu**: Kế hoạch chuẩn hóa Markdown, Qdrant và chất lượng tri thức RAG.
+   - **Mục tiêu**: Loại dữ liệu bảng trùng, tái dựng bảng nhiều trang/ô gộp, chuẩn hóa thành record nghiệp vụ, bổ sung Quality Gate, Structured Facts, record-aware chunking và revision-safe Qdrant để LLM trả lời đúng và có trích dẫn kiểm chứng.
+   - **Trạng thái**: Hướng dẫn triển khai chi tiết; ưu tiên bắt đầu từ P0 Duplicate-Free Parser và Multi-page Table Reconstruction.

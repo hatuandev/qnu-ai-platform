@@ -1,4 +1,6 @@
 import { EmptyState } from "@/components/admin/empty-state";
+import { KpiMetric } from "@/components/admin/kpi-metric";
+import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -235,76 +237,78 @@ export function AssistantsPage({ onNavigate }: AssistantsPageProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Bot className="size-4 text-primary" />
-            <span>Vận hành / Danh mục Trợ lý AI</span>
+    <div className="space-y-6 pb-10">
+      {/* 1. Page Header Chuẩn QLKTX */}
+      <PageHeader
+        eyebrow="Vận Hành / Danh Mục Trợ Lý AI"
+        title="Hệ Sinh Thái Trợ Lý AI QNU"
+        description="Quản trị các Trợ lý AI chuyên trách theo vòng đời 7 lớp, kết nối Kho tri thức thật, Workflow DAG chuẩn và rào chắn chống bịa đặt TM-08."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              accept="application/json,.bundle"
+              aria-label="Chọn bundle trợ lý để nhập"
+              className="hidden"
+              type="file"
+              onChange={handleImport}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileUp className="size-3.5" />
+              Nhập bundle
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={seedMutation.isPending}
+              onClick={() => seedMutation.mutate()}
+            >
+              <RefreshCw
+                className={seedMutation.isPending ? "size-3.5 animate-spin" : "size-3.5"}
+              />
+              Đồng bộ mẫu Core
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => onNavigate("/assistants/new")}>
+              <Plus className="size-3.5" />
+              Tạo trợ lý mới
+            </Button>
           </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-            Hệ sinh thái Trợ lý AI QNU
-          </h1>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            Quản trị các Trợ lý AI chuyên trách theo vòng đời 7 lớp, kết nối Kho tri thức thật,
-            Workflow DAG chuẩn và rào chắn chống bịa đặt TM-08.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            ref={fileInputRef}
-            accept="application/json,.bundle"
-            aria-label="Chọn bundle trợ lý để nhập"
-            className="hidden"
-            type="file"
-            onChange={handleImport}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <FileUp className="size-3.5" />
-            Nhập bundle
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            disabled={seedMutation.isPending}
-            onClick={() => seedMutation.mutate()}
-          >
-            <RefreshCw className={seedMutation.isPending ? "size-3.5 animate-spin" : "size-3.5"} />
-            Đồng bộ mẫu Core
-          </Button>
-          <Button
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => onNavigate("/assistants/new")}
-          >
-            <Plus className="size-3.5" />
-            Tạo trợ lý mới
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[
-          { label: "Tổng trợ lý hệ thống", value: items.length },
-          { label: "Đang hoạt động", value: activeCount },
-          { label: "Bắt buộc trích dẫn & Grounded", value: guardedCount },
-        ].map((stat) => (
-          <Card key={stat.label} className="border-border/80">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground font-mono">
-                {stat.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* 2. Stat KPIs Card Chuẩn QLKTX */}
+      <Card className="overflow-hidden border bg-card shadow-2xs">
+        <CardContent className="grid p-0 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            label="Tổng Trợ Lý Hệ Thống"
+            value={items.length}
+            helper="Hỗ trợ các phân hệ nghiệp vụ"
+            icon={Bot}
+          />
+          <KpiMetric
+            label="Đang Hoạt Động"
+            value={activeCount}
+            delta={`${items.length > 0 ? Math.round((activeCount / items.length) * 100) : 0}%`}
+            trend="positive"
+            helper="Sẵn sàng phục vụ sinh viên/cán bộ"
+            icon={CheckCircle2}
+          />
+          <KpiMetric
+            label="Bắt Buộc Trích Dẫn & Grounded"
+            value={guardedCount}
+            delta="100% TM-08"
+            trend="positive"
+            helper="Chống bịa đặt Zero-Hallucination"
+            icon={ShieldCheck}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="gap-4 lg:flex-row lg:items-end lg:justify-between pb-3">

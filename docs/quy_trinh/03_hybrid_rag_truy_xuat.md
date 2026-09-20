@@ -50,17 +50,29 @@ flowchart TD
 - **Input Safety Guardrail**: Quét phát hiện tấn công Prompt Injection (`Ignore all previous instructions...`, `Reveal system prompt...`).
 - **PII Data Redaction**: Tự động nhận diện và che mờ các thông tin nhạy cảm của thí sinh/sinh viên trước khi gửi sang LLM (CCCD thành `077******988`, SĐT thành `0912***678`, Email thành `sin***@qnu.edu.vn`).
 
+### Bước 2.5: Phân Loại Ý Định Truy Vấn & Định Tuyến Ưu Tiên Số Liệu (Fact-First Query Routing)
+- **Bộ phân loại ý định thông minh (`QueryClassifier`)**:
+  * Phân tách câu hỏi thành 3 nhóm ý định chuyên biệt (`QueryIntent`):
+    - `EXACT_FACT`: Tra cứu số liệu cụ thể (mã ngành `7\d{6}`, chỉ tiêu, điểm chuẩn, học phí, quy đổi IELTS/VSTEP, mã nhiệm vụ `\d+\.\d+`, đơn vị chủ trì, hạn hoàn thành).
+    - `NARRATIVE`: Câu hỏi giải thích chính sách, quy chế đào tạo, thủ tục nhập học, văn bản hướng dẫn.
+    - `MIXED`: Câu hỏi tổng hợp đòi hỏi cả số liệu cụ thể kèm văn cảnh diễn giải.
+  * **Trích xuất thực thể miền sâu (Domain Entity Extraction)**: Tự động bóc tách các mã định danh chuẩn (`entity_codes` như `7480107`, `6.8`, `certificate_conversion`) và danh mục thuộc tính nghiệp vụ (`fact_attributes` như `expected_quota`, `cutoff_score`, `lead_unit`, `end_date`, `converted_score`).
+- **Chiến lược điều phối tìm kiếm thích ứng (Intent-tailored Retrieval Strategy)**:
+  * Khi `is_fact_first = True` (thuộc `EXACT_FACT` hoặc `MIXED`):
+    - Hệ thống ưu tiên tra cứu trực tiếp từ `KnowledgeFact` qua `lookup_facts` với bộ lọc `entity_codes` và `fact_attributes`.
+    - Kết quả số liệu được định dạng thành Markdown Table chuẩn và đưa lên vị trí trang trọng nhất (`BẢNG SỐ LIỆU ĐÃ XÁC THỰC`) trong ngữ cảnh cung cấp cho LLM.
+    - Với `EXACT_FACT`, hệ thống thu gọn phạm vi Hybrid Retrieval (`top_k=4`, `rerank_top_k=3`) nhằm tránh hiện tượng văn bản thừa làm loãng hoặc xung đột với số liệu chính xác.
+  * Với `NARRATIVE`, hệ thống mở rộng Hybrid Retrieval (`top_k=8`, `rerank_top_k=5`) để bao quát đầy đủ các điều khoản và quy định liên quan.
+
 ### Bước 3: Ưu Tiên Tuyệt Đối Bảng Sự Thật (Structured Fact Layer) & Ràng Buộc Vòng Đời Tài Liệu
 - Tra cứu bảng `knowledge_facts` trên PostgreSQL kết hợp `outerjoin` với `knowledge_documents`.
-- **Ràng buộc Vòng đời Phê duyệt (Document Lifecycle Binding)**: Chỉ trích xuất facts gắn với tài liệu ở trạng thái đã kiểm duyệt và hiệu lực (`status in ["approved", "completed", "processed", "ready"]` và `is_active = True`) hoặc các facts số liệu độc lập không gắn tệp (nhập qua bảng tính Excel/CSV). Tuyệt đối loại trừ 100% facts từ tài liệu đ### Bước 4 & 5: Tìm kiếm lai song song (Concurrent Hybrid Retrieval) & Dung hợp thứ hạng RRF ($k=60$)
-- **Thực thi song song phi phong tỏa**: Động cơ `retriever.py` kích hoạt đồng thời Dense Vector Search trên Qdrant và Sparse FTS Lexical Search trên PostgreSQL thông qua `asyncio.gather`, giảm tối đa 50% độ trễ (latency) so với truy vấn tuần tự.
-- **Ràng buộc Vòng đời & Phân quyền Đa người thuê theo Positive Allowlist (Giai Đoạn D)**:
-  * Qdrant payload lưu trữ đầy đủ 11 trường: `tenant_id`, `workspace_id`, `collection_id`, `document_id`, `document_revision`, `chunk_id`, `document_status`, `is_retrievable`, `content_hash`, `embedding_model`, `payload_schema_version`.
-  * `search_dense` áp dụng bộ lọc **Positive Allowlist** tuyệt đối (loại bỏ hoàn toàn cơ chế blacklist `must_not`):
-    - `is_active = True`
-    - `is_retrievable = True`
-    - `document_status in ["ready", "approved"]`
-    - `tenant_id` và `workspace_id` khớp chính xác với ngữ cảnh truy vấn.
+- **Ràng buộc Vòng đời Phê duyệt (Document Lifecycle Binding)**: Chỉ trích xuất facts gắn với tài liệu ở trạng thái đã kiểm duyệt và hiệu lực (`status in ["approved", "completed", "processed", "ready"]` và `is_active = True`) hoặc các facts số liệu độc lập không gắn tệp (nhập qua bảng tính Excel/CSV). Tuyệt đối loại trừ 100% facts từ tài liệu đang chờ duyệt hoặc đã lưu trữ.
+
+### Bước 3.5: Cơ Chế Lập Chỉ Mục Qdrant An Toàn Theo Phiên Bản (Revision-Safe Qdrant Indexing)
+- **Staging Revision**: Khi tài liệu có bản sửa đổi mới (`document_revision`), các chunks mới được tính toán vector và nạp vào Qdrant với `is_retrievable = False` và `document_status = "indexing"`. Revision cũ vẫn tiếp tục phục vụ tìm kiếm bình thường mà không bị gián đoạn (Zero Downtime).
+- **Parity Verification (`verify_revision_parity`)**: Trước khi công bố, hệ thống đối soát tự động số lượng points trong Qdrant có cùng `document_id` và `document_revision` với số chunks trong PostgreSQL. Nếu phát hiện lệch số lượng hoặc thiếu metadata, quá trình kích hoạt bị chặn đứng ngay lập tức (Fail-Fast).
+- **Kích hoạt nguyên tử (`activate_document_revision`)**: Chỉ khi parity đạt 100%, hệ thống cập nhật đồng loạt payload sang `is_retrievable = True` và `document_status = "ready"`.
+- **Dọn dẹp an toàn revision cũ (`purge_stale_revisions`)**: Sau khi revision mới đã active thành công, hệ thống xóa bỏ các points thuộc các revision cũ hơn (`document_revision < current_revision`), triệt tiêu 100% hiện tượng "vector ma" (ghost chunks).
   * Tương tự, `search_sparse_fts` và `lookup_facts` trên PostgreSQL cũng chỉ truy xuất các bản ghi thuộc tài liệu có `status.in_(["ready", "approved"])`, `is_active=True`, bảo đảm tính đồng thuận và nhất quán 100% giữa 3 nguồn dữ liệu.
 - **Công thức Reciprocal Rank Fusion kết hợp Trọng số Pháp lý (Legal Priority Weighted RRF)**:
   $$RRF\_Score(d) = \left( \sum_{m \in \{Dense, Sparse\}} \frac{1}{k + rank_m(d)} \right) \times \left(1.0 + (\text{priority} - 5) \times 0.02\right) \quad (\text{với } k = 60)$$

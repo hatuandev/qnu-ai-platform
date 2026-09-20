@@ -55,6 +55,12 @@ class CitationGuard:
             title = c.section or f"Tài liệu {c.document_id[:8]}"
             quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")
 
+            meta = c.metadata or {}
+            source_pages = meta.get("source_pages")
+            if not source_pages and c.page_number:
+                source_pages = [c.page_number]
+            entity_key = meta.get("entity_key")
+
             citations.append(
                 Citation(
                     source_id=c.document_id,
@@ -62,6 +68,8 @@ class CitationGuard:
                     section=c.section,
                     page_number=c.page_number,
                     quote=quote,
+                    source_pages=source_pages,
+                    entity_key=entity_key,
                 )
             )
 
@@ -111,6 +119,65 @@ class CitationGuard:
     def get_no_answer_response(self, module_code: str = "general") -> str:
         """Return friendly rejection response when context is insufficient."""
         return NO_ANSWER_MESSAGES.get(module_code, NO_ANSWER_MESSAGES["general"])
+
+    def audit_claim_citations(
+        self,
+        answer: str,
+        citations: list[Citation],
+        facts_used: list[dict] | None = None,
+    ) -> dict:
+        """Audit claim-evidence grounding alignment between generated answer and citations/facts."""
+        if not answer.strip():
+            return {
+                "is_grounded": False,
+                "citation_coverage": 0.0,
+                "has_citations": False,
+                "facts_count": 0,
+                "issues": ["Câu trả lời rỗng."],
+            }
+
+        # Safe refusal is 100% compliant with No-Answer policy
+        answer_lower = answer.lower()
+        if any(msg in answer_lower for msg in [
+            "thông tin này hiện chưa có",
+            "chưa có trong tài liệu chính thức",
+            "chưa có dữ liệu chính thức",
+            "vui lòng liên hệ hotline",
+            "vui lòng liên hệ ban tư vấn",
+            "vui lòng liên hệ phòng đào tạo",
+            "hiện không đào tạo",
+        ]):
+            return {
+                "is_grounded": True,
+                "citation_coverage": 1.0,
+                "has_citations": len(citations) > 0,
+                "is_refusal": True,
+                "facts_count": len(facts_used or []),
+                "issues": [],
+            }
+
+        # Check citations presence
+        has_citations = len(citations) > 0
+        has_facts = bool(facts_used and len(facts_used) > 0)
+
+        issues: list[str] = []
+        if not has_citations and not has_facts:
+            issues.append("Câu trả lời chứa dữ liệu thực tế nhưng không có bất kỳ trích dẫn hoặc bảng facts nào đính kèm.")
+
+        # Check if citations have source_pages
+        citations_with_pages = [c for c in citations if c.source_pages or c.page_number]
+        page_coverage = len(citations_with_pages) / len(citations) if citations else (1.0 if has_facts else 0.0)
+
+        is_grounded = (has_citations or has_facts) and len(issues) == 0
+
+        return {
+            "is_grounded": is_grounded,
+            "citation_coverage": round(page_coverage, 2),
+            "has_citations": has_citations,
+            "citations_count": len(citations),
+            "facts_count": len(facts_used or []),
+            "issues": issues,
+        }
 
 
 citation_guard = CitationGuard()

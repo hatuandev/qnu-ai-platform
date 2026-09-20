@@ -14,12 +14,16 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 _YEAR_RE = re.compile(r"(19|20)\d{2}")
 _CONFIDENCE_EXACT = 0.95
 _CONFIDENCE_HEURISTIC = 0.80
+_MARKDOWN_TABLE_SEPARATOR_RE = re.compile(
+    r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$"
+)
 
 
 def _normalize_header(header: str) -> str:
@@ -231,6 +235,153 @@ class FactExtractor:
                     add(label, str(fee), _CONFIDENCE_EXACT)
                 else:
                     add(label, cell, _CONFIDENCE_HEURISTIC)
+        return facts
+
+    def extract_from_verified_markdown_pages(
+        self,
+        pages: list[dict],
+        collection_id: str,
+        document_id: str,
+    ) -> list[dict]:
+        """Reconstruct facts from human-verified GFM markdown tables on each page."""
+        facts: list[dict] = []
+        for p in pages:
+            page_number = p.get("page_number", 1)
+            markdown_content = p.get("markdown_content") or ""
+            lines = [line.strip() for line in markdown_content.splitlines() if line.strip()]
+
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                if "|" in line and i + 1 < len(lines) and _MARKDOWN_TABLE_SEPARATOR_RE.match(lines[i + 1]):
+                    raw_headers = [c.strip() for c in line.strip("|").split("|")]
+                    headers = [c for c in raw_headers if c]
+                    i += 2
+                    rows = []
+                    while i < len(lines) and "|" in lines[i] and not _MARKDOWN_TABLE_SEPARATOR_RE.match(lines[i]):
+                        raw_cells = [c.strip() for c in lines[i].strip("|").split("|")]
+                        rows.append(raw_cells)
+                        i += 1
+
+                    if headers and rows:
+                        row_facts = self._extract_row_facts(
+                            headers,
+                            rows,
+                            table_idx=0,
+                            page_number=page_number,
+                            collection_id=collection_id,
+                            document_id=document_id,
+                        )
+                        facts.extend(row_facts)
+                else:
+                    i += 1
+        return facts
+
+    def extract_facts_from_domain_records(
+        self,
+        records: list[Any],
+        collection_id: str,
+        document_id: str,
+    ) -> list[dict]:
+        """Extract atomic facts from typed domain records (Admissions & Action Plans)."""
+        facts: list[dict] = []
+        for rec in records:
+            # 1. Admission Program Record
+            if hasattr(rec, "program_code") and hasattr(rec, "subject_combinations"):
+                p_page = rec.source_pages[0] if getattr(rec, "source_pages", None) else 1
+                base_raw = {"page_number": p_page, "entity_key": f"program:{rec.program_code}"}
+
+                facts.append({
+                    "collection_id": collection_id,
+                    "document_id": document_id,
+                    "entity_name": rec.program_name,
+                    "entity_type": "admissions_major",
+                    "attribute_name": "Mã ngành",
+                    "attribute_value": rec.program_code,
+                    "confidence": _CONFIDENCE_EXACT,
+                    "raw_data": base_raw,
+                })
+                if getattr(rec, "expected_quota", None) is not None:
+                    facts.append({
+                        "collection_id": collection_id,
+                        "document_id": document_id,
+                        "entity_name": rec.program_name,
+                        "entity_type": "admissions_major",
+                        "attribute_name": "Chỉ tiêu",
+                        "attribute_value": str(rec.expected_quota),
+                        "confidence": _CONFIDENCE_EXACT,
+                        "raw_data": base_raw,
+                    })
+                if getattr(rec, "subject_combinations", None):
+                    comb_text = "; ".join(" - ".join(c) for c in rec.subject_combinations)
+                    facts.append({
+                        "collection_id": collection_id,
+                        "document_id": document_id,
+                        "entity_name": rec.program_name,
+                        "entity_type": "admissions_major",
+                        "attribute_name": "Tổ hợp xét tuyển",
+                        "attribute_value": comb_text,
+                        "confidence": _CONFIDENCE_HEURISTIC,
+                        "raw_data": base_raw,
+                    })
+                if getattr(rec, "admission_methods", None):
+                    facts.append({
+                        "collection_id": collection_id,
+                        "document_id": document_id,
+                        "entity_name": rec.program_name,
+                        "entity_type": "admissions_major",
+                        "attribute_name": "Phương thức tuyển sinh",
+                        "attribute_value": ", ".join(rec.admission_methods),
+                        "confidence": _CONFIDENCE_HEURISTIC,
+                        "raw_data": base_raw,
+                    })
+
+            # 2. Certificate Conversion Record
+            elif hasattr(rec, "certificate_type") and hasattr(rec, "converted_score"):
+                cert_page = getattr(rec, "source_page", 1)
+                entity = f"Chứng chỉ {rec.certificate_type} {rec.source_score}"
+                facts.append({
+                    "collection_id": collection_id,
+                    "document_id": document_id,
+                    "entity_name": entity,
+                    "entity_type": "certificate_conversion",
+                    "attribute_name": "Điểm quy đổi",
+                    "attribute_value": str(rec.converted_score),
+                    "confidence": _CONFIDENCE_EXACT,
+                    "raw_data": {"page_number": cert_page, "certificate_type": rec.certificate_type},
+                })
+
+            # 3. Implementation Task Record
+            elif hasattr(rec, "task_code") and hasattr(rec, "lead_unit"):
+                t_page = rec.source_pages[0] if getattr(rec, "source_pages", None) else 1
+                base_raw = {"page_number": t_page, "task_code": rec.task_code}
+                entity = f"Nhiệm vụ {rec.task_code}"
+
+                if rec.lead_unit:
+                    facts.append({
+                        "collection_id": collection_id,
+                        "document_id": document_id,
+                        "entity_name": entity,
+                        "entity_type": "implementation_task",
+                        "attribute_name": "Đơn vị chủ trì",
+                        "attribute_value": rec.lead_unit.strip(),
+                        "confidence": _CONFIDENCE_EXACT,
+                        "raw_data": base_raw,
+                    })
+                if getattr(rec, "deliverables", None):
+                    clean_deliv = "; ".join(d.strip() for d in rec.deliverables if d and d.strip())
+                    if clean_deliv:
+                        facts.append({
+                            "collection_id": collection_id,
+                            "document_id": document_id,
+                            "entity_name": entity,
+                            "entity_type": "implementation_task",
+                            "attribute_name": "Sản phẩm kết quả",
+                            "attribute_value": clean_deliv,
+                            "confidence": _CONFIDENCE_HEURISTIC,
+                            "raw_data": base_raw,
+                        })
+
         return facts
 
 

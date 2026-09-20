@@ -158,8 +158,8 @@ export function CollectionFactsTab({
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant="default"
-                      className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                      variant="outline"
+                      className="text-xs bg-success/10 text-success border-success/30"
                     >
                       {Math.round(fact.confidence * 100)}%
                     </Badge>

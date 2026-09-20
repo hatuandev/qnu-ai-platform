@@ -22,6 +22,7 @@ from app.modules.modelops.models import ModelProviderConfig
 from app.modules.modelops.schemas import (
     ProviderConfigCreate,
     ProviderConfigUpdate,
+    ProviderImportRequest,
     ProviderKeyCreate,
     ProviderKeyUpdate,
 )
@@ -139,6 +140,7 @@ def _sanitize_key_for_output(k: dict[str, Any]) -> dict[str, Any]:
         "id": k.get("id"),
         "name": k.get("name"),
         "api_key_masked": k.get("api_key_masked") or "******",
+        "account_id": k.get("account_id"),
         "priority": k.get("priority", 1),
         "is_active": k.get("is_active", True),
         "status": k.get("status", "active"),
@@ -1002,7 +1004,12 @@ class ProviderService:
                     cf_model = clean_model if clean_model.startswith("@cf/") else f"@cf/{clean_model}"
                     url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{cf_model}"
                     headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
-                    payload = {"text": "ping"} if ("embed" in m_lower or "bge" in m_lower) else {"prompt": "hi", "max_tokens": 1}
+                    if "rerank" in m_lower:
+                        payload = {"query": "ping", "contexts": [{"text": "pong"}]}
+                    elif "embed" in m_lower or "bge" in m_lower:
+                        payload = {"text": "ping"}
+                    else:
+                        payload = {"prompt": "hi", "max_tokens": 1}
                     resp = await client.post(url, headers=headers, json=payload)
                     elapsed = round((time.perf_counter() - start) * 1000, 1)
                     if resp.status_code == 200:
@@ -1014,13 +1021,22 @@ class ProviderService:
                             "message": f"Mô hình '{clean_model}' phản hồi tốt trên Cloudflare Workers AI.",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
-                    elif resp.status_code in (400, 404):
+                    elif resp.status_code == 404:
                         return {
                             "model_name": clean_model,
                             "success": False,
                             "status": "unavailable",
                             "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' không tồn tại trong danh mục Cloudflare Workers AI (HTTP {resp.status_code}).",
+                            "message": f"Mô hình '{clean_model}' không tồn tại trong danh mục Cloudflare Workers AI (HTTP 404).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 400:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "error",
+                            "latency_ms": elapsed,
+                            "message": f"Cloudflare phản hồi lỗi tham số (HTTP 400): {resp.text[:120]}",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
                     else:
@@ -1336,6 +1352,7 @@ class ProviderService:
             "name": data.name,
             "api_key": enc_key,
             "api_key_masked": masked,
+            "account_id": data.account_id.strip() if data.account_id else None,
             "priority": data.priority,
             "is_active": True,
             "status": "active",
@@ -1366,7 +1383,8 @@ class ProviderService:
             await db.refresh(config)
 
             # Live synchronization into runtime settings
-            self._sync_runtime_credentials(config.provider_type, enc_key, extra.get("account_id"))
+            effective_acc_id = data.account_id or extra.get("account_id")
+            self._sync_runtime_credentials(config.provider_type, enc_key, effective_acc_id)
             return _sanitize_key_for_output(new_key)
 
         # Fallback in-memory
@@ -1394,6 +1412,8 @@ class ProviderService:
             if target_key:
                 if data.name is not None:
                     target_key["name"] = data.name
+                if data.account_id is not None:
+                    target_key["account_id"] = data.account_id.strip() if data.account_id else None
                 if data.priority is not None:
                     target_key["priority"] = data.priority
                 if data.is_active is not None:
@@ -1415,8 +1435,9 @@ class ProviderService:
                 await db.commit()
                 await db.refresh(config)
 
+                effective_acc_id = target_key.get("account_id") or extra.get("account_id")
                 self._sync_runtime_credentials(
-                    config.provider_type, config.api_key_encrypted, extra.get("account_id")
+                    config.provider_type, config.api_key_encrypted, effective_acc_id
                 )
                 return _sanitize_key_for_output(target_key)
 
@@ -1515,7 +1536,7 @@ class ProviderService:
 
         p_type = config.provider_type if config else provider_id.replace("prov_", "")
         b_url = config.api_base_url if config else None
-        acc_id = extra.get("account_id")
+        acc_id = target_key.get("account_id") or extra.get("account_id")
 
         success, latency, msg = await self._ping_provider_api(
             provider_type=p_type,
@@ -1608,5 +1629,291 @@ class ProviderService:
             "message": msg,
         }
 
+    async def export_provider(
+        self, db: AsyncSession, provider_id: str, include_secrets: bool = True
+    ) -> dict[str, Any]:
+        """Export a single provider configuration as a standardized JSON structure."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        res = await db.execute(stmt)
+        config = res.scalar_one_or_none()
+
+        if not config:
+            raise AppException(
+                status_code=404,
+                title="Nhà cung cấp không tồn tại",
+                detail=f"Không tìm thấy nhà cung cấp '{provider_id}'.",
+                code="PROVIDER_NOT_FOUND",
+            )
+
+        extra = dict(config.extra_config or {})
+        keys_raw = list(extra.get("api_keys", []))
+        if not keys_raw and config.api_key_encrypted:
+            keys_raw = [
+                {
+                    "name": f"Khóa {config.name} (Chính)",
+                    "api_key": config.api_key_encrypted,
+                    "account_id": extra.get("account_id"),
+                    "priority": 1,
+                    "is_active": True,
+                    "quota_limit": None,
+                }
+            ]
+
+        exported_keys = []
+        for k in keys_raw:
+            raw_k = k.get("api_key")
+            secret_val = None
+            if include_secrets and raw_k:
+                secret_val = decrypt_secret(raw_k) if is_encrypted(raw_k) else raw_k
+            exported_keys.append(
+                {
+                    "name": k.get("name", "API Key"),
+                    "api_key": secret_val,
+                    "account_id": k.get("account_id"),
+                    "priority": k.get("priority", 1),
+                    "is_active": k.get("is_active", True),
+                    "quota_limit": k.get("quota_limit"),
+                }
+            )
+
+        provider_secret = None
+        if include_secrets and config.api_key_encrypted:
+            provider_secret = (
+                decrypt_secret(config.api_key_encrypted)
+                if is_encrypted(config.api_key_encrypted)
+                else config.api_key_encrypted
+            )
+
+        provider_data = {
+            "id": config.id,
+            "name": config.name,
+            "code": extra.get("code") or config.provider_type,
+            "provider_type": config.provider_type,
+            "model_name": config.model_name,
+            "models": list(extra.get("models", []))
+            or ([config.model_name] if config.model_name else []),
+            "api_base_url": config.api_base_url,
+            "api_key": provider_secret,
+            "account_id": extra.get("account_id"),
+            "priority": config.priority,
+            "timeout_seconds": config.timeout_seconds,
+            "is_active": config.is_active,
+            "extra_config": {
+                k: v for k, v in extra.items() if k not in ("api_keys", "models", "account_id")
+            },
+            "api_keys": exported_keys,
+        }
+
+        return {
+            "version": "1.0",
+            "export_type": "single_provider",
+            "exported_at": datetime.now(UTC).isoformat(),
+            "provider": provider_data,
+        }
+
+    async def export_all_providers(
+        self, db: AsyncSession, include_secrets: bool = True
+    ) -> dict[str, Any]:
+        """Export all configured providers and their key pools into a unified JSON backup."""
+        stmt = select(ModelProviderConfig).order_by(ModelProviderConfig.priority.asc())
+        res = await db.execute(stmt)
+        configs = res.scalars().all()
+
+        providers_list = []
+        for config in configs:
+            single = await self.export_provider(db, config.id, include_secrets=include_secrets)
+            providers_list.append(single["provider"])
+
+        return {
+            "version": "1.0",
+            "export_type": "all_providers",
+            "exported_at": datetime.now(UTC).isoformat(),
+            "total_providers": len(providers_list),
+            "providers": providers_list,
+        }
+
+    async def import_providers(
+        self, db: AsyncSession, payload: ProviderImportRequest
+    ) -> dict[str, Any]:
+        """Import single or bulk providers from JSON with conflict resolution strategies."""
+        raw_data = payload.data
+        strategy = payload.conflict_strategy
+
+        # Unpack raw_data into items list
+        items_to_import: list[dict[str, Any]] = []
+        if isinstance(raw_data, dict):
+            if raw_data.get("export_type") == "single_provider" and isinstance(
+                raw_data.get("provider"), dict
+            ):
+                items_to_import.append(raw_data["provider"])
+            elif raw_data.get("export_type") == "all_providers" and isinstance(
+                raw_data.get("providers"), list
+            ):
+                items_to_import.extend([p for p in raw_data["providers"] if isinstance(p, dict)])
+            elif "provider" in raw_data and isinstance(raw_data["provider"], dict):
+                items_to_import.append(raw_data["provider"])
+            elif "providers" in raw_data and isinstance(raw_data["providers"], list):
+                items_to_import.extend([p for p in raw_data["providers"] if isinstance(p, dict)])
+            elif "name" in raw_data and ("provider_type" in raw_data or "type" in raw_data):
+                items_to_import.append(raw_data)
+        elif isinstance(raw_data, list):
+            items_to_import.extend([p for p in raw_data if isinstance(p, dict)])
+
+        if not items_to_import:
+            raise AppException(
+                status_code=400,
+                title="Dữ liệu JSON không hợp lệ",
+                detail="Tệp JSON không chứa cấu trúc Provider hoặc danh sách Providers hợp lệ.",
+                code="INVALID_IMPORT_DATA",
+            )
+
+        imported_count = 0
+        updated_count = 0
+        skipped_count = 0
+        errors: list[str] = []
+
+        for p_data in items_to_import:
+            name = (p_data.get("name") or "").strip()
+            p_type = (p_data.get("provider_type") or p_data.get("type") or "").strip().lower()
+
+            if not name or not p_type:
+                errors.append(f"Bản ghi thiếu 'name' hoặc 'provider_type': {p_data}")
+                continue
+
+            # Check existing provider
+            stmt = select(ModelProviderConfig).where(
+                (ModelProviderConfig.name == name) | (ModelProviderConfig.provider_type == p_type)
+            )
+            res = await db.execute(stmt)
+            existing = res.scalars().first()
+
+            if existing and strategy == "skip":
+                skipped_count += 1
+                continue
+
+            models = list(p_data.get("models") or [])
+            model_name = p_data.get("model_name") or (models[0] if models else None)
+            base_url = p_data.get("api_base_url")
+            priority = p_data.get("priority", 1)
+            timeout = p_data.get("timeout_seconds", 15)
+            is_active = p_data.get("is_active", True)
+            account_id = p_data.get("account_id")
+
+            incoming_keys = p_data.get("api_keys") or []
+            extra_config = dict(p_data.get("extra_config") or {})
+            extra_config["models"] = models
+            if account_id:
+                extra_config["account_id"] = account_id
+
+            if existing and strategy == "overwrite":
+                existing.name = name
+                existing.model_name = model_name
+                if base_url:
+                    existing.api_base_url = base_url
+                existing.priority = priority
+                existing.timeout_seconds = timeout
+                existing.is_active = is_active
+
+                current_extra = dict(existing.extra_config or {})
+                current_keys = list(current_extra.get("api_keys", []))
+
+                for ink in incoming_keys:
+                    k_sec = ink.get("api_key")
+                    if k_sec and not any(k.get("name") == ink.get("name") for k in current_keys):
+                        enc = encrypt_secret(k_sec.strip())
+                        current_keys.append(
+                            {
+                                "id": f"key_{uuid.uuid4().hex[:8]}",
+                                "name": ink.get("name", "Imported Key"),
+                                "api_key": enc,
+                                "api_key_masked": mask_api_key(k_sec),
+                                "account_id": ink.get("account_id") or account_id,
+                                "priority": ink.get("priority", 1),
+                                "is_active": ink.get("is_active", True),
+                                "status": "active",
+                                "quota_limit": ink.get("quota_limit"),
+                                "usage_tokens": 0,
+                                "created_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+
+                current_extra.update(extra_config)
+                current_extra["api_keys"] = current_keys
+                existing.extra_config = current_extra
+
+                if p_data.get("api_key"):
+                    existing.api_key_encrypted = encrypt_secret(p_data["api_key"].strip())
+                elif current_keys and not existing.api_key_encrypted:
+                    existing.api_key_encrypted = current_keys[0].get("api_key")
+
+                flag_modified(existing, "extra_config")
+                updated_count += 1
+                self._sync_runtime_credentials(
+                    existing.provider_type, existing.api_key_encrypted, account_id
+                )
+
+            else:
+                new_name = f"{name} (Imported)" if (existing and strategy == "create_new") else name
+                prepared_keys = []
+                for ink in incoming_keys:
+                    k_sec = ink.get("api_key")
+                    if k_sec:
+                        enc = encrypt_secret(k_sec.strip())
+                        prepared_keys.append(
+                            {
+                                "id": f"key_{uuid.uuid4().hex[:8]}",
+                                "name": ink.get("name", "Imported Key"),
+                                "api_key": enc,
+                                "api_key_masked": mask_api_key(k_sec),
+                                "account_id": ink.get("account_id") or account_id,
+                                "priority": ink.get("priority", 1),
+                                "is_active": ink.get("is_active", True),
+                                "status": "active",
+                                "quota_limit": ink.get("quota_limit"),
+                                "usage_tokens": 0,
+                                "created_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+
+                extra_config["api_keys"] = prepared_keys
+                enc_main_key = None
+                if p_data.get("api_key"):
+                    enc_main_key = encrypt_secret(p_data["api_key"].strip())
+                elif prepared_keys:
+                    enc_main_key = prepared_keys[0].get("api_key")
+
+                new_config = ModelProviderConfig(
+                    id=f"prov_{uuid.uuid4().hex[:8]}",
+                    name=new_name,
+                    provider_type=p_type,
+                    model_name=model_name,
+                    api_base_url=base_url,
+                    api_key_encrypted=enc_main_key,
+                    priority=priority,
+                    timeout_seconds=timeout,
+                    is_active=is_active,
+                    extra_config=extra_config,
+                )
+                db.add(new_config)
+                imported_count += 1
+                self._sync_runtime_credentials(p_type, enc_main_key, account_id)
+
+        await db.commit()
+
+        msg = (
+            f"Đã xử lý {len(items_to_import)} nhà cung cấp: "
+            f"nhập mới {imported_count}, cập nhật {updated_count}, bỏ qua {skipped_count}."
+        )
+        return {
+            "success": True,
+            "total_processed": len(items_to_import),
+            "imported": imported_count,
+            "updated": updated_count,
+            "skipped": skipped_count,
+            "errors": errors,
+            "message": msg,
+        }
+
 
 provider_service = ProviderService()
+

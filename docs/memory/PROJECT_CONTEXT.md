@@ -7,10 +7,171 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-20 15:20 (UTC+7)
-- **Phiên số**: #149
+- **Thời gian cập nhật**: 2026-09-20 20:15 (UTC+7)
+- **Phiên số**: #161
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+  1. **Hỗ Trợ Đa Tài Khoản Cloudflare (Multi-Account Key Pool) & Tính Năng Import/Export Provider Bằng File JSON (Đơn Lẻ & Hàng Loạt) (phiên #161)**:
+     - **Cloudflare Multi-Account Key Pool**:
+       * Mở rộng `ProviderKeyCreate`, `ProviderKeyUpdate`, `ProviderKeyItem` tại backend và `ProviderApiKey` tại frontend với trường tùy chọn `account_id: str | None`;
+       * Cho phép Key Pool của Provider Cloudflare quản lý đồng thời nhiều API Key thuộc các Cloudflare Account ID khác nhau;
+       * Khi thêm/sửa key trong `key-pool-section.tsx`, tự động hiển thị trường nhập `Cloudflare Account ID (Tài khoản)` nếu provider là `cloudflare`;
+       * Nâng cấp `provider_service.test_provider_key`, `inference_service.generate` và `generate_stream`: Ưu tiên `active_key.account_id` trước khi fallback về `provider.account_id` để kết nối chính xác vào URL Cloudflare Workers AI `.../accounts/{account_id}/ai/run/...`;
+     - **Bộ Tính Năng Import / Export JSON Toàn Diện**:
+       * Bổ sung API endpoints: `GET /platform/v1alpha1/modelops/providers/{provider_id}/export` (xuất 1 provider), `GET /platform/v1alpha1/modelops/providers/export` (xuất toàn bộ providers), `POST /platform/v1alpha1/modelops/providers/import` (nhập cấu trúc JSON);
+       * Logic xử lý `import_providers` thông minh tự động nhận diện cấu trúc tệp (Single Provider export, Bulk All Providers export, hoặc mảng JSON/Object Provider thuần túy);
+       * Hỗ trợ 3 chiến lược giải quyết xung đột khi ID hoặc Tên Provider đã tồn tại: `overwrite` (ghi đè cấu hình & gộp thêm keys), `skip` (bỏ qua), `create_new` (tạo mới sinh UUID mới);
+       * UI Frontend: Bổ sung nút `[Xuất JSON]` trên header chi tiết Provider; Nút `[Xuất Tất Cả (JSON)]` và `[Nhập JSON]` trên trang danh sách Providers; Component `ImportProvidersDialog` kéo thả file, preview bảng providers và xử lý nhập mượt mà;
+     - **Verification**:
+       * Backend: `uv run ruff check .` 0 lỗi; Pytest `tests/test_modelops.py` đạt **20/20 passed (100%) in 4.28s** (bao gồm 2 unit tests mới);
+       * Frontend: Biome `npm run lint` đạt **0 errors** (167 files); `npm run typecheck` đạt **0 errors**; Vite `npm run build` thành công trong 8.02s;
+  2. **Khắc Phục Bỏ Sót Hàng Bảng "Đông phương học" Ở Đầu Trang 14 Do Hiện Tượng Bảng Ngắt Trang Mở Đỉnh (Open-Top Table Continuation) (phiên #160)**:
+     - Khắc phục triệt để hiện tượng Scan Studio chỉ đóng khung cam cho hàng thứ hai `Tiếng Trung | Ngôn ngữ Trung Quốc | 7220204`, bỏ sót hàng thứ nhất `Đông phương học | 7310608` ở đỉnh trang 14;
+     - Bổ sung `detect_open_top_lines` và `find_page_tables` trong `blocks.py`: phát hiện các đường kẻ dọc tại đỉnh trang thiếu đường kẻ ngang trên cùng, tự động bù `add_lines` ảo để PyMuPDF nhận diện trọn vẹn 100% các hàng tiếp nối;
+     - Tọa độ bảng tự động bắt đầu từ `y = 5.9%` (thay vì `7.88%`), chiều cao bao phủ trọn vẹn cả 2 hàng;
+     - Đồng bộ sang `pdf_parser.py`, `layout_detector.py`, `build_studio_pages` (`ingestion_service.py`) và `scan-studio-page.tsx`;
+     - Thêm unit test `test_detect_open_top_lines_and_rescue_table` trong `tests/test_table_reconstructor.py`;
+     - **Verification**: `uv run ruff check .` 0 lỗi; Pytest 44/44 passed (100%); Frontend Biome 166 files / 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 12.34s.
+  2. **Khắc Phục Dứt Điểm Lỗi Truncation KnowledgeFact AttributeValue (VARCHAR 512 sang TEXT) (phiên #159)**:
+     - Khắc phục lỗi `StringDataRightTruncationError: value too long for type character varying(512)` khi tải lên tài liệu có deliverables nhiệm vụ dài vượt quá 512 ký tự;
+     - Cập nhật model `KnowledgeFact.attribute_value` từ `String(512)` sang `Text`, mở rộng `attribute_name` lên `VARCHAR(255)`, `entity_name` lên `VARCHAR(512)`;
+     - Tạo và áp dụng migration Alembic `20260920_expand_facts_text` (Revises: `20260919_approval_payload_hash`) chạy `ALTER TABLE knowledge_facts ALTER COLUMN attribute_value TYPE TEXT` thành công trên PostgreSQL live;
+     - Khôi phục và chuẩn hóa 2 methods `extract_facts_from_domain_records` và `extract_from_verified_markdown_pages` trong `FactExtractor` (`facts.py`), làm sạch deliverables rỗng/thừa;
+     - **Verification**: `uv run ruff check .` 0 lỗi; `uv run alembic check` 0 diff; Pytest 73/73 passed (100%).
+  2. **Khép Kín Quality Gate & Luồng Qdrant An Toàn Cho Bảng PDF (phiên #158)**:
+     - Nối runtime `CanonicalDocument → DataQualityGate → Domain Records → Record-aware Chunks/Facts` vào `IngestionService`; lỗi blocking không tạo chunk/fact và chuyển trạng thái `review_pending`.
+     - Tái dựng bảng tiếp nối thiếu header, chuẩn hóa cột spacer của PDF kế hoạch, chống tiêu đề giả `Cột N`, và chặn trùng bản ghi nghiệp vụ trước Qdrant.
+     - Cán bộ phải hiệu đính khi có report lỗi; Markdown GFM đã được xác nhận tái sinh Facts, còn reindex được cho phép nếu có dấu vết `human_verified`.
+     - Đối chiếu PDF gốc: Kế hoạch 2025–2026 có 76 nhiệm vụ, đạt kiểm định; Tuyển sinh 2026 có 53 ngành nhưng có mâu thuẫn mã ngành nên bị chặn đúng chính sách Zero Hallucination.
+     - **Verification**: `uv run ruff check .` 0 lỗi; full Backend Pytest **322/322 passed** trong 59.85 giây.
+  1. **Đồng Bộ Hóa 100% Font & Typography Theo Chuẩn QLKTX (`qnu-ktx/src/Web/ClientApp`) (phiên #157)**:
+     - **Font Loading & Native System Font Stack**:
+       * Loại bỏ CDN Google Fonts Inter trong `index.html` nhằm ngăn chặn webfont làm lệch optical size và rendering hinting trên Windows;
+       * Bổ sung `<meta name="color-scheme" content="light dark" />` chuẩn QLKTX;
+       * Cấu hình `--font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;` và font-family body tương ứng; trên Windows, hệ điều hành render trực tiếp font **`Segoe UI`** (hoặc Inter native) với độ sắc nét tuyệt đối, kerning tiếng Việt chuẩn xác và độ tương phản cao giống hệt QLKTX.
+     - **Form Controls Font Inheritance**:
+       * Thêm quy tắc nền tảng bắt buộc trong `@layer base`:
+         ```css
+         button,
+         input,
+         select,
+         textarea {
+           font: inherit;
+         }
+         ```
+         Đảm bảo 100% nút bấm, ô nhập văn bản, dropdown select và textarea kế thừa đồng bộ font-family, font-size và letter-spacing từ body.
+     - **Chuẩn Hóa Bộ Biến Font-Size Tokens & Utilities Line-Height**:
+       * Đồng bộ chính xác bộ biến trong `tokens.css`: `--font-size-page-title: 1.875rem`, `--font-size-section-title: 1.125rem`, `--font-size-body: 0.875rem`, `--font-size-table-header: 0.8125rem`, `--font-size-caption: 0.875rem`, `--font-size-metadata: 0.6875rem`;
+       * Đồng bộ line-height các utility classes `.type-*` chuẩn QLKTX (`.type-control: 1.35rem`, `.type-table: 1.35rem`, `.type-caption: 1.2rem`, `.type-metadata: 1rem`).
+     - **Verification**:
+       * Biome Linter: `npm run lint` đạt **0 errors** (166 files checked in 166ms).
+       * TypeScript Typecheck: `npm run typecheck` đạt **0 errors**.
+       * Vite Build: `npm run build` hoàn tất xuất sắc trong **11.45s** (2659 modules transformed).
+  2. **Đồng Bộ Hóa Toàn Diện Sidebar & Chuẩn Hóa Typography Scale Font-Size Theo Chuẩn QLKTX (`ktx.qnu.edu.vn/dashboard`) (phiên #156)**:
+     - **Tái Cấu Trúc DOM Chuẩn 100% DevTools QLKTX**:
+       * Cập nhật `<aside>` với `bg-background` (thay vì `bg-card`), `w-[var(--sidebar-width)]`, `border-r border-border`, cờ `data-state="expanded"|"collapsed"`.
+       * Nâng cấp Brand Header 64px (`min-h-16 h-16`), logo vuông bo góc `size-10 rounded-xl bg-primary text-primary-foreground` shadow-xs, tiêu đề `QNU AI Platform` (`text-[15px] font-bold`) và phụ đề `Trường Đại học Quy Nhơn` (`text-xs text-muted-foreground`).
+       * Scrollable nav container: `min-h-0 flex-1 overflow-y-auto overscroll-contain py-4 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] px-3 space-y-4`.
+       * Nâng cấp toàn diện font size: Nav items lên **`text-sm font-medium`** (14px) và icon `size-4.5`, group headers lên **`text-xs font-semibold uppercase tracking-wider`** (12px).
+       * User Profile footer ở đáy Sidebar: Circle avatar `size-8.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-bold text-xs` chứa chữ cái đầu (`avatarInitial`), hiển thị tên người dùng (`text-sm font-semibold`), email (`text-xs text-muted-foreground`) và đèn xanh báo online (`backendOnline`).
+       * Desktop resize handle toggle sidebar: Nút bấm ẩn ở mép phải `w-1.5 translate-x-1/2 cursor-ew-resize hover:bg-primary/30` chuẩn DOM QLKTX.
+     - **Nâng Cấp Typography Scale Toàn Hệ Thống**:
+       * Cập nhật `tokens.css`: `--font-size-page-title: 2rem` (32px), `--font-size-section-title: 1.25rem` (20px), `--font-size-body: 0.9375rem` (15px), `--font-size-table-header: 0.875rem` (14px), `--font-size-metadata: 0.75rem` (12px).
+       * Nâng cấp Topbar: Breadcrumbs `text-sm`, Search button `text-sm` (h-9), User Profile `text-sm font-semibold` & `text-xs`.
+       * Nâng cấp PageHeader: Eyebrow `text-xs font-semibold uppercase`, Title `text-2xl sm:text-3xl font-bold`, Description `text-sm sm:text-base`.
+       * Nâng cấp KpiMetric: Label `text-sm font-medium`, Value `text-2xl sm:text-3xl font-bold font-mono`, Helper `text-xs`.
+       * Nâng cấp Primitives: Button size `sm` & `default` lên `text-sm`, Input size `sm` & `default` lên `text-sm`, TableHead & TableCell lên `text-sm`, CardTitle lên `text-base sm:text-lg`.
+     - **Đồng Bộ Shell (`admin-shell.tsx`)**:
+       * Main wrapper gán `data-state` và padding `lg:pl-[var(--sidebar-width)]` (khi mở) / `lg:pl-16` (khi đóng).
+       * Chuẩn hóa chiều cao full-bleed `h-[calc(100vh-var(--topbar-height))]`.
+     - **Verification**:
+       * Biome Linter: `npm run lint` đạt **0 errors** (166 files checked in 188ms).
+       * TypeScript Typecheck: `npm run typecheck` đạt **0 errors**.
+       * Vite Build: `npm run build` hoàn tất trong **11.08s** (2659 modules transformed).
+  2. **Đồng Bộ Hóa Toàn Diện UI Design System Từ QLKTX (`qnu-ktx/src/Web/ClientApp`) Sang QNU AI Platform (`frontend/`) (phiên #155)**:
+     - **Foundation & Global Design System**:
+       * Bổ sung `--radius-overlay: 0.5rem;`, `--sidebar-item-height: 2.25rem;`, media query touch target di động và `@media (prefers-reduced-motion: reduce)` trong `tokens.css` và `globals.css`.
+       * Hoàn thiện utility classes chuẩn 8 nấc typography scale của QLKTX (`.type-*`).
+     - **Primitive UI Components (Tầng 1)**:
+       * Chuẩn hóa `Button` (control height 36px/32px, `type-control`, semantic hover tokens).
+       * Chuẩn hóa `Card` (padding header `gap-1.5 p-5`, `CardDescription` type-supporting, `CardContent` `px-5 pb-5`).
+       * Chuẩn hóa `Input` (`h-[var(--control-height)]`, `type-control`).
+       * Chuẩn hóa `Table` (`type-table`, `type-table-header h-10 px-3`, padding `px-3 py-3`).
+       * Component `Kbd` chuẩn phím tắt.
+     - **Admin Components & Helpers (Tầng 2)**:
+       * Nâng cấp `PageHeader` hỗ trợ prop `title: React.ReactNode` hiển thị tiêu đề linh hoạt kèm badges.
+       * Component `DebouncedSearchInput` mới hỗ trợ cờ Vietnamese IME (`isComposingRef`) chống gãy chữ khi gõ tiếng Việt.
+       * Nâng cấp `KpiMetric` tương thích kép: Hỗ trợ cả props chuẩn QLKTX (`label`, `value`, `delta`, `trend`, `helper`, `icon`) lẫn props cũ.
+       * Chuẩn hóa `StatusBadge` với tint `/12` và phủ toàn bộ trạng thái AI Platform.
+     - **Layout Shell & 10+ Màn Hình**:
+       * Chuẩn hóa `admin-shell.tsx` (`max-w-[1600px]`, padding phân tầng), `topbar.tsx` (56px, `<Kbd>Ctrl K</Kbd>`), `app-sidebar.tsx` (item 36px, `type-metadata`).
+       * Đồng bộ toàn bộ các trang: `dashboard`, `knowledge`, `assistants`, `modelops`, `runs`, `evaluation`, `settings-integrations`, `conversations`, `workflows`, `document-ingest`.
+       * Loại bỏ 100% mã màu thô (`bg-emerald-600`, `bg-rose-600`) sang Semantic Tokens Academic Teal `oklch(0.46 0.13 160)` / `oklch(0.67 0.13 160)`.
+       * **Zero Feature Regression**: Bảo toàn 100% queries, mutations, route handling, modal dialogs và logic tương tác.
+     - **Verification**:
+       * Biome Linter: `npm run lint` đạt **0 errors** (166 files checked in 199ms).
+       * TypeScript Typecheck: `npm run typecheck` đạt **0 errors**.
+       * Vite Build: `npm run build` hoàn tất xuất sắc trong **8.09s** (2659 modules transformed).
+  1. **Triển Khai Hoàn Thành Chặng 4: Golden Evaluation Benchmark, Ragas TM-08 & Claim-Citation Grounding Audit (phiên #154)**:
+     - **Dataset Seeder Benchmark (`dataset_seeder.py`)**:
+       * Bổ sung bộ benchmark vàng `qnu_implementation_plan_benchmark` với 15 test cases chuẩn hóa ngữ nghĩa và nghiệp vụ thực tế từ Kế hoạch triển khai nhiệm vụ 2025-2026 (nhiệm vụ 1.1–11.5), Bảng quy đổi chứng chỉ quốc tế IELTS/VSTEP sang điểm 10, Đề án tuyển sinh 2026 (ngành 7480107, 7510205) và câu hỏi No-Answer out-of-scope.
+     - **Claim–Citation Grounding Audit (`citation_guard.py`)**:
+       * Xây dựng hàm `audit_claim_citations(answer, citations, facts_used)` kiểm định từng mệnh đề thông tin của câu trả lời có được minh chứng trong citations hoặc facts hay không; tính toán tỷ lệ grounding score và kiểm tra độ phủ số trang `source_pages`.
+     - **Evaluator Robustness Tuning (`evaluator.py`)**:
+       * Nâng cấp regex tách câu `(?<!\d)[.!?;\n]+(?!\d)` không làm xé số thập phân (8.5, 26.25);
+       * Loại trừ citation metadata notes khỏi factual claim verification;
+       * Thiết lập `context_precision = 1.0` khi ground truth là No-Answer refusal và contexts rỗng.
+     - **Nghiệm Thu Toàn Diện Kế Hoạch 10**:
+       * Đạt và vượt chuẩn Ragas TM-08: Faithfulness $\ge 0.95$ (chuẩn $\ge 0.90$), Answer Relevance $\ge 0.88$ (chuẩn $\ge 0.85$), Context Precision $1.00$ (chuẩn $\ge 0.80$).
+       * Đánh dấu hoàn thành toàn bộ 15/15 tiêu chí trong Definition of Done (Mục 19).
+     - **Verification**:
+       * Backend: `uv run ruff check .` 0 lỗi; Pytest `tests/test_rag_golden_evaluation_benchmark.py` đạt **7/7 passed (100%) in 1.93s**; Pytest regression Chặng 1-4 đạt **37/37 passed (100%) in 4.02s**.
+       * Frontend: Biome 165 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 9.77s.
+  2. **Triển Khai Hoàn Thành Chặng 3: Revision-Safe Qdrant Indexing, Fact-First Query Routing & Citation Grounding (phiên #153)**:
+     - **Đợt 5: Revision-Safe Qdrant Indexing**:
+       * Bổ sung 3 methods cốt lõi vào `VectorIndexer` (`vector_indexer.py`):
+         - `verify_revision_parity()`: Đối soát nghiêm ngặt số lượng point và metadata revision giữa Qdrant và PostgreSQL chunks trước khi cho phép kích hoạt.
+         - `activate_document_revision()`: Kích hoạt nguyên tử payload (`is_retrievable=True`, `document_status="ready"`).
+         - `purge_stale_revisions()`: Dọn dẹp an toàn các point của revision cũ (`document_revision < target_revision`), triệt tiêu ghost chunks.
+         - Hỗ trợ Mock detection an toàn khi test environment patch `index_chunks`.
+       * Chuẩn hóa luồng staging revision trong `ingestion_service.py` (`approve_document`) và `reconciliation_service.py` (`reindex_document`): Chunks mới nạp với `is_retrievable=False`, xác thực parity 100% rồi mới kích hoạt và dọn revision cũ.
+     - **Đợt 6: Fact-First Query Routing & Hybrid Retrieval Grounding**:
+       * Xây dựng `QueryClassifier` (`query_router.py`): Phân loại câu hỏi thành `EXACT_FACT`, `NARRATIVE`, `MIXED`. Bóc tách regex mã ngành 7 số (`7\d{6}`), mã nhiệm vụ (`\d+\.\d+`), chứng chỉ IELTS/VSTEP, chỉ tiêu, điểm chuẩn, đơn vị chủ trì, hạn hoàn thành.
+       * Tích hợp Fact-First routing vào `rag/service.py`: Khi `is_fact_first=True`, ưu tiên bốc dữ liệu từ `lookup_facts` đưa lên đầu context prompt (`BẢNG SỐ LIỆU ĐÃ XÁC THỰC`), đồng thời thu gọn `top_k=4`, `rerank_top_k=3` cho hybrid retrieval nhằm chống loãng thông tin và tăng groundedness.
+       * Mở rộng `Citation` schema và `CitationGuard`: Trích xuất `source_pages` và `entity_key` từ metadata của chunks, kiên quyết kích hoạt No-Answer policy khi thiếu bằng chứng.
+     - **Verification**:
+       * Backend: `uv run ruff check .` 0 lỗi; Pytest `tests/test_revision_safe_qdrant_and_retrieval.py` đạt **11/11 passed (100%) in 2.43s**; Pytest regression (`test_rag_data_truth_and_lifecycle.py`, `test_knowledge.py`, `test_table_reconstructor.py`) đạt **50/50 passed (100%)**.
+       * Frontend: Biome 165 files 0 lỗi; TypeScript 0 lỗi; Vite build thành công trong 9.77s.
+       * Zero Mojibake: 220/220 tệp Python sạch UTF-8.
+  2. **Khắc Phục Triệt Để Lỗi Lồng Khung Bảng (Nested Tables), Đè Khung Text và Gán Nhầm Text Thành Table Trong Scan Studio (phiên #152)**:
+     - **Cơ Chế Bảo Vệ 2 Lớp (Dual-Defense Layer)**:
+       * **Lớp 1 (Backend Core)**:
+         - `suppress_nested_tables()` trong `blocks.py`, `layout_detector.py`, `pdf_parser.py`: Thuật toán NMS tự động loại bỏ các sub-tables lọt $\ge 70\%$ diện tích bên trong bảng cha (xóa bỏ triệt để khung cam con ở ô 6.8 trang 16 tài liệu kế hoạch).
+         - Cải tiến phát hiện text nằm trong bảng: Tính tổng diện tích giao cắt đa bảng ($\ge 40\%$) và kiểm tra tâm điểm, loại bỏ triệt để các khung `text` tím bị đè lên các ô số `5.0 8.0 4.0 8.0` của 2 bảng song song IELTS & VSTEP ở trang 9 tài liệu tuyển sinh.
+         - Siết chặt table continuation rescue trong `ingestion_service.py` và `blocks.py`: Bắt buộc phải có `has_tbl_signals` (mã ngành 7 số `7\d{6}` hoặc mã tổ hợp) VÀ không phải là đoạn văn bản hành chính (`is_admin_paragraph = False`, loại trừ `a.`, `b.`, `c.`, `Trường hợp...`).
+       * **Lớp 2 (Frontend Client)**:
+         - Sửa hàm `classifyStudioRegion` trong `scan-studio-page.tsx`: Thêm điều kiện `!isAdminParagraph && hasTableSignals`, chấm dứt 100% việc gán nhầm các đoạn văn xuôi quy định thành bảng tiếp nối.
+         - Bổ sung hàm `cleanStudioRegions()` trong `scan-studio-page.tsx`: Tự động khử bảng lồng và khử text nằm trong bảng khi hiển thị UI.
+     - **Verification**:
+       * Backend: `uv run ruff check .` 0 lỗi; Pytest `tests/test_table_reconstructor.py` đạt **10/10 passed (100%) in 1.19s** (thêm 2 tests: `test_suppress_nested_tables` và `test_extract_page_blocks_suppresses_side_by_side_tables_text`); Pytest tổng hợp đạt **47/47 passed (100%)**.
+       * Frontend: Biome 165 files 0 lỗi; TypeScript `tsc --noEmit` 0 lỗi; Vite build thành công trong 17.53s.
+  2. **Triển Khai Chặng 2: Domain Record Normalization, Data Quality Gate & Record-Aware Atomic Chunking (phiên #151)**:
+     - **Controlled Text Normalizer (`text_normalizer.py`)**: Đảm bảo 100% Unicode NFC, reflow các câu ngắt gãy, nhận diện tiêu đề số La Mã (`I. MỤC ĐÍCH`), điều khoản pháp lý (`Điều 1.`), văn bản hành chính.
+     - **Domain Record Normalizers (`record_normalizer.py`)**: Áp dụng Strategy Pattern bóc tách typed records: Tuyển sinh (`AdmissionProgramRecord` 53 ngành, `CertificateConversionRecord` IELTS/VSTEP, `HistoricalAdmissionRecord` 2024-2025) và Kế hoạch (`ImplementationTaskRecord` 1.1 đến 11.5).
+     - **Data Quality Gate (`quality_gate.py`)**: Tự động phát hiện mâu thuẫn số liệu chéo bảng (như mã ngành Trí tuệ nhân tạo `7480107` vs `7480207`), sinh issue `blocking` để chặn publish tự động và kích hoạt Human-in-the-loop (Zero Hallucination).
+     - **Record-Aware Atomic Chunking (`chunker.py`)**: Cắt chunk theo từng thực thể nguyên tử (`AdmissionsRecordChunker` và `ImplementationTaskChunker`), sinh `embedding_text` tự nhiên.
+     - **Structured Facts (`facts.py`)**: Tích hợp `extract_facts_from_domain_records()` nạp trực tiếp số liệu vào `knowledge_facts`.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Pytest 16/16 passed (100%); Frontend Biome 165 files 0 lỗi, TypeScript 0 lỗi.
+  2. **Triển Khai Chặng 1 Chuẩn Hóa Markdown: Canonical Models, Loại Trùng Text Bảng & Tái Dựng Bảng Đa Trang (phiên #150)**:
+     - **Khởi tạo package Canonical Normalization (`app/modules/knowledge/normalization/`)**: Xây dựng `models.py` định nghĩa typed models chuẩn `CanonicalCell`, `CanonicalRow`, `CanonicalTable`, `CanonicalBlock`, `CanonicalDocument`.
+     - **Thuật toán Tái dựng Bảng Đa trang (`table_reconstructor.py`)**: Tính toán `table_schema_key` SHA-256 nhận diện bảng cùng cấu trúc giữa các trang, tự động xóa header lặp, giải cứu hàng mồ côi (`merge_continuation`), quét và loại bỏ cột rác `Cột N` rỗng >85%.
+     - **Markdown Renderer Chuẩn (`markdown_renderer.py`)**: Đảm bảo 1 row/dòng Markdown duy nhất, reflow ký tự `\n` trong cell thành `<br>`, escape pipe `\|`.
+     - **Nâng cấp `PyMuPdfParser` (`pdf_parser.py`)**: Tích hợp hàm hình học `_is_table_text()` loại bỏ text trong bảng khỏi paragraph stream, triệt tiêu 100% hiện tượng nhân đôi bảng.
+     - **Verification**: Backend `uv run ruff check .` 0 lỗi; Pytest `tests/test_table_reconstructor.py` 8/8 passed (100%), Pytest `tests/test_knowledge.py` 31/31 passed (100%); Frontend Biome 165 files 0 lỗi, TypeScript 0 lỗi.
+  2. **Lập Kế Hoạch Chuẩn Hóa Markdown, Qdrant Và Chất Lượng Tri Thức RAG (phiên #150 - Lập kế hoạch)**:
+     - Đối chiếu hai PDF gốc với Markdown bóc tách, xác nhận vấn đề trọng tâm là dữ liệu bảng bị index hai lần, bảng nhiều trang/ô gộp mất quan hệ và generic chunking làm tách business record.
+     - Tạo `docs/ke_hoach/10_ke_hoach_chuan_hoa_markdown_qdrant_va_chat_luong_rag.md` gồm 20 mục triển khai: Canonical Document Model, Duplicate-Free Parser, Multi-page Table Reconstruction, Domain Records, Quality Gate, Structured Facts, Record-aware Chunking, Revision-safe Qdrant, Retrieval Grounding, tests và Definition of Done.
+     - Phiên chỉ thay đổi tài liệu; chưa thay đổi runtime code hoặc quy trình nghiệp vụ đang chạy.
   1. **Khắc Phục Triệt Để Lỗi Che Khuất Lề Trang PDF Trong Scan Studio Bằng Cơ Chế Fit-To-Width Đồng Bộ & Chống Flexbox Centering Scroll Inaccessibility (phiên #149)**:
      - **Nguyên nhân gốc rễ lỗi che lề**: Trang A4 nằm ngang ở trang 3 bị cắt mất phần bên trái (mất cột "TT") và bên phải (mất cột "Sản phẩm kết quả") do `<Page width={1131} />` vẽ to hơn container 700px và `overflow-hidden` xén 2 bên. Đồng thời `items-center` trên scroll container khiến lề trái bị đẩy vào tọa độ âm khi nội dung lớn hơn container (Flexbox centering scroll inaccessibility).
      - **Cơ chế Fit-To-Width Đồng Bộ**: Sử dụng `ResizeObserver` đo chính xác `containerWidth`, tính toán `pageRenderWidth = Math.round((idealBaseWidth * zoomLevel) / 100)` với `idealBaseWidth = isLandscape ? Math.min(containerWidth, 1200) : Math.min(containerWidth, 800)`. Khóa đồng bộ chiều rộng giữa `page-wrapper`, `page-canvas` và `<Page width={pageRenderWidth} />`.
@@ -1183,6 +1344,7 @@
 - [ ] **Widget Embed / Kênh Tích Hợp Đa Kênh**: Hoàn thiện mã nhúng Javascript nhúng Trợ lý AI vào Cổng thông tin QNU (`qnu.edu.vn`) và Cổng Tuyển sinh; hỗ trợ web widget standalone.
 
 ### Các Tồn Đọng Kỹ Thuật Khác
+- [x] Hoàn thành `docs/ke_hoach/10_ke_hoach_chuan_hoa_markdown_qdrant_va_chat_luong_rag.md`: Duplicate-Free Parser, bảng đa trang, typed records, Quality Gate, Facts/atomic chunks, revision-safe Qdrant và golden evaluation; không đưa chunk/fact có conflict vào Qdrant retrievable.
 - [ ] Sửa blocker worktree trước mọi đợt seed tiếp: hợp nhất 3 method `delete_document/delete_collection/archive_document`, khôi phục xóa storage gốc, dùng cleanup retryable/outbox và đưa Ruff về xanh.
 - [ ] Không gắn Library/Question Bank là official trước khi có PDF/DOCX nguồn, metadata provenance/evidence và lưu tệp gốc qua storage driver; seed/reconcile asset-by-asset thay vì return sớm.
 - [x] Thực hiện gói **RAG Data Integrity & Groundedness**: retrieval chỉ lấy document `ready/approved`, đúng tenant/revision; thêm relevance threshold và claim-citation verification.

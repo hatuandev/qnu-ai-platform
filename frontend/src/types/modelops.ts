@@ -4,6 +4,7 @@ export interface ProviderApiKey {
   id: string;
   name: string;
   api_key_masked: string;
+  account_id?: string | null;
   priority: number;
   is_active: boolean;
   status: "active" | "rate_limited" | "exhausted" | "inactive";
@@ -140,4 +141,55 @@ export interface UsageStatsResponse {
   avg_latency_ms: number;
   models_breakdown: ModelUsageBreakdownItem[];
   daily_usage: DailyUsageItem[];
+}
+
+export type ConflictStrategy = "overwrite" | "skip" | "create_new";
+
+export interface ProviderExportItem {
+  id?: string;
+  name: string;
+  code?: string;
+  provider_type: string;
+  model_name?: string;
+  models: string[];
+  api_base_url?: string;
+  api_key?: string;
+  account_id?: string;
+  priority: number;
+  timeout_seconds: number;
+  is_active: boolean;
+  extra_config: Record<string, unknown>;
+  api_keys: Array<{
+    name: string;
+    api_key?: string;
+    account_id?: string;
+    priority: number;
+    is_active: boolean;
+    quota_limit?: number | null;
+  }>;
+}
+
+export interface ProviderSingleExportResponse {
+  version: string;
+  export_type: "single_provider";
+  exported_at: string;
+  provider: ProviderExportItem;
+}
+
+export interface ProviderBulkExportResponse {
+  version: string;
+  export_type: "all_providers";
+  exported_at: string;
+  total_providers: number;
+  providers: ProviderExportItem[];
+}
+
+export interface ProviderImportResponse {
+  success: boolean;
+  total_processed: number;
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+  message: string;
 }

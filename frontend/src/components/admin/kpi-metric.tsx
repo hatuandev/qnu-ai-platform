@@ -1,67 +1,88 @@
 import { cn } from "@/lib/utils";
-import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import type * as React from "react";
 
+export type Trend = "positive" | "negative" | "neutral";
+
 export interface KpiMetricProps extends React.HTMLAttributes<HTMLDivElement> {
-  title: string;
+  label?: string;
+  title?: string;
   value: string | number;
-  description?: string;
+  delta?: string;
   change?: string;
+  trend?: Trend;
   changeType?: "increase" | "decrease" | "neutral";
-  icon?: React.ElementType;
+  helper?: string;
+  description?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  standalone?: boolean;
 }
 
 export function KpiMetric({
+  label,
   title,
   value,
-  description,
+  delta,
   change,
-  changeType = "neutral",
+  trend,
+  changeType,
+  helper,
+  description,
   icon: Icon,
+  standalone = false,
   className,
   ...props
 }: KpiMetricProps) {
+  const displayLabel = label ?? title ?? "";
+  const displayHelper = helper ?? description;
+  const displayDelta = delta ?? change;
+
+  // Resolve trend
+  let resolvedTrend: Trend = "neutral";
+  if (trend) {
+    resolvedTrend = trend;
+  } else if (changeType === "increase") {
+    resolvedTrend = "positive";
+  } else if (changeType === "decrease") {
+    resolvedTrend = "negative";
+  }
+
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card p-5 shadow-2xs transition-shadow hover:shadow-xs",
+        "min-w-0 p-4 sm:p-5",
+        standalone && "rounded-lg border border-border bg-card shadow-2xs",
         className
       )}
       {...props}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">{title}</p>
-        {Icon && (
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Icon className="size-4" />
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-muted-foreground">{displayLabel}</span>
+        {Icon ? (
+          <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Icon className="size-4" aria-hidden="true" />
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="mt-2">
-        <h3 className="text-2xl font-bold tracking-tight text-foreground font-mono">{value}</h3>
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-mono">
+          {value}
+        </span>
+        {displayDelta ? (
+          <span
+            className={cn(
+              "text-xs sm:text-sm font-medium",
+              resolvedTrend === "positive" && "text-success",
+              resolvedTrend === "negative" && "text-destructive",
+              resolvedTrend === "neutral" && "text-muted-foreground"
+            )}
+          >
+            {displayDelta}
+          </span>
+        ) : null}
       </div>
 
-      {(change || description) && (
-        <div className="mt-3 flex items-center gap-2 text-xs">
-          {change && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-sm px-1.5 py-0.5 font-medium",
-                changeType === "increase" && "bg-success/15 text-success",
-                changeType === "decrease" && "bg-destructive/15 text-destructive",
-                changeType === "neutral" && "bg-muted text-muted-foreground"
-              )}
-            >
-              {changeType === "increase" && <ArrowUpRight className="size-3" />}
-              {changeType === "decrease" && <ArrowDownRight className="size-3" />}
-              {changeType === "neutral" && <Minus className="size-3" />}
-              {change}
-            </span>
-          )}
-          {description && <span className="text-muted-foreground text-[11px]">{description}</span>}
-        </div>
-      )}
+      {displayHelper ? <p className="mt-1 text-xs text-muted-foreground">{displayHelper}</p> : null}
     </div>
   );
 }

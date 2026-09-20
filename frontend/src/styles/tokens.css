@@ -36,16 +36,17 @@
   --chart-3: oklch(0.72 0.15 80);
   --chart-4: oklch(0.58 0.14 320);
 
-  /* Kích thước & Căn lề chuẩn (Design System QLKTX) */
   --radius-micro: 0.25rem; /* 4px: Badges, Kbd */
   --radius-control: 0.375rem; /* 6px: Buttons, Inputs */
   --radius-surface: 0.5rem; /* 8px: Cards, Dialogs, Drawers */
+  --radius-overlay: 0.5rem; /* 8px */
   --radius: 0.375rem; /* default rounded-md */
 
   --sidebar-width: 16rem; /* 256px */
-  --topbar-height: 3.5rem; /* 56px */
+  --topbar-height: 4rem; /* 64px chuẩn QLKTX (min-h-16) */
   --control-height: 2.25rem; /* 36px */
   --control-height-sm: 2rem; /* 32px */
+  --sidebar-item-height: 2.25rem; /* 36px */
   --table-row-height: 2.75rem; /* 44px */
 
   --motion-fast: 140ms;
@@ -65,6 +66,23 @@
   --font-size-field-help: 0.8125rem;
   --font-size-supporting: 0.875rem;
   --font-size-metadata: 0.6875rem;
+}
+
+/* Touch targets and readable text for phones and small tablets */
+@media (max-width: 767px) {
+  :root {
+    --control-height: 2.75rem;
+    --control-height-sm: 2.5rem;
+    --sidebar-item-height: 2.375rem;
+    --font-size-body: 0.9375rem;
+    --font-size-control: 1rem;
+    --font-size-table: 0.875rem;
+    --font-size-table-header: 0.875rem;
+    --font-size-caption: 0.875rem;
+    --font-size-field-help: 0.875rem;
+    --font-size-supporting: 0.875rem;
+    --font-size-metadata: 0.75rem;
+  }
 }
 
 /* Chế độ Dark Mode */

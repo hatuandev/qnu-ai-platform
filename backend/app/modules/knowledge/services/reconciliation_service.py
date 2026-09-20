@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.jobs.models import JobRecord
 from app.modules.knowledge.models import KnowledgeChunk, KnowledgeDocument
@@ -53,6 +54,20 @@ class ReconciliationService:
         """Re-index chunks of a single document into Qdrant vector database."""
         doc = await self._get_document(db, document_id)
         col = await self._get_collection(db, doc.collection_id)
+        metadata = doc.doc_metadata or {}
+        quality_report = metadata.get("quality_report") or {}
+        is_human_verified = bool(metadata.get("human_verified"))
+        if doc.status == "review_pending" or (
+            quality_report
+            and not bool(quality_report.get("passed"))
+            and not is_human_verified
+        ):
+            raise AppException(
+                "Tài liệu còn lỗi chất lượng dữ liệu và chưa được phép lập chỉ mục lại.",
+                code="document_review_required",
+                status_code=409,
+                details={"quality_report": quality_report},
+            )
 
         chunks = list(
             (
@@ -91,8 +106,8 @@ class ReconciliationService:
                 "tenant_id": col.tenant_id,
                 "workspace_id": col.workspace_id,
                 "document_revision": doc.version,
-                "document_status": "ready" if doc.status in ("approved", "ready") else doc.status,
-                "is_retrievable": doc.status in ("approved", "ready"),
+                "document_status": "indexing",
+                "is_retrievable": False,
                 "content_hash": c.chunk_hash,
                 "embedding_model": settings.EMBEDDING_MODEL,
                 "payload_schema_version": "v1",
@@ -110,9 +125,29 @@ class ReconciliationService:
                 chunks=chunks_payload,
             )
             if indexed > 0:
-                doc.status = "ready" if doc.status in ("approved", "ready") else doc.status
-                doc.index_status = "indexed"
-                doc.index_error = None
+                is_parity, parity_reason = await vector_indexer.verify_revision_parity(
+                    collection_id=doc.collection_id,
+                    document_id=doc.id,
+                    target_revision=doc.version,
+                    expected_count=len(chunks),
+                )
+                if is_parity:
+                    await vector_indexer.activate_document_revision(
+                        collection_id=doc.collection_id,
+                        document_id=doc.id,
+                        target_revision=doc.version,
+                    )
+                    await vector_indexer.purge_stale_revisions(
+                        collection_id=doc.collection_id,
+                        document_id=doc.id,
+                        current_revision=doc.version,
+                    )
+                    doc.status = "ready" if doc.status in ("approved", "ready") else doc.status
+                    doc.index_status = "indexed"
+                    doc.index_error = None
+                else:
+                    doc.index_status = "index_failed"
+                    doc.index_error = parity_reason
             else:
                 doc.index_status = "index_failed"
                 doc.index_error = "Vector indexer trả về 0 điểm."

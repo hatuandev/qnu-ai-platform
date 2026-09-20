@@ -1,19 +1,19 @@
 export const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   approved: {
     label: "Hiệu lực",
-    className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200",
+    className: "bg-success/10 text-success border-success/30",
   },
   completed: {
     label: "Hiệu lực",
-    className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200",
+    className: "bg-success/10 text-success border-success/30",
   },
   pending: {
     label: "Chờ duyệt",
-    className: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    className: "bg-warning/10 text-warning border-warning/30",
   },
   processing: {
     label: "Đang xử lý",
-    className: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+    className: "bg-info/10 text-info border-info/30",
   },
   archived: {
     label: "Lưu trữ",
@@ -21,22 +21,22 @@ export const STATUS_BADGE: Record<string, { label: string; className: string }> 
   },
   failed: {
     label: "Lỗi",
-    className: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+    className: "bg-destructive/10 text-destructive border-destructive/30",
   },
 };
 
 export const TASK_STATUS_BADGE: Record<string, { label: string; className: string }> = {
   completed: {
     label: "Hoàn tất",
-    className: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-300",
+    className: "bg-success/10 text-success border-success/30",
   },
   processing: {
     label: "Đang xử lý",
-    className: "bg-sky-500/10 text-sky-600 border-sky-500/30",
+    className: "bg-info/10 text-info border-info/30",
   },
   failed: {
     label: "Thất bại",
-    className: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+    className: "bg-destructive/10 text-destructive border-destructive/30",
   },
   cancelled: {
     label: "Đã hủy",

@@ -237,9 +237,108 @@ class SemanticChunker(BaseChunker):
         return chunks
 
 
+class AdmissionsRecordChunker(BaseChunker):
+    """Atomic chunker for University Admissions programs (1 program = 1 atomic chunk)."""
+
+    def chunk(self, text: str, **kwargs: Any) -> list[ChunkDraft]:
+        records = kwargs.get("records")
+        if not records:
+            # Fallback to SemanticChunker if no pre-extracted records are provided
+            return SemanticChunker().chunk(text, **kwargs)
+
+        chunks: list[ChunkDraft] = []
+        for idx, rec in enumerate(records):
+            quota_str = str(rec.expected_quota) if getattr(rec, "expected_quota", None) is not None else "Chưa công bố cụ thể"
+            methods_str = ", ".join(getattr(rec, "admission_methods", [])) or "1, 2, 4"
+            comb_lines = []
+            for combo in getattr(rec, "subject_combinations", []):
+                comb_lines.append(" - ".join(combo))
+            comb_text = "; ".join(comb_lines) if comb_lines else "Theo quy định tuyển sinh chung"
+
+            content = (
+                f"Thông tin tuyển sinh ngành {rec.program_name} (Mã ngành: {rec.program_code}):\n"
+                f"- Phương thức xét tuyển: {methods_str}\n"
+                f"- Chỉ tiêu dự kiến: {quota_str}\n"
+                f"- Các tổ hợp môn xét tuyển: {comb_text}"
+            )
+            p_num = rec.source_pages[0] if getattr(rec, "source_pages", None) else None
+
+            chunks.append(
+                ChunkDraft(
+                    index=idx,
+                    content=content,
+                    token_count=self.estimate_tokens(content),
+                    chunk_hash=self.compute_hash(content),
+                    page_number=p_num,
+                    section=f"Ngành {rec.program_name}",
+                    metadata={
+                        "chunk_type": "admission_program",
+                        "entity_key": f"program:{rec.program_code}",
+                        "program_code": rec.program_code,
+                        "program_name": rec.program_name,
+                    },
+                )
+            )
+        return chunks
+
+
+class ImplementationTaskChunker(BaseChunker):
+    """Atomic chunker for institutional action plan tasks (1 task = 1 atomic chunk)."""
+
+    def chunk(self, text: str, **kwargs: Any) -> list[ChunkDraft]:
+        records = kwargs.get("records")
+        if not records:
+            return SemanticChunker().chunk(text, **kwargs)
+
+        chunks: list[ChunkDraft] = []
+        for idx, task in enumerate(records):
+            coord_str = ", ".join(getattr(task, "coordinating_units", [])) if getattr(task, "coordinating_units", None) else "Không"
+            time_parts = []
+            if getattr(task, "start_date", None):
+                time_parts.append(f"bắt đầu: {task.start_date}")
+            if getattr(task, "end_date", None):
+                time_parts.append(f"hoàn thành: {task.end_date}")
+            time_str = ", ".join(time_parts) if time_parts else "Trong năm học 2025 - 2026"
+            deliv_str = "; ".join(getattr(task, "deliverables", [])) if getattr(task, "deliverables", None) else "Theo kế hoạch phê duyệt"
+
+            content = (
+                f"Kế hoạch nhiệm vụ {task.task_code} ({task.category}):\n"
+                f"- Nội dung nhiệm vụ: {task.content}\n"
+                f"- Đơn vị chủ trì: {task.lead_unit or 'Chưa phân công'}\n"
+                f"- Đơn vị phối hợp: {coord_str}\n"
+                f"- Thời gian thực hiện: {time_str}\n"
+                f"- Sản phẩm kết quả: {deliv_str}"
+            )
+            p_num = task.source_pages[0] if getattr(task, "source_pages", None) else None
+
+            chunks.append(
+                ChunkDraft(
+                    index=idx,
+                    content=content,
+                    token_count=self.estimate_tokens(content),
+                    chunk_hash=self.compute_hash(content),
+                    page_number=p_num,
+                    section=f"Nhiệm vụ {task.task_code}",
+                    metadata={
+                        "chunk_type": "implementation_task",
+                        "entity_key": f"task:{task.task_code}",
+                        "task_code": task.task_code,
+                        "category": task.category,
+                        "lead_unit": task.lead_unit,
+                    },
+                )
+            )
+        return chunks
+
+
 def get_chunker(strategy: str = "semantic") -> BaseChunker:
     """Factory creating appropriate chunking strategy."""
     clean_strat = strategy.lower().strip()
     if clean_strat in ("clause", "regulations", "clause_based"):
         return ClauseBasedChunker()
+    if clean_strat in ("admissions", "admission_program", "admissions_record"):
+        return AdmissionsRecordChunker()
+    if clean_strat in ("task", "implementation_task", "action_plan"):
+        return ImplementationTaskChunker()
     return SemanticChunker()
+

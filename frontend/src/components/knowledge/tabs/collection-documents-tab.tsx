@@ -167,7 +167,7 @@ export function CollectionDocumentsTab({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-start gap-3">
-                      <div className="flex size-8 items-center justify-center rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0 mt-0.5">
+                      <div className="flex size-8 items-center justify-center rounded bg-primary/10 text-primary shrink-0 mt-0.5">
                         <FileText className="size-4" />
                       </div>
                       <div>
@@ -195,14 +195,14 @@ export function CollectionDocumentsTab({
                       </span>
                       <Badge
                         variant="outline"
-                        className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                        className="text-xs bg-primary/10 text-primary border-primary/30"
                       >
                         Ưu tiên Cao (Cốt lõi)
                       </Badge>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="font-semibold text-xs text-emerald-600 font-mono">
+                    <span className="font-semibold text-xs text-primary font-mono">
                       {doc.chunk_count} chunks
                     </span>
                   </TableCell>

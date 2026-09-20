@@ -5,9 +5,9 @@ import {
   BookOpen,
   CheckCircle2,
   Cpu,
+  FileText,
   Plus,
   RefreshCw,
-  Search,
   Settings,
   Terminal,
   Trash2,
@@ -16,9 +16,12 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { DebouncedSearchInput } from "../components/admin/debounced-search-input";
+import { KpiMetric } from "../components/admin/kpi-metric";
+import { PageHeader } from "../components/admin/page-header";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import {
   Table,
@@ -28,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
+import { cn } from "../lib/utils";
 import { type IngestionTask, apiClient } from "../services/api-client";
 import { CollectionDetailPage } from "./collection-detail-page";
 
@@ -160,113 +164,136 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
     );
   }
 
-  // MASTER VIEW: Kho Tri Thức & Vector Collections Overview matching Screenshot 1
+  // MASTER VIEW: Kho Tri Thức & Vector Collections Overview
   return (
-    <div className="space-y-6">
-      {/* 1. Master Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200 dark:border-emerald-800/50 shrink-0 mt-0.5">
-            <BookOpen className="size-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                Kho Tri thức & Vector Collections
-              </h1>
-              <Badge variant="outline" className="font-mono text-xs text-muted-foreground">
-                {collections.length} Kho • {totalDocs} Văn bản • {totalChunks} Chunks
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              Quản trị kho vector Qdrant, giám sát tác vụ bóc tách tài liệu và cấu hình Embedding
-              ModelOps phục vụ Trợ lý AI RAG
-            </p>
-            {systemDefaults && (
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40 text-xs text-muted-foreground flex-wrap">
-                <span className="text-[11px] font-medium">Model mặc định hệ thống:</span>
-                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground bg-muted/60 px-2 py-0.5 rounded border border-border/50">
-                  {systemDefaults.default_embedding_model.includes("@cf/") ? (
-                    <Zap className="size-3 text-amber-500" />
-                  ) : (
-                    <Cpu className="size-3 text-primary" />
-                  )}
-                  {systemDefaults.default_embedding_model}
-                </span>
-                <span className="text-[11px] text-muted-foreground">•</span>
-                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                  Reranker: {systemDefaults.default_reranker_model}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onNavigate?.("/modelops")}
-                  className="h-6 px-2 text-[11px] text-primary hover:text-primary/80 gap-1 ml-auto"
-                >
-                  <Settings className="size-3" />
-                  <span>Quản lý ModelOps</span>
-                </Button>
-              </div>
+    <div className="space-y-6 pb-10">
+      {/* 1. Page Header Chuẩn QLKTX */}
+      <PageHeader
+        eyebrow="Kho Tri Thức / RAG Corpus"
+        title="Kho Tri Thức & Vector Collections"
+        description="Quản trị kho vector Qdrant, giám sát tác vụ bóc tách tài liệu và cấu hình Embedding ModelOps phục vụ Trợ lý AI RAG."
+        actions={
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              // Dialog mở tạo kho mới nếu có
+            }}
+          >
+            <Plus className="size-4" />
+            Khởi tạo Kho Mới
+          </Button>
+        }
+      />
+
+      {/* 2. Dải Thống kê Kho Tri thức (Summary Strip) Chuẩn QLKTX */}
+      <Card>
+        <CardContent className="grid p-0 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            label="Tổng Bộ Sưu Tập"
+            value={collections.length}
+            delta="Kho"
+            helper="Cơ sở tri thức số hóa"
+            icon={BookOpen}
+          />
+          <KpiMetric
+            label="Tổng Văn Bản"
+            value={totalDocs}
+            delta="Tài liệu"
+            helper="PDF, DOCX, Quyết định"
+            icon={FileText}
+          />
+          <KpiMetric
+            label="Tổng Vector Chunks"
+            value={totalChunks}
+            delta="Đoạn vector"
+            helper="Qdrant dense vector 1024d"
+            icon={Cpu}
+          />
+          <KpiMetric
+            label="Tác Vụ Hoạt Động"
+            value={allTasks.length}
+            delta="Tác vụ"
+            helper="Ingestion & OCR pipeline"
+            icon={Activity}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Model mặc định hệ thống */}
+      {systemDefaults && (
+        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-border/70 bg-card text-xs text-muted-foreground flex-wrap shadow-2xs">
+          <span className="font-medium text-foreground">Model mặc định hệ thống:</span>
+          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground bg-muted px-2 py-0.5 rounded border border-border/50">
+            {systemDefaults.default_embedding_model.includes("@cf/") ? (
+              <Zap className="size-3 text-warning" />
+            ) : (
+              <Cpu className="size-3 text-primary" />
             )}
-          </div>
+            {systemDefaults.default_embedding_model}
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+            Reranker: {systemDefaults.default_reranker_model}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onNavigate?.("/models")}
+            className="h-6 px-2 text-xs text-primary hover:text-primary/80 gap-1 ml-auto"
+          >
+            <Settings className="size-3" />
+            <span>Quản lý ModelOps</span>
+          </Button>
         </div>
+      )}
 
-        <Button
-          size="sm"
-          className="h-9 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm shrink-0"
-        >
-          <Plus className="size-4" />
-          <span>+ Khởi tạo Kho Mới</span>
-        </Button>
-      </div>
-
-      {/* 2. Sub-Navigation Pill Tabs */}
+      {/* 2. Sub-Navigation Tabs Chuẩn QLKTX */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/60 border border-border/60">
           <button
             type="button"
             onClick={() => setActiveTab("collections")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
               activeTab === "collections"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-semibold"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
+                ? "bg-background text-foreground shadow-2xs font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            <BookOpen className="size-3.5 text-emerald-600" />
+            <BookOpen className="size-3.5 text-primary" />
             <span>Kho Tri thức ({collections.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("tasks")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
               activeTab === "tasks"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-semibold"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
+                ? "bg-background text-foreground shadow-2xs font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            <Activity className="size-3.5 text-emerald-600" />
+            <Activity className="size-3.5 text-primary" />
             <span>Tác vụ Nền & Bóc tách ({allTasks.length})</span>
           </button>
         </div>
       </div>
 
-      {/* 3. TAB 1: KHO TRI THỨC GRID (3 Cột Chuẩn qnu-ai-core) */}
+      {/* 3. TAB 1: KHO TRI THỨC GRID */}
       {activeTab === "collections" && (
         <div className="space-y-4">
           {/* Search Filter Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2 w-full sm:w-96 bg-card border border-border rounded-lg px-3 py-1.5">
-              <Search className="size-4 text-muted-foreground shrink-0" />
-              <input
-                type="text"
+            <div className="w-full sm:w-96">
+              <DebouncedSearchInput
                 placeholder="Tìm theo tên kho, mã Qdrant collection..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                onChange={(val) => setSearchQuery(val)}
               />
             </div>
-            <span className="text-xs text-muted-foreground">
+            <span className="type-caption text-muted-foreground">
               Hiển thị {filteredCollections.length} / {collections.length} Kho Tri thức
             </span>
           </div>
@@ -276,17 +303,17 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
             {filteredCollections.map((col) => (
               <Card
                 key={col.id}
-                className="flex flex-col justify-between border-border hover:border-emerald-500/50 transition-all rounded-lg bg-card shadow-xs"
+                className="flex flex-col justify-between border-border hover:border-primary/50 transition-all rounded-lg bg-card shadow-2xs"
               >
                 <div className="p-5 space-y-3">
                   {/* Card Header: Icon + Title + Status Badge */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex size-8 items-center justify-center rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0">
+                      <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
                         <BookOpen className="size-4" />
                       </div>
                       <div>
-                        <h2 className="text-sm font-bold text-foreground leading-snug">
+                        <h2 className="text-sm font-semibold text-foreground leading-snug">
                           {col.name}
                         </h2>
                         <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
@@ -296,7 +323,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                     </div>
                     <Badge
                       variant="outline"
-                      className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px] font-medium shrink-0"
+                      className="bg-success/10 text-success border-success/30 text-[10px] font-medium shrink-0"
                     >
                       Sẵn sàng
                     </Badge>
@@ -315,7 +342,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                         systemDefaults?.default_embedding_model ||
                         ""
                       ).includes("@cf/") ? (
-                        <Zap className="size-3 text-amber-500 shrink-0" />
+                        <Zap className="size-3 text-warning shrink-0" />
                       ) : (
                         <Cpu className="size-3 text-primary shrink-0" />
                       )}
@@ -355,7 +382,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-7 text-rose-500 hover:text-rose-600"
+                      className="size-7 text-destructive hover:text-destructive/80"
                     >
                       <Trash2 className="size-3" />
                     </Button>
@@ -363,7 +390,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                     <Button
                       size="sm"
                       onClick={() => handleSelectCollection(col.id)}
-                      className="h-7 px-3 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                      className="h-7 px-3 text-[11px] gap-1"
                     >
                       <span>Xem tài liệu</span>
                       <ArrowRight className="size-3" />
@@ -374,8 +401,8 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
             ))}
 
             {/* Dashed Placeholder Card: Khởi tạo Kho Mới */}
-            <div className="border-2 border-dashed border-border/80 hover:border-emerald-500/60 transition-colors rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-card/40 hover:bg-emerald-50/20 min-h-[220px]">
-              <div className="flex size-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 mb-3">
+            <div className="border-2 border-dashed border-border/80 hover:border-primary/60 transition-colors rounded-lg p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-card/40 hover:bg-primary/5 min-h-[220px]">
+              <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary mb-3">
                 <Plus className="size-5" />
               </div>
               <h3 className="text-sm font-bold text-foreground">+ Khởi tạo Kho Tri thức Mới</h3>
@@ -429,7 +456,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                   <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
                     <TableCell>
                       <div className="flex items-start gap-3">
-                        <div className="flex size-8 items-center justify-center rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0 mt-0.5">
+                        <div className="flex size-8 items-center justify-center rounded bg-primary/10 text-primary shrink-0 mt-0.5">
                           <Upload className="size-4" />
                         </div>
                         <div>
@@ -461,12 +488,12 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                     <TableCell>
                       <div className="w-24 space-y-1">
                         <div className="flex justify-between text-[11px] font-mono">
-                          <span className="text-emerald-600 font-bold">{t.progress_percent}%</span>
+                          <span className="text-primary font-bold">{t.progress_percent}%</span>
                           <span className="text-muted-foreground">Xong</span>
                         </div>
                         <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-emerald-600 rounded-full"
+                            className="h-full bg-primary rounded-full"
                             style={{ width: `${t.progress_percent}%` }}
                           />
                         </div>
@@ -475,7 +502,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-300 text-[11px] gap-1"
+                        className="bg-success/10 text-success border-success/30 text-[11px] gap-1"
                       >
                         <CheckCircle2 className="size-3" />
                         <span>Hoàn tất</span>
@@ -509,7 +536,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
       <Dialog open={!!selectedTaskLog} onOpenChange={() => setSelectedTaskLog(null)}>
         <DialogContent className="max-w-2xl bg-slate-950 text-slate-100 font-mono text-xs">
           <DialogHeader>
-            <DialogTitle className="text-sm font-mono text-emerald-400 flex items-center gap-2">
+            <DialogTitle className="text-sm font-mono text-primary flex items-center gap-2">
               <Terminal className="size-4" />
               <span>Worker Log: {selectedTaskLog?.worker_name}</span>
             </DialogTitle>

@@ -55,7 +55,7 @@ def _format_table_markdown(rows: list[list[Any]]) -> str:
 
     padded_rows = [r + [""] * (max_cols - len(r)) for r in clean_rows]
     raw_headers = padded_rows[0]
-    clean_headers = [h if h else f"Cột {idx + 1}" for idx, h in enumerate(raw_headers)]
+    clean_headers = [h if h else "" for h in raw_headers]
 
     lines = [
         "| " + " | ".join(clean_headers) + " |",
@@ -135,6 +135,7 @@ def classify_text_block(text: str, top_percent: float, bottom_percent: float) ->
 
     # 4. Table continuation row (hàng dữ liệu của bảng bị rớt sang trang sau do ngắt trang)
     # Đặc điểm: ở đầu trang <= 25%, chiều cao nhỏ <= 12%, chứa mã ngành 7 số hoặc mã tổ hợp môn
+    # và tuyệt đối không phải là đoạn văn bản quy định hành chính (a., b., c., Trường hợp...)
     block_height = bottom_percent - top_percent
     has_table_signals = bool(
         re.search(r"\b7\d{6}\b", clean)
@@ -143,11 +144,170 @@ def classify_text_block(text: str, top_percent: float, bottom_percent: float) ->
             clean,
         )
     )
-    if top_percent <= 25.0 and block_height <= 12.0 and has_table_signals:
+    is_admin_paragraph = bool(
+        re.match(
+            r"^(?:[a-z]\.|\d+\.|\+|-\s|Trường hợp|Theo quy định|Căn cứ)\b",
+            clean,
+            re.IGNORECASE,
+        )
+    )
+    if not is_admin_paragraph and top_percent <= 25.0 and block_height <= 12.0 and has_table_signals:
         return "table", "Bảng dữ liệu (tiếp nối)"
 
     # 5. Mặc định là Text (bao gồm cả các đoạn văn xuôi, căn cứ, danh mục, thuyết minh)
     return "text", "Khối văn bản"
+
+
+def _rect_area(r: tuple[float, float, float, float]) -> float:
+    """Calculate width * height of a bounding box."""
+    return max(0.0, r[2] - r[0]) * max(0.0, r[3] - r[1])
+
+
+def _rect_intersection(
+    r1: tuple[float, float, float, float], r2: tuple[float, float, float, float]
+) -> float:
+    """Calculate intersection area between two bounding boxes."""
+    ix0 = max(r1[0], r2[0])
+    iy0 = max(r1[1], r2[1])
+    ix1 = min(r1[2], r2[2])
+    iy1 = min(r1[3], r2[3])
+    if ix1 <= ix0 or iy1 <= iy0:
+        return 0.0
+    return (ix1 - ix0) * (iy1 - iy0)
+
+
+def suppress_nested_tables(table_list: list[Any]) -> list[Any]:
+    """Remove sub-tables that are substantially enclosed (>= 70%) within a larger parent table."""
+    if len(table_list) <= 1:
+        return table_list
+
+    table_data = []
+    for tab in table_list:
+        try:
+            bbox = _get_bbox_coords(tab.bbox)
+            area = _rect_area(bbox)
+            table_data.append({"tab": tab, "bbox": bbox, "area": area})
+        except Exception as exc:
+            logger.debug("Skipping unreadable table bbox in suppression: %s", exc)
+            continue
+
+    keep = [True] * len(table_data)
+    for i, t_i in enumerate(table_data):
+        if not keep[i]:
+            continue
+        for j, t_j in enumerate(table_data):
+            if i == j or not keep[j]:
+                continue
+            # If t_j is larger than t_i and contains >= 70% of t_i area
+            if t_j["area"] > t_i["area"]:
+                inter = _rect_intersection(t_i["bbox"], t_j["bbox"])
+                if t_i["area"] > 0 and (inter / t_i["area"]) >= 0.70:
+                    keep[i] = False
+                    break
+
+    return [t["tab"] for i, t in enumerate(table_data) if keep[i]]
+
+
+def detect_open_top_lines(page: Any) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """Phát hiện các đường kẻ dọc ở đỉnh trang bị thiếu đường kẻ ngang trên cùng do ngắt trang.
+
+    Khi bảng biểu kéo dài qua nhiều trang (multi-page table continuation), trang tiếp nối
+    thường không có đường kẻ ngang ở đỉnh (open-top). Thuật toán PyMuPDF mặc định yêu cầu
+    khung khép kín nên sẽ bỏ qua hàng đầu tiên. Hàm này tạo một đường kẻ ngang ảo (add_lines)
+    nối qua các đường kẻ dọc tại đỉnh trang để PyMuPDF nhận diện trọn vẹn 100% các hàng tiếp nối.
+    """
+    add_lines: list[tuple[tuple[float, float], tuple[float, float]]] = []
+    try:
+        drawings = page.get_drawings() or []
+        page_height = float(page.rect.height)
+        v_lines: list[Any] = []
+        for d in drawings:
+            r = d.get("rect")
+            if r and (r.x1 - r.x0) <= 4.0 and (r.y1 - r.y0) >= 8.0:
+                v_lines.append(r)
+
+        top_v = [vl for vl in v_lines if vl.y0 < page_height * 0.35]
+        if top_v:
+            min_y0 = min(vl.y0 for vl in top_v)
+            at_min = [vl for vl in top_v if abs(vl.y0 - min_y0) <= 2.5]
+            if len(at_min) >= 2:
+                min_x = min(vl.x0 for vl in at_min)
+                max_x = max(vl.x1 for vl in at_min)
+                has_h = any(
+                    d.get("rect")
+                    and abs(d["rect"].y0 - min_y0) <= 2.5
+                    and (d["rect"].x1 - d["rect"].x0) >= 20.0
+                    for d in drawings
+                )
+                if not has_h and (max_x - min_x) >= 100.0:
+                    add_lines.append(((min_x, min_y0), (max_x, min_y0)))
+    except Exception as exc:
+        logger.debug("detect_open_top_lines error: %s", exc)
+    return add_lines
+
+
+def find_page_tables(page: Any, **kwargs: Any) -> Any:
+    """Gọi page.find_tables() kèm cơ chế tự động bù đường kẻ biên cho bảng ngắt trang (open-top)."""
+    if "add_lines" not in kwargs:
+        missing_lines = detect_open_top_lines(page)
+        if missing_lines:
+            kwargs["add_lines"] = missing_lines
+    try:
+        return page.find_tables(**kwargs)
+    except Exception as exc:
+        logger.debug("find_page_tables failed: %s", exc)
+        return getattr(page, "find_tables", lambda **k: None)()
+
+
+def _rescue_open_top_table(
+    page: Any, bbox: tuple[float, float, float, float]
+) -> tuple[float, float, float, float]:
+    """Mở rộng bounding box của bảng ở đỉnh trang nếu có đường kẻ hoặc text block tiếp giáp phía trên."""
+    tx0, ty0, tx1, ty1 = bbox
+    page_height = float(page.rect.height)
+    if ty0 > page_height * 0.35:
+        return bbox
+
+    raw_blocks = page.get_text("blocks") or []
+    bridging_y0: float | None = None
+    for b in raw_blocks:
+        if len(b) < 5:
+            continue
+        bx0, by0, bx1, by1 = float(b[0]), float(b[1]), float(b[2]), float(b[3])
+        if (
+            bx1 >= tx0 - 10.0
+            and bx0 <= tx1 + 10.0
+            and by0 < ty0 - 5.0
+            and by1 > ty0 + 5.0
+        ):
+            bridging_y0 = by0 if bridging_y0 is None else min(bridging_y0, by0)
+
+    line_y0: float | None = None
+    try:
+        drawings = page.get_drawings() or []
+        for d in drawings:
+            dr = d.get("rect")
+            if (
+                dr
+                and dr.y1 <= ty0 + 2.0
+                and dr.y0 < ty0 - 5.0
+                and (dr.x1 - dr.x0) <= 4.0
+                and tx0 - 5.0 <= dr.x0 <= tx1 + 5.0
+            ):
+                line_y0 = dr.y0 if line_y0 is None else min(line_y0, dr.y0)
+    except Exception:
+        pass
+
+    candidate_y0: float | None = None
+    if line_y0 is not None:
+        candidate_y0 = line_y0
+    elif bridging_y0 is not None:
+        candidate_y0 = bridging_y0 - 2.0
+
+    if candidate_y0 is not None and candidate_y0 < ty0 and (ty0 - candidate_y0) <= 120.0:
+        return (tx0, max(0.0, candidate_y0), tx1, ty1)
+
+    return bbox
 
 
 def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, Any]]:
@@ -157,18 +317,19 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
     page_width = float(page_rect.width)
     page_height = float(page_rect.height)
 
-    # 1. Trích xuất tables trước để lấy bbox và dữ liệu bảng Markdown
+    # 1. Trích xuất tables và lọc khử bảng con lồng trong bảng cha (Nested Table Suppression)
     table_bboxes: list[tuple[float, float, float, float]] = []
     try:
-        tables = page.find_tables()
-        table_list = list(getattr(tables, "tables", []) or [])
+        raw_tables = find_page_tables(page)
+        raw_list = list(getattr(raw_tables, "tables", []) or [])
+        table_list = suppress_nested_tables(raw_list)
     except Exception:
         table_list = []
 
     for tab_idx, tab in enumerate(table_list):
         try:
-            bbox = tab.bbox
-            tx0, ty0, tx1, ty1 = _get_bbox_coords(bbox)
+            bbox = _rescue_open_top_table(page, _get_bbox_coords(tab.bbox))
+            tx0, ty0, tx1, ty1 = bbox
             table_bboxes.append((tx0, ty0, tx1, ty1))
             coords = to_percent(tx0, ty0, tx1, ty1, page_width, page_height)
         except Exception as exc:
@@ -197,7 +358,7 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
             }
         )
 
-    # 2. Trích xuất text blocks (loại trừ các block nằm trong table)
+    # 2. Trích xuất text blocks (loại trừ các block nằm trong table, kể cả bảng song song)
     try:
         raw_blocks = page.get_text("blocks") or []
     except Exception:
@@ -213,13 +374,25 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
         if not snippet:
             continue
 
-        # Kiểm tra xem text block có nằm trong bảng không
+        # Kiểm tra xem text block có nằm trong bảng không (tính tổng diện tích giao cắt đa bảng)
         bx0, by0, bx1, by1 = float(block[0]), float(block[1]), float(block[2]), float(block[3])
+        b_rect = (bx0, by0, bx1, by1)
+        b_area = _rect_area(b_rect)
+
         is_inside_tbl = False
-        for tx0, ty0, tx1, ty1 in table_bboxes:
-            if bx0 >= tx0 - 2 and by0 >= ty0 - 2 and bx1 <= tx1 + 2 and by1 <= ty1 + 2:
+        if b_area > 0 and table_bboxes:
+            total_table_inter = sum(_rect_intersection(b_rect, tb) for tb in table_bboxes)
+            if (total_table_inter / b_area) >= 0.40:
                 is_inside_tbl = True
-                break
+
+            if not is_inside_tbl:
+                cx = (bx0 + bx1) / 2.0
+                cy = (by0 + by1) / 2.0
+                for tx0, ty0, tx1, ty1 in table_bboxes:
+                    if tx0 - 3.0 <= cx <= tx1 + 3.0 and ty0 - 3.0 <= cy <= ty1 + 3.0:
+                        is_inside_tbl = True
+                        break
+
         if is_inside_tbl:
             continue
 

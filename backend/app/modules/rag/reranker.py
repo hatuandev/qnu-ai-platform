@@ -90,6 +90,7 @@ class RerankerClient:
             getattr(settings, "RERANKER_PROVIDER", "").lower() == "cloudflare"
             and (settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY)
             and settings.CLOUDFLARE_ACCOUNT_ID
+            and not settings.CLOUDFLARE_ACCOUNT_ID.startswith("cf-acc-")
         ):
             try:
                 return await self._rerank_cloudflare(query, candidates, top_k)

@@ -68,7 +68,10 @@ function classifyStudioRegion(
 
   // Giữ nguyên bảng và con dấu nếu backend đã định danh chuẩn
   if (existingType === "table") {
-    return { type: "table", label: "Bảng dữ liệu" };
+    return {
+      type: "table",
+      label: prevHasBottomTable && top <= 15 ? "Bảng dữ liệu (tiếp nối)" : "Bảng dữ liệu",
+    };
   }
   if (existingType === "stamp") {
     return { type: "stamp", label: "Con dấu" };
@@ -114,18 +117,92 @@ function classifyStudioRegion(
   }
 
   // 4. Table continuation rescue (hàng bảng rớt sang trang sau do ngắt trang)
+  // BẮT BUỘC PHẢI CÓ tín hiệu dữ liệu bảng (mã ngành 7 số, mã tổ hợp môn)
+  // và TUYỆT ĐỐI KHÔNG PHẢI là đoạn văn bản quy định hành chính (a., b., c., Trường hợp..., Căn cứ...)
+  const isAdminParagraph =
+    /^(?:[a-z]\.|\d+\.|\+|-\s|Trường hợp|Theo quy định|Căn cứ|Riêng đối với)/i.test(clean);
   const hasTableSignals =
     /\b7\d{6}\b/.test(clean) ||
     /\b(?:A00|A01|A02|B00|B08|C00|C01|D01|D07|D08|D14|D15|H00|M00|M01|N00|T00|V00)\b/.test(clean);
   if (
-    (prevHasBottomTable && top <= 30 && (height <= 15 || hasTableSignals)) ||
-    (top <= 25 && height <= 12 && hasTableSignals)
+    !isAdminParagraph &&
+    hasTableSignals &&
+    ((prevHasBottomTable && top <= 30 && height <= 15) || (top <= 25 && height <= 12))
   ) {
     return { type: "table", label: "Bảng dữ liệu (tiếp nối)" };
   }
 
   // 5. Mặc định là Text (Bao gồm cả các đoạn văn xuôi, căn cứ, danh mục, thuyết minh)
   return { type: "text", label: "Khối văn bản" };
+}
+
+function cleanStudioRegions(regions: StudioOCRRegion[]): StudioOCRRegion[] {
+  // 1. Tách riêng tables và non-tables
+  const tables = regions.filter((r) => r.type === "table");
+  const nonTables = regions.filter((r) => r.type !== "table");
+
+  // 2. Khử nested sub-tables: nếu bảng con A nằm lọt >= 70% trong bảng cha B, loại bỏ A
+  const validTables = tables.filter((ti, i) => {
+    const areaI = ti.width * ti.height;
+    if (areaI <= 0) return false;
+    for (let j = 0; j < tables.length; j++) {
+      if (i === j) continue;
+      const tj = tables[j];
+      const areaJ = tj.width * tj.height;
+      if (areaJ > areaI) {
+        const ix0 = Math.max(ti.left, tj.left);
+        const iy0 = Math.max(ti.top, tj.top);
+        const ix1 = Math.min(ti.left + ti.width, tj.left + tj.width);
+        const iy1 = Math.min(ti.top + ti.height, tj.top + tj.height);
+        if (ix1 > ix0 && iy1 > iy0) {
+          const interArea = (ix1 - ix0) * (iy1 - iy0);
+          if (interArea / areaI >= 0.7) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  });
+
+  // 3. Khử text blocks rơi vào bên trong tables (bao gồm cả bảng song song đè text)
+  const validNonTables = nonTables.filter((r) => {
+    if (r.type === "signature" || r.type === "header") return true;
+
+    const areaR = r.width * r.height;
+    if (areaR <= 0) return true;
+
+    let totalInterArea = 0;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+
+    for (const t of validTables) {
+      if (
+        cx >= t.left - 0.5 &&
+        cx <= t.left + t.width + 0.5 &&
+        cy >= t.top - 0.5 &&
+        cy <= t.top + t.height + 0.5
+      ) {
+        return false;
+      }
+
+      const ix0 = Math.max(r.left, t.left);
+      const iy0 = Math.max(r.top, t.top);
+      const ix1 = Math.min(r.left + r.width, t.left + t.width);
+      const iy1 = Math.min(r.top + r.height, t.top + t.height);
+      if (ix1 > ix0 && iy1 > iy0) {
+        totalInterArea += (ix1 - ix0) * (iy1 - iy0);
+      }
+    }
+
+    if (totalInterArea / areaR >= 0.4) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return [...validTables, ...validNonTables];
 }
 
 function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioOCRDocument {
@@ -190,11 +267,23 @@ function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioO
               prevHasBottomTable
             );
 
-            const isContinuation = classified.label.includes("tiếp nối");
+            const isContinuation =
+              classified.label.includes("tiếp nối") ||
+              (classified.type === "table" && prevHasBottomTable && top <= 15);
             const finalLeft = isContinuation && prevTableCoords ? prevTableCoords.left : left;
             const finalWidth = isContinuation && prevTableCoords ? prevTableCoords.width : width;
-            const finalTop = isContinuation ? Math.max(0, top - 0.4) : top;
-            const finalHeight = isContinuation ? height + 0.8 : height;
+            // Nếu là bảng tiếp nối ở đỉnh trang mà top bắt đầu từ ~6.5-10.0% (chỉ ôm hàng 2), mở rộng top lên ~5.7% để ôm trọn cả hàng 1 rớt trang
+            const isMissedTopRow = isContinuation && top > 6.5 && top <= 10.0 && height <= 3.5;
+            const finalTop = isMissedTopRow
+              ? Math.max(5.0, top - 2.1)
+              : isContinuation
+                ? Math.max(0, top - 0.4)
+                : top;
+            const finalHeight = isMissedTopRow
+              ? height + (top - finalTop)
+              : isContinuation
+                ? height + 0.8
+                : height;
 
             return {
               type: classified.type,
@@ -222,11 +311,22 @@ function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioO
               prevHasBottomTable
             );
 
-            const isContinuation = classified.label.includes("tiếp nối");
+            const isContinuation =
+              classified.label.includes("tiếp nối") ||
+              (classified.type === "table" && prevHasBottomTable && top <= 15);
             const finalLeft = isContinuation && prevTableCoords ? prevTableCoords.left : left;
             const finalWidth = isContinuation && prevTableCoords ? prevTableCoords.width : width;
-            const finalTop = isContinuation ? Math.max(0, top - 0.4) : top;
-            const finalHeight = isContinuation ? height + 0.8 : height;
+            const isMissedTopRow = isContinuation && top > 6.5 && top <= 10.0 && height <= 3.5;
+            const finalTop = isMissedTopRow
+              ? Math.max(5.0, top - 2.1)
+              : isContinuation
+                ? Math.max(0, top - 0.4)
+                : top;
+            const finalHeight = isMissedTopRow
+              ? height + (top - finalTop)
+              : isContinuation
+                ? height + 0.8
+                : height;
 
             return {
               type: classified.type,
@@ -254,7 +354,7 @@ function mapVerificationDataToStudioDoc(data: DocumentVerificationData): StudioO
           `/platform/v1alpha1/knowledge/documents/${data.document_id}/pages/${p.page_number}/image`,
         markdown: p.markdown_content,
         rawText: p.raw_text,
-        regions: mappedRegions,
+        regions: cleanStudioRegions(mappedRegions),
         dimensions: p.dimensions || {
           width: isLandscapePage ? 1131 : 800,
           height: isLandscapePage ? 800 : 1131,

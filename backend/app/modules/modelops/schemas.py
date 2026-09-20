@@ -58,6 +58,7 @@ class ProviderKeyItem(BaseModel):
     id: str
     name: str
     api_key_masked: str
+    account_id: str | None = None
     priority: int = 1
     is_active: bool = True
     status: Literal["active", "rate_limited", "exhausted", "inactive"] = "active"
@@ -71,12 +72,14 @@ class ProviderKeyItem(BaseModel):
 class ProviderKeyCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100, description="Tên nhãn gợi nhớ (VD: Key Khoa CNTT 1)")
     api_key: str = Field(..., min_length=4, description="Mã khóa API bí mật (Secret Key)")
+    account_id: str | None = Field(None, description="Cloudflare Account ID (cho nhà cung cấp Cloudflare)")
     priority: int = Field(1, ge=1, le=99, description="Mức độ ưu tiên (1 = ưu tiên dùng trước)")
     quota_limit: int | None = Field(None, ge=1000, description="Hạn mức token cho key này (None = không giới hạn)")
 
 
 class ProviderKeyUpdate(BaseModel):
     name: str | None = None
+    account_id: str | None = None
     priority: int | None = Field(None, ge=1, le=99)
     is_active: bool | None = None
     status: Literal["active", "rate_limited", "exhausted", "inactive"] | None = None
@@ -438,6 +441,69 @@ class UsageStatsResponse(BaseModel):
     avg_latency_ms: float
     models_breakdown: list[ModelUsageBreakdownItem] = Field(default_factory=list)
     daily_usage: list[DailyUsageItem] = Field(default_factory=list)
+
+
+# ---------------- Provider Import & Export Schemas ----------------
+
+
+class ProviderKeyExportItem(BaseModel):
+    name: str
+    api_key: str | None = None
+    account_id: str | None = None
+    priority: int = 1
+    is_active: bool = True
+    quota_limit: int | None = None
+
+
+class ProviderExportItem(BaseModel):
+    id: str | None = None
+    name: str
+    code: str | None = None
+    provider_type: str
+    model_name: str | None = None
+    models: list[str] = Field(default_factory=list)
+    api_base_url: str | None = None
+    api_key: str | None = None
+    account_id: str | None = None
+    priority: int = 1
+    timeout_seconds: int = 15
+    is_active: bool = True
+    extra_config: dict[str, Any] = Field(default_factory=dict)
+    api_keys: list[ProviderKeyExportItem] = Field(default_factory=list)
+
+
+class ProviderSingleExportResponse(BaseModel):
+    version: str = "1.0"
+    export_type: Literal["single_provider"] = "single_provider"
+    exported_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    provider: ProviderExportItem
+
+
+class ProviderBulkExportResponse(BaseModel):
+    version: str = "1.0"
+    export_type: Literal["all_providers"] = "all_providers"
+    exported_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    total_providers: int
+    providers: list[ProviderExportItem]
+
+
+class ProviderImportRequest(BaseModel):
+    data: Any = Field(..., description="Cấu hình JSON của 1 provider hoặc toàn bộ danh sách providers")
+    conflict_strategy: Literal["overwrite", "skip", "create_new"] = Field(
+        "overwrite",
+        description="Chiến lược khi trùng provider: overwrite (ghi đè), skip (bỏ qua), create_new (tạo mới với tên mới)",
+    )
+
+
+class ProviderImportResponse(BaseModel):
+    success: bool
+    total_processed: int
+    imported: int
+    updated: int
+    skipped: int
+    errors: list[str] = Field(default_factory=list)
+    message: str
+
 
 
 

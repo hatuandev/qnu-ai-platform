@@ -1,9 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Cloud, Cpu, Plus, RefreshCw, Server, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  Cloud,
+  Cpu,
+  Download,
+  FileJson,
+  Plus,
+  RefreshCw,
+  Server,
+  SlidersHorizontal,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "../components/admin/empty-state";
+import { PageHeader } from "../components/admin/page-header";
 import { AddCustomModelDialog } from "../components/modelops/add-custom-model-dialog";
+import { ImportProvidersDialog } from "../components/modelops/import-providers-dialog";
 import { KeyPoolSection } from "../components/modelops/key-pool-section";
 import {
   type ProviderCategory,
@@ -106,6 +118,11 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
 
   // Add Custom Model Dialog state
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
+
+  // Import / Export state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [isExportingSingle, setIsExportingSingle] = useState(false);
 
   // -------------------------------------------------------------
   // DATA FETCHING & QUERIES
@@ -522,6 +539,51 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     }
   };
 
+  const downloadJsonFile = (data: unknown, filename: string) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = async () => {
+    try {
+      setIsExportingAll(true);
+      const data = await apiClient.exportAllProviders(true);
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      downloadJsonFile(data, `qnu-ai-providers-all-${dateStr}.json`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Xuất toàn bộ Provider thất bại";
+      alert(msg);
+    } finally {
+      setIsExportingAll(false);
+    }
+  };
+
+  const handleExportSingle = async (
+    providerId: string,
+    providerName: string,
+    providerType: string
+  ) => {
+    try {
+      setIsExportingSingle(true);
+      const data = await apiClient.exportProvider(providerId, true);
+      const safeName = providerName.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      downloadJsonFile(data, `provider-${providerType}-${safeName}.json`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Xuất Provider thất bại";
+      alert(msg);
+    } finally {
+      setIsExportingSingle(false);
+    }
+  };
+
   // -------------------------------------------------------------
   // DETAIL VIEW (When Provider is selected)
   // -------------------------------------------------------------
@@ -563,10 +625,14 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
           isTesting={testingId === selectedProvider.id}
           testResult={testResult}
           copiedUrl={copiedUrl}
+          isExporting={isExportingSingle}
           onBackToList={handleBackToList}
           onCopyUrl={copyToClipboard}
           onToggleActive={() => toggleMutation.mutate(selectedProvider.id)}
           onTestConnection={() => handleTestConnection(selectedProvider.id)}
+          onExport={() =>
+            handleExportSingle(selectedProvider.id, selectedProvider.name, selectedProvider.type)
+          }
           onEdit={() => openEditModal(selectedProvider)}
           onDelete={() => {
             if (
@@ -676,33 +742,46 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   // MASTER LIST VIEW
   // -------------------------------------------------------------
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            Quản Lý Provider
-            <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
-              ModelOps
-            </Badge>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Quản lý các nhà cung cấp mô hình LLM, nhóm khóa API xoay vòng (Key Pool), và chính sách
-            phục hồi dự phòng.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => openCreateModal("openai")}
-            className="text-xs h-8 gap-1.5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Thêm Provider Mới</span>
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 pb-10">
+      {/* Top Header Chuẩn QLKTX */}
+      <PageHeader
+        eyebrow="ModelOps / Hạ Tầng AI"
+        title="Quản Lý Provider & ModelOps"
+        description="Quản lý các nhà cung cấp mô hình LLM, nhóm khóa API xoay vòng (Key Pool), và chính sách phục hồi dự phòng Circuit Breaker."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isExportingAll}
+              onClick={handleExportAll}
+              className="gap-1.5"
+              title="Xuất cấu hình tất cả các Provider ra tệp JSON"
+            >
+              {isExportingAll ? (
+                <RefreshCw className="size-3.5 animate-spin text-primary" />
+              ) : (
+                <Download className="size-3.5 text-muted-foreground" />
+              )}
+              <span>{isExportingAll ? "Đang xuất..." : "Xuất Tất Cả (JSON)"}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsImportModalOpen(true)}
+              className="gap-1.5"
+              title="Nhập cấu hình Provider từ tệp JSON (đơn lẻ hoặc toàn bộ)"
+            >
+              <FileJson className="size-3.5 text-primary" />
+              <span>Nhập JSON</span>
+            </Button>
+            <Button size="sm" onClick={() => openCreateModal("openai")} className="gap-1.5">
+              <Plus className="size-3.5" />
+              <span>Thêm Provider Mới</span>
+            </Button>
+          </div>
+        }
+      />
 
       {/* System Default Routing Card */}
       <SystemDefaultsCard
@@ -1025,6 +1104,15 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
           }
         }}
         isSaving={createMutation.isPending || updateMutation.isPending}
+      />
+
+      {/* Import Providers Dialog */}
+      <ImportProvidersDialog
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+        }}
       />
     </div>
   );

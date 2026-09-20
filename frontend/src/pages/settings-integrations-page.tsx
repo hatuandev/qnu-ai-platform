@@ -1,7 +1,8 @@
+import { PageHeader } from "@/components/admin/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChannelsPage } from "@/pages/channels-page";
 import { DeveloperPage } from "@/pages/developer-page";
-import { Code2, Share2, Sparkles } from "lucide-react";
+import { Code2, Share2 } from "lucide-react";
 import * as React from "react";
 
 interface SettingsIntegrationsPageProps {
@@ -29,21 +30,11 @@ export const SettingsIntegrationsPage: React.FC<SettingsIntegrationsPageProps> =
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="size-4 text-primary" />
-            <span>Hệ Thống / Cài Đặt & Tích Hợp</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">
-            Tích Hợp & Kênh Triển Khai
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Quản lý mã nhúng Web Chat Widget, CDN Script và Khóa API cho các phòng ban, cổng thông
-            tin trường.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Hệ Thống / Cài Đặt & Tích Hợp"
+        title="Tích Hợp & Kênh Triển Khai"
+        description="Quản lý mã nhúng Web Chat Widget, CDN Script và Khóa API cho các phòng ban, cổng thông tin trường."
+      />
 
       {/* Main Tabs Container */}
       <Tabs value={activeTab} onValueChange={handleValueChange} className="space-y-6">

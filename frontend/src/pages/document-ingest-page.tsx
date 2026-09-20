@@ -182,7 +182,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
           {/* Header */}
           <div className="flex items-start gap-4 pb-4 border-b border-border/70">
-            <div className="flex size-11 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200 dark:border-emerald-800/60 shrink-0">
+            <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0">
               <UploadCloud className="size-6" />
             </div>
             <div>
@@ -206,7 +206,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
               className="text-xs font-semibold text-foreground flex items-center gap-1"
             >
               <span>Tiêu đề / Số hiệu Văn bản</span>
-              <span className="text-rose-500">*</span>
+              <span className="text-destructive">*</span>
             </label>
             <Input
               id="document-title-input"
@@ -413,7 +413,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
           <div className="space-y-2">
             <span className="text-xs font-semibold text-foreground flex items-center gap-1">
               <span>Tệp tài liệu đính kèm (PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, MD, PPTX)</span>
-              <span className="text-rose-500">*</span>
+              <span className="text-destructive">*</span>
             </span>
             <label
               htmlFor="file-upload-input"
@@ -433,7 +433,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md,.pptx"
                 onChange={handleFileChange}
               />
-              <div className="size-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center mb-3">
+              <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
                 <UploadCloud className="size-5" />
               </div>
               <p className="text-xs font-medium text-foreground">
@@ -500,7 +500,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 className="h-9 text-xs px-3 text-muted-foreground hover:text-primary gap-1.5 border border-dashed border-border hover:border-primary/40"
                 title="Mở tài liệu mẫu Đề án Tuyển sinh 2026 với 14 trang scan Docling thực tế"
               >
-                <Sparkles className="size-3.5 text-amber-500" />
+                <Sparkles className="size-3.5 text-primary" />
                 <span>Xem tài liệu mẫu (Tuyển sinh 2026)</span>
               </Button>
             </div>
@@ -508,7 +508,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
             <Button
               type="submit"
               disabled={isProcessing || (!selectedFile && !docTitle.trim())}
-              className="h-9 text-xs px-5 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm w-full sm:w-auto cursor-pointer disabled:opacity-50"
+              className="h-9 text-xs px-5 gap-2 w-full sm:w-auto cursor-pointer disabled:opacity-50"
             >
               {isProcessing ? (
                 <>

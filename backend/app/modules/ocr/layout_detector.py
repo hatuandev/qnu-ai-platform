@@ -426,15 +426,21 @@ class SmartLayoutDetector:
         # 1. Tables via fitz_page.find_tables()
         tables: list[dict[str, Any]] = []
         try:
-            tab_finder = fitz_page.find_tables()
-            tab_list = list(getattr(tab_finder, "tables", []) or [])
+            from app.modules.knowledge.parsers.blocks import (
+                find_page_tables,
+                suppress_nested_tables,
+            )
+
+            tab_finder = find_page_tables(fitz_page)
+            raw_tab_list = list(getattr(tab_finder, "tables", []) or [])
+            tab_list = suppress_nested_tables(raw_tab_list)
             for t_idx, tab in enumerate(tab_list):
                 x0, y0, x1, y1 = tab.bbox
                 t_top = round(y0 / ph * 100, 1)
                 t_left = round(x0 / pw * 100, 1)
                 t_w = round((x1 - x0) / pw * 100, 1)
                 t_h = round((y1 - y0) / ph * 100, 1)
-                if t_w > 15.0 and t_h > 2.0:
+                if t_w > 15.0 and t_h >= 1.5:
                     rows = []
                     try:
                         rows = tab.extract() or []
@@ -476,20 +482,28 @@ class SmartLayoutDetector:
             x0, y0, x1, y1 = float(b[0]), float(b[1]), float(b[2]), float(b[3])
 
             # Suppress text blocks falling inside any detected table (including side-by-side tables)
+            b_area = max(0.0, x1 - x0) * max(0.0, y1 - y0)
             is_inside_table = False
-            for t in tables:
-                tx0, ty0, tx1, ty1 = t["bbox"]
-                y_overlap = max(0.0, min(y1, ty1) - max(y0, ty0))
-                h_b = max(1.0, y1 - y0)
-                x_overlap = max(0.0, min(x1, tx1) - max(x0, tx0))
-                # If vertical overlap > 50% and substantial horizontal overlap
-                if (y_overlap / h_b > 0.50) and (x_overlap > 10.0):
+            if b_area > 0 and tables:
+                total_inter = 0.0
+                for t in tables:
+                    tx0, ty0, tx1, ty1 = t["bbox"]
+                    ix0 = max(x0, tx0)
+                    iy0 = max(y0, ty0)
+                    ix1 = min(x1, tx1)
+                    iy1 = min(y1, ty1)
+                    if ix1 > ix0 and iy1 > iy0:
+                        total_inter += (ix1 - ix0) * (iy1 - iy0)
+                if (total_inter / b_area) >= 0.40:
                     is_inside_table = True
-                    break
-                cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-                if tx0 - 5.0 <= cx <= tx1 + 5.0 and ty0 - 3.0 <= cy <= ty1 + 3.0:
-                    is_inside_table = True
-                    break
+
+                if not is_inside_table:
+                    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+                    for t in tables:
+                        tx0, ty0, tx1, ty1 = t["bbox"]
+                        if tx0 - 5.0 <= cx <= tx1 + 5.0 and ty0 - 3.0 <= cy <= ty1 + 3.0:
+                            is_inside_table = True
+                            break
 
             if not is_inside_table:
                 text_blocks.append({

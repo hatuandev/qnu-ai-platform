@@ -159,7 +159,7 @@ class InferenceService:
                         api_key=used_api_key,
                         base_url=p["api_base_url"],
                         timeout_seconds=p["timeout_seconds"],
-                        account_id=p.get("account_id"),
+                        account_id=active_key_entry.get("account_id") or p.get("account_id"),
                     )
 
                     resp = await adapter.generate(
@@ -340,7 +340,7 @@ class InferenceService:
                         api_key=used_api_key,
                         base_url=p["api_base_url"],
                         timeout_seconds=p["timeout_seconds"],
-                        account_id=p.get("account_id"),
+                        account_id=active_key_entry.get("account_id") or p.get("account_id"),
                     )
                     async for token_chunk in adapter.stream(
                         messages=req.messages,

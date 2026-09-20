@@ -1,8 +1,11 @@
+import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
+import { KpiMetric } from "@/components/admin/kpi-metric";
+import { PageHeader } from "@/components/admin/page-header";
 import { WorkflowVersionHistoryDialog } from "@/components/admin/workflow-version-history-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { apiClient } from "@/services/api-client";
 import { listAssistants } from "@/services/assistants-api";
 import { type WorkflowDefinition, workflowsApi } from "@/services/workflows-api";
@@ -22,7 +25,6 @@ import {
   Network,
   Play,
   RefreshCw,
-  Search,
   ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -44,18 +46,18 @@ const MODULE_CATEGORIES = [
 
 function getModuleIcon(moduleCode: string): ReactNode {
   if (moduleCode.includes("admission")) {
-    return <GraduationCap className="size-5 text-emerald-600 dark:text-emerald-400" />;
+    return <GraduationCap className="size-5 text-success" />;
   }
   if (moduleCode.includes("regulation")) {
-    return <BookOpen className="size-5 text-blue-600 dark:text-blue-400" />;
+    return <BookOpen className="size-5 text-info" />;
   }
   if (moduleCode.includes("library")) {
-    return <Library className="size-5 text-amber-600 dark:text-amber-400" />;
+    return <Library className="size-5 text-warning" />;
   }
   if (moduleCode.includes("drafting")) {
-    return <FileText className="size-5 text-purple-600 dark:text-purple-400" />;
+    return <FileText className="size-5 text-purple-500" />;
   }
-  return <FileCode className="size-5 text-teal-600 dark:text-teal-400" />;
+  return <FileCode className="size-5 text-primary" />;
 }
 
 function getModuleCategory(moduleCode: string): string {
@@ -132,132 +134,88 @@ export function WorkflowsPage({ onNavigate }: WorkflowsPageProps) {
   return (
     <div className="space-y-6">
       {/* 1. Header & Navigation Actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <PageHeader
+        eyebrow="Workflow Control Plane / Orchestration"
+        title="Quy Trình & Workflow DAG"
+        description="Điều phối động cơ thực thi có hướng (DAG Runtime Engine) và Workflow Control Plane cho 05 Trợ lý AI QNU."
+        actions={
           <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Network className="size-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-                Quy Trình & Workflow DAG
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Điều phối động cơ thực thi có hướng (DAG Runtime Engine) và Workflow Control Plane
-                cho 05 Trợ lý AI QNU.
-              </p>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleRefresh}
+              disabled={definitionsQuery.isFetching}
+            >
+              <RefreshCw
+                className={cn("size-3.5", definitionsQuery.isFetching && "animate-spin")}
+              />
+              <span>Làm mới</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onNavigate("/nodes")}
+            >
+              <Layers className="size-3.5 text-primary" />
+              <span>Thư viện DAG Nodes</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onNavigate("/runs")}
+            >
+              <History className="size-3.5 text-muted-foreground" />
+              <span>Lịch sử Runs</span>
+            </Button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={handleRefresh}
-            disabled={definitionsQuery.isFetching}
-          >
-            <RefreshCw
-              className={`size-3.5 text-muted-foreground ${definitionsQuery.isFetching ? "animate-spin" : ""}`}
-            />
-            Làm mới
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => onNavigate("/nodes")}
-          >
-            <Layers className="size-3.5 text-primary" />
-            Thư viện DAG Nodes
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 text-xs gap-1.5"
-            onClick={() => onNavigate("/runs")}
-          >
-            <History className="size-3.5 text-muted-foreground" />
-            Lịch sử Runs
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* 2. KPI Metrics Strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="border-border bg-card/60 shadow-2xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Tổng Quy Trình</span>
-              <Network className="size-4 text-primary" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-foreground">
-                {kpiMetrics.totalWorkflows}
-              </span>
-              <span className="text-[11px] text-muted-foreground">chuẩn QNU</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Phủ 5 chuyên môn học thuật</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card/60 shadow-2xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Đang Phục Vụ</span>
-              <CheckCircle2 className="size-4 text-emerald-500" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                {kpiMetrics.activeWorkflows}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                / {kpiMetrics.totalWorkflows} active
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Phiên bản v1.0.0 đã xuất bản</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card/60 shadow-2xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Độ Phức Tạp DAG</span>
-              <Layers className="size-4 text-primary" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-foreground">{kpiMetrics.avgNodes}</span>
-              <span className="text-[11px] text-muted-foreground">nodes / workflow</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Topo Ready-Set Scheduler</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border bg-card/60 shadow-2xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Chuẩn Kiểm Định</span>
-              <ShieldCheck className="size-4 text-amber-500" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">TM-08</span>
-              <span className="text-[11px] text-muted-foreground">Anti-Hallucination</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">Bắt buộc trích dẫn văn bản</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="grid p-0 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            label="Tổng Quy Trình"
+            value={kpiMetrics.totalWorkflows}
+            delta="chuẩn QNU"
+            helper="Phủ 5 chuyên môn học thuật"
+            icon={Network}
+          />
+          <KpiMetric
+            label="Đang Phục Vụ"
+            value={kpiMetrics.activeWorkflows}
+            delta={`/ ${kpiMetrics.totalWorkflows} active`}
+            helper="Phiên bản v1.0.0 đã xuất bản"
+            icon={CheckCircle2}
+          />
+          <KpiMetric
+            label="Độ Phức Tạp DAG"
+            value={kpiMetrics.avgNodes}
+            delta="nodes / workflow"
+            helper="Topo Ready-Set Scheduler"
+            icon={Layers}
+          />
+          <KpiMetric
+            label="Chuẩn Kiểm Định"
+            value="TM-08"
+            delta="Anti-Hallucination"
+            helper="Bắt buộc trích dẫn văn bản"
+            icon={ShieldCheck}
+          />
+        </CardContent>
+      </Card>
 
       {/* 3. Search & Category Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="flex-1 max-w-md">
+          <DebouncedSearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={setSearch}
             placeholder="Tìm theo tên quy trình, mã module, mô tả…"
-            className="h-9 pl-9 text-xs"
+            className="h-9 text-xs"
           />
         </div>
 

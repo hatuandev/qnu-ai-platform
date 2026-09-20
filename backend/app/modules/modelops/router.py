@@ -12,8 +12,11 @@ from app.modules.modelops.schemas import (
     PROVIDER_PRESETS,
     LLMGenerateRequest,
     LLMGenerateResponse,
+    ProviderBulkExportResponse,
     ProviderConfigCreate,
     ProviderConfigUpdate,
+    ProviderImportRequest,
+    ProviderImportResponse,
     ProviderKeyCreate,
     ProviderKeyItem,
     ProviderKeyTestResponse,
@@ -21,6 +24,7 @@ from app.modules.modelops.schemas import (
     ProviderModelsTestRequest,
     ProviderModelsTestResponse,
     ProviderPresetItem,
+    ProviderSingleExportResponse,
     ProviderTestResponse,
     SetDefaultModelRequest,
     SimulateKeyRotationRequest,
@@ -127,6 +131,30 @@ async def create_provider(
     return await modelops_service.create_provider(db, body)
 
 
+@router.get(
+    "/providers/export",
+    response_model=ProviderBulkExportResponse,
+    summary="Xuất toàn bộ cấu hình tất cả các nhà cung cấp và key pool ra tệp JSON",
+)
+async def export_all_providers_endpoint(
+    include_secrets: bool = True,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await modelops_service.export_all_providers(db, include_secrets=include_secrets)
+
+
+@router.post(
+    "/providers/import",
+    response_model=ProviderImportResponse,
+    summary="Nhập cấu hình nhà cung cấp từ tệp JSON (hỗ trợ đơn lẻ hoặc hàng loạt, kèm chiến lược xử lý trùng lặp)",
+)
+async def import_providers_endpoint(
+    body: ProviderImportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await modelops_service.import_providers(db, body)
+
+
 @router.put(
     "/providers/{provider_id}",
     summary="Cập nhật thông tin, API key và danh sách mô hình của Provider",
@@ -137,6 +165,19 @@ async def update_provider(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     return await modelops_service.update_provider(db, provider_id, body)
+
+
+@router.get(
+    "/providers/{provider_id}/export",
+    response_model=ProviderSingleExportResponse,
+    summary="Xuất cấu hình của một nhà cung cấp và key pool ra tệp JSON",
+)
+async def export_single_provider_endpoint(
+    provider_id: str,
+    include_secrets: bool = True,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await modelops_service.export_provider(db, provider_id, include_secrets=include_secrets)
 
 
 @router.delete(

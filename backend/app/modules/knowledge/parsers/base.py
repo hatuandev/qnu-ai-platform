@@ -27,6 +27,9 @@ class ParsedContent:
     metadata: dict[str, Any] = field(default_factory=dict)
     # Real geometry blocks: {page_number, type, coordinates(%), label, content_snippet}
     blocks: list[dict[str, Any]] = field(default_factory=list)
+    # Canonical representation is retained in memory for quality validation and
+    # record-aware chunking. It is intentionally not serialized into document metadata.
+    canonical_document: Any | None = None
 
 
 class BaseDocumentParser(ABC):

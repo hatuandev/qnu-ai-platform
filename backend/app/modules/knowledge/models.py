@@ -188,15 +188,15 @@ class KnowledgeFact(Base):
     )
 
     entity_name: Mapped[str] = mapped_column(
-        String(255), nullable=False, index=True
+        String(512), nullable=False, index=True
     )  # e.g., "Công nghệ thông tin"
     entity_type: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )  # e.g., "major", "rule", "fee"
     attribute_name: Mapped[str] = mapped_column(
-        String(128), nullable=False
+        String(255), nullable=False
     )  # e.g., "benchmark_score_2024", "quota"
-    attribute_value: Mapped[str] = mapped_column(String(512), nullable=False)  # e.g., "24.5", "180"
+    attribute_value: Mapped[str] = mapped_column(Text, nullable=False)  # e.g., "24.5", "180", full deliverables text
 
     confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     raw_data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)

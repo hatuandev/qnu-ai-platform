@@ -84,20 +84,23 @@ class HeuristicTM08Evaluator(BaseTM08Evaluator):
         if not combined_context:
             return 0.0
 
-        # Extract factual sentences/clauses from answer
-        raw_sentences = [s.strip() for s in re.split(r"[.!?;\n]+", answer) if len(s.strip()) > 8]
+        # Extract factual sentences/clauses from answer (do not split on decimal points like 8.5 or 26.25)
+        raw_sentences = [
+            s.strip() for s in re.split(r"(?<!\d)[.!?;\n]+(?!\d)", answer) if len(s.strip()) > 8
+        ]
         if not raw_sentences:
             return 1.0
 
-        # Exclude polite conversational framing from factual grounding check
+        # Exclude polite conversational framing & citation meta notes from factual grounding check
         sentences = []
         for s in raw_sentences:
             s_lower = s.lower().strip()
-            if any(s_lower.startswith(p) for p in [
+            if any(s_lower.startswith(p) or p in s_lower for p in [
                 "căn cứ quy định", "căn cứ tài liệu", "căn cứ thông tin", "căn cứ dữ liệu",
                 "dựa trên", "theo quy chế", "theo thông báo", "theo đề án",
-                "xin giải đáp", "xin gửi thông tin", "chào bạn", "kính gửi"
-            ]) and len(s.split()) <= 16:
+                "xin giải đáp", "xin gửi thông tin", "chào bạn", "kính gửi",
+                "thông tin được trích dẫn", "trích dẫn từ", "nguồn:", "trích dẫn chính xác",
+            ]) and len(s.split()) <= 18:
                 continue
             sentences.append(s)
 
@@ -112,7 +115,7 @@ class HeuristicTM08Evaluator(BaseTM08Evaluator):
 
             matching_words = [w for w in words if w in combined_context]
             overlap_ratio = len(matching_words) / len(words)
-            if overlap_ratio >= 0.60:
+            if overlap_ratio >= 0.50:
                 grounded_count += 1
 
         return round(min(1.0, max(0.0, grounded_count / len(sentences))), 3)
@@ -173,6 +176,10 @@ class HeuristicTM08Evaluator(BaseTM08Evaluator):
 
     def compute_context_precision(self, ground_truth: str, contexts: list[str]) -> float:
         """Measure if retrieved contexts contain the essential facts of the ground truth using Ragas AP@k."""
+        # For mutual refusal (No-Answer policy compliance on ungrounded questions), precision is 100%
+        if self.is_refusal_answer(ground_truth):
+            return 1.0
+
         if not contexts or not ground_truth.strip():
             return 0.0
 

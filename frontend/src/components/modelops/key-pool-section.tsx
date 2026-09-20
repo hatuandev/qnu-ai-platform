@@ -33,6 +33,7 @@ export interface KeyPoolSectionProps {
   onSaveNewKey: (payload: {
     name: string;
     api_key: string;
+    account_id?: string;
     priority: number;
     quota_limit?: number;
   }) => void;
@@ -59,6 +60,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
   const [showAddKeyForm, setShowAddKeyForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeySecret, setNewKeySecret] = useState("");
+  const [newKeyAccountId, setNewKeyAccountId] = useState("");
   const [newKeyPriority, setNewKeyPriority] = useState(1);
   const [newKeyQuota, setNewKeyQuota] = useState("");
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
@@ -77,11 +79,13 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
     onSaveNewKey({
       name: newKeyName.trim(),
       api_key: newKeySecret.trim(),
+      account_id: newKeyAccountId.trim() || undefined,
       priority: newKeyPriority,
       quota_limit: newKeyQuota ? Number.parseInt(newKeyQuota, 10) : undefined,
     });
     setNewKeyName("");
     setNewKeySecret("");
+    setNewKeyAccountId("");
     setNewKeyPriority(1);
     setNewKeyQuota("");
     setShowAddKeyForm(false);
@@ -230,6 +234,26 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                 </div>
               </div>
 
+              {selectedProvider.type === "cloudflare" && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-medium text-foreground block">
+                    Cloudflare Account ID (Tài khoản)
+                  </span>
+                  <Input
+                    placeholder={
+                      selectedProvider.account_id || "VD: ab6bf689e472cb9a61358ef23d13330c"
+                    }
+                    value={newKeyAccountId}
+                    onChange={(e) => setNewKeyAccountId(e.target.value)}
+                    className="h-8 text-xs font-mono"
+                  />
+                  <span className="text-[10px] text-muted-foreground block">
+                    Nhập Account ID riêng của tài khoản này (để trống sẽ kế thừa Account ID của
+                    Provider: {selectedProvider.account_id || "chưa gán"})
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-1 border-t border-border/60">
                 <Button
                   type="button"
@@ -317,6 +341,20 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                               )}
                             </button>
                           </div>
+
+                          {keyItem.account_id && (
+                            <span
+                              className="text-[11px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 flex items-center gap-1"
+                              title={`Tài khoản Cloudflare Account ID: ${keyItem.account_id}`}
+                            >
+                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-sans font-semibold">
+                                Acc:
+                              </span>
+                              {keyItem.account_id.length > 14
+                                ? `${keyItem.account_id.slice(0, 6)}...${keyItem.account_id.slice(-4)}`
+                                : keyItem.account_id}
+                            </span>
+                          )}
                         </div>
 
                         {/* Status Badge & Actions */}

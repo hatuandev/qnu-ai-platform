@@ -857,6 +857,136 @@ async def test_generate_prioritizes_fallback_model_when_primary_unavailable():
         assert "Gemini Fallback" in response.content
 
 
+@pytest.mark.asyncio
+async def test_cloudflare_multi_account_key_pool():
+    """Verify adding keys with custom account_id to Cloudflare provider key pool."""
+    from app.modules.modelops.schemas import ProviderKeyCreate
+
+    mock_db = AsyncMock()
+    mock_config = ModelProviderConfig(
+        id="prov_cf_test",
+        name="Cloudflare Workers AI",
+        provider_type="cloudflare",
+        model_name="@cf/baai/bge-m3",
+        api_base_url="https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run",
+        api_key_encrypted="enc_initial_key",
+        priority=1,
+        is_active=True,
+        extra_config={
+            "account_id": "default_cf_acc_123",
+            "api_keys": [],
+        },
+    )
+
+    mock_scalar = MagicMock()
+    mock_scalar.scalar_one_or_none.return_value = mock_config
+    mock_db.execute.return_value = mock_scalar
+
+    # Add 1st key with specific account_id (e.g. Khoa CNTT)
+    key_data_1 = ProviderKeyCreate(
+        name="Tài khoản Cloudflare Khoa CNTT",
+        api_key="mock_cf_token_1",
+        account_id="cf_acc_cntt_999",
+        priority=1,
+    )
+    res1 = await modelops_service.add_provider_key(mock_db, "prov_cf_test", key_data_1)
+    assert res1["name"] == "Tài khoản Cloudflare Khoa CNTT"
+    assert res1["account_id"] == "cf_acc_cntt_999"
+    assert "api_key" not in res1
+    assert "api_key_masked" in res1
+
+    # Add 2nd key with another account_id (e.g. Tuyển sinh)
+    key_data_2 = ProviderKeyCreate(
+        name="Tài khoản Cloudflare Tuyển Sinh",
+        api_key="mock_cf_token_2",
+        account_id="cf_acc_tuyensinh_888",
+        priority=2,
+    )
+    res2 = await modelops_service.add_provider_key(mock_db, "prov_cf_test", key_data_2)
+    assert res2["name"] == "Tài khoản Cloudflare Tuyển Sinh"
+    assert res2["account_id"] == "cf_acc_tuyensinh_888"
+
+    # Verify both keys stored in extra_config
+    stored_keys = mock_config.extra_config["api_keys"]
+    assert len(stored_keys) == 2
+    assert stored_keys[0]["account_id"] == "cf_acc_cntt_999"
+    assert stored_keys[1]["account_id"] == "cf_acc_tuyensinh_888"
+
+
+@pytest.mark.asyncio
+async def test_export_and_import_providers():
+    """Verify JSON Export (single/all) and Import with conflict strategies."""
+    from app.modules.modelops.schemas import ProviderImportRequest
+
+    mock_db = AsyncMock()
+    mock_config = ModelProviderConfig(
+        id="prov_cf_export_test",
+        name="Cloudflare Workers AI",
+        provider_type="cloudflare",
+        model_name="@cf/baai/bge-m3",
+        api_base_url="https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run",
+        api_key_encrypted="test_secret_token",
+        priority=1,
+        is_active=True,
+        extra_config={
+            "account_id": "acc_export_123",
+            "models": ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base"],
+            "api_keys": [
+                {
+                    "name": "Key 1",
+                    "api_key": "test_secret_token",
+                    "account_id": "acc_export_123",
+                    "priority": 1,
+                    "is_active": True,
+                }
+            ],
+        },
+    )
+
+    mock_scalar = MagicMock()
+    mock_scalar.scalar_one_or_none.return_value = mock_config
+    mock_scalar.scalars.return_value.all.return_value = [mock_config]
+    mock_scalar.scalars.return_value.first.return_value = mock_config
+    mock_db.execute.return_value = mock_scalar
+
+    # 1. Test Single Export
+    export_single = await modelops_service.export_provider(
+        mock_db, "prov_cf_export_test", include_secrets=True
+    )
+    assert export_single["version"] == "1.0"
+    assert export_single["export_type"] == "single_provider"
+    assert export_single["provider"]["name"] == "Cloudflare Workers AI"
+    assert export_single["provider"]["account_id"] == "acc_export_123"
+    assert len(export_single["provider"]["api_keys"]) == 1
+    assert export_single["provider"]["api_keys"][0]["account_id"] == "acc_export_123"
+
+    # 2. Test Bulk Export
+    export_all = await modelops_service.export_all_providers(mock_db, include_secrets=True)
+    assert export_all["version"] == "1.0"
+    assert export_all["export_type"] == "all_providers"
+    assert export_all["total_providers"] == 1
+    assert export_all["providers"][0]["name"] == "Cloudflare Workers AI"
+
+    # 3. Test Import Overwrite
+    import_req_overwrite = ProviderImportRequest(
+        data=export_single,
+        conflict_strategy="overwrite",
+    )
+    res_import = await modelops_service.import_providers(mock_db, import_req_overwrite)
+    assert res_import["success"] is True
+    assert res_import["updated"] == 1
+
+    # 4. Test Import Create New
+    import_req_new = ProviderImportRequest(
+        data=export_single,
+        conflict_strategy="create_new",
+    )
+    res_import_new = await modelops_service.import_providers(mock_db, import_req_new)
+    assert res_import_new["success"] is True
+    assert res_import_new["imported"] == 1
+
+
+
 
 
 

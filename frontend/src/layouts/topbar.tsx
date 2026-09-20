@@ -82,7 +82,7 @@ export function Topbar({
   const isDevMode = import.meta.env.DEV;
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-border bg-background/80 px-3 sm:px-4 backdrop-blur-md transition-all">
+    <header className="sticky top-0 z-40 flex h-[var(--topbar-height)] w-full items-center justify-between border-b border-border bg-background/95 px-3 sm:px-4 lg:px-6 backdrop-blur transition-all">
       {/* Left: Mobile Drawer Trigger, Desktop Sidebar Toggle & Breadcrumbs */}
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Mobile Hamburger Trigger (< lg) */}
@@ -90,7 +90,7 @@ export function Topbar({
           variant="ghost"
           size="icon-sm"
           onClick={onOpenMobileDrawer}
-          className="text-muted-foreground hover:text-foreground lg:hidden"
+          className="size-8.5 rounded-lg text-muted-foreground hover:text-foreground lg:hidden"
           title="Mở menu điều hướng"
           aria-label="Mở menu điều hướng"
         >
@@ -102,7 +102,7 @@ export function Topbar({
           variant="ghost"
           size="icon-sm"
           onClick={onToggleSidebar}
-          className="hidden lg:inline-flex text-muted-foreground hover:text-foreground"
+          className="hidden lg:inline-flex size-8.5 rounded-lg text-muted-foreground hover:text-foreground"
           title={sidebarOpen ? "Thu gọn thanh bên" : "Mở rộng thanh bên"}
           aria-label="Toggle Sidebar"
         >
@@ -114,36 +114,36 @@ export function Topbar({
         </Button>
 
         {/* Breadcrumbs */}
-        <nav aria-label="Breadcrumbs" className="hidden items-center gap-1.5 text-xs sm:flex">
-          <span className="font-semibold text-foreground/80">QNU Studio</span>
-          <ChevronRight className="size-3.5 text-muted-foreground" />
+        <nav aria-label="Breadcrumbs" className="hidden items-center gap-2 text-sm sm:flex">
+          <span className="font-semibold text-foreground/80">QNU Platform</span>
+          <ChevronRight className="size-3.5 text-muted-foreground/70" />
           <span className="text-muted-foreground">{breadcrumbInfo.section}</span>
-          <ChevronRight className="size-3.5 text-muted-foreground" />
+          <ChevronRight className="size-3.5 text-muted-foreground/70" />
           <span className="font-medium text-primary">{breadcrumbInfo.item}</span>
         </nav>
       </div>
 
       {/* Right: Search, Theme Toggle, User Profile */}
-      <div className="flex items-center gap-1.5 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
         {/* Quick Search Button (Ctrl + K) */}
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onOpenCommand}
-          className="flex h-8 w-36 sm:w-60 items-center justify-between rounded-md border border-input bg-background/50 px-2.5 text-xs text-muted-foreground shadow-2xs transition-colors hover:bg-muted/50 hover:text-foreground"
-          aria-label="Mở tìm kiếm nhanh"
+          className="h-9 items-center gap-2.5 rounded-lg border-border/70 bg-muted/20 px-3 text-sm font-normal text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          aria-label="Mở tìm kiếm nhanh (Ctrl K)"
         >
-          <div className="flex items-center gap-2 truncate">
-            <Search className="size-3.5 shrink-0" />
-            <span className="truncate">Tìm kiếm...</span>
-          </div>
+          <Search className="size-4 shrink-0 text-muted-foreground/80" />
+          <span className="hidden sm:inline font-normal text-foreground/80">Tìm kiếm...</span>
           <Kbd className="hidden sm:inline-flex">Ctrl K</Kbd>
-        </button>
+        </Button>
 
         {/* Theme Toggle Button */}
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          className="size-8.5 rounded-lg text-muted-foreground hover:text-foreground"
           title={
             resolvedTheme === "dark" ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"
           }
@@ -159,26 +159,28 @@ export function Topbar({
         {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 px-1.5 hover:bg-muted">
-              <Avatar className="size-7">
-                <AvatarFallback className="text-[11px] font-bold text-primary bg-primary/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 px-1.5 h-9 hover:bg-muted rounded-lg"
+            >
+              <Avatar className="size-8">
+                <AvatarFallback className="text-xs font-semibold text-primary bg-primary/10">
                   {avatarInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden text-left sm:block">
-                <p className="text-xs font-semibold leading-none text-foreground truncate max-w-[120px]">
+                <p className="text-sm font-semibold leading-tight text-foreground truncate max-w-[140px]">
                   {displayName}
                 </p>
-                <p className="text-[10px] text-muted-foreground">{displayRole}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{displayRole}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <p className="text-xs font-semibold text-foreground">{displayName}</p>
-              <p className="text-[11px] text-muted-foreground font-normal truncate">
-                {displayEmail}
-              </p>
+              <p className="text-sm font-semibold text-foreground">{displayName}</p>
+              <p className="text-xs text-muted-foreground font-normal truncate">{displayEmail}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
 

@@ -19,21 +19,31 @@ class FactLayer:
         self,
         db: AsyncSession,
         collection_id: str,
-        keywords: list[str],
-        limit: int = 10,
+        keywords: list[str] | None = None,
+        entity_codes: list[str] | None = None,
+        fact_attributes: list[str] | None = None,
+        limit: int = 15,
         tenant_id: str | None = None,
         workspace_id: str | None = None,
     ) -> list[KnowledgeFact]:
-        """Look up fact records matching any of the identified keywords, strictly bound to approved documents."""
-        if not keywords:
-            return []
-
+        """Look up fact records matching identified keywords or entity codes, strictly bound to approved documents."""
         conditions = []
-        for kw in keywords:
-            clean_kw = kw.strip().lower()
-            if len(clean_kw) >= 2:
-                conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_kw}%"))
-                conditions.append(KnowledgeFact.attribute_name.ilike(f"%{clean_kw}%"))
+
+        # 1. Match specific entity codes (e.g. 7480107, 6.8, IELTS)
+        if entity_codes:
+            for code in entity_codes:
+                clean_code = code.strip()
+                if clean_code:
+                    conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_code}%"))
+                    conditions.append(KnowledgeFact.attribute_value.ilike(f"%{clean_code}%"))
+
+        # 2. Match keywords
+        if keywords:
+            for kw in keywords:
+                clean_kw = kw.strip().lower()
+                if len(clean_kw) >= 2:
+                    conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_kw}%"))
+                    conditions.append(KnowledgeFact.attribute_name.ilike(f"%{clean_kw}%"))
 
         if not conditions:
             return []
@@ -55,6 +65,12 @@ class FactLayer:
                 or_(*conditions),
             )
         )
+
+        # 3. Optional attribute filter
+        if fact_attributes:
+            attr_conditions = [KnowledgeFact.attribute_name.ilike(f"%{attr}%") for attr in fact_attributes]
+            query = query.where(or_(*attr_conditions))
+
         if tenant_id:
             query = query.where(KnowledgeCollection.tenant_id == tenant_id)
         if workspace_id:

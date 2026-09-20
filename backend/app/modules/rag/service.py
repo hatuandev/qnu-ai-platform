@@ -14,6 +14,7 @@ from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
 from app.modules.rag.composer import answer_format_planner
 from app.modules.rag.facts import fact_layer
+from app.modules.rag.query_router import QueryIntent, query_classifier
 from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.schemas import (
     AskRequest,
@@ -92,25 +93,39 @@ class RagService:
             cached["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
             return AskResponse.model_validate(cached)
 
-        # 3. Lookup Structured Fact Layer (Extract numerical facts)
-        keywords = [w.strip() for w in req.question.split() if len(w.strip()) >= 3]
+        # 3. Query Intent Analysis & Fact-First Routing
+        analysis = query_classifier.analyze(req.question)
+        lookup_limit = 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
+
         facts = await fact_layer.lookup_facts(
             db,
             req.collection_id,
-            keywords=keywords,
-            limit=5,
+            keywords=analysis.keywords,
+            entity_codes=analysis.entity_codes if analysis.entity_codes else None,
+            fact_attributes=analysis.fact_attributes if analysis.fact_attributes else None,
+            limit=lookup_limit,
             tenant_id=req.tenant_id,
             workspace_id=req.workspace_id,
         )
         fact_markdown = fact_layer.format_facts_as_markdown(facts)
 
-        # 4. Hybrid Retrieval (Dense + Sparse + Rerank)
+        # 4. Hybrid Retrieval with Intent-tailored Top-K
+        if analysis.intent == QueryIntent.EXACT_FACT:
+            retrieval_top_k = 4
+            rerank_top_k = 3
+        elif analysis.intent == QueryIntent.MIXED:
+            retrieval_top_k = 6
+            rerank_top_k = 4
+        else:
+            retrieval_top_k = 8
+            rerank_top_k = 5
+
         candidates = await hybrid_retriever.retrieve(
             db=db,
             collection_id=req.collection_id,
             query=req.question,
-            top_k=8,
-            rerank_top_k=5,
+            top_k=retrieval_top_k,
+            rerank_top_k=rerank_top_k,
             tenant_id=req.tenant_id,
             workspace_id=req.workspace_id,
         )

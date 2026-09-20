@@ -49,6 +49,8 @@ class Citation(BaseModel):
     section: str | None = None
     page_number: int | None = None
     quote: str | None = None
+    source_pages: list[int] | None = None
+    entity_key: str | None = None
 
 
 class AskRequest(BaseModel):

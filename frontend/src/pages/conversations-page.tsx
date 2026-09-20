@@ -1,3 +1,5 @@
+import { DebouncedSearchInput } from "@/components/admin/debounced-search-input";
+import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,9 +24,7 @@ import {
   Library,
   MessageSquare,
   RefreshCw,
-  Search,
   Send,
-  ShieldAlert,
   ShieldCheck,
   User,
   UserCheck,
@@ -120,8 +120,8 @@ export const ConversationsPage: React.FC = () => {
     onError: (err: Error) => toast.error(`Cập nhật trạng thái thất bại: ${err.message}`),
   });
 
-  const handleSendReply = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendReply = (e?: React.SyntheticEvent) => {
+    if (e) e.preventDefault();
     if (!replyText.trim() || replyMutation.isPending) return;
     replyMutation.mutate(replyText.trim());
   };
@@ -133,11 +133,11 @@ export const ConversationsPage: React.FC = () => {
   const getAssistantIcon = (code: string) => {
     switch (code) {
       case "admissions":
-        return <GraduationCap className="size-3.5 text-emerald-500" />;
+        return <GraduationCap className="size-3.5 text-success" />;
       case "regulations":
-        return <ShieldCheck className="size-3.5 text-sky-500" />;
+        return <ShieldCheck className="size-3.5 text-info" />;
       case "library":
-        return <Library className="size-3.5 text-amber-500" />;
+        return <Library className="size-3.5 text-warning" />;
       default:
         return <Bot className="size-3.5 text-primary" />;
     }
@@ -147,10 +147,7 @@ export const ConversationsPage: React.FC = () => {
     switch (status) {
       case "handoff_requested":
         return (
-          <Badge
-            variant="destructive"
-            className="text-[10px] gap-1 animate-pulse bg-rose-500/15 text-rose-600 border border-rose-500/30"
-          >
+          <Badge variant="destructive" className="text-[10px] gap-1 animate-pulse">
             <AlertTriangle className="size-3" />
             Cần tiếp quản
           </Badge>
@@ -159,7 +156,7 @@ export const ConversationsPage: React.FC = () => {
         return (
           <Badge
             variant="outline"
-            className="text-[10px] gap-1 bg-sky-500/10 text-sky-600 border-sky-500/30"
+            className="text-[10px] gap-1 bg-info/10 text-info border-info/30"
           >
             <UserCheck className="size-3" />
             Cán bộ hỗ trợ
@@ -169,7 +166,7 @@ export const ConversationsPage: React.FC = () => {
         return (
           <Badge
             variant="outline"
-            className="text-[10px] gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+            className="text-[10px] gap-1 bg-success/10 text-success border-success/30"
           >
             <CheckCircle2 className="size-3" />
             Đã giải quyết
@@ -189,29 +186,22 @@ export const ConversationsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-4 rounded-lg border border-border">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Headphones className="size-5 text-primary" />
-            <span>Giám Sát Hội Thoại & Bàn Giao Nhân Sự (Staff Handoff)</span>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Theo dõi các phiên trao đổi thời gian thực giữa người học và Trợ lý AI ĐH Quy Nhơn. Cán
-            bộ có thể can thiệp 1-click khi câu hỏi vượt quá phạm vi tri thức.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {handoffCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="text-xs px-3 py-1 gap-1.5 bg-rose-500 text-white font-medium shadow-sm"
-            >
-              <ShieldAlert className="size-3.5" />
-              <span>{handoffCount} yêu cầu cần hỗ trợ</span>
-            </Badge>
-          )}
+      <PageHeader
+        eyebrow="Hội Thoại / Giám Sát Nhân Sự"
+        title={
+          <span className="inline-flex items-center gap-2">
+            Giám Sát Hội Thoại & Bàn Giao Nhân Sự (Staff Handoff)
+            {handoffCount > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {handoffCount} yêu cầu cần hỗ trợ
+              </Badge>
+            )}
+          </span>
+        }
+        description="Theo dõi các phiên trao đổi thời gian thực giữa người học và Trợ lý AI ĐH Quy Nhơn. Cán bộ có thể can thiệp 1-click khi câu hỏi vượt quá phạm vi tri thức."
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -220,13 +210,13 @@ export const ConversationsPage: React.FC = () => {
               if (selectedThreadId) threadDetailQuery.refetch();
             }}
             disabled={threadsQuery.isFetching}
-            className="h-8 text-xs gap-1.5"
+            className="gap-1.5"
           >
             <RefreshCw className={cn("size-3.5", threadsQuery.isFetching && "animate-spin")} />
             <span>Làm mới</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Main 2-Column Master-Detail Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-[22rem_1fr] gap-4 min-h-[680px]">
@@ -234,15 +224,12 @@ export const ConversationsPage: React.FC = () => {
         <Card className="flex flex-col border border-border overflow-hidden">
           {/* Search & Status Filter */}
           <div className="p-3 border-b border-border space-y-2 bg-muted/20">
-            <div className="relative">
-              <Search className="size-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
-              <Input
-                placeholder="Tìm thí sinh, sinh viên, nội dung..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 text-xs pl-8"
-              />
-            </div>
+            <DebouncedSearchInput
+              placeholder="Tìm thí sinh, sinh viên, nội dung..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+              className="h-8 text-xs"
+            />
 
             {/* Filter Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 text-[11px]">
@@ -384,7 +371,8 @@ export const ConversationsPage: React.FC = () => {
                         })
                       }
                       disabled={statusMutation.isPending}
-                      className="h-8 text-xs gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-sm"
+                      variant="destructive"
+                      className="h-8 text-xs gap-1.5 font-medium shadow-sm"
                     >
                       <UserCheck className="size-3.5" />
                       <span>Tiếp nhận hỗ trợ</span>
@@ -418,7 +406,7 @@ export const ConversationsPage: React.FC = () => {
                         })
                       }
                       disabled={statusMutation.isPending}
-                      className="h-8 text-xs gap-1.5 text-emerald-600 hover:bg-emerald-500/10"
+                      className="h-8 text-xs gap-1.5 text-success hover:bg-success/10 border-success/30"
                     >
                       <CheckCircle2 className="size-3.5" />
                       <span>Đã giải quyết</span>
@@ -531,7 +519,9 @@ export const ConversationsPage: React.FC = () => {
                     </span>
                     <Input
                       value={staffName}
-                      onChange={(e) => setStaffName(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setStaffName(e.target.value)
+                      }
                       placeholder="Cán bộ QNU..."
                       className="h-7 text-xs w-48 font-medium"
                     />

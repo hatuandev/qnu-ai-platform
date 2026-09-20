@@ -6,6 +6,7 @@ import {
   Cloud,
   Copy,
   Cpu,
+  Download,
   Globe,
   Pencil,
   Play,
@@ -27,10 +28,12 @@ export interface ProviderDetailHeaderProps {
   isTesting: boolean;
   testResult: { id: string; success: boolean; message: string } | null;
   copiedUrl: boolean;
+  isExporting?: boolean;
   onBackToList: () => void;
   onCopyUrl: (url: string) => void;
   onToggleActive: () => void;
   onTestConnection: () => void;
+  onExport?: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -40,10 +43,12 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
   isTesting,
   testResult,
   copiedUrl,
+  isExporting,
   onBackToList,
   onCopyUrl,
   onToggleActive,
   onTestConnection,
+  onExport,
   onEdit,
   onDelete,
 }) => {
@@ -177,6 +182,22 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
                 <Play className="h-3.5 w-3.5 text-primary" />
               )}
               <span>{isTesting ? "Đang kiểm tra..." : "Test Kết Nối"}</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isExporting}
+              onClick={onExport}
+              className="h-9 text-xs gap-1.5"
+              title="Xuất cấu hình của Provider này ra tệp JSON"
+            >
+              {isExporting ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
+              ) : (
+                <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              <span>{isExporting ? "Đang xuất..." : "Xuất JSON"}</span>
             </Button>
 
             <Button variant="outline" size="sm" onClick={onEdit} className="h-9 text-xs gap-1.5">

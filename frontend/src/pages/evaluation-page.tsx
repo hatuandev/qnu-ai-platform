@@ -21,6 +21,7 @@ import type React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "../components/admin/empty-state";
+import { PageHeader } from "../components/admin/page-header";
 import { EvaluationRunDetailSheet } from "../components/evaluation/evaluation-run-detail-sheet";
 import { RunBenchmarkDialog } from "../components/evaluation/run-benchmark-dialog";
 import { Badge } from "../components/ui/badge";
@@ -123,29 +124,24 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+      <PageHeader
+        eyebrow="Ragas Benchmarks / TM-08 Standard"
+        title={
+          <span className="inline-flex items-center gap-2">
             Kiểm Định Chất Lượng Ragas TM-08 & Gap Inbox
             <Badge variant="outline" className="font-mono text-xs text-primary border-primary/30">
               Tiêu Chuẩn TM-08
             </Badge>
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Đo lường định lượng 3 chỉ số Ragas tự động: Độ trung thực (Faithfulness), Độ liên quan
-            (Relevance), Độ chính xác ngữ cảnh (Context Precision) và đối soát lỗ hổng tri thức.
-          </p>
-        </div>
-
-        <Button
-          size="sm"
-          onClick={() => setIsRunDialogOpen(true)}
-          className="h-9 gap-1.5 text-xs self-start sm:self-auto shrink-0"
-        >
-          <Play className="h-4 w-4" />
-          <span>Chạy Benchmark TM-08</span>
-        </Button>
-      </div>
+          </span>
+        }
+        description="Đo lường định lượng 3 chỉ số Ragas tự động: Độ trung thực (Faithfulness), Độ liên quan (Relevance), Độ chính xác ngữ cảnh (Context Precision) và đối soát lỗ hổng tri thức."
+        actions={
+          <Button size="sm" onClick={() => setIsRunDialogOpen(true)} className="gap-1.5 shrink-0">
+            <Play className="size-3.5" />
+            <span>Chạy Benchmark TM-08</span>
+          </Button>
+        }
+      />
 
       {/* 3 Ragas TM-08 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -204,10 +200,10 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
         </Card>
 
         {/* Metric 3: Context Precision */}
-        <Card className="p-4 space-y-2 border-l-4 border-l-emerald-500 hover:border-emerald-500/50 transition-all">
+        <Card className="p-4 space-y-2 border-l-4 border-l-success hover:border-success/50 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-emerald-500" />
+              <Sparkles className="h-4 w-4 text-success" />
               Độ Chính Xác Ngữ Cảnh (Precision)
             </span>
             <Badge variant={isPrecise ? "success" : "secondary"} className="text-[10px]">
@@ -220,7 +216,7 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-success rounded-full transition-all duration-500"
               style={{ width: `${Math.min(100, Math.max(0, Number.parseFloat(precisionPct)))}%` }}
             />
           </div>
@@ -305,7 +301,7 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px] gap-1 font-mono">
-                              <Zap className="h-2.5 w-2.5 text-amber-500" /> Heuristic
+                              <Zap className="h-2.5 w-2.5 text-warning" /> Heuristic
                             </Badge>
                           )}
                         </TableCell>
@@ -321,7 +317,7 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
                         <TableCell className="font-mono text-xs font-bold text-info">
                           {r.answer_relevance_avg.toFixed(3)}
                         </TableCell>
-                        <TableCell className="font-mono text-xs font-bold text-emerald-500">
+                        <TableCell className="font-mono text-xs font-bold text-success">
                           {r.context_precision_avg.toFixed(3)}
                         </TableCell>
                         <TableCell>

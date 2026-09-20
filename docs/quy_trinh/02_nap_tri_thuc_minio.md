@@ -34,19 +34,22 @@ flowchart TD
         H2 -->|Trang có Digital Text >= 40 ký tự| H3[PyMuPDF Fast Native: Trích xuất Text & Bảng trực tiếp 15-30ms]
         H2 -->|Trang Scan / Ảnh thuần hoặc text rỗng| H4[Cứu hộ OCR tự động: Mistral OCR Cloud / EasyOCR Local]
         
-        H1 & H3 & H4 --> K1[Bảo toàn bảng biểu: _format_table_markdown chuyển đổi thành bảng GFM]
+        H1 & H3 & H4 --> K1[Bảo toàn bảng biểu & Canonical Normalization: Loại bỏ trùng lặp text/table, TableReconstructor nối bảng đa trang]
         K1 --> K2[SmartLayoutDetector OpenCV: Phân vùng vĩ mô, bóc tách con dấu đỏ, chữ ký]
-        K2 --> K3[Markdown Cleaner: Chuẩn hóa Unicode NFC, loại bỏ số trang rác, footnote thừa]
-        K3 --> K4[Bảo tồn Markdown từng trang: page_markdowns lưu vào doc_metadata]
+        K2 --> K3[Markdown Renderer: Chuẩn hóa 1 hàng/dòng Markdown, reflow ô nhiều dòng thành <br>, Unicode NFC]
+        K3 --> K4[Bảo tồn Markdown từng trang & CanonicalDocument trong bộ nhớ xử lý]
+        K4 --> QG{Data Quality Gate}
+        QG -->|Có lỗi blocking| REVIEW[status = review_pending<br/>Không sinh chunk, fact hay Qdrant point]
+        QG -->|Đạt kiểm định| L
     end
 
     subgraph TANG_PHAN_MANH [3. Tầng Phân Mảnh Tri Thức & Structured Facts]
-        K4 --> L{Loại văn bản?}
         L -->|Văn bản pháp quy / Quy chế đào tạo| M[ClauseBasedChunker: Cắt theo từng Điều / Khoản có nhãn trích dẫn]
         L -->|Cẩm nang / Tuyển sinh / Giáo trình| N[SemanticChunker: Cắt phân đoạn ngữ nghĩa trôi chảy max 500 tokens]
+        L -->|Tuyển sinh / Kế hoạch nhiệm vụ đã đạt kiểm định| R[Record-aware chunker: 1 ngành / 1 nhiệm vụ = 1 chunk]
         
-        M & N -->|Lưu danh sách Chunks vào CSDL| DB_CHUNKS[(PostgreSQL: bảng knowledge_chunks)]
-        M & N --> O[Fact Extractor: Trích xuất Bảng số liệu dạng cấu trúc]
+        M & N & R -->|Lưu danh sách Chunks vào CSDL| DB_CHUNKS[(PostgreSQL: bảng knowledge_chunks)]
+        M & N & R --> O[Fact Extractor: Trích xuất Bảng số liệu dạng cấu trúc]
         O -->|Nạp các bộ Fact: Điểm chuẩn, Mã ngành, Học phí| DB_FACTS[(PostgreSQL: bảng knowledge_facts)]
     end
 
@@ -107,16 +110,19 @@ flowchart TD
 - **Bảo toàn bảng biểu GFM**: Hàm `_format_table_markdown` chuyển đổi ma trận bảng số hóa thành bảng Markdown chuẩn GitHub Flavored Markdown (`| Tiêu đề 1 | Tiêu đề 2 |`), ngăn ngừa triệt để lỗi mất dữ liệu bảng tuyển sinh hay điểm chuẩn.
 - **Phân vùng bố cục vĩ mô ([`layout_detector.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/ocr/layout_detector.py))**: Kết hợp Computer Vision OpenCV và Vector PDF để nhận diện con dấu đỏ (`HSV stamps`), khối Dấu & Ký (`signature`), phân định Quốc hiệu, Tiêu ngữ, Căn cứ pháp lý, triệt tiêu 100% hiện tượng text giả lập.
 - **Làm sạch văn bản ([`cleaner.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/knowledge/cleaner.py))**: Chuẩn hóa Unicode NFC sạch, loại bỏ dấu trang thừa, chân trang rác.
-- **Bảo tồn Markdown từng trang (`page_markdowns`)**: Lưu trữ nội dung Markdown sạch độc lập cho từng trang trong `doc_metadata["page_markdowns"]` để khắc phục triệt để lỗi "chunks dồn hết vào trang 1 khiến trang 2..N bị trắng tinh".
+- **Bảo tồn Markdown từng trang (`page_markdowns`)**: Lưu trữ nội dung Markdown sạch độc lập cho từng trang trong `doc_metadata["page_markdowns"]` để khắc phục triệt để lỗi "chunks dồn hết vào trang 1 khiến trang 2..N bị trắng tinh". `CanonicalDocument` chỉ tồn tại trong phiên xử lý để kiểm định và không được tuần tự hóa vào metadata.
+- **Không phát minh tiêu đề cột**: Markdown renderer không tự đặt tên kiểu `Cột N`. Bảng có header rỗng, header giả hoặc không tái dựng được sẽ không được render như dữ liệu hợp lệ.
 
 ### Bước 5: Chiến lược phân đoạn tri thức (Chunking Strategy)
 - **`ClauseBasedChunker`**: Dành riêng cho Quy chế đào tạo, Quyết định, Thông tư, Quy định học vụ. Quét biểu thức chính quy `(?:Điều|Chương|Phần)\s+\d+` để cắt độc lập từng Điều, Khoản, gắn nhãn trích dẫn chính xác.
 - **`SemanticChunker`**: Dành cho cẩm nang sinh viên, đề án tuyển sinh, giáo trình. Cắt theo ranh giới đoạn văn ngữ nghĩa với kích thước `max_tokens = 500`.
 - **Ghi nhận `page_number` chính xác**: Mọi chunk đều được parse thẻ `<!-- Trang X -->` để gắn đúng số trang phục vụ trích dẫn gốc.
+- **Record-aware chunking cho bảng nghiệp vụ**: Khi Quality Gate đạt, Tuyển sinh tạo một chunk nguyên tử cho mỗi ngành; Kế hoạch nhiệm vụ tạo một chunk cho mỗi mã nhiệm vụ. Không cắt theo độ dài giữa một bản ghi và không index lại header/trang lặp.
 
 ### Bước 6: Bóc tách tầng số liệu sự thật (Structured Facts Layer)
 - Các bảng số liệu có tính biến động cao hoặc yêu cầu độ chính xác tuyệt đối (Mã ngành, Điểm chuẩn, Chỉ tiêu tuyển sinh, Học phí từng học kỳ) được trích xuất tự động qua `fact_extractor.py` và nạp vào bảng PostgreSQL `knowledge_facts`.
-- Khi nạp tệp xong, tài liệu được lưu trong PostgreSQL với trạng thái **`status = "pending"`**. Chunks và Facts đã sẵn sàng trong DB quan hệ nhưng **CHƯA ĐƯỢC NẠP VÀO VECTOR DB**.
+- **Data Quality Gate bắt buộc trước Facts/Chunks**: kiểm tra lỗi mã hóa, cột vô danh, hàng sai số cột, trùng bản ghi nghiệp vụ và mâu thuẫn chéo bảng. Lỗi `blocking` chuyển tài liệu sang **`review_pending`**, lưu `quality_report`, không lưu chunk/fact và không được phép lập chỉ mục Qdrant.
+- Khi nạp tệp đạt kiểm định, tài liệu được lưu trong PostgreSQL với trạng thái **`status = "pending"`**. Chunks và Facts đã sẵn sàng trong DB quan hệ nhưng **CHƯA ĐƯỢC NẠP VÀO VECTOR DB**.
 
 ### Bước 7: Tầng đối soát & Hiệu đính con người (Human-in-the-loop Verification Studio)
 - Cán bộ mở **Document Verification Studio** (`/knowledge/collections/:id/documents/:docId/verification`):
@@ -126,12 +132,13 @@ flowchart TD
 
 ### Bước 8: Phê duyệt & Đánh chỉ mục kép (Dual Indexing)
 - Khi cán bộ bấm nút **`[Xác nhận & Nạp vào Vector DB]`** (gọi API `POST /knowledge/documents/{document_id}/approve` hoặc `POST /knowledge/documents/batch-approve`):
+  0. Nếu `quality_report.passed = false`, API từ chối phê duyệt rỗng với HTTP 409 `document_review_required`. Cán bộ phải gửi trang Markdown đã hiệu đính; hành động này là xác nhận có trách nhiệm và đặt `human_verified = true`.
   1. **Chỉ mục Ngữ nghĩa (Dense Vector Search)**: Sinh vector 1024 chiều bằng mô hình Embedding đang hoạt động (Cloudflare BGE-M3 hoặc Local CPU), đẩy các điểm vector (`points`) vào Qdrant Vector DB kèm metadata số trang, trích đoạn.
   2. **Chỉ mục Từ khóa (Sparse Lexical Search)**: Cập nhật chỉ mục `tsvector` tiếng Việt trên cột `tsv_content` của bảng PostgreSQL `knowledge_chunks` phục vụ tra cứu từ khóa chính xác và chữ viết tắt (DQN, CNTT, UIS).
   3. **Chuyển đổi trạng thái hoàn tất**: Tài liệu được cập nhật sang **`status = "approved"`**, ghi nhận `indexed_chunks` và sẵn sàng 100% cho bộ máy Hybrid RAG kết hợp thuật toán **Reciprocal Rank Fusion (RRF $k=60$)** và Cross-Encoder Reranking không bịa đặt.
 
 ### Bước 9: Tái Đối Soát Facts Khi Sửa Tay (Fact Reconciliation) & Xóa Thác Đổ (Cascading Cleanup) Chống Ghost Vector
-- **Tái đối soát Facts khi sửa tay (Facts Reconciliation)**: Khi cán bộ phê duyệt tài liệu sau khi sửa tay các trang trong Verification Studio (`approve_document`), hệ thống tự động xóa toàn bộ Facts cũ (`DELETE FROM knowledge_facts WHERE document_id = ...`) và kích hoạt trích xuất lại Facts mới từ Markdown đã hiệu đính, ngăn chặn triệt để tình trạng Facts lỗi thời mâu thuẫn với nội dung trang.
+- **Tái đối soát Facts khi sửa tay (Facts Reconciliation)**: Khi cán bộ phê duyệt tài liệu sau khi sửa tay các trang trong Verification Studio (`approve_document`), hệ thống tự động xóa toàn bộ Facts cũ (`DELETE FROM knowledge_facts WHERE document_id = ...`) và chỉ trích xuất lại Facts từ các bảng GFM có header/row hợp lệ trong Markdown đã xác nhận. Không suy đoán dữ liệu từ bảng lỗi; số lượng được lưu ở `human_verified_fact_count`.
 - **Xóa thác đổ (Cascading Cleanup) triệt tiêu Ghost Vectors**:
   * Khi gọi API Xóa tài liệu (`DELETE /knowledge/documents/{id}`), Lưu trữ (`POST /knowledge/documents/{id}/archive`) hoặc Xóa bộ sưu tập (`DELETE /knowledge/collections/{id}`), hệ thống xóa đồng bộ và dọn dẹp triệt để trên 4 tầng:
     1. **Tầng Lưu trữ (MinIO / Local Disk)**: Xóa tệp gốc và toàn bộ ảnh render trang trong thư mục cache.

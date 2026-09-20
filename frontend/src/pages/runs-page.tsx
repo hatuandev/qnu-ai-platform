@@ -18,9 +18,11 @@ import {
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { KpiMetric } from "../components/admin/kpi-metric";
+import { PageHeader } from "../components/admin/page-header";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
-import { Card } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -186,76 +188,71 @@ export const RunsPage: React.FC<RunsPageProps> = ({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+      <PageHeader
+        eyebrow="Workflow Orchestration / Audit Trails"
+        title={
+          <span className="inline-flex items-center gap-2">
             Lịch Sử Thực Thi Luồng Điều Phối (DAG Runs)
-            <Badge variant="outline" className="font-mono text-xs">
-              Audit Trails
-            </Badge>
             {pendingApprovals.length > 0 && (
-              <Badge variant="warning" className="animate-pulse text-xs">
+              <Badge variant="warning" className="animate-pulse">
                 {pendingApprovals.length} Chờ duyệt
               </Badge>
             )}
-          </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Theo dõi từng phiên chạy workflow, số node đã qua, độ trễ và phê duyệt checkpoint
-            Human-in-the-loop trực tiếp.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void refetchRuns();
-              void refetchApprovals();
-            }}
-            className="h-8 text-xs gap-1.5"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Làm mới</span>
-          </Button>
-
-          {onNavigateToCanvas && (
-            <Button size="sm" onClick={onNavigateToCanvas} className="h-8 text-xs gap-1.5">
-              <GitBranch className="h-3.5 w-3.5" />
-              <span>Mở Visual DAG Studio</span>
+          </span>
+        }
+        description="Theo dõi từng phiên chạy workflow, số node đã qua, độ trễ và phê duyệt checkpoint Human-in-the-loop trực tiếp."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void refetchRuns();
+                void refetchApprovals();
+              }}
+              className="gap-1.5"
+            >
+              <RefreshCw className="size-3.5" />
+              <span>Làm mới</span>
             </Button>
-          )}
-        </div>
-      </div>
+
+            {onNavigateToCanvas && (
+              <Button size="sm" onClick={onNavigateToCanvas} className="gap-1.5">
+                <GitBranch className="size-3.5" />
+                <span>Mở Visual DAG Studio</span>
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {/* Summary KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4">
-          <span className="text-xs text-muted-foreground">Tổng Phiên Thực Thi</span>
-          <p className="text-xl font-bold text-foreground mt-1">{runs.length} Phiên chạy</p>
-          <span className="text-[11px] text-success flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" /> {completedCount}/{runs.length || 0} hoàn thành
-          </span>
-        </Card>
-
-        <Card className="p-4">
-          <span className="text-xs text-muted-foreground">Độ Trễ Trung Bình (E2E Latency)</span>
-          <p className="text-xl font-bold text-primary font-mono mt-1">{averageLatency} ms</p>
-          <span className="text-[11px] text-muted-foreground">Bao gồm RAG & LLM inference</span>
-        </Card>
-
-        <Card className="p-4">
-          <span className="text-xs text-muted-foreground">Hộp Thư Phê Duyệt (HITL Inbox)</span>
-          <p className="text-xl font-bold text-warning font-mono mt-1">
-            {pendingApprovals.length} Yêu cầu
-          </p>
-          <span className="text-[11px] text-muted-foreground">
-            {pendingApprovals.length > 0
-              ? "Cần cán bộ kiểm tra & quyết định"
-              : "Tất cả chốt kiểm duyệt đã hoàn tất"}
-          </span>
-        </Card>
-      </div>
+      <Card>
+        <CardContent className="grid p-0 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            label="Tổng Phiên Thực Thi"
+            value={`${runs.length} Phiên chạy`}
+            helper={`${completedCount}/${runs.length || 0} hoàn thành`}
+            icon={CheckCircle2}
+          />
+          <KpiMetric
+            label="Độ Trễ Trung Bình (E2E)"
+            value={`${averageLatency} ms`}
+            helper="Bao gồm RAG & LLM inference"
+            icon={Clock}
+          />
+          <KpiMetric
+            label="Hộp Thư Phê Duyệt (HITL)"
+            value={`${pendingApprovals.length} Yêu cầu`}
+            helper={
+              pendingApprovals.length > 0
+                ? "Cần cán bộ kiểm tra & quyết định"
+                : "Tất cả chốt kiểm duyệt đã hoàn tất"
+            }
+            icon={Inbox}
+          />
+        </CardContent>
+      </Card>
 
       {/* Approval Inbox Section */}
       <Card className="p-4 border-warning/40 bg-warning/5">
@@ -327,7 +324,7 @@ export const RunsPage: React.FC<RunsPageProps> = ({
                   <Button
                     size="sm"
                     onClick={() => handleOpenDecisionDialog(approval, "approved")}
-                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                    className="h-8 text-xs gap-1"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     <span>Phê duyệt</span>
@@ -587,7 +584,7 @@ export const RunsPage: React.FC<RunsPageProps> = ({
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               {approvalDecision === "approved" ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
                   <span>Xác Nhận Phê Duyệt Checkpoint</span>
                 </>
               ) : (
@@ -636,11 +633,7 @@ export const RunsPage: React.FC<RunsPageProps> = ({
                   <Button
                     type="button"
                     variant={approvalDecision === "approved" ? "default" : "outline"}
-                    className={`h-8 text-xs gap-1.5 ${
-                      approvalDecision === "approved"
-                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                        : ""
-                    }`}
+                    className="h-8 text-xs gap-1.5"
                     onClick={() => setApprovalDecision("approved")}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
@@ -701,13 +694,10 @@ export const RunsPage: React.FC<RunsPageProps> = ({
             <Button
               type="button"
               size="sm"
+              variant={approvalDecision === "approved" ? "default" : "destructive"}
               onClick={() => void handleSubmitDecision()}
               disabled={isSubmittingDecision}
-              className={`h-8 text-xs gap-1.5 ${
-                approvalDecision === "approved"
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-              }`}
+              className="h-8 text-xs gap-1.5"
             >
               {isSubmittingDecision ? (
                 <>

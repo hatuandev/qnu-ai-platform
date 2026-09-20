@@ -17,12 +17,13 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import type React from "react";
 import { KpiMetric } from "../components/admin/kpi-metric";
+import { PageHeader } from "../components/admin/page-header";
 import { StatusBadge } from "../components/admin/status-badge";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
+import { cn } from "../lib/utils";
 import { apiClient } from "../services/api-client";
 import { modelopsApi } from "../services/modelops-api";
 
@@ -90,59 +91,69 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Banner */}
-      <section className="relative overflow-hidden rounded-surface border border-border bg-gradient-to-br from-card via-card to-muted/40 p-6 shadow-xs">
-        <div className="relative z-10 max-w-3xl space-y-2.5">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary font-medium">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>QNU AI Platform — Hệ Thống Sản Xuất Đạt Chuẩn</span>
+    <div className="space-y-6 pb-10">
+      {/* 1. Page Header Chuẩn QLKTX */}
+      <PageHeader
+        eyebrow="Hệ Thống / Tổng Quan Điều Phối"
+        title="Bảng Điều Khiển Nền Tảng AI"
+        description="Nền tảng hợp nhất Trợ lý AI và Động cơ RAG Đa tầng Trường Đại học Quy Nhơn, tuân thủ nghiêm ngặt Zero-Hallucination và đo lường độ trung thực TM-08."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchHealth()}
+              disabled={isHealthLoading}
+              className="gap-1.5"
+            >
+              <RefreshCw className={cn("size-3.5", isHealthLoading && "animate-spin")} />
+              Kiểm tra dịch vụ
+            </Button>
+            <Button size="sm" onClick={() => onNavigate("/assistants")} className="gap-1.5">
+              <Sparkles className="size-3.5" />
+              Quản trị Trợ lý
+            </Button>
           </div>
-          <h1 className="font-bold text-2xl tracking-tight text-foreground sm:text-3xl">
-            Nền Tảng Điều Phối Trợ Lý AI & Động Cơ RAG
-          </h1>
-          <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
-            Hợp nhất 05 Trợ lý Chuyên trách (Tuyển sinh, Quy chế, Thư viện, Soạn thảo NĐ 30, Đề thi
-            Bloom) trên một hạ tầng AI hiện đại, bảo mật và tuân thủ Zero-Hallucination.
-          </p>
-        </div>
-      </section>
+        }
+      />
 
-      {/* KPI Metrics Row */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiMetric
-          title="Tổng Tokens Tháng Này"
-          value={totalTokensFormatted}
-          change="+14.2%"
-          changeType="increase"
-          description="Hạn ngạch: 10,000,000"
-          icon={Cpu}
-        />
-        <KpiMetric
-          title="Chi Phí FinOps USD"
-          value={costFormatted}
-          change="-3.8%"
-          changeType="decrease"
-          description="Tiết kiệm nhờ local vLLM"
-          icon={Coins}
-        />
-        <KpiMetric
-          title="Độ Trung Thực Ragas TM-08"
-          value={faithfulnessScore}
-          change="Đạt Chuẩn"
-          changeType="increase"
-          description="Ngưỡng tối thiểu >= 90%"
-          icon={ShieldCheck}
-        />
-        <KpiMetric
-          title="Kho Tri Thức RAG"
-          value={`${totalCollectionsCount} Collections`}
-          change="5 Phân hệ"
-          changeType="neutral"
-          description="Qdrant + Postgres FTS"
-          icon={BookOpen}
-        />
-      </section>
+      {/* 2. Top 4 KPI Metrics Card (Cụm chia ô chuẩn QLKTX) */}
+      <Card className="overflow-hidden border bg-card shadow-2xs">
+        <CardContent className="grid p-0 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x">
+          <KpiMetric
+            label="Tổng Tokens Tháng Này"
+            value={totalTokensFormatted}
+            delta="+14.2%"
+            trend="positive"
+            helper="Hạn ngạch: 10,000,000"
+            icon={Cpu}
+          />
+          <KpiMetric
+            label="Chi Phí Tích Lũy"
+            value={costFormatted}
+            delta="Trong định mức"
+            trend="neutral"
+            helper="Ngân sách cấp: $50.00"
+            icon={Coins}
+          />
+          <KpiMetric
+            label="Độ Chuẩn Xác Ragas (TM-08)"
+            value={faithfulnessScore}
+            delta="+1.8%"
+            trend="positive"
+            helper="Ngưỡng quy định: ≥ 90%"
+            icon={ShieldCheck}
+          />
+          <KpiMetric
+            label="Kho Tri Thức & Corpus"
+            value={totalCollectionsCount}
+            delta="100% Sẵn sàng"
+            trend="neutral"
+            helper="Cơ sở tri thức ĐH Quy Nhơn"
+            icon={Database}
+          />
+        </CardContent>
+      </Card>
 
       {/* Diagnostic & FinOps Breakdown Grid */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">

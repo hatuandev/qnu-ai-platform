@@ -97,7 +97,7 @@ export function CollectionTasksTab({
       </div>
 
       {taskSuccessMessage && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-600">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/30 text-xs text-success">
           <CheckCircle2 className="size-4 shrink-0" />
           <span>{taskSuccessMessage}</span>
         </div>
@@ -159,7 +159,7 @@ export function CollectionTasksTab({
                 <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
                   <TableCell>
                     <div className="flex items-start gap-3">
-                      <div className="flex size-8 items-center justify-center rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 shrink-0 mt-0.5">
+                      <div className="flex size-8 items-center justify-center rounded bg-primary/10 text-primary shrink-0 mt-0.5">
                         <Upload className="size-4" />
                       </div>
                       <div>
@@ -186,12 +186,12 @@ export function CollectionTasksTab({
                   <TableCell>
                     <div className="w-28 space-y-1">
                       <div className="flex justify-between text-xs font-mono">
-                        <span className="text-emerald-600 font-bold">{t.progress_percent}%</span>
+                        <span className="text-primary font-bold">{t.progress_percent}%</span>
                         <span className="text-muted-foreground">Xong</span>
                       </div>
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-emerald-600 rounded-full"
+                          className="h-full bg-primary rounded-full"
                           style={{ width: `${t.progress_percent}%` }}
                         />
                       </div>
@@ -238,7 +238,7 @@ export function CollectionTasksTab({
                           size="icon"
                           onClick={() => onTaskAction(t.id, "retry")}
                           disabled={taskActionId === t.id}
-                          className="size-7 text-emerald-600 hover:text-emerald-700"
+                          className="size-7 text-primary hover:text-primary/80"
                           title="Chạy lại job"
                           aria-label="Chạy lại job"
                         >
@@ -251,7 +251,7 @@ export function CollectionTasksTab({
                           size="icon"
                           onClick={() => onTaskAction(t.id, "cancel")}
                           disabled={taskActionId === t.id}
-                          className="size-7 text-amber-600 hover:text-amber-700"
+                          className="size-7 text-warning hover:text-warning/80"
                           title="Hủy job"
                           aria-label="Hủy job"
                         >
@@ -263,7 +263,7 @@ export function CollectionTasksTab({
                         size="icon"
                         onClick={() => onDeleteTask(t)}
                         disabled={taskActionId === t.id}
-                        className="size-7 text-rose-500 hover:text-rose-600"
+                        className="size-7 text-destructive hover:text-destructive/80"
                         title="Xóa tác vụ khỏi danh sách"
                         aria-label="Xóa tác vụ"
                       >
