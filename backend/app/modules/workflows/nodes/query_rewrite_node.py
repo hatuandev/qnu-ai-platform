@@ -109,6 +109,59 @@ _TYPO_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\btuyển\s+xính\b", re.IGNORECASE), "tuyển sinh"),
 ]
 
+# Paraphrase expansion: "môn học nào để xét tuyển" -> "tổ hợp môn xét tuyển".
+# Prevents Hybrid RAG from favoring Phụ lục 1 (môn thi HSG / xét tuyển thẳng)
+# when the user actually asks for Trang 6 subject combinations.
+_SUBJECT_COMBO_PARAPHRASES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\bnhững\s+môn\s+học\s+nào\b", re.IGNORECASE), "những tổ hợp môn nào"),
+    (
+        re.compile(r"(?<!tổ hợp\s)\bmôn\s+học\s+nào\b", re.IGNORECASE),
+        "tổ hợp môn nào",
+    ),
+    (
+        re.compile(r"(?<!tổ hợp\s)\bmôn\s+nào\s+để\s+xét\s+tuyển\b", re.IGNORECASE),
+        "tổ hợp môn nào để xét tuyển",
+    ),
+    (
+        re.compile(r"(?<!tổ hợp\s)\bmôn\s+học\s+để\s+xét\s+tuyển\b", re.IGNORECASE),
+        "tổ hợp môn để xét tuyển",
+    ),
+    (
+        re.compile(r"\bcần\s+học\s+môn\s+gì(?:\s+để\s+xét\s+tuyển)?\b", re.IGNORECASE),
+        "cần xét tuyển tổ hợp môn gì",
+    ),
+    (
+        re.compile(r"(?<!cần\s)\bhọc\s+môn\s+gì(?:\s+để\s+xét\s+tuyển)?\b", re.IGNORECASE),
+        "xét tuyển tổ hợp môn gì",
+    ),
+]
+
+_DIRECT_ADMISSION_MARKERS: tuple[str, ...] = (
+    "học sinh giỏi",
+    "tuyển thẳng",
+    "ưu tiên xét tuyển",
+)
+
+
+def expand_subject_combo_paraphrase(text: str) -> str:
+    """Expand ambiguous 'môn học' phrasing into explicit 'tổ hợp môn' wording."""
+    if not text:
+        return text
+    lowered = text.lower()
+    if "tổ hợp" in lowered:
+        return text
+    if any(marker in lowered for marker in _DIRECT_ADMISSION_MARKERS):
+        return text
+    if "xét tuyển" not in lowered and "ngành" not in lowered:
+        return text
+    expanded = text
+    for pattern, replacement in _SUBJECT_COMBO_PARAPHRASES:
+        if "tổ hợp" in expanded.lower() and "tổ hợp" in replacement.lower():
+            continue
+        expanded = pattern.sub(replacement, expanded)
+    return expanded
+
+
 # Canonical major capitalizations for standardized retrieval (matched longest first)
 _CANONICAL_MAJORS: dict[str, str] = {
     r"\bsư phạm toán học\b": "Sư phạm Toán học",
@@ -144,6 +197,9 @@ def fast_rule_normalize(text: str, extra_acronyms: dict[str, str] | None = None)
     # 1. Apply typo pattern replacements
     for pattern, replacement in _TYPO_PATTERNS:
         normalized = pattern.sub(replacement, normalized)
+
+    # 1b. Expand ambiguous subject-combo paraphrases before acronyms
+    normalized = expand_subject_combo_paraphrase(normalized)
 
     # 2. Apply acronym replacements (universal + per-assistant custom)
     for pat_str, replacement in _ACRONYM_MAP.items():
@@ -199,9 +255,11 @@ def get_node_instruction(context: WorkflowContext, config: dict[str, Any]) -> st
             )
             if role_desc:
                 role_desc = str(role_desc).strip()
-        if role_desc:
+            assistant_label = getattr(profile, "name", None) or getattr(
+                profile, "assistant_code", "Trợ lý QNU"
+            )
             return (
-                f"Bạn là trợ lý chuẩn hóa câu hỏi cho quy trình '{profile.name or profile.assistant_code}' "
+                f"Bạn là trợ lý chuẩn hóa câu hỏi cho quy trình '{assistant_label}' "
                 f"của Trường Đại học Quy Nhơn (QNU) ({role_desc}).\n"
                 "Nhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh tiếng Việt, "
                 "chuẩn hóa các từ viết tắt chuyên môn và viết hoa chuẩn danh từ riêng, thuật ngữ."
@@ -215,27 +273,223 @@ def get_node_instruction(context: WorkflowContext, config: dict[str, Any]) -> st
     )
 
 
-def build_rewrite_prompt(query: str, instruction: str) -> str:
-    """Build rewrite prompt with few-shot formatting rules using the workflow instruction."""
+_AFFIRMATIVE_SHORT_CUES = re.compile(
+    r"^(có|ừ|vâng|được|tôi muốn|có tôi muốn|muốn|muốn ạ|muốn biết|tiếp đi|chi tiết đi|"
+    r"nói rõ hơn|tìm hiểu thêm|xem thêm|ok|chỉ tiêu|phương thức|có chứ|rất muốn|"
+    r"cho tôi biết|cho mình biết|hãy chia sẻ thêm|bạn chia sẻ đi|bạn nói đi|chia sẻ đi)$",
+    re.IGNORECASE,
+)
+
+# Demonstratives, relative pronouns, and ellipsis cues in Vietnamese
+_CONTEXT_DEPENDENT_MARKERS = re.compile(
+    r"\b(ngành này|ngành đó|ngành trên|chuyên ngành này|chuyên ngành đó|khoa này|môn này|"
+    r"thế còn|vậy còn|còn nó|ở đâu|bao giờ|tại sao|nó|này|đó|kia|trên)\b",
+    re.IGNORECASE,
+)
+
+
+def _unaccent(text: str) -> str:
+    decomposed = unicodedata.normalize("NFD", text)
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return stripped.replace("đ", "d").replace("Đ", "d")
+
+
+# Common functional/conversational words that do not carry specific domain content
+_FUNCTIONAL_STOPWORDS: frozenset[str] = frozenset(
+    {
+        "bạn", "biết", "không", "cho", "nào", "tôi", "xin", "chào", "năm",
+        "được", "các", "những", "với", "của", "thế", "như", "bao", "nhiêu",
+        "gì", "là", "và", "trong", "trường", "đại", "học", "muốn", "hỏi",
+        "xét", "tuyển", "gồm", "danh", "sách", "thì", "sao", "ra", "vào",
+        "ở", "tại", "có", "hay", "hoặc", "nhé", "ạ", "ơi", "này", "đó",
+        "kia", "tất", "cả", "ai", "mấy", "sẽ", "đã", "đang", "về", "lại",
+        "đi", "nhất", "hơn", "theo", "ngay", "liệu", "thông", "tin", "cần",
+        "để", "ý", "em", "anh", "chị", "mình", "người", "ta",
+    }
+)
+
+_UNACCENTED_FUNCTIONAL_STOPWORDS: frozenset[str] = frozenset(
+    _unaccent(w) for w in _FUNCTIONAL_STOPWORDS
+) | {"hoi", "voi", "nhe", "nhi"}
+
+_CORE_INTENT_TERMS: tuple[str, ...] = (
+    "phương thức",
+    "học phí",
+    "chỉ tiêu",
+    "điểm chuẩn",
+    "học bổng",
+    "ký túc xá",
+    "thời gian",
+    "hạn chót",
+    "lệ phí",
+    "điều kiện",
+    "thủ tục",
+    "hồ sơ",
+    "quy định",
+    "chuẩn đầu ra",
+    "tín chỉ",
+    "giáo trình",
+    "tài liệu",
+    "ma trận",
+    "ngân hàng câu hỏi",
+)
+
+_COMBO_SUBJECT_TERMS: tuple[str, ...] = (
+    "toán", "lý", "hóa", "sinh", "văn", "sử", "địa", "tin", "tiếng anh", "ngoại ngữ"
+)
+
+
+def is_context_dependent_query(text: str) -> bool:
+    """Determine whether a query is context-dependent and requires history to understand.
+
+    A standalone complete sentence (e.g. 'Phương thức xét tuyển của trường gồm những gì?',
+    'Học phí ngành Sư phạm Toán học là bao nhiêu?') does NOT depend on past conversational
+    turns. Passing unrelated history causes recency bias and context bleeding.
+    """
+    if not text:
+        return False
+    clean = text.strip()
+    words = re.findall(r"\w+", clean)
+    if not words:
+        return False
+
+    # 1. Short affirmative responses (e.g. 'có', 'tôi muốn', 'tiếp đi', 'chi tiết đi')
+    if _AFFIRMATIVE_SHORT_CUES.search(clean):
+        return True
+
+    # 2. Contains demonstratives or anaphora pointing back to prior turn
+    if _CONTEXT_DEPENDENT_MARKERS.search(clean):
+        return True
+
+    # 3. Sentence fragment (<= 4 words) without full subject or verb
+    # e.g., 'học phí bao nhiêu?', 'điểm chuẩn thế nào?', 'thế còn ngành CNTT?'
+    return len(words) <= 4
+
+
+def extract_entity_from_text(text: str) -> str | None:
+    """Extract major or entity name from previous conversational turn."""
+    if not text:
+        return None
+    for pat, canonical in _CANONICAL_MAJORS.items():
+        if re.search(pat, text, re.IGNORECASE):
+            return f"ngành {canonical}"
+    m = re.search(
+        r"\bngành\s+([a-zA-ZÀ-ỹ\s]+?)(?:\s+tại|\s+của|\s+ở|\s+xét|\s+cần|\s+không|\?|$)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        name = m.group(1).strip()
+        if (
+            len(name) > 2
+            and len(name.split()) <= 5
+            and not any(
+                p in name.lower()
+                for p in ("cụ thể", "nào", "gì", "bất kỳ", "khác", "này", "đó", "mới")
+            )
+        ):
+            return f"ngành {name}"
+    return None
+
+
+def resolve_multiturn_query(
+    raw_query: str, history: list[dict[str, Any]] | None
+) -> str | None:
+    """Resolve short affirmative or pronoun follow-up queries using conversation history in 0ms."""
+    if not history or not raw_query:
+        return None
+    query_clean = raw_query.strip()
+
+    last_assistant = ""
+    last_user = ""
+    for msg in reversed(history):
+        role = msg.get("role")
+        content = str(msg.get("content") or "")
+        if role == "assistant" and not last_assistant:
+            last_assistant = content
+        elif role == "user" and not last_user:
+            last_user = content
+        if last_assistant and last_user:
+            break
+
+    detected_entity = extract_entity_from_text(last_user) or extract_entity_from_text(last_assistant)
+
+    # 1. Pronoun substitution (e.g. 'học phí ngành này' -> 'học phí ngành Công nghệ thông tin')
+    if detected_entity:
+        pronoun_sub = re.sub(
+            r"\b(ngành này|ngành đó|chuyên ngành này|chuyên ngành đó)\b",
+            detected_entity,
+            query_clean,
+            flags=re.IGNORECASE,
+        )
+        if pronoun_sub.lower() != query_clean.lower():
+            return pronoun_sub
+
+    # 2. Affirmative short response (e.g. 'có tôi muốn', 'vâng', 'tiếp đi')
+    is_affirmative = bool(_AFFIRMATIVE_SHORT_CUES.search(query_clean)) or (
+        len(query_clean.split()) <= 4
+        and any(w in query_clean.lower() for w in ("có", "muốn", "tiếp", "thêm", "vâng", "ừ", "được"))
+    )
+    if is_affirmative and last_assistant:
+        m = re.search(
+            r"(?:chia sẻ thêm|tìm hiểu thêm|thông tin về)\s+([^?.\n]+?)(?:\s+áp dụng cho|\s+cho ngành|\s+không|\?|$)",
+            last_assistant,
+            re.IGNORECASE,
+        )
+        if m:
+            topic = m.group(1).strip()
+            topic = re.sub(r"\bhoặc\b", "và", topic, flags=re.IGNORECASE)
+            topic = re.sub(r"^(thông tin về|về)\s+", "", topic, flags=re.IGNORECASE)
+            entity_suffix = f" {detected_entity}" if detected_entity else ""
+            return f"{topic.capitalize()}{entity_suffix}".strip()
+
+        if detected_entity:
+            return f"Chỉ tiêu và phương thức tuyển sinh {detected_entity}"
+
+    return None
+
+
+def build_rewrite_prompt(
+    query: str, instruction: str, history: list[dict[str, Any]] | None = None
+) -> str:
+    """Build rewrite prompt with few-shot formatting rules using the workflow instruction and optional history."""
     # If the user specified a full template with {query} placeholder, honor it directly
     if "{query}" in instruction:
         return instruction.replace("{query}", query)
 
+    history_context = ""
+    if history:
+        turns: list[str] = []
+        for msg in history[-4:]:
+            role_label = "Người dùng" if msg.get("role") == "user" else "Trợ lý AI"
+            content = str(msg.get("content") or "").strip()
+            if content:
+                turns.append(f"- {role_label}: {content[:250]}")
+        if turns:
+            history_context = "LỊCH SỬ TRAO ĐỔI GẦN NHẤT:\n" + "\n".join(turns) + "\n\n"
+
     return (
         f"{instruction.strip()}\n\n"
+        f"{history_context}"
         "QUY TẮC BẮT BUỘC:\n"
-        "- Bạn KHÔNG PHẢI chatbot nói chuyện với người dùng. Nhiệm vụ của bạn CHỈ LÀ chuẩn hóa câu hỏi đầu vào.\n"
+        "- Bạn KHÔNG PHẢI chatbot nói chuyện với người dùng. Nhiệm vụ của bạn CHỈ LÀ chuẩn hóa câu hỏi đầu vào (sửa lỗi gõ nhầm Telex, chính tả, viết tắt).\n"
+        "- NẾU CÂU HỎI ĐÃ ĐỦ RÕ RÀNG HOẶC LÀ CÂU HỎI ĐỘC LẬP: BẮT BUỘC GIỮ NGUYÊN NGUYÊN VĂN CÂU HỎI. TUYỆT ĐỐI KHÔNG TỰ Ý ĐỔI SANG CHỦ ĐỀ KHÁC.\n"
+        "- Nếu câu hỏi là phản hồi ngắn (ví dụ: 'có', 'tôi muốn', 'tiếp đi') hoặc chứa đại từ ('ngành đó', 'ở đâu'), "
+        "mới kết hợp Lịch sử trao đổi để khôi phục thành một câu hỏi tra cứu độc lập, hoàn chỉnh.\n"
+        "- TUYỆT ĐỐI KHÔNG tự ý suy diễn hoặc gán ghép tên ngành/tổ hợp môn từ lịch sử vào câu hỏi hiện tại nếu câu hỏi gốc KHÔNG yêu cầu.\n"
+        "- Nếu câu hỏi là câu hỏi chung (ví dụ: câu hỏi về thủ tục, chính sách chung, cơ sở vật chất), hãy giữ nguyên tính chất câu hỏi chung, không ép buộc một chuyên ngành hay đối tượng cụ thể.\n"
         "- Giữ nguyên 100% ý định câu hỏi gốc của người dùng.\n"
         "- Trả về DUY NHẤT một dòng chứa câu hỏi đã được chuẩn hóa.\n"
-        "- TUYỆT ĐỐI KHÔNG giải thích, KHÔNG hỏi ngược lại người dùng (không dùng 'Bạn muốn...', 'Vui lòng...'), KHÔNG thêm tiền tố, KHÔNG trả lời câu hỏi.\n"
-        "- Nếu câu hỏi đã rõ ràng, giữ nguyên câu hỏi.\n\n"
+        "- TUYỆT ĐỐI KHÔNG giải thích, KHÔNG hỏi ngược lại người dùng (không dùng 'Bạn muốn...', 'Vui lòng...'), KHÔNG thêm tiền tố, KHÔNG trả lời câu hỏi.\n\n"
         "Ví dụ:\n"
         "Input: học phí ngày cntt là bao nhiêu\n"
         "Học phí ngành Công nghệ thông tin là bao nhiêu?\n\n"
         "Input: quy định xét học bỗng đrl tín chì\n"
         "Quy định xét học bổng điểm rèn luyện và tín chỉ như thế nào?\n\n"
-        "Input: bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?\n"
-        "Ngành Công nghệ thông tin xét tuyển những tổ hợp môn nào?\n\n"
+        "Input: chỉ tiêu tuyển sinh nghành sp toán\n"
+        "Chỉ tiêu tuyển sinh ngành Sư phạm Toán học là bao nhiêu?\n\n"
+        "Input: Điều kiện đăng ký nội trú ký túc xá gồm những gì?\n"
+        "Điều kiện đăng ký nội trú ký túc xá gồm những gì?\n\n"
         f"Input: {query}"
     )
 
@@ -261,18 +515,35 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
         if not isinstance(custom_acronyms, dict):
             custom_acronyms = None
 
+        # Stage 0: Multi-turn Context Resolution (0ms, recovers context from history)
+        history = (
+            context.inputs.get("conversation_history")
+            or context.node_data.get("conversation_history")
+            or []
+        )
+        multiturn_query = resolve_multiturn_query(raw_query, history)
+        query_to_normalize = multiturn_query if multiturn_query else raw_query
+
         # Stage 1: Fast Rule-based Normalization (0ms, reusable per-assistant)
         rule_normalized = (
-            fast_rule_normalize(raw_query, extra_acronyms=custom_acronyms)
+            fast_rule_normalize(query_to_normalize, extra_acronyms=custom_acronyms)
             if use_fast_rules
-            else raw_query
+            else query_to_normalize
         )
         final_query = rule_normalized
 
+        # Determine whether history should be exposed to LLM rewrite
+        # Standalone complete queries must NOT receive past history to prevent context bleeding
+        is_dependent = is_context_dependent_query(raw_query)
+        effective_history = history if is_dependent else None
+
         # Stage 2: Fast Contextual LLM Rewrite (optional, ~150ms)
-        if use_llm and context.db:
+        # Skip LLM if Stage 0 already produced a full multi-turn query
+        if use_llm and context.db and not multiturn_query:
             try:
-                llm_query = await self._rewrite_with_llm(context, rule_normalized, config=config)
+                llm_query = await self._rewrite_with_llm(
+                    context, rule_normalized, config=config, history=effective_history
+                )
                 if llm_query and len(llm_query) >= 3:
                     final_query = llm_query
             except Exception as exc:
@@ -302,7 +573,11 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
         )
 
     async def _rewrite_with_llm(
-        self, context: WorkflowContext, query: str, config: dict[str, Any] | None = None
+        self,
+        context: WorkflowContext,
+        query: str,
+        config: dict[str, Any] | None = None,
+        history: list[dict[str, Any]] | None = None,
     ) -> str | None:
         """Call fast LLM with thinkingBudget=0 to correct contextual typos without altering intent."""
         if not context.db:
@@ -310,7 +585,7 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
 
         node_cfg = config or {}
         instruction = get_node_instruction(context, node_cfg)
-        prompt = build_rewrite_prompt(query, instruction)
+        prompt = build_rewrite_prompt(query, instruction, history=history)
 
         profile = context.assistant_profile
         primary_model = (
@@ -381,24 +656,60 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
                 )
                 return query
 
-            # Defensive guard 2: Must share significant keywords with query (prevent hallucinations)
-            _stopwords = {
-                "bạn", "biết", "không", "cho", "nào", "tôi", "xin", "chào", "năm",
-                "được", "các", "những", "với", "của", "thế", "như", "bao", "nhiêu",
-                "gì", "là", "và", "trong", "trường", "đại", "học", "muốn", "hỏi"
+            query_unaccented = _unaccent(query.lower())
+            cand_unaccented = _unaccent(candidate.lower())
+
+            # Defensive guard 2: Significant keywords recall check (prevent hallucinations & context hijacking)
+            # Use unaccented tokens to accommodate unaccented or typo-laden user queries
+            query_words = {
+                _unaccent(w)
+                for w in re.findall(r"\w+", query.lower())
+                if len(_unaccent(w)) >= 2 and _unaccent(w) not in _UNACCENTED_FUNCTIONAL_STOPWORDS
             }
-            query_words = {w for w in re.findall(r"\w{3,}", query.lower()) if w not in _stopwords}
-            cand_words = set(re.findall(r"\w{3,}", candidate.lower()))
-            if query_words and not (query_words & cand_words):
+            cand_words = {
+                _unaccent(w)
+                for w in re.findall(r"\w+", candidate.lower())
+                if len(_unaccent(w)) >= 2
+            }
+            if query_words:
+                overlap = len(query_words & cand_words)
+                preserved_ratio = overlap / len(query_words)
+                if preserved_ratio < 0.5:
+                    logger.warning(
+                        "LLM query rewrite dropped key content words (preserved ratio %.2f: '%s' vs '%s'), fallback to original.",
+                        preserved_ratio,
+                        candidate,
+                        query,
+                    )
+                    return query
+
+            # Defensive guard 3: Preserve core domain inquiry intent terms
+            for core_term in _CORE_INTENT_TERMS:
+                core_unaccent = _unaccent(core_term.lower())
+                if core_unaccent in query_unaccented and core_unaccent not in cand_unaccented:
+                    logger.warning(
+                        "LLM query rewrite dropped core intent phrase '%s' ('%s' vs '%s'), fallback to original.",
+                        core_term,
+                        candidate,
+                        query,
+                    )
+                    return query
+
+            # Defensive guard 4: Guard against unsolicited combo subject injection from history
+            query_has_combo = any(_unaccent(s) in query_unaccented for s in _COMBO_SUBJECT_TERMS)
+            cand_combo_count = sum(
+                1 for s in _COMBO_SUBJECT_TERMS
+                if re.search(r"\b" + re.escape(_unaccent(s)) + r"\b", cand_unaccented)
+            )
+            if not query_has_combo and cand_combo_count >= 2:
                 logger.warning(
-                    "LLM query rewrite has zero keyword overlap ('%s' vs '%s'), fallback to original.",
+                    "LLM query rewrite hallucinated combo subjects into a query that had none ('%s'), fallback to original.",
                     candidate,
-                    query,
                 )
                 return query
 
-            # Defensive guard 3: candidate must not be excessively long or empty
-            if len(candidate) > len(query) * 3 or len(candidate) < 3:
+            # Defensive guard 5: Candidate must not be excessively long or empty
+            if len(candidate) > len(query) * 2.5 or len(candidate) < 3:
                 return query
             return candidate
         except TimeoutError:

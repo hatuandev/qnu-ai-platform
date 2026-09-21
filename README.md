@@ -108,3 +108,4 @@ bạn biết ngành công nghệ thông tin cần những môn học nào để 
 các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học
 
 
+Phương thức xét tuyển của trường gồm những gì?

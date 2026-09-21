@@ -7,10 +7,74 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-21 17:10 (UTC+7)
-- **Phiên số**: #181
+- **Thời gian cập nhật**: 2026-09-22 08:45 (UTC+7)
+- **Phiên số**: #192
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Bổ Sung Nút Tải Nội Dung Cuộc Trò Chuyện Dạng Markdown (.md) & Loại Bỏ Fallback Bắt Nhầm Thực Thể "Nào" (phiên #192)**:
+  - Tính năng 1 (Xuất Markdown Chat Studio): Tạo tiện ích `frontend/src/lib/export-markdown.ts` định dạng toàn bộ cuộc trò chuyện thành tệp Markdown (.md) chuẩn chỉnh kèm Header metadata, vai trò Người dùng/Trợ lý, thời gian, nội dung câu hỏi/trả lời, trích dẫn tài liệu gốc (blockquote), tệp đính kèm và nút gợi ý; tích hợp nút "Tải về (.md)" với icon Lucide `Download` trên thanh công cụ `ChatStudioPage`.
+  - Tính năng 2 (Xuất Markdown Bàn Làm Việc Cán Bộ): Tích hợp nút "Xuất MD" tại thanh điều khiển chi tiết cuộc trò chuyện của cán bộ tư vấn trong `ConversationsPage` (`/conversations`).
+  - Sửa lỗi Backend (Chống Entity Hijacking Đại Từ Nghi Vấn): Loại bỏ đoạn regex fallback cũ trong `backend/app/modules/rag/service.py` từng bắt nhầm đại từ nghi vấn `"nào"` trong câu "áp dụng cho những ngành nào?" thành tên thực thể `"Nào"`, làm RAG ép LLM chỉ trả lời cho ngành CNTT của lượt trước; sử dụng trực tiếp `analysis.target_entities` đã được bảo vệ.
+  - Verification: Thêm 1 unit test mới trong `test_rag_entity_scoped_formatting.py` (7/7 passed), Pytest 394/394 passed (100%), Ruff 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build thành công (8.37s).
+- 0. **Khắc Phục 3 Lỗi RAG Thực Tế: Entity Stickiness, False-Positive Tổ Hợp Môn & Ký Tự Rác GIZ (phiên #191)**:
+  - Vấn đề 1 (Entity Stickiness ở câu hỏi chung): Người dùng hỏi "xin chào cho tôi biết phương thức tuyển sinh năm 2026" nhưng bot trả lời phương thức riêng của ngành CNTT (mã 7480201) do `lookup_facts` quét `attribute_name.ilike("%phương thức%")` trả về facts của ngành CNTT đặt vào `[TẦNG 1 - BẢNG SỐ LIỆU]`, ép LLM phải nói về ngành đó.
+  - Vấn đề 2 (False-Positive Tổ Hợp Môn): Hỏi "các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học" nhưng bot liệt kê ngành Giáo dục Tiểu học vì combo 1 có Toán, combo 2 có Hóa; thuật toán cũ quét gộp toàn bộ chuỗi khiến xuất hiện cả 3 từ khóa.
+  - Vấn đề 3 (Rò rỉ thẻ `[GIZ]:` và gợi ý lặp lại): Bot bị rò rỉ header `[GIZ]:` và nút gợi ý lặp lại chính câu hỏi người dùng vừa hỏi.
+  - Giải pháp 1 (Chống Fact Hijacking): Nâng cấp `lookup_facts` trong `facts.py`: khi câu hỏi chung không có `target_entities`, `entity_codes` hay `subject_names`, hàm `_is_major_specific_fact` tự động loại bỏ các facts của ngành đơn lẻ, nhường đường cho các chunks tài liệu Đề án tuyển sinh toàn trường. Khi có `target_entities`, chỉ trả về facts của đúng ngành đó.
+  - Giải pháp 2 (Chấm điểm từng combo con & Semicolon Fallback): Cập nhật `count_subject_matches` bóc tách từng combo trong ngoặc đơn `(...)` hoặc dấu phân cách `;`, `\n`, `|`, `/`, tính điểm theo max matches của một combo duy nhất + alias môn học (tiếng anh $\leftrightarrow$ anh, vật lý $\leftrightarrow$ lý,...). Cập nhật `SYSTEM_PROMPT_TEMPLATE` yêu cầu tất cả môn phải thuộc cùng 1 tổ hợp duy nhất.
+  - Giải pháp 3 (Dọn sạch `[GIZ]:` và Echo Filter): `_TRAILING_TAG_PATTERN` dọn sạch triệt để `**[GIZ]:**`, `[GỢI Ý]:`, `[GIZ]:`; `_is_too_similar_to_query` lọc bỏ gợi ý trùng lặp ý $\ge 70\%$ với câu hỏi hiện tại.
+  - Verification: 7 unit tests mới trong `test_suggestion_perspective_and_multiturn.py` (16/16 passed), Pytest 393/393 passed (100%), Ruff 0 lỗi, Biome 169 files 0 lỗi, tsc 0 lỗi, Vite build thành công.
+- 0. **Nâng Cấp Node DAG Query Rewrite, Chống Context Bleeding Từ Lịch Sử Đa Lượt & Bảo Vệ Toàn Vẹn RAG (Zero Hardcoding) (phiên #190)**:
+  - Vấn đề: Câu hỏi lượt 2 "Phương thức xét tuyển của trường gồm những gì?" bị LLM lôi tổ hợp môn Toán, Tiếng Anh, Hóa học của lượt 1 vào, biến thành câu hỏi về ngành xét tuyển tổ hợp môn, làm RAG tra cứu sai chủ đề.
+  - Phân tích nguyên nhân: LLM rewrite nhận toàn bộ lịch sử trò chuyện lượt trước nên bị recency bias/context bleeding; các chốt chặn phòng vệ cũ so sánh có dấu và từ khóa stopwords chưa toàn diện.
+  - Giải pháp 1 (`is_context_dependent_query`): Phân loại câu hỏi độc lập (câu hoàn chỉnh $\ge 5$ từ, không đại từ nối) $\rightarrow$ CẮT TOÀN BỘ lịch sử khỏi prompt LLM rewrite (`effective_history = None`). LLM không thể gán ghép chủ đề cũ khi không thấy lịch sử.
+  - Giải pháp 2 (Chuẩn hóa không dấu `_unaccent` & Stopwords mở rộng): Tập `_UNACCENTED_FUNCTIONAL_STOPWORDS` khử sạch từ ngữ pháp, xã giao giúp bóc tách chính xác các từ khóa nội dung thực sự.
+  - Giải pháp 3 (4 lớp chốt chặn phòng vệ bất biến dấu): Guard 2 kiểm tra recall từ khóa nội dung (bắt buộc $\ge 50\%$), Guard 3 bảo vệ các cụm ý định cốt lõi tổng quát (`_CORE_INTENT_TERMS`), Guard 4 chặn tự ý nhét môn thi THPT (`_COMBO_SUBJECT_TERMS`), Guard 5 kiểm tra độ dài.
+  - Giải pháp 4 (Zero Hardcode): Chuẩn hóa prompt với các ví dụ tổng quát đại diện cho các mô đun trường đại học, xóa sạch mọi mẫu gán ghép câu hỏi cụ thể.
+  - Verification: 3 unit tests mới, 11/11 tests `test_query_rewrite_node.py` passed, full backend suite 395/395 passed (100%), Biome 0 lỗi, tsc 0 lỗi, Vite build thành công.
+- 0. **Khắc Phục Triệt Để Lỗi Lộn Vai Nút Gợi Ý & Chống Entity Hijacking Trong Hội Thoại Đa Lượt (phiên #189)**:
+  - Vấn đề 1: Bot trả lời kết thúc bằng câu hỏi bot hỏi người dùng ("Bạn có muốn tìm hiểu về tổ hợp môn xét tuyển của ngành cụ thể nào không?"), nút Suggestion Chip lấy nguyên văn khiến khi người dùng click vào bị lộn vai trò.
+  - Vấn đề 2: Khi nhận câu hỏi chứa "ngành cụ thể nào", query router bóc tách thành `target_entities = ["Cụ Thể Nào"]`, hoặc query rewrite suy diễn kéo tên ngành CNTT từ lượt trước vào làm sai lệch ý định.
+  - Giải pháp 1: `convert_or_filter_suggestion_perspective()` trong `composer.py` chuyển đổi tự động các câu hỏi lộn vai thành câu hỏi góc độ người dùng ("Các ngành của trường xét tuyển những tổ hợp môn nào?"), lọc bỏ câu lịch sự không thể chuyển đổi. Cập nhật `SYSTEM_PROMPT_TEMPLATE` và seeder prompt bắt buộc 100% câu hỏi gợi ý phải ở ngôi Người dùng hỏi Trợ lý.
+  - Giải pháp 2: `query_router.py` loại trừ danh sách từ placeholder ("cụ thể", "cụ thể nào", "nào đó", "bất kỳ",...) khỏi `target_entities`. `query_rewrite_node.py` cập nhật quy tắc phòng vệ cấm tự ý gán ghép ngành vào câu hỏi chung.
+  - Verification: 9 unit tests mới trong `test_suggestion_perspective_and_multiturn.py` passed 100%, 32 tests hồi quy passed, ruff 0 lỗi, biome 0 lỗi, tsc 0 lỗi, live chat E2E 3 lượt thành công mỹ mãn.
+- 0. **Khắc Phục Triệt Để Lỗi Rò Rỉ Dữ Liệu Bảng Thô & Nâng Cấp Chất Lượng Trình Bày RAG (phiên #188)**:
+  - Vấn đề: Bot trả lời nguyên cụm bảng thô `|||||| 31 | 7380101...`, rò rỉ 9 ngành không liên quan (over-inclusion), vỡ cú pháp bảng Markdown.
+  - Entity-Scoped Extraction: `QueryClassifier.analyze()` phát hiện `target_entities`, tự động inject ràng buộc bắt buộc LLM chỉ trích xuất đúng thực thể được hỏi, cấm liệt kê ngành khác.
+  - Chỉ đạo Định dạng Động: `answer_format_planner.get_format_instructions()` đưa trực tiếp quy tắc trình bày vào prompt (ép dùng danh sách gạch đầu dòng rõ ràng cho tổ hợp môn, giải thích ký hiệu phương thức 1, 2, 3, 4).
+  - Bộ lọc Hậu xử lý (`sanitize_rag_answer`): Tự động dọn sạch pipe dính chùm `||||||` và chốt chặn phân tích chuyển đổi cụm bảng nhiều ngành thành danh sách sạch sẽ.
+  - Đồng bộ Prompts CSDL: Cập nhật `ast_admissions`, workflow JSON và CSDL PostgreSQL.
+  - Verification: 6 tests mới trong `test_rag_entity_scoped_formatting.py` passed (100%), `test_rag.py` 26 passed, ruff 0 lỗi, biome 0 lỗi, tsc 0 lỗi, build Vite thành công.
+- 0. **Triển Khai Đợt C Đánh Giá RAG (phiên #187)**:
+  - Parent-child: `expand_with_neighbors()` prompt-only, suy thoái êm.
+  - Multi-query: `sparse_variants` + RRF chiết khấu 0.5, không tốn embedding.
+  - Drift loop: trend/samples APIs + tab Đánh Giá Người Dùng trên `/evaluation`.
+  - Verification: Ruff 0 lỗi, Pytest **377/377 passed**, Biome 169 files/tsc/build xanh.
+- 0. **Triển Khai Đợt B Đánh Giá RAG (phiên #186)**:
+  - Facts: rank theo số môn khớp (over-fetch ×3, chỉ quét value).
+  - RRF: trọng số intent (exact 1.0/1.2, narrative 1.2/0.8) + log.
+  - Prompt: 3 tầng evidence + ép temperature ≤0.2 cho fact.
+  - Eval online: bảng `conversation_feedbacks`, migration đã upgrade, 2 API, vote best-effort.
+  - Verification: Ruff 0 lỗi, Pytest **373/373 passed**, Alembic sạch, Biome/tsc/build xanh.
+- 0. **Triển Khai Đợt A Đánh Giá RAG (phiên #185)**:
+  - Cache: key thêm `history_hash`, bỏ cache query <8 từ kèm history.
+  - History: `scope_history_by_topic()` tối đa 4 tin nhắn trùng chủ đề.
+  - Runtime: `verify_numeric_grounding()` chặn số bịa → No-Answer.
+  - Rerank: timeout 10s→3s + log provider/latency/in/out.
+  - Sparse: unaccent fallback cho query không dấu.
+  - Verification: Ruff 0 lỗi, Pytest **368/368 passed**.
+- 0. **Parser Gợi Ý Chịu Lỗi JSON Inline + Tra Cứu Ngược Tổ Hợp Môn (phiên #184)**:
+  - Câu 3 `Toán, Tiếng Anh, Hóa học` lặp đáp án phương thức câu 2; cả 3 lượt lộ raw `[GỢI Ý]: [...]`.
+  - `composer.py`: regex nhận cùng dòng, parse JSON inline quoted-first, lột marker rỗng.
+  - `query_router.py`: `subject_names` + `SUBJECT_PATTERNS` có gate ngữ cảnh, loại đại từ `anh` và HSG.
+  - `retriever.py`: `select_ilike_tokens()` regex + stop mở rộng, OR tới 6 token đặc thù.
+  - Verification: Ruff 0 lỗi, Pytest **363/363 passed**.
+- 0. **Khắc Phục RAG Trả Nhầm Bảng Xét Tuyển Thẳng Khi Hỏi Tổ Hợp Môn CNTT (phiên #183)**:
+  - Câu `ngành CNTT cần những môn học nào để xét tuyển` bị trả Phụ lục 1 HSG do `fact_attributes=[]` và overlap `môn + xét tuyển`.
+  - `query_rewrite_node.py`: thêm `expand_subject_combo_paraphrase()` 0ms (`môn học nào/môn nào/cần học môn gì` → `tổ hợp môn`), bỏ qua HSG/tuyển thẳng, chống nhân đôi.
+  - `query_router.py`: thêm `tổ hợp/môn học` vào packs, map `môn + xét tuyển/ngành` → `subject_combinations`.
+  - Tests mới: `test_fast_rule_normalize_subject_combo_paraphrase`, `test_query_classifier_mon_hoc_maps_to_subject_combinations`.
+  - Verification: Ruff 0 lỗi, Pytest **360/360 passed**, verify thủ công bug query → `exact_fact [7480201] [subject_combinations]`.
   1. **Kích Hoạt Hệ Thống Nút Bấm Gợi Ý Tương Tác 1-Click (Interactive Suggestion Chips) & Triệt Tiêu Câu Hỏi Tu Từ Rập Khuôn (phiên #180)**:
      - **Vấn đề giải quyết**: Khắc phục triệt để hiện tượng bot lặp đi lặp lại câu hỏi tu từ thụ động ở đuôi: *"Bạn có muốn mình chia sẻ thêm về chỉ tiêu tuyển sinh hoặc các phương thức xét tuyển áp dụng cho các ngành này không?"*.
      - **Backend**:

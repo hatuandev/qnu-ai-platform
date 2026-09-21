@@ -91,10 +91,4 @@ def get_llm_adapter(
             timeout_seconds=timeout_seconds,
         )
 
-    # Default fallback to Local / vLLM
-    return LocalVLLMAdapter(
-        model_name=model_name,
-        api_key=api_key,
-        base_url=base_url,
-        timeout_seconds=timeout_seconds,
-    )
+    raise ValueError(f"Unsupported LLM provider type: '{provider_type}'")

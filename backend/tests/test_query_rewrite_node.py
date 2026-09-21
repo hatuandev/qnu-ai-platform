@@ -152,6 +152,24 @@ def test_fast_rule_normalize_academic_and_library_terms():
     assert "mượn giáo trình và tài liệu thư viện" == res3
 
 
+def test_fast_rule_normalize_subject_combo_paraphrase():
+    """Ambiguous 'mon hoc' queries must expand to 'to hop mon' without double expansion."""
+    from app.modules.workflows.nodes.query_rewrite_node import expand_subject_combo_paraphrase
+
+    bug_query = "bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?"
+    expanded = fast_rule_normalize(bug_query)
+    assert "tổ hợp môn nào" in expanded
+    assert "tổ hợp tổ hợp" not in expanded
+    assert "Công nghệ thông tin" in expanded
+
+    # HSG / direct admission queries must stay untouched to keep Phu luc 1 routing
+    hsg_query = "Danh sách học sinh giỏi được tuyển thẳng ngành Công nghệ thông tin?"
+    assert expand_subject_combo_paraphrase(hsg_query) == hsg_query
+
+    # Date mentions must not be mangled
+    assert fast_rule_normalize("Hôm nay là ngày 20 tháng 11") == "Hôm nay là ngày 20 tháng 11"
+
+
 def test_get_node_instruction_and_prompt_building():
     """Verify that node instruction is resolved flexibly per workflow without hardcoded domains."""
     from app.modules.workflows.nodes.query_rewrite_node import (
@@ -189,3 +207,112 @@ def test_get_node_instruction_and_prompt_building():
     # 4. Universal fallback for any custom workflow
     inst4 = get_node_instruction(ctx_empty, {})
     assert "Bạn là trợ lý chuẩn hóa câu hỏi cho Trường Đại học Quy Nhơn" in inst4
+
+
+def test_is_context_dependent_query():
+    """Verify that standalone questions are recognized as independent of conversation history."""
+    from app.modules.workflows.nodes.query_rewrite_node import is_context_dependent_query
+
+    # Standalone queries should NOT depend on history
+    assert not is_context_dependent_query("Phương thức xét tuyển của trường gồm những gì?")
+    assert not is_context_dependent_query("Học phí ngành Sư phạm Toán học là bao nhiêu?")
+    assert not is_context_dependent_query("Quy định đăng ký ký túc xá cho sinh viên năm nhất?")
+    assert not is_context_dependent_query("Điều kiện nhận học bổng khuyến khích học tập là gì?")
+
+    # Follow-ups and anaphora queries MUST depend on history
+    assert is_context_dependent_query("học phí ngành này")
+    assert is_context_dependent_query("thế còn ngành đó?")
+    assert is_context_dependent_query("có tôi muốn")
+    assert is_context_dependent_query("tiếp đi")
+    assert is_context_dependent_query("bao nhiêu?")
+
+
+@pytest.mark.asyncio
+async def test_query_rewrite_standalone_query_not_hijacked_by_history():
+    """Verify that a standalone question is not corrupted by previous multi-turn history."""
+    from app.modules.workflows.nodes.query_rewrite_node import is_context_dependent_query
+
+    handler = QueryRewriteNodeHandler()
+    spec = WorkflowNodeSpec(
+        id="query_rewrite_1",
+        type="query.rewrite",
+        config={"use_fast_rules": True, "use_llm": True},
+    )
+    fake_db = AsyncMock()
+    user_query = "Phương thức xét tuyển của trường gồm những gì?"
+    history = [
+        {"role": "user", "content": "các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học"},
+        {
+            "role": "assistant",
+            "content": "Dưới đây là các ngành xét tuyển tổ hợp Toán, Tiếng Anh, Hóa học: Công nghệ thông tin...",
+        },
+    ]
+    ctx = WorkflowContext(
+        workflow_id="wf_test",
+        tenant_id="tenant_qnu",
+        conversation_id="conv_123",
+        inputs={
+            "message": user_query,
+            "conversation_history": history,
+        },
+        db=fake_db,
+    )
+
+    # Standalone check must be False
+    assert not is_context_dependent_query(user_query)
+
+    # Even if LLM erroneously bleeds history into candidate, defensive guards MUST reject it
+    mock_hijacked_response = LLMGenerateResponse(
+        content="Các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học tại Trường Đại học Quy Nhơn gồm những ngành nào?",
+        provider="gemini",
+        model="gemini-2.5-flash",
+    )
+
+    with patch(
+        "app.modules.workflows.nodes.query_rewrite_node.modelops_service.generate",
+        new=AsyncMock(return_value=mock_hijacked_response),
+    ):
+        res = await handler.execute(spec, ctx)
+
+    assert res.status == "completed"
+    # The output MUST preserve the user's intended question without bleeding previous subjects
+    assert ctx.node_data["normalized_query"] == user_query
+    assert ctx.node_data["user_message"] == user_query
+
+
+@pytest.mark.asyncio
+async def test_query_rewrite_defensive_guard_rejects_dropped_intent():
+    """Verify that if LLM replaces intent (e.g. 'học phí' -> 'điểm chuẩn'), it is rejected."""
+    handler = QueryRewriteNodeHandler()
+    spec = WorkflowNodeSpec(
+        id="query_rewrite_1",
+        type="query.rewrite",
+        config={"use_fast_rules": True, "use_llm": True},
+    )
+    fake_db = AsyncMock()
+    user_query = "học phí ngành Sư phạm Toán học"
+    ctx = WorkflowContext(
+        workflow_id="wf_test",
+        tenant_id="tenant_qnu",
+        conversation_id=None,
+        inputs={"message": user_query},
+        db=fake_db,
+    )
+
+    # LLM hallucinates and switches from tuition fee to benchmark score
+    mock_switched_response = LLMGenerateResponse(
+        content="Điểm chuẩn ngành Sư phạm Toán học năm 2024 là bao nhiêu?",
+        provider="gemini",
+        model="gemini-2.5-flash",
+    )
+
+    with patch(
+        "app.modules.workflows.nodes.query_rewrite_node.modelops_service.generate",
+        new=AsyncMock(return_value=mock_switched_response),
+    ):
+        res = await handler.execute(spec, ctx)
+
+    assert res.status == "completed"
+    # Must fallback because 'học phí' intent was dropped
+    assert "học phí" in ctx.node_data["normalized_query"].lower()
+

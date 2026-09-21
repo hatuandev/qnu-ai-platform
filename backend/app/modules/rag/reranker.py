@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from app.core.config import get_settings
 from app.modules.rag.fusion import FusionCandidate
@@ -47,7 +48,7 @@ class RerankerClient:
             "contexts": [{"text": c.content} for c in candidates],
         }
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=3.0) as client:
             resp = await client.post(url, headers=headers, json=payload)
             if resp.status_code == 200:
                 data = resp.json().get("result", {})
@@ -85,6 +86,9 @@ class RerankerClient:
         if not candidates:
             return []
 
+        start_time = time.perf_counter()
+        provider = "rrf_fallback"
+
         # 1. Try Cloudflare Workers AI Cross-Encoder if configured
         if (
             getattr(settings, "RERANKER_PROVIDER", "").lower() == "cloudflare"
@@ -93,7 +97,16 @@ class RerankerClient:
             and not settings.CLOUDFLARE_ACCOUNT_ID.startswith("cf-acc-")
         ):
             try:
-                return await self._rerank_cloudflare(query, candidates, top_k)
+                ranked = await self._rerank_cloudflare(query, candidates, top_k)
+                provider = "cloudflare"
+                logger.info(
+                    "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
+                    provider,
+                    (time.perf_counter() - start_time) * 1000,
+                    len(candidates),
+                    len(ranked),
+                )
+                return ranked
             except Exception as exc:
                 logger.warning(
                     "Cloudflare reranker failed or timed out: %s. Falling back to RRF score.", exc
@@ -122,6 +135,14 @@ class RerankerClient:
                                 cand.rrf_score = float(score)
                                 scored_candidates.append(cand)
                         scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
+                        provider = "custom"
+                        logger.info(
+                            "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
+                            provider,
+                            (time.perf_counter() - start_time) * 1000,
+                            len(candidates),
+                            len(scored_candidates[:top_k]),
+                        )
                         return scored_candidates[:top_k]
             except Exception as exc:
                 logger.warning(
@@ -129,6 +150,13 @@ class RerankerClient:
                 )
 
         # Fallback to top_k by initial RRF score
+        logger.info(
+            "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
+            provider,
+            (time.perf_counter() - start_time) * 1000,
+            len(candidates),
+            len(candidates[:top_k]),
+        )
         return candidates[:top_k]
 
 

@@ -49,6 +49,30 @@ class ConversationThreadModel(Base):
     )
 
 
+class ConversationFeedbackModel(Base):
+    """Online eval signal: user thumbs up/down on an assistant answer (phiên #186)."""
+
+    __tablename__ = "conversation_feedbacks"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: f"fb_{uuid.uuid4().hex[:12]}"
+    )
+    thread_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("conversation_threads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    assistant_code: Mapped[str] = mapped_column(String(50), nullable=False, default="", index=True)
+    vote: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # "up" | "down"
+    question_excerpt: Mapped[str] = mapped_column(Text, default="")
+    answer_excerpt: Mapped[str] = mapped_column(Text, default="")
+    tenant_id: Mapped[str] = mapped_column(
+        String(100), default="tenant_qnu", nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
 class ConversationMessageModel(Base):
     """Represents a single message in a conversation thread."""
 

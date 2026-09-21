@@ -13,6 +13,11 @@ from app.modules.conversations.schemas import (
     ConversationStatusUpdateRequest,
     ConversationThreadDetailResponse,
     ConversationThreadItemResponse,
+    FeedbackSampleItem,
+    FeedbackStatsResponse,
+    FeedbackTrendResponse,
+    FeedbackVoteRequest,
+    FeedbackVoteResponse,
 )
 from app.modules.conversations.service import conversation_service
 
@@ -89,3 +94,56 @@ async def record_conversation_message(
 ) -> ConversationMessageResponse:
     """Ghi nhận tin nhắn mới từ client/widget/chat studio vào lịch sử hội thoại."""
     return await conversation_service.record_message(db, body)
+
+
+@router.post(
+    "/feedback",
+    response_model=FeedbackVoteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def record_feedback_vote(
+    body: FeedbackVoteRequest,
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackVoteResponse:
+    """Ghi nhận vote up/down của người dùng cho eval online chất lượng RAG."""
+    return await conversation_service.record_feedback(db, body)
+
+
+@router.get("/feedback/stats", response_model=FeedbackStatsResponse)
+async def get_feedback_stats(
+    assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
+    tenant_id: str | None = Query(None, description="Lọc theo tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackStatsResponse:
+    """Thống kê tín hiệu eval online (tổng vote, tỷ lệ up)."""
+    return await conversation_service.feedback_stats(
+        db, assistant_code=assistant_code, tenant_id=tenant_id
+    )
+
+
+@router.get("/feedback/trend", response_model=FeedbackTrendResponse)
+async def get_feedback_trend(
+    days: int = Query(14, ge=1, le=90, description="Số ngày gần nhất"),
+    assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
+    tenant_id: str | None = Query(None, description="Lọc theo tenant"),
+    db: AsyncSession = Depends(get_db),
+) -> FeedbackTrendResponse:
+    """Xu hướng vote theo ngày để phát hiện drift chất lượng RAG."""
+    return await conversation_service.feedback_trend(
+        db, days=days, assistant_code=assistant_code, tenant_id=tenant_id
+    )
+
+
+@router.get("/feedback/samples", response_model=list[FeedbackSampleItem])
+async def get_feedback_samples(
+    vote: str = Query("down", description="Lọc vote: up/down"),
+    limit: int = Query(20, ge=1, le=100),
+    assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
+    db: AsyncSession = Depends(get_db),
+) -> list[FeedbackSampleItem]:
+    """Vote mới nhất để cán bộ đối soát thủ công (down trước)."""
+    if vote not in ("up", "down"):
+        vote = "down"
+    return await conversation_service.feedback_samples(
+        db, vote=vote, limit=limit, assistant_code=assistant_code
+    )

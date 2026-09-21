@@ -243,3 +243,197 @@ class TestCitationGroundingAndFactFirst:
             assert called_kwargs["tenant_id"] == "tenant_qnu"
             assert called_kwargs["workspace_id"] == "ws_main"
             assert "7480107" in called_kwargs["query"]
+
+    @pytest.mark.asyncio
+    async def test_rag_ask_applies_intent_weights_and_fact_temperature(self):
+        """EXACT_FACT leans lexical + clamps temperature; NARRATIVE leans semantic."""
+        from app.modules.rag.schemas import AskRequest
+
+        async def run_ask(question: str, temperature: float):
+            req = AskRequest(
+                question=question,
+                collection_id="col_admissions",
+                module_code="admissions",
+                tenant_id="tenant_qnu",
+                workspace_id="ws_main",
+                temperature=temperature,
+            )
+            mock_candidate = FusionCandidate(
+                chunk_id="chk_01",
+                document_id="doc_ts_2026",
+                content="Mã ngành 7480107: Chỉ tiêu dự kiến 60 sinh viên.",
+                rrf_score=0.9,
+                dense_rank=1,
+                sparse_rank=1,
+                section="Chỉ tiêu",
+                page_number=6,
+                metadata={},
+            )
+            with (
+                patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock) as mock_get,
+                patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock),
+                patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
+                patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
+                patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
+            ):
+                mock_get.return_value = None
+                mock_lookup.return_value = []
+                mock_retrieve.return_value = [mock_candidate]
+                mock_llm_res = MagicMock()
+                mock_llm_res.content = "Chỉ tiêu là 60 sinh viên."
+                mock_generate.return_value = mock_llm_res
+                resp = await rag_service.ask(AsyncMock(), req)
+                return resp, mock_retrieve.await_args.kwargs, mock_generate.await_args.args[1]
+
+        _, exact_retrieve, exact_llm = await run_ask("Mã ngành 7480107 có chỉ tiêu bao nhiêu?", 0.9)
+        assert (exact_retrieve["dense_weight"], exact_retrieve["sparse_weight"]) == (1.0, 1.2)
+        assert exact_llm.temperature == 0.2
+        assert any("TẦNG 1" in m.content for m in exact_llm.messages if m.role == "user")
+
+        _, narrative_retrieve, narrative_llm = await run_ask(
+            "Quy định về bảo hiểm y tế cho sinh viên như thế nào?", 0.9
+        )
+        assert (narrative_retrieve["dense_weight"], narrative_retrieve["sparse_weight"]) == (1.2, 0.8)
+        assert narrative_llm.temperature == 0.9
+        assert all("TẦNG 1" not in m.content for m in narrative_llm.messages)
+
+    @pytest.mark.asyncio
+    async def test_rag_ask_sends_sparse_variants_and_neighbor_context(self):
+        """Keyword-form variant query feeds sparse fusion; neighbors join the prompt."""
+        from app.modules.rag.schemas import AskRequest
+
+        req = AskRequest(
+            question="các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học",
+            collection_id="col_admissions",
+            module_code="admissions",
+            tenant_id="tenant_qnu",
+            workspace_id="ws_main",
+        )
+        mock_candidate = FusionCandidate(
+            chunk_id="chk_01",
+            document_id="doc_ts_2026",
+            content="Thông tin tuyển sinh ngành X: Các tổ hợp môn xét tuyển: Toán - Hóa - Anh.",
+            rrf_score=0.9,
+            dense_rank=1,
+            sparse_rank=1,
+            section="Ngành X",
+            page_number=6,
+            metadata={},
+        )
+        with (
+            patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock) as mock_get,
+            patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock),
+            patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
+            patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
+            patch(
+                "app.modules.rag.service.hybrid_retriever.expand_with_neighbors",
+                new_callable=AsyncMock,
+            ) as mock_expand,
+            patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
+        ):
+            mock_get.return_value = None
+            mock_lookup.return_value = []
+            mock_retrieve.return_value = [mock_candidate]
+            mock_expand.return_value = {"chk_01": ["Bối cảnh kề: điều kiện xét tuyển chung."]}
+            mock_llm_res = MagicMock()
+            mock_llm_res.content = "Các ngành có tổ hợp."
+            mock_generate.return_value = mock_llm_res
+
+            resp = await rag_service.ask(AsyncMock(), req)
+
+            assert resp.status == "answered"
+            variants = mock_retrieve.await_args.kwargs.get("sparse_variants") or []
+            assert variants and any("toán" in v.lower() for v in variants)
+            user_texts = [
+                m.content for m in mock_generate.await_args.args[1].messages if m.role == "user"
+            ]
+            assert any("BỐI CẢNH MỞ RỘNG" in t for t in user_texts)
+
+    @pytest.mark.asyncio
+    async def test_rag_ask_skips_cache_for_context_dependent_short_query(self):
+        """Short follow-ups with history ('có tôi muốn') must never hit shared cache."""
+        req = AskRequest(
+            question="có tôi muốn",
+            collection_id="col_admissions",
+            module_code="admissions",
+            tenant_id="tenant_qnu",
+            workspace_id="ws_main",
+            history=[
+                {"role": "user", "content": "điểm chuẩn CNTT bao nhiêu?"},
+                {"role": "assistant", "content": "Điểm chuẩn là 24.5"},
+            ],
+        )
+        mock_db = AsyncMock()
+        mock_candidate = FusionCandidate(
+            chunk_id="chk_01",
+            document_id="doc_ts_2026",
+            content="Chỉ tiêu tuyển sinh ngành Công nghệ thông tin và phương thức xét tuyển chi tiết.",
+            rrf_score=0.9,
+            dense_rank=1,
+            sparse_rank=1,
+            section="Chỉ tiêu",
+            page_number=6,
+            metadata={},
+        )
+        with (
+            patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock) as mock_get,
+            patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock) as mock_set,
+            patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
+            patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
+            patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
+        ):
+            mock_lookup.return_value = []
+            mock_retrieve.return_value = [mock_candidate]
+            mock_llm_res = MagicMock()
+            mock_llm_res.content = (
+                "Chỉ tiêu tuyển sinh ngành Công nghệ thông tin và phương thức xét tuyển."
+            )
+            mock_generate.return_value = mock_llm_res
+
+            resp = await rag_service.ask(mock_db, req)
+
+            assert resp.status == "answered"
+            mock_get.assert_not_awaited()
+            mock_set.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_rag_ask_rejects_hallucinated_figures_via_numeric_gate(self):
+        """Answers with figures absent from evidence fall back to No-Answer policy."""
+        req = AskRequest(
+            question="Điểm chuẩn ngành CNTT là bao nhiêu?",
+            collection_id="col_admissions",
+            module_code="admissions",
+            tenant_id="tenant_qnu",
+            workspace_id="ws_main",
+        )
+        mock_db = AsyncMock()
+        mock_candidate = FusionCandidate(
+            chunk_id="chk_01",
+            document_id="doc_ts_2026",
+            content="Điểm chuẩn ngành Công nghệ thông tin là 24.5 điểm.",
+            rrf_score=0.9,
+            dense_rank=1,
+            sparse_rank=1,
+            section="Điểm chuẩn",
+            page_number=6,
+            metadata={},
+        )
+        with (
+            patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock) as mock_get,
+            patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock),
+            patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
+            patch("app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock) as mock_retrieve,
+            patch("app.modules.rag.service.modelops_service.generate", new_callable=AsyncMock) as mock_generate,
+        ):
+            mock_get.return_value = None
+            mock_lookup.return_value = []
+            mock_retrieve.return_value = [mock_candidate]
+            mock_llm_res = MagicMock()
+            mock_llm_res.content = "Điểm chuẩn ngành Công nghệ thông tin là 29.9 điểm."
+            mock_generate.return_value = mock_llm_res
+
+            resp = await rag_service.ask(mock_db, req)
+
+            assert resp.status == "insufficient_context"
+            assert "29.9" not in resp.answer
+            assert resp.citations == []

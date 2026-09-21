@@ -34,6 +34,7 @@ export interface ChatMessageProps {
   onCitationClick?: (citation: ChatCitation) => void;
   onRegenerate?: () => void;
   onSuggestedClick?: (question: string) => void;
+  onFeedback?: (vote: "up" | "down") => void;
   className?: string;
 }
 
@@ -61,6 +62,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onCitationClick,
   onRegenerate,
   onSuggestedClick,
+  onFeedback,
   className,
 }) => {
   const isUser = message.role === "user";
@@ -317,7 +319,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setFeedback(feedback === "up" ? null : "up")}
+                onClick={() => {
+                  const next = feedback === "up" ? null : "up";
+                  setFeedback(next);
+                  if (next) onFeedback?.(next);
+                }}
                 className={cn(
                   "h-7 w-7 p-0 text-muted-foreground hover:text-foreground",
                   feedback === "up" && "text-primary bg-primary/10"
@@ -329,7 +335,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setFeedback(feedback === "down" ? null : "down")}
+                onClick={() => {
+                  const next = feedback === "down" ? null : "down";
+                  setFeedback(next);
+                  if (next) onFeedback?.(next);
+                }}
                 className={cn(
                   "h-7 w-7 p-0 text-muted-foreground hover:text-foreground",
                   feedback === "down" && "text-destructive bg-destructive/10"

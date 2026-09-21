@@ -5,19 +5,29 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import EntityNotFoundError
-from app.modules.conversations.models import ConversationMessageModel, ConversationThreadModel
+from app.modules.conversations.models import (
+    ConversationFeedbackModel,
+    ConversationMessageModel,
+    ConversationThreadModel,
+)
 from app.modules.conversations.schemas import (
     ConversationCreateMessageRequest,
     ConversationMessageResponse,
     ConversationThreadDetailResponse,
     ConversationThreadItemResponse,
+    FeedbackSampleItem,
+    FeedbackStatsResponse,
+    FeedbackTrendPoint,
+    FeedbackTrendResponse,
+    FeedbackVoteRequest,
+    FeedbackVoteResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -242,6 +252,141 @@ class ConversationService:
         await db.refresh(thread)
         logger.info("Updated thread %s status to %s", thread.id, status)
         return _to_thread_dto(thread)
+
+    async def record_feedback(
+        self, db: AsyncSession, req: FeedbackVoteRequest
+    ) -> FeedbackVoteResponse:
+        """Persist a thumbs up/down vote for online RAG evaluation (phiên #186)."""
+        if req.thread_id:
+            res = await db.execute(
+                select(ConversationThreadModel).where(
+                    ConversationThreadModel.id == req.thread_id
+                )
+            )
+            if not res.scalar_one_or_none():
+                raise EntityNotFoundError(
+                    f"Phiên hội thoại '{req.thread_id}' không tồn tại.",
+                    details={"thread_id": req.thread_id},
+                )
+        feedback = ConversationFeedbackModel(
+            id=f"fb_{uuid.uuid4().hex[:12]}",
+            thread_id=req.thread_id,
+            assistant_code=req.assistant_code,
+            vote=req.vote,
+            question_excerpt=(req.question or "")[:2000],
+            answer_excerpt=(req.answer or "")[:8000],
+            tenant_id=req.tenant_id,
+        )
+        db.add(feedback)
+        await db.commit()
+        await db.refresh(feedback)
+        logger.info(
+            "Recorded feedback vote=%s assistant=%s thread=%s",
+            req.vote,
+            req.assistant_code,
+            req.thread_id,
+        )
+        return FeedbackVoteResponse(
+            id=feedback.id,
+            thread_id=feedback.thread_id,
+            assistant_code=feedback.assistant_code,
+            vote=feedback.vote,  # type: ignore[arg-type]
+            created_at=feedback.created_at,
+        )
+
+    async def feedback_stats(
+        self,
+        db: AsyncSession,
+        *,
+        assistant_code: str | None = None,
+        tenant_id: str | None = None,
+    ) -> FeedbackStatsResponse:
+        """Aggregate online eval signal: totals and up-rate, optionally per assistant."""
+        conditions = []
+        if assistant_code:
+            conditions.append(ConversationFeedbackModel.assistant_code == assistant_code)
+        if tenant_id:
+            conditions.append(ConversationFeedbackModel.tenant_id == tenant_id)
+        total_stmt = select(func.count(ConversationFeedbackModel.id))
+        up_stmt = select(func.count(ConversationFeedbackModel.id)).where(
+            ConversationFeedbackModel.vote == "up"
+        )
+        if conditions:
+            total_stmt = total_stmt.where(*conditions)
+            up_stmt = up_stmt.where(*conditions)
+        total = (await db.execute(total_stmt)).scalar_one()
+        up = (await db.execute(up_stmt)).scalar_one()
+        down = total - up
+        return FeedbackStatsResponse(
+            total=total,
+            up=up,
+            down=down,
+            up_rate=round(up / total, 4) if total else 0.0,
+            assistant_code=assistant_code,
+        )
+
+    async def feedback_trend(
+        self,
+        db: AsyncSession,
+        *,
+        days: int = 14,
+        assistant_code: str | None = None,
+        tenant_id: str | None = None,
+    ) -> FeedbackTrendResponse:
+        """Daily up/down buckets for drift watching (grouped in Python for PG/SQLite parity)."""
+        days = max(1, min(days, 90))
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+        stmt = select(ConversationFeedbackModel.vote, ConversationFeedbackModel.created_at).where(
+            ConversationFeedbackModel.created_at >= cutoff
+        )
+        if assistant_code:
+            stmt = stmt.where(ConversationFeedbackModel.assistant_code == assistant_code)
+        if tenant_id:
+            stmt = stmt.where(ConversationFeedbackModel.tenant_id == tenant_id)
+        stmt = stmt.order_by(ConversationFeedbackModel.created_at).limit(5000)
+        rows = (await db.execute(stmt)).all()
+
+        buckets: dict[str, dict[str, int]] = {}
+        for vote, created_at in rows:
+            day = created_at.date().isoformat() if hasattr(created_at, "date") else str(created_at)[:10]
+            bucket = buckets.setdefault(day, {"up": 0, "down": 0})
+            if vote == "up":
+                bucket["up"] += 1
+            else:
+                bucket["down"] += 1
+        points = [
+            FeedbackTrendPoint(date=day, up=counts["up"], down=counts["down"])
+            for day, counts in sorted(buckets.items())
+        ]
+        return FeedbackTrendResponse(points=points, days=days)
+
+    async def feedback_samples(
+        self,
+        db: AsyncSession,
+        *,
+        vote: str = "down",
+        limit: int = 20,
+        assistant_code: str | None = None,
+    ) -> list[FeedbackSampleItem]:
+        """Newest votes for manual review (down votes reveal retrieval failures first)."""
+        limit = max(1, min(limit, 100))
+        stmt = select(ConversationFeedbackModel).where(ConversationFeedbackModel.vote == vote)
+        if assistant_code:
+            stmt = stmt.where(ConversationFeedbackModel.assistant_code == assistant_code)
+        stmt = stmt.order_by(ConversationFeedbackModel.created_at.desc()).limit(limit)
+        rows = (await db.execute(stmt)).scalars().all()
+        return [
+            FeedbackSampleItem(
+                id=r.id,
+                thread_id=r.thread_id,
+                assistant_code=r.assistant_code,
+                vote=r.vote,  # type: ignore[arg-type]
+                question_excerpt=r.question_excerpt or "",
+                answer_excerpt=r.answer_excerpt or "",
+                created_at=r.created_at,
+            )
+            for r in rows
+        ]
 
 
 conversation_service = ConversationService()

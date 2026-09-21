@@ -60,10 +60,32 @@ class SemanticCache:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
+        history_hash: str | None = None,
     ) -> str:
         h = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()
         model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
-        return f"rag:cache:{tenant_id}:{workspace_id}:{collection_id}:{model_part}:{policy_version}:{h}"
+        hist_part = history_hash or "nohist"
+        return (
+            f"rag:cache:{tenant_id}:{workspace_id}:{collection_id}:"
+            f"{model_part}:{policy_version}:{h}:{hist_part}"
+        )
+
+    @staticmethod
+    def hash_history(history: list[dict[str, Any]] | None) -> str | None:
+        """Hash normalized recent turns so short follow-ups with different context never collide."""
+        if not history:
+            return None
+        parts: list[str] = []
+        for msg in history[-4:]:
+            if not isinstance(msg, dict):
+                continue
+            role = str(msg.get("role", "")).strip().lower()
+            content = str(msg.get("content", "")).strip().lower()
+            if role in ("user", "assistant") and content:
+                parts.append(f"{role}:{content[:300]}")
+        if not parts:
+            return None
+        return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
     async def get(
         self,
@@ -73,6 +95,7 @@ class SemanticCache:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
+        history_hash: str | None = None,
     ) -> dict[str, Any] | None:
         try:
             key = self._make_key(
@@ -82,6 +105,7 @@ class SemanticCache:
                 tenant_id,
                 workspace_id,
                 policy_version,
+                history_hash,
             )
             val = await self.client.get(key)
             if val:
@@ -99,6 +123,7 @@ class SemanticCache:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
+        history_hash: str | None = None,
     ) -> None:
         try:
             key = self._make_key(
@@ -108,6 +133,7 @@ class SemanticCache:
                 tenant_id,
                 workspace_id,
                 policy_version,
+                history_hash,
             )
             await self.client.setex(key, self.ttl, json.dumps(data, ensure_ascii=False))
         except Exception as exc:

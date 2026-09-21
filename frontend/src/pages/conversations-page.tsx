@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { downloadMarkdownFile } from "@/lib/export-markdown";
 import { cn } from "@/lib/utils";
 import { conversationsApi } from "@/services/conversations-api";
 import type {
@@ -19,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   CornerDownLeft,
+  Download,
   GraduationCap,
   Headphones,
   Library,
@@ -124,6 +126,59 @@ export const ConversationsPage: React.FC = () => {
     if (e) e.preventDefault();
     if (!replyText.trim() || replyMutation.isPending) return;
     replyMutation.mutate(replyText.trim());
+  };
+
+  const handleExportThreadMarkdown = () => {
+    if (!activeThread || activeThread.messages.length === 0) {
+      toast.info("Chưa có tin nhắn nào trong phiên hội thoại này.");
+      return;
+    }
+    const lines: string[] = [];
+    lines.push(`# Phiên Hội Thoại — ${activeThread.user_name}`);
+    lines.push("");
+    lines.push(
+      `- **Người học**: ${activeThread.user_name}${
+        activeThread.user_email ? ` <${activeThread.user_email}>` : ""
+      }`
+    );
+    lines.push(
+      `- **Trợ lý tiếp nhận**: ${activeThread.assistant_name} (\`${activeThread.assistant_code}\`)`
+    );
+    lines.push(`- **Trạng thái**: ${activeThread.status}`);
+    if (activeThread.assigned_to) {
+      lines.push(`- **Cán bộ phụ trách**: ${activeThread.assigned_to}`);
+    }
+    lines.push(`- **Thời gian xuất**: ${new Date().toLocaleString("vi-VN")}`);
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+
+    activeThread.messages.forEach((msg, idx) => {
+      const timeStr = msg.created_at ? new Date(msg.created_at).toLocaleTimeString("vi-VN") : "";
+      const senderLabel =
+        msg.sender === "user"
+          ? `👤 Người dùng (${activeThread.user_name})`
+          : msg.sender === "agent"
+            ? `👨‍💼 Cán bộ hỗ trợ (${activeThread.assigned_to || "Cán bộ QNU"})`
+            : `🎓 Trợ lý AI (${activeThread.assistant_name})`;
+
+      lines.push(`### [Lượt ${idx + 1}] ${senderLabel} ${timeStr ? `(${timeStr})` : ""}`);
+      lines.push("");
+      lines.push(msg.text.trim());
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    });
+
+    lines.push(
+      "> *Tệp được xuất tự động từ Nền tảng AI Trường Đại học Quy Nhơn (QNU AI Platform).*"
+    );
+    lines.push("");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `hoi_thoai_${activeThread.id}_${dateStr}.md`;
+    downloadMarkdownFile(filename, lines.join("\n"));
+    toast.success(`Đã xuất tệp Markdown "${filename}" thành công!`);
   };
 
   const handoffCount = useMemo(() => {
@@ -427,6 +482,17 @@ export const ConversationsPage: React.FC = () => {
                       <span>Mở lại phiên</span>
                     </Button>
                   )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportThreadMarkdown}
+                    className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    title="Tải nội dung hội thoại dạng Markdown (.md)"
+                  >
+                    <Download className="size-3.5" />
+                    <span className="hidden sm:inline">Xuất MD</span>
+                  </Button>
                 </div>
               </div>
 

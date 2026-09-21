@@ -44,6 +44,83 @@ def test_query_classifier_unknown_module_uses_generic_signals() -> None:
     assert generic_narrative.is_fact_first is False
 
 
+def test_query_classifier_mon_hoc_maps_to_subject_combinations() -> None:
+    """Ambiguous 'mon hoc ... xet tuyen' must route Fact-First with subject_combinations."""
+    bug_analysis = query_classifier.analyze(
+        "bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?",
+        module_code="admissions",
+    )
+    assert bug_analysis.is_fact_first is True
+    assert "7480201" in bug_analysis.entity_codes
+    assert "subject_combinations" in bug_analysis.fact_attributes
+    assert "tổ hợp môn" in bug_analysis.keywords
+
+    # Direct admission (HSG / tuyen thang) must NOT be forced to subject_combinations
+    hsg_analysis = query_classifier.analyze(
+        "Danh sách học sinh giỏi được tuyển thẳng ngành Công nghệ thông tin?",
+        module_code="admissions",
+    )
+    assert "7480201" in hsg_analysis.entity_codes
+    assert "subject_combinations" not in hsg_analysis.fact_attributes
+
+
+def test_query_classifier_extracts_subjects_for_reverse_combo_lookup() -> None:
+    """'Which programs have Toan-Anh-Hoa?' must yield subject names for recall."""
+    reverse = query_classifier.analyze(
+        "các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học",
+        module_code="admissions",
+    )
+    assert reverse.is_fact_first is True
+    assert "subject_combinations" in reverse.fact_attributes
+    assert "toán" in reverse.subject_names
+    assert "hóa" in reverse.subject_names
+    assert "tiếng anh" in reverse.subject_names
+    assert "anh" not in reverse.subject_names
+
+    # Bare pronouns and HSG queries must not produce subjects
+    pronoun = query_classifier.analyze(
+        "anh cho em hỏi học phí là bao nhiêu?",
+        module_code="admissions",
+    )
+    assert pronoun.subject_names == []
+
+    hsg = query_classifier.analyze(
+        "Danh sách học sinh giỏi được tuyển thẳng ngành Công nghệ thông tin?",
+        module_code="admissions",
+    )
+    assert hsg.subject_names == []
+    assert "subject_combinations" not in hsg.fact_attributes
+
+
+def test_scope_history_by_topic_drops_stale_turns() -> None:
+    """Independent new questions must not inherit unrelated older answers."""
+    from app.modules.rag.query_router import scope_history_by_topic
+
+    history = [
+        {"role": "user", "content": "học phí ngành Kế toán là bao nhiêu?"},
+        {"role": "assistant", "content": "Học phí ngành Kế toán là 15 triệu."},
+        {"role": "user", "content": "trường áp dụng những phương thức xét tuyển nào?"},
+        {"role": "assistant", "content": "Phương thức 1: thi THPT..."},
+    ]
+    reverse = query_classifier.analyze(
+        "các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học",
+        module_code="admissions",
+    )
+    scoped = scope_history_by_topic(history, reverse)
+    # Latest turn preserved for continuity, stale Kế toán turn dropped
+    assert len(scoped) <= 4
+    assert scoped[-2:] == history[-2:]
+    assert all("Kế toán" not in str(m.get("content", "")) for m in scoped)
+
+    # Same-topic follow-ups keep overlapping turns; empty history stays honest
+    same_topic = query_classifier.analyze(
+        "học phí ngành Kế toán năm 2026?", module_code="admissions"
+    )
+    assert len(scope_history_by_topic(history, same_topic)) >= 2
+    assert scope_history_by_topic([], reverse) == []
+    assert scope_history_by_topic(None, reverse) == []
+
+
 def test_citation_guard_generic_no_answer_for_new_modules() -> None:
     """New modules get polite generic refusal; known modules keep curated templates."""
     assert "0256.3846.156" in citation_guard.get_no_answer_response("admissions")

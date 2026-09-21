@@ -51,6 +51,12 @@ flowchart TD
 - **PII Data Redaction**: Tự động nhận diện và che mờ các thông tin nhạy cảm của thí sinh/sinh viên trước khi gửi sang LLM (CCCD thành `077******988`, SĐT thành `0912***678`, Email thành `sin***@qnu.edu.vn`).
 
 ### Bước 2.5: Phân Loại Ý Định Truy Vấn & Định Tuyến Ưu Tiên Số Liệu (Fact-First Query Routing)
+- **Phân biệt paraphrase tổ hợp môn vs xét tuyển thẳng (phiên #183)**:
+  * Câu hỏi mơ hồ `"ngành CNTT cần những môn học nào để xét tuyển"` được chuẩn hóa thành `"tổ hợp môn"` trước retrieval; `QueryClassifier` ánh xạ `môn + xét tuyển/ngành` sang `fact_attributes=["subject_combinations"]` khi không chứa marker `học sinh giỏi / tuyển thẳng / ưu tiên xét tuyển`.
+  * Truy vấn HSG / tuyển thẳng giữ nguyên để không lấn át Phụ lục 1; truy vấn ngày tháng thuần túy không bị ép Fact-First.
+- **Tra cứu ngược theo tên môn + token ILIKE đặc thù (phiên #184)**:
+  * `QueryClassifier.SUBJECT_PATTERNS` bóc tách tên môn chuẩn (`toán/lý/hóa/sinh/văn/sử/địa/tiếng anh/tin...`) vào `QueryAnalysis.subject_names` khi có ngữ cảnh `tổ hợp` hoặc `môn + xét tuyển`; đại từ `anh` trần và truy vấn HSG bị loại trừ.
+  * `select_ilike_tokens()` tách từ bằng regex `\w+` (hết dính dấu phẩy `toán,`), loại âm tiết chung (`các/ngành/xét/tuyển/hợp/môn`) để token đặc thù dẫn dắt ILIKE thay vì 3 token đầu chung chung.
 - **Bộ phân loại ý định thông minh (`QueryClassifier`)**:
   * Phân tách câu hỏi thành 3 nhóm ý định chuyên biệt (`QueryIntent`):
     - `EXACT_FACT`: Tra cứu số liệu cụ thể (mã ngành `7\d{6}`, chỉ tiêu, điểm chuẩn, học phí, quy đổi IELTS/VSTEP, mã nhiệm vụ `\d+\.\d+`, đơn vị chủ trì, hạn hoàn thành).
@@ -91,6 +97,20 @@ flowchart TD
   * **Tuyệt đối không cấp Citation giả**: Khi không có trích dẫn nào vượt qua ngưỡng kiểm định bằng chứng, hệ thống trả về danh sách rỗng (`[]`) và chuyển trạng thái câu trả lời sang `insufficient_context` (chấm dứt hoàn toàn cơ chế fallback trả ngẫu nhiên 2 citation đầu).
 - **Phản hồi từ chối chuẩn mực (No-Answer Policy)**: Khi thiếu căn cứ, phản hồi hướng dẫn lịch sự kèm hotline tư vấn tuyển sinh chính thức: `0256.3846.156` hoặc email `tuyensinh@qnu.edu.vn`.
 
+### Bước 8b: Chốt Số Liệu Trích Dẫn Ở Runtime (phiên #185)
+- `CitationGuard.verify_numeric_grounding()` trích số nhiều chữ số trong đáp án (so sánh không phân biệt `,`/`.`), đối soát với quotes + facts; số lạ → `insufficient_context` + No-Answer thay vì trả liều. Số 1 chữ số và đáp án không số được miễn (nhiễu).
+
+### Bước 8c: Đợt B — Rank Facts, RRF Trọng Số, Prompt Tầng, Eval Online (phiên #186)
+- **Rank facts theo số môn khớp (B1)**: `count_subject_matches()` đếm môn trong `attribute_value` (không quét tên thực thể, tránh `Kế Toán` khớp `toán`); `lookup_facts(..., subject_names)` over-fetch ×3 rồi xếp hạng và cắt limit.
+- **RRF trọng số theo intent (B2)**: `reciprocal_rank_fusion(..., dense_weight, sparse_weight)`; EXACT_FACT (1.0/1.2) tin lexical, NARRATIVE (1.2/0.8) nghiêng ngữ nghĩa, MIXED cân bằng; log policy mỗi lượt.
+- **Prompt phân tầng + ép temperature (B3)**: fact-query tách TẦNG 1 facts / TẦNG 2 chunks / TẦNG 3 history kèm quy tắc xung đột, history gắn nhãn tham khảo, `temperature = min(req, 0.2)`.
+- **Eval online từ vote (B4)**: bảng `conversation_feedbacks` + `POST /conversations/feedback` + `GET /conversations/feedback/stats` (up-rate); nút 👍/👎 Chat Studio gửi vote best-effort kèm thread/câu hỏi/trả lời.
+
+### Bước 8d: Đợt C — Parent-Child, Multi-Query, Drift Dashboard (phiên #187)
+- **Parent-child mở rộng ngữ cảnh (C1)**: `expand_with_neighbors()` lấy chunks kề cùng document theo `chunk_index` (fallback `page_number`), tối đa 2 chunks top đầu; đưa vào prompt dưới nhãn `BỐI CẢNH MỞ RỘNG`, không trích dẫn, không làm evidence; lỗi DB suy thoái êm.
+- **Multi-query sparse fusion (C2)**: service dựng `keyword_query` từ mã/môn/từ khóa dài; `retrieve(..., sparse_variants)` chạy thêm tối đa 2 truy vấn sparse song song (không tốn embedding), dung hợp RRF với trọng số chiết khấu 0.5 qua `extra_lists`.
+- **Trend + samples + panel eval (C3)**: `GET /conversations/feedback/trend` (buckets ngày, gom bằng Python cho tương thích PG/SQLite), `GET /conversations/feedback/samples` (down mới nhất); tab `Đánh Giá Người Dùng` trên `/evaluation` với KPI up-rate, thanh trend 14 ngày và bảng down cần đối soát.
+
 ### Bước 9: Phân Vùng Bộ Nhớ Đệm Ngữ Nghĩa Đa Tầng (Multi-Tenant & Policy Partitioned Semantic Cache)
 - Lớp cache ngữ nghĩa trên Redis (`SemanticCache`) sử dụng khóa phân vùng bảo vệ chặt chẽ:
   `rag:cache:{tenant_id}:{workspace_id}:{collection_id}:{preferred_model}:{policy_version}:{hash(query)}`
@@ -100,6 +120,10 @@ flowchart TD
   2. Khi người dùng đổi mô hình (`gpt-4o-mini`, `gemini-1.5-flash`, `qwen2.5-7b`), cache không trả kết quả lệch lạc do định dạng của model trước đó sinh ra.
   3. Khi chính sách retrieval thay đổi (`policy_version`), cache tự động phân tách mà không bị ô nhiễm bởi kết quả từ chính sách cũ.
 - Hỗ trợ cơ chế vô hiệu hóa cache chủ động theo mẫu wildcard (`invalidate_collection`) bao quát cả mẫu khóa mới `rag:cache:*:*:{collection_id}:*` và mẫu khóa kế thừa `rag:cache:*:{collection_id}:*` ngay khi có tài liệu mới được duyệt/lập chỉ mục hoặc bị xóa.
+- **Cache theo history (phiên #185)**: key thêm hậu tố `history_hash` (SHA-256 16 ký tự của 4 turns gần nhất, `nohist` khi không có history) qua `SemanticCache.hash_history()`; query ngắn <8 từ kèm history (ví dụ `có tôi muốn`) bị bỏ qua cache đọc/ghi để không trả đáp án của ngữ cảnh cũ.
+- **Scoping history theo chủ đề (phiên #185)**: `scope_history_by_topic()` giữ turn mới nhất + các turn cũ có trùng mã thực thể/tên môn/từ khóa dài, tối đa 4 tin nhắn; tên môn trần chỉ tính khi tin nhắn cũ bàn về tổ hợp (chống `Kế toán` khớp nhầm `toán`).
+- **Unaccent fallback (phiên #185)**: `strip_vietnamese_accents()` + `is_unaccented_query()`; query không dấu kích hoạt lượt ILIKE bổ sung dùng `func.unaccent()` (bỏ qua êm khi CSDL thiếu extension).
+- **Rerank quan sát được (phiên #185)**: timeout Cloudflare 10s→3s, log `provider/latency_ms/in/out` cho cả 3 nhánh (cloudflare/custom/rrf_fallback).
 
 ### Bước 10: Định dạng thông minh (Answer Format Planner)
 Tự động lập kế hoạch trình bày câu trả lời:
@@ -111,5 +135,28 @@ Tự động lập kế hoạch trình bày câu trả lời:
 - **Query Router theo module (`query_router.py`)**: Registry `FACT_KEYWORD_PACKS` cho admissions, regulations, library, drafting, question_bank; trợ lý mới dùng tín hiệu generic (số hiệu QĐ/NĐ/TT, số tiền triệu/tỷ, năm, bao nhiêu/danh sách/liệt kê) mà không cần sửa code. API `analyze(query, module_code="general")` tương thích ngược.
 - **System Prompt dùng chung (`service.py`)**: `build_generic_system_instruction(module_code, custom_prompt)` ưu tiên prompt của trợ lý, ngược lại dùng instruction Zero-Hallucination toàn trường kèm contact theo module (admissions giữ hotline 0256.3846.156, module mới dùng contact tổng quát).
 - **Phát hiện từ chối phi thiên vị**: `is_refusal_answer(answer, has_evidence)` chỉ dựa vào cụm từ từ chối + có/không có citations/facts, thay thế hoàn toàn heuristic cũ chỉ biết triệu/học phí/điểm chuẩn.
-- **Citation Guard mở rộng**: `EVIDENCE_KEYWORDS` bao phủ thư viện/giáo trình/luận văn/quyết định/công văn/đề thi/ma trận/KTX; `get_no_answer_response(module_code, assistant_name)` giữ 5 template chuẩn và sinh template generic nêu tên trợ lý mới.
 - **Mặc định an toàn**: `AskRequest.module_code` mặc định `general` (thay vì admissions) để trợ lý mới không bị nhiễm ngữ cảnh tuyển sinh.
+
+### Bước 12: Ràng Buộc Thực Thể, Chỉ Đạo Định Dạng & Bộ Lọc Hậu Xử Lý (phiên #188)
+- **Nhận diện Thực thể Trọng tâm (`target_entities`)**: `QueryClassifier.analyze()` tự động trích xuất các thực thể cụ thể (ví dụ: ngành đào tạo, mã ngành, văn bản) từ câu hỏi người dùng.
+- **Ràng buộc Trích xuất theo Thực thể (Entity-Scoped Prompt Injection)**: Khi người dùng hỏi về một thực thể cụ thể (ví dụ: *Công nghệ thông tin*), hệ thống inject chỉ thị bắt buộc vào `user_content`:
+  * Chỉ được phép trích xuất thông tin liên quan đến thực thể đó.
+  * Tuyệt đối không sao chép hay hiển thị thông tin của các ngành/đối tượng khác có trong bảng/tài liệu.
+- **Chỉ đạo Định dạng Động từ `AnswerFormatPlanner`**: `get_format_instructions(format_type, target_entity, is_combo_query)` đưa trực tiếp quy tắc trình bày vào prompt:
+  * Tổ hợp môn: Bắt buộc dùng danh sách gạch đầu dòng (-) rõ ràng từng tổ hợp môn `(Môn 1, Môn 2, Môn 3)`, giải thích rõ ràng các ký hiệu số phương thức (ví dụ: 1, 2, 3, 4 là Phương thức xét tuyển 1-4).
+  * Bảng số liệu: Bắt buộc dùng cú pháp bảng Markdown chuẩn chỉnh đầy đủ Header, cấm viết ký tự pipe `||` thô dính chùm.
+- **Bộ lọc Hậu xử lý Làm sạch Cú pháp Bảng (`sanitize_rag_answer`)**:
+  * Tự động làm sạch các cụm ký tự pipe rác `||||||` do OCR tài liệu sinh ra.
+  * Chốt chặn trường hợp LLM nhả cả khối bảng nhiều ngành: tự động phân tích và chuyển đổi thành danh sách gạch đầu dòng chuẩn mực cho đúng thực thể được hỏi.
+  * Giữ nguyên vẹn tính toàn vẹn của các bảng Markdown chuẩn.
+
+### Bước 13: Chuẩn Hóa Góc Độ Nút Gợi Ý & Chống Entity Hijacking Đa Lượt (phiên #189)
+- **Chuyển đổi góc độ Nút Gợi Ý (`convert_or_filter_suggestion_perspective`)**:
+  * Rào chắn chống lộn vai trò: Nhận diện và chuyển đổi các câu hỏi tu từ bot hỏi người dùng (*"Bạn có muốn tìm hiểu về tổ hợp môn xét tuyển của ngành cụ thể nào không?"*) sang góc độ người dùng hỏi bot (*"Các ngành của trường xét tuyển những tổ hợp môn nào?"*).
+  * Lọc sạch câu hỏi lịch sự mơ hồ (*"Bạn có muốn mình chia sẻ thêm điều gì không?"* $\rightarrow$ loại bỏ hoàn toàn, không hiển thị).
+  * Chỉ dẫn System Prompt: Ép 100% câu gợi ý phải đặt câu hỏi từ góc độ người dùng, cấm bắt đầu bằng *"Bạn có muốn..."*, *"Bạn có quan tâm..."*.
+- **Chống Entity Hijacking & Intent Drift trong Query Router & Query Rewrite**:
+  * Loại trừ danh sách từ placeholder mơ hồ (*"cụ thể"*, *"cụ thể nào"*, *"nào đó"*, *"bất kỳ"*, *"gì"*, *"khác"*,...) khỏi việc trích xuất `target_entities`.
+  * Cấm gán ghép thiên kiến ngành vào câu hỏi chung khi xử lý đa lượt, ngăn chặn hiện tượng kéo tên ngành cũ (như CNTT) vào làm biến dạng ý định câu hỏi hiện tại.
+
+

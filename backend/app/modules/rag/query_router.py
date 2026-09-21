@@ -27,6 +27,8 @@ class QueryAnalysis:
     entity_codes: list[str] = field(default_factory=list)
     fact_attributes: list[str] = field(default_factory=list)
     is_fact_first: bool = False
+    subject_names: list[str] = field(default_factory=list)
+    target_entities: list[str] = field(default_factory=list)
 
 
 class QueryClassifier:
@@ -48,6 +50,8 @@ class QueryClassifier:
         "thang điểm",
         "tổ hợp xét tuyển",
         "tổ hợp môn",
+        "tổ hợp",
+        "môn học",
         "học phí",
     ]
 
@@ -192,6 +196,32 @@ class QueryClassifier:
         "công nghệ kỹ thuật ô tô": "7510205",
     }
 
+    # Canonical subject names for reverse combo lookup ("which programs have Toan-Anh-Hoa?").
+    # Patterns are ordered longest-first so "tiếng anh" wins over bare "anh" (a pronoun).
+    # Extraction is gated on subject context ("tổ hợp" or "môn" + "xét tuyển") to avoid
+    # pronoun false positives such as "anh cho em hỏi".
+    SUBJECT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+        (re.compile(r"\btiếng\s+anh\b", re.IGNORECASE), "tiếng anh"),
+        (re.compile(r"\bvật\s*l[ýy]\b", re.IGNORECASE), "lý"),
+        (re.compile(r"\bhóa\s*học\b", re.IGNORECASE), "hóa"),
+        (re.compile(r"\bsinh\s*học\b", re.IGNORECASE), "sinh"),
+        (re.compile(r"\bngữ\s*văn\b", re.IGNORECASE), "văn"),
+        (re.compile(r"\blịch\s*sử\b", re.IGNORECASE), "sử"),
+        (re.compile(r"\bđịa\s*l[ýy]\b", re.IGNORECASE), "địa"),
+        (re.compile(r"\btin\s*học\b", re.IGNORECASE), "tin"),
+        (re.compile(r"\bgiáo\s*dục\s*(?:kt|kinh\s*tế).*?pháp\b", re.IGNORECASE), "giáo dục"),
+        (re.compile(r"\bcông\s*nghệ\b", re.IGNORECASE), "công nghệ"),
+        (re.compile(r"\btoán\b", re.IGNORECASE), "toán"),
+        (re.compile(r"\blý\b", re.IGNORECASE), "lý"),
+        (re.compile(r"\bhóa\b", re.IGNORECASE), "hóa"),
+        (re.compile(r"\bsinh\b", re.IGNORECASE), "sinh"),
+        (re.compile(r"\bvăn\b", re.IGNORECASE), "văn"),
+        (re.compile(r"\bsử\b", re.IGNORECASE), "sử"),
+        (re.compile(r"\bđịa\b", re.IGNORECASE), "địa"),
+        (re.compile(r"\btin\b", re.IGNORECASE), "tin"),
+        (re.compile(r"\banh\b", re.IGNORECASE), "anh"),
+    ]
+
     # Conversational Vietnamese stopwords that should not dilute search keywords
     VI_CONVERSATIONAL_STOPWORDS: set[str] = {
         "tôi", "mình", "bạn", "em", "anh", "chị", "muốn", "hỏi", "cho", "biết",
@@ -215,6 +245,7 @@ class QueryClassifier:
         entity_codes: list[str] = []
         fact_attributes: list[str] = []
         keywords: list[str] = []
+        target_entities: list[str] = []
 
         # 1. Detect program codes (e.g., 7480107, 7480201)
         for match in self.RE_PROGRAM_CODE.finditer(clean_query):
@@ -231,6 +262,33 @@ class QueryClassifier:
                     keywords.append(code)
                 if major_name not in keywords:
                     keywords.append(major_name)
+                display_major = major_name.title()
+                if display_major not in target_entities:
+                    target_entities.append(display_major)
+
+        # 1c. Detect generic major mention (e.g., 'ngành Công nghệ thông tin', 'ngành Kỹ thuật cơ khí')
+        major_pattern = re.search(
+            r"\b(?:ngành|chuyên ngành)\s+([A-ZÀ-Ỹa-zà-ỹ\s]{3,40})\b", clean_query, re.IGNORECASE
+        )
+        if major_pattern:
+            cand = major_pattern.group(1).strip()
+            cand = re.sub(
+                r"\b(?:cần|có|ở|tại|xét tuyển|năm|không|gì|bao nhiêu|như thế nào|thế nào).*$",
+                "",
+                cand,
+                flags=re.IGNORECASE,
+            ).strip()
+            # Do NOT treat indefinite/placeholder words as majors (e.g. 'cụ thể nào', 'nào đó')
+            if (
+                cand
+                and len(cand) >= 3
+                and not any(
+                    p in cand.lower()
+                    for p in ("cụ thể", "nào", "gì", "bất kỳ", "khác", "này", "đó", "mới")
+                )
+                and cand.title() not in target_entities
+            ):
+                target_entities.append(cand.title())
 
         # 2. Detect task codes (e.g., 6.8, 1.1, 11.5)
         for match in self.RE_TASK_CODE.finditer(clean_query):
@@ -255,6 +313,44 @@ class QueryClassifier:
                 elif "điểm" in kw:
                     fact_attributes.append("cutoff_score")
                 elif "tổ hợp" in kw:
+                    fact_attributes.append("subject_combinations")
+
+        # 4b. Ambiguous "môn học ... xét tuyển" paraphrase means subject combinations.
+        # Must exclude direct-admission tables (HSG / tuyển thẳng / ưu tiên xét tuyển)
+        # so Phụ lục 1 does not outrank Trang 6 for CNTT-style queries.
+        is_direct_admission_query = any(
+            marker in query_lower
+            for marker in ("học sinh giỏi", "tuyển thẳng", "ưu tiên xét tuyển")
+        )
+        if (
+            not is_direct_admission_query
+            and "môn" in query_lower
+            and ("xét tuyển" in query_lower or "ngành" in query_lower)
+        ):
+            has_admissions_fact = True
+            if "tổ hợp môn" not in keywords:
+                keywords.append("tổ hợp môn")
+            if "subject_combinations" not in fact_attributes:
+                fact_attributes.append("subject_combinations")
+
+        # 4c. Reverse combo lookup: extract subject names for "which programs have X-Y-Z?".
+        # Gated on subject context so bare pronouns ("anh cho em hỏi") never match.
+        subject_names: list[str] = []
+        if not is_direct_admission_query and (
+            "tổ hợp" in query_lower
+            or ("môn" in query_lower and "xét tuyển" in query_lower)
+        ):
+            for pattern, canonical in self.SUBJECT_PATTERNS:
+                if pattern.search(query_lower) and canonical not in subject_names:
+                    subject_names.append(canonical)
+            if "tiếng anh" in subject_names and "anh" in subject_names:
+                subject_names.remove("anh")
+            for subject in subject_names:
+                if subject not in keywords:
+                    keywords.append(subject)
+            if subject_names:
+                has_admissions_fact = True
+                if "subject_combinations" not in fact_attributes:
                     fact_attributes.append("subject_combinations")
 
         # 5. Check implementation plan fact signals
@@ -343,7 +439,73 @@ class QueryClassifier:
             entity_codes=entity_codes,
             fact_attributes=list(set(fact_attributes)),
             is_fact_first=is_fact_first,
+            subject_names=subject_names,
+            target_entities=target_entities,
         )
+
+
+# Generic topic words too broad to signal continuity across turns.
+_TOPIC_GENERIC_WORDS: frozenset[str] = frozenset(
+    {
+        "ngành", "xét", "tuyển", "tổ hợp", "môn", "nganh", "xet", "tuyen",
+        "trường", "đại", "học", "truong", "dai", "hoc", "cho", "biết",
+        "bao nhiêu", "bao nhieu", "năm", "nam",
+    }
+)
+
+
+def scope_history_by_topic(
+    history: list[dict] | None,
+    analysis: QueryAnalysis,
+    max_messages: int = 4,
+) -> list[dict]:
+    """Keep only history turns sharing topic signals with the current query.
+
+    The most recent turn is always preserved for pronoun continuity ("ngành này").
+    Older turns survive only when they mention the same entity codes, subject
+    names or distinctive keywords. Prevents a stale answer (e.g. phương thức)
+    from steering an independent new question (e.g. reverse combo lookup).
+    """
+    if not history:
+        return []
+    recent = [m for m in history if isinstance(m, dict)][:]
+
+    signals: set[str] = set()
+    for code in analysis.entity_codes:
+        signals.add(code.strip().lower())
+    for subject in analysis.subject_names:
+        signals.add(subject.strip().lower())
+    for kw in analysis.keywords:
+        clean_kw = kw.strip().lower()
+        if len(clean_kw) >= 8 and clean_kw not in _TOPIC_GENERIC_WORDS:
+            signals.add(clean_kw)
+    signals.discard("")
+
+    if not signals:
+        return recent[-max_messages:]
+
+    # Always preserve the latest turn (up to 2 messages) for continuity.
+    tail = recent[-2:]
+    subject_set = {s.strip().lower() for s in analysis.subject_names}
+    scoped: list[dict] = []
+    for msg in recent[: len(recent) - len(tail)]:
+        content = str(msg.get("content", "")).lower()
+        matched = False
+        for sig in signals:
+            if sig not in content:
+                continue
+            # Bare subject words only count inside combo discussions, so "Kế toán"
+            # never matches the "toán" subject of an unrelated older turn.
+            if sig in subject_set and not any(
+                marker in content for marker in ("tổ hợp", "môn", "xét tuyển")
+            ):
+                continue
+            matched = True
+            break
+        if matched:
+            scoped.append(msg)
+    scoped.extend(tail)
+    return scoped[-max_messages:]
 
 
 query_classifier = QueryClassifier()

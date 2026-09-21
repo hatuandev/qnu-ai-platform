@@ -74,9 +74,76 @@ export async function updateConversationStatus(
   );
 }
 
+export interface FeedbackVoteRequest {
+  thread_id?: string | null;
+  assistant_code: string;
+  vote: "up" | "down";
+  question?: string;
+  answer?: string;
+}
+
+export async function recordFeedbackVote(body: FeedbackVoteRequest): Promise<unknown> {
+  return requestJson<unknown>(`${CONVERSATIONS_URL}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export interface FeedbackStats {
+  total: number;
+  up: number;
+  down: number;
+  up_rate: number;
+  assistant_code: string | null;
+}
+
+export interface FeedbackTrendPoint {
+  date: string;
+  up: number;
+  down: number;
+}
+
+export interface FeedbackTrend {
+  points: FeedbackTrendPoint[];
+  days: number;
+}
+
+export interface FeedbackSample {
+  id: string;
+  thread_id: string | null;
+  assistant_code: string;
+  vote: "up" | "down";
+  question_excerpt: string;
+  answer_excerpt: string;
+  created_at: string;
+}
+
+export async function getFeedbackStats(assistantCode?: string): Promise<FeedbackStats> {
+  const query = assistantCode ? `?assistant_code=${encodeURIComponent(assistantCode)}` : "";
+  return requestJson<FeedbackStats>(`${CONVERSATIONS_URL}/feedback/stats${query}`);
+}
+
+export async function getFeedbackTrend(days = 14): Promise<FeedbackTrend> {
+  return requestJson<FeedbackTrend>(`${CONVERSATIONS_URL}/feedback/trend?days=${days}`);
+}
+
+export async function getFeedbackSamples(
+  vote: "up" | "down" = "down",
+  limit = 20
+): Promise<FeedbackSample[]> {
+  return requestJson<FeedbackSample[]>(
+    `${CONVERSATIONS_URL}/feedback/samples?vote=${vote}&limit=${limit}`
+  );
+}
+
 export const conversationsApi = {
   listConversations,
   getConversationDetail,
   replyConversation,
   updateConversationStatus,
+  recordFeedbackVote,
+  getFeedbackStats,
+  getFeedbackTrend,
+  getFeedbackSamples,
 };

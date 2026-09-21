@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncIterator
 
 import httpx
 
+from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 
 class LocalVLLMAdapter(BaseLLMAdapter):
@@ -52,16 +56,18 @@ class LocalVLLMAdapter(BaseLLMAdapter):
             prompt_tokens = usage.get("prompt_tokens", 0)
             completion_tokens = usage.get("completion_tokens", 0)
             total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
-        except Exception:
-            # Safe campus fallback mock if local server is unreachable
-            user_msg = messages[-1].content if messages else ""
-            content = (
-                f"[Local {self.model_name}] Phản hồi từ máy chủ AI nội bộ ĐH Quy Nhơn:\n"
-                f"Đã ghi nhận yêu cầu: '{user_msg[:100]}'."
+        except Exception as exc:
+            logger.warning(
+                "Local vLLM server at %s unreachable or returned error: %s",
+                endpoint,
+                exc,
             )
-            prompt_tokens = sum(len(m.content.split()) for m in messages) * 2
-            completion_tokens = len(content.split()) * 2
-            total_tokens = prompt_tokens + completion_tokens
+            raise AppException(
+                message=f"Máy chủ AI nội bộ ({self.model_name}) hiện không phản hồi: {exc}",
+                code="local_llm_unavailable",
+                status_code=502,
+                details={"model": self.model_name, "endpoint": endpoint},
+            ) from exc
 
         elapsed = (time.perf_counter() - start_time) * 1000
         return LLMResponse(

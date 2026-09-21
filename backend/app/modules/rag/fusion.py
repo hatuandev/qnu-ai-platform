@@ -21,53 +21,60 @@ class FusionCandidate:
     metadata: dict[str, Any] = None
 
 
+def _merge_ranked_list(
+    scores: dict[str, float],
+    candidates: dict[str, FusionCandidate],
+    results: list[dict[str, Any]],
+    k: int,
+    weight: float,
+    rank_field: str,
+) -> None:
+    """Add one ranked list into shared RRF scores (1-indexed ranks)."""
+    for rank, item in enumerate(results, start=1):
+        cid = str(item["chunk_id"])
+        scores[cid] = scores.get(cid, 0.0) + (weight / (k + rank))
+        if cid not in candidates:
+            candidates[cid] = FusionCandidate(
+                chunk_id=cid,
+                document_id=str(item.get("document_id", "")),
+                content=str(item.get("content", "")),
+                rrf_score=0.0,
+                section=item.get("section"),
+                page_number=item.get("page_number"),
+                metadata=item.get("metadata", {}),
+            )
+            setattr(candidates[cid], rank_field, rank)
+        elif getattr(candidates[cid], rank_field, -1) == -1:
+            setattr(candidates[cid], rank_field, rank)
+
+
 def reciprocal_rank_fusion(
     dense_results: list[dict[str, Any]],
     sparse_results: list[dict[str, Any]],
     k: int = 60,
+    dense_weight: float = 1.0,
+    sparse_weight: float = 1.0,
+    extra_lists: list[tuple[list[dict[str, Any]], float]] | None = None,
 ) -> list[FusionCandidate]:
     """Fuse rankings from Dense Vector Search and Sparse Lexical (FTS) Search using RRF.
 
-    Formula: RRF_Score(d) = sum(1 / (k + rank(d))) across all retrieval lists.
+    Formula: RRF_Score(d) = dense_w / (k + rank_dense(d)) + sparse_w / (k + rank_sparse(d)).
+    Intent-tailored weights let exact lookups trust lexical precision while narrative
+    questions lean on semantic similarity. Defaults keep legacy balanced behavior.
+    `extra_lists` carries discounted variant queries (multi-query sparse fusion).
     """
     scores: dict[str, float] = {}
     candidates: dict[str, FusionCandidate] = {}
 
     # 1. Process Dense Vector rankings (1-indexed)
-    for rank, item in enumerate(dense_results, start=1):
-        cid = str(item["chunk_id"])
-        scores[cid] = scores.get(cid, 0.0) + (1.0 / (k + rank))
-        if cid not in candidates:
-            candidates[cid] = FusionCandidate(
-                chunk_id=cid,
-                document_id=str(item.get("document_id", "")),
-                content=str(item.get("content", "")),
-                rrf_score=0.0,
-                dense_rank=rank,
-                section=item.get("section"),
-                page_number=item.get("page_number"),
-                metadata=item.get("metadata", {}),
-            )
-        else:
-            candidates[cid].dense_rank = rank
+    _merge_ranked_list(scores, candidates, dense_results, k, dense_weight, "dense_rank")
 
     # 2. Process Sparse FTS rankings (1-indexed)
-    for rank, item in enumerate(sparse_results, start=1):
-        cid = str(item["chunk_id"])
-        scores[cid] = scores.get(cid, 0.0) + (1.0 / (k + rank))
-        if cid not in candidates:
-            candidates[cid] = FusionCandidate(
-                chunk_id=cid,
-                document_id=str(item.get("document_id", "")),
-                content=str(item.get("content", "")),
-                rrf_score=0.0,
-                sparse_rank=rank,
-                section=item.get("section"),
-                page_number=item.get("page_number"),
-                metadata=item.get("metadata", {}),
-            )
-        else:
-            candidates[cid].sparse_rank = rank
+    _merge_ranked_list(scores, candidates, sparse_results, k, sparse_weight, "sparse_rank")
+
+    # 3. Discounted variant query lists (e.g. keyword-form rewrite of the question)
+    for variant_results, variant_weight in extra_lists or []:
+        _merge_ranked_list(scores, candidates, variant_results, k, variant_weight, "sparse_rank")
 
     # 3. Assign merged RRF scores with legal priority weighting and sort descending
     for cid, cand in candidates.items():

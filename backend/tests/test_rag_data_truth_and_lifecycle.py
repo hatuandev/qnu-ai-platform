@@ -237,6 +237,29 @@ def test_semantic_cache_key_partition():
     )
     assert key_v1 != key_other_ws
 
+    # History isolation: same short follow-up with different context never collides
+    key_hist_a = cache._make_key(
+        collection_id="col_admissions",
+        query="có tôi muốn",
+        history_hash="aaaabbbbccccdddd",
+    )
+    key_hist_b = cache._make_key(
+        collection_id="col_admissions",
+        query="có tôi muốn",
+        history_hash="eeeffff00001111",
+    )
+    assert key_hist_a != key_hist_b
+    assert key_hist_a != key_v1
+
+    # hash_history is stable for identical turns and honest for empty input
+    turns = [
+        {"role": "user", "content": "Có tôi muốn"},
+        {"role": "assistant", "content": "Chỉ tiêu..."},
+    ]
+    assert cache.hash_history(turns) == cache.hash_history(turns)
+    assert cache.hash_history([]) is None
+    assert cache.hash_history(None) is None
+
 
 # ============================================================================
 # 4. Document Ingestion Lifecycle State Machine Tests

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen,
   Bot,
+  Download,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -27,7 +28,9 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { type ChatAttachment, useRAGStream } from "../hooks/use-rag-stream";
+import { downloadMarkdownFile, formatConversationToMarkdown } from "../lib/export-markdown";
 import { listAssistants } from "../services/assistants-api";
+import { recordFeedbackVote } from "../services/conversations-api";
 
 interface AssistantInfo {
   code: string;
@@ -147,12 +150,46 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
     isStreaming,
     activeCitation,
     setActiveCitation,
+    conversationId,
     sendMessage,
     stopStreaming,
     clearMessages,
   } = useRAGStream({
     assistantCode: selectedCode,
   });
+
+  const handleFeedback = (msgId: string, vote: "up" | "down") => {
+    const msgIndex = messages.findIndex((m) => m.id === msgId);
+    const answerMsg = msgIndex >= 0 ? messages[msgIndex] : undefined;
+    if (!answerMsg) return;
+    const questionMsg = [...messages.slice(0, msgIndex)].reverse().find((m) => m.role === "user");
+    void recordFeedbackVote({
+      thread_id: conversationId ?? null,
+      assistant_code: selectedCode,
+      vote,
+      question: questionMsg?.content.slice(0, 2000),
+      answer: answerMsg.content.slice(0, 8000),
+    }).catch(() => {
+      /* best-effort: vote failures must not break chat */
+    });
+  };
+
+  const handleExportMarkdown = () => {
+    if (messages.length === 0) {
+      toast.info("Chưa có nội dung cuộc trò chuyện để tải về.");
+      return;
+    }
+    const mdContent = formatConversationToMarkdown({
+      assistantName: activeAssistant?.name || "Trợ lý AI QNU",
+      assistantCode: activeAssistant?.code || selectedCode,
+      assistantDescription: activeAssistant?.description,
+      messages,
+    });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `hoi_thoai_${activeAssistant?.code || "chat"}_${dateStr}.md`;
+    downloadMarkdownFile(filename, mdContent);
+    toast.success(`Đã tải tệp Markdown "${filename}" thành công!`);
+  };
 
   const handleSelectAssistant = (code: string) => {
     setSelectedCode(code);
@@ -384,8 +421,20 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
             <Button
               variant="outline"
               size="sm"
+              onClick={handleExportMarkdown}
+              disabled={messages.length === 0}
+              className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+              title="Tải nội dung cuộc trò chuyện dạng Markdown (.md)"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tải về (.md)</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
               onClick={clearMessages}
-              className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer"
               title="Xóa phiên hội thoại"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -442,6 +491,7 @@ export const ChatStudioPage: React.FC<ChatStudioPageProps> = ({ initialAssistant
                     }
                   }}
                   onSuggestedClick={(q) => sendMessage(q)}
+                  onFeedback={(vote) => handleFeedback(msg.id, vote)}
                 />
               ))}
 

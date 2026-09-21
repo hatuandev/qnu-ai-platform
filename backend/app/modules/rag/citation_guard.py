@@ -179,6 +179,44 @@ class CitationGuard:
 
         return filtered
 
+    def verify_numeric_grounding(
+        self,
+        answer: str,
+        citations: list[Citation],
+        facts_used: list[dict] | None = None,
+    ) -> tuple[bool, list[str]]:
+        """Check that multi-digit figures in the answer exist in evidence text.
+
+        Single digits are skipped (too noisy: list indices, counts). Comparison is
+        separator-insensitive so "112,3" matches "112.3". Returns (grounded, ungrounded).
+        """
+        if not (answer or "").strip():
+            return True, []
+        targets = {
+            re.sub(r"\D", "", n)
+            for n in re.findall(r"\d+(?:[.,]\d+)*", answer)
+        }
+        targets = {t for t in targets if len(t) >= 2}
+        if not targets:
+            return True, []
+
+        evidence_parts: list[str] = []
+        for cite in citations or []:
+            if cite.quote:
+                evidence_parts.append(cite.quote)
+        for fact in facts_used or []:
+            if isinstance(fact, dict):
+                for key in ("val", "entity", "attr"):
+                    if fact.get(key):
+                        evidence_parts.append(str(fact[key]))
+        evidence_numbers = {
+            re.sub(r"\D", "", n)
+            for n in re.findall(r"\d+(?:[.,]\d+)*", " ".join(evidence_parts))
+        }
+
+        ungrounded = sorted(t for t in targets if t not in evidence_numbers)
+        return (not ungrounded), ungrounded
+
     def get_no_answer_response(
         self,
         module_code: str = "general",

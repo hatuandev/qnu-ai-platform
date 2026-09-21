@@ -403,6 +403,12 @@ Nhằm giải quyết triệt để lỗi người dùng gõ nhầm trượt ph�
   * *Tầng 1 (0ms Fast Rules)*: Xử lý tức thì các lỗi trượt phím Telex thông dụng và từ viết tắt QNU quen thuộc qua biểu thức chính quy tối ưu.
   * *Tầng 2 (~150ms Contextual LLM)*: Gọi mô hình ngôn ngữ siêu tốc (`thinking_budget: 0`, `temperature: 0.0`) với cấu trúc prompt Few-shot nghiêm ngặt (không giải thích, không thêm tiền tố, bảo toàn 100% ý định câu hỏi gốc).
 
+### 13.1b. Mở Rộng Paraphrase Tổ Hợp Môn Trong Fast Rules (phiên #183)
+- Hàm `expand_subject_combo_paraphrase()` trong `query_rewrite_node.py` chạy ở Stage 1 (0ms): `"những môn học nào" / "môn nào để xét tuyển" / "cần học môn gì"` thành `"tổ hợp môn"` khi có ngữ cảnh `xét tuyển / ngành`, bỏ qua khi đã có `tổ hợp` hoặc marker `học sinh giỏi / tuyển thẳng / ưu tiên xét tuyển`; chống nhân đôi bằng lookbehind và cờ skip-once.
+
+### 13.1c. Parser Gợi Ý Chịu Lỗi Định Dạng LLM (phiên #184)
+- `extract_suggested_questions()` trong `composer.py` chấp nhận khối `[GỢI Ý]:` cùng dòng (regex kết thúc `\s*` thay vì `\s*\n`), parse mảng JSON inline 1 dòng qua trích xuất chuỗi quoted, fallback bullet/`;`, và tự lột marker rỗng thay vì rò raw JSON ra UI khiến chips rơi về `sample_questions` tĩnh.
+
 ### 13.2. Cấu Hình Seed Data Thực Tế Trên 5 Quy Trình Chuẩn QNU
 Cả 5 quy trình nghiệp vụ chính thức đều được nạp sẵn node `query_rewrite` với prompt chuyên biệt:
 

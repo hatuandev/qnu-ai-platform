@@ -27,6 +27,23 @@ from app.modules.modelops.services.usage_accounting_service import usage_account
 
 logger = logging.getLogger(__name__)
 
+VALID_CHAT_PROVIDER_TYPES: set[str] = {
+    "gemini",
+    "openai",
+    "cloudflare",
+    "deepseek",
+    "groq",
+    "claude",
+    "mistral",
+    "local_vllm",
+    "local",
+    "ollama",
+    "openrouter",
+    "nvidia",
+    "custom",
+}
+NON_CHAT_MODEL_KEYWORDS: tuple[str, ...] = ("bge-", "embed", "rerank", "tableformer")
+
 
 class InferenceService:
     """Executes LLM inference (generate & stream) with Key Pool rotation, Dynamic Fallback, and Quota accounting."""
@@ -77,8 +94,14 @@ class InferenceService:
         # 1. Quota Pre-check
         quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
 
-        # 2. Retrieve Provider Cascade and apply Preferred Provider/Model priority
-        providers = await self._call_get_active_providers(db)
+        # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
+        all_providers = await self._call_get_active_providers(db)
+        providers = [
+            p
+            for p in all_providers
+            if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
+            and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
+        ]
         if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
             def _match_score(p: dict[str, Any]) -> int:
                 score = 0
@@ -137,6 +160,12 @@ class InferenceService:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
                 p_models = p.get("models") or []
+                chat_candidates = [
+                    m
+                    for m in p_models
+                    if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
+                ]
+
                 if req.preferred_model_name and (
                     req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
                 ):
@@ -146,18 +175,25 @@ class InferenceService:
                 ):
                     chosen_model = req.fallback_model_name
                 else:
-                    chat_candidates = [
-                        m
-                        for m in p_models
-                        if not any(x in m.lower() for x in ("bge-", "embed", "rerank", "tableformer"))
-                    ]
                     if chat_candidates and any(
                         x in str(p.get("model_name", "")).lower()
-                        for x in ("bge-", "embed", "rerank", "tableformer")
+                        for x in NON_CHAT_MODEL_KEYWORDS
                     ):
                         chosen_model = chat_candidates[0]
                     else:
                         chosen_model = p["model_name"]
+
+                # Hard safety check: never pass an embedding / reranker model to LLM chat generator
+                if any(x in str(chosen_model).lower() for x in NON_CHAT_MODEL_KEYWORDS):
+                    if chat_candidates:
+                        chosen_model = chat_candidates[0]
+                    else:
+                        logger.warning(
+                            "Provider '%s' has only non-chat model '%s', skipping provider",
+                            p["name"],
+                            chosen_model,
+                        )
+                        continue
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)
@@ -285,8 +321,14 @@ class InferenceService:
         # 1. Quota Pre-check
         quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
 
-        # 2. Retrieve Provider Cascade and apply Preferred/Fallback Model priority
-        providers = await self._call_get_active_providers(db)
+        # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
+        all_providers = await self._call_get_active_providers(db)
+        providers = [
+            p
+            for p in all_providers
+            if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
+            and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
+        ]
         if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
             def _match_score(p: dict[str, Any]) -> int:
                 score = 0
@@ -336,6 +378,12 @@ class InferenceService:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
                 p_models = p.get("models") or []
+                chat_candidates = [
+                    m
+                    for m in p_models
+                    if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
+                ]
+
                 if req.preferred_model_name and (
                     req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
                 ):
@@ -345,18 +393,25 @@ class InferenceService:
                 ):
                     chosen_model = req.fallback_model_name
                 else:
-                    chat_candidates = [
-                        m
-                        for m in p_models
-                        if not any(x in m.lower() for x in ("bge-", "embed", "rerank", "tableformer"))
-                    ]
                     if chat_candidates and any(
                         x in str(p.get("model_name", "")).lower()
-                        for x in ("bge-", "embed", "rerank", "tableformer")
+                        for x in NON_CHAT_MODEL_KEYWORDS
                     ):
                         chosen_model = chat_candidates[0]
                     else:
                         chosen_model = p["model_name"]
+
+                # Hard safety check: never pass an embedding / reranker model to LLM chat generator
+                if any(x in str(chosen_model).lower() for x in NON_CHAT_MODEL_KEYWORDS):
+                    if chat_candidates:
+                        chosen_model = chat_candidates[0]
+                    else:
+                        logger.warning(
+                            "Provider '%s' has only non-chat model '%s', skipping provider",
+                            p["name"],
+                            chosen_model,
+                        )
+                        continue
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)

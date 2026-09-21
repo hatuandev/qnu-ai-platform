@@ -14,6 +14,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 import { EmptyState } from "../components/admin/empty-state";
 import { PageHeader } from "../components/admin/page-header";
 import { EvaluationRunDetailSheet } from "../components/evaluation/evaluation-run-detail-sheet";
+import { FeedbackPanel } from "../components/evaluation/feedback-panel";
 import { RunBenchmarkDialog } from "../components/evaluation/run-benchmark-dialog";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -238,6 +240,10 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
             <Badge variant="warning" className="text-[10px] h-4 px-1 ml-1">
               {gapItems.filter((g) => !resolvedGaps.includes(g.id)).length}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="feedback" className="text-xs px-3 py-1.5 gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />
+            <span>Đánh Giá Người Dùng</span>
           </TabsTrigger>
         </TabsList>
 
@@ -484,6 +490,7 @@ export const EvaluationPage: React.FC<{ onNavigateToKnowledge?: () => void }> = 
             )}
           </div>
         )}
+        {activeTab === "feedback" && <FeedbackPanel />}
       </Tabs>
 
       {/* Dialog Cấu Hình Chạy Benchmark TM-08 */}
