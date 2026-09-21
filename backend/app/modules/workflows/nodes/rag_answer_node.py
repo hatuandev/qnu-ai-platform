@@ -69,14 +69,17 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             answer_text = rag_res.answer
             citations = [c.model_dump() for c in rag_res.citations]
             status = rag_res.status
+            suggested_questions = getattr(rag_res, "suggested_questions", [])
         else:
             answer_text = f"Dựa trên tài liệu chính thức của ĐH Quy Nhơn cho câu hỏi: '{query}'."
             citations = []
             status = "answered"
+            suggested_questions = []
 
         context.node_data["rag_answer"] = answer_text
         context.node_data["citations"] = citations
         context.node_data["rag_status"] = status
+        context.node_data["suggested_questions"] = suggested_questions
 
         return NodeExecutionResult(
             node_id=node_spec.id,
@@ -85,5 +88,6 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                 "answer": answer_text,
                 "citations": citations,
                 "status": status,
+                "suggested_questions": suggested_questions,
             },
         )

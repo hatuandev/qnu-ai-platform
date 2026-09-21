@@ -104,3 +104,7 @@ docker compose logs -f backend
 xin chào cho tôi biết phương thức tuyển sinh năm 2026
 
 bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?
+
+các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học
+
+

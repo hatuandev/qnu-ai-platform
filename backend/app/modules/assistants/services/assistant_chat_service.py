@@ -261,13 +261,20 @@ class AssistantChatService:
         except Exception as u_err:
             logger.warning("failed_to_record_usage_in_chat: %s", u_err)
 
+        dynamic_suggestions = workflow_response.outputs.get("suggested_questions")
+        final_suggested_questions = (
+            dynamic_suggestions
+            if (dynamic_suggestions and isinstance(dynamic_suggestions, list))
+            else (sample_questions or [])[:3]
+        )
+
         return AssistantChatResponse(
             assistant_code=assistant.code,
             assistant_name=assistant.name,
             answer=answer,
             status=output_status,
             citations=citations if isinstance(citations, list) else [],
-            suggested_questions=(sample_questions or [])[:3],
+            suggested_questions=final_suggested_questions,
             latency_ms=workflow_response.latency_ms,
             execution_id=workflow_response.execution_id,
             artifacts=artifacts if isinstance(artifacts, list) else [],
@@ -455,10 +462,17 @@ class AssistantChatService:
         except Exception as u_err:
             logger.warning("failed_to_record_usage_in_chat_stream: %s", u_err)
 
+        dynamic_suggestions = workflow_response.outputs.get("suggested_questions")
+        final_suggested_questions = (
+            dynamic_suggestions
+            if (dynamic_suggestions and isinstance(dynamic_suggestions, list))
+            else (sample_questions or [])[:3]
+        )
+
         done_payload = {
             "conversation_id": conversation_id,
             "latency_ms": workflow_response.latency_ms,
-            "suggested_questions": (sample_questions or [])[:3],
+            "suggested_questions": final_suggested_questions,
             "execution_id": workflow_response.execution_id,
             "status": output_status,
             "approval_id": approval_id,

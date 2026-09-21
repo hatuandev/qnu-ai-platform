@@ -12,7 +12,7 @@ from app.core.redis import semantic_cache
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
-from app.modules.rag.composer import answer_format_planner
+from app.modules.rag.composer import answer_format_planner, extract_suggested_questions
 from app.modules.rag.facts import fact_layer
 from app.modules.rag.query_router import QueryIntent, query_classifier
 from app.modules.rag.retriever import hybrid_retriever
@@ -293,17 +293,19 @@ class RagService:
             )
         )
         status = "insufficient_context" if is_refusal else "answered"
+        clean_answer, suggested_questions = extract_suggested_questions(final_answer)
 
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
         resp = AskResponse(
             status=status,
-            answer=final_answer,
+            answer=clean_answer,
             answer_format=chosen_format,
             citations=final_citations,
             facts_used=[
                 {"entity": f.entity_name, "attr": f.attribute_name, "val": f.attribute_value}
                 for f in facts
             ],
+            suggested_questions=suggested_questions,
             latency_ms=exec_ms,
         )
 

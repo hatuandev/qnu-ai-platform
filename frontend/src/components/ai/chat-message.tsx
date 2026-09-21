@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   BookOpen,
   Bot,
   Check,
@@ -250,12 +251,13 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
-        {/* Suggested Follow-up Questions */}
+        {/* Suggested Follow-up Questions (Interactive 1-Click Chips) */}
         {message.suggestedQuestions &&
           message.suggestedQuestions.length > 0 &&
           message.status === "completed" && (
-            <div className="mt-2 space-y-1.5">
-              <span className="text-[11px] font-medium text-muted-foreground">
+            <div className="mt-2.5 space-y-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                <Lightbulb className="size-3 text-primary shrink-0" />
                 Gợi ý câu hỏi liên quan tiếp theo:
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -264,9 +266,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     key={q}
                     type="button"
                     onClick={() => onSuggestedClick?.(q)}
-                    className="inline-flex items-center gap-1.5 text-left text-xs px-2.5 py-1 rounded-control bg-muted/60 hover:bg-muted text-foreground/80 hover:text-primary border border-border/80 transition-colors cursor-pointer"
+                    title="Nhấp để hỏi ngay câu này"
+                    className="inline-flex items-center gap-1.5 text-left text-xs px-2.5 py-1.5 rounded-control bg-card hover:bg-primary/5 text-foreground/90 hover:text-primary border border-border/80 hover:border-primary/40 shadow-2xs transition-all cursor-pointer group/chip"
                   >
-                    <Lightbulb className="size-3 text-primary shrink-0" />
+                    <ArrowRight className="size-3 text-primary shrink-0 group-hover/chip:translate-x-0.5 transition-transform" />
                     <span>{q}</span>
                   </button>
                 ))}

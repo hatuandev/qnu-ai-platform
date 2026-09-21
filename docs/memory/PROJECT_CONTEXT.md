@@ -7,11 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-21 16:34 (UTC+7)
-- **Phiên số**: #179
+- **Thời gian cập nhật**: 2026-09-21 16:53 (UTC+7)
+- **Phiên số**: #180
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Khắc Phục RAG Entity Code Augmentation & Chống Rò Rỉ Few-Shot Trong Query Rewrite (phiên #179)**:
+  1. **Kích Hoạt Hệ Thống Nút Bấm Gợi Ý Tương Tác 1-Click (Interactive Suggestion Chips) & Triệt Tiêu Câu Hỏi Tu Từ Rập Khuôn (phiên #180)**:
+     - **Vấn đề giải quyết**: Khắc phục triệt để hiện tượng bot lặp đi lặp lại câu hỏi tu từ thụ động ở đuôi: *"Bạn có muốn mình chia sẻ thêm về chỉ tiêu tuyển sinh hoặc các phương thức xét tuyển áp dụng cho các ngành này không?"*.
+     - **Backend**:
+       * Cập nhật `SYSTEM_PROMPT_TEMPLATE` trong `composer.py` cấm câu hỏi tu từ đóng dạng *"Bạn có muốn..."*, yêu cầu đề xuất 2 câu hỏi hành động cụ thể theo khối `[GỢI Ý]:`;
+       * Xây dựng hàm `extract_suggested_questions`: bóc tách gợi ý thành danh sách, dọn sạch 100% câu hỏi boilerplate khỏi thân tin nhắn Markdown, tự động chuyển đổi câu hỏi đóng sót lại thành 2 câu hỏi cụ thể;
+       * Bổ sung trường `suggested_questions: list[str]` vào `AskResponse`, chuyển tiếp qua các node DAG (`rag_answer_node`, `output_chat_node`), và truyền ra trong cả HTTP JSON response và SSE `event: done`;
+       * Cập nhật và đồng bộ cấu hình CSDL PostgreSQL cho Trợ lý `ast_admissions` và quy trình `admissions-assistant`.
+     - **Frontend**:
+       * Nâng cấp component `ChatMessage` hiển thị mảng `suggestedQuestions` thành các Nút bấm Chip bo tròn cao cấp kèm icon Lucide `ArrowRight` có hiệu ứng hover QNU Academic Teal và đổ bóng `shadow-2xs`;
+       * Kết nối sự kiện `onSuggestedClick(q)`: người dùng click vào chip sẽ tự động gửi câu hỏi ngay lập tức mà không cần gõ lại.
+     - **Verification**:
+       * Thử nghiệm trực tiếp với câu hỏi: *"các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học"*: Thân tin nhắn sạch 100%, chân tin nhắn xuất hiện 2 Suggestion Chips tương tác;
+       * Backend Ruff 0 lỗi, Pytest 41/41 passed (100%), Frontend Biome 0 lỗi (168 files), TypeScript 0 lỗi, Vite Build thành công (9.27s).
+  2. **Khắc Phục RAG Entity Code Augmentation & Chống Rò Rỉ Few-Shot Trong Query Rewrite (phiên #179)**:
      - **Phân tích nguyên nhân cốt lõi**:
        * Khi người dùng hỏi `"ý tôi muốn hỏi là tổ hợp môn xét tuyển của ngành công nghệ thông tin"`, `QueryClassifier` đã nhận diện đúng mã ngành `7480201` nhưng chuỗi query gửi sang Hybrid Retriever không đính kèm mã thực thể, khiến Trang 6 bị tụt hạng và rơi khỏi top_k.
        * Node `query.rewrite` có ví dụ few-shot về `diem chuan qtkd nam 2024`, trong một số trường hợp gọi LLM bị lặp lại dòng ví dụ và bộ lọc stopwords chưa đủ rộng (chỉ lọc 5 từ) khiến candidate chứa chữ `năm` lọt qua chốt chặn, dẫn đến việc câu hỏi phương thức tuyển sinh 2026 bị biến thành câu hỏi điểm chuẩn QTKD 2024.

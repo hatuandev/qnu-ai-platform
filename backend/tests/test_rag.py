@@ -464,4 +464,30 @@ async def test_search_dense_gracefully_degrades_when_embedding_fails():
         assert results == []
 
 
+def test_extract_suggested_questions_cleans_passive_boilerplate_and_parses_block():
+    """Verify extract_suggested_questions strips boilerplate trailing questions and extracts suggestions."""
+    from app.modules.rag.composer import extract_suggested_questions
 
+    # Case 1: Passive trailing question converted and stripped
+    raw_1 = (
+        "Chào bạn! Ngành Công nghệ thông tin xét tuyển các môn: Toán, Lý, Hóa.\n\n"
+        "Bạn có muốn mình chia sẻ thêm về chỉ tiêu tuyển sinh hoặc các phương thức xét tuyển áp dụng cho các ngành này không?"
+    )
+    clean_1, sugs_1 = extract_suggested_questions(raw_1)
+    assert "Bạn có muốn mình chia sẻ thêm" not in clean_1
+    assert len(sugs_1) == 2
+    assert "phương thức" in sugs_1[0].lower() or "chỉ tiêu" in sugs_1[0].lower()
+
+    # Case 2: Explicit [GỢI Ý] block parsed and stripped
+    raw_2 = (
+        "Chào bạn! Điểm chuẩn ngành Sư phạm Toán là 26.5 điểm.\n\n"
+        "[GỢI Ý]:\n"
+        "- \"Học phí ngành Sư phạm Toán năm 2026 là bao nhiêu?\"\n"
+        "- \"Trường có chính sách học bổng nào cho ngành này không?\""
+    )
+    clean_2, sugs_2 = extract_suggested_questions(raw_2)
+    assert "[GỢI Ý]" not in clean_2
+    assert "26.5 điểm." in clean_2
+    assert len(sugs_2) == 2
+    assert sugs_2[0] == "Học phí ngành Sư phạm Toán năm 2026 là bao nhiêu?"
+    assert sugs_2[1] == "Trường có chính sách học bổng nào cho ngành này không?"

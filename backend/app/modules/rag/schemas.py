@@ -87,4 +87,7 @@ class AskResponse(BaseModel):
     facts_used: list[dict[str, Any]] = Field(
         default_factory=list, description="Các bản ghi sự thật đã sử dụng"
     )
+    suggested_questions: list[str] = Field(
+        default_factory=list, description="Danh sách câu hỏi gợi ý tiếp theo"
+    )
     latency_ms: float = 0.0
