@@ -414,6 +414,14 @@ Cả 5 quy trình nghiệp vụ chính thức đều được nạp sẵn node `
 | **Soạn thảo NĐ 30** (`drafting-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `extract_fields` & `sample_retrieval` | Sửa lỗi "tờ trinh" $\rightarrow$ "tờ trình", "kế hoach" $\rightarrow$ "kế hoạch", "quyết đinh" $\rightarrow$ "quyết định", mở rộng Nghị định 30/2020/NĐ-CP, BGH, UBND, PĐT, TCHC. |
 | **Khảo thí & Đề thi** (`question-bank-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `knowledge_answer` | Sửa lỗi "ma trân" $\rightarrow$ "ma trận đề thi", "ngân hang" $\rightarrow$ "ngân hàng câu hỏi", "thang đo blom" $\rightarrow$ "thang đo Bloom", mở rộng CLO, PLO, CĐR, ĐCHP, KTĐG. |
 
+## 14. Template dùng chung & Fork an toàn cho mọi Trợ lý mới (Generic DAG Reuse)
+
+- **Template `_base-assistant.v1alpha1.json`**: DAG 8 nodes chuẩn (chat_input → condition_route → query_rewrite → knowledge_answer → citation_guard → chat_output/no_answer). `knowledge_answer.module_code=general`, `query_rewrite` không gán instruction cứng mà kế thừa `assistant_profile`. File tiền tố `_` được `sync_default_workflows` bỏ qua khi seed nhưng vẫn nạp qua `get_workflow_spec` để fork.
+- **Fork tiêm bindings (`fork_workflow`)**: Tham số mới `module_code, collection_id, system_prompt, rewrite_instruction` tự tiêm vào node clone qua `_inject_assistant_bindings`, thay thế thao tác copy JSON thủ công 314 dòng.
+- **RAG node fail-safe**: Ưu tiên `profile.collection_id` → `config.collection_id` → quy ước `col_{module}` cho 5 module chính thức; module lạ thiếu collection ném `workflow_missing_collection` (HTTP 422) thay vì rò rỉ dữ liệu tuyển sinh.
+- **LLM node chịu lỗi**: Bọc `modelops_service.generate` trong try/except, ném `llm_generation_failed` (HTTP 502) để Engine ghi failed rõ ràng thay vì crash.
+- **Query Rewrite mở rộng**: `fast_rule_normalize(text, extra_acronyms)` đọc `config.custom_acronyms` của từng trợ lý (ví dụ KTX: SV, phòng ở) mà không sửa code lõi.
+
 
 
 

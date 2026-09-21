@@ -57,7 +57,7 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")
     collection_id: str = Field(..., description="Mã bộ sưu tập tri thức")
     module_code: str = Field(
-        "admissions", description="Mã phân hệ: admissions, regulations, library, drafting..."
+        "general", description="Mã phân hệ: admissions, regulations, library, drafting..."
     )
     conversation_id: str | None = None
     system_prompt: str | None = None

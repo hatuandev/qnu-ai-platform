@@ -7,8 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-21 16:53 (UTC+7)
-- **Phiên số**: #180
+- **Thời gian cập nhật**: 2026-09-21 17:10 (UTC+7)
+- **Phiên số**: #181
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
   1. **Kích Hoạt Hệ Thống Nút Bấm Gợi Ý Tương Tác 1-Click (Interactive Suggestion Chips) & Triệt Tiêu Câu Hỏi Tu Từ Rập Khuôn (phiên #180)**:
@@ -97,6 +97,12 @@
        * Chạy test thực tế: `"xin chào bạn cho tôi hỏi phương thức tuyển sinh năm 2026"` đi qua đầy đủ 6 nodes: `['chat_input', 'condition_route', 'query_rewrite', 'knowledge_answer', 'citation_guard', 'chat_output']`, trích xuất 5 trích dẫn chính thức từ văn bản Đề án tuyển sinh 2026 của ĐH Quy Nhơn;
        * Backend Ruff 0 lỗi, Pytest 341/341 passed (100%);
        * Frontend Biome 0 lỗi, TypeScript 0 lỗi, Build thành công 9.10s.
+- **Phiên team #175-180 đã hợp nhất**: greeting routing, zero-emoji 5 modules, Gemini 2.5/Gemma 4, focus guardrail, entity augmentation, suggestion chips (giữ nguyên từ upstream).
+- **Rebase dùng chung phiên #181**:
+  - **RAG generic**: Query Router packs library/drafting/question_bank + generic QĐ/tiền/năm, `analyze(query, module_code="general")` hợp nhất với `MAJOR_NAME_TO_CODE` của team (bỏ alias `ai` gây false-positive); `build_generic_system_instruction()` + `is_refusal_answer()` phi thiên vị giữ kèm `extract_suggested_questions` chips của team; `AskRequest.module_code` mặc định `general`.
+  - **DAG generic**: Template `_base-assistant.v1alpha1.json` 8 nodes pass validation; `fork_workflow` tiêm module/collection/prompt/instruction; RAG node fail-closed `workflow_missing_collection` với fallback `col_{module}` chính thức; LLM node `llm_generation_failed` 502; query_rewrite hỗ trợ `custom_acronyms`; seeder bỏ qua `_*.json`.
+  - **Tests & Docs**: 9 tests `test_rag_generic_reuse.py` mới; `test_node_catalog` >=14; Bước 11 quy trình 03 + Mục 14 quy trình 04; nhật ký phiên 181 + WORK_LOG.
+  - **Verification**: xem mục nhật ký phiên 181.
   2. **Bổ Sung Node Query Rewrite Vào Seed Data Của Cả 5 Mô Đun Quy Trình DAG (phiên #174)**:
      - **Tích hợp `query_rewrite` vào 5 workflow configs (`configs/workflows/*.json`)**:
        * `admissions-assistant`: Chuẩn hóa ngành học, học phí, học bổng, điểm chuẩn, viết tắt CNTT, QTKD, ĐGNL, THPT, KTX.

@@ -109,12 +109,20 @@ class AnswerFormatPlanner:
     """Plans optimal output format (table, list, timeline, checklist) based on user query intent."""
 
     RE_TABLE = re.compile(
-        r"bảng|so sánh|điểm chuẩn|chỉ tiêu|danh sách ngành|mã ngành|học phí", re.IGNORECASE
+        r"bảng|so sánh|điểm chuẩn|chỉ tiêu|danh sách|mã ngành|mã số|học phí|"
+        r"giáo trình|tài liệu|ma trận|chuẩn đầu ra|thống kê|liệt kê",
+        re.IGNORECASE,
     )
     RE_TIMELINE = re.compile(
-        r"khi nào|thời gian|lịch trình|mốc thời gian|hạn chót|hạn nộp", re.IGNORECASE
+        r"khi nào|thời gian|lịch trình|mốc thời gian|hạn chót|hạn nộp|"
+        r"ngày ban hành|ngày hiệu lực|hạn hoàn thành",
+        re.IGNORECASE,
     )
-    RE_CHECKLIST = re.compile(r"hồ sơ|thủ tục|các bước|quy trình|điều kiện|yêu cầu", re.IGNORECASE)
+    RE_CHECKLIST = re.compile(
+        r"hồ sơ|thủ tục|các bước|quy trình|điều kiện|yêu cầu|"
+        r"hướng dẫn|thủ tục mượn|điều khoản",
+        re.IGNORECASE,
+    )
 
     def plan_format(self, query: str, context_has_table: bool = False) -> str:
         """Decide the best answer presentation format."""

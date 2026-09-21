@@ -57,6 +57,40 @@ NO_ANSWER_MESSAGES = {
     ),
 }
 
+# Generic evidence keywords reusable across all assistants.
+# Replaces the old admissions-only heuristic so new domains are not misclassified.
+EVIDENCE_KEYWORDS = (
+    "triệu",
+    "học phí",
+    "điểm chuẩn",
+    "điểm trúng tuyển",
+    "chỉ tiêu",
+    "phương thức",
+    "quy định",
+    "điều ",
+    "khoản ",
+    "tín chỉ",
+    "chương trình",
+    "giáo trình",
+    "tài liệu",
+    "thư viện",
+    "luận văn",
+    "quyết định",
+    "công văn",
+    "nghị định",
+    "thông tư",
+    "tờ trình",
+    "đề thi",
+    "câu hỏi",
+    "ma trận",
+    "chuẩn đầu ra",
+    "ký túc xá",
+    "học bổng",
+    "%",
+    "năm 202",
+    "năm 199",
+)
+
 ACADEMIC_STOPWORDS = {
     "sinh", "viên", "trường", "đại", "học", "quy", "nhơn", "được", "trong", "theo",
     "những", "các", "cho", "với", "của", "và", "hoặc", "khi", "thì", "tại", "này",
@@ -114,22 +148,7 @@ class CitationGuard:
             return []
 
         answer_lower = answer.lower()
-        has_substantive_content = any(
-            kw in answer_lower
-            for kw in [
-                "triệu",
-                "học phí",
-                "điểm chuẩn",
-                "điểm trúng tuyển",
-                "chỉ tiêu",
-                "phương thức",
-                "quy định",
-                "điều ",
-                "khoản ",
-                "tín chỉ",
-                "chương trình",
-            ]
-        )
+        has_substantive_content = any(kw in answer_lower for kw in EVIDENCE_KEYWORDS)
         if not has_substantive_content and any(msg in answer_lower for msg in [
             "thông tin này hiện chưa có",
             "chưa có trong tài liệu chính thức",
@@ -160,9 +179,28 @@ class CitationGuard:
 
         return filtered
 
-    def get_no_answer_response(self, module_code: str = "general") -> str:
-        """Return friendly rejection response when context is insufficient."""
-        return NO_ANSWER_MESSAGES.get(module_code, NO_ANSWER_MESSAGES["general"])
+    def get_no_answer_response(
+        self,
+        module_code: str = "general",
+        assistant_name: str | None = None,
+    ) -> str:
+        """Return friendly rejection response when context is insufficient.
+
+        Reusable for any new assistant: known modules use curated templates,
+        unknown modules fall back to a generic template optionally naming
+        the assistant.
+        """
+        normalized = (module_code or "general").strip().lower()
+        if normalized in NO_ANSWER_MESSAGES:
+            return NO_ANSWER_MESSAGES[normalized]
+        if assistant_name and assistant_name.strip():
+            return (
+                f"Chào bạn! Thông tin này hiện chưa có trong kho tri thức của "
+                f"Trợ lý {assistant_name.strip()} (Trường Đại học Quy Nhơn).\n"
+                "Bạn vui lòng thử diễn đạt lại câu hỏi cụ thể hơn hoặc liên hệ "
+                "bộ phận phụ trách để được hỗ trợ chính xác nhất."
+            )
+        return NO_ANSWER_MESSAGES["general"]
 
     def audit_claim_citations(
         self,

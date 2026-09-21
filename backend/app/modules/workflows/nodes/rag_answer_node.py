@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+
+from app.core.exceptions import AppException
 from app.modules.rag.schemas import AskRequest
 from app.modules.rag.service import rag_service
 from app.modules.workflows.nodes.base import (
@@ -10,6 +13,18 @@ from app.modules.workflows.nodes.base import (
     WorkflowContext,
 )
 from app.modules.workflows.schemas import WorkflowNodeSpec
+
+logger = logging.getLogger(__name__)
+
+# Official collections kept for backward compatibility with the 5 seeded workflows.
+# New assistants must provide explicit collection_id via profile or node config.
+OFFICIAL_MODULE_COLLECTIONS: dict[str, str] = {
+    "admissions": "col_admissions",
+    "regulations": "col_regulations",
+    "library": "col_library",
+    "drafting": "col_drafting",
+    "question_bank": "col_question_bank",
+}
 
 
 class RAGAnswerNodeHandler(BaseNodeHandler):
@@ -26,12 +41,31 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
         config = node_spec.config or {}
 
         profile = context.assistant_profile
-        collection_id = (
-            profile.collection_id if profile else config.get("collection_id") or "col_admissions"
+        module_code = (
+            config.get("module_code")
+            or (profile.assistant_code if profile else None)
+            or "general"
         )
-        module_code = config.get("module_code") or (
-            profile.assistant_code if profile else context.workflow_id.split("-")[0]
+        collection_id = (profile.collection_id if profile else None) or config.get(
+            "collection_id"
         )
+        if not collection_id:
+            fallback_collection = OFFICIAL_MODULE_COLLECTIONS.get(module_code)
+            if fallback_collection:
+                logger.debug(
+                    "RAG node '%s' using conventional collection '%s' for module '%s'",
+                    node_spec.id,
+                    fallback_collection,
+                    module_code,
+                )
+                collection_id = fallback_collection
+        if not collection_id:
+            raise AppException(
+                "Node RAG thiếu collection_id. Hãy gắn kho tri thức cho trợ lý hoặc cấu hình collection_id trên node.",
+                code="workflow_missing_collection",
+                status_code=422,
+                details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
+            )
 
         primary_model = (
             profile.model_policy.primary_model

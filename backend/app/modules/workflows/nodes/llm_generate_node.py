@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+
+from app.core.exceptions import AppException
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
 from app.modules.workflows.nodes.base import (
@@ -10,6 +13,8 @@ from app.modules.workflows.nodes.base import (
     WorkflowContext,
 )
 from app.modules.workflows.schemas import WorkflowNodeSpec
+
+logger = logging.getLogger(__name__)
 
 
 class LLMGenerateNodeHandler(BaseNodeHandler):
@@ -51,7 +56,16 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
         )
 
         if context.db:
-            resp = await modelops_service.generate(context.db, gen_req)
+            try:
+                resp = await modelops_service.generate(context.db, gen_req)
+            except Exception as exc:
+                logger.warning("LLM node '%s' generation failed: %s", node_spec.id, exc)
+                raise AppException(
+                    f"Node LLM '{node_spec.id}' không thể sinh nội dung: {exc}",
+                    code="llm_generation_failed",
+                    status_code=502,
+                    details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
+                ) from exc
             content = resp.content
             provider = resp.provider
             tokens = resp.total_tokens

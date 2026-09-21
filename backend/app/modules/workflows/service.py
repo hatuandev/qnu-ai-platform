@@ -858,6 +858,10 @@ class WorkflowService:
 
         synced = 0
         for json_file in sorted(self.workflows_dir.glob("*.json")):
+            # Skip reusable templates (e.g. _base-assistant): loadable via
+            # get_workflow_spec/fork but never seeded as live definitions.
+            if json_file.name.startswith("_"):
+                continue
             try:
                 data = await asyncio.to_thread(self._read_json_file, json_file)
                 meta = data.get("metadata", {})
@@ -980,6 +984,32 @@ class WorkflowService:
             assistants=items,
         )
 
+    @staticmethod
+    def _inject_assistant_bindings(
+        dag_spec: WorkflowDagSpec,
+        *,
+        module_code: str | None = None,
+        collection_id: str | None = None,
+        system_prompt: str | None = None,
+        rewrite_instruction: str | None = None,
+    ) -> WorkflowDagSpec:
+        """Inject assistant-specific bindings into a cloned DAG spec.
+
+        Reusable for any new assistant: sets RAG collection/module,
+        system prompt, and query-rewrite instruction without manual JSON edits.
+        """
+        for node in dag_spec.nodes:
+            if node.type == "core.knowledge.answer":
+                if module_code:
+                    node.config["module_code"] = module_code
+                if collection_id:
+                    node.config["collection_id"] = collection_id
+                if system_prompt:
+                    node.config["system_prompt"] = system_prompt
+            elif node.type == "query.rewrite" and rewrite_instruction:
+                node.config["instruction"] = rewrite_instruction
+        return dag_spec
+
     async def fork_workflow(
         self,
         db: AsyncSession,
@@ -987,6 +1017,10 @@ class WorkflowService:
         new_workflow_id: str,
         new_name: str,
         assistant_id: str | None = None,
+        module_code: str | None = None,
+        collection_id: str | None = None,
+        system_prompt: str | None = None,
+        rewrite_instruction: str | None = None,
     ) -> WorkflowDefinitionResponse:
         """Fork an existing or template workflow into an isolated private workflow for an assistant."""
         existing = (
@@ -1020,13 +1054,21 @@ class WorkflowService:
         else:
             dag_spec = await self.get_workflow_spec(db, source_workflow_id)
 
+        dag_spec = self._inject_assistant_bindings(
+            dag_spec,
+            module_code=module_code,
+            collection_id=collection_id,
+            system_prompt=system_prompt,
+            rewrite_instruction=rewrite_instruction,
+        )
+
         serialized_spec = self._serialize_dag_spec(dag_spec)
         new_record = WorkflowDefinition(
             id=new_workflow_id,
             name=new_workflow_id,
             display_name=new_name,
             description=f"Quy trình riêng tạo lập cho trợ lý {new_name}.",
-            module_code="custom",
+            module_code=module_code or "custom",
             version="1.0.0",
             published_version_id=None,
             ownership="private",

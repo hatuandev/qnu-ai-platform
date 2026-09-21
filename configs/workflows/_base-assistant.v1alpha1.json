@@ -1,0 +1,312 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "WorkflowDefinition",
+  "metadata": {
+    "name": "_base-assistant",
+    "display_name": "Mẫu dùng chung cho mọi Trợ lý AI QNU",
+    "description": "Template DAG chuẩn tái sử dụng cho mọi trợ lý mới: chuẩn hóa câu hỏi, tra cứu RAG hybrid, kiểm định trích dẫn và trả lời có căn cứ. Khi fork, hệ thống tự tiêm collection_id, module_code, system_prompt và rewrite instruction của trợ lý mới.",
+    "scope": {
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu"
+    },
+    "module_code": "general",
+    "labels": {
+      "template": "base_reusable",
+      "phase": "phase_3_generic"
+    },
+    "annotations": {
+      "purpose": "qnu_generic_assistant_qa",
+      "reusable": "true"
+    }
+  },
+  "spec": {
+    "execution_mode": "conversational",
+    "entry_node_id": "chat_input",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "conversation_id": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "answer"],
+      "properties": {
+        "status": {
+          "enum": ["answered", "insufficient_context"]
+        },
+        "answer": {
+          "type": "string"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "nodes": [
+      {
+        "id": "chat_input",
+        "type": "input.chat",
+        "version": "1.0.0",
+        "display_name": "Câu hỏi người dùng",
+        "config": {
+          "trim": true,
+          "max_length": 10000
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "condition_route",
+        "type": "condition.route",
+        "version": "1.0.0",
+        "display_name": "Phân loại ý định (Chào hỏi / Tra cứu)",
+        "config": {
+          "rules": [
+            {
+              "id": "greeting_rule",
+              "match": {
+                "intent": "xin chào|hello|hi|chào|cm ơn|cảm ơn|tạm biệt|bye"
+              },
+              "to": "greeting_output"
+            }
+          ],
+          "default_node": "query_rewrite"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "greeting_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Lời chào dùng chung",
+        "config": {
+          "include_citations": false,
+          "format": "markdown",
+          "output_template": "Chào bạn! Mình là Trợ lý AI của Trường Đại học Quy Nhơn. Bạn đang quan tâm đến thông tin nào, hãy nhắn cho mình nhé!"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa câu hỏi dùng chung",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "knowledge_answer",
+        "type": "core.knowledge.answer",
+        "version": "1.0.0",
+        "display_name": "Tra cứu RAG hybrid dùng chung",
+        "config": {
+          "module_code": "general",
+          "profile": "rag_fast",
+          "retrieval_limit": 8,
+          "context_max_chars": 12000,
+          "require_citations": true,
+          "no_answer_policy": "insufficient_context"
+        },
+        "connection_refs": ["conn_qnu_ai_core"],
+        "policy": {
+          "timeout_seconds": 30,
+          "max_attempts": 2,
+          "checkpoint_after": true,
+          "required_permissions": ["knowledge.read"]
+        }
+      },
+      {
+        "id": "citation_guard",
+        "type": "guard.citation_policy",
+        "version": "1.0.0",
+        "display_name": "Xác thực trích dẫn dùng chung",
+        "config": {
+          "require_citation_for_answer": true,
+          "accepted_statuses": ["answered", "success"],
+          "invalid_route": "ungrounded"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "chat_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Trả lời có trích dẫn",
+        "config": {
+          "include_citations": true,
+          "format": "markdown"
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "no_answer_output",
+        "type": "output.no_answer",
+        "version": "1.0.0",
+        "display_name": "Từ chối lịch sự dùng chung",
+        "config": {
+          "status": "insufficient_context",
+          "message": "Thông tin bạn yêu cầu hiện không có trong cơ sở dữ liệu tri thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ bộ phận phụ trách để được giải đáp chính xác nhất.",
+          "default_message": "Thông tin bạn yêu cầu hiện không có trong cơ sở dữ liệu tri thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ bộ phận phụ trách để được giải đáp chính xác nhất."
+        },
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": true,
+          "required_permissions": []
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_input_to_route",
+        "source": {
+          "node_id": "chat_input",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "condition_route",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_route_to_greeting",
+        "source": {
+          "node_id": "condition_route",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "greeting_output",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_route_to_rewrite",
+        "source": {
+          "node_id": "condition_route",
+          "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_knowledge",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
+        },
+        "target": {
+          "node_id": "knowledge_answer",
+          "port": "question"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_knowledge_to_guard",
+        "source": {
+          "node_id": "knowledge_answer",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "citation_guard",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_grounded_to_output",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "grounded"
+        },
+        "target": {
+          "node_id": "chat_output",
+          "port": "response"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_ungrounded_to_no_answer",
+        "source": {
+          "node_id": "citation_guard",
+          "port": "ungrounded"
+        },
+        "target": {
+          "node_id": "no_answer_output",
+          "port": "reason"
+        },
+        "priority": 100
+      }
+    ],
+    "policies": {
+      "run_timeout_seconds": 60,
+      "max_steps": 12,
+      "max_parallel_nodes": 1,
+      "default_retry": {
+        "max_attempts": 1,
+        "initial_backoff_ms": 250,
+        "max_backoff_ms": 2000,
+        "retryable_error_codes": []
+      },
+      "data_classification": "public",
+      "allowed_connection_ids": ["conn_qnu_ai_core"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "node_resolution": "exact",
+      "features": ["citations", "no_answer", "conversation", "fact_lookup"]
+    }
+  }
+}

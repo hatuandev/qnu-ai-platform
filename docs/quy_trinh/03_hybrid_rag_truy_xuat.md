@@ -106,3 +106,10 @@ Tự động lập kế hoạch trình bày câu trả lời:
 - Hỏi so sánh / danh sách ngành $\rightarrow$ Trả về **Bảng Markdown** (`markdown_table`).
 - Hỏi thủ tục / hồ sơ $\rightarrow$ Trả về **Danh sách kiểm tra** (`checklist`).
 - Hỏi lịch trình / mốc thời gian $\rightarrow$ Trả về **Dòng thời gian** (`timeline`).
+
+### Bước 11: Tái sử dụng dùng chung cho mọi Trợ lý mới (Generic Reusable RAG)
+- **Query Router theo module (`query_router.py`)**: Registry `FACT_KEYWORD_PACKS` cho admissions, regulations, library, drafting, question_bank; trợ lý mới dùng tín hiệu generic (số hiệu QĐ/NĐ/TT, số tiền triệu/tỷ, năm, bao nhiêu/danh sách/liệt kê) mà không cần sửa code. API `analyze(query, module_code="general")` tương thích ngược.
+- **System Prompt dùng chung (`service.py`)**: `build_generic_system_instruction(module_code, custom_prompt)` ưu tiên prompt của trợ lý, ngược lại dùng instruction Zero-Hallucination toàn trường kèm contact theo module (admissions giữ hotline 0256.3846.156, module mới dùng contact tổng quát).
+- **Phát hiện từ chối phi thiên vị**: `is_refusal_answer(answer, has_evidence)` chỉ dựa vào cụm từ từ chối + có/không có citations/facts, thay thế hoàn toàn heuristic cũ chỉ biết triệu/học phí/điểm chuẩn.
+- **Citation Guard mở rộng**: `EVIDENCE_KEYWORDS` bao phủ thư viện/giáo trình/luận văn/quyết định/công văn/đề thi/ma trận/KTX; `get_no_answer_response(module_code, assistant_name)` giữ 5 template chuẩn và sinh template generic nêu tên trợ lý mới.
+- **Mặc định an toàn**: `AskRequest.module_code` mặc định `general` (thay vì admissions) để trợ lý mới không bị nhiễm ngữ cảnh tuyển sinh.

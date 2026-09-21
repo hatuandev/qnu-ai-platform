@@ -52,9 +52,19 @@ class TestQueryClassifier:
 
     def test_query_classifier_mixed(self):
         classifier = QueryClassifier()
+        # NOTE (session 179 team + 181 rebase): MAJOR_NAME_TO_CODE augments
+        # "Công nghệ thông tin" -> entity 7480201, so a query pairing a
+        # concrete major with "chỉ tiêu" now routes EXACT_FACT (fact-first).
+        # A mixed narrative+fact query without a resolvable entity stays MIXED.
         analysis = classifier.analyze("Giải thích chính sách ưu tiên và chỉ tiêu tuyển sinh ngành Công nghệ thông tin")
-        assert analysis.intent == QueryIntent.MIXED
+        assert analysis.intent == QueryIntent.EXACT_FACT
         assert analysis.is_fact_first is True
+        assert "7480201" in analysis.entity_codes
+
+    def test_query_classifier_mixed_without_entity(self):
+        classifier = QueryClassifier()
+        analysis = classifier.analyze("Giải thích chính sách ưu tiên tuyển sinh cho sinh viên năm nhất như thế nào?")
+        assert analysis.intent in (QueryIntent.MIXED, QueryIntent.NARRATIVE)
 
 
 class TestRevisionSafeQdrantIndexing:
@@ -223,13 +233,13 @@ class TestCitationGroundingAndFactFirst:
             assert len(resp.facts_used) == 1
             assert resp.facts_used[0]["val"] == "60"
 
-            # Check that retrieve was called with exact fact top_k=4
-            mock_retrieve.assert_awaited_once_with(
-                db=mock_db,
-                collection_id="col_admissions",
-                query=req.question,
-                top_k=4,
-                rerank_top_k=3,
-                tenant_id="tenant_qnu",
-                workspace_id="ws_main",
-            )
+            # Check retrieve uses EXACT_FACT top_k (8/6 since team session 180
+            # recall tuning; was 4/3 before). Query is entity-augmented, so
+            # match on top_k/rerank + collection/scope instead of exact query.
+            called_kwargs = mock_retrieve.await_args.kwargs
+            assert called_kwargs["collection_id"] == "col_admissions"
+            assert called_kwargs["top_k"] == 8
+            assert called_kwargs["rerank_top_k"] == 6
+            assert called_kwargs["tenant_id"] == "tenant_qnu"
+            assert called_kwargs["workspace_id"] == "ws_main"
+            assert "7480107" in called_kwargs["query"]

@@ -63,14 +63,97 @@ class QueryClassifier:
         "sản phẩm đầu ra",
     ]
 
-    # 3. Canonical admissions major names mapped to official program codes
+    FACT_KEYWORDS_LIBRARY = [
+        "giáo trình",
+        "sách chuyên khảo",
+        "tài liệu tham khảo",
+        "luận văn",
+        "luận án",
+        "mã tài liệu",
+        "ký hiệu xếp giá",
+        "nhà xuất bản",
+        "năm xuất bản",
+        "số lượng bản",
+        "vị trí kệ",
+    ]
+
+    FACT_KEYWORDS_DRAFTING = [
+        "số hiệu văn bản",
+        "ngày ban hành",
+        "cơ quan ban hành",
+        "người ký",
+        "trích yếu",
+        "nghị định",
+        "thông tư",
+        "quyết định",
+        "công văn",
+        "tờ trình",
+        "kế hoạch",
+        "ngày hiệu lực",
+    ]
+
+    FACT_KEYWORDS_QUESTION_BANK = [
+        "ma trận đề",
+        "ma trận đề thi",
+        "chuẩn đầu ra",
+        "clo",
+        "plo",
+        "mức độ bloom",
+        "thang bloom",
+        "độ khó",
+        "độ phân biệt",
+        "số câu hỏi",
+        "thời gian làm bài",
+        "hình thức thi",
+    ]
+
+    FACT_KEYWORDS_REGULATIONS = [
+        "điều",
+        "khoản",
+        "tín chỉ",
+        "học phần",
+        "điểm rèn luyện",
+        "học bổng",
+        "kỷ luật",
+        "khiển trách",
+        "cảnh cáo",
+        "buộc thôi học",
+    ]
+
+    GENERIC_FACT_KEYWORDS = [
+        "bao nhiêu",
+        "mấy",
+        "danh sách",
+        "liệt kê",
+        "thống kê",
+        "mã số",
+        "số lượng",
+        "ngày",
+        "hạn",
+        "mức",
+        "tỷ lệ",
+    ]
+
+    # Registry mapping module_code -> keyword pack for reusable routing.
+    # New assistants reuse "general" fallback without code changes.
+    FACT_KEYWORD_PACKS: dict[str, list[str]] = {
+        "admissions": FACT_KEYWORDS_ADMISSIONS,
+        "regulations": FACT_KEYWORDS_REGULATIONS,
+        "library": FACT_KEYWORDS_LIBRARY,
+        "drafting": FACT_KEYWORDS_DRAFTING,
+        "question_bank": FACT_KEYWORDS_QUESTION_BANK,
+        "plan": FACT_KEYWORDS_PLAN,
+    }
+
+    # 3. Canonical admissions major names mapped to official program codes (team session 179).
+    # Kept alongside generic packs: entity augmentation boosts recall for natural
+    # queries without memorized codes, while packs keep routing reusable per-module.
     MAJOR_NAME_TO_CODE: dict[str, str] = {
         "công nghệ thông tin": "7480201",
         "cntt": "7480201",
         "kỹ thuật phần mềm": "7480103",
         "ktpm": "7480103",
         "trí tuệ nhân tạo": "7480107",
-        "ai": "7480107",
         "khoa học dữ liệu": "7460108",
         "toán ứng dụng": "7460112",
         "quản trị kinh doanh": "7340101",
@@ -114,10 +197,17 @@ class QueryClassifier:
         "tôi", "mình", "bạn", "em", "anh", "chị", "muốn", "hỏi", "cho", "biết",
         "xem", "với", "ạ", "nhé", "không", "nhỉ", "nào", "gì", "sao", "thế",
         "được", "có", "là", "của", "và", "các", "những", "cần", "để", "ý",
-        "bao", "nhiêu", "như"
+        "bao", "nhiêu", "như",
     }
 
-    def analyze(self, query: str) -> QueryAnalysis:
+    RE_DECISION_CODE = re.compile(
+        r"\b(?:QĐ|NĐ|TT|CV|KH|TB|BC)[\s\-]*\d+[\/\-]\w+",
+        re.IGNORECASE,
+    )
+    RE_MONEY = re.compile(r"\b\d[\d\.\,]*\s*(?:triệu|tỷ|nghìn|đồng|vnđ|vnd)\b", re.IGNORECASE)
+    RE_YEAR = re.compile(r"\b(?:năm\s+)?(19|20)\d{2}\b")
+
+    def analyze(self, query: str, module_code: str = "general") -> QueryAnalysis:
         """Analyze query intent, extract entity keys, and determine routing strategy."""
         clean_query = query.strip()
         query_lower = clean_query.lower()
@@ -154,7 +244,7 @@ class QueryClassifier:
             keywords.extend(["ielts", "vstep", "quy đổi"])
             fact_attributes.append("converted_score")
 
-        # 4. Check admissions fact signals
+        # 4. Check admissions fact signals (kept for backward compatibility)
         has_admissions_fact = False
         for kw in self.FACT_KEYWORDS_ADMISSIONS:
             if kw in query_lower:
@@ -180,9 +270,38 @@ class QueryClassifier:
                 elif "sản phẩm" in kw:
                     fact_attributes.append("deliverables")
 
+        # 5b. Generic reusable routing for any new assistant.
+        # Uses module-specific pack + generic decision/money/year signals.
+        has_module_fact = has_admissions_fact or has_plan_fact
+        normalized_module = (module_code or "general").strip().lower()
+        active_pack = self.FACT_KEYWORD_PACKS.get(normalized_module, [])
+        for kw in active_pack:
+            if kw in query_lower and kw not in keywords:
+                has_module_fact = True
+                keywords.append(kw)
+
+        has_generic_signal = False
+        for kw in self.GENERIC_FACT_KEYWORDS:
+            if kw in query_lower:
+                has_generic_signal = True
+                if kw not in keywords:
+                    keywords.append(kw)
+
+        decision_match = self.RE_DECISION_CODE.search(clean_query)
+        if decision_match:
+            has_generic_signal = True
+            entity_codes.append(decision_match.group(0))
+            keywords.append("số hiệu văn bản")
+        if self.RE_MONEY.search(query_lower):
+            has_generic_signal = True
+            keywords.append("mức phí")
+        year_match = self.RE_YEAR.search(query_lower)
+        if year_match:
+            keywords.append(year_match.group(0))
+
         # 6. Intent classification decision
         has_specific_entity = len(entity_codes) > 0
-        has_fact_keywords = has_admissions_fact or has_plan_fact
+        has_fact_keywords = has_module_fact or has_generic_signal
 
         # Questions asking for exact numbers or entities
         is_exact = (has_specific_entity and has_fact_keywords) or (

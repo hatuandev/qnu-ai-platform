@@ -27,6 +27,56 @@ from app.modules.rag.schemas import (
 logger = logging.getLogger(__name__)
 
 
+MODULE_CONTACT_HINTS: dict[str, str] = {
+    "admissions": "Hotline tư vấn tuyển sinh: 0256.3846.156 / Email: tuyensinh@qnu.edu.vn.",
+    "regulations": "Phòng Đào tạo Trường ĐH Quy Nhơn.",
+    "library": "Thư viện Trường ĐH Quy Nhơn.",
+    "drafting": "Phòng Hành chính - Tổng hợp Trường ĐH Quy Nhơn.",
+    "question_bank": "Phòng Khảo thí & Đảm bảo chất lượng Trường ĐH Quy Nhơn.",
+    "general": "bộ phận phụ trách của Trường ĐH Quy Nhơn.",
+}
+
+
+def build_generic_system_instruction(module_code: str, custom_prompt: str | None) -> str:
+    """Build reusable system instruction for any assistant.
+
+    Custom prompt from assistant profile takes precedence. Otherwise a
+    universal Zero-Hallucination instruction is returned with a
+    module-specific contact hint.
+    """
+    if custom_prompt and custom_prompt.strip():
+        return custom_prompt.strip()
+    contact = MODULE_CONTACT_HINTS.get((module_code or "general").strip().lower())
+    if not contact:
+        contact = MODULE_CONTACT_HINTS["general"]
+    return (
+        "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU).\n"
+        "Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA HOÀN TOÀN VÀO tài liệu và số liệu chính thức được cung cấp bên dưới.\n"
+        "QUY TẮC BẮT BUỘC (Zero Hallucination):\n"
+        "1. Chỉ sử dụng thông tin có trong Bảng Số Liệu hoặc Tài Liệu Trích Xuất. Tuyệt đối không tự suy diễn hoặc bịa đặt.\n"
+        f"2. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức và hướng dẫn liên hệ {contact}\n"
+        "3. Trình bày rõ ràng theo định dạng Markdown, giữ nguyên tính chính xác của các con số, văn phong sư phạm chuẩn mực."
+    )
+
+
+REFUSAL_PHRASES = (
+    "thông tin này hiện chưa có",
+    "chưa có trong tài liệu chính thức",
+    "chưa có dữ liệu chính thức",
+    "tài liệu không cung cấp",
+    "đề án không cung cấp",
+    "không tìm thấy thông tin",
+)
+
+
+def is_refusal_answer(answer: str, has_evidence: bool) -> bool:
+    """Detect No-Answer refusals without domain-specific keyword bias."""
+    if has_evidence:
+        return False
+    lowered = answer.lower()
+    return any(phrase in lowered for phrase in REFUSAL_PHRASES)
+
+
 class RagService:
     """Service orchestrating Hybrid Retrieval, Fact verification and RAG response generation."""
 
@@ -93,8 +143,8 @@ class RagService:
             cached["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
             return AskResponse.model_validate(cached)
 
-        # 3. Query Intent Analysis & Fact-First Routing
-        analysis = query_classifier.analyze(req.question)
+        # 3. Query Intent Analysis & Fact-First Routing (module-aware, reusable)
+        analysis = query_classifier.analyze(req.question, module_code=req.module_code)
         lookup_limit = 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
 
         facts = await fact_layer.lookup_facts(
@@ -170,18 +220,7 @@ class RagService:
         context_texts = [c.content for c in candidates]
         citations = citation_guard.build_citations(candidates)
 
-        system_instruction = (
-            req.system_prompt
-            or (
-                "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU).\n"
-                "Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA HOÀN TOÀN VÀO tài liệu và số liệu chính thức được cung cấp bên dưới.\n"
-                "QUY TẮC BẮT BUỘC (Zero Hallucination):\n"
-                "1. Chỉ sử dụng thông tin có trong Bảng Số Liệu hoặc Tài Liệu Trích Xuất. Tuyệt đối không tự suy diễn hoặc bịa đặt.\n"
-                "2. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức "
-                "và hướng dẫn liên hệ Hotline tư vấn: 0256.3846.156.\n"
-                "3. Trình bày rõ ràng theo định dạng Markdown, giữ nguyên tính chính xác của các con số, văn phong sư phạm chuẩn mực."
-            )
-        )
+        system_instruction = build_generic_system_instruction(req.module_code, req.system_prompt)
 
         user_content = f"Câu hỏi của người dùng: {req.question}\n\n"
         if fact_markdown:
@@ -262,37 +301,16 @@ class RagService:
         safe_output = output_guardrail.check(synthesized_answer)
         final_answer = safe_output.sanitized_text
 
-        # Evidence-based citation filtering
+        # Evidence-based citation filtering (generic, no domain keyword bias)
         final_citations = citation_guard.filter_evidence_citations(citations, final_answer)
 
-        has_substantive_content = any(
-            x in final_answer.lower()
-            for x in [
-                "triệu",
-                "học phí",
-                "điểm chuẩn",
-                "chỉ tiêu",
-                "phương thức",
-                "%",
-                "năm 202",
-                "chương trình",
-            ]
-        )
-        is_refusal = (
-            not has_substantive_content
-            and any(
-                msg in final_answer.lower()
-                for msg in [
-                    "thông tin này hiện chưa có",
-                    "chưa có trong tài liệu chính thức",
-                    "chưa có dữ liệu chính thức",
-                    "tài liệu không cung cấp",
-                    "đề án không cung cấp",
-                    "không tìm thấy thông tin",
-                ]
-            )
-        )
-        status = "insufficient_context" if is_refusal else "answered"
+        facts_used_payload = [
+            {"entity": f.entity_name, "attr": f.attribute_name, "val": f.attribute_value}
+            for f in facts
+        ]
+        has_evidence = bool(final_citations or facts_used_payload)
+        refusal_detected = is_refusal_answer(final_answer, has_evidence)
+        status = "insufficient_context" if refusal_detected else "answered"
         clean_answer, suggested_questions = extract_suggested_questions(final_answer)
 
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -301,10 +319,7 @@ class RagService:
             answer=clean_answer,
             answer_format=chosen_format,
             citations=final_citations,
-            facts_used=[
-                {"entity": f.entity_name, "attr": f.attribute_name, "val": f.attribute_value}
-                for f in facts
-            ],
+            facts_used=facts_used_payload,
             suggested_questions=suggested_questions,
             latency_ms=exec_ms,
         )

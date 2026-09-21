@@ -131,8 +131,12 @@ _CANONICAL_MAJORS: dict[str, str] = {
 }
 
 
-def fast_rule_normalize(text: str) -> str:
-    """Apply rule-based acronym expansion and contextual typo correction in 0ms."""
+def fast_rule_normalize(text: str, extra_acronyms: dict[str, str] | None = None) -> str:
+    """Apply rule-based acronym expansion and contextual typo correction in 0ms.
+
+    `extra_acronyms` allows each new assistant to inject domain abbreviations
+    via node config `custom_acronyms` without code changes.
+    """
     if not text:
         return ""
     normalized = unicodedata.normalize("NFC", text.strip())
@@ -141,9 +145,13 @@ def fast_rule_normalize(text: str) -> str:
     for pattern, replacement in _TYPO_PATTERNS:
         normalized = pattern.sub(replacement, normalized)
 
-    # 2. Apply acronym replacements
+    # 2. Apply acronym replacements (universal + per-assistant custom)
     for pat_str, replacement in _ACRONYM_MAP.items():
         normalized = re.sub(pat_str, replacement, normalized, flags=re.IGNORECASE)
+    if extra_acronyms:
+        for pat_str, replacement in extra_acronyms.items():
+            if pat_str and replacement:
+                normalized = re.sub(pat_str, replacement, normalized, flags=re.IGNORECASE)
 
     # 3. Apply canonical major capitalizations
     for pat_str, replacement in _CANONICAL_MAJORS.items():
@@ -249,9 +257,16 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
         config = node_spec.config or {}
         use_fast_rules = config.get("use_fast_rules", True)
         use_llm = config.get("use_llm", True)
+        custom_acronyms = config.get("custom_acronyms")
+        if not isinstance(custom_acronyms, dict):
+            custom_acronyms = None
 
-        # Stage 1: Fast Rule-based Normalization (0ms)
-        rule_normalized = fast_rule_normalize(raw_query) if use_fast_rules else raw_query
+        # Stage 1: Fast Rule-based Normalization (0ms, reusable per-assistant)
+        rule_normalized = (
+            fast_rule_normalize(raw_query, extra_acronyms=custom_acronyms)
+            if use_fast_rules
+            else raw_query
+        )
         final_query = rule_normalized
 
         # Stage 2: Fast Contextual LLM Rewrite (optional, ~150ms)
