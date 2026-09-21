@@ -152,7 +152,7 @@
         "display_name": "Thông báo không tìm thấy tài liệu trong kho",
         "config": {
           "status": "insufficient_context",
-          "message": "Không tìm thấy giáo trình hoặc tài liệu tương ứng trong Thư viện số QNU. Bạn có thể gửi phiếu yêu cầu bổ sung tài liệu tại Quầy thông tin Thư viện."
+          "message": "Chào bạn! Hiện tại chưa tìm thấy giáo trình hoặc tài liệu này trong cơ sở dữ liệu Thư viện số Trường ĐH Quy Nhơn.\n\nBạn có thể thử tra cứu:\n- **Giáo trình & Sách chuyên khảo**: Tìm kiếm theo tên học phần, tác giả hoặc chuyên ngành\n- **Cơ sở dữ liệu số**: Hướng dẫn truy cập tài liệu quốc tế (ScienceDirect, IEEE Xplore, Springer)\n- **Mượn trả & Lưu chiểu**: Thời hạn mượn sách, quy trình nộp khóa luận tốt nghiệp bản điện tử\n\nBạn vui lòng liên hệ **Trung tâm Thông tin - Thư viện QNU** qua Hotline: **0256.3846.888** hoặc Email: **thuvien@qnu.edu.vn** để được hỗ trợ bạn đọc nhé!"
         },
         "policy": {
           "timeout_seconds": 2,

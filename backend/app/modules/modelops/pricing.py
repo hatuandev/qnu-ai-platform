@@ -9,7 +9,14 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "gpt-4o": {"prompt": 2.50, "completion": 10.00},
     "text-embedding-3-small": {"prompt": 0.02, "completion": 0.0},
     "text-embedding-3-large": {"prompt": 0.13, "completion": 0.0},
-    # Google Gemini
+    # Google Gemini & Gemma
+    "gemini-2.5-flash-lite": {"prompt": 0.05, "completion": 0.20},
+    "gemini-2.5-flash": {"prompt": 0.075, "completion": 0.30},
+    "gemini-2.5-pro": {"prompt": 1.25, "completion": 5.00},
+    "gemini-flash-lite-latest": {"prompt": 0.05, "completion": 0.20},
+    "gemini-3.1-flash-lite": {"prompt": 0.05, "completion": 0.20},
+    "gemma-4-26b-a4b-it": {"prompt": 0.05, "completion": 0.20},
+    "gemma-4-31b-it": {"prompt": 0.06, "completion": 0.24},
     "gemini-1.5-flash": {"prompt": 0.075, "completion": 0.30},
     "gemini-1.5-pro": {"prompt": 1.25, "completion": 5.00},
     "gemini-2.0-flash": {"prompt": 0.10, "completion": 0.40},

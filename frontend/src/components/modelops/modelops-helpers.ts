@@ -58,12 +58,20 @@ export const getModelDisplayName = (modelName: string): string => {
 
 export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
   openai: ["gpt-4o", "gpt-4o-mini", "o1-mini"],
-  gemini: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+  gemini: [
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite",
+    "gemma-4-26b-a4b-it",
+    "gemma-4-31b-it",
+  ],
   claude: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
   mistral: ["mistral-ocr-latest"],
-  cloudflare: ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base", "@cf/baai/bge-reranker-large"],
+  cloudflare: ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base", "@cf/meta/llama-3.1-8b-instruct"],
   nvidia: ["meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-r1"],
   ollama: ["qwen2.5:7b", "llama3.1:8b", "bge-m3:latest"],
   local_vllm: ["qwen2.5-7b-instruct"],

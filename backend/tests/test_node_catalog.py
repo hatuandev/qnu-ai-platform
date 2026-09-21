@@ -18,9 +18,10 @@ async def test_node_catalog_api_returns_core_manifests() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["items"]) == 13
+    assert len(payload["items"]) == 14
     assert payload["items"][0]["api_version"] == "qnu.ai/v1alpha1"
     assert any(item["type"] == "core.knowledge.answer" for item in payload["items"])
+    assert any(item["type"] == "query.rewrite" for item in payload["items"])
 
 
 @pytest.mark.asyncio

@@ -78,7 +78,7 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
       text: q,
     })),
     primary_model: cfg.model_policy.primary_model || "gpt-4o-mini",
-    fallback_model: cfg.model_policy.fallback_model || "gemini-1.5-flash",
+    fallback_model: cfg.model_policy.fallback_model || "gemini-2.5-flash-lite",
     temperature: cfg.model_policy.temperature ?? 0.2,
     max_tokens: cfg.model_policy.max_tokens ?? 1200,
     thinking_budget: cfg.model_policy.thinking_budget ?? 0,

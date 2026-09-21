@@ -87,10 +87,10 @@ class WorkflowService:
             tgt = e.get("target")
 
             source_id = src.get("node_id") if isinstance(src, dict) else str(src or "")
-            source_port = src.get("port") if isinstance(src, dict) else None
+            source_port = (src.get("port") if isinstance(src, dict) else None) or e.get("source_port")
 
             target_id = tgt.get("node_id") if isinstance(tgt, dict) else str(tgt or "")
-            target_port = tgt.get("port") if isinstance(tgt, dict) else None
+            target_port = (tgt.get("port") if isinstance(tgt, dict) else None) or e.get("target_port")
 
             parsed_edges.append(
                 WorkflowEdgeSpec(

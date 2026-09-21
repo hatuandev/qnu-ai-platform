@@ -218,13 +218,23 @@ export function AssistantCreatePage({ onNavigate }: AssistantCreatePageProps) {
           providerName: "OpenAI",
         },
         {
-          value: "gemini-1.5-flash",
-          label: "Google Gemini 1.5 Flash (Xử lý ngữ cảnh siêu dài)",
+          value: "gemini-2.5-flash-lite",
+          label: "Google Gemini 2.5 Flash-Lite (Siêu tốc & Miễn phí 1,500 RPD)",
           providerName: "Google",
         },
         {
-          value: "gemini-1.5-pro",
-          label: "Google Gemini 1.5 Pro (Phân tích học thuật sâu)",
+          value: "gemini-2.5-flash",
+          label: "Google Gemini 2.5 Flash (Suy luận sâu & Tư duy)",
+          providerName: "Google",
+        },
+        {
+          value: "gemma-4-26b-a4b-it",
+          label: "Google Gemma 4 26B A4B IT (Mã nguồn mở thế hệ mới)",
+          providerName: "Google",
+        },
+        {
+          value: "gemma-4-31b-it",
+          label: "Google Gemma 4 31B IT (Hiệu năng cao)",
           providerName: "Google",
         },
         {

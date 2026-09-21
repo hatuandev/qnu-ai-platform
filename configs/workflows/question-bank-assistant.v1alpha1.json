@@ -152,7 +152,7 @@
         "display_name": "Thông báo chưa đủ dữ liệu quy chế khảo thí",
         "config": {
           "status": "insufficient_context",
-          "message": "Chưa đủ chuẩn đầu ra hoặc nội dung học phần để xây dựng câu hỏi. Vui lòng cung cấp đề cương học phần đã phê duyệt hoặc liên hệ Phòng Khảo thí & Đảm bảo chất lượng."
+          "message": "Chào Thầy/Cô! Hiện chưa đủ dữ liệu chuẩn đầu ra (CLO/PLO) hoặc nội dung học phần để thiết kế câu hỏi hoặc ma trận đề thi này.\n\nThầy/Cô có thể cung cấp thêm đề cương chi tiết học phần hoặc thử các yêu cầu như:\n- **Thiết kế ma trận đề thi**: Phân bổ 4 mức độ nhận thức Bloom (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao)\n- **Soạn câu hỏi trắc nghiệm / tự luận**: Kèm đáp án, biểu điểm và hướng dẫn chấm chi tiết\n- **Xuất file ma trận đề**: Định dạng bảng tính Excel chuẩn khảo thí ĐH Quy Nhơn\n\nĐể được hướng dẫn chuẩn hóa ngân hàng câu hỏi, Thầy/Cô vui lòng liên hệ **Phòng Khảo thí & Đảm bảo chất lượng giáo dục**."
         },
         "policy": {
           "timeout_seconds": 2,

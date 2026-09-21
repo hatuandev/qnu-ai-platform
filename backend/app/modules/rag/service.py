@@ -111,19 +111,26 @@ class RagService:
 
         # 4. Hybrid Retrieval with Intent-tailored Top-K
         if analysis.intent == QueryIntent.EXACT_FACT:
-            retrieval_top_k = 4
-            rerank_top_k = 3
-        elif analysis.intent == QueryIntent.MIXED:
-            retrieval_top_k = 6
-            rerank_top_k = 4
-        else:
             retrieval_top_k = 8
-            rerank_top_k = 5
+            rerank_top_k = 6
+        elif analysis.intent == QueryIntent.MIXED:
+            retrieval_top_k = 12
+            rerank_top_k = 8
+        else:
+            retrieval_top_k = 12
+            rerank_top_k = 8
+
+        # Augment retrieval query with detected entity codes (e.g. program codes 7480201)
+        retrieval_query = req.question
+        if analysis.entity_codes:
+            extra_tokens = [c for c in analysis.entity_codes if c not in retrieval_query]
+            if extra_tokens:
+                retrieval_query = f"{retrieval_query} {' '.join(extra_tokens)}"
 
         candidates = await hybrid_retriever.retrieve(
             db=db,
             collection_id=req.collection_id,
-            query=req.question,
+            query=retrieval_query,
             top_k=retrieval_top_k,
             rerank_top_k=rerank_top_k,
             tenant_id=req.tenant_id,
@@ -202,6 +209,7 @@ class RagService:
                 conversation_id=req.conversation_id,
                 preferred_provider_id=req.preferred_provider_id,
                 preferred_model_name=req.preferred_model_name,
+                fallback_model_name=req.fallback_model,
             )
             llm_res = await modelops_service.generate(db, llm_req)
             synthesized_answer = llm_res.content.strip()

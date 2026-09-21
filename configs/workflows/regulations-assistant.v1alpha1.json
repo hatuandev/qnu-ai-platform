@@ -152,7 +152,7 @@
         "display_name": "Từ chối khi thiếu căn cứ",
         "config": {
           "status": "insufficient_context",
-          "message": "Chưa có đủ nguồn chính thức để trả lời câu hỏi này."
+          "message": "Chào bạn! Nội dung này hiện chưa được quy định cụ thể trong các văn bản Quy chế đào tạo của Trường ĐH Quy Nhơn có trong hệ thống.\n\nBạn có thể thử tra cứu các chủ đề như:\n- **Tín chỉ & Học phần**: Đăng ký học phần, số tín chỉ tối đa, rút bớt học phần\n- **Xử lý học vụ**: Cảnh báo học tập, buộc thôi học, cách tính điểm tích lũy GPA\n- **Chuẩn đầu ra & Tốt nghiệp**: Chứng chỉ ngoại ngữ VSTEP, tin học và điều kiện xét tốt nghiệp\n\nNếu cần giải quyết trường hợp cụ thể, bạn vui lòng liên hệ trực tiếp **Phòng Đào tạo** (Bàn tiếp sinh viên) để được hướng dẫn chi tiết nhé!"
         },
         "policy": {
           "timeout_seconds": 2,

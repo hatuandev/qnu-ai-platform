@@ -9,6 +9,7 @@ import {
   GraduationCap,
   HelpCircle,
   Library,
+  Lightbulb,
   RotateCcw,
   ShieldCheck,
   ThumbsDown,
@@ -263,9 +264,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     key={q}
                     type="button"
                     onClick={() => onSuggestedClick?.(q)}
-                    className="text-left text-xs px-2.5 py-1 rounded-control bg-muted/60 hover:bg-muted text-foreground/80 hover:text-primary border border-border/80 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 text-left text-xs px-2.5 py-1 rounded-control bg-muted/60 hover:bg-muted text-foreground/80 hover:text-primary border border-border/80 transition-colors cursor-pointer"
                   >
-                    💡 {q}
+                    <Lightbulb className="size-3 text-primary shrink-0" />
+                    <span>{q}</span>
                   </button>
                 ))}
               </div>

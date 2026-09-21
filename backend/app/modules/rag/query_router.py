@@ -63,6 +63,60 @@ class QueryClassifier:
         "sản phẩm đầu ra",
     ]
 
+    # 3. Canonical admissions major names mapped to official program codes
+    MAJOR_NAME_TO_CODE: dict[str, str] = {
+        "công nghệ thông tin": "7480201",
+        "cntt": "7480201",
+        "kỹ thuật phần mềm": "7480103",
+        "ktpm": "7480103",
+        "trí tuệ nhân tạo": "7480107",
+        "ai": "7480107",
+        "khoa học dữ liệu": "7460108",
+        "toán ứng dụng": "7460112",
+        "quản trị kinh doanh": "7340101",
+        "qtkd": "7340101",
+        "tài chính - ngân hàng": "7340201",
+        "tài chính ngân hàng": "7340201",
+        "tcnh": "7340201",
+        "kế toán": "7340301",
+        "kiểm toán": "7340302",
+        "luật": "7380101",
+        "sư phạm toán học": "7140209",
+        "sư phạm toán": "7140209",
+        "sư phạm tin học": "7140210",
+        "sư phạm tin": "7140210",
+        "sư phạm vật lý": "7140211",
+        "sư phạm lý": "7140211",
+        "sư phạm hóa học": "7140212",
+        "sư phạm hóa": "7140212",
+        "sư phạm sinh học": "7140213",
+        "sư phạm sinh": "7140213",
+        "sư phạm ngữ văn": "7140217",
+        "sư phạm văn": "7140217",
+        "sư phạm lịch sử": "7140218",
+        "sư phạm sử": "7140218",
+        "sư phạm địa lý": "7140219",
+        "sư phạm địa": "7140219",
+        "sư phạm tiếng anh": "7140231",
+        "sư phạm anh": "7140231",
+        "giáo dục mầm non": "7140201",
+        "giáo dục tiểu học": "7140202",
+        "giáo dục thể chất": "7140206",
+        "ngôn ngữ anh": "7220201",
+        "ngôn ngữ trung quốc": "7220204",
+        "logistics": "7510605",
+        "kỹ thuật điện": "7520201",
+        "công nghệ kỹ thuật ô tô": "7510205",
+    }
+
+    # Conversational Vietnamese stopwords that should not dilute search keywords
+    VI_CONVERSATIONAL_STOPWORDS: set[str] = {
+        "tôi", "mình", "bạn", "em", "anh", "chị", "muốn", "hỏi", "cho", "biết",
+        "xem", "với", "ạ", "nhé", "không", "nhỉ", "nào", "gì", "sao", "thế",
+        "được", "có", "là", "của", "và", "các", "những", "cần", "để", "ý",
+        "bao", "nhiêu", "như"
+    }
+
     def analyze(self, query: str) -> QueryAnalysis:
         """Analyze query intent, extract entity keys, and determine routing strategy."""
         clean_query = query.strip()
@@ -77,6 +131,16 @@ class QueryClassifier:
             code = match.group(1)
             entity_codes.append(code)
             keywords.append(code)
+
+        # 1b. Detect canonical major names in admissions
+        for major_name, code in self.MAJOR_NAME_TO_CODE.items():
+            if re.search(r"\b" + re.escape(major_name) + r"\b", query_lower):
+                if code not in entity_codes:
+                    entity_codes.append(code)
+                if code not in keywords:
+                    keywords.append(code)
+                if major_name not in keywords:
+                    keywords.append(major_name)
 
         # 2. Detect task codes (e.g., 6.8, 1.1, 11.5)
         for match in self.RE_TASK_CODE.finditer(clean_query):
@@ -135,11 +199,11 @@ class QueryClassifier:
             intent = QueryIntent.NARRATIVE
             is_fact_first = False
 
-        # Add general tokens if keywords list is short
-        if len(keywords) < 2:
+        # Add general tokens if keywords list is short, excluding conversational stopwords
+        if len(keywords) < 3:
             tokens = [
-                w for w in clean_query.split()
-                if len(w) >= 3 and w.lower() not in {"bao", "nhiêu", "như", "thế", "nào"}
+                w for w in re.findall(r"\w+", query_lower)
+                if len(w) >= 3 and w not in self.VI_CONVERSATIONAL_STOPWORDS
             ]
             keywords.extend(tokens[:3])
 

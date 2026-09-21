@@ -183,11 +183,14 @@ def get_node_instruction(context: WorkflowContext, config: dict[str, Any]) -> st
     # 3. Inherit role context from Assistant Profile if running under an assistant
     profile = context.assistant_profile
     if profile:
-        role_desc = (
-            profile.persona_scope.role_description.strip()
-            if (profile.persona_scope and profile.persona_scope.role_description)
-            else None
-        )
+        persona_scope = getattr(profile, "persona_scope", None)
+        role_desc = None
+        if persona_scope:
+            role_desc = getattr(persona_scope, "persona", None) or getattr(
+                persona_scope, "role_description", None
+            )
+            if role_desc:
+                role_desc = str(role_desc).strip()
         if role_desc:
             return (
                 f"Bạn là trợ lý chuẩn hóa câu hỏi cho quy trình '{profile.name or profile.assistant_code}' "
@@ -213,17 +216,18 @@ def build_rewrite_prompt(query: str, instruction: str) -> str:
     return (
         f"{instruction.strip()}\n\n"
         "QUY TẮC BẮT BUỘC:\n"
+        "- Bạn KHÔNG PHẢI chatbot nói chuyện với người dùng. Nhiệm vụ của bạn CHỈ LÀ chuẩn hóa câu hỏi đầu vào.\n"
         "- Giữ nguyên 100% ý định câu hỏi gốc của người dùng.\n"
         "- Trả về DUY NHẤT một dòng chứa câu hỏi đã được chuẩn hóa.\n"
-        "- TUYỆT ĐỐI KHÔNG giải thích, KHÔNG thêm tiền tố (như 'Output:', 'Câu hỏi:'), KHÔNG trả lời câu hỏi.\n"
-        "- Nếu câu hỏi đã rõ ràng và đúng chính tả, giữ nguyên câu hỏi.\n\n"
+        "- TUYỆT ĐỐI KHÔNG giải thích, KHÔNG hỏi ngược lại người dùng (không dùng 'Bạn muốn...', 'Vui lòng...'), KHÔNG thêm tiền tố, KHÔNG trả lời câu hỏi.\n"
+        "- Nếu câu hỏi đã rõ ràng, giữ nguyên câu hỏi.\n\n"
         "Ví dụ:\n"
         "Input: học phí ngày cntt là bao nhiêu\n"
         "Học phí ngành Công nghệ thông tin là bao nhiêu?\n\n"
         "Input: quy định xét học bỗng đrl tín chì\n"
         "Quy định xét học bổng điểm rèn luyện và tín chỉ như thế nào?\n\n"
-        "Input: diem chuan qtkd nam 2024\n"
-        "Điểm chuẩn ngành Quản trị kinh doanh năm 2024 là bao nhiêu?\n\n"
+        "Input: bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?\n"
+        "Ngành Công nghệ thông tin xét tuyển những tổ hợp môn nào?\n\n"
         f"Input: {query}"
     )
 
@@ -321,6 +325,10 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
                 timeout=3.0,
             )
             raw_text = res.content.strip()
+            if not raw_text or "[Local " in raw_text or "máy chủ AI nội bộ" in raw_text or "Đã ghi nhận yêu cầu" in raw_text:
+                logger.debug("LLM query rewrite returned fallback mock, keeping rule query.")
+                return query
+
             lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
             if not lines:
                 return query
@@ -344,7 +352,37 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
                 flags=re.IGNORECASE,
             ).strip().strip('"').strip("'")
 
-            # Defensive guard: candidate must not be excessively long or empty
+            # Defensive guard 1: Reject meta-instruction / chatbot prompt leakage
+            leakage_patterns = re.compile(
+                r"(bạn muốn chuẩn hóa|vui lòng cung cấp|hãy nhập|tôi là trợ lý|chào bạn|"
+                r"câu hỏi đầu vào|yêu cầu xử lý|hệ thống|bạn có thể hỏi|chuẩn hóa câu hỏi nào|"
+                r"xin vui lòng|vui lòng cho biết)",
+                re.IGNORECASE,
+            )
+            if leakage_patterns.search(candidate):
+                logger.warning(
+                    "LLM query rewrite leaked chatbot conversational meta '%s', fallback to original.",
+                    candidate,
+                )
+                return query
+
+            # Defensive guard 2: Must share significant keywords with query (prevent hallucinations)
+            _stopwords = {
+                "bạn", "biết", "không", "cho", "nào", "tôi", "xin", "chào", "năm",
+                "được", "các", "những", "với", "của", "thế", "như", "bao", "nhiêu",
+                "gì", "là", "và", "trong", "trường", "đại", "học", "muốn", "hỏi"
+            }
+            query_words = {w for w in re.findall(r"\w{3,}", query.lower()) if w not in _stopwords}
+            cand_words = set(re.findall(r"\w{3,}", candidate.lower()))
+            if query_words and not (query_words & cand_words):
+                logger.warning(
+                    "LLM query rewrite has zero keyword overlap ('%s' vs '%s'), fallback to original.",
+                    candidate,
+                    query,
+                )
+                return query
+
+            # Defensive guard 3: candidate must not be excessively long or empty
             if len(candidate) > len(query) * 3 or len(candidate) < 3:
                 return query
             return candidate

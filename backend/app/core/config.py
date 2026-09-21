@@ -92,7 +92,7 @@ class Settings(BaseSettings):
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+    GEMINI_MODEL_NAME: str = "gemini-2.5-flash-lite"
 
     # --- Mistral & Cloudflare ---
     MISTRAL_API_KEY: str | None = None

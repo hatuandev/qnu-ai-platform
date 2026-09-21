@@ -27,7 +27,7 @@ def _lifecycle_config(
     questions: list[str],
     chunking_strategy: str,
     primary_model: str = "gpt-4o-mini",
-    fallback_model: str = "gemini-1.5-flash",
+    fallback_model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.2,
     require_structured_facts: bool = False,
     enabled_tools: list[str] | None = None,
@@ -92,16 +92,18 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         "collection_id": "col_admissions",
         "system_prompt": (
             "Bạn là Trợ lý Tuyển sinh chính thức của Trường Đại học Quy Nhơn (QNU.AI). "
-            "Nhiệm vụ: Giải đáp đề án tuyển sinh, điểm chuẩn, phương thức xét tuyển và học phí. "
-            "Khi trả lời về học phí: Nêu rõ các khung học phí liên quan trong đề án (cử nhân đại trà "
-            "83-97 triệu đồng/khóa 4 năm; kỹ sư đại trà 112,3 triệu đồng/khóa 4,5 năm; chương trình đào tạo "
-            "bằng tiếng Anh như CNTT: dự kiến bằng 1,5 lần so với chương trình đại trà)."
+            "Nhiệm vụ: Giải đáp thông tin đề án tuyển sinh, điểm chuẩn, phương thức xét tuyển, học phí và học bổng dựa trên tài liệu chính thức được cung cấp. "
+            "Quy tắc trả lời: "
+            "Luôn xưng 'mình' và gọi người dùng là 'bạn'. Giọng văn nhiệt tình, thân thiện, rõ ràng, ngắn gọn và đi thẳng vào trọng tâm. "
+            "BÁM SÁT TRỌNG TÂM: Chỉ trả lời đúng và đủ khía cạnh người dùng hỏi. Tuyệt đối KHÔNG tự ý đưa thêm học phí, điểm chuẩn, lệ phí nếu câu hỏi không yêu cầu. "
+            "Mọi thông tin số liệu (học phí, chỉ tiêu, điểm chuẩn) phải trích xuất chính xác theo đúng tài liệu đề án của năm học đang xét, không suy diễn hoặc tự bịa đặt số liệu. "
+            "Ở cuối câu trả lời, hãy gợi ý 2 câu hỏi liên quan tiếp theo mà bạn nghĩ người dùng sẽ quan tâm."
         ),
         "config": _lifecycle_config(
             persona="Trợ lý Tuyển sinh chính thức, thân thiện và chính xác của QNU.",
             topics=["đề án tuyển sinh", "điểm chuẩn", "học phí", "học bổng", "ký túc xá", "sư phạm", "Nghị định 116"],
             questions=[
-                "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin năm 2024 là bao nhiêu?",
+                "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
                 "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
                 "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
                 "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?",
@@ -110,8 +112,12 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             require_structured_facts=True,
             enabled_tools=["lookup_admission_score"],
             no_answer_message=(
-                "Thông tin này chưa có trong Đề án tuyển sinh chính thức. Vui lòng liên hệ "
-                "Hotline 0256.3846.156 hoặc tuyensinh@qnu.edu.vn."
+                "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\n"
+                "Bạn có thể thử hỏi mình các chủ đề phổ biến như:\n"
+                "- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n"
+                "- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n"
+                "- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\n"
+                "Nếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: 0256.3846.156 hoặc Email: tuyensinh@qnu.edu.vn nhé!"
             ),
         ),
     },
@@ -145,7 +151,12 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             require_structured_facts=True,
             enabled_tools=[],
             no_answer_message=(
-                "Chưa đủ căn cứ trong quy chế hiện hành để trả lời. Vui lòng liên hệ Phòng Đào tạo."
+                "Chào bạn! Nội dung này hiện chưa được quy định cụ thể trong các văn bản Quy chế đào tạo của Trường ĐH Quy Nhơn có trong hệ thống.\n\n"
+                "Bạn có thể thử tra cứu các chủ đề như:\n"
+                "- **Tín chỉ & Học phần**: Đăng ký học phần, số tín chỉ tối đa, rút bớt học phần\n"
+                "- **Xử lý học vụ**: Cảnh báo học tập, buộc thôi học, cách tính điểm tích lũy GPA\n"
+                "- **Chuẩn đầu ra & Tốt nghiệp**: Chứng chỉ ngoại ngữ VSTEP, tin học và điều kiện xét tốt nghiệp\n\n"
+                "Nếu cần giải quyết trường hợp cụ thể, bạn vui lòng liên hệ trực tiếp Phòng Đào tạo (Bàn tiếp sinh viên) để được hướng dẫn chi tiết nhé!"
             ),
         ),
     },
@@ -177,8 +188,12 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             require_structured_facts=True,
             enabled_tools=[],
             no_answer_message=(
-                "Chưa tìm thấy thông tin trong cẩm nang thư viện. Vui lòng liên hệ Trung tâm "
-                "Thông tin - Thư viện QNU qua hotline 0256.3846.888 hoặc thuvien@qnu.edu.vn."
+                "Chào bạn! Hiện tại chưa tìm thấy giáo trình hoặc tài liệu này trong cơ sở dữ liệu Thư viện số Trường ĐH Quy Nhơn.\n\n"
+                "Bạn có thể thử tra cứu:\n"
+                "- **Giáo trình & Sách chuyên khảo**: Tìm kiếm theo tên học phần, tác giả hoặc chuyên ngành\n"
+                "- **Cơ sở dữ liệu số**: Hướng dẫn truy cập tài liệu quốc tế (ScienceDirect, IEEE Xplore, Springer)\n"
+                "- **Mượn trả & Lưu chiểu**: Thời hạn mượn sách, quy trình nộp khóa luận tốt nghiệp bản điện tử\n\n"
+                "Bạn vui lòng liên hệ Trung tâm Thông tin - Thư viện QNU qua Hotline: 0256.3846.888 hoặc Email: thuvien@qnu.edu.vn để được hỗ trợ bạn đọc nhé!"
             ),
         ),
     },
@@ -209,7 +224,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             persona="Trợ lý soạn thảo văn bản hành chính chuẩn Nghị định 30 của QNU.",
             topics=["thông báo", "tờ trình", "kế hoạch", "giấy mời", "thể thức Nghị định 30", "xuất file word", "xuất file pdf"],
             questions=[
-                "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên năm học 2024-2025.",
+                "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên cấp Trường.",
                 "Lập tờ trình xin phê duyệt kinh phí mua sắm trang thiết bị phòng thực hành.",
                 "Quy chuẩn căn lề, phông chữ và cách đánh số văn bản theo Nghị định 30/2020/NĐ-CP như thế nào?",
                 "Soạn giấy mời dự Lễ Khai giảng năm học mới chuẩn thể thức Đại học Quy Nhơn.",
@@ -219,8 +234,12 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             require_structured_facts=True,
             enabled_tools=["export_administrative_document"],
             no_answer_message=(
-                "Chưa có mẫu hoặc căn cứ phù hợp. Vui lòng cung cấp thêm yêu cầu hoặc liên hệ "
-                "Phòng Hành chính - Tổng hợp."
+                "Chào Thầy/Cô! Hiện tại hệ thống chưa tìm thấy biểu mẫu hoặc căn cứ pháp lý phù hợp trong kho văn bản hành chính của Trường ĐH Quy Nhơn.\n\n"
+                "Thầy/Cô có thể yêu cầu soạn thảo các thể thức văn bản theo Nghị định 30/2020/NĐ-CP như:\n"
+                "- **Tờ trình**: Xin phê duyệt kinh phí, mua sắm trang thiết bị, tổ chức hội nghị khoa học\n"
+                "- **Thông báo & Kế hoạch**: Kế hoạch công tác năm học, thông báo triển khai nhiệm vụ\n"
+                "- **Quyết định & Giấy mời**: Kiện toàn ban tổ chức, giấy mời đại biểu dự lễ khai giảng\n\n"
+                "Nếu cần cung cấp thêm biểu mẫu đặc thù, Thầy/Cô vui lòng liên hệ Phòng Hành chính - Tổng hợp để được hỗ trợ."
             ),
         ),
     },
@@ -253,8 +272,12 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             require_structured_facts=True,
             enabled_tools=["export_exam_matrix"],
             no_answer_message=(
-                "Chưa đủ chuẩn đầu ra hoặc nội dung học phần để xây dựng câu hỏi. Vui lòng cung "
-                "cấp đề cương học phần đã phê duyệt hoặc liên hệ Phòng Khảo thí & Đảm bảo chất lượng."
+                "Chào Thầy/Cô! Hiện chưa đủ dữ liệu chuẩn đầu ra (CLO/PLO) hoặc nội dung học phần để thiết kế câu hỏi hoặc ma trận đề thi này.\n\n"
+                "Thầy/Cô có thể cung cấp thêm đề cương chi tiết học phần hoặc thử các yêu cầu như:\n"
+                "- **Thiết kế ma trận đề thi**: Phân bổ 4 mức độ nhận thức Bloom (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao)\n"
+                "- **Soạn câu hỏi trắc nghiệm / tự luận**: Kèm đáp án, biểu điểm và hướng dẫn chấm chi tiết\n"
+                "- **Xuất file ma trận đề**: Định dạng bảng tính Excel chuẩn khảo thí ĐH Quy Nhơn\n\n"
+                "Để được hướng dẫn chuẩn hóa ngân hàng câu hỏi, Thầy/Cô vui lòng liên hệ Phòng Khảo thí & Đảm bảo chất lượng giáo dục."
             ),
         ),
     },
@@ -274,7 +297,7 @@ async def seed_standard_assistants(db: AsyncSession) -> AssistantSeedResponse:
     workflow_ids = [str(item["workflow_id"]) for item in STANDARD_ASSISTANTS]
 
     assistant_result = await db.execute(select(AssistantModel).where(AssistantModel.code.in_(codes)))
-    existing_codes = {record.code for record in assistant_result.scalars().all()}
+    existing_by_code = {record.code: record for record in assistant_result.scalars().all()}
     workflow_result = await db.execute(
         select(WorkflowDefinition).where(WorkflowDefinition.id.in_(workflow_ids))
     )
@@ -305,7 +328,16 @@ async def seed_standard_assistants(db: AsyncSession) -> AssistantSeedResponse:
             workflows_added += 1
 
         code = str(item["code"])
-        if code in existing_codes:
+        if code in existing_by_code:
+            existing_record = existing_by_code[code]
+            if hasattr(existing_record, "config"):
+                existing_cfg = dict(existing_record.config or {})
+                existing_cfg["sample_questions"] = item["config"]["sample_questions"]
+                if "guardrails" in existing_cfg and isinstance(existing_cfg["guardrails"], dict):
+                    existing_cfg["guardrails"]["no_answer_message"] = item["config"]["guardrails"]["no_answer_message"]
+                else:
+                    existing_cfg["guardrails"] = item["config"]["guardrails"]
+                existing_record.config = existing_cfg
             continue
         db.add(
             AssistantModel(

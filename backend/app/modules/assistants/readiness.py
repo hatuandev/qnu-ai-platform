@@ -204,7 +204,7 @@ class AssistantReadinessEngine:
     ) -> tuple[ReadinessCheckItem, str | None, str | None]:
         """Verify primary and fallback models for operational resilience."""
         primary = getattr(policy, "primary_model", None) or "gpt-4o-mini"
-        fallback = getattr(policy, "fallback_model", None) or "gemini-1.5-flash"
+        fallback = getattr(policy, "fallback_model", None) or "gemini-2.5-flash-lite"
         temperature = getattr(policy, "temperature", 0.2)
 
         if not primary:

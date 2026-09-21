@@ -7,11 +7,84 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-21 14:32 (UTC+7)
-- **Phiên số**: #174
+- **Thời gian cập nhật**: 2026-09-21 16:34 (UTC+7)
+- **Phiên số**: #179
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Bổ Sung Node Query Rewrite Vào Seed Data Của Cả 5 Mô Đun Quy Trình DAG (phiên #174)**:
+  1. **Khắc Phục RAG Entity Code Augmentation & Chống Rò Rỉ Few-Shot Trong Query Rewrite (phiên #179)**:
+     - **Phân tích nguyên nhân cốt lõi**:
+       * Khi người dùng hỏi `"ý tôi muốn hỏi là tổ hợp môn xét tuyển của ngành công nghệ thông tin"`, `QueryClassifier` đã nhận diện đúng mã ngành `7480201` nhưng chuỗi query gửi sang Hybrid Retriever không đính kèm mã thực thể, khiến Trang 6 bị tụt hạng và rơi khỏi top_k.
+       * Node `query.rewrite` có ví dụ few-shot về `diem chuan qtkd nam 2024`, trong một số trường hợp gọi LLM bị lặp lại dòng ví dụ và bộ lọc stopwords chưa đủ rộng (chỉ lọc 5 từ) khiến candidate chứa chữ `năm` lọt qua chốt chặn, dẫn đến việc câu hỏi phương thức tuyển sinh 2026 bị biến thành câu hỏi điểm chuẩn QTKD 2024.
+       * Hàm `get_node_instruction` gặp lỗi `AttributeError: 'AssistantPersonaScope' object has no attribute 'role_description'` (thuộc tính đúng là `persona`).
+     - **Triển khai giải pháp kỹ thuật**:
+       * `backend/app/modules/rag/service.py`: Tự động bổ sung `analysis.entity_codes` vào `retrieval_query` gửi sang Hybrid Retriever, bảo đảm các trang chứa mã ngành chuyên biệt luôn đạt điểm cao nhất trong cả Qdrant Dense và PostgreSQL FTS.
+       * `backend/app/modules/workflows/nodes/query_rewrite_node.py`: Sửa lỗi truy cập `persona_scope.persona`, loại bỏ ví dụ few-shot QTKD 2024 thay bằng ví dụ tổ hợp môn, mở rộng bộ stopwords phòng vệ (`_stopwords`) bao gồm toàn bộ đại từ, từ chức năng và từ chỉ thời gian thông dụng (`năm`, `cho`, `biết`,...).
+       * `backend/app/modules/rag/query_router.py`: Loại bỏ phần tử trùng lặp trong set `VI_CONVERSATIONAL_STOPWORDS`, đạt chuẩn Ruff 0 lỗi.
+     - **Verification**:
+       * Kiểm thử thành công 100% cả 3 câu hỏi (đơn lẻ & multi-turn thread liên tục): Câu 1 và Câu 2 trả lời đầy đủ 5 tổ hợp môn ngành CNTT (Trang 6), Câu 3 trả lời đúng 5 phương thức tuyển sinh 2026 không rò rỉ QTKD và không thừa học phí.
+       * Backend Ruff 0 lỗi, Pytest 40/40 passed (100%), Frontend Biome 0 lỗi (168 files), TypeScript 0 lỗi.
+  2. **Khắc Phục Hiện Tượng Trợ Lý Tuyển Sinh Tự Bổ Sung Học Phí Khi Hỏi Phương Thức Tuyển Sinh (Focus Guardrail) (phiên #178)**:
+     - **Phân tích nguyên nhân cốt lõi (Root Cause)**:
+       * Tầng Hybrid RAG bóc tách cả Trang 2 (các phương thức tuyển sinh) và Trang 10 (Mục 8: Lệ phí xét tuyển, thi tuyển năng khiếu, học phí) vào ngữ cảnh tham chiếu;
+       * Tầng System Prompt trong CSDL (`ast_admissions.system_prompt`) có đoạn hướng dẫn chi tiết khung học phí cần trích dẫn, nhưng thiếu ràng buộc phạm vi nghiêm ngặt;
+       * Mô hình LLM (đặc biệt là các dòng Flash/Lite) bị thiên kiến quá nhiệt tình (helpfulness bias), tự phỏng đoán rằng thí sinh hỏi phương thức thì muốn biết luôn cả học phí và tự động đưa thêm Mục 2 vào câu trả lời.
+     - **Triển khai chốt chặn phạm vi (Focus / Scope Guardrail)**:
+       * Cập nhật `backend/app/modules/rag/composer.py` (`SYSTEM_PROMPT_TEMPLATE`): Bổ sung quy tắc *"BÁM SÁT TRỌNG TÂM CÂU HỎI: Chỉ trả lời đúng và đủ khía cạnh người dùng hỏi. Tuyệt đối không tự ý mở rộng sang các chủ đề khác (như học phí, điểm chuẩn, lệ phí, ký túc xá) nếu câu hỏi không yêu cầu"*;
+       * Cập nhật `configs/workflows/admissions-assistant.v1alpha1.json` (node `knowledge_answer`);
+       * Cập nhật `backend/app/modules/assistants/seeder.py` và CSDL PostgreSQL (`ast_admissions.system_prompt`).
+     - **Verification**:
+       * Chạy thử nghiệm thực tế với câu hỏi `"xin chào cho tôi biết phương thức tuyển sinh năm 2026"`: câu trả lời hoàn toàn sạch sẽ, tập trung 100% vào 5 phương thức tuyển sinh + xét tuyển thẳng, 0% học phí;
+       * Backend Ruff 0 lỗi, Pytest 52/52 passed; Frontend Biome 0 lỗi.
+  2. **Nâng Cấp Danh Mục Mô Hình Google Lên Gemini 2.5+, Gemma 4 26B/31B & Loại Bỏ Thế Hệ Cũ 1.5, 2.0 (phiên #177)**:
+     - **Phát hiện & Xác thực mô hình Google AI Studio**:
+       * Xác thực qua live API key Google AI Studio: toàn bộ mô hình 1.5 (`gemini-1.5-flash`, `gemini-1.5-pro`) và 2.0 đã chính thức bị Google ngừng hoạt động (deprecated/shutdown);
+       * Xác thực thành công các mô hình thế hệ mới với độ trễ phản hồi thấp, tiếng Việt chuẩn: `gemini-2.5-flash-lite` (~2.4s, 1,500 RPD), `gemini-2.5-flash` (~2.1s), `gemini-2.5-pro`, `gemini-flash-lite-latest`, `gemini-3.1-flash-lite`, `gemma-4-26b-a4b-it`, `gemma-4-31b-it`.
+     - **Cập nhật Backend & ModelOps**:
+       * Cập nhật `provider_service.py`: `prov_gemini` đặt default model `gemini-2.5-flash-lite` và danh sách `models` gồm 7 model mới; loại bỏ hoàn toàn 1.5 và 2.0;
+       * Cập nhật `config.py`: `GEMINI_MODEL_NAME = "gemini-2.5-flash-lite"`;
+       * Cập nhật `pricing.py` và `cost_tracker.py`: Bổ sung định mức tính chi phí USD cho toàn bộ dòng 2.5+, 3.1 và Gemma 4;
+       * Sửa lỗi luồng RAG Fallback trong `backend/app/modules/rag/service.py`: truyền tham số `fallback_model_name=req.fallback_model` vào `llm_req`, giúp luồng fallback chuyển mạch trực tiếp và chính xác;
+       * Cập nhật `schemas.py`, `readiness.py`, `seeder.py`: fallback model mặc định đổi sang `gemini-2.5-flash-lite`.
+     - **Cập nhật Giao diện Frontend**:
+       * Cập nhật `frontend/src/components/modelops/modelops-helpers.ts`: danh sách gợi ý cho Google gồm Gemini 2.5 Flash/Lite/Pro, 3.1 Flash-Lite, Gemma 4 26B/31B; Cloudflare có `@cf/meta/llama-3.1-8b-instruct`;
+       * Cập nhật `assistant-create-page.tsx` và `assistant-detail-page.tsx`: Danh sách dropdown model Google loại bỏ 1.5/2.0, thêm 2.5 Flash-Lite, 2.5 Flash, Gemma 4 26B, Gemma 4 31B.
+     - **Đồng bộ CSDL & Kiểm thử đầu cuối**:
+       * Cập nhật CSDL PostgreSQL cho `prov_gemini` và Trợ lý `ast_admissions` (`primary_model: gemini-2.5-flash-lite`, `fallback_model: @cf/meta/llama-3.1-8b-instruct`);
+       * Test chat thực tế thành công: Trợ lý Tuyển sinh trả lời đầy đủ phương thức tuyển sinh 2026 với 5 trích dẫn PDF chính thức;
+       * Backend Ruff 0 lỗi, Pytest 48/48 passed; Frontend Biome 0 lỗi, tsc 0 lỗi, build Vite 8.89s thành công.
+  2. **Triệt Tiêu Toàn Diện Mẫu Hardcode, Năm Cũ & Chuẩn Hóa Lời Từ Chối / Gợi Ý Cho Cả 5 Mô Đun (Zero-Emoji 100%) (phiên #176)**:
+     - **Hoàn thiện No-Answer Policy RFC 7807 cho 5/5 mô đun**:
+       * Mở rộng `NO_ANSWER_MESSAGES` trong `backend/app/modules/rag/citation_guard.py` và các workflow configs DAG (`configs/workflows/*.json`) với đầy đủ hotline, email, đơn vị đầu mối tiếp nhận và 3 nhóm gợi ý tra cứu thường trực (evergreen):
+         + `admissions`: Hotline Ban Tư vấn Tuyển sinh `0256.3846.156`, Email `tuyensinh@qnu.edu.vn`.
+         + `regulations`: Bàn tiếp sinh viên - Phòng Đào tạo (Tín chỉ, cảnh báo học vụ, chuẩn đầu ra VSTEP).
+         + `library`: Trung tâm Thông tin - Thư viện QNU, Hotline `0256.3846.888`, Email `thuvien@qnu.edu.vn`.
+         + `drafting`: Phòng Hành chính - Tổng hợp (Soạn thảo văn bản chuẩn Nghị định 30/2020/NĐ-CP).
+         + `question_bank`: Phòng Khảo thí & Đảm bảo chất lượng giáo dục (Ma trận Bloom, CLO/PLO, xuất Excel).
+     - **Bảo vệ danh xưng 5 Trợ lý & Đa miền nghiệp vụ**:
+       * Mở rộng `_INQUIRY_KEYWORDS` và `_TITLE_PATTERNS` trong `condition_route_node.py` bao phủ danh xưng cả 5 Trợ lý và các đơn vị chuyên trách ĐH Quy Nhơn, bảo vệ mọi câu hỏi tra cứu không bị regex chào hỏi bắt nhầm.
+     - **Triệt tiêu năm cũ trong câu hỏi mẫu & Đồng bộ CSDL**:
+       * Cập nhật `backend/app/modules/assistants/seeder.py`: Xóa bỏ năm 2024 trong Tuyển sinh ("các năm gần nhất"), năm 2024-2025 trong Soạn thảo ("cấp Trường");
+       * Nâng cấp logic đồng bộ cấu hình Trợ lý đã tồn tại trong CSDL khi chạy seed; Chạy `db seed --assistants --workflows` đồng bộ thành công cả 5/5 Trợ lý và DAGs.
+     - **Triệt tiêu 100% Emoji trên UI Frontend**:
+       * Thay thế ký tự `💡` trong `frontend/src/components/ai/chat-message.tsx` bằng Lucide Icon `Lightbulb` (`size-3 text-primary shrink-0`), sắp xếp import theo alphabet chuẩn AGENTS.md Quy tắc 4.8.
+     - **Verification**:
+       * Backend Ruff 0 lỗi, Pytest 341/341 passed (100%);
+       * Frontend Biome 0 lỗi, TypeScript 0 lỗi, Vite build 10.36s thành công.
+  2. **Khắc Phục Lỗi Điều Hướng Chào Hỏi Cắt Ngang Tra Cứu & Triệt Tiêu Mẫu Hardcode Cũ (phiên #175)**:
+     - **Giải quyết triệt để lỗi Regex Hijacking trong Condition Route**:
+       * Trước đây khi người dùng đặt câu hỏi tra cứu có chứa từ chào hỏi lịch sự ở đầu câu (`"xin chào bạn cho tôi hỏi phương thức tuyển sinh năm 2026"`), regex `"xin chào|hello|hi|..."` bắt thô và điều hướng nhầm sang node `greeting_output`.
+       * Nâng cấp hàm `_is_pure_greeting`: Bóc tách toàn bộ danh xưng (`Trợ lý Tuyển sinh`, `QNU`, `bạn`, `thầy cô`,...), kiểm tra dấu hỏi `?` và các từ khóa tra cứu nghiệp vụ (`phương thức`, `điểm chuẩn`, `học phí`, `chỉ tiêu`, `năm 202...`); Nếu có nội dung câu hỏi thực chất -> bỏ qua quy tắc chào hỏi, đi thẳng vào `query_rewrite` -> `knowledge_answer` (RAG); Chỉ khi người dùng chào thuần túy mới vào `greeting_output`.
+     - **Triệt tiêu toàn bộ Hardcoded Templates & Năm lỗi thời**:
+       * Cập nhật `greeting_output` và `no_answer_output` trong `configs/workflows/admissions-assistant.v1alpha1.json`: Viết lại lời chào thường trực (evergreen), chuyên nghiệp, xóa bỏ các năm cũ 2024/2025 ghim cứng và tuân thủ chuẩn Zero-Emoji của AGENTS.md;
+       * Cập nhật `NO_ANSWER_MESSAGES["admissions"]` trong `backend/app/modules/rag/citation_guard.py`.
+     - **Sửa lỗi bóc tách Cổng Phân Nhánh (DAG Port Parsing Bug)**:
+       * Khắc phục hàm `_parse_spec_from_json` trong `service.py`: Đọc đúng `source_port` và `target_port` từ cấp phẳng khi giải mã DAG từ CSDL, sửa dứt điểm lỗi `citation_guard` chọn cổng `grounded` nhưng runtime báo lỗi không tìm thấy cạnh;
+       * Bổ sung phòng vệ trong `query_rewrite_node.py` phát hiện thông báo fallback mock của máy chủ cục bộ.
+     - **Verification**:
+       * Chạy test thực tế: `"xin chào bạn cho tôi hỏi phương thức tuyển sinh năm 2026"` đi qua đầy đủ 6 nodes: `['chat_input', 'condition_route', 'query_rewrite', 'knowledge_answer', 'citation_guard', 'chat_output']`, trích xuất 5 trích dẫn chính thức từ văn bản Đề án tuyển sinh 2026 của ĐH Quy Nhơn;
+       * Backend Ruff 0 lỗi, Pytest 341/341 passed (100%);
+       * Frontend Biome 0 lỗi, TypeScript 0 lỗi, Build thành công 9.10s.
+  2. **Bổ Sung Node Query Rewrite Vào Seed Data Của Cả 5 Mô Đun Quy Trình DAG (phiên #174)**:
      - **Tích hợp `query_rewrite` vào 5 workflow configs (`configs/workflows/*.json`)**:
        * `admissions-assistant`: Chuẩn hóa ngành học, học phí, học bổng, điểm chuẩn, viết tắt CNTT, QTKD, ĐGNL, THPT, KTX.
        * `regulations-assistant`: Chuẩn hóa tín chỉ, học phần, điểm rèn luyện, khen thưởng, viết tắt ĐRL, GPA, CTĐT, CTSV, PĐT, NCKH.
