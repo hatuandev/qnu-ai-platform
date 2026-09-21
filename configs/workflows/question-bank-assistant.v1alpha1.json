@@ -74,6 +74,24 @@
         }
       },
       {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa thuật ngữ khảo thí & ngân hàng đề",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true,
+          "instruction": "Bạn là trợ lý chuẩn hóa yêu cầu khảo thí, ngân hàng câu hỏi và ma trận đề thi cho Trường Đại học Quy Nhơn (QNU).\nNhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh (ví dụ: 'ma trân' -> 'ma trận đề thi', 'ngân hang' -> 'ngân hàng câu hỏi', 'thang đo blom' -> 'thang đo Bloom', 'chuẩn đầu ra' -> 'chuẩn đầu ra CLO/PLO'), mở rộng các từ viết tắt chuyên môn (CLO, PLO, CĐR, ĐCHP, KTĐG, TNKQ) và chuẩn hóa tên học phần, mức độ nhận thức Bloom."
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "knowledge_answer",
         "type": "core.knowledge.answer",
         "version": "1.0.0",
@@ -146,10 +164,22 @@
     ],
     "edges": [
       {
-        "id": "edge_input_to_knowledge",
+        "id": "edge_input_to_rewrite",
         "source": {
           "node_id": "chat_input",
           "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_knowledge",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "knowledge_answer",

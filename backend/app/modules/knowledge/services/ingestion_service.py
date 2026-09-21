@@ -270,7 +270,19 @@ class IngestionService:
             ocr_method = parser.__class__.__name__
             ocr_fallback = False
 
-            if ext == "pdf" and (not (parsed.raw_text or "").strip() or len(parsed.raw_text.strip()) < 40):
+            # Smart OCR Rescue routing powered by Firecrawl PDF Inspector
+            pdf_needs_ocr = False
+            if ext == "pdf":
+                pdf_type = parsed.metadata.get("pdf_type")
+                pages_needing_ocr = parsed.metadata.get("pages_needing_ocr") or []
+                pdf_needs_ocr = (
+                    pdf_type in ("scanned", "image_based")
+                    or (pdf_type == "mixed" and bool(pages_needing_ocr))
+                    or not (parsed.raw_text or "").strip()
+                    or len(parsed.raw_text.strip()) < 40
+                )
+
+            if pdf_needs_ocr:
                 ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
                     db, file_bytes, file_name, ocr_engine
                 )
@@ -560,11 +572,18 @@ class IngestionService:
             parsed = await parser.parse(file_bytes, file_name)
             ocr_method = parser.__class__.__name__
 
-            if (
-                db is not None
-                and ext == "pdf"
-                and (not (parsed.raw_text or "").strip() or len(parsed.raw_text.strip()) < 40)
-            ):
+            pdf_needs_ocr = False
+            if ext == "pdf":
+                pdf_type = parsed.metadata.get("pdf_type")
+                pages_needing_ocr = parsed.metadata.get("pages_needing_ocr") or []
+                pdf_needs_ocr = (
+                    pdf_type in ("scanned", "image_based")
+                    or (pdf_type == "mixed" and bool(pages_needing_ocr))
+                    or not (parsed.raw_text or "").strip()
+                    or len(parsed.raw_text.strip()) < 40
+                )
+
+            if db is not None and pdf_needs_ocr:
                 ocr_text, ocr_engine_used, ocr_pages, rescued, _ocr_blocks = (
                     await self._run_ocr_rescue(db, file_bytes, file_name, ocr_engine)
                 )

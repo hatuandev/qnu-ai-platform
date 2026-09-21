@@ -34,6 +34,9 @@ _CANONICAL_TYPE_ALIASES: dict[str, str] = {
     "citation_guard": "guard.citation_policy",
     "no_answer_output": "output.no_answer",
     "extract_fields": "extract.fields",
+    "query_rewrite": "query.rewrite",
+    "query.normalize": "query.rewrite",
+    "query_normalize": "query.rewrite",
 }
 
 _TERMINAL_NODE_TYPES = frozenset(

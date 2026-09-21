@@ -198,6 +198,7 @@ class RagService:
                 messages=llm_messages,
                 temperature=req.temperature,
                 max_tokens=req.max_tokens,
+                thinking_budget=req.thinking_budget,
                 conversation_id=req.conversation_id,
                 preferred_provider_id=req.preferred_provider_id,
                 preferred_model_name=req.preferred_model_name,
@@ -217,6 +218,7 @@ class RagService:
                         messages=llm_messages,
                         temperature=req.temperature,
                         max_tokens=req.max_tokens,
+                        thinking_budget=req.thinking_budget,
                         conversation_id=req.conversation_id,
                         preferred_model_name=req.fallback_model,
                     )
@@ -255,14 +257,33 @@ class RagService:
         # Evidence-based citation filtering
         final_citations = citation_guard.filter_evidence_citations(citations, final_answer)
 
-        is_refusal = any(msg in final_answer.lower() for msg in [
-            "thông tin này hiện chưa có",
-            "chưa có trong tài liệu chính thức",
-            "chưa có dữ liệu chính thức",
-            "vui lòng liên hệ hotline",
-            "vui lòng liên hệ ban tư vấn",
-            "vui lòng liên hệ phòng đào tạo",
-        ])
+        has_substantive_content = any(
+            x in final_answer.lower()
+            for x in [
+                "triệu",
+                "học phí",
+                "điểm chuẩn",
+                "chỉ tiêu",
+                "phương thức",
+                "%",
+                "năm 202",
+                "chương trình",
+            ]
+        )
+        is_refusal = (
+            not has_substantive_content
+            and any(
+                msg in final_answer.lower()
+                for msg in [
+                    "thông tin này hiện chưa có",
+                    "chưa có trong tài liệu chính thức",
+                    "chưa có dữ liệu chính thức",
+                    "tài liệu không cung cấp",
+                    "đề án không cung cấp",
+                    "không tìm thấy thông tin",
+                ]
+            )
+        )
         status = "insufficient_context" if is_refusal else "answered"
 
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -278,15 +299,16 @@ class RagService:
             latency_ms=exec_ms,
         )
 
-        # 9. Save to Semantic Cache
-        await semantic_cache.set(
-            req.collection_id,
-            req.question,
-            resp.model_dump(),
-            req.preferred_model_name or "default",
-            tenant_id=req.tenant_id,
-            workspace_id=req.workspace_id,
-        )
+        # 9. Save to Semantic Cache (Only cache valid answered queries with citations)
+        if status == "answered" and final_citations:
+            await semantic_cache.set(
+                req.collection_id,
+                req.question,
+                resp.model_dump(),
+                req.preferred_model_name or "default",
+                tenant_id=req.tenant_id,
+                workspace_id=req.workspace_id,
+            )
 
         return resp
 

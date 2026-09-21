@@ -892,6 +892,11 @@ class WorkflowService:
                     )
                     db.add(wf_def)
                     await db.flush()
+                else:
+                    wf_def.display_name = display_name
+                    wf_def.description = description
+                    wf_def.module_code = module_code
+                    wf_def.dag_spec = serialized_spec
 
                 draft_stmt = select(WorkflowDraft).where(WorkflowDraft.workflow_id == workflow_id)
                 draft_res = await db.execute(draft_stmt)
@@ -905,6 +910,9 @@ class WorkflowService:
                     )
                     db.add(draft)
                     await db.flush()
+                else:
+                    draft.dag_spec = serialized_spec
+                    draft.revision += 1
 
                 ver_stmt = select(WorkflowVersion).where(
                     WorkflowVersion.workflow_id == workflow_id,
@@ -923,6 +931,10 @@ class WorkflowService:
                     )
                     db.add(version)
                     await db.flush()
+                else:
+                    version.dag_spec = serialized_spec
+                    version.content_hash = content_hash
+                    version.validation_report = validation.model_dump(mode="json")
 
                 if wf_def.published_version_id != version.id:
                     wf_def.published_version_id = version.id

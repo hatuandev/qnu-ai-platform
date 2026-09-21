@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/admin/empty-state";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AdminShell } from "@/layouts/admin-shell";
@@ -322,6 +323,7 @@ export default function App() {
         <TooltipProvider delayDuration={0}>
           <AuthProvider>
             <AppContent />
+            <Toaster />
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>

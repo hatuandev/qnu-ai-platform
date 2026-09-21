@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 
@@ -57,15 +58,26 @@ class GeminiAdapter(BaseLLMAdapter):
             role = "user" if m.role in ("user", "system") else "model"
             contents.append({"role": role, "parts": [{"text": m.content}]})
 
+        thinking_budget = kwargs.get("thinking_budget", 0)
+        gen_config: dict[str, Any] = {
+            "temperature": temperature,
+        }
+        if "2.5" in self.model_name or thinking_budget > 0:
+            if thinking_budget > 0:
+                gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
+                gen_config["maxOutputTokens"] = max(max_tokens, thinking_budget + 1024)
+            else:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+                gen_config["maxOutputTokens"] = max(max_tokens, 2048)
+        else:
+            gen_config["maxOutputTokens"] = max_tokens
+
         payload = {
             "contents": contents,
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens,
-            },
+            "generationConfig": gen_config,
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             resp = await client.post(endpoint, json=payload)
             resp.raise_for_status()
             data = resp.json()

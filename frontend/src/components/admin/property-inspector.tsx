@@ -230,8 +230,83 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
                 <span>Cấu hình tham số thực tế (Parameters):</span>
               </span>
 
+              {/* Query Rewrite Node */}
+              {(nodeType === "query.rewrite" || nodeType.includes("rewrite")) && (
+                <div className="space-y-2.5 p-2.5 rounded-control bg-muted/40 border border-border/80 text-[11px]">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label
+                        htmlFor="rewrite-instruction"
+                        className="text-foreground font-semibold"
+                      >
+                        Prompt / Hướng dẫn chuẩn hóa:
+                      </label>
+                      <span className="text-[10px] text-primary font-mono">Workflow-specific</span>
+                    </div>
+                    <textarea
+                      id="rewrite-instruction"
+                      rows={5}
+                      placeholder="Ví dụ: Bạn là trợ lý chuẩn hóa câu hỏi tuyển sinh... Sửa lỗi trượt phím Telex, mở rộng từ viết tắt, viết hoa chuẩn tên ngành..."
+                      value={String(
+                        configState.instruction ||
+                          configState.prompt ||
+                          configState.custom_prompt ||
+                          ""
+                      )}
+                      onChange={(e) => updateConfigField("instruction", e.target.value)}
+                      className="w-full p-2 rounded-control border border-border bg-background text-foreground text-[11px] focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Nhập prompt định hướng cho node chuẩn hóa lỗi gõ nhầm và từ viết tắt phù hợp
+                      với quy trình này. Hỗ trợ placeholder {"{query}"}.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <label
+                        htmlFor="rewrite-fast-rules"
+                        className="text-foreground font-medium block"
+                      >
+                        Quy tắc nhanh (0ms Fast Rules):
+                      </label>
+                      <span className="text-[10px] text-muted-foreground">
+                        Sửa tức thì trượt phím Telex & viết tắt QNU thông dụng
+                      </span>
+                    </div>
+                    <Switch
+                      id="rewrite-fast-rules"
+                      checked={configState.use_fast_rules !== false}
+                      onCheckedChange={(checked) => updateConfigField("use_fast_rules", checked)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <label
+                        htmlFor="rewrite-use-llm"
+                        className="text-foreground font-medium block"
+                      >
+                        Tầng LLM chuẩn hóa (~150ms):
+                      </label>
+                      <span className="text-[10px] text-muted-foreground">
+                        Dùng mô hình ngôn ngữ siêu tốc chuẩn hóa theo instruction
+                      </span>
+                    </div>
+                    <Switch
+                      id="rewrite-use-llm"
+                      checked={configState.use_llm !== false}
+                      onCheckedChange={(checked) => updateConfigField("use_llm", checked)}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* RAG Knowledge Node */}
-              {(node.category === "rag" || nodeType.includes("knowledge")) && (
+              {((node.category === "rag" &&
+                nodeType !== "query.rewrite" &&
+                !nodeType.includes("rewrite")) ||
+                nodeType.includes("knowledge")) && (
                 <div className="space-y-2 p-2.5 rounded-control bg-muted/40 border border-border/80 text-[11px]">
                   <div className="space-y-1">
                     <label htmlFor="rag-module-code" className="text-muted-foreground font-medium">

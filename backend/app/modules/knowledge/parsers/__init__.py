@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.modules.knowledge.parsers.base import BaseDocumentParser, ExtractedTable, ParsedContent
 from app.modules.knowledge.parsers.markdown_parser import MarkdownParser
 from app.modules.knowledge.parsers.office_parser import DocxParser, PlainTextParser, XlsxParser
+from app.modules.knowledge.parsers.pdf_inspector import PDFInspectionResult, PDFInspector
 from app.modules.knowledge.parsers.pdf_parser import PyMuPdfParser
 
 _PARSERS: dict[str, BaseDocumentParser] = {
@@ -33,6 +34,8 @@ __all__ = [
     "DocxParser",
     "ExtractedTable",
     "MarkdownParser",
+    "PDFInspectionResult",
+    "PDFInspector",
     "ParsedContent",
     "PlainTextParser",
     "PyMuPdfParser",

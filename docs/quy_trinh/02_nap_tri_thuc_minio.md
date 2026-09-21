@@ -29,10 +29,10 @@ flowchart TD
     subgraph TANG_BOC_TACH [2. Tầng Bóc Tách Văn Bản & Phân Nhánh PDF Inspector]
         E -->|Đọc file bytes| G{Định dạng tệp?}
         G -->|.docx / .xlsx / .txt| H1[Parsers Chuyên Dụng: DocxParser / Openpyxl / PlainTextParser]
-        G -->|.pdf| H2[PDF Inspector: Thanh tra cấu trúc từng trang PDF]
+        G -->|.pdf| H2[Firecrawl PDF Inspector: Phân loại Rust text_based / scanned / mixed]
         
-        H2 -->|Trang có Digital Text >= 40 ký tự| H3[PyMuPDF Fast Native: Trích xuất Text & Bảng trực tiếp 15-30ms]
-        H2 -->|Trang Scan / Ảnh thuần hoặc text rỗng| H4[Cứu hộ OCR tự động: Mistral OCR Cloud / EasyOCR Local]
+        H2 -->|text_based: Fast-Path| H3[Bóc tách Markdown Siêu Tốc 10-30ms & PyMuPDF Geometry BBoxes]
+        H2 -->|scanned / mixed: Trang scan| H4[Cứu hộ OCR tự động: Mistral OCR Cloud / EasyOCR Local]
         
         H1 & H3 & H4 --> K1[Bảo toàn bảng biểu & Canonical Normalization: Loại bỏ trùng lặp text/table, TableReconstructor nối bảng đa trang]
         K1 --> K2[SmartLayoutDetector OpenCV: Phân vùng vĩ mô, bóc tách con dấu đỏ, chữ ký]
@@ -99,12 +99,17 @@ flowchart TD
   - **Development / Test Mode (`STORAGE_DRIVER=local`)**: Tự động lưu trữ tại thư mục cục bộ `./storage/uploads/...` giúp lập trình viên chạy kiểm thử và phát triển mà không phụ thuộc hạ tầng cụ thể.
 - **Lưu trữ ảnh render trang phục vụ Studio**: Hệ thống đồng thời lưu ảnh kết xuất chuẩn hóa của từng trang (`cache/{document_id}/page_{page_number}.png`) trên Storage Driver để phục vụ Document Verification Studio.
 
-### Bước 3: Cơ chế phân nhánh PDF Inspector & Bóc tách đa tầng
-Đối với tệp định dạng PDF, hệ thống áp dụng cơ chế thanh tra 2 pha:
-1. **Pha 1 — PDF Inspector Fast-path**:
-   - Dùng PyMuPDF thanh tra nhanh cấu trúc trang. Nếu số ký tự có thể trích xuất trực tiếp $\ge 40$ ký tự: Trích xuất văn bản và cấu trúc bảng (`find_tables()`) chỉ mất **10 - 30ms**, không tiêu tốn tài nguyên OCR.
+### Bước 3: Cơ chế phân nhánh PDF Inspector (Firecrawl Rust) & Bóc tách đa tầng
+Đối với tệp định dạng PDF, hệ thống áp dụng kiến trúc song mã kết hợp giữa **`firecrawl/pdf-inspector`** (lõi Rust) và **`PyMuPDF`** (`fitz`):
+1. **Pha 1 — PDF Inspector Fast-path (Firecrawl Rust Core, 10 - 30ms)**:
+   - Module `PDFInspector` (`backend/app/modules/knowledge/parsers/pdf_inspector.py`) gọi thư viện Rust `pdf-inspector` phân tích tức thì `file_bytes` mà không tốn tài nguyên GPU hay API Cloud.
+   - Nhận diện trạng thái tài liệu:
+     - **`text_based`**: 100% trang là văn bản số hóa sạch $\rightarrow$ Trích xuất trực tiếp sang Markdown có cấu trúc (Headings, Tables, Lists), bỏ qua hoàn toàn tầng OCR.
+     - **`scanned` / `image_based`**: Toàn bộ là bản scan hoặc ảnh $\rightarrow$ Chuyển thẳng sang Pha 2 (Cứu hộ OCR tự động).
+     - **`mixed`**: Tài liệu hỗn hợp $\rightarrow$ Xác định danh sách chính xác `pages_needing_ocr` để chỉ cứu hộ những trang scan, bảo toàn tốc độ cho các trang số hóa.
+   - Song song, `PyMuPDF` trích xuất `extract_page_blocks` (khối hình học Bounding Boxes) và render ảnh PNG (`get_pixmap()`) lưu vào MinIO cache phục vụ giao diện đối soát trực quan Scan Studio.
 2. **Pha 2 — Cứu hộ OCR tự động (Automatic OCR Rescue)**:
-   - Nếu phát hiện trang scan, trang ảnh hoặc số ký tự $< 40$, hệ thống tự động định tuyến cứu hộ qua **Mistral OCR Cloud** (`mistral-ocr-latest`) cho độ chính xác cao và tốc độ 1-2s; nếu mạng lỗi hoặc thiếu API key, hệ thống tự động rơi về **Local OCR** (`easyocr` / `docling`).
+   - Khi phát hiện trang scan hoặc tài liệu `mixed`, hệ thống tự động định tuyến cứu hộ qua **Mistral OCR Cloud** (`mistral-ocr-latest`) cho độ chính xác cao và tốc độ 1-2s; nếu mạng lỗi hoặc thiếu API key, hệ thống tự động rơi về **Local OCR** (`easyocr` / `docling`).
 
 ### Bước 4: Bảo toàn bảng biểu Markdown GFM, Phân vùng vĩ mô & Lưu trữ `page_markdowns`
 - **Bảo toàn bảng biểu GFM**: Hàm `_format_table_markdown` chuyển đổi ma trận bảng số hóa thành bảng Markdown chuẩn GitHub Flavored Markdown (`| Tiêu đề 1 | Tiêu đề 2 |`), ngăn ngừa triệt để lỗi mất dữ liệu bảng tuyển sinh hay điểm chuẩn.

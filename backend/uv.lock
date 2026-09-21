@@ -2592,6 +2592,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pdf-inspector"
+version = "1.22.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/54/4b5ca8a71efa4469e74f02852f806793146ed0dad0df663b3ebd6c358c3d/pdf_inspector-1.22.1.tar.gz", hash = "sha256:ef8dd7a031f6116ead6c4f41dc5f0dce53f1d99827fe3b4528c8a82884dd31c3", size = 1951357, upload-time = "2026-09-20T22:55:15.246Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/ee/3bef7b49709da1b70c3ba21e2f66f938e1e1c70d751eea75e162f1820fd1/pdf_inspector-1.22.1-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:5810dc19af3ccc4b13de4a0821f938a2f5423e8b734ad0ecfed820585fafc097", size = 5292102, upload-time = "2026-09-20T22:55:06.708Z" },
+    { url = "https://files.pythonhosted.org/packages/57/c4/4880240c24c4881df6f23a11a2505ce9dc28df9945be2968a550477bcef5/pdf_inspector-1.22.1-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:096aeaf42dfdc92799853790ce038bd40f7c6cefd8f28302b290251983f6bb1b", size = 4988551, upload-time = "2026-09-20T22:55:08.548Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/74/9fdb682b3cbe2eb04e9a7b102e9570de655fb53fd9d0d26714008d8044ee/pdf_inspector-1.22.1-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0c3efcde9a52a34e076d2dbd31cac33a66997ff3079473e3da14bf652750a77b", size = 5547061, upload-time = "2026-09-20T22:55:10.376Z" },
+    { url = "https://files.pythonhosted.org/packages/da/ee/e17fc25677bd538022d113171915e2c865ae9991ba8cd7b8f76630c5ba71/pdf_inspector-1.22.1-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e1efcd24a43f1ccedad9f499942ec8f50875aea4effa494a2a72000aad051dc5", size = 5819769, upload-time = "2026-09-20T22:55:12.101Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/1c/8f62f17f547932e98d12f97fd58c92a018030c851a9e9bb964f007077c24/pdf_inspector-1.22.1-cp38-abi3-win_amd64.whl", hash = "sha256:1fff392d44cdb32953dcb62f2e010e28373fc5505e617b1f8458c9491d513ec1", size = 5122752, upload-time = "2026-09-20T22:55:13.699Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3319,6 +3332,7 @@ dependencies = [
     { name = "markdown" },
     { name = "openpyxl" },
     { name = "passlib", extra = ["bcrypt"] },
+    { name = "pdf-inspector" },
     { name = "prometheus-client" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -3359,6 +3373,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
+    { name = "pdf-inspector", specifier = ">=1.22.1" },
     { name = "prometheus-client", specifier = ">=0.20.0" },
     { name = "pydantic", specifier = ">=2.8.0" },
     { name = "pydantic-settings", specifier = ">=2.4.0" },

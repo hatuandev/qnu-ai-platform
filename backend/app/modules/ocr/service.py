@@ -173,10 +173,65 @@ class OCRService:
         else:
             candidate_order = ("mistral_ocr", "easyocr", "docling")
 
-        # For PDF and text files, try native PyMuPDF fast text extraction first (10-30ms)
+        # For PDF and text files, run Firecrawl Rust-based PDF Inspector for fast classification
         default_adapter = self._adapters[self.default_engine]
         result_dict = None
-        if ext not in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "xlsx", "xls"):
+
+        if ext == "pdf":
+            from app.modules.knowledge.parsers.pdf_inspector import PDFInspector
+
+            inspection = PDFInspector.inspect_bytes(content)
+
+            # If Firecrawl confirms this is clean digital text (text_based), extract fast without OCR!
+            if inspection.can_skip_ocr and inspection.markdown:
+                logger.info(
+                    "auto_ocr_pdf_inspector_fast_path",
+                    pdf_type=inspection.pdf_type,
+                    confidence=inspection.confidence,
+                    elapsed_ms=round(inspection.processing_time_ms, 2),
+                )
+                try:
+                    result_dict = await default_adapter.extract(content, filename)
+                except Exception as exc:
+                    logger.warning("default_adapter_extract_failed: %s", exc)
+                    result_dict = None
+
+                if not result_dict or not (result_dict.get("raw_text") or "").strip():
+                    page_list = [
+                        {
+                            "page_number": p.page_number,
+                            "text": p.markdown,
+                            "confidence": inspection.confidence,
+                            "blocks": [],
+                        }
+                        for p in inspection.pages_detail
+                    ] or [
+                        {
+                            "page_number": 1,
+                            "text": inspection.markdown,
+                            "confidence": inspection.confidence,
+                            "blocks": [],
+                        }
+                    ]
+                    result_dict = {
+                        "raw_text": inspection.markdown,
+                        "pages": page_list,
+                        "engine_used": "pdf_inspector_fast_path",
+                        "total_pages": inspection.page_count or 1,
+                        "latency_ms": inspection.processing_time_ms,
+                    }
+
+                return await self._build_response(
+                    session=session,
+                    result_dict=result_dict,
+                    filename=filename,
+                    tenant_id=tenant_id,
+                    start_time=start_time,
+                    fallback_triggered=False,
+                    error_msg=None,
+                )
+
+        elif ext not in ("png", "jpg", "jpeg", "webp", "bmp", "tiff", "xlsx", "xls"):
             try:
                 result_dict = await default_adapter.extract(content, filename)
             except Exception as exc:

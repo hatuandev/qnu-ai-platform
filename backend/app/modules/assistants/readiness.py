@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.assistants.models import AssistantModel
@@ -126,12 +126,15 @@ class AssistantReadinessEngine:
             col_res = await session.execute(col_stmt)
             collection = col_res.scalar_one_or_none()
 
-            # Count processed/approved documents
+            # Count processed/approved/ready/completed/indexed documents
             doc_stmt = (
                 select(func.count(KnowledgeDocument.id))
                 .where(
                     KnowledgeDocument.collection_id == collection_id,
-                    KnowledgeDocument.status.in_(["processed", "approved"]),
+                    or_(
+                        KnowledgeDocument.status.in_(["processed", "approved", "ready", "completed"]),
+                        KnowledgeDocument.index_status == "indexed",
+                    ),
                     KnowledgeDocument.is_active.is_(True),
                 )
             )

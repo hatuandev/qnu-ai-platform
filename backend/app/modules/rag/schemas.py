@@ -62,7 +62,8 @@ class AskRequest(BaseModel):
     conversation_id: str | None = None
     system_prompt: str | None = None
     temperature: float = Field(0.2, ge=0.0, le=2.0)
-    max_tokens: int = Field(2000, ge=100, le=4096)
+    max_tokens: int = Field(2000, ge=100, le=32000)
+    thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
     preferred_model_name: str | None = None
     preferred_provider_id: str | None = None
     fallback_model: str | None = None

@@ -25,6 +25,7 @@ class LLMGenerateRequest(BaseModel):
     temperature: float = Field(0.2, ge=0.0, le=2.0, description="Độ sáng tạo")
     max_tokens: int = Field(2000, ge=50, le=8192, description="Giới hạn số token đầu ra")
     stream: bool = Field(False, description="Bật chế độ Streaming SSE")
+    thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
     preferred_provider_id: str | None = Field(
         None, description="Mã nhà cung cấp được Trợ lý AI ưu tiên chỉ định"
     )

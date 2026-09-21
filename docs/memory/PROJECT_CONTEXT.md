@@ -7,11 +7,78 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-20 23:25 (UTC+7)
-- **Phiên số**: #167
+- **Thời gian cập nhật**: 2026-09-21 14:32 (UTC+7)
+- **Phiên số**: #174
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-  1. **Tinh Giản Giao Diện Trợ Lý AI & Tách Biệt DAG Visual Studio Thành Màn Hình Độc Lập (phiên #167)**:
+  1. **Bổ Sung Node Query Rewrite Vào Seed Data Của Cả 5 Mô Đun Quy Trình DAG (phiên #174)**:
+     - **Tích hợp `query_rewrite` vào 5 workflow configs (`configs/workflows/*.json`)**:
+       * `admissions-assistant`: Chuẩn hóa ngành học, học phí, học bổng, điểm chuẩn, viết tắt CNTT, QTKD, ĐGNL, THPT, KTX.
+       * `regulations-assistant`: Chuẩn hóa tín chỉ, học phần, điểm rèn luyện, khen thưởng, viết tắt ĐRL, GPA, CTĐT, CTSV, PĐT, NCKH.
+       * `library-assistant`: Chuẩn hóa giáo trình, sách chuyên khảo, tài liệu, luận văn, viết tắt SP, CNTT, QTKD, KHCN, NCKH.
+       * `drafting-assistant`: Chuẩn hóa tờ trình, kế hoạch, quyết định, công văn, Nghị định 30, viết tắt BGH, ĐHQG, UBND, PĐT, TCHC.
+       * `question-bank-assistant`: Chuẩn hóa ma trận đề thi, ngân hàng câu hỏi, thang đo Bloom, chuẩn đầu ra CLO/PLO, CĐR, ĐCHP, KTĐG.
+     - **Nâng cấp Idempotent Seeder**: Cập nhật `sync_default_workflows` trong `service.py` tự động cập nhật bản nháp và phiên bản v1.0.0 khi cấu hình JSON thay đổi; chạy `db seed --workflows` đồng bộ thành công cả 5/5 quy trình vào PostgreSQL.
+     - **Cập nhật Tài liệu Quy trình**: Bổ sung Mục 13 trong `docs/quy_trinh/04_dieu_phoi_tro_ly_dag.md`.
+     - **Verification**: Backend Ruff 0 lỗi, Pytest 31/31 passed; Frontend Biome 0 lỗi, tsc 0 lỗi; CSDL xác nhận 5/5 quy trình đã có node `query.rewrite`.
+  2. **Chuẩn Hóa Node DAG Query Rewrite Dùng Chung Đa Quy Trình & Visual Prompt Inspector (phiên #173)**:
+     - **Triệt tiêu hoàn toàn Hardcoded Domains**:
+       * Xóa bỏ hoàn toàn biến toàn cục `DOMAIN_CONTEXT_MAP` cố định 5 mô đun trong `backend/app/modules/workflows/nodes/query_rewrite_node.py`;
+       * Đưa `query.rewrite` trở thành building block dùng chung cho mọi quy trình nghiệp vụ (tuyển sinh, đào tạo, ký túc xá, thư viện, khảo thí, công tác sinh viên, văn phòng khoa,...);
+       * Xây dựng hàm `get_node_instruction`: ưu tiên cao nhất cho `instruction` / `prompt` do người dùng cấu hình trực tiếp trên từng node của từng quy trình;
+       * Xây dựng hàm `build_rewrite_prompt`: hỗ trợ placeholder `{query}` nếu muốn định nghĩa mẫu hoàn chỉnh, hoặc tự động gói trong format few-shot chuẩn hóa;
+     - **Visual Property Inspector trên Frontend**:
+       * Nâng cấp `frontend/src/components/admin/property-inspector.tsx`: Thêm khối giao diện cấu hình trực quan riêng cho node `query.rewrite`;
+       * Cung cấp Textarea soạn thảo `Prompt / Hướng dẫn chuẩn hóa` (`instruction`), công tắc bật/tắt Fast Rules (0ms) và Tầng LLM (~150ms);
+     - **Đồng bộ Manifest & CSDL**:
+       * Cập nhật `configs/nodes/query.rewrite.v1alpha1.json`: bổ sung `instruction` và `prompt` vào `config_schema`;
+       * Cập nhật `configs/workflows/admissions-assistant.v1alpha1.json`: cấu hình instruction tuyển sinh đặc thù vào node `query_rewrite`;
+       * Đồng bộ cập nhật CSDL PostgreSQL (`workflow_definitions`, `workflow_drafts`, `workflow_versions`);
+     - **Verification**: Backend Ruff 0 lỗi, Pytest 31/31 passed (100%); Frontend Biome 168 files 0 lỗi, TypeScript 0 lỗi, Vite build 8.15s; End-to-end chat test 100% pass với câu hỏi gõ nhầm Telex được chuẩn hóa và trả về đầy đủ học phí kèm 4 trích dẫn PDF;
+  2. **Khắc Phục Hiện Tượng Phản Hồi Mock RAG & Kích Hoạt Cloudflare LLM Generation (@cf/meta/llama-3.1-8b-instruct) (phiên #171)**:
+     - **Phân tích nguyên nhân gốc**: Tầng RAG Retrieval bóc tách và truy vấn chính xác 100% (5 trích dẫn từ tài liệu PDF `doc_f0c1` được trích xuất hoàn hảo). Khi chuyển sang tầng tổng hợp văn bản, Trợ lý gọi `gemini-2.5-flash` nhưng CSDL chỉ có key mẫu (`AIzaSyMockKey-1`) gây lỗi HTTP 400. Cascade fallback sang Cloudflare nhưng thiếu cấu hình LLM chat, cuối cùng rơi về Local vLLM offline kích hoạt thông báo mô phỏng an toàn (`[Local @cf/baai/bge-m3]...`);
+     - **Kích hoạt LLM Cloudflare Workers AI**: Khai thác token Cloudflare đang hoạt động sẵn có, đưa `@cf/meta/llama-3.1-8b-instruct` vào danh sách models chính thức của `prov_cloudflare` trong `backend/app/modules/modelops/services/provider_service.py` và CSDL;
+     - **Gia cố phòng vệ cascade trong `InferenceService`**: Tự động lọc bỏ các mô hình nhúng (`bge-`, `embed`, `rerank`, `tableformer`) khi chọn model mặc định trong cascade fallback cho cả `generate` và `stream`, ngăn chặn lỗi gọi chat vào embedding endpoint;
+     - **Cập nhật cấu hình Trợ lý Tuyển sinh (`admissions`)**: Sử dụng `@cf/meta/llama-3.1-8b-instruct`. Thử nghiệm trực tiếp trả lời tiếng Việt trôi chảy, chi tiết, chính xác 100% theo tài liệu PDF với độ trễ chỉ 2 giây;
+     - **Verification**: Backend ruff 0 lỗi, pytest 48/48 passed; Frontend Biome 168 files 0 lỗi, tsc 0 lỗi;
+  2. **Khắc Phục Lỗi Chặn Xuất Bản (Publish Gate 100%) & Tích Hợp Sonner Toaster Toàn Cục Kèm Thông Báo Khi Lưu Trợ Lý AI (phiên #170)**:
+     - **Backend: Triệt tiêu 2 blockers trong Publish Gate**:
+       * Mở rộng bộ lọc tài liệu đối soát trong `backend/app/modules/assistants/readiness.py`: Thêm trạng thái `ready`, `completed` và `index_status == "indexed"`, đưa điểm tiêu chí Kho tri thức chuyên biệt từ 25/100 lên 100/100;
+       * Bổ sung `ALIASES` trong `backend/app/modules/tools/registry.py` (`admissions.fact_lookup` -> `lookup_admission_score`), đồng bộ cấu hình CSDL `enabled_tools`, đưa điểm Tool Gateway lên 100/100;
+       * Tổng điểm sẵn sàng của Trợ lý Tuyển sinh đạt 100/100 (5/5 tiêu chí ĐẠT, 0 blocker);
+     - **Frontend: Tích hợp hệ thống Toast toàn cục & Thông báo khi bấm Lưu**:
+       * Tạo component `src/components/ui/sonner.tsx` chuẩn shadcn/ui tích hợp `useTheme()` và tokens thiết kế QNU;
+       * Gắn `<Toaster />` vào `src/App.tsx`, mở khóa popup thông báo cho toàn bộ hơn 50 màn hình;
+       * Nâng cấp `updateMutation.onSuccess` trong `assistant-detail-page.tsx`, hiển thị thông báo popup Toast "Đã lưu thay đổi cấu hình thành công!" kèm mô tả và tự động làm mới cache readiness;
+     - **Verification**: Backend ruff 0 lỗi, pytest 27/27 passed; Frontend Biome 168 files 0 lỗi, tsc 0 lỗi, build 11.26s.
+  2. **Tích Hợp Firecrawl `pdf-inspector` Lõi Rust (v1.22.1) & Tối Ưu Hóa Phân Nhánh Ingestion Pipeline (phiên #169)**:
+     - **Cài đặt thư viện chính thức**: Cài đặt `pdf-inspector==1.22.1` vào `backend/pyproject.toml` qua `uv add pdf-inspector`.
+     - **Module Adapter `PDFInspector`**:
+       * Xây dựng [`backend/app/modules/knowledge/parsers/pdf_inspector.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/knowledge/parsers/pdf_inspector.py) bọc Rust native engine, phân loại `pdf_type` (`text_based`, `scanned`, `image_based`, `mixed`) và danh sách `pages_needing_ocr` trong 10-30ms;
+       * Trang bị Graceful Fallback tự động xử lý an toàn dữ liệu nhị phân hỏng;
+       * Export từ `app.modules.knowledge.parsers`;
+     - **Tích hợp Kiến trúc Song Mã (Complementary Architecture)**:
+       * `pdf_parser.py`: Gọi `PDFInspector.inspect_bytes(file_bytes)` để đính kèm metadata phân loại thông minh (`pdf_type`, `pages_needing_ocr`, `confidence`) và ưu tiên Markdown cấu trúc do Rust trích xuất; đồng thời bảo tồn 100% PyMuPDF geometry blocks cho Bounding Boxes UI;
+       * `ingestion_service.py`: Thay thế toàn bộ logic thủ công `len < 40` bằng kiểm tra phân loại `pdf_type` và `pages_needing_ocr`;
+       * `ocr/service.py`: Trong `_extract_auto()`, tích hợp `PDFInspector` thanh tra trước, kích hoạt Fast-Path (10-30ms) cho `text_based` mà không tốn chi phí gọi OCR;
+     - **Đồng bộ tài liệu & sơ đồ**:
+       * Quy trình 02 ([`docs/quy_trinh/02_nap_tri_thuc_minio.md`](file:///d:/DuAnPhanMem/qnu-ai-platform/docs/quy_trinh/02_nap_tri_thuc_minio.md)): cập nhật Bước 3 và Mermaid diagram;
+       * Sơ đồ tương tác ([`docs/diagrams/kho_tri_thuc_architecture.html`](file:///d:/DuAnPhanMem/qnu-ai-platform/docs/diagrams/kho_tri_thuc_architecture.html)): cập nhật node `Firecrawl PDF Inspector` và Card 1;
+     - **Verification**:
+       * `backend/tests/test_pdf_inspector.py`: 5/5 tests passed (100%) trong 0.90s;
+       * Toàn bộ test suite Knowledge & OCR: 63/63 tests passed (100%) trong 54s;
+       * `uv run ruff check .`: 0 lỗi linter;
+       * Frontend: Biome 167 files 0 lỗi, TypeScript tsc 0 lỗi.
+  1. **Loại Bỏ Chuyển Hướng /workflows/* & Giữ Nguyên Không Gian URL /assistants/:id/workflow (phiên #168)**:
+     - **Triệt tiêu hoàn toàn hook redirect tự động và query rườm rà `?returnTo=...`**:
+       * Xóa bỏ hook `useEffect` trong `assistant-detail-page.tsx` từng tự động đẩy người dùng sang `http://localhost:3001/workflows/admissions-assistant?returnTo=...`;
+       * Giữ nguyên 100% URL sạch trong không gian Trợ lý: `/assistants/:code/workflow`;
+       * Khi ở subView `workflow`, `AssistantDetailPage` trả về trực tiếp `DAGCanvasPage` toàn màn hình (`h-[calc(100vh-4rem)]`), giải phóng trọn vẹn diện tích đồ thị DAG mà không bị chèn ép;
+       * Bảo toàn 100% ngữ cảnh điều hướng: Sidebar bên trái luôn duy trì highlight xanh ở **Trợ lý AI** (không bị nhảy sang Thư Viện Workflow dưới Nâng cao); Topbar breadcrumbs duy trì **Xây Dựng AI > Trợ Lý AI**;
+       * Bổ sung tab `workflow` ("Sơ đồ DAG Studio", icon `Network`) vào `WORKSPACE_TABS` giúp chuyển đổi liền mạch;
+       * Chuẩn hóa nút quay lại trên thanh DAG Studio: hiển thị `[Quay lại Trợ lý]` điều hướng về đúng trang cấu hình `/assistants/:id`.
+     - **Verification**: `npm run typecheck` 0 lỗi, `npm run lint` 0 lỗi trên 167 files, `npm run build` thành công trong 8.73s, `uv run ruff check .` pass.
+  2. **Tinh Giản Giao Diện Trợ Lý AI & Tách Biệt DAG Visual Studio Thành Màn Hình Độc Lập (phiên #167)**:
      - **Dọn sạch thông tin dư thừa & dữ liệu giả trên trang Chi tiết Trợ lý AI (`/assistants/:id`)**:
        * Xóa 4 thẻ KPI thô/giả (128 lượt chạy, 240ms độ trễ, thẻ kho tri thức trùng lặp, thẻ Ragas TM-08 trùng lặp);
        * Xóa chuỗi ID kỹ thuật `assistant.id` (`ast_admissions`) nằm dưới tiêu đề gây rối mắt;

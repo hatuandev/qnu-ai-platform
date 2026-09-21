@@ -17,6 +17,7 @@ export interface AssistantLifecycleConfig {
     fallback_model: string;
     temperature: number;
     max_tokens: number;
+    thinking_budget?: number;
   };
   guardrails: {
     block_prompt_injection: boolean;

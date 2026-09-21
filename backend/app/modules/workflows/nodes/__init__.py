@@ -17,6 +17,7 @@ from app.modules.workflows.nodes.human_approval_node import HumanApprovalNodeHan
 from app.modules.workflows.nodes.llm_generate_node import LLMGenerateNodeHandler
 from app.modules.workflows.nodes.no_answer_node import OutputNoAnswerNodeHandler
 from app.modules.workflows.nodes.output_chat_node import OutputChatNodeHandler
+from app.modules.workflows.nodes.query_rewrite_node import QueryRewriteNodeHandler
 from app.modules.workflows.nodes.rag_answer_node import RAGAnswerNodeHandler
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "NodeExecutionResult",
     "OutputChatNodeHandler",
     "OutputNoAnswerNodeHandler",
+    "QueryRewriteNodeHandler",
     "RAGAnswerNodeHandler",
     "WorkflowContext",
 ]

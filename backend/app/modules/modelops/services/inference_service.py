@@ -146,7 +146,18 @@ class InferenceService:
                 ):
                     chosen_model = req.fallback_model_name
                 else:
-                    chosen_model = p["model_name"]
+                    chat_candidates = [
+                        m
+                        for m in p_models
+                        if not any(x in m.lower() for x in ("bge-", "embed", "rerank", "tableformer"))
+                    ]
+                    if chat_candidates and any(
+                        x in str(p.get("model_name", "")).lower()
+                        for x in ("bge-", "embed", "rerank", "tableformer")
+                    ):
+                        chosen_model = chat_candidates[0]
+                    else:
+                        chosen_model = p["model_name"]
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)
@@ -162,11 +173,22 @@ class InferenceService:
                         account_id=active_key_entry.get("account_id") or p.get("account_id"),
                     )
 
-                    resp = await adapter.generate(
-                        messages=req.messages,
-                        temperature=req.temperature,
-                        max_tokens=req.max_tokens,
-                    )
+                    try:
+                        resp = await adapter.generate(
+                            messages=req.messages,
+                            temperature=req.temperature,
+                            max_tokens=req.max_tokens,
+                            thinking_budget=getattr(req, "thinking_budget", 0),
+                        )
+                    except TypeError as te:
+                        if "thinking_budget" in str(te):
+                            resp = await adapter.generate(
+                                messages=req.messages,
+                                temperature=req.temperature,
+                                max_tokens=req.max_tokens,
+                            )
+                        else:
+                            raise
 
                     # Update token usage on active key
                     active_key_entry["usage_tokens"] = active_key_entry.get("usage_tokens", 0) + resp.total_tokens
@@ -323,7 +345,18 @@ class InferenceService:
                 ):
                     chosen_model = req.fallback_model_name
                 else:
-                    chosen_model = p["model_name"]
+                    chat_candidates = [
+                        m
+                        for m in p_models
+                        if not any(x in m.lower() for x in ("bge-", "embed", "rerank", "tableformer"))
+                    ]
+                    if chat_candidates and any(
+                        x in str(p.get("model_name", "")).lower()
+                        for x in ("bge-", "embed", "rerank", "tableformer")
+                    ):
+                        chosen_model = chat_candidates[0]
+                    else:
+                        chosen_model = p["model_name"]
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)
@@ -342,11 +375,24 @@ class InferenceService:
                         timeout_seconds=p["timeout_seconds"],
                         account_id=active_key_entry.get("account_id") or p.get("account_id"),
                     )
-                    async for token_chunk in adapter.stream(
-                        messages=req.messages,
-                        temperature=req.temperature,
-                        max_tokens=req.max_tokens,
-                    ):
+                    try:
+                        token_stream = adapter.stream(
+                            messages=req.messages,
+                            temperature=req.temperature,
+                            max_tokens=req.max_tokens,
+                            thinking_budget=getattr(req, "thinking_budget", 0),
+                        )
+                    except TypeError as te:
+                        if "thinking_budget" in str(te):
+                            token_stream = adapter.stream(
+                                messages=req.messages,
+                                temperature=req.temperature,
+                                max_tokens=req.max_tokens,
+                            )
+                        else:
+                            raise
+
+                    async for token_chunk in token_stream:
                         yielded_any = True
                         streamed_chunks.append(token_chunk)
                         yield token_chunk

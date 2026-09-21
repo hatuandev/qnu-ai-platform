@@ -116,6 +116,22 @@ export const CATALOG_NODE_ITEMS: NodeCatalogItem[] = [
     version: "1.0.0",
   },
   {
+    type: "query.rewrite",
+    category: "rag",
+    label: "Chuẩn Hóa Câu Hỏi & Sửa Lỗi Ngữ Cảnh (Query Rewrite)",
+    description:
+      "Tự động nhận diện và sửa lỗi gõ nhầm Telex ('ngày' -> 'ngành'), viết tắt ('cntt' -> 'Công nghệ thông tin') và chuẩn hóa câu hỏi ngữ cảnh trước khi tra cứu RAG.",
+    defaultConfigSummary: "use_fast_rules: true, use_llm: true",
+    defaultConfig: {
+      use_fast_rules: true,
+      use_llm: true,
+      preserve_original: true,
+    },
+    timeoutSeconds: 5,
+    status: "active",
+    version: "1.0.0",
+  },
+  {
     type: "core.drafting.compose",
     category: "llm",
     label: "Soạn Thảo Văn Bản LLM (Drafting)",

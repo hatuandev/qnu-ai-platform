@@ -33,6 +33,7 @@ class AssistantModelPolicy(BaseModel):
     fallback_model: str = Field("gemini-1.5-flash", min_length=2, max_length=100)
     temperature: float = Field(0.2, ge=0, le=2)
     max_tokens: int = Field(1200, ge=128, le=32000)
+    thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
 
 
 class AssistantGuardrailPolicy(BaseModel):

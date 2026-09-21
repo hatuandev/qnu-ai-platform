@@ -16,6 +16,7 @@ from app.modules.workflows.nodes import (
     LLMGenerateNodeHandler,
     OutputChatNodeHandler,
     OutputNoAnswerNodeHandler,
+    QueryRewriteNodeHandler,
     RAGAnswerNodeHandler,
 )
 
@@ -82,6 +83,12 @@ class NodeHandlerRegistry:
         extract_fields = ExtractFieldsNodeHandler()
         self.register("extract.fields", extract_fields)
         self.register("extract_fields", extract_fields)
+
+        query_rewrite = QueryRewriteNodeHandler()
+        self.register("query.rewrite", query_rewrite)
+        self.register("query_rewrite", query_rewrite)
+        self.register("query.normalize", query_rewrite)
+        self.register("query_normalize", query_rewrite)
 
     def register(self, node_type: str, handler: BaseNodeHandler) -> None:
         self._handlers[node_type.lower().strip()] = handler

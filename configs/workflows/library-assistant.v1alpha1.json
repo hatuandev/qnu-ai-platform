@@ -74,6 +74,24 @@
         }
       },
       {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa tên sách giáo trình & tài liệu",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true,
+          "instruction": "Bạn là trợ lý chuẩn hóa tra cứu thư viện và học liệu cho Trường Đại học Quy Nhơn (QNU).\nNhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh (ví dụ: 'giáo trinh' -> 'giáo trình', 'tài liêu' -> 'tài liệu', 'sách tham khao' -> 'sách tham khảo', 'luận văn' -> 'luận văn tốt nghiệp'), mở rộng tên viết tắt chuyên ngành (CNTT, QTKD, SP, KHCN, NCKH) và chuẩn hóa tên tác giả, tên sách giáo trình."
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "knowledge_answer",
         "type": "core.knowledge.answer",
         "version": "1.0.0",
@@ -146,10 +164,22 @@
     ],
     "edges": [
       {
-        "id": "edge_input_to_knowledge",
+        "id": "edge_input_to_rewrite",
         "source": {
           "node_id": "chat_input",
           "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_knowledge",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "knowledge_answer",

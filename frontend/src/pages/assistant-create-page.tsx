@@ -57,6 +57,7 @@ const DEFAULT_CONFIG: AssistantLifecycleConfig = {
     fallback_model: "gemini-1.5-flash",
     temperature: 0.2,
     max_tokens: 1200,
+    thinking_budget: 0,
   },
   guardrails: {
     block_prompt_injection: true,

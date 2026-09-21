@@ -61,8 +61,9 @@ flowchart TD
         ENTRY --> ROUTE{4. condition.route<br>Phân loại ý định Regex}
         
         ROUTE -->|Chào hỏi xã giao| GREET[5A. output.chat: Template Chào Mừng QNU]
-        ROUTE -->|Tra cứu nghiệp vụ| RAG[5B. core.knowledge.answer: Hybrid RAG Pipeline]
-        ROUTE -->|Tác vụ nhạy cảm: Điểm thi, Học bổng| APPROVAL{5C. tool.human_approval: Điểm Chốt Phê Duyệt}
+        ROUTE -->|Tra cứu nghiệp vụ| REWRITE[5B. query.rewrite: Chuẩn Hóa & Sửa Lỗi Gõ Nhầm Telex]
+        REWRITE --> RAG[5C. core.knowledge.answer: Hybrid RAG Pipeline]
+        ROUTE -->|Tác vụ nhạy cảm: Điểm thi, Học bổng| APPROVAL{5D. tool.human_approval: Điểm Chốt Phê Duyệt}
         
         RAG --> GUARD{6. guard.citation: Kiểm Tra Căn Cứ RAG}
         GUARD -->|Đủ căn cứ trích dẫn| OUT_RAG[7A. output.chat: Câu trả lời có Citation]
@@ -166,6 +167,20 @@ Trong `ConditionRouteNodeHandler`:
   - `/workflows/:id`: Mở trực tiếp bản nháp DAG của Trợ lý tương ứng trên DAG Studio, hỗ trợ nút chép link chia sẻ đồng bộ.
   - `/assistants/:id`: Trung tâm điều hành chuyên sâu cho từng Trợ lý AI với deep link định danh (`/assistants/admissions`, `/assistants/regulations`,...).
 - Tuân thủ 100% nguyên tắc UI mở, không gò bó, hỗ trợ bookmark và F5 không mất ngữ cảnh.
+
+### 7. Chuẩn Hóa Câu Hỏi & Khắc Phục Lỗi Gõ Nhầm Ngữ Cảnh (Contextual Typo Correction & Query Rewrite Node)
+- **Vị trí trong DAG**: Đặt ngay sau `condition_route` và ngay trước `core.knowledge.answer`.
+- **Cơ chế Xử lý 2 Tầng (2-Stage Normalization Pipeline)**:
+  1. *Tầng 1 — Fast Rule Engine (0ms)*:
+     - Tự động chuẩn hóa Unicode NFC sạch;
+     - Phát hiện và sửa lỗi trượt phím Telex hoặc ngữ cảnh phổ biến: `"ngày"` $\rightarrow$ `"ngành"` (khi đi kèm tên ngành), `"học bà"` $\rightarrow$ `"học bạ"`, `"điểm chuẫn"` $\rightarrow$ `"điểm chuẩn"`, `"kí túc sá"` $\rightarrow$ `"ký túc xá"`, `"sư pham"` $\rightarrow$ `"sư phạm"`;
+     - Mở rộng các từ viết tắt chuyên ngành: `"cntt"` $\rightarrow$ `"Công nghệ thông tin"`, `"qtkd"` $\rightarrow$ `"Quản trị kinh doanh"`, `"đgnl"` $\rightarrow$ `"Đánh giá năng lực"`, `"thpt"` $\rightarrow$ `"THPT"`, `"ktx"` $\rightarrow$ `"ký túc xá"`, `"nd 116"` $\rightarrow$ `"Nghị định 116"`;
+     - Chuẩn hóa viết hoa danh từ riêng của 17 ngành học trọng điểm QNU.
+  2. *Tầng 2 — Fast Contextual LLM Rewrite (~150ms, Tùy chọn)*:
+     - Sử dụng mô hình Flash với `temperature=0.0`, `thinking_budget=0` và timeout 3.0 giây;
+     - Được trang bị bộ Prompt Few-shot nghiêm ngặt (chỉ trả về câu hỏi sạch, không giải thích, không tiền tố);
+     - Tự động Cascade an toàn về kết quả của Tầng 1 khi xảy ra lỗi mạng hoặc quá hạn thời gian.
+- **Tính Bền Vững & Downstream Sync**: Ghi đè câu hỏi đã chuẩn hóa vào `context.node_data["normalized_query"]` và `context.node_data["user_message"]`, giúp tầng Hybrid RAG (`core.knowledge.answer`) truy xuất chính xác 100% các vector và facts liên quan.
 
 ---
 
@@ -370,6 +385,35 @@ Nhằm bảo đảm tính toàn vẹn cấu hình đồ thị trước khi xuấ
   * Giao diện cung cấp thẻ thông tin trực quan: Tên Node, Mã phiên (Run ID), Mã Checkpoint, Thông điệp kiểm duyệt, Thời điểm khởi tạo, cùng cặp nút hành động nhanh **[Phê duyệt]** và **[Từ chối]**.
   * Hộp thoại quyết định (`Approval Decision Dialog`) cho phép cán bộ nhập danh tính người thẩm định (`decided_by`) và ý kiến/căn cứ chuyên môn (`decision_reason`).
   * Khi gửi quyết định (`POST /executions/{execution_id}/approvals/{approval_id}/decision`), Backend cập nhật trạng thái `WorkflowApprovalRequest`, đánh dấu checkpoint hoàn tất và tự động đánh thức động cơ DAG tiếp tục thực thi các bước kế tiếp.
+
+---
+
+## 13. Node Chuẩn Hóa Câu Hỏi & Sửa Lỗi Ngữ Cảnh Dùng Chung (`query.rewrite`)
+
+Nhằm giải quyết triệt để lỗi người dùng gõ nhầm trượt phím Telex (ví dụ: *"ngày"* thay vì *"ngành"*, *"học bà"* thay vì *"học bạ"*, *"tín chì"* thay vì *"tín chỉ"*) và viết tắt chuyên ngành trước khi câu hỏi đi vào tầng RAG hay tầng trích xuất thông tin:
+
+### 13.1. Tôn Chỉ Thiết Kế Node Dùng Chung (Generic Reusable Building Block)
+- **Zero Hardcoded Domain**: Node `query.rewrite` không chứa bất kỳ danh sách cố định nào về số lượng mô đun hay phân hệ. Đây là một building block trung lập sẵn sàng kéo-thả vào bất kỳ đồ thị DAG nào trong hệ sinh thái QNU AI.
+- **Phân Giải Instruction Ưu Tiên Cấp Node**:
+  1. `config.instruction` hoặc `config.prompt`: Do cán bộ thiết kế quy trình nhập trực tiếp trên thanh thuộc tính `PropertyInspector` của DAG Visual Studio.
+  2. `config.domain`: Tên lĩnh vực vắn tắt (nếu muốn dùng mẫu tự động).
+  3. Ngữ cảnh Trợ lý AI (`context.assistant_profile`): Kế thừa mô tả vai trò trợ lý nếu đang chạy dưới một Trợ lý AI.
+  4. Fallback toàn trường ĐH Quy Nhơn cho các quy trình mở rộng mới.
+- **Kiến Trúc Chuẩn Hóa 2 Tầng**:
+  * *Tầng 1 (0ms Fast Rules)*: Xử lý tức thì các lỗi trượt phím Telex thông dụng và từ viết tắt QNU quen thuộc qua biểu thức chính quy tối ưu.
+  * *Tầng 2 (~150ms Contextual LLM)*: Gọi mô hình ngôn ngữ siêu tốc (`thinking_budget: 0`, `temperature: 0.0`) với cấu trúc prompt Few-shot nghiêm ngặt (không giải thích, không thêm tiền tố, bảo toàn 100% ý định câu hỏi gốc).
+
+### 13.2. Cấu Hình Seed Data Thực Tế Trên 5 Quy Trình Chuẩn QNU
+Cả 5 quy trình nghiệp vụ chính thức đều được nạp sẵn node `query_rewrite` với prompt chuyên biệt:
+
+| Quy Trình | ID Node | Vị Trí Trong DAG | Instruction Chuẩn Hóa Chuyên Biệt |
+| :--- | :--- | :--- | :--- |
+| **Tuyển sinh** (`admissions-assistant`) | `query_rewrite` | `condition_route` $\rightarrow$ `knowledge_answer` | Sửa trượt phím ("ngày" $\rightarrow$ "ngành", "học bà" $\rightarrow$ "học bạ"), mở rộng CNTT, QTKD, ĐGNL, THPT, KTX, viết hoa chuẩn tên các ngành đào tạo. |
+| **Quy chế học vụ** (`regulations-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `knowledge_answer` | Sửa lỗi "tín chì" $\rightarrow$ "tín chỉ", "học phầm" $\rightarrow$ "học phần", "rèn luyên" $\rightarrow$ "rèn luyện", mở rộng ĐRL, GPA, CTĐT, CTSV, PĐT, NCKH. |
+| **Thư viện & NCKH** (`library-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `knowledge_answer` | Sửa lỗi "giáo trinh" $\rightarrow$ "giáo trình", "tài liêu" $\rightarrow$ "tài liệu", "luận văn", mở rộng CNTT, QTKD, SP, KHCN, NCKH và chuẩn hóa tên tác giả/giáo trình. |
+| **Soạn thảo NĐ 30** (`drafting-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `extract_fields` & `sample_retrieval` | Sửa lỗi "tờ trinh" $\rightarrow$ "tờ trình", "kế hoach" $\rightarrow$ "kế hoạch", "quyết đinh" $\rightarrow$ "quyết định", mở rộng Nghị định 30/2020/NĐ-CP, BGH, UBND, PĐT, TCHC. |
+| **Khảo thí & Đề thi** (`question-bank-assistant`) | `query_rewrite` | `chat_input` $\rightarrow$ `knowledge_answer` | Sửa lỗi "ma trân" $\rightarrow$ "ma trận đề thi", "ngân hang" $\rightarrow$ "ngân hàng câu hỏi", "thang đo blom" $\rightarrow$ "thang đo Bloom", mở rộng CLO, PLO, CĐR, ĐCHP, KTĐG. |
+
 
 
 

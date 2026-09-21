@@ -1,0 +1,95 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "query.rewrite",
+    "version": "1.0.0",
+    "display_name": "Chuẩn hóa Câu hỏi & Sửa lỗi Ngữ cảnh (Query Rewrite)",
+    "description": "Tự động nhận diện và sửa lỗi gõ nhầm Telex ('ngày' -> 'ngành'), viết tắt ('cntt' -> 'Công nghệ thông tin') và chuẩn hóa câu hỏi ngữ cảnh trước khi tra cứu RAG.",
+    "category": "rag",
+    "labels": {
+      "provider": "qnu_ai_core"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "builtin",
+      "operation": "query.rewrite"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "use_fast_rules": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bật tầng tiền xử lý quy tắc nhanh (0ms) cho từ viết tắt QNU và trượt phím Telex"
+        },
+        "use_llm": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bật tầng LLM siêu tốc (~150ms) để sửa lỗi ngữ cảnh nâng cao"
+        },
+        "preserve_original": {
+          "type": "boolean",
+          "default": true,
+          "description": "Lưu câu hỏi gốc vào context.node_data['original_query']"
+        },
+        "instruction": {
+          "type": "string",
+          "description": "Hướng dẫn / Prompt chuẩn hóa câu hỏi tùy biến theo đúng quy trình nghiệp vụ (ví dụ: quy định ngữ cảnh, từ viết tắt đặc thù, viết hoa tên ngành/thuật ngữ)."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Alias của instruction hoặc system prompt tùy biến."
+        },
+        "domain": {
+          "type": "string",
+          "description": "Lĩnh vực chuyên môn của quy trình (ví dụ: tuyển sinh, quy chế đào tạo, thư viện học liệu, khảo thí, ký túc xá). Tùy chọn nếu đã cung cấp instruction."
+        },
+        "custom_prompt": {
+          "type": "string",
+          "description": "Tùy biến prompt chuẩn hóa câu hỏi nếu cần ghi đè hoàn toàn (hỗ trợ biến {query})."
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["normalized_query"],
+      "properties": {
+        "normalized_query": {
+          "type": "string"
+        },
+        "original_query": {
+          "type": "string"
+        },
+        "modified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "capabilities": ["query.transform"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 5,
+      "max_timeout_seconds": 15,
+      "supports_cancellation": true
+    },
+    "compatibility": {
+      "status": "active",
+      "min_runtime_version": "0.1.0"
+    }
+  }
+}

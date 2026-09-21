@@ -265,8 +265,12 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "id": "prov_cloudflare",
         "name": "Cloudflare Workers AI",
         "provider_type": "cloudflare",
-        "model_name": "@cf/baai/bge-m3",
-        "models": ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base"],
+        "model_name": "@cf/meta/llama-3.1-8b-instruct",
+        "models": [
+            "@cf/meta/llama-3.1-8b-instruct",
+            "@cf/baai/bge-m3",
+            "@cf/baai/bge-reranker-base",
+        ],
         "api_base_url": f"https://api.cloudflare.com/client/v4/accounts/{settings.CLOUDFLARE_ACCOUNT_ID or '{account_id}'}/ai/run",
         "api_key": encrypt_secret(settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN) if (settings.CLOUDFLARE_API_KEY or settings.CLOUDFLARE_API_TOKEN) else "",
         "priority": 4,
@@ -274,7 +278,11 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "timeout_seconds": 25,
         "extra_config": {
             "account_id": settings.CLOUDFLARE_ACCOUNT_ID or "",
-            "models": ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base"],
+            "models": [
+                "@cf/meta/llama-3.1-8b-instruct",
+                "@cf/baai/bge-m3",
+                "@cf/baai/bge-reranker-base",
+            ],
             "api_keys": [
                 {
                     "id": "key_cloudflare_primary",
@@ -785,7 +793,7 @@ class ProviderService:
         start = time.perf_counter()
         timeout = 10.0
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
                 if provider_type == "mistral":
                     url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/models"
                     resp = await client.get(url, headers={"Authorization": f"Bearer {clean_key}"})
@@ -934,7 +942,7 @@ class ProviderService:
 
         timeout = 10.0
         try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
                 if provider_type == "gemini":
                     model_id = clean_model.replace("models/", "")
                     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={clean_key}"

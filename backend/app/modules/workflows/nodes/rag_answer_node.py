@@ -18,7 +18,11 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        query = context.node_data.get("user_message") or context.inputs.get("message", "")
+        query = (
+            context.node_data.get("normalized_query")
+            or context.node_data.get("user_message")
+            or context.inputs.get("message", "")
+        )
         config = node_spec.config or {}
 
         profile = context.assistant_profile
@@ -39,6 +43,11 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             if (profile and hasattr(profile, "model_policy") and profile.model_policy)
             else None
         )
+        thinking_budget = (
+            getattr(profile.model_policy, "thinking_budget", 0)
+            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            else config.get("thinking_budget", 0)
+        )
 
         ask_req = AskRequest(
             question=query,
@@ -48,7 +57,8 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             tenant_id=context.tenant_id or "tenant_qnu",
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
             temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
-            max_tokens=profile.model_policy.max_tokens if profile else config.get("max_tokens", 2000),
+            max_tokens=min(profile.model_policy.max_tokens, 8192) if profile else config.get("max_tokens", 2000),
+            thinking_budget=thinking_budget,
             preferred_model_name=primary_model,
             fallback_model=fallback_model,
             history=context.inputs.get("conversation_history"),

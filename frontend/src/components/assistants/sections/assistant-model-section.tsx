@@ -119,6 +119,22 @@ export function AssistantModelSection({
             onChange={(e) => onChange({ ...form, max_tokens: Number(e.target.value) })}
           />
         </Field>
+
+        <Field
+          htmlFor="detail-thinking-budget"
+          label="Thinking Budget (Suy nghĩ ngầm)"
+          hint="0 = Tắt suy nghĩ ngầm (phản hồi siêu tốc 1-2s). > 0: Bật suy luận sâu cho Gemini 2.5 (0 - 4096 tokens)"
+        >
+          <Input
+            id="detail-thinking-budget"
+            max="4096"
+            min="0"
+            step="128"
+            type="number"
+            value={form.thinking_budget ?? 0}
+            onChange={(e) => onChange({ ...form, thinking_budget: Number(e.target.value) })}
+          />
+        </Field>
       </CardContent>
     </Card>
   );

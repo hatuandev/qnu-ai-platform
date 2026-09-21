@@ -96,7 +96,7 @@ class CloudflareAdapter(BaseLLMAdapter):
             "Content-Type": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             resp = await client.post(endpoint, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()

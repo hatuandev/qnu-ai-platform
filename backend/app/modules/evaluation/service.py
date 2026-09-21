@@ -426,9 +426,10 @@ class EvaluationService:
             )
             res = await session.execute(stmt)
             existing = res.scalar_one_or_none()
+            now = datetime.now(UTC).replace(tzinfo=None)
             if existing:
                 existing.frequency += 1
-                existing.updated_at = datetime.now(UTC)
+                existing.updated_at = now
                 await session.commit()
                 await session.refresh(existing)
                 return existing
@@ -440,8 +441,8 @@ class EvaluationService:
                 question=clean_q,
                 frequency=1,
                 status="pending",
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+                created_at=now,
+                updated_at=now,
             )
             session.add(new_gap)
             await session.commit()

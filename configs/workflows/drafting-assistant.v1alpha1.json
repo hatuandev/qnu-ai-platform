@@ -75,6 +75,24 @@
         }
       },
       {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa yêu cầu soạn thảo văn bản",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true,
+          "instruction": "Bạn là trợ lý chuẩn hóa yêu cầu soạn thảo văn bản hành chính theo Nghị định 30 cho Trường Đại học Quy Nhơn (QNU).\nNhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh (ví dụ: 'tờ trinh' -> 'tờ trình', 'kế hoach' -> 'kế hoạch', 'quyết đinh' -> 'quyết định', 'công văn' -> 'công văn hành chính', 'nghị định 30' -> 'Nghị định 30/2020/NĐ-CP'), mở rộng các từ viết tắt cơ quan/đơn vị (BGH, ĐHQG, UBND, PĐT, TCHC, CTSV) và chuẩn hóa tên loại văn bản hành chính."
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "extract_fields",
         "type": "extract.fields",
         "version": "1.0.0",
@@ -224,10 +242,22 @@
     ],
     "edges": [
       {
-        "id": "edge_input_to_extract",
+        "id": "edge_input_to_rewrite",
         "source": {
           "node_id": "chat_input",
           "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_extract",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "extract_fields",
@@ -248,10 +278,10 @@
         "priority": 100
       },
       {
-        "id": "edge_input_to_samples",
+        "id": "edge_rewrite_to_samples",
         "source": {
-          "node_id": "chat_input",
-          "port": "message"
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "sample_retrieval",

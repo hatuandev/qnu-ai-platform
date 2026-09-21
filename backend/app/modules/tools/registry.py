@@ -13,6 +13,12 @@ from app.modules.tools.builtin.exam_matrix_tool import ExamMatrixExporterTool
 class ToolRegistry:
     """Central registry of executable tools and OpenAPI function schemas."""
 
+    ALIASES: dict[str, str] = {
+        "admissions.fact_lookup": "lookup_admission_score",
+        "document.docx_export": "export_administrative_document",
+        "assessment.xlsx_export": "export_exam_matrix",
+    }
+
     def __init__(self) -> None:
         self._tools: dict[str, BaseTool] = {}
         self._register_defaults()
@@ -28,8 +34,14 @@ class ToolRegistry:
         self._tools[tool.name] = tool
 
     def get(self, name: str) -> BaseTool | None:
-        """Get tool by unique name."""
-        return self._tools.get(name)
+        """Get tool by unique name or legacy alias."""
+        tool = self._tools.get(name)
+        if tool is not None:
+            return tool
+        canonical_name = self.ALIASES.get(name)
+        if canonical_name:
+            return self._tools.get(canonical_name)
+        return None
 
     def list_all(self, category: str | None = None) -> list[BaseTool]:
         """List all registered tools, optionally filtered by category."""

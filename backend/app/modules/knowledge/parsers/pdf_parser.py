@@ -188,16 +188,34 @@ class PyMuPdfParser(BaseDocumentParser):
                 )
             )
 
+        # 7. Run Firecrawl Rust-based PDF Inspector for smart classification and OCR routing
+        from app.modules.knowledge.parsers.pdf_inspector import PDFInspector
+
+        inspection = PDFInspector.inspect_bytes(file_bytes)
+
+        # If native canonical markdown is empty but inspector recovered text, use it as fallback
+        final_markdown = clean_markdown
+        if (not final_markdown or not final_markdown.strip()) and inspection.markdown and inspection.markdown.strip():
+            final_markdown = inspection.markdown
+
         metadata = {
             "title": doc.metadata.get("title") or file_name,
             "author": doc.metadata.get("author") or "",
             "page_count": page_count,
             "table_count": len(extracted_tables),
+            "pdf_type": inspection.pdf_type,
+            "confidence": inspection.confidence,
+            "pages_needing_ocr": inspection.pages_needing_ocr,
+            "has_encoding_issues": inspection.has_encoding_issues,
+            "is_complex_layout": inspection.is_complex_layout,
+            "pages_with_tables": inspection.pages_with_tables,
+            "inspector_engine": inspection.inspector_engine,
+            "inspection_time_ms": inspection.processing_time_ms,
         }
         doc.close()
 
         return ParsedContent(
-            raw_text=clean_markdown,
+            raw_text=final_markdown,
             page_count=page_count,
             tables=extracted_tables,
             metadata=metadata,

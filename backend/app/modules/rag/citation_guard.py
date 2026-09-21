@@ -86,7 +86,23 @@ class CitationGuard:
             return []
 
         answer_lower = answer.lower()
-        if any(msg in answer_lower for msg in [
+        has_substantive_content = any(
+            kw in answer_lower
+            for kw in [
+                "triệu",
+                "học phí",
+                "điểm chuẩn",
+                "điểm trúng tuyển",
+                "chỉ tiêu",
+                "phương thức",
+                "quy định",
+                "điều ",
+                "khoản ",
+                "tín chỉ",
+                "chương trình",
+            ]
+        )
+        if not has_substantive_content and any(msg in answer_lower for msg in [
             "thông tin này hiện chưa có",
             "chưa có trong tài liệu chính thức",
             "chưa có dữ liệu chính thức",

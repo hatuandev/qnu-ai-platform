@@ -15,6 +15,7 @@ export interface AssistantEditForm {
   fallback_model: string;
   temperature: number;
   max_tokens: number;
+  thinking_budget: number;
   block_prompt_injection: boolean;
   mask_pii: boolean;
   require_grounded_answer: boolean;

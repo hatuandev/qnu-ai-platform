@@ -74,6 +74,24 @@
         }
       },
       {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa câu hỏi quy chế học vụ",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true,
+          "instruction": "Bạn là trợ lý chuẩn hóa câu hỏi quy chế học vụ cho Trường Đại học Quy Nhơn (QNU).\nNhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh (ví dụ: 'tín chì' -> 'tín chỉ', 'học phầm' -> 'học phần', 'rèn luyên' -> 'rèn luyện', 'khen thướng' -> 'khen thưởng'), mở rộng các từ viết tắt học vụ (ĐRL, GPA, CTĐT, CTSV, PĐT, NCKH) và làm rõ thuật ngữ quy chế tín chỉ."
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "knowledge_answer",
         "type": "core.knowledge.answer",
         "version": "1.0.0",
@@ -146,10 +164,22 @@
     ],
     "edges": [
       {
-        "id": "edge_input_to_knowledge",
+        "id": "edge_input_to_rewrite",
         "source": {
           "node_id": "chat_input",
           "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_knowledge",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "knowledge_answer",

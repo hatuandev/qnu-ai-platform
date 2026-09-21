@@ -88,7 +88,7 @@
               "to": "greeting_output"
             }
           ],
-          "default_node": "knowledge_answer"
+          "default_node": "query_rewrite"
         },
         "policy": {
           "timeout_seconds": 2,
@@ -111,6 +111,24 @@
           "timeout_seconds": 2,
           "max_attempts": 1,
           "checkpoint_after": true,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "query_rewrite",
+        "type": "query.rewrite",
+        "version": "1.0.0",
+        "display_name": "Chuẩn hóa câu hỏi & Sửa lỗi ngữ cảnh",
+        "config": {
+          "use_fast_rules": true,
+          "use_llm": true,
+          "preserve_original": true,
+          "instruction": "Bạn là trợ lý chuẩn hóa câu hỏi tuyển sinh cho Trường Đại học Quy Nhơn (QNU).\nNhiệm vụ: Sửa các từ gõ nhầm trượt phím Telex hoặc nhầm lẫn ngữ cảnh (ví dụ: 'ngày' -> 'ngành', 'học bà' -> 'học bạ'), chuẩn hóa các từ viết tắt ngành/tuyển sinh (CNTT, QTKD, ĐGNL, THPT, KTX) và viết hoa chuẩn tên các ngành đào tạo."
+        },
+        "policy": {
+          "timeout_seconds": 5,
+          "max_attempts": 1,
+          "checkpoint_after": false,
           "required_permissions": []
         }
       },
@@ -213,10 +231,22 @@
         "priority": 100
       },
       {
-        "id": "edge_route_to_knowledge",
+        "id": "edge_route_to_rewrite",
         "source": {
           "node_id": "condition_route",
           "port": "message"
+        },
+        "target": {
+          "node_id": "query_rewrite",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_rewrite_to_knowledge",
+        "source": {
+          "node_id": "query_rewrite",
+          "port": "normalized_query"
         },
         "target": {
           "node_id": "knowledge_answer",

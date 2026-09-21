@@ -38,7 +38,7 @@ import {
 import { modelopsApi } from "@/services/modelops-api";
 import { workflowsApi } from "@/services/workflows-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Network } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -81,6 +81,7 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     fallback_model: cfg.model_policy.fallback_model || "gemini-1.5-flash",
     temperature: cfg.model_policy.temperature ?? 0.2,
     max_tokens: cfg.model_policy.max_tokens ?? 1200,
+    thinking_budget: cfg.model_policy.thinking_budget ?? 0,
     block_prompt_injection: cfg.guardrails.block_prompt_injection ?? true,
     mask_pii: cfg.guardrails.mask_pii ?? true,
     require_grounded_answer: cfg.guardrails.require_grounded_answer ?? true,
@@ -187,6 +188,7 @@ export function AssistantDetailPage({
             fallback_model: value.fallback_model,
             temperature: value.temperature,
             max_tokens: value.max_tokens,
+            thinking_budget: value.thinking_budget ?? 0,
           },
           guardrails: {
             ...current.config.guardrails,
@@ -210,11 +212,17 @@ export function AssistantDetailPage({
     onSuccess: (assistant) => {
       queryClient.setQueryData(["assistants", reference], assistant);
       queryClient.invalidateQueries({ queryKey: ["assistants"] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-readiness", reference] });
+      queryClient.invalidateQueries({ queryKey: ["assistant-readiness", assistant.code] });
       setForm(toEditForm(assistant));
-      toast.success("Đã cập nhật toàn bộ cấu hình Trợ lý AI thành công!");
+      toast.success("Đã lưu thay đổi cấu hình thành công!", {
+        description: `Các thiết lập của "${assistant.name}" đã được cập nhật vào hệ thống.`,
+      });
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Cập nhật trợ lý thất bại.");
+      toast.error("Lưu thay đổi thất bại", {
+        description: error.message || "Cập nhật trợ lý thất bại.",
+      });
     },
   });
 
