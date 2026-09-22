@@ -1704,6 +1704,15 @@
    - Khi xử lý đoạn mã sửa lỗi Windows IPv6 `no_proxy`, đặt đoạn sanitize sau toàn bộ module imports chuẩn để ruff check 0 lỗi.
 6. **AsyncMock DB Refresh trong Test**:
    - Trong unit tests với `AsyncMock` DB, hàm `db.refresh(record)` không tự sinh ID hoặc timestamp như PostgreSQL thật; service cần chủ động khởi tạo explicit ID (`f"ast_{uuid.uuid4().hex[:12]}"`) và datetime UTC trước khi add.
+7. **Tiêu Chuẩn Nhận Diện Header Bảng Bằng Hình Thái Học Zero-Keyword (Zero-Keyword Morphological Table Header Detection)**:
+   - **Tuyệt đối không dùng hardcoded dictionary/keywords** (`stt`, `nhiệm vụ`, `đơn vị`...) để xác định header bảng. Việc hardcode từ khóa làm hỏng bóc tách khi gặp tài liệu tài chính, thời khóa biểu, y tế hoặc tiếng Anh.
+   - Nhận diện hàng Header bảng dựa trên **5 tiêu chuẩn hình thái học & cấu trúc (Morphological Standards)**:
+     1. *Loại trừ khóa chuỗi dữ liệu (Sequence Key Check)*: Hàng bắt đầu bằng số nguyên (`^\d+$`), mã phân cấp (`^\d+(\.\d+)+$`), chữ số La Mã (`^[IVXLCDM]+$`) hoặc mã 7 số (`^\d{7}$`) là hàng dữ liệu, không phải header.
+     2. *Bắt buộc định danh Cột 0*: Tiêu đề bảng thật sự bắt buộc phải có nhãn ở Cột 0; nếu Cột 0 bị rỗng thì đó là hàng nối dòng mồ côi (orphan wrapped cell).
+     3. *Độ dài & Phi mô tả*: Ô header là nhãn danh từ ngắn gọn ($\le 45$ ký tự), không chứa gạch đầu dòng (`-`, `•`), không bao giờ kết thúc bằng dấu chấm kết câu `.`, và không bao giờ chứa dấu chấm phẩy `;` phân tách mệnh đề.
+     4. *Mật độ số liệu / ngày tháng thấp*: Tỷ lệ ô chứa ngày tháng, phần trăm, số tiền $\le 20\%$.
+     5. *Chữ cái bắt buộc*: 100% ô có nghĩa phải chứa ký tự chữ cái (`[a-zA-Zà-ỹÀ-Ỹ]`).
+   - *Sub-header cấp 2*: Nếu hàng có 1 ô phụ đơn lẻ, độ dài phải $\le 25$ ký tự (như `điều chỉnh`, `ACCA`, `Năm 2024`) để không nuốt nhầm các câu văn ngắt đôi từ trang trước trôi sang.
 
 ---
 

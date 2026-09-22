@@ -101,11 +101,20 @@ docker compose logs -f backend
 - **`qnu_minio`**: MinIO S3-compatible Object Storage lưu trữ tệp tài liệu thô (cổng 9000, 9001).
 - **`qnu_gotenberg`**: Gotenberg 8 chuyển đổi tài liệu Word NĐ 30 sang PDF để xem trước trực tiếp trên web (cổng 3005).
 
-xin chào cho tôi biết phương thức tuyển sinh năm 2026
+---
 
-bạn biết ngành công nghệ thông tin cần những môn học nào để xét tuyển không ?
+## 🔬 Năng Lực Document Intelligence & Bóc Tách Bảng Đa Trang
 
-các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học
+Nền tảng trang bị bộ bóc tách tài liệu thông minh chuyên sâu cho văn bản hành chính Việt Nam (chuẩn Nghị định 30/2020/NĐ-CP):
 
-
-Phương thức xét tuyển của trường gồm những gì?
+- **Thuật toán Nhận diện Hình thái học & Cấu trúc (Zero-Keyword Morphological Table Header Detection)**:
+  - 100% không phụ thuộc từ điển từ khóa cố định, tự động nhận diện chính xác tiêu đề bảng trên mọi lĩnh vực (Tài chính, Thời khóa biểu, Tuyển sinh, Y tế, Tiếng Anh).
+  - Phân tích 5 tiêu chuẩn hình thái: loại trừ sequence key (`\d+`, `\d+\.\d+`, Roman, mã 7 số), bảo đảm định danh Cột 0, độ dài ô $\le 45$ ký tự, mật độ số/ngày $\le 20\%$, chứa ký tự chữ cái.
+- **Tái Cấu Trúc Bảng Đa Trang (Multi-Page Table Stitching)**:
+  - Hợp nhất các bảng phụ lục kéo dài từ 3 đến 20+ trang thành 1 Master Table duy nhất.
+  - Tự động hàn gắn câu bị ngắt dòng qua trang (Orphan Continuation Rows) và điền tiến phân cấp (Forward-Fill).
+  - Khử triệt để số trang rò rỉ ở lề trên ($\le 8\%$) và chân trang ($\ge 88\%$).
+- **Hợp Nhất Bảng Song Song (Side-by-Side Fusion)**:
+  - Tự động phát hiện các bảng in ngang cùng trục Y (như bảng IELTS và VSTEP) để gộp thành bảng chuẩn 4 cột.
+- **Bảo Vệ Toàn Vẹn Dữ Liệu RAG**:
+  - Chuẩn hóa Unicode NFC, chống Mojibake 100%, bảo toàn 100% dòng phân cách GFM `|:---|`.

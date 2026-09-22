@@ -59,3 +59,15 @@ Quy trình ingestion diễn ra qua 7 bước nghiêm ngặt:
 2. Đăng ký đuôi mở rộng `.pptx` vào hàm factory `get_document_parser(ext)` tại `parsers/__init__.py`.
 3. Viết unit test bổ sung trong `tests/test_knowledge.py`.
 
+---
+
+## 3. Tiêu Chuẩn Nhận Diện Header Bảng Bằng Hình Thái Học Zero-Keyword
+
+Khi trích xuất hoặc tái cấu trúc bảng biểu trong `pdf_parser.py` và `table_reconstructor.py`, **tuyệt đối không dùng hardcoded dictionary/keywords** (`stt`, `nhiệm vụ`, `đơn vị`...). Thay vào đó, áp dụng **5 tiêu chuẩn hình thái học & cấu trúc (Morphological Standards)**:
+1. **Loại trừ Sequence Key**: Ô đầu tiên không được là số nguyên (`^\d+$`), mã phân cấp (`^\d+(\.\d+)+$`), chữ số La Mã (`^[IVXLCDM]+$`) hoặc mã 7 số (`^\d{7}$`).
+2. **Định danh Cột 0**: Hàng header bắt buộc định danh Cột 0; nếu Cột 0 bị rỗng thì đó là hàng nối dòng mồ côi (orphan continuation row).
+3. **Độ dài & Phi mô tả**: Nhãn danh từ $\le 45$ ký tự, không gạch đầu dòng (`-`, `•`), không kết thúc bằng dấu chấm kết câu `.`, và không chứa dấu chấm phẩy `;` phân tách mệnh đề.
+4. **Mật độ số liệu / ngày tháng thấp**: Tỷ lệ ô chứa ngày tháng, %, số tiền $\le 20\%$.
+5. **Chữ cái bắt buộc**: 100% ô có nghĩa chứa ký tự chữ cái (`[a-zA-Zà-ỹÀ-Ỹ]`).
+6. **Sub-header cấp 2**: Nếu hàng có 1 ô phụ đơn lẻ, độ dài phải $\le 25$ ký tự để không nuốt nhầm các câu văn ngắt đôi từ trang trước trôi sang.
+
