@@ -198,9 +198,15 @@ def _normalize_raw_table_rows(
         if any(
             len(c) > 45
             or c.startswith(("- ", "+ ", "• ", "* "))
+            or (c.endswith((".", "...")) and len(c) > 10)
+            or ";" in c
             or re.search(r"[\.;]\s+[A-ZÀ-Ỹ]", c)
             for c in non_empty
         ):
+            return False
+
+        # Check 2b: Sub-headers (level 2+) single cell must be short labels
+        if not is_first_header and len(non_empty) == 1 and len(non_empty[0]) > 25:
             return False
 
         # Check 3: Numeric / date density (headers are predominantly text labels)

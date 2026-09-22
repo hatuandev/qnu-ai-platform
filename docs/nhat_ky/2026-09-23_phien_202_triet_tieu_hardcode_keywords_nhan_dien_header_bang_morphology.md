@@ -34,10 +34,22 @@ Hệ thống chuyển đổi triệt để sang 5 tiêu chuẩn phân tích hìn
    - `File 1: Kế hoạch Bán dẫn, AI & ANM (2214/KH-ĐHQN)` (12 trang): Ghép nối hoàn hảo bảng Phụ lục 8 trang (Trang 5-12) thành 1 Master Table duy nhất gồm 339 dòng. 0 số trang rò rỉ.
    - `File 2: Kế hoạch Học liệu E-learning (2781/KH-ĐHQN)` (3 trang): Bóc tách 8 dòng bảng 4 cột chuẩn chỉnh, 0 số trang rò rỉ.
    - `File 3: Kế hoạch BĐCLGD (4053/KH-ĐHQN)` (7 trang): Bóc tách 26 dòng bảng, 0 số trang rò rỉ.
-2. **Backend**:
+3. **Kiểm tra 2 tệp PDF theo yêu cầu trực tiếp của người dùng**:
+   - `Tệp 1: Kế hoạch triển khai nhiệm vụ trọng tâm 2025-2026 (22 trang)`:
+     - Bóc tách và ghép nối toàn bộ 20 trang Phụ lục (Trang 3 đến 22) thành **1 Master Table duy nhất gồm 87 dòng**.
+     - Hoàn thiện nối câu bị ngắt đôi qua trang cho các nhiệm vụ trọng yếu: Row 8.1 (Trang 18 $\to$ 19: "...mức lương cơ sở và chế độ tiền thưởng đối với cán bộ, công chức, viên chức và lực lượng vũ trang"), Row 9.3 (Trang 19 $\to$ 20: "...quản lý tài sản công; xây dựng định mức kinh tế kỹ thuật"), Row 11.3 (Trang 21 $\to$ 22: "...Đại hội Hội Sinh viên Trường ĐHQN lần thứ XVI, nhiệm kỳ 2025 - 2028").
+     - 0 số trang rò rỉ, 100% cột và định dạng bảng đạt chuẩn.
+   - `Tệp 2: Thông tin tuyển sinh đại học 2026 (14 trang)`:
+     - Bóc tách đầy đủ và chính xác **4 bảng dữ liệu**:
+       - Bảng 1 (Trang 2-8): Đầy đủ 53/53 ngành & tổ hợp môn xét tuyển.
+       - Bảng 2 (Trang 9): Bảng 4 cột quy đổi điểm chứng chỉ IELTS và VSTEP.
+       - Bảng 3 (Trang 11-12): Đầy đủ 52/52 ngành với chỉ tiêu, số trúng tuyển và điểm chuẩn 2 năm 2024 & 2025.
+       - Bảng 4 (Trang 13-14): Đầy đủ 38/38 ngành xét tuyển thẳng và ưu tiên xét tuyển theo môn thi HSG quốc gia.
+     - 0 số trang rò rỉ, 100% dữ liệu nguyên vẹn.
+4. **Backend**:
    - `uv run ruff check .`: 0 lỗi (All checks passed).
-   - `uv run --extra dev pytest`: **413/413 passed (100%)** trong 118.85s.
-3. **Frontend**:
+   - `uv run --extra dev pytest`: **413/413 passed (100%)**.
+5. **Frontend**:
    - `npm run lint`: 170 files checked, 0 lỗi.
    - `npm run typecheck`: 0 lỗi.
    - `npm run build`: Thành công trong 14.42s.

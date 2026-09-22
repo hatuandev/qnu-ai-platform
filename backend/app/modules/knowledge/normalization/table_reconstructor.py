@@ -81,6 +81,8 @@ def _has_semantic_headers(headers: list[str]) -> bool:
     if any(
         len(h) > 45
         or h.startswith(("- ", "+ ", "• ", "* "))
+        or (h.endswith((".", "...")) and len(h) > 10)
+        or ";" in h
         or re.search(r"[\.;]\s+[A-ZÀ-Ỹ]", h)
         for h in meaningful_headers
     ):
