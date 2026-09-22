@@ -50,20 +50,54 @@ def _is_phantom_header(value: str) -> bool:
 
 
 def _has_semantic_headers(headers: list[str]) -> bool:
-    """Determine whether a table has a genuine header row instead of data at its top."""
-    meaningful_headers = [header for header in headers if not _is_phantom_header(header)]
+    """Determine whether a table has a genuine header row instead of data at its top.
+
+    Zero-Keyword Morphological & Structural Analysis:
+    1. Must contain at least 2 non-empty meaningful column labels.
+    2. The first non-empty cell must not be a sequence data key (integer, task code, Roman numeral, or program code).
+    3. No cell may contain long descriptive sentences (> 45 chars) or administrative bullet points.
+    4. Data density must be low: headers are concise noun labels, not data values (dates, percentages, amounts).
+    5. Every meaningful header cell must contain alphabetic characters.
+    """
+    meaningful_headers = [
+        header.strip()
+        for header in headers
+        if header.strip() and not _is_phantom_header(header)
+    ]
     if len(meaningful_headers) < 2:
         return False
-    if any(len(h.strip()) > 40 for h in meaningful_headers):
+
+    first_val = meaningful_headers[0]
+    # Check 1: Primary data sequence keys
+    if (
+        re.fullmatch(r"^\d+$", first_val)
+        or re.fullmatch(r"^\d+(?:\.\d+)+$", first_val)
+        or re.fullmatch(r"^[IVXLCDM]+$", first_val)
+        or re.fullmatch(r"^\d{7}[A-Za-z]*$", first_val)
+    ):
         return False
 
-    pattern = r"\b(stt|tt|mã|tên|công việc|ngành|nhiệm vụ|chủ trì|đơn vị|thời gian|sản phẩm|kết quả|điểm|chỉ tiêu|tổ hợp|phương thức)\b"
-    matched_terms = set()
-    for header in meaningful_headers:
-        for match in re.finditer(pattern, normalize_header(header)):
-            matched_terms.add(match.group(1))
+    # Check 2: Paragraph descriptions, bullet points or multi-sentence content
+    if any(
+        len(h) > 45
+        or h.startswith(("- ", "+ ", "• ", "* "))
+        or re.search(r"[\.;]\s+[A-ZÀ-Ỹ]", h)
+        for h in meaningful_headers
+    ):
+        return False
 
-    return len(matched_terms) >= 2
+    # Check 3: Numeric / date density
+    data_re = re.compile(r"\d+[/\-]\d+|\d+%\b|\btháng\s+\d|\bnăm\s+\d", re.IGNORECASE)
+    date_or_data_count = sum(1 for h in meaningful_headers if data_re.search(h))
+    if (date_or_data_count / len(meaningful_headers)) > 0.20:
+        return False
+
+    # Check 4: Check if any cell has a distinct program or task code
+    if any(_PROGRAM_CODE_RE.fullmatch(h) or _TASK_CODE_RE.fullmatch(h) for h in meaningful_headers):
+        return False
+
+    # Check 5: Every meaningful header cell must contain alphabetic characters
+    return all(re.search(r"[a-zA-Zà-ỹÀ-Ỹ]", h) for h in meaningful_headers)
 
 
 def _header_looks_like_data(headers: list[str]) -> bool:

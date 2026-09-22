@@ -21,6 +21,7 @@ from app.modules.knowledge.normalization.models import (
     SourceSpan,
 )
 from app.modules.knowledge.normalization.table_reconstructor import (
+    _is_phantom_header,
     reconstruct_multi_page_tables,
     table_schema_key,
 )
@@ -172,50 +173,54 @@ def _normalize_raw_table_rows(
     if not rows:
         return title_text, [], []
 
-    header_keywords = (
-        "stt",
-        "tt",
-        "nội dung",
-        "công việc",
-        "nhiệm vụ",
-        "chủ trì",
-        "đơn vị",
-        "thực hiện",
-        "phối hợp",
-        "thời gian",
-        "bắt đầu",
-        "hoàn thành",
-        "sản phẩm",
-        "kết quả",
-        "ghi chú",
-        "chỉ tiêu",
-        "điểm",
-        "ngành",
-        "mã ngành",
-        "tên ngành",
-        "tổ hợp",
-    )
-
-    def _is_hdr(r_cells: list[str]) -> bool:
-        non_empty = [c.strip() for c in r_cells if c.strip()]
+    def _is_hdr(r_cells: list[str], is_first_header: bool = False) -> bool:
+        non_empty = [
+            str(c or "").strip()
+            for c in r_cells
+            if str(c or "").strip() and not _is_phantom_header(str(c or ""))
+        ]
         if not non_empty:
             return False
-        # Do not treat rows with numeric row keys, Roman numerals, task codes (e.g. 1.1), or 7-digit program codes as headers
-        if re.fullmatch(r"^\d+$", non_empty[0]):
+        if is_first_header and len(non_empty) < 2:
             return False
+
+        first = non_empty[0]
+        # Check 1: Primary data sequence keys (STT, task code, Roman numeral, or program code)
+        if (
+            re.fullmatch(r"^\d+$", first)
+            or re.fullmatch(r"^\d+(?:\.\d+)+$", first)
+            or re.fullmatch(r"^[IVXLCDM]+$", first)
+            or re.fullmatch(r"^\d{7}[A-Za-z]*$", first)
+        ):
+            return False
+
+        # Check 2: Paragraph descriptions, bullet points or multi-sentence content
         if any(
-            re.fullmatch(r"^[IVXLCDM]+$", c)
-            or re.fullmatch(r"^\d+(?:\.\d+)+$", c)
-            or re.fullmatch(r"^\d{7}[A-Za-z]*$", c)
-            or len(c) > 50
+            len(c) > 45
+            or c.startswith(("- ", "+ ", "• ", "* "))
+            or re.search(r"[\.;]\s+[A-ZÀ-Ỹ]", c)
             for c in non_empty
         ):
             return False
-        matches = sum(1 for c in non_empty if any(kw in c.lower() for kw in header_keywords))
-        return (matches / len(non_empty)) >= 0.40
+
+        # Check 3: Numeric / date density (headers are predominantly text labels)
+        data_re = re.compile(r"\d+[/\-]\d+|\d+%\b|\btháng\s+\d|\bnăm\s+\d", re.IGNORECASE)
+        data_count = sum(1 for c in non_empty if data_re.search(c))
+        if (data_count / len(non_empty)) > 0.20:
+            return False
+
+        # Check 4: Check if any cell has a distinct program or task code
+        if any(
+            re.fullmatch(r"^\d{7}[A-Za-z]*$", c) or re.fullmatch(r"^\d+\.\d+$", c)
+            for c in non_empty
+        ):
+            return False
+
+        # Check 5: Every meaningful header cell must contain alphabetic characters
+        return all(re.search(r"[a-zA-Zà-ỹÀ-Ỹ]", c) for c in non_empty)
 
     h_count = 0
-    while h_count < min(3, len(rows)) and _is_hdr(rows[h_count]):
+    while h_count < min(3, len(rows)) and _is_hdr(rows[h_count], is_first_header=(h_count == 0)):
         h_count += 1
 
     if h_count > 1:

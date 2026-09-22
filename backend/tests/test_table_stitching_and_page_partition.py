@@ -426,5 +426,35 @@ def test_has_semantic_headers_word_boundaries():
     assert _has_semantic_headers(real_headers)
 
 
+def test_morphological_header_detection_multilingual_and_financial():
+    """Verify zero-keyword morphological header detection works for English, financial, and diverse domains."""
+    from app.modules.knowledge.normalization.table_reconstructor import _has_semantic_headers
+    from app.modules.knowledge.parsers.pdf_parser import _normalize_raw_table_rows
+
+    # 1. English enterprise table
+    english_headers = ["No.", "Task Description", "Lead Unit", "Status"]
+    assert _has_semantic_headers(english_headers)
+
+    # 2. Financial & Accounting table
+    financial_headers = ["Khoản mục", "Dự toán", "Quyết toán", "Chênh lệch"]
+    assert _has_semantic_headers(financial_headers)
+
+    # 3. Timetable / Course schedule
+    schedule_headers = ["Môn học", "Số tín chỉ", "Giảng viên", "Phòng học"]
+    assert _has_semantic_headers(schedule_headers)
+
+    # 4. Multi-line table parsing with financial terms
+    raw_table = [
+        ["Khoản chi", "Dự toán ban đầu", "Dự toán", "Thực chi"],
+        ["", "", "điều chỉnh", ""],
+        ["1", "Chi hoạt động chuyên môn", "100.000.000", "95.000.000"],
+    ]
+    _, merged_h, data_r = _normalize_raw_table_rows(raw_table)
+    assert merged_h == ["Khoản chi", "Dự toán ban đầu", "Dự toán điều chỉnh", "Thực chi"]
+    assert len(data_r) == 1
+    assert data_r[0][0] == "1"
+
+
+
 
 

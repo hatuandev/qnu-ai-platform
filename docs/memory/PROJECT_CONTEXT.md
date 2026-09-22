@@ -7,10 +7,20 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-22 23:59 (UTC+7)
-- **Phiên số**: #201
+- **Thời gian cập nhật**: 2026-09-23 00:15 (UTC+7)
+- **Phiên số**: #202
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Triệt Tiêu 100% Hardcoded Keywords, Nhận Diện Header Bảng Dựa Trên Hình Thái & Cấu Trúc Đa Miền (Zero-Keyword Morphological Table Header Detection) (phiên #202)**:
+  - Loại bỏ hoàn toàn danh sách từ khóa cố định tiếng Việt (`header_keywords`) và regex từ khóa trong `pdf_parser.py` và `table_reconstructor.py`.
+  - Chuyển dịch toàn diện sang 5 tiêu chuẩn nhận diện hình thái học zero-keyword:
+    1. *Khóa chuỗi dữ liệu (Sequence Key Check)*: Loại trừ hàng bắt đầu bằng số nguyên, mã nhiệm vụ phân cấp `\d+(\.\d+)+`, chữ số La Mã `[IVXLCDM]+`, hoặc mã 7 số `\d{7}`.
+    2. *Định danh Cột 0 (Column 0 Integrity)*: Header bảng bắt buộc định danh Cột 0; nếu rỗng thì là hàng dữ liệu mồ côi ngắt dòng.
+    3. *Độ dài & Phi mô tả (Length & Non-descriptive)*: Nhãn danh từ $\le 45$ ký tự, không chứa gạch đầu dòng hành chính, không có ngắt câu mệnh đề.
+    4. *Mật độ dữ liệu thấp (Low Data Density)*: Tỷ lệ ngày tháng, % $\le 20\%$.
+    5. *Chữ cái bắt buộc (Alphabetic Label)*: 100% ô có nghĩa chứa ký tự chữ cái.
+  - Bổ sung test suite đa lĩnh vực (tiếng Anh doanh nghiệp, tài chính kế toán, thời khóa biểu).
+  - Verification: Ruff 0 lỗi, Pytest 413/413 passed (100%), Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build thành công (14.42s). Live verification 3 tệp PDF nghiệp vụ đạt 100% độ chính xác.
 - 0. **Hoàn Thiện Bóc Tách & Reconstruct Bảng Đa Trang Cho 3 PDF Nghiệp Vụ (Kế Hoạch 2214 Bán Dẫn-AI-ANM, Kế Hoạch 2781 Học Liệu E-Learning, Kế Hoạch 4053 BĐCLGD) (phiên #201)**:
   - Kiểm thử & hoàn thiện pipeline bóc tách trên 3 tài liệu PDF hành chính thực tế của ĐH Quy Nhơn:
     1. `QNU_Ke hoach THUC HIEN DE AN DAO TAO NHAN LUC BAN DAN_AI_AT va ANM-signed.pdf` (12 trang, 2214/KH-ĐHQN).

@@ -65,6 +65,8 @@ storage/backups/*
 backend/storage/artifacts/*
 backend/storage/uploads/*
 backend/storage/backups/*
+backend/storage/ocr_cache/*
+storage/ocr_cache/*
 
 # Testing & Coverage
 .pytest_cache/
