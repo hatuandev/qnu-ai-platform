@@ -115,7 +115,13 @@ flowchart TD
 - **Bảo toàn bảng biểu GFM**: Hàm `_format_table_markdown` chuyển đổi ma trận bảng số hóa thành bảng Markdown chuẩn GitHub Flavored Markdown (`| Tiêu đề 1 | Tiêu đề 2 |`), ngăn ngừa triệt để lỗi mất dữ liệu bảng tuyển sinh hay điểm chuẩn.
 - **Phân vùng bố cục vĩ mô ([`layout_detector.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/ocr/layout_detector.py))**: Kết hợp Computer Vision OpenCV và Vector PDF để nhận diện con dấu đỏ (`HSV stamps`), khối Dấu & Ký (`signature`), phân định Quốc hiệu, Tiêu ngữ, Căn cứ pháp lý, triệt tiêu 100% hiện tượng text giả lập.
 - **Làm sạch văn bản ([`cleaner.py`](file:///d:/DuAnPhanMem/qnu-ai-platform/backend/app/modules/knowledge/cleaner.py))**: Chuẩn hóa Unicode NFC sạch, loại bỏ dấu trang thừa, chân trang rác.
-- **Bảo tồn Markdown từng trang (`page_markdowns`)**: Lưu trữ nội dung Markdown sạch độc lập cho từng trang trong `doc_metadata["page_markdowns"]` để khắc phục triệt để lỗi "chunks dồn hết vào trang 1 khiến trang 2..N bị trắng tinh". `CanonicalDocument` chỉ tồn tại trong phiên xử lý để kiểm định và không được tuần tự hóa vào metadata.
+- **Chuẩn Hóa Cấu Trúc Bảng Biểu & Luồng Đọc Đa Tầng (Table Reconstruction & Semantic Order)**:
+  * *Hợp nhất bảng song song (`_fuse_side_by_side_tables`)*: Nhận diện các bảng nằm ngang nhau có độ phủ trục $Y \ge 70\%$ (ví dụ bảng quy đổi IELTS và VSTEP) và ghép ngang thành 1 bảng 4 cột thống nhất, tự động phân biệt tên cột trùng lặp.
+  * *Nhận diện & loại bỏ Sub-header lặp lại (`is_sub_header_row`)*: Phát hiện tiêu đề cấp 2 (Chỉ tiêu, Điểm trúng tuyển) lặp lại ở đầu trang tiếp theo để loại bỏ, bảo vệ hàng dữ liệu cuối trang trước không bị gộp bậy.
+  * *Bảo vệ hàng độc lập & Chuẩn hóa mã ngành*: Bảo vệ các hàng chứa mã ngành 7 ký tự (`_PROGRAM_CODE_RE = r"^\d{7}[A-Za-z]*$"`) không bị coi là hàng mồ côi; tự động hợp nhất các mã ngành bị bẻ dòng (`7340301\nAC` $\to$ `7340301AC`).
+  * *Điền tiến phân cấp (`_forward_fill_hierarchical_columns`)*: Tự động điền giá trị danh mục/môn học cột 1 cho các hàng rowspan.
+  * *Bảo tồn dòng phân cách GFM (`_stitch_table_continuations`)*: Yêu cầu điều kiện ranh giới trang (`has_page_boundary`) trước khi khâu nối, bảo đảm 100% dòng phân cách `|---|---|` không bị nuốt.
+  * *Sắp xếp trật tự đọc tự nhiên*: Neo khối text và bảng trên mỗi trang theo tọa độ $top\_y$ thực tế, bảo đảm phần lời dẫn/phương thức luôn đứng trước bảng danh mục.
 - **Không phát minh tiêu đề cột**: Markdown renderer không tự đặt tên kiểu `Cột N`. Bảng có header rỗng, header giả hoặc không tái dựng được sẽ không được render như dữ liệu hợp lệ.
 
 #### Bước 4A: Tiếp nhận trực tiếp Markdown đã bóc tách

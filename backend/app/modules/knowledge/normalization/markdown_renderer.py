@@ -53,10 +53,18 @@ def render_canonical_table_markdown(table: CanonicalTable) -> str:
     sep_elements = []
     for idx, h in enumerate(headers):
         h_lower = h.lower()
-        if idx == 0 or "stt" in h_lower or "tt" in h_lower or "mã" in h_lower or "điểm" in h_lower or "chỉ tiêu" in h_lower or "năm" in h_lower:
-            sep_elements.append(":---:")
-        else:
-            sep_elements.append(":---")
+        is_centered = (
+            "stt" in h_lower
+            or h_lower == "tt"
+            or "mã" in h_lower
+            or "điểm" in h_lower
+            or "chỉ tiêu" in h_lower
+            or "năm" in h_lower
+            or "phương thức" in h_lower
+            or "học phí" in h_lower
+            or (idx == 0 and ("stt" in h_lower or "tt" in h_lower or h_lower in ["#", "no", "no."]))
+        )
+        sep_elements.append(":---:" if is_centered else ":---")
     sep_line = "| " + " | ".join(sep_elements) + " |"
 
     # 3. Data rows (strictly 1 line per row)

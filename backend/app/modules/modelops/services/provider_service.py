@@ -413,6 +413,22 @@ class ProviderService:
         elif provider_type == "gemini":
             settings.GEMINI_API_KEY = clean_key
 
+    async def sync_active_providers_to_runtime(self, db: AsyncSession) -> int:
+        """Query active providers from database and inject credentials into runtime settings at startup."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.is_active.is_(True))
+        res = await db.execute(stmt)
+        providers = res.scalars().all()
+        synced_count = 0
+        for p in providers:
+            extra = p.extra_config or {}
+            effective_key = p.api_key_encrypted
+            if not effective_key and extra.get("api_keys"):
+                effective_key = extra["api_keys"][0].get("api_key")
+            if effective_key:
+                self._sync_runtime_credentials(p.provider_type, effective_key, extra.get("account_id"))
+                synced_count += 1
+        return synced_count
+
     async def seed_default_providers(
         self, db: AsyncSession, overwrite: bool = False
     ) -> list[dict[str, Any]]:

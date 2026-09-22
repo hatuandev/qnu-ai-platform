@@ -97,6 +97,9 @@ class ModelOpsService:
     ) -> list[dict[str, Any]]:
         return await self._provider.seed_default_providers(db, overwrite=overwrite)
 
+    async def sync_active_providers_to_runtime(self, db: AsyncSession) -> int:
+        return await self._provider.sync_active_providers_to_runtime(db)
+
     async def get_active_providers(
         self, db: AsyncSession, only_active: bool = False
     ) -> list[dict]:

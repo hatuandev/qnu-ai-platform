@@ -81,6 +81,43 @@ def _normalize_markdown_table_block(table_lines: list[str]) -> list[str]:
     return result
 
 
+def _is_orphan_markdown_row(line: str) -> bool:
+    """Check if a markdown table row lacks primary keys (empty STT/Code) but has trailing text."""
+    if not _is_table_row(line) or _is_table_sep(line):
+        return False
+    clean_s = line.replace(r"\|", "___PIPE___")
+    inner = clean_s[1:-1] if clean_s.endswith("|") else clean_s.lstrip("|")
+    cells = [c.replace("___PIPE___", r"\|").strip() for c in inner.split("|")]
+    if len(cells) < 3:
+        return False
+    first_empty = not any(cells[:min(3, len(cells) - 1)])
+    has_trailing = any(len(c) > 0 for c in cells[min(3, len(cells) - 1):])
+    return first_empty and has_trailing
+
+
+def _merge_orphan_into_row(target_row: str, orphan_row: str) -> str:
+    """Merge trailing text of an orphan continuation row into the target table row."""
+    clean_t = target_row.replace(r"\|", "___PIPE___")
+    inner_t = clean_t[1:-1] if clean_t.endswith("|") else clean_t.lstrip("|")
+    t_cells = [c.replace("___PIPE___", r"\|").strip() for c in inner_t.split("|")]
+
+    clean_o = orphan_row.replace(r"\|", "___PIPE___")
+    inner_o = clean_o[1:-1] if clean_o.endswith("|") else clean_o.lstrip("|")
+    o_cells = [c.replace("___PIPE___", r"\|").strip() for c in inner_o.split("|")]
+
+    max_c = max(len(t_cells), len(o_cells))
+    t_cells += [""] * (max_c - len(t_cells))
+    o_cells += [""] * (max_c - len(o_cells))
+
+    merged = []
+    for tc, oc in zip(t_cells, o_cells):
+        if tc and oc:
+            merged.append(f"{tc} {oc}".strip())
+        else:
+            merged.append(tc or oc)
+    return "| " + " | ".join(merged) + " |"
+
+
 def _stitch_table_continuations(text: str) -> str:
     """Nối các bảng bị ngắt qua ranh giới trang (<!-- Trang N --> hoặc ---) mà không làm mất hàng."""
     lines = text.splitlines()
@@ -99,21 +136,36 @@ def _stitch_table_continuations(text: str) -> str:
             while j < n and (
                 not lines[j].strip()
                 or lines[j].strip() == "---"
-                or bool(re.match(r"^<!--\s*Trang\s+\d+\s*-->$", lines[j].strip(), re.IGNORECASE))
+                or bool(re.match(r"^<!--\s*(?:Trang|Page)\s+\d+\s*-->$", lines[j].strip(), re.IGNORECASE))
             ):
                 interstitial.append(lines[j])
                 j += 1
 
-            if j < n and _is_table_row(lines[j]):
+            has_page_boundary = any(
+                bool(re.match(r"^<!--\s*(?:Trang|Page)\s+\d+\s*-->$", x.strip(), re.IGNORECASE))
+                or x.strip() == "---"
+                for x in interstitial
+            )
+
+            if has_page_boundary and j < n and _is_table_row(lines[j]):
                 next_cols = _count_cols(lines[j])
                 if next_cols == cols:
                     k = j
-                    if _is_table_sep(lines[k]):
+                    # Check if lines[k] is an orphan continuation row
+                    if _is_orphan_markdown_row(lines[k]) and result:
+                        # Merge into previous table's last row!
+                        result[-1] = _merge_orphan_into_row(result[-1], lines[k])
                         k += 1
-                    elif k + 1 < n and _is_table_sep(lines[k + 1]):
-                        k += 2
+                        # If a separator was inserted under the orphan row, skip it
+                        if k < n and _is_table_sep(lines[k]):
+                            k += 1
+                    else:
+                        # Skip repeated header if present
+                        if _is_table_sep(lines[k]):
+                            k += 1
+                        elif k + 1 < n and _is_table_sep(lines[k + 1]):
+                            k += 2
 
-                    result.extend(interstitial)
                     i = k - 1
             i += 1
             continue

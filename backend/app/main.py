@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Response, status
 
 from app.core.config import get_settings
-from app.core.database import check_db_health, engine
+from app.core.database import AsyncSessionFactory, check_db_health, engine
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import setup_middlewares
@@ -89,6 +89,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("DEV_AUTO_SEED is enabled. Running seed...")
             from app.cli import run_db_seed
             await run_db_seed(seed_all=True)
+
+        # Synchronize active AI model provider credentials into runtime settings
+        try:
+            from app.modules.modelops.service import modelops_service
+            async with AsyncSessionFactory() as session:
+                synced = await modelops_service.sync_active_providers_to_runtime(session)
+                logger.info("Synchronized %d active model provider credentials into runtime settings", synced)
+        except Exception as exc:
+            logger.warning("Model provider credentials sync warning: %s", exc)
 
     except Exception as exc:
         if settings.ENVIRONMENT == "production":

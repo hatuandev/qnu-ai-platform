@@ -37,18 +37,20 @@ def upgrade() -> None:
         existing_fks = {fk["name"] for fk in inspector.get_foreign_keys("knowledge_facts")}
         fk_name = "fk_knowledge_facts_document_id_knowledge_documents"
         if fk_name not in existing_fks:
-            try:
-                op.create_foreign_key(
-                    fk_name,
-                    "knowledge_facts",
-                    "knowledge_documents",
-                    ["document_id"],
-                    ["id"],
-                    ondelete="CASCADE",
+            # Clean up orphan facts so the foreign key constraint can be established cleanly
+            bind.execute(
+                sa.text(
+                    "DELETE FROM knowledge_facts WHERE document_id IS NOT NULL AND document_id NOT IN (SELECT id FROM knowledge_documents)"
                 )
-            except Exception:
-                # If existing invalid/orphan data prevents FK, migration passes safely
-                pass
+            )
+            op.create_foreign_key(
+                fk_name,
+                "knowledge_facts",
+                "knowledge_documents",
+                ["document_id"],
+                ["id"],
+                ondelete="CASCADE",
+            )
 
 
 def downgrade() -> None:

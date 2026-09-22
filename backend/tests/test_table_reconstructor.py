@@ -457,3 +457,134 @@ def test_detect_open_top_lines_and_rescue_table():
     assert "Tieng Trung" in tbl["text"]
 
 
+def test_fuse_side_by_side_tables():
+    """Verify that horizontally adjacent tables with vertical overlap are fused into a 4-column table."""
+    from app.modules.knowledge.parsers.pdf_parser import _fuse_side_by_side_tables, _RawTableItem
+
+    t1 = _RawTableItem(
+        bbox=(100.0, 200.0, 300.0, 350.0),
+        rows=[
+            ["Điểm IELTS", "Điểm quy đổi"],
+            ["5.0", "8.0"],
+            ["6.0", "9.0"],
+        ],
+    )
+    t2 = _RawTableItem(
+        bbox=(310.0, 200.0, 500.0, 350.0),
+        rows=[
+            ["Điểm VSTEP", "Điểm quy đổi"],
+            ["4.0", "8.0"],
+            ["6.0", "9.0"],
+        ],
+    )
+
+    fused = _fuse_side_by_side_tables([t1, t2])
+    assert len(fused) == 1
+    assert fused[0].bbox == (100.0, 200.0, 500.0, 350.0)
+    assert fused[0].rows[0] == ["Điểm IELTS", "Điểm quy đổi IELTS", "Điểm VSTEP", "Điểm quy đổi VSTEP"]
+    assert fused[0].rows[1] == ["5.0", "8.0", "4.0", "8.0"]
+    assert fused[0].rows[2] == ["6.0", "9.0", "6.0", "9.0"]
+
+
+def test_row_with_program_code_is_not_orphan():
+    """Verify that a row with an empty column 0 but containing a 7-digit program code is not treated as an orphan."""
+    from app.modules.knowledge.normalization.models import CanonicalCell, CanonicalRow, SourceSpan
+    from app.modules.knowledge.normalization.table_reconstructor import is_orphan_continuation_row
+
+    span = SourceSpan(page_number=1)
+    row = CanonicalRow(
+        row_id="r1",
+        cells=[
+            CanonicalCell(raw_value="", source_span=span),
+            CanonicalCell(raw_value="Đông phương học", source_span=span),
+            CanonicalCell(raw_value="7310608", source_span=span),
+        ],
+    )
+    assert is_orphan_continuation_row(row) is False
+
+
+def test_forward_fill_hierarchical_columns():
+    """Verify that hierarchical rowspan tables forward-fill category in column 0."""
+    from app.modules.knowledge.normalization.models import CanonicalCell, CanonicalRow, SourceSpan
+    from app.modules.knowledge.normalization.table_reconstructor import (
+        _forward_fill_hierarchical_columns,
+    )
+
+    span = SourceSpan(page_number=1)
+    headers = ["Tên môn thi học sinh giỏi quốc gia", "Tên ngành đào tạo", "Mã ngành"]
+    rows = [
+        CanonicalRow(
+            row_id="r1",
+            cells=[
+                CanonicalCell(raw_value="Toán", source_span=span),
+                CanonicalCell(raw_value="Sư phạm Toán học", source_span=span),
+                CanonicalCell(raw_value="7140209", source_span=span),
+            ],
+        ),
+        CanonicalRow(
+            row_id="r2",
+            cells=[
+                CanonicalCell(raw_value="", source_span=span),
+                CanonicalCell(raw_value="Toán ứng dụng", source_span=span),
+                CanonicalCell(raw_value="7460112", source_span=span),
+            ],
+        ),
+    ]
+
+    filled = _forward_fill_hierarchical_columns(headers, rows)
+    assert len(filled) == 2
+    assert filled[0].cells[0].raw_value == "Toán"
+    assert filled[1].cells[0].raw_value == "Toán"
+
+
+def test_is_sub_header_row():
+    """Verify that repeated sub-header rows with empty leading cells and sub-header keywords are detected."""
+    from app.modules.knowledge.normalization.models import CanonicalCell, CanonicalRow, SourceSpan
+    from app.modules.knowledge.normalization.table_reconstructor import (
+        is_orphan_continuation_row,
+        is_sub_header_row,
+    )
+
+    span = SourceSpan(page_number=12)
+    sub_header_cells = [
+        CanonicalCell(raw_value="", source_span=span),
+        CanonicalCell(raw_value="", source_span=span),
+        CanonicalCell(raw_value="", source_span=span),
+        CanonicalCell(raw_value="Chỉ\ntiêu", source_span=span),
+        CanonicalCell(raw_value="Số\ntrúng\ntuyển\nnhập\nhọc", source_span=span),
+        CanonicalCell(raw_value="Điểm\ntrúng\ntuyển", source_span=span),
+        CanonicalCell(raw_value="Chỉ\ntiêu", source_span=span),
+        CanonicalCell(raw_value="Số\ntrúng\ntuyển\nnhập\nhọc", source_span=span),
+        CanonicalCell(raw_value="Điểm\ntrúng\ntuyển", source_span=span),
+    ]
+    row = CanonicalRow(row_id="sub_hdr", cells=sub_header_cells, source_pages=[12])
+
+    assert is_sub_header_row(sub_header_cells) is True
+    assert is_orphan_continuation_row(row) is False
+
+
+def test_normalize_program_code_cells():
+    """Verify that program codes wrapped with newlines inside narrow cells are normalized."""
+    from app.modules.knowledge.normalization.models import CanonicalCell, CanonicalRow, SourceSpan
+    from app.modules.knowledge.normalization.table_reconstructor import (
+        _normalize_program_code_cells,
+    )
+
+    span = SourceSpan(page_number=2)
+    rows = [
+        CanonicalRow(
+            row_id="r29",
+            cells=[
+                CanonicalCell(raw_value="29", source_span=span),
+                CanonicalCell(raw_value="7340301\nAC", source_span=span),
+                CanonicalCell(raw_value="Kế toán ACCA", source_span=span),
+            ],
+        )
+    ]
+    norm = _normalize_program_code_cells(rows)
+    assert norm[0].cells[1].raw_value == "7340301AC"
+    assert norm[0].cells[1].normalized_value == "7340301AC"
+
+
+
+

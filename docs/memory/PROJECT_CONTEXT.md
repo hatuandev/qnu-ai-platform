@@ -7,10 +7,44 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-22 08:45 (UTC+7)
-- **Phiên số**: #192
+- **Thời gian cập nhật**: 2026-09-22 14:30 (UTC+7)
+- **Phiên số**: #196
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Khắc Phục Triệt Để 6 Vấn Đề Cấu Trúc Trong Bộ Bóc Tách Tài Liệu (PDF, OCR, Table Reconstructor & Cleaner) (phiên #196)**:
+  - Vấn đề: Bộ mã nguồn bóc tách tài liệu tuyển sinh ĐH Quy Nhơn 2026 từ PDF 14 trang gặp 6 vấn đề cấu trúc: (1) Đảo lộn trật tự đọc (bảng nhảy lên trước lời dẫn phương thức tuyển sinh); (2) Đứt gãy dòng ngắt trang tạo hàng mồ côi (STT 5, 23, 30, 39, 48); (3) Xé đôi bảng song song IELTS/VSTEP; (4) Header đa tầng (Chỉ tiêu, Điểm trúng tuyển) rớt vào hàng dữ liệu số 32 trên trang tiếp nối; (5) Rò rỉ rác OCR ngành 51, 52 đáy trang 12; (6) Nuốt hàng phân cách GFM table `|---|---|` và mã ngành ngắt dòng (`7340301\nAC`).
+  - Giải pháp Kỹ thuật tại lõi pipeline:
+    1. `pdf_parser.py`: Bổ sung `_fuse_side_by_side_tables` ghép ngang bảng song song $Y \ge 70\%$, phân biệt tiêu đề trùng; mở rộng margin buffer `_is_table_text` triệt tiêu 100% rác OCR; bổ sung guard `is_heading` bảo vệ tiêu đề mục.
+    2. `table_reconstructor.py`: Thêm `is_sub_header_row` nhận diện và loại bỏ sub-header lặp lại bảo vệ hàng 32; mở rộng `_PROGRAM_CODE_RE = r"^\d{7}[A-Za-z]*$"`; thêm `_normalize_program_code_cells` nối mã ngành bẻ dòng; thêm `_forward_fill_hierarchical_columns` điền tên môn Phụ lục 1.
+    3. `cleaner.py`: Bổ sung điều kiện `has_page_boundary` vào `_stitch_table_continuations` bảo toàn 100% dòng phân cách GFM table `|---|---|`.
+    4. `markdown_renderer.py`: Sắp xếp khối văn bản và bảng theo `top_y` tự nhiên từng trang; sinh căn lề thông minh `:---:` và `:---`.
+  - Verification: 100% kiểm định tự động `validate_admission_markdown.py` vượt qua trên cả 2 tệp bóc tách thực tế và golden format (53/53 ngành tuyển sinh, 52/52 ngành điểm chuẩn, 38/38 ngành Phụ lục 1, bảng 4 cột VSTEP/IELTS); Pytest `tests/test_table_reconstructor.py` & `tests/test_knowledge.py` 51/51 passed (100%); Ruff 0 lỗi; Biome 170 files 0 lỗi, tsc 0 lỗi; 414/414 files sạch Zero Mojibake.
+- 0. **Phân Tích & Chuẩn Hóa Tệp Bóc Tách Đề Án Tuyển Sinh 2026 Đạt Chuẩn GFM và Vector DB (phiên #195)**:
+  - Vấn đề: Người dùng kiểm thử tính năng bóc tách PDF 14 trang thành file Markdown `Thong tin tuyen sinh dai hoc 2026_Lan2-1_boc_tach.md`. Kiểm toán phát hiện 5 lỗi nghiêm trọng: (1) Đảo lộn trật tự logic văn bản (bảng ngành nhảy lên trước mô tả phương thức; bảng điểm chuẩn 32 ngành chèn ngang chia cắt Mục 8 học phí; bảng Phụ lục 1 đặt trước tiêu đề); (2) Các hàng bảng bị ngắt qua trang (STT 5, 23, 30, 39, 48) biến thành hàng mồ côi mất tên và mã ngành; (3) Bảng quy đổi VSTEP/IELTS bị xé nhỏ và mất tiêu đề VSTEP; (4) 100% bảng Markdown thiếu hàng phân cách `|---|---|`; (5) Trùng lặp Mục 8 và rò rỉ rác OCR ngành 51, 52 cuối trang 12.
+  - Giải pháp Kỹ thuật:
+    1. Xây dựng script `scripts/standardize_admission_markdown.py` chuẩn hóa toàn bộ tệp Markdown theo cấu trúc GFM vàng (Gold Standard), khôi phục trật tự đọc tuyến tính chuẩn văn bản hành chính, ghép nối 100% các hàng mồ côi vào ngành cha, chuẩn hóa bảng VSTEP/IELTS 4 cột đầy đủ tiêu đề, định dạng phân cách dòng bằng `<br>`, xóa bỏ rác OCR và khối trùng lặp.
+    2. Xây dựng script kiểm định tự động `scripts/validate_admission_markdown.py` kiểm toán 9 tiêu chí: UTF-8 sạch, cú pháp GFM table, trật tự đọc, 53/53 ngành tuyển sinh, 52/52 ngành điểm chuẩn, 38/38 ngành Phụ lục 1, zero orphan rows, zero OCR leakage.
+  - Verification: `validate_admission_markdown.py` 100% passed, Pytest `tests/test_knowledge.py` 33/33 passed (100%), Ruff 0 errors, `check_mojibake.py` 414/414 tệp sạch. Tệp Markdown sẵn sàng 100% để nạp vào Vector DB.
+- 0. **Khắc Phục Lỗi Index Kho Tri Thức, Ánh Xạ Mô Hình BGE-M3 & Đồng Bộ Credentials Provider Lúc Khởi Động (phiên #194)**:
+  - Vấn đề: Người dùng nạp tệp `Thong tin tuyen sinh dai hoc 2026_Lan2-1.pdf` vào Kho Tri thức Đề án Tuyển sinh (`col_admissions`), giao diện hiển thị badge màu đỏ `! Lỗi index`. Qua truy vấn CSDL, bản ghi `job_1c26a820413d` báo lỗi: `Mô hình embedding (BGE-M3/Cloudflare) không khả dụng. Hệ thống từ chối nạp dữ liệu giả mạo.` (503).
+  - Nguyên nhân cốt lõi:
+    1. `settings.CLOUDFLARE_ACCOUNT_ID` và API Token được lưu trong CSDL PostgreSQL nhưng chưa có bước tự động đồng bộ vào runtime `settings` khi server FastAPI khởi động (`lifespan`), khiến nhánh Cloudflare GPU nhanh bị bỏ qua vì thiếu `account_id`.
+    2. Nhánh local fallback gọi `SentenceTransformer(settings.EMBEDDING_MODEL)` với giá trị `@cf/baai/bge-m3` thay vì tên repository Hugging Face chuẩn `BAAI/bge-m3`, gây lỗi 404 RepositoryNotFoundError.
+    3. Cả 2 tầng đều không khả dụng, kích hoạt chốt chặn Anti-Mock từ chối dữ liệu giả mạo $\rightarrow$ `index_status = "index_failed"`.
+  - Giải pháp Kỹ thuật:
+    1. Thêm hàm `_resolve_local_model_name()` trong `vector_indexer.py` tự động chuyển đổi các alias Cloudflare (`@cf/baai/bge-m3` $\rightarrow$ `BAAI/bge-m3`) cho SentenceTransformers.
+    2. Thêm phương thức `sync_active_providers_to_runtime()` trong `ProviderService` và `ModelOpsService`.
+    3. Tích hợp gọi `sync_active_providers_to_runtime()` ngay trong hàm `lifespan` lúc khởi động server `app/main.py`, bảo đảm Cloudflare Workers AI Edge Embedding và các API khác luôn sẵn sàng phục vụ tức thì.
+    4. Bổ sung `refetchInterval` tự động thăm dò (3s) trên giao diện `collection-detail-page.tsx` khi có tài liệu đang `indexing`/`processing`.
+  - Verification: 70/70 pytests passed (100%), Ruff 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi. Tài liệu `doc_640939cf032e` đã được reindex thành công với 16/16 chunks vào Qdrant (`status: ready`, `index_status: indexed`).
+- 0. **Khắc Phục Lỗi Thiếu Bảng `platform_document_types` & Tối Ưu Hóa Chuỗi Migration Alembic Cho Seed Data (phiên #193)**:
+  - Vấn đề: Người dùng chạy seed dữ liệu (`db seed --document-types`, `db seed --all`, `seed_document_types.py`) gặp lỗi `UndefinedTableError: relation "platform_document_types" does not exist`. Khi thử migrate, gặp tiếp lỗi `StringDataRightTruncationError` do Alembic `version_num` mặc định `VARCHAR(32)` trong khi revision ID dài 43 ký tự, lỗi foreign key do 772 orphan facts trong `knowledge_facts`, lỗi thiếu bảng `conversation_threads` trong migration feedback, và thiếu `await connection.commit()` trong `alembic/env.py`.
+  - Giải pháp Kỹ thuật:
+    1. Override `DefaultImpl.version_table_impl` trong `backend/alembic/env.py` tạo `version_num VARCHAR(64)` và thực thi `ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)`. Bổ sung `await connection.commit()` đảm bảo async migration commit trọn vẹn.
+    2. Dọn dẹp orphan facts trong `20260919_facts_foreign_key_and_schema_sync.py` trước khi thiết lập foreign key `CASCADE`.
+    3. Thêm DDL tạo bảng `conversation_threads` và `conversation_messages` nếu chưa có trong `20260922_conversation_feedback.py`.
+  - Kết quả Seed: Đồng bộ thành công 37 loại văn bản theo NĐ 30/2020 (`added=37`), seed toàn bộ `--all` thành công mỹ mãn (5 workflows, 5 trợ lý AI, 5 kho tri thức, 5 Qdrant collections, 7 ingestion job records).
+  - Verification: Pytest 394/394 passed (100%), Ruff 0 errors, 8/8 tests `test_document_types.py` passed.
 - 0. **Bổ Sung Nút Tải Nội Dung Cuộc Trò Chuyện Dạng Markdown (.md) & Loại Bỏ Fallback Bắt Nhầm Thực Thể "Nào" (phiên #192)**:
   - Tính năng 1 (Xuất Markdown Chat Studio): Tạo tiện ích `frontend/src/lib/export-markdown.ts` định dạng toàn bộ cuộc trò chuyện thành tệp Markdown (.md) chuẩn chỉnh kèm Header metadata, vai trò Người dùng/Trợ lý, thời gian, nội dung câu hỏi/trả lời, trích dẫn tài liệu gốc (blockquote), tệp đính kèm và nút gợi ý; tích hợp nút "Tải về (.md)" với icon Lucide `Download` trên thanh công cụ `ChatStudioPage`.
   - Tính năng 2 (Xuất Markdown Bàn Làm Việc Cán Bộ): Tích hợp nút "Xuất MD" tại thanh điều khiển chi tiết cuộc trò chuyện của cán bộ tư vấn trong `ConversationsPage` (`/conversations`).
