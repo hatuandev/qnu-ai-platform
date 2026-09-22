@@ -7,10 +7,37 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-22 08:45 (UTC+7)
-- **Phiên số**: #192
+- **Thời gian cập nhật**: 2026-09-22 23:05 (UTC+7)
+- **Phiên số**: #196
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Bóc Tách Kế Hoạch ĐGN AUN-QA 4.0 (KH130), Ghép Nối Đa Trang Dòng 16 & 23, Triệt Tiêu Số Trang Lề Trên Header (phiên #196)**:
+  - Kiểm thử thực tế tệp `KH130 trien khai chuan bi DGN CTDT 3 CTDT AUN-QA 2026.pdf` (6 trang, 45 nhiệm vụ): Xác nhận toàn bộ 45 nhiệm vụ được bóc tách hoàn hảo vào đủ 6 cột chuẩn, 100% dòng phân cách `:---` được bảo toàn.
+  - Ghép nối đa trang siêu chuẩn: Dòng 16 tự động hút phần text nối trang ở đỉnh Trang 3 (`KH-TC, TT. S&HL, các đơn vị liên quan`), Dòng 23 tự động nối tiếp câu ở đỉnh Trang 4 (`Bảo đảm tính hoạt động ổn định...`), 0 dòng mồ côi.
+  - Triệt tiêu số trang lề trên (Header Pagination theo NĐ 30/2020/NĐ-CP Điều 9.4): Bổ sung kiểm tra `top_percent <= 8.0` cho `blocks.py` và `page_num > 1 and b_rect.y1 < height * 0.08` cho `pdf_parser.py`, cập nhật `_RE_PAGE_NUMBERS` trong `cleaner.py` bao quát số trang đơn độc `\d{1,3}`, xóa sạch hoàn toàn các số trang header `2`, `3`, `4`, `5`, `6`.
+  - Verification: 10/10 unit tests trong `test_table_stitching_and_page_partition.py` passed, ruff check 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi. Live verification trên KH130 sạch 100% không còn số trang rác.
+
+- 0. **Khắc Phục Lệch Cột Row 3.1 ("Ban hành") & Bảo Toàn Dòng Phân Cách Bảng Markdown (:---) (phiên #195)**:
+  - Khắc phục 1 (Chống nhầm động từ "Ban hành" thành Đơn vị chủ trì): Cập nhật `_LEAD_UNIT_RE` trong `table_reconstructor.py` bằng negative lookahead `ban(?!\s+hành)`, `phòng(?!\s+ngừa|\s+chống)`, `trường(?!\s+hợp)`, `viện(?!\s+dẫn)`. Ngăn chặn triệt để hiện tượng nội dung nhiệm vụ 3.1 ("Ban hành quy định đo lường...") bị nhận diện nhầm thành Đơn vị chủ trì, làm rỗng cột Nội dung và dồn Phòng KT&BĐCL, Trung tâm S&HL vào cột Sản phẩm.
+  - Khắc phục 2 (Ưu tiên ánh xạ cột trực tiếp qua semantic_indices): Trong `_normalize_spacer_columns`, khi hàng có đủ số cột $\ge$ len(headers) và đã khớp mã nhiệm vụ & đơn vị chủ trì, ánh xạ trực tiếp `selected_cells` theo `semantic_indices` của trang thay vì chạy lại heuristic compact, giữ nguyên 100% cấu trúc trích xuất chuẩn xác của PyMuPDF.
+  - Khắc phục 3 (Bảo toàn dòng phân cách bảng Markdown `|:---|:---|...|`): Sửa lỗi trong `_stitch_table_continuations` (`cleaner.py`). Trước đây hàm kiểm tra hàng tiếp theo mà không xét xem giữa 2 hàng có ranh giới trang (`---` hay `<!-- Trang N -->`) hay không, khiến dòng phân cách (separator row) ngay sau header của MỌI bảng bị nuốt chửng (khiến Markdown không render được bảng). Bổ sung điều kiện `has_boundary = any(...)` giúp bảo toàn toàn bộ 20 dòng separator của 20 trang phụ lục.
+  - Verification: 10/10 unit tests trong `test_table_stitching_and_page_partition.py` passed, ruff check 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build 8.64s thành công. Kiểm thử live trên tệp Kế hoạch 2025-2026 xác nhận: Row 3.1 chuẩn 7 cột, 20 dòng phân cách bảng phục hồi 100%, Row 4.10, 7.2, 8.1 và Section VIII hoàn hảo.
+
+- 0. **Giải Pháp Bóc Tách Hoàn Chỉnh Toàn Diện: Chuẩn Hóa Bảng Đa Trang, Ghép Dòng Ngắt Đôi & Triệt Tiêu Số Trang Footer (phiên #194)**:
+  - Khắc phục 1 (Căn chỉnh cột bảng tiếp nối có cột spacer rỗng): Cập nhật `_compact_task_row` và `_normalize_spacer_columns` trong `table_reconstructor.py` hỗ trợ `semantic_indices`, đưa các bảng 9/11 cột về 7 cột danh nghĩa chuẩn và ánh xạ chính xác hàng tiếp nối (orphan continuation row) sang Cột 1 (Nội dung) thay vì bị lệch sang Cột 3/6. Khắc phục triệt để lỗi dòng 4.10, 7.2, 8.1.
+  - Khắc phục 2 (Gộp số La Mã bị tách ngắt dòng): Thêm hàm `_merge_split_roman_rows` tự động nhận diện chữ số La Mã bị rớt dòng (`VII` + `I` $\rightarrow$ `VIII`), gộp thành 1 hàng duy nhất và loại bỏ hàng rỗng thừa.
+  - Khắc phục 3 (Chống nhầm lẫn hàng dữ liệu dài thành subheader): Thêm chốt chặn trong `_merge_second_header_row` từ chối các hàng có ô dài >50 ký tự hoặc gạch đầu dòng, ngăn không cho hàng dữ liệu nhiệm vụ bị nuốt vào tiêu đề bảng.
+  - Khắc phục 4 (Tiền chuẩn hóa bảng trước khi ghép liên trang): Chuẩn hóa schema (`clean_table_columns`) cho từng bảng đơn lẻ trước khi kiểm tra `schema_key`, bảo đảm mọi bảng con chia sẻ cùng cấu trúc cột trước khi chạy `merge_continuation`.
+  - Khắc phục 5 (Triệt tiêu số trang rác ở chân trang): Cập nhật `blocks.py` và `pdf_parser.py` lọc bỏ các khối số trang đơn độc ở chân trang (`y0 > 88%` và khớp `^\d{1,3}$` hoặc `Trang \d+`), giúp Markdown không bị dính số lẻ trước dấu `---`.
+  - Khắc phục 6 (Đảm bảo quy tắc 1 dòng = 1 bản ghi): Mỗi hàng bảng Markdown xuất ra là 1 dòng vật lý duy nhất, xuống dòng nội bộ ô chuyển thành `<br>`, bảo đảm tính toàn vẹn khi vector hóa vào Qdrant.
+  - Verification: 8/8 unit tests trong `test_table_stitching_and_page_partition.py` passed, full knowledge test suite 55/55 passed (100%), Ruff 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build 9.00s.
+- 0. **Tối Ưu Hóa Toàn Diện Bộ Bóc Tách PDF, Phân Mảnh Bảng Đa Trang & Triệt Tiêu Lặp Text Chân Trang (phiên #193)**:
+  - Khắc phục 1 (Thứ tự khối Trang 2 & 13): Cập nhật `backend/app/modules/knowledge/parsers/blocks.py` sắp xếp toàn bộ khối bảng và văn bản theo tọa độ đọc tự nhiên `(y, x)`, giúp phần mô tả Phương thức 1-5 & Mục 4 nằm trên bảng (Trang 2) và tiêu đề `PHỤ LỤC 1` nằm trên đỉnh trang (Trang 13).
+  - Khắc phục 2 (Phân bổ bảng đa trang Trang 2..8): Cập nhật `markdown_renderer.py` cắt lát các hàng bảng đa trang theo `pnum in sorted(tbl.source_pages)`, sinh bảng Markdown độc lập kèm header cho từng trang, bảo toàn thứ tự nội dung và triệt tiêu hoàn toàn hiện tượng trang 3..8 bị trống hoặc rách hàng mồ côi khi fallback.
+  - Khắc phục 3 (Line-Level Clipping chống lặp text Trang 12): Thêm cơ chế cắt lọc giao cắt biên giới bảng trong `blocks.py` và `pdf_parser.py`, triệt tiêu 100% text lặp của ngành 51 & 52 trước khối chữ ký "Nơi nhận:".
+  - Khắc phục 4 (Bảo vệ ngành độc lập Trang 14): Cập nhật `table_reconstructor.py` (`is_orphan_continuation_row`) bảo vệ hàng có mã ngành 7 số (`7310608`), tự động kế thừa tên nhóm môn `active_group` ("Tiếng Anh") từ cuối trang trước cho ngành Đông phương học.
+  - Khắc phục 5 (Sửa lỗi Serialization str vs int trong `build_studio_pages`): `ingestion_service.py` tra cứu `page_markdowns.get(page_number) or page_markdowns.get(str(page_number))` và đưa toàn bộ các trang có trong `page_markdowns` vào `page_numbers`.
+  - Verification: 5 unit tests mới trong `test_table_stitching_and_page_partition.py` passed 100%, Pytest 27/27 passed, Ruff 0 lỗi, Biome 170 files 0 lỗi, TypeScript 0 lỗi, Vite build thành công 11.27s, live verification trên tệp PDF tuyển sinh 14 trang đạt 6/6 tiêu chí.
 - 0. **Bổ Sung Nút Tải Nội Dung Cuộc Trò Chuyện Dạng Markdown (.md) & Loại Bỏ Fallback Bắt Nhầm Thực Thể "Nào" (phiên #192)**:
   - Tính năng 1 (Xuất Markdown Chat Studio): Tạo tiện ích `frontend/src/lib/export-markdown.ts` định dạng toàn bộ cuộc trò chuyện thành tệp Markdown (.md) chuẩn chỉnh kèm Header metadata, vai trò Người dùng/Trợ lý, thời gian, nội dung câu hỏi/trả lời, trích dẫn tài liệu gốc (blockquote), tệp đính kèm và nút gợi ý; tích hợp nút "Tải về (.md)" với icon Lucide `Download` trên thanh công cụ `ChatStudioPage`.
   - Tính năng 2 (Xuất Markdown Bàn Làm Việc Cán Bộ): Tích hợp nút "Xuất MD" tại thanh điều khiển chi tiết cuộc trò chuyện của cán bộ tư vấn trong `ConversationsPage` (`/conversations`).

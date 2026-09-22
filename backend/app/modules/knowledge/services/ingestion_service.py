@@ -663,19 +663,29 @@ class IngestionService:
     def _synthesize_page_markdown_from_blocks(cls, blocks: list[dict]) -> str:
         """Synthesize clean markdown for a page from its layout blocks when chunks are missing or clumped."""
         lines: list[str] = []
-        for b in blocks:
+        # Sắp xếp các khối theo thứ tự đọc tự nhiên theo tọa độ (từ trên xuống dưới, từ trái sang phải)
+        sorted_blocks = sorted(
+            blocks,
+            key=lambda b: (
+                float(b.get("coordinates", {}).get("y", 0.0) or 0.0),
+                float(b.get("coordinates", {}).get("x", 0.0) or 0.0),
+            ),
+        )
+        for b in sorted_blocks:
             text = (b.get("text") or b.get("content_snippet") or "").strip()
             if not text or text.lower().strip() in cls._SYNTHESIS_PLACEHOLDERS:
                 continue
             b_type = str(b.get("type", "text")).lower()
+            if b_type == "footer":
+                continue
             if b_type == "list":
                 if not text.startswith(("- ", "* ")):
                     lines.append(f"- {text}")
                 else:
                     lines.append(text)
-            elif b_type in ("title", "header"):
+            elif b_type in ("title", "header", "heading"):
                 if not text.startswith("#"):
-                    prefix = "##" if b_type == "title" else "###"
+                    prefix = "##" if b_type in ("title", "heading") else "###"
                     lines.append(f"{prefix} {text}")
                 else:
                     lines.append(text)
@@ -713,7 +723,15 @@ class IngestionService:
             if isinstance(items, list):
                 blocks_by_page[page_number] = items
 
-        page_numbers = sorted(set(by_page) | set(blocks_by_page)) or [1]
+        pm_pages: set[int] = set()
+        if page_markdowns:
+            for k in page_markdowns:
+                try:
+                    pm_pages.add(int(k))
+                except (TypeError, ValueError):
+                    pass
+
+        page_numbers = sorted(set(by_page) | set(blocks_by_page) | pm_pages) or [1]
         is_clumped = len(page_numbers) > 1 and set(by_page.keys()) <= {1}
         pages: list[dict] = []
         for p_idx, page_number in enumerate(page_numbers):
@@ -731,8 +749,15 @@ class IngestionService:
                         }
             prev_has_bottom_table = prev_table_coords is not None
 
-            if page_markdowns and page_number in page_markdowns:
-                markdown = page_markdowns[page_number] or ""
+            # Hỗ trợ cả khóa int lẫn str từ JSONB PostgreSQL
+            pm_content = None
+            if page_markdowns:
+                pm_content = page_markdowns.get(page_number)
+                if pm_content is None:
+                    pm_content = page_markdowns.get(str(page_number))
+
+            if pm_content is not None:
+                markdown = pm_content or ""
             elif is_clumped and page_number in blocks_by_page:
                 synth = self._synthesize_page_markdown_from_blocks(blocks_by_page[page_number])
                 if synth:

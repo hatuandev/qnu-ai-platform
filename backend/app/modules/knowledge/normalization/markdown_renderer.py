@@ -93,11 +93,28 @@ def render_canonical_document_markdown(doc: CanonicalDocument) -> str:
         page_items.setdefault(pnum, []).append((top_y, b.text))
 
     for tbl in doc.tables:
-        pnum = min(tbl.source_pages) if tbl.source_pages else 1
-        top_y = tbl.bbox[1] if tbl.bbox else 50.0
-        tbl_md = render_canonical_table_markdown(tbl)
-        if tbl_md:
-            page_items.setdefault(pnum, []).append((top_y, tbl_md))
+        if not tbl.source_pages or len(tbl.source_pages) <= 1:
+            pnum = min(tbl.source_pages) if tbl.source_pages else 1
+            top_y = tbl.bbox[1] if tbl.bbox else 50.0
+            tbl_md = render_canonical_table_markdown(tbl)
+            if tbl_md:
+                page_items.setdefault(pnum, []).append((top_y, tbl_md))
+        else:
+            # Multi-page table: distribute rows by their source_pages across individual pages
+            for pnum in sorted(tbl.source_pages):
+                p_rows = [
+                    r
+                    for r in tbl.rows
+                    if (min(r.source_pages) if r.source_pages else pnum) == pnum
+                ]
+                if not p_rows:
+                    continue
+                # For first page, use actual table bbox y; for continuation pages, start at top
+                top_y = (tbl.bbox[1] if tbl.bbox else 50.0) if pnum == min(tbl.source_pages) else 5.0
+                sub_tbl = tbl.model_copy(update={"rows": p_rows, "source_pages": [pnum]})
+                tbl_md = render_canonical_table_markdown(sub_tbl)
+                if tbl_md:
+                    page_items.setdefault(pnum, []).append((top_y, tbl_md))
 
     all_pages = sorted(page_items.keys())
     for pnum in all_pages:

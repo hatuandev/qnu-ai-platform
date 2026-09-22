@@ -96,6 +96,12 @@ def classify_text_block(text: str, top_percent: float, bottom_percent: float) ->
     if not clean:
         return "text", "Khối văn bản"
 
+    # 0. Header / Footer Pagination (ở đỉnh trang <= 8% hoặc đáy trang >= 88%, là số trang đơn độc như "2", "15", "Trang 2/22")
+    if (top_percent <= 8.0 or top_percent >= 88.0) and re.fullmatch(
+        r"(?:Trang\s+)?\d{1,3}(?:\s*/\s*\d{1,3})?", clean, re.IGNORECASE
+    ):
+        return "footer", "Số trang"
+
     # 1. Header (chỉ ở đầu trang <= 16% và BẮT ĐẦU bằng từ khóa hành chính / số hiệu)
     if top_percent <= 16.0 and re.match(
         r"^(?:bộ giáo dục|trường đại học|cộng hòa xã hội|độc lập\s*-\s*tự do|số\s*[:\/])",
@@ -393,6 +399,36 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
                         is_inside_tbl = True
                         break
 
+            # Xử lý khối văn bản cắt ngang biên giới bảng (ví dụ: chân bảng nối với Nơi nhận / Chữ ký)
+            if not is_inside_tbl and total_table_inter > 0:
+                import fitz
+
+                for tx0, ty0, tx1, ty1 in table_bboxes:
+                    inter_area = _rect_intersection(b_rect, (tx0, ty0, tx1, ty1))
+                    if inter_area > 0:
+                        # Khối bắt đầu từ trong bảng và kéo dài xuống dưới bảng
+                        if ty0 <= by0 < ty1 < by1:
+                            clipped_txt = page.get_text("text", clip=fitz.Rect(bx0, ty1, bx1, by1)).strip()
+                            if clipped_txt:
+                                raw_txt = clipped_txt
+                                snippet = raw_txt.replace("\n", " ")
+                                by0 = ty1
+                                b_rect = (bx0, by0, bx1, by1)
+                            else:
+                                is_inside_tbl = True
+                            break
+                        # Khối bắt đầu phía trên bảng và ăn vào trong bảng
+                        elif by0 < ty0 < by1 <= ty1:
+                            clipped_txt = page.get_text("text", clip=fitz.Rect(bx0, by0, bx1, ty0)).strip()
+                            if clipped_txt:
+                                raw_txt = clipped_txt
+                                snippet = raw_txt.replace("\n", " ")
+                                by1 = ty0
+                                b_rect = (bx0, by0, bx1, by1)
+                            else:
+                                is_inside_tbl = True
+                            break
+
         if is_inside_tbl:
             continue
 
@@ -400,7 +436,7 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
             break
 
         coords = to_percent(
-            block[0], block[1], block[2], block[3], page_width, page_height
+            bx0, by0, bx1, by1, page_width, page_height
         )
         b_type, b_label = classify_text_block(
             raw_txt, coords["y"], coords["y"] + coords["height"]
@@ -416,4 +452,6 @@ def extract_page_blocks(page: Any, max_text_blocks: int = 60) -> list[dict[str, 
             }
         )
 
+    # Sắp xếp các khối theo tọa độ đọc tự nhiên (từ trên xuống dưới, từ trái sang phải)
+    blocks.sort(key=lambda b: (b["coordinates"]["y"], b["coordinates"]["x"]))
     return blocks

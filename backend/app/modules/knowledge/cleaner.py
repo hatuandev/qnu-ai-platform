@@ -9,7 +9,7 @@ import unicodedata
 _RE_MULTIPLE_NEWLINES = re.compile(r"\n{3,}")
 _RE_MULTIPLE_SPACES = re.compile(r"[ \t]{2,}")
 _RE_PAGE_NUMBERS = re.compile(
-    r"^\s*(?:Trang\s+\d+(?:\s*/\s*\d+)?|[-—~–]\s*\d+\s*[-—~–]|\d+\s*/\s*\d+)\s*$",
+    r"^\s*(?:Trang\s+\d+(?:\s*/\s*\d+)?|[-—~–]\s*\d+\s*[-—~–]|\d+\s*/\s*\d+|\d{1,3})\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 _RE_HEADING_NORMALIZE = re.compile(
@@ -104,14 +104,21 @@ def _stitch_table_continuations(text: str) -> str:
                 interstitial.append(lines[j])
                 j += 1
 
-            if j < n and _is_table_row(lines[j]):
+            has_boundary = any(
+                s.strip() == "---"
+                or bool(re.match(r"^<!--\s*Trang\s+\d+\s*-->$", s.strip(), re.IGNORECASE))
+                for s in interstitial
+            )
+
+            if has_boundary and j < n and _is_table_row(lines[j]):
                 next_cols = _count_cols(lines[j])
                 if next_cols == cols:
                     k = j
-                    if _is_table_sep(lines[k]):
-                        k += 1
-                    elif k + 1 < n and _is_table_sep(lines[k + 1]):
+                    # Repeated header followed by separator on continuation page
+                    if k + 1 < n and _is_table_sep(lines[k + 1]):
                         k += 2
+                    elif _is_table_sep(lines[k]):
+                        k += 1
 
                     result.extend(interstitial)
                     i = k - 1
@@ -122,6 +129,7 @@ def _stitch_table_continuations(text: str) -> str:
         i += 1
 
     return "\n".join(result)
+
 
 
 def clean_markdown_text(raw_text: str) -> str:

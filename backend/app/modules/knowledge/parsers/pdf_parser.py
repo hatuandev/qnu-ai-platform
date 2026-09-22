@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import pymupdf as fitz
 
@@ -140,14 +141,60 @@ class PyMuPdfParser(BaseDocumentParser):
                     # Text belongs to a table -> suppress to avoid duplication!
                     continue
 
+                # Filter out standalone page numbers (header <= 8% from page 2 onward, or footer >= 88%)
+                is_page_num = bool(
+                    re.fullmatch(r"(?:Trang\s+)?\d{1,3}(?:\s*/\s*\d{1,3})?", txt, re.IGNORECASE)
+                )
+                if is_page_num:
+                    if b_rect.y0 > page.rect.height * 0.88:
+                        continue
+                    if page_num > 1 and b_rect.y1 < page.rect.height * 0.08:
+                        continue
+
+                # Xử lý khối văn bản cắt ngang biên giới bảng (ví dụ: chân bảng nối với Nơi nhận / Chữ ký)
+                if table_rects:
+                    bx0, by0, bx1, by1 = b_rect.x0, b_rect.y0, b_rect.x1, b_rect.y1
+                    for tr in table_rects:
+                        inter = b_rect & tr
+                        if not inter.is_empty:
+                            if tr.y0 <= by0 < tr.y1 < by1:
+                                clip_rect = fitz.Rect(bx0, tr.y1, bx1, by1)
+                                clipped_txt = page.get_text("text", clip=clip_rect).strip()
+                                if clipped_txt:
+                                    txt = clipped_txt
+                                    by0 = tr.y1
+                                    b_rect = fitz.Rect(bx0, by0, bx1, by1)
+                                else:
+                                    txt = ""
+                                break
+                            elif by0 < tr.y0 < by1 <= tr.y1:
+                                clip_rect = fitz.Rect(bx0, by0, bx1, tr.y0)
+                                clipped_txt = page.get_text("text", clip=clip_rect).strip()
+                                if clipped_txt:
+                                    txt = clipped_txt
+                                    by1 = tr.y0
+                                    b_rect = fitz.Rect(bx0, by0, bx1, by1)
+                                else:
+                                    txt = ""
+                                break
+
+                if not txt:
+                    continue
+
+                b_type = (
+                    BlockType.HEADING
+                    if txt.startswith("#") or txt.upper().startswith("PHỤ LỤC")
+                    else BlockType.PARAGRAPH
+                )
+
                 canonical_blocks.append(
                     CanonicalBlock(
                         block_id=f"block_p{page_num}_{b_idx+1}",
-                        type=BlockType.PARAGRAPH,
+                        type=b_type,
                         text=txt,
                         source_span=SourceSpan(
                             page_number=page_num,
-                            bbox=(b[0], b[1], b[2], b[3]),
+                            bbox=(b_rect.x0, b_rect.y0, b_rect.x1, b_rect.y1),
                         ),
                     )
                 )

@@ -29,7 +29,7 @@ _PROGRAM_CODE_RE = re.compile(r"^\d{7}$")
 _TASK_CODE_RE = re.compile(r"^\d+\.\d+$")
 _ROMAN_NUMERAL_RE = re.compile(r"^[IVXLCDM]+$")
 _LEAD_UNIT_RE = re.compile(
-    r"^(?:ban|cđ|đtn|hsv|khoa|phòng|trung tâm|trường|viện|văn phòng)\b",
+    r"^(?:ban(?!\s+hành)|cđ|đtn|hsv|khoa|phòng(?!\s+ngừa|\s+chống)|trung tâm|trường(?!\s+hợp)|viện(?!\s+dẫn)|văn phòng)\b",
     re.IGNORECASE,
 )
 _DATE_RE = re.compile(r"^\d{1,2}/\d{4}$")
@@ -127,6 +127,9 @@ def _merge_second_header_row(
     has_subheaders = sum(1 for value in first_values if value) >= 2
     if not first_three_are_empty or not has_subheaders:
         return headers, rows
+    # Subheader row items must be short column titles, never long paragraphs or bulleted lists
+    if any(len(v) > 50 or v.startswith("-") for v in first_values if v):
+        return headers, rows
 
     merged_headers: list[str] = []
     active_group = ""
@@ -178,45 +181,76 @@ def _split_coordination_spillover(value: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def _compact_task_row(row: CanonicalRow, target_count: int) -> CanonicalRow:
+def _compact_task_row(
+    row: CanonicalRow, target_count: int, semantic_indices: list[int] | None = None
+) -> CanonicalRow:
     """Repair mixed 7/9/11-column task rows into one seven-column semantic layout."""
     values = [_as_text(cell) for cell in row.cells]
     page_number = row.source_pages[0] if row.source_pages else 1
-    code = values[0] if values else ""
-
-    if not _TASK_CODE_RE.fullmatch(code):
-        roman_index = next(
-            (index for index, value in enumerate(values) if _ROMAN_NUMERAL_RE.fullmatch(value)),
-            None,
-        )
-        if roman_index is None:
-            return row
-        category = next(
-            (
-                value
-                for index, value in enumerate(values)
-                if index != roman_index and value and not _ROMAN_NUMERAL_RE.fullmatch(value)
-            ),
-            "",
-        )
-        category_cells = [
-            _clone_cell_with_value(_cell_at(row, roman_index), values[roman_index], page_number),
-            _clone_cell_with_value(None, category, page_number),
-        ]
-        category_cells.extend(
-            _clone_cell_with_value(None, "", page_number)
-            for _ in range(max(0, target_count - len(category_cells)))
-        )
-        return row.model_copy(update={"cells": category_cells})
-
-    lead_index = next(
-        (index for index, value in enumerate(values[1:], start=1) if _LEAD_UNIT_RE.match(value)),
+    task_code_idx = next((i for i, v in enumerate(values[:3]) if _TASK_CODE_RE.fullmatch(v)), None)
+    roman_index = next(
+        (index for index, value in enumerate(values) if _ROMAN_NUMERAL_RE.fullmatch(value)),
         None,
     )
-    if lead_index is None:
+
+    if task_code_idx is None:
+        if roman_index is not None:
+            category = next(
+                (
+                    value
+                    for index, value in enumerate(values)
+                    if index != roman_index and value and not _ROMAN_NUMERAL_RE.fullmatch(value)
+                ),
+                "",
+            )
+            category_cells = [
+                _clone_cell_with_value(_cell_at(row, roman_index), values[roman_index], page_number),
+                _clone_cell_with_value(None, category, page_number),
+            ]
+            category_cells.extend(
+                _clone_cell_with_value(None, "", page_number)
+                for _ in range(max(0, target_count - len(category_cells)))
+            )
+            return row.model_copy(update={"cells": category_cells})
+
+        if semantic_indices:
+            selected_cells = [_cell_at(row, index) for index in semantic_indices]
+            selected_cells = [
+                c if c is not None else _clone_cell_with_value(None, "", page_number)
+                for c in selected_cells
+            ]
+            if len(selected_cells) < target_count:
+                selected_cells.extend(
+                    _clone_cell_with_value(None, "", page_number)
+                    for _ in range(target_count - len(selected_cells))
+                )
+            return row.model_copy(update={"cells": selected_cells[:target_count]})
         return row
 
-    content_values = [value for value in values[1:lead_index] if value]
+    code = values[task_code_idx]
+    after_code_values = values[task_code_idx + 1 :]
+    lead_index_rel = next(
+        (index for index, value in enumerate(after_code_values) if _LEAD_UNIT_RE.match(value)),
+        None,
+    )
+
+    if lead_index_rel is None:
+        if semantic_indices:
+            selected_cells = [_cell_at(row, index) for index in semantic_indices]
+            selected_cells = [
+                c if c is not None else _clone_cell_with_value(None, "", page_number)
+                for c in selected_cells
+            ]
+            if len(selected_cells) < target_count:
+                selected_cells.extend(
+                    _clone_cell_with_value(None, "", page_number)
+                    for _ in range(target_count - len(selected_cells))
+                )
+            return row.model_copy(update={"cells": selected_cells[:target_count]})
+        return row
+
+    lead_index = task_code_idx + 1 + lead_index_rel
+    content_values = [value for value in values[task_code_idx + 1 : lead_index] if value]
     content = " ".join(content_values)
     lead = values[lead_index]
     trailing_values = values[lead_index + 1 :]
@@ -266,34 +300,25 @@ def _normalize_spacer_columns(
             normalized_rows.append(row)
             continue
         if len(row.cells) >= len(headers):
-            if _looks_like_implementation_table(headers) and not _as_text(_cell_at(row, 0)):
-                normalized_rows.append(_compact_task_row(row, len(semantic_headers)))
-                continue
             selected_cells = [_cell_at(row, index) for index in semantic_indices]
+            selected_cells = [
+                c if c is not None else _clone_cell_with_value(None, "", row.source_pages[0] if row.source_pages else 1)
+                for c in selected_cells
+            ]
+            first_val = _as_text(selected_cells[0])
+            lead_val = _as_text(selected_cells[2]) if len(selected_cells) > 2 else ""
+            if _TASK_CODE_RE.fullmatch(first_val) and _LEAD_UNIT_RE.match(lead_val):
+                normalized_rows.append(row.model_copy(update={"cells": selected_cells[:len(semantic_headers)]}))
+                continue
             if _looks_like_implementation_table(headers):
-                unmapped_values = [
-                    _as_text(_cell_at(row, index))
-                    for index, header in enumerate(headers)
-                    if _is_phantom_header(header) and _as_text(_cell_at(row, index))
-                ]
-                selected_cells = [cell for cell in selected_cells if cell is not None]
-                normalized_row = row.model_copy(update={"cells": selected_cells})
-                if unmapped_values and len(normalized_row.cells) > 1:
-                    extra_text = " ".join(unmapped_values)
-                    current_content = normalized_row.cells[1].raw_value
-                    normalized_row.cells[1] = _clone_cell_with_value(
-                        normalized_row.cells[1],
-                        f"{current_content} {extra_text}",
-                        row.source_pages[0] if row.source_pages else 1,
-                    )
-                normalized_rows.append(normalized_row)
-            else:
-                normalized_rows.append(
-                    row.model_copy(update={"cells": [cell for cell in selected_cells if cell is not None]})
-                )
+                normalized_rows.append(_compact_task_row(row, len(semantic_headers), semantic_indices))
+                continue
+            normalized_rows.append(
+                row.model_copy(update={"cells": selected_cells[:len(semantic_headers)]})
+            )
             continue
         if _looks_like_implementation_table(headers):
-            normalized_rows.append(_compact_task_row(row, len(semantic_headers)))
+            normalized_rows.append(_compact_task_row(row, len(semantic_headers), semantic_indices))
             continue
         normalized_rows.append(row)
     return semantic_headers, normalized_rows
@@ -334,6 +359,10 @@ def is_orphan_continuation_row(row: CanonicalRow, key_col_idx: int = 0) -> bool:
     in the descriptive/content columns.
     """
     if not row.cells:
+        return False
+    # If the row has its own distinct program code (e.g. 7 digits like 7310608),
+    # it is an independent business row with an inherited group header, NOT a continuation!
+    if any(_PROGRAM_CODE_RE.fullmatch(_as_text(c)) for c in row.cells):
         return False
     if key_col_idx < len(row.cells):
         key_val = row.cells[key_col_idx].raw_value.strip()
@@ -455,10 +484,42 @@ def _deduplicate_exact_business_rows(rows: list[CanonicalRow]) -> list[Canonical
     return unique_rows
 
 
+def _merge_split_roman_rows(rows: list[CanonicalRow]) -> list[CanonicalRow]:
+    """Merge accidental Roman numeral split rows (e.g. 'VII' on line 1, 'I' on line 2 -> 'VIII')."""
+    if len(rows) < 2:
+        return rows
+    merged: list[CanonicalRow] = []
+    idx = 0
+    while idx < len(rows):
+        curr = rows[idx]
+        if idx + 1 < len(rows):
+            nxt = rows[idx + 1]
+            curr_code = _as_text(_cell_at(curr, 0))
+            nxt_code = _as_text(_cell_at(nxt, 0))
+            nxt_other_blank = not any(_as_text(c) for c in nxt.cells[1:])
+            if (
+                _ROMAN_NUMERAL_RE.fullmatch(curr_code)
+                and _ROMAN_NUMERAL_RE.fullmatch(nxt_code)
+                and nxt_other_blank
+            ):
+                combined = f"{curr_code}{nxt_code}".upper()
+                if _ROMAN_NUMERAL_RE.fullmatch(combined):
+                    page_num = curr.source_pages[0] if curr.source_pages else 1
+                    updated_cells = list(curr.cells)
+                    updated_cells[0] = _clone_cell_with_value(curr.cells[0], combined, page_num)
+                    curr = curr.model_copy(update={"cells": updated_cells})
+                    idx += 2
+                    merged.append(curr)
+                    continue
+        merged.append(curr)
+        idx += 1
+    return merged
+
+
 def _finalize_table(table: CanonicalTable) -> CanonicalTable:
     """Apply structural cleanup once a logical table has been fully reconstructed."""
     clean_headers, clean_rows = clean_table_columns(table.headers, table.rows)
-    clean_rows = _deduplicate_exact_business_rows(clean_rows)
+    clean_rows = _merge_split_roman_rows(_deduplicate_exact_business_rows(clean_rows))
     return table.model_copy(
         update={
             "headers": clean_headers,
@@ -473,10 +534,24 @@ def reconstruct_multi_page_tables(raw_tables: list[CanonicalTable]) -> list[Cano
     if not raw_tables:
         return []
 
+    # Pre-clean all candidate tables so schemas and column widths match cleanly
+    cleaned_tables: list[CanonicalTable] = []
+    for tbl in raw_tables:
+        clean_h, clean_r = clean_table_columns(tbl.headers, tbl.rows)
+        cleaned_tables.append(
+            tbl.model_copy(
+                update={
+                    "headers": clean_h,
+                    "rows": clean_r,
+                    "schema_key": table_schema_key(clean_h),
+                }
+            )
+        )
+
     reconstructed: list[CanonicalTable] = []
     current_master: CanonicalTable | None = None
 
-    for tbl in raw_tables:
+    for tbl in cleaned_tables:
         if current_master is None:
             current_master = tbl.model_copy(deep=True)
             continue
@@ -513,6 +588,25 @@ def reconstruct_multi_page_tables(raw_tables: list[CanonicalTable]) -> list[Cano
                     last_row = current_master.rows[-1]
                     current_master.rows[-1] = merge_continuation(last_row, row)
                     continue
+
+                # 3. Inherit spanned/empty group column at start of continuation page
+                if not new_rows and current_master.rows and row.cells and not row.cells[0].raw_value.strip():
+                    active_group = next(
+                        (
+                            r.cells[0].raw_value.strip()
+                            for r in reversed(current_master.rows)
+                            if r.cells and r.cells[0].raw_value.strip()
+                        ),
+                        "",
+                    )
+                    if active_group:
+                        inherited_cells = list(row.cells)
+                        inherited_cells[0] = _clone_cell_with_value(
+                            inherited_cells[0],
+                            active_group,
+                            row.source_pages[0] if row.source_pages else 1,
+                        )
+                        row = row.model_copy(update={"cells": inherited_cells})
 
                 new_rows.append(row)
 
