@@ -7,11 +7,26 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-22 23:10 (UTC+7)
-- **Phiên số**: #200
+- **Thời gian cập nhật**: 2026-09-22 23:59 (UTC+7)
+- **Phiên số**: #201
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-- 0. **Bóc Tách Kế Hoạch ĐGN AUN-QA 4.0 (KH130), Ghép Nối Đa Trang Dòng 16 & 23, Triệt Tiêu Số Trang Lề Trên Header (phiên #200)**:
+- 0. **Hoàn Thiện Bóc Tách & Reconstruct Bảng Đa Trang Cho 3 PDF Nghiệp Vụ (Kế Hoạch 2214 Bán Dẫn-AI-ANM, Kế Hoạch 2781 Học Liệu E-Learning, Kế Hoạch 4053 BĐCLGD) (phiên #201)**:
+  - Kiểm thử & hoàn thiện pipeline bóc tách trên 3 tài liệu PDF hành chính thực tế của ĐH Quy Nhơn:
+    1. `QNU_Ke hoach THUC HIEN DE AN DAO TAO NHAN LUC BAN DAN_AI_AT va ANM-signed.pdf` (12 trang, 2214/KH-ĐHQN).
+    2. `KH2781 XAY DUNG HOC LIEU E-LEARNING 2025-2026.pdf` (3 trang, 2781/KH-ĐHQN).
+    3. `KH4053 BDCLGD nam hoc 2025-2026 (Final)-signed.pdf` (7 trang, 4053/KH-ĐHQN).
+  - Khắc phục 1 (Tách tiêu đề Phụ lục & Gộp Multi-line Headers trong `pdf_parser.py`):
+    - Thêm `_normalize_raw_table_rows`: Phát hiện khi hàng 0 là ô tiêu đề phụ lục (`PHỤ LỤC...`), tách thành block `HEADING` độc lập trước bảng; gộp các hàng header nhiều tầng thành 1 hàng header chuẩn; bảo vệ các dòng dữ liệu (loại trừ số thứ tự STT, mã số 7 chữ số, chữ số La Mã, nội dung dài > 50 ký tự).
+  - Khắc phục 2 (Chống nuốt gạch đầu dòng hành chính tại Trang 6 Kế hoạch 4053):
+    - Thêm `is_admin_bullet = txt.startswith(("- ", "+ ", "• "))` loại trừ các gạch đầu dòng phân công nhiệm vụ khỏi bộ lọc anti-leakage của bảng.
+  - Khắc phục 3 (Nối bảng 4 cột có spacer columns tại Kế hoạch 2781):
+    - Hạ ngưỡng `_normalize_spacer_columns` trong `table_reconstructor.py` từ `>= 5` xuống `>= 3`; bổ sung direct remapping khi số ô dữ liệu thực tế bằng số cột tiêu đề ngữ nghĩa. Khôi phục hoàn hảo Row 1 & Row 2 và nối liền 7 dòng nhiệm vụ của Trang 1 & 2 thành 1 bảng master duy nhất.
+  - Khắc phục 4 (Sửa lỗi False Positive `tt` trong `_has_semantic_headers`):
+    - Chuyển `any(term in normalize_header(header))` sang regex word boundary `r"\b(stt|tt|mã|tên|công việc|ngành|nhiệm vụ|chủ trì|đơn vị|thời gian|sản phẩm|kết quả|điểm|chỉ tiêu|tổ hợp|phương thức)\b"` và giới hạn chiều dài header <= 40 ký tự. Ngăn chặn `Khoa CNTT` bị nhận nhầm thành header `tt`, giúp bảng Phụ lục 284 dòng Trang 5-12 của Kế hoạch 2214 nối liền mạch.
+  - Khắc phục 5 (Fallback an toàn trong `markdown_renderer.py`):
+    - Thêm fallback gọi `clean_table_columns` trước khi từ chối render bảng, tránh rớt bảng khi còn cột trắng phụ.
+  - Verification: 31/31 unit tests trong `test_table_stitching_and_page_partition.py` và `test_table_reconstructor.py` passed, ruff check 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi. Live verification trên cả 3 file PDF đạt 100% độ chính xác.
   - Kiểm thử thực tế tệp `KH130 trien khai chuan bi DGN CTDT 3 CTDT AUN-QA 2026.pdf` (6 trang, 45 nhiệm vụ): Xác nhận toàn bộ 45 nhiệm vụ được bóc tách hoàn hảo vào đủ 6 cột chuẩn, 100% dòng phân cách `:---` được bảo toàn.
   - Ghép nối đa trang siêu chuẩn: Dòng 16 tự động hút phần text nối trang ở đỉnh Trang 3 (`KH-TC, TT. S&HL, các đơn vị liên quan`), Dòng 23 tự động nối tiếp câu ở đỉnh Trang 4 (`Bảo đảm tính hoạt động ổn định...`), 0 dòng mồ côi.
   - Triệt tiêu số trang lề trên (Header Pagination theo NĐ 30/2020/NĐ-CP Điều 9.4): Bổ sung kiểm tra `top_percent <= 8.0` cho `blocks.py` và `page_num > 1 and b_rect.y1 < height * 0.08` cho `pdf_parser.py`, cập nhật `_RE_PAGE_NUMBERS` trong `cleaner.py` bao quát số trang đơn độc `\d{1,3}`, xóa sạch hoàn toàn các số trang header `2`, `3`, `4`, `5`, `6`.

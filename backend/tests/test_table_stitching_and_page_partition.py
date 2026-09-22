@@ -355,4 +355,76 @@ def test_row_3_1_ban_hanh_not_matched_as_lead_unit():
     assert compacted.cells[6].raw_value == "Các quy định đã ban hành"
 
 
+def test_normalize_spacer_columns_four_columns():
+    """Verify 4-column tables with interspersed blank spacer columns are compacted and remapped."""
+    from app.modules.knowledge.normalization.table_reconstructor import _normalize_spacer_columns
+
+    headers = ["TT", "CÔNG VIỆC", "", "CHỦ TRÌ/ PHỐI HỢP", "", "", "THỜI GIAN", ""]
+    rows = [
+        CanonicalRow(
+            row_id="r1",
+            cells=[
+                CanonicalCell(raw_value="1", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="Lập danh sách học phần", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="TT.S&HL / Các Khoa", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="9/2025", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="", source_span=SourceSpan(page_number=1)),
+                CanonicalCell(raw_value="", source_span=SourceSpan(page_number=1)),
+            ],
+            source_pages=[1],
+        )
+    ]
+    clean_h, clean_r = _normalize_spacer_columns(headers, rows)
+    assert len(clean_h) == 4
+    assert clean_h == ["TT", "CÔNG VIỆC", "CHỦ TRÌ/ PHỐI HỢP", "THỜI GIAN"]
+    assert len(clean_r[0].cells) == 4
+    assert clean_r[0].cells[0].raw_value == "1"
+    assert clean_r[0].cells[1].raw_value == "Lập danh sách học phần"
+    assert clean_r[0].cells[2].raw_value == "TT.S&HL / Các Khoa"
+    assert clean_r[0].cells[3].raw_value == "9/2025"
+
+
+def test_normalize_raw_table_rows_extracts_title_and_merges():
+    """Verify _normalize_raw_table_rows pops appendix title and merges multi-line headers."""
+    from app.modules.knowledge.parsers.pdf_parser import _normalize_raw_table_rows
+
+    raw_table = [
+        ["", "PHỤ LỤC (Ban hành kèm theo Kế hoạch...)", "", ""],
+        ["TT", "Nội dung nhiệm vụ", "Chủ trì", "Thời gian"],
+        ["", "", "", "hoàn thành"],
+        ["1", "Nhiệm vụ số 1", "Khoa CNTT", "12/2025"],
+    ]
+    title, headers, data_rows = _normalize_raw_table_rows(raw_table)
+    assert title == "PHỤ LỤC (Ban hành kèm theo Kế hoạch...)"
+    assert headers == ["TT", "Nội dung nhiệm vụ", "Chủ trì", "Thời gian hoàn thành"]
+    assert len(data_rows) == 1
+    assert data_rows[0][0] == "1"
+    assert data_rows[0][1] == "Nhiệm vụ số 1"
+
+
+def test_has_semantic_headers_word_boundaries():
+    """Verify 'Khoa CNTT' in data row does not falsely match 'tt' as a semantic header."""
+    from app.modules.knowledge.normalization.table_reconstructor import _has_semantic_headers
+
+    # Row from Page 6 of File 1 (data continuation)
+    continuation_headers = [
+        "",
+        "Kết nối mạng lưới các cơ quan, doanh nghiệp",
+        "",
+        "Phòng CTSV&HTDN",
+        "Các Khoa: KT&CN, KHTN, CNTT Các cơ quan; DN",
+        "",
+        "Tháng 1, 2",
+        "Các doanh nghiệp",
+    ]
+    assert not _has_semantic_headers(continuation_headers)
+
+    # Legitimate header
+    real_headers = ["TT", "Nội dung nhiệm vụ", "Chủ trì", "Thời gian bắt đầu"]
+    assert _has_semantic_headers(real_headers)
+
+
+
 

@@ -54,22 +54,16 @@ def _has_semantic_headers(headers: list[str]) -> bool:
     meaningful_headers = [header for header in headers if not _is_phantom_header(header)]
     if len(meaningful_headers) < 2:
         return False
+    if any(len(h.strip()) > 40 for h in meaningful_headers):
+        return False
 
-    semantic_terms = (
-        "stt",
-        "tt",
-        "mã",
-        "tên",
-        "ngành",
-        "nhiệm vụ",
-        "đơn vị",
-        "thời gian",
-        "sản phẩm",
-        "điểm",
-        "chỉ tiêu",
-        "tổ hợp",
-    )
-    return any(term in normalize_header(header) for header in meaningful_headers for term in semantic_terms)
+    pattern = r"\b(stt|tt|mã|tên|công việc|ngành|nhiệm vụ|chủ trì|đơn vị|thời gian|sản phẩm|kết quả|điểm|chỉ tiêu|tổ hợp|phương thức)\b"
+    matched_terms = set()
+    for header in meaningful_headers:
+        for match in re.finditer(pattern, normalize_header(header)):
+            matched_terms.add(match.group(1))
+
+    return len(matched_terms) >= 2
 
 
 def _header_looks_like_data(headers: list[str]) -> bool:
@@ -293,7 +287,7 @@ def _normalize_spacer_columns(
         index for index, header in enumerate(headers) if not _is_phantom_header(header)
     ]
     has_interspersed_spacers = (
-        len(semantic_indices) >= 5 and len(semantic_indices) < len(headers)
+        len(semantic_indices) >= 3 and len(semantic_indices) < len(headers)
     )
     if not has_interspersed_spacers:
         return headers, rows
@@ -304,6 +298,19 @@ def _normalize_spacer_columns(
         if len(row.cells) == len(semantic_headers):
             normalized_rows.append(row)
             continue
+
+        # Check if the non-empty cells in the row exactly match the count of semantic headers.
+        # This handles cases where PDF extraction misaligns cells across spacer columns.
+        row_non_empty = [c for c in row.cells if c.raw_value.strip()]
+        if len(row_non_empty) == len(semantic_headers):
+            page_num = row.source_pages[0] if row.source_pages else 1
+            remapped_cells = [
+                _clone_cell_with_value(row_non_empty[i], row_non_empty[i].raw_value, page_num)
+                for i in range(len(semantic_headers))
+            ]
+            normalized_rows.append(row.model_copy(update={"cells": remapped_cells}))
+            continue
+
         if len(row.cells) >= len(headers):
             selected_cells = [_cell_at(row, index) for index in semantic_indices]
             selected_cells = [

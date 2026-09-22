@@ -38,12 +38,17 @@ def render_canonical_table_markdown(table: CanonicalTable) -> str:
     if not table.headers and not table.rows:
         return ""
 
-    # A missing header is a structural extraction error, not a value that may be
-    # silently promoted to ``Cột N`` and later embedded into Qdrant.
-    if not table.headers or any(not header.strip() for header in table.headers):
-        return ""
-
     headers = table.headers
+    # If any header is blank, attempt cleanup via clean_table_columns before discarding
+    if not headers or any(not header.strip() for header in headers):
+        from app.modules.knowledge.normalization.table_reconstructor import clean_table_columns
+
+        clean_h, clean_r = clean_table_columns(table.headers, table.rows)
+        if clean_h and not any(not h.strip() for h in clean_h):
+            table = table.model_copy(update={"headers": clean_h, "rows": clean_r})
+            headers = clean_h
+        else:
+            return ""
     col_count = len(headers)
 
     # 1. Header line

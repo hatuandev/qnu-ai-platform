@@ -154,6 +154,83 @@ def _fuse_side_by_side_tables(tables: list[_RawTableItem]) -> list[_RawTableItem
     return fused
 
 
+def _normalize_raw_table_rows(
+    table_rows: list[list[str]],
+) -> tuple[str | None, list[str], list[list[str]]]:
+    """Extract appendix/table title if captured as row 0, and merge multi-line header rows."""
+    if not table_rows:
+        return None, [], []
+    rows = list(table_rows)
+    title_text = None
+    first_non_empty = [c.strip() for c in rows[0] if c.strip()]
+    if len(first_non_empty) == 1 and re.match(
+        r"^\s*(?:PHỤ\s+LỤC|BẢNG|DANH\s+MỤC)\b", first_non_empty[0], re.IGNORECASE
+    ):
+        title_text = first_non_empty[0]
+        rows = rows[1:]
+
+    if not rows:
+        return title_text, [], []
+
+    header_keywords = (
+        "stt",
+        "tt",
+        "nội dung",
+        "công việc",
+        "nhiệm vụ",
+        "chủ trì",
+        "đơn vị",
+        "thực hiện",
+        "phối hợp",
+        "thời gian",
+        "bắt đầu",
+        "hoàn thành",
+        "sản phẩm",
+        "kết quả",
+        "ghi chú",
+        "chỉ tiêu",
+        "điểm",
+        "ngành",
+        "mã ngành",
+        "tên ngành",
+        "tổ hợp",
+    )
+
+    def _is_hdr(r_cells: list[str]) -> bool:
+        non_empty = [c.strip() for c in r_cells if c.strip()]
+        if not non_empty:
+            return False
+        # Do not treat rows with numeric row keys, Roman numerals, task codes (e.g. 1.1), or 7-digit program codes as headers
+        if re.fullmatch(r"^\d+$", non_empty[0]):
+            return False
+        if any(
+            re.fullmatch(r"^[IVXLCDM]+$", c)
+            or re.fullmatch(r"^\d+(?:\.\d+)+$", c)
+            or re.fullmatch(r"^\d{7}[A-Za-z]*$", c)
+            or len(c) > 50
+            for c in non_empty
+        ):
+            return False
+        matches = sum(1 for c in non_empty if any(kw in c.lower() for kw in header_keywords))
+        return (matches / len(non_empty)) >= 0.40
+
+    h_count = 0
+    while h_count < min(3, len(rows)) and _is_hdr(rows[h_count]):
+        h_count += 1
+
+    if h_count > 1:
+        cols = len(rows[0])
+        merged_hdr = [""] * cols
+        for r in rows[:h_count]:
+            for i, c in enumerate(r):
+                val = c.strip()
+                if val:
+                    merged_hdr[i] = (f"{merged_hdr[i]} {val}").strip() if merged_hdr[i] else val
+        return title_text, merged_hdr, rows[h_count:]
+
+    return title_text, rows[0], rows[1:]
+
+
 class PyMuPdfParser(BaseDocumentParser):
     """Fast PDF parser preserving page numbers, structure and non-duplicated tables."""
 
@@ -196,18 +273,31 @@ class PyMuPdfParser(BaseDocumentParser):
                 t_rect = fitz.Rect(item.bbox)
                 table_rects.append(t_rect)
 
-                headers = item.rows[0]
+                title_text, headers, data_rows = _normalize_raw_table_rows(item.rows)
+                if title_text:
+                    canonical_blocks.append(
+                        CanonicalBlock(
+                            block_id=f"heading_p{page_num}_{t_idx+1}",
+                            type=BlockType.HEADING,
+                            text=title_text,
+                            source_span=SourceSpan(
+                                page_number=page_num,
+                                bbox=(t_rect.x0, t_rect.y0, t_rect.x1, t_rect.y0 + 20.0),
+                            ),
+                        )
+                    )
+
                 schema_key = table_schema_key(headers)
                 canonical_rows: list[CanonicalRow] = []
 
                 # Index table cell words for content deduplication
-                for r in item.rows:
+                for r in data_rows:
                     for c in r:
                         for word in str(c or "").strip().lower().split():
                             if len(word) >= 3:
                                 page_table_words.add(word)
 
-                for r_idx, r_cells in enumerate(item.rows[1:]):
+                for r_idx, r_cells in enumerate(data_rows):
                     cells = [
                         CanonicalCell(
                             raw_value=str(c or "").strip(),
@@ -300,7 +390,8 @@ class PyMuPdfParser(BaseDocumentParser):
                         txt,
                     )
                 )
-                if not is_heading and page_table_words:
+                is_admin_bullet = txt.startswith(("- ", "+ ", "• "))
+                if not is_heading and not is_admin_bullet and page_table_words:
                     b_words = [w for w in txt.lower().split() if len(w) >= 3]
                     if len(b_words) >= 4:
                         overlap = sum(1 for w in b_words if w in page_table_words)
