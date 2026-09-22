@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kiến Trúc Kho Tri Thức — QNU AI Platform</title>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -33,7 +33,7 @@
       color: var(--color-ink);
     }
 
-    .container { max-width: 1200px; margin: 0 auto; }
+    .container { max-width: 1240px; margin: 0 auto; }
 
     /* ── Header ─────────────────────────────────────────────────── */
     .header { margin-bottom: 2rem; }
@@ -75,7 +75,7 @@
       font-size: 0.95rem;
       line-height: 1.6;
       color: var(--color-muted);
-      max-width: 72ch;
+      max-width: 80ch;
     }
 
     /* ── Diagram container ────────────────────────────────────────── */
@@ -90,14 +90,14 @@
 
     svg {
       width: 100%;
-      min-width: 1060px;
+      min-width: 1140px;
       display: block;
     }
 
     /* ── Info cards ───────────────────────────────────────────────── */
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 1.25rem;
       margin-top: 1.75rem;
     }
@@ -107,6 +107,8 @@
       border-radius: 6px;
       border: 1px solid var(--color-rule);
       padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
     }
 
     .card-header {
@@ -141,10 +143,11 @@
       color: var(--color-muted);
       font-size: 0.8125rem;
       line-height: 1.6;
+      flex-grow: 1;
     }
 
     .card li {
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.45rem;
       padding-left: 0.875rem;
       position: relative;
     }
@@ -180,15 +183,15 @@
     <!-- Header -->
     <div class="header">
       <p class="header-eyebrow">QNU AI Platform · Kiến Trúc Nền Tảng</p>
-      <h1>Kho Tri Thức & Pipeline Lập Chỉ Mục Kép</h1>
-      <p class="subtitle">Quy trình nạp tài liệu toàn trình từ tệp thô qua tầng OCR cứu bảng tiếp nối, chốt chặn Zero Hallucination Quality Gate và biểu diễn kép (Structured Facts + Qdrant Dense Vector 1024D).</p>
+      <h1>Kho Tri Thức &amp; Pipeline Nạp Toàn Trình (Dual-Lane &amp; Zero-Keyword)</h1>
+      <p class="subtitle">Kiến trúc bóc tách dữ liệu đa tầng từ tệp thô qua Động cơ Nhận diện Hình thái học Zero-Keyword, Chốt chặn Quality Gate, Scan Studio Đối soát Cán bộ (Human-in-the-Loop) và Tầng Biểu diễn Kép (PostgreSQL Facts + Qdrant Dense BGE-M3 1024D).</p>
     </div>
 
     <!-- Main Diagram -->
     <div class="diagram-container">
-      <svg viewBox="0 0 1180 610" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="qnu-knowledge-title qnu-knowledge-desc">
+      <svg viewBox="0 0 1180 630" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="qnu-knowledge-title qnu-knowledge-desc">
         <title id="qnu-knowledge-title">Kiến Trúc Toàn Trình Kho Tri Thức QNU AI Platform</title>
-        <desc id="qnu-knowledge-desc">Sơ đồ luồng 4 phân vùng: Nạp và Lưu trữ MinIO, PDF Inspector và Động cơ Bóc tách OCR, Chốt chặn Kiểm định Quality Gate và Review Studio, Tầng Biểu diễn Kép Facts và Vector Qdrant.</desc>
+        <desc id="qnu-knowledge-desc">Sơ đồ 4 phân vùng: 1. Nạp và Lưu trữ MinIO S3; 2. PDF Inspector và Động cơ Bóc tách Hình thái học Zero-Keyword; 3. Data Quality Gate và Scan Studio Đối soát Phê duyệt; 4. Tầng Biểu diễn Kép Facts PostgreSQL và Vector DB Qdrant.</desc>
         
         <defs>
           <!-- Arrow: default muted -->
@@ -210,240 +213,270 @@
         <!-- 1. Background -->
         <rect width="100%" height="100%" fill="#ffffff"/>
 
-        <!-- 2. Zone Boundaries (Background groups drawn first) -->
+        <!-- 2. Zone Boundaries -->
         <!-- Zone 1: Ingestion & Storage -->
-        <rect x="30" y="40" width="225" height="470" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
-        <rect x="42" y="32" width="130" height="16" rx="2" fill="#ffffff"/>
-        <text x="46" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">1. NẠP &amp; LƯU TRỮ</text>
+        <rect x="25" y="40" width="225" height="490" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+        <rect x="37" y="32" width="135" height="16" rx="2" fill="#ffffff"/>
+        <text x="42" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">1. NẠP &amp; LƯU TRỮ</text>
 
-        <!-- Zone 2: Parsing & Geometry Engine (Includes PDF Inspector) -->
-        <rect x="275" y="40" width="250" height="470" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
-        <rect x="287" y="32" width="175" height="16" rx="2" fill="#ffffff"/>
-        <text x="291" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">2. PDF INSPECTOR &amp; BÓC TÁCH</text>
+        <!-- Zone 2: Parsing & Geometry Engine (Zero-Keyword) -->
+        <rect x="268" y="40" width="254" height="490" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+        <rect x="280" y="32" width="215" height="16" rx="2" fill="#ffffff"/>
+        <text x="285" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">2. BÓC TÁCH &amp; ZERO-KEYWORD</text>
 
         <!-- Zone 3: Quality Gate & Studio Review -->
-        <rect x="545" y="40" width="250" height="470" rx="8" fill="rgba(15,118,110,0.02)" stroke="rgba(15,118,110,0.25)" stroke-width="0.8" stroke-dasharray="4,4"/>
-        <rect x="557" y="32" width="160" height="16" rx="2" fill="#ffffff"/>
-        <text x="561" y="44" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">3. KIỂM ĐỊNH &amp; HIỆU ĐÍNH</text>
+        <rect x="540" y="40" width="254" height="490" rx="8" fill="rgba(15,118,110,0.02)" stroke="rgba(15,118,110,0.25)" stroke-width="0.8" stroke-dasharray="4,4"/>
+        <rect x="552" y="32" width="180" height="16" rx="2" fill="#ffffff"/>
+        <text x="557" y="44" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">3. KIỂM ĐỊNH &amp; HIỆU ĐÍNH (HITL)</text>
 
         <!-- Zone 4: Dual-Index Representation Layer -->
-        <rect x="815" y="40" width="335" height="470" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
-        <rect x="827" y="32" width="165" height="16" rx="2" fill="#ffffff"/>
-        <text x="831" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">4. BIỂU DIỄN KÉP &amp; INDEX</text>
+        <rect x="812" y="40" width="343" height="490" rx="8" fill="rgba(15,23,42,0.015)" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+        <rect x="824" y="32" width="185" height="16" rx="2" fill="#ffffff"/>
+        <text x="829" y="44" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">4. BIỂU DIỄN KÉP &amp; VECTOR DB</text>
 
         <!-- 3. Connectors (Drawn before nodes to preserve z-order) -->
 
         <!-- Connector 1: Input -> MinIO (Vertical within Zone 1) -->
-        <path d="M 142,145 V 315" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <rect x="105" y="222" width="74" height="14" rx="2" fill="#ffffff"/>
-        <text x="142" y="232" fill="#64748b" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MINIO SAVE</text>
+        <path d="M 137,143 V 335" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="100" y="235" width="74" height="14" rx="2" fill="#ffffff"/>
+        <text x="137" y="245" fill="#64748b" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">MINIO SAVE</text>
 
         <!-- Connector 2: Input -> PDF Inspector (Horizontal Zone 1 -> Zone 2) -->
-        <path d="M 230,109 H 292" fill="none" stroke="#0284c7" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-        <rect x="238" y="95" width="46" height="14" rx="2" fill="#ffffff"/>
-        <text x="261" y="105" fill="#0284c7" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">STREAM</text>
+        <path d="M 222,109 H 284" fill="none" stroke="#0284c7" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <rect x="232" y="95" width="46" height="14" rx="2" fill="#ffffff"/>
+        <text x="255" y="105" fill="#0284c7" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">STREAM</text>
 
         <!-- Connector 3A: PDF Inspector -> Dual Engine (Vertical within Zone 2) -->
-        <path d="M 400,143 V 172" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <rect x="345" y="150" width="110" height="14" rx="2" fill="#ffffff"/>
-        <text x="400" y="160" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">≥ 40 CHARS / SCAN</text>
+        <path d="M 395,143 V 173" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="340" y="152" width="110" height="14" rx="2" fill="#ffffff"/>
+        <text x="395" y="162" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">≥ 40 CHARS / SCAN</text>
 
-        <!-- Connector 3B: Dual Engine -> Table Rescue (Vertical within Zone 2) -->
-        <path d="M 400,243 V 272" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <rect x="358" y="250" width="84" height="14" rx="2" fill="#ffffff"/>
-        <text x="400" y="260" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">LAYOUT BBOX</text>
+        <!-- Connector 3B: Dual Engine -> Zero-Keyword Reconstructor (Vertical within Zone 2) -->
+        <path d="M 395,243 V 273" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="345" y="252" width="100" height="14" rx="2" fill="#ffffff"/>
+        <text x="395" y="262" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">LAYOUT COORDINATES</text>
 
-        <!-- Connector 4: Table Rescue -> Text Normalizer (Vertical within Zone 2) -->
-        <path d="M 400,343 V 372" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <rect x="358" y="350" width="84" height="14" rx="2" fill="#ffffff"/>
-        <text x="400" y="360" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">RESCUED GFM</text>
+        <!-- Connector 4: Table Reconstructor -> NĐ 30 Normalizer (Vertical within Zone 2) -->
+        <path d="M 395,343 V 373" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="345" y="352" width="100" height="14" rx="2" fill="#ffffff"/>
+        <text x="395" y="362" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">STITCHED GFM TABLES</text>
 
-        <!-- Connector 5: Text Normalizer -> Data Quality Gate (Orthogonal Zone 2 -> Zone 3) -->
-        <path d="M 507,409 H 536 Q 544,409 544,401 V 181 Q 544,173 552,173 H 563" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-        <rect x="512" y="285" width="64" height="14" rx="2" fill="#ffffff"/>
-        <text x="544" y="295" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CANONICAL</text>
+        <!-- Connector 5: NĐ 30 Normalizer -> Data Quality Gate (Orthogonal Zone 2 -> Zone 3) -->
+        <path d="M 503,409 H 530 Q 538,409 538,401 V 181 Q 538,173 546,173 H 556" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <rect x="506" y="285" width="64" height="14" rx="2" fill="#ffffff"/>
+        <text x="538" y="295" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CANONICAL</text>
 
-        <!-- Connector 6: Quality Gate -> Scan Studio (Review Pending flow - Dashed) -->
-        <path d="M 670,211 V 332" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
-        <rect x="627" y="265" width="86" height="14" rx="2" fill="#ffffff"/>
-        <text x="670" y="275" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REVIEW PENDING</text>
+        <!-- Connector 6: Quality Gate -> Scan Studio (Review Pending flow - HITL Lane) -->
+        <path d="M 667,213 V 328" fill="none" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <rect x="618" y="265" width="98" height="14" rx="2" fill="#ffffff"/>
+        <text x="667" y="275" fill="#475569" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REVIEW PENDING</text>
 
-        <!-- Connector 7: Quality Gate -> Facts Layer (Fast-Track / Approved - Orthogonal) -->
-        <path d="M 775,150 H 802 Q 810,150 810,140 V 118 Q 810,110 818,110 H 833" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-        <rect x="782" y="95" width="56" height="14" rx="2" fill="#ffffff"/>
-        <text x="810" y="105" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EXTRACT</text>
+        <!-- Connector 7: Quality Gate -> Facts Layer (Fast-Track Lane - Auto Approve) -->
+        <path d="M 772,150 H 798 Q 806,150 806,140 V 118 Q 806,110 814,110 H 828" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <rect x="768" y="95" width="80" height="14" rx="2" fill="#ffffff"/>
+        <text x="808" y="105" fill="#0f766e" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.05em">FAST-TRACK FACTS</text>
 
-        <!-- Connector 8: Quality Gate -> Atomic Chunks (Orthogonal) -->
-        <path d="M 775,185 H 802 Q 810,185 810,235 V 242 Q 810,252 818,252 H 833" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
-        <rect x="786" y="210" width="52" height="14" rx="2" fill="#ffffff"/>
-        <text x="812" y="220" fill="#64748b" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CHUNKING</text>
+        <!-- Connector 8: Quality Gate -> Atomic Chunks (Fast-Track Lane) -->
+        <path d="M 772,185 H 798 Q 806,185 806,235 V 242 Q 806,252 814,252 H 828" fill="none" stroke="#475569" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="766" y="210" width="84" height="14" rx="2" fill="#ffffff"/>
+        <text x="808" y="220" fill="#64748b" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.05em">FAST-TRACK CHUNKS</text>
 
-        <!-- Connector 9: Scan Studio -> Atomic Chunks (Human-verified override) -->
-        <path d="M 775,373 H 802 Q 810,373 810,272 Q 810,262 818,262 H 833" fill="none" stroke="#0284c7" stroke-width="1.2" marker-end="url(#arrow-link)"/>
-        <rect x="780" y="310" width="64" height="14" rx="2" fill="#ffffff"/>
-        <text x="812" y="320" fill="#0284c7" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">VERIFIED</text>
+        <!-- Connector 9: Scan Studio Approval Action -> Zone 4 (HITL Flow) -->
+        <path d="M 772,398 H 798 Q 806,398 806,370 V 275 Q 806,262 814,262 H 828" fill="none" stroke="#0284c7" stroke-width="1.3" marker-end="url(#arrow-link)"/>
+        <rect x="768" y="318" width="82" height="14" rx="2" fill="#ffffff"/>
+        <text x="809" y="328" fill="#0284c7" font-size="7.2" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.05em">POST /approve</text>
 
         <!-- Connector 10: Atomic Chunks -> Qdrant Vector DB (Vertical) -->
-        <path d="M 982,289 V 362" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
-        <rect x="930" y="320" width="104" height="14" rx="2" fill="#ffffff"/>
-        <text x="982" y="330" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PURGE &amp; REINDEX</text>
+        <path d="M 983,289 V 358" fill="none" stroke="#0f766e" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <rect x="918" y="318" width="130" height="14" rx="2" fill="#ffffff"/>
+        <text x="983" y="328" fill="#0f766e" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PURGE &amp; REINDEX BGE-M3</text>
 
         <!-- 4. Node Boxes -->
 
         <!-- Zone 1 Node 1: Multi-format Input -->
-        <rect x="52" y="75" width="180" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <rect x="60" y="81" width="34" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
-        <text x="77" y="90" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INPUT</text>
-        <text x="142" y="110" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Tệp Văn Bản Gốc</text>
-        <text x="142" y="128" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">PDF · DOCX · XLSX · MD</text>
+        <rect x="44" y="75" width="186" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+        <rect x="52" y="81" width="34" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
+        <text x="69" y="90" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INPUT</text>
+        <text x="137" y="110" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Tệp Văn Bản Gốc</text>
+        <text x="137" y="128" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">PDF · DOCX · XLSX · MD</text>
 
         <!-- Zone 1 Node 2: MinIO Storage -->
-        <rect x="52" y="320" width="180" height="70" rx="6" fill="rgba(15,23,42,0.03)" stroke="#475569" stroke-width="1"/>
-        <rect x="60" y="326" width="48" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
-        <text x="84" y="335" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STORAGE</text>
-        <text x="142" y="355" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">MinIO S3 Driver</text>
-        <text x="142" y="373" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">StoragePath · SHA-256</text>
+        <rect x="44" y="340" width="186" height="70" rx="6" fill="rgba(15,23,42,0.03)" stroke="#475569" stroke-width="1"/>
+        <rect x="52" y="346" width="52" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
+        <text x="78" y="355" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MINIO S3</text>
+        <text x="137" y="375" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Lưu Trữ Bền Vững</text>
+        <text x="137" y="393" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">StoragePath · SHA-256 DupCheck</text>
 
-        <!-- Zone 2 Node 3A: PDF Inspector (Thanh Tra Cấu Trúc) -->
-        <rect x="293" y="75" width="214" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.2"/>
-        <rect x="301" y="81" width="58" height="12" rx="2" fill="rgba(2,132,199,0.12)" stroke="#0284c7" stroke-width="0.8"/>
-        <text x="330" y="90" fill="#0284c7" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">FIRECRAWL</text>
-        <text x="400" y="110" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Firecrawl PDF Inspector</text>
-        <text x="400" y="128" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Rust Core (10ms) · text_based / scanned / mixed</text>
+        <!-- Zone 2 Node 3A: PDF Inspector -->
+        <rect x="286" y="75" width="218" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1.2"/>
+        <rect x="294" y="81" width="58" height="12" rx="2" fill="rgba(2,132,199,0.12)" stroke="#0284c7" stroke-width="0.8"/>
+        <text x="323" y="90" fill="#0284c7" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">FIRECRAWL</text>
+        <text x="395" y="110" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Firecrawl PDF Inspector</text>
+        <text x="395" y="128" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Rust Core (10ms) · text_based / scanned / mixed</text>
 
-        <!-- Zone 2 Node 3B: Fast-Path & Cứu Hộ OCR Router -->
-        <rect x="293" y="175" width="214" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <rect x="301" y="181" width="76" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
-        <text x="339" y="190" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PARSER &amp; OCR</text>
-        <text x="400" y="210" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Fast-Path &amp; Cứu Hộ OCR</text>
-        <text x="400" y="228" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">PyMuPDF (15ms) · Mistral OCR</text>
+        <!-- Zone 2 Node 3B: Fast-Path & OCR Router -->
+        <rect x="286" y="175" width="218" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+        <rect x="294" y="181" width="76" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
+        <text x="332" y="190" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PARSER &amp; OCR</text>
+        <text x="395" y="210" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Fast-Path &amp; Cứu Hộ OCR</text>
+        <text x="395" y="228" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">PyMuPDF (15ms) · EasyOCR / Surya / Docling</text>
 
-        <!-- Zone 2 Node 4: Table Rescue & NMS -->
-        <rect x="293" y="275" width="214" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <rect x="301" y="281" width="48" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
-        <text x="325" y="290" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RESCUE</text>
-        <text x="400" y="310" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Giải Cứu Bảng Đa Trang</text>
-        <text x="400" y="328" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Continuation · Khử Bảng Lồng NMS</text>
+        <!-- Zone 2 Node 4: Zero-Keyword Table Reconstructor (BREAKTHROUGH #202) -->
+        <rect x="286" y="275" width="218" height="68" rx="6" fill="rgba(15,118,110,0.03)" stroke="#0f766e" stroke-width="1.2"/>
+        <rect x="294" y="281" width="78" height="12" rx="2" fill="rgba(15,118,110,0.12)" stroke="#0f766e" stroke-width="0.8"/>
+        <text x="333" y="290" fill="#0f766e" font-size="6.8" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">ZERO-KEYWORD</text>
+        <text x="395" y="310" fill="#0f172a" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Zero-Keyword Reconstructor</text>
+        <text x="395" y="328" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Hình Thái Học Cột 0 · Nối Bảng Đa Trang · NMS</text>
 
-        <!-- Zone 2 Node 5: Text Normalizer & Layout -->
-        <rect x="293" y="375" width="214" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <rect x="301" y="381" width="54" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
-        <text x="328" y="390" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CLEANER</text>
-        <text x="400" y="410" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Chuẩn Hóa NFC &amp; Bố Cục</text>
-        <text x="400" y="428" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Unicode NFC · Con Dấu &amp; Chữ Ký</text>
+        <!-- Zone 2 Node 5: Chuẩn Hóa NĐ 30 & Unicode NFC -->
+        <rect x="286" y="375" width="218" height="68" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+        <rect x="294" y="381" width="86" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
+        <text x="337" y="390" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">NĐ 30 &amp; CLEANER</text>
+        <text x="395" y="410" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Chuẩn Hóa NĐ 30 &amp; NFC</text>
+        <text x="395" y="428" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Lọc Số Trang Đầu/Cuối · Khử Rò Rỉ OCR Chân Trang</text>
 
         <!-- Zone 3 Node 6: Data Quality Gate (FOCAL 1 - ACADEMIC TEAL) -->
-        <rect x="563" y="135" width="212" height="76" rx="6" fill="rgba(15,118,110,0.08)" stroke="#0f766e" stroke-width="1.5"/>
-        <rect x="571" y="141" width="62" height="12" rx="2" fill="#0f766e"/>
-        <text x="602" y="150" fill="#ffffff" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">FOCAL GATE</text>
-        <text x="669" y="172" fill="#0f766e" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Data Quality Gate</text>
-        <text x="669" y="190" fill="#0f766e" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Zero Hallucination · Mâu Thuẫn</text>
+        <rect x="558" y="135" width="218" height="78" rx="6" fill="rgba(15,118,110,0.08)" stroke="#0f766e" stroke-width="1.5"/>
+        <rect x="566" y="141" width="64" height="12" rx="2" fill="#0f766e"/>
+        <text x="598" y="150" fill="#ffffff" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">FOCAL GATE</text>
+        <text x="667" y="172" fill="#0f766e" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Data Quality Gate</text>
+        <text x="667" y="190" fill="#0f766e" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Zero Hallucination · Phân Luồng Fast-Track</text>
 
-        <!-- Zone 3 Node 7: Scan Studio HITL -->
-        <rect x="563" y="335" width="212" height="76" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1"/>
-        <rect x="571" y="341" width="56" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
-        <text x="599" y="350" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">STUDIO</text>
-        <text x="669" y="372" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Scan Studio Đối Soát</text>
-        <text x="669" y="390" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Bounding Box · Human-in-the-loop</text>
+        <!-- Zone 3 Node 7: Scan Studio HITL (With Approval Button) -->
+        <rect x="558" y="330" width="218" height="96" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.2"/>
+        <rect x="566" y="336" width="58" height="12" rx="2" fill="rgba(15,118,110,0.12)" stroke="#0f766e" stroke-width="0.8"/>
+        <text x="595" y="345" fill="#0f766e" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">HITL STUDIO</text>
+        <text x="667" y="365" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Scan Studio Đối Soát Cán Bộ</text>
+        <text x="667" y="381" fill="#64748b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Ảnh Trang Scan + BBoxes · Sửa Markdown Tay</text>
+        
+        <!-- Embedded Mini-Button: Xác nhận đối soát & Phê duyệt -->
+        <rect x="578" y="394" width="178" height="22" rx="4" fill="#0f766e"/>
+        <path d="M 588,401 v 4 c 0 3 4 5 5 6 c 1 -1 5 -3 5 -6 v -4 z" fill="none" stroke="#ffffff" stroke-width="1.1"/>
+        <text x="680" y="409" fill="#ffffff" font-size="7.5" font-family="'Geist', sans-serif" font-weight="600" text-anchor="middle">Xác nhận đối soát &amp; Phê duyệt</text>
 
         <!-- Zone 4 Node 8: Structured Fact Layer -->
-        <rect x="833" y="75" width="298" height="70" rx="6" fill="rgba(15,23,42,0.03)" stroke="#475569" stroke-width="1"/>
-        <rect x="841" y="81" width="68" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
-        <text x="875" y="90" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FACT LAYER</text>
-        <text x="982" y="111" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">knowledge_facts (PostgreSQL)</text>
-        <text x="982" y="129" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Điểm chuẩn · Mã ngành · Chỉ tiêu · Nhiệm vụ</text>
+        <rect x="828" y="75" width="310" height="70" rx="6" fill="rgba(15,23,42,0.03)" stroke="#475569" stroke-width="1"/>
+        <rect x="836" y="81" width="68" height="12" rx="2" fill="transparent" stroke="rgba(71,85,105,0.40)" stroke-width="0.8"/>
+        <text x="870" y="90" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FACT LAYER</text>
+        <text x="983" y="111" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">knowledge_facts (PostgreSQL)</text>
+        <text x="983" y="129" fill="#64748b" font-size="8.2" font-family="'Geist Mono', monospace" text-anchor="middle">FactExtractor · Điểm chuẩn · Mã ngành · Chỉ tiêu · Học phí</text>
 
         <!-- Zone 4 Node 9: Atomic Chunks & FTS -->
-        <rect x="833" y="215" width="298" height="74" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <rect x="841" y="221" width="76" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
-        <text x="879" y="230" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TEXT CHUNKS</text>
-        <text x="982" y="251" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">knowledge_chunks &amp; FTS</text>
-        <text x="982" y="269" fill="#64748b" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Atomic Record Chunks · Tiếng Việt FTS</text>
+        <rect x="828" y="215" width="310" height="74" rx="6" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+        <rect x="836" y="221" width="76" height="12" rx="2" fill="transparent" stroke="rgba(15,23,42,0.35)" stroke-width="0.8"/>
+        <text x="874" y="230" fill="#475569" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TEXT CHUNKS</text>
+        <text x="983" y="251" fill="#0f172a" font-size="11.5" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">knowledge_chunks &amp; FTS</text>
+        <text x="983" y="269" fill="#64748b" font-size="8.2" font-family="'Geist Mono', monospace" text-anchor="middle">ClauseBased / Semantic Chunker · human_verified: True</text>
 
         <!-- Zone 4 Node 10: Qdrant Vector DB (FOCAL 2 - ACADEMIC TEAL) -->
-        <rect x="833" y="365" width="298" height="78" rx="6" fill="rgba(15,118,110,0.08)" stroke="#0f766e" stroke-width="1.5"/>
-        <rect x="841" y="371" width="70" height="12" rx="2" fill="#0f766e"/>
-        <text x="876" y="380" fill="#ffffff" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">VECTOR DB</text>
-        <text x="982" y="402" fill="#0f766e" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Qdrant Vector Indexer (1024D)</text>
-        <text x="982" y="420" fill="#0f766e" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">BAAI/bge-m3 · Revision Parity · Zero Duplicate</text>
+        <rect x="828" y="360" width="310" height="84" rx="6" fill="rgba(15,118,110,0.08)" stroke="#0f766e" stroke-width="1.5"/>
+        <rect x="836" y="366" width="70" height="12" rx="2" fill="#0f766e"/>
+        <text x="871" y="375" fill="#ffffff" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" font-weight="600" letter-spacing="0.08em">VECTOR DB</text>
+        <text x="983" y="396" fill="#0f766e" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Qdrant Vector Indexer (1024D)</text>
+        <text x="983" y="413" fill="#0f766e" font-size="8.2" font-family="'Geist Mono', monospace" text-anchor="middle">BAAI/bge-m3 (Cloudflare Workers AI GPU + Local Fallback)</text>
+        <text x="983" y="428" fill="#64748b" font-size="7.6" font-family="'Geist Mono', monospace" text-anchor="middle">delete_by_document() · Revision Parity (100% Khớp)</text>
 
         <!-- 5. Legend Strip (Bottom horizontal bar) -->
-        <line x1="30" y1="545" x2="1150" y2="545" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
-        <text x="30" y="572" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.14em">CHÚ THÍCH THÀNH PHẦN</text>
+        <line x1="25" y1="565" x2="1155" y2="565" stroke="rgba(15,23,42,0.10)" stroke-width="0.8"/>
+        <text x="25" y="592" fill="#475569" font-size="8" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.14em">CHÚ THÍCH THÀNH PHẦN</text>
 
         <!-- Legend Item 1: Focal Core -->
-        <rect x="220" y="564" width="12" height="12" rx="2" fill="rgba(15,118,110,0.15)" stroke="#0f766e" stroke-width="1.2"/>
-        <text x="240" y="573" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Chốt chặn cốt lõi (Quality Gate / Qdrant)</text>
+        <rect x="210" y="584" width="12" height="12" rx="2" fill="rgba(15,118,110,0.15)" stroke="#0f766e" stroke-width="1.2"/>
+        <text x="230" y="593" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Chốt chặn cốt lõi (Quality Gate / Qdrant)</text>
 
         <!-- Legend Item 2: Internal Service -->
-        <rect x="490" y="564" width="12" height="12" rx="2" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
-        <text x="510" y="573" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Module xử lý (PDF Inspector, Parser, Rescue)</text>
+        <rect x="470" y="584" width="12" height="12" rx="2" fill="#ffffff" stroke="#0f172a" stroke-width="1"/>
+        <text x="490" y="593" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Module xử lý (PDF Inspector, Zero-Keyword, Cleaner)</text>
 
         <!-- Legend Item 3: Storage Store -->
-        <rect x="780" y="564" width="12" height="12" rx="2" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
-        <text x="800" y="573" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Kho lưu trữ bền vững (PostgreSQL, MinIO S3)</text>
+        <rect x="765" y="584" width="12" height="12" rx="2" fill="rgba(15,23,42,0.05)" stroke="#475569" stroke-width="1"/>
+        <text x="785" y="593" fill="#0f172a" font-size="8.5" font-family="'Geist', sans-serif">Kho lưu trữ bền vững (PostgreSQL, MinIO S3)</text>
 
         <!-- Legend Item 4: Conditional Review Flow -->
-        <line x1="1020" y1="570" x2="1050" y2="570" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
-        <text x="1058" y="573" fill="#475569" font-size="8.5" font-family="'Geist', sans-serif">Điều hướng đối soát (review_pending)</text>
+        <line x1="1005" y1="590" x2="1035" y2="590" stroke="#475569" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <text x="1043" y="593" fill="#475569" font-size="8.5" font-family="'Geist', sans-serif">Luồng đối soát (review_pending)</text>
 
       </svg>
     </div>
 
-    <!-- Summary Cards -->
+    <!-- Summary Cards (6-Card Comprehensive Architecture Grid) -->
     <div class="cards">
       <div class="card">
         <div class="card-header">
           <span class="card-dot blue"></span>
-          <h3>Firecrawl PDF Inspector (Lõi Rust)</h3>
+          <h3>1. Firecrawl PDF Inspector &amp; Phân Tuyến</h3>
         </div>
         <ul>
-          <li><strong>Phân loại cấu trúc thông minh:</strong> Tự động nhận diện `text_based`, `scanned`, `image_based` và `mixed` trong 10-30ms.</li>
-          <li><strong>Fast-path (10-30ms):</strong> Với trang số hóa, xuất trực tiếp Markdown có cấu trúc, tiết kiệm 100% tài nguyên GPU/Cloud OCR.</li>
-          <li><strong>Selective OCR Routing:</strong> Với tài liệu `mixed`, chỉ định tuyến chính xác các trang scan sang Mistral OCR Cloud / EasyOCR Local.</li>
+          <li><strong>Phân loại siêu tốc (10-30ms):</strong> Nhận diện hình thái tệp: `text_based`, `scanned`, `mixed` dựa trên mật độ ký tự và cấu trúc stream.</li>
+          <li><strong>Fast-path Digital (15ms):</strong> Tài liệu số hóa được PyMuPDF bóc tách trực tiếp, bảo toàn 100% bảng biểu và bố cục gốc.</li>
+          <li><strong>Selective OCR Rescue:</strong> Chỉ định tuyến trang scan thực sự sang EasyOCR / Surya / Docling, tối ưu tài nguyên tính toán.</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <span class="card-dot teal"></span>
-          <h3>Tái Dựng Bảng &amp; Cứu Hàng Mồ Côi</h3>
+          <h3>2. Động Cơ Hình Thái Học Zero-Keyword</h3>
         </div>
         <ul>
-          <li>Thuật toán NMS Suppress Nested Tables triệt tiêu 100% bảng lồng và text lồng.</li>
-          <li>Table Continuation Rescue tự động phục hồi các hàng dữ liệu rớt trang (Orphan rows).</li>
-          <li>Chuẩn hóa định dạng bảng GFM Markdown 1 row/line duy nhất và phát hiện con dấu / chữ ký qua OpenCV.</li>
+          <li><strong>Loại bỏ 100% Hardcoded Keywords:</strong> Thay thế từ điển từ khóa tiếng Việt bằng 5 tiêu chuẩn hình thái học và cấu trúc bảng (Phiên #202).</li>
+          <li><strong>Bảo vệ Cột 0 &amp; Khóa Chuỗi:</strong> Phân biệt chính xác tiêu đề bảng với số thứ tự, mã 7 số, chữ số La Mã hay ngắt câu mô tả.</li>
+          <li><strong>Ghép Nối Bảng Đa Trang &amp; NMS:</strong> Ghép liền mạch bảng trải dài nhiều trang, khử bảng lồng NMS và bảo toàn dòng phân cách `:---:`.</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <span class="card-dot ink"></span>
-          <h3>Data Quality Gate (Zero Hallucination)</h3>
+          <h3>3. Chuẩn Hóa NĐ 30 &amp; Anti-Leakage</h3>
         </div>
         <ul>
-          <li>Tự động đối soát chéo số liệu giữa các bảng biểu và quy định pháp lý.</li>
-          <li>Chặn xuất bản (block publish) nếu phát hiện mâu thuẫn mã ngành hoặc sai lệch chỉ tiêu.</li>
-          <li>Hỗ trợ Fast-Track nạp tự động vào Qdrant khi tài liệu đạt 100% kiểm định.</li>
+          <li><strong>Loại bỏ số trang lề trên/dưới:</strong> Tự động triệt tiêu số trang đơn độc theo Nghị định 30/2020/NĐ-CP Điều 9.4 (`top_percent ≤ 8%` &amp; `y0 > 88%`).</li>
+          <li><strong>Line-Level Clipping chống rò rỉ:</strong> Cắt lọc chính xác giao cắt biên giới bảng tại chân trang trước khối chữ ký "Nơi nhận:".</li>
+          <li><strong>Unicode NFC Sạch:</strong> Chuẩn hóa 100% bảng mã tiếng Việt, ngăn chặn hoàn toàn lỗi vỡ font và Mojibake.</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <span class="card-dot teal"></span>
-          <h3>Biểu Diễn Kép (Facts + Vector DB)</h3>
+          <h3>4. Data Quality Gate &amp; Luồng Phân Kép</h3>
         </div>
         <ul>
-          <li><strong>Structured Facts:</strong> Nạp trực tiếp số liệu có cấu trúc vào PostgreSQL `knowledge_facts`.</li>
-          <li><strong>Idempotent Qdrant:</strong> Quét sạch vector cũ trước khi reindex, đảm bảo 0 duplicate.</li>
-          <li><strong>Revision Parity:</strong> Đối soát số lượng chunk và vector 100% trước khi kích hoạt tìm kiếm.</li>
+          <li><strong>Zero Hallucination Gatekeeper:</strong> Quét mâu thuẫn mã ngành, kiểm toán số lượng chỉ tiêu và tính toàn vẹn cấu trúc.</li>
+          <li><strong>Làn 1 — Fast-Track (Tự động duyệt):</strong> Nếu tệp đạt 100% tiêu chí và không có cảnh báo chất lượng, tự động nạp thẳng vào Vector DB.</li>
+          <li><strong>Làn 2 — Fail-Safe Review:</strong> Tự động kích hoạt cờ `review_pending` khi phát hiện sai lệch số liệu, chuyển hướng cán bộ vào Scan Studio.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-dot teal"></span>
+          <h3>5. Scan Studio &amp; Nút Phê Duyệt (HITL)</h3>
+        </div>
+        <ul>
+          <li><strong>Đối soát trực quan 2 cột:</strong> Ảnh scan độ phân giải cao kết hợp Bounding Box (OpenCV) đối soát song song với Markdown sửa tay.</li>
+          <li><strong>Nút [Xác nhận đối soát &amp; Phê duyệt]:</strong> Đóng gói payload `pages` đã được hiệu đính gửi lên `POST /documents/:id/approve`.</li>
+          <li><strong>3 Trạng thái UX Chống Bấm Trùng:</strong> Mới duyệt (Active) → Đã lập chỉ mục (Outline/Disabled) → Tái lập chỉ mục khi sửa tay.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-dot blue"></span>
+          <h3>6. Biểu Diễn Kép (Facts + Qdrant 1024D)</h3>
+        </div>
+        <ul>
+          <li><strong>Tầng sự thật (knowledge_facts):</strong> Trích xuất số liệu bảng có cấu trúc vào PostgreSQL (điểm chuẩn, tổ hợp xét tuyển, học phí).</li>
+          <li><strong>Mô hình BAAI/bge-m3:</strong> Ưu tiên Cloudflare Workers AI GPU Edge Inference, tự động chuyển đổi Hugging Face khi chạy offline.</li>
+          <li><strong>Revision Parity &amp; Anti-Duplicate:</strong> Gọi `delete_by_document()` xóa vector cũ, kiểm định $N_{\text{qdrant}} == N_{\text{chunks}}$ trước khi kích hoạt tìm kiếm.</li>
         </ul>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="footer">
-      <span>QUY NHON UNIVERSITY AI PLATFORM · KHO TRI THỨC V2.5</span>
+      <span>QUY NHON UNIVERSITY AI PLATFORM · KHO TRI THỨC V2.6</span>
       <span>EDITORIAL DESIGN SYSTEM · ACADEMIC TEAL #0F766E</span>
     </div>
 

@@ -231,7 +231,10 @@ class DocxParser(BaseDocumentParser):
 
                     if is_roman_category:
                         clean_cat = " — ".join(unique_texts)
-                        table_lines.append("\n")
+                        if len(table_lines) == 2:
+                            table_lines.clear()
+                        else:
+                            table_lines.append("\n")
                         table_lines.append(f"### {clean_cat}\n")
                         table_lines.append("| " + " | ".join(clean_headers) + " |")
                         table_lines.append(
