@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from typing import Any
 
-from sqlalchemy import pool
+import sqlalchemy as sa
+from alembic.ddl.impl import DefaultImpl
+from sqlalchemy import Column, MetaData, PrimaryKeyConstraint, String, Table, pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -23,6 +26,29 @@ import app.modules.workflows.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
 from app.core.database import Base
+
+
+# Ensure Alembic creates version_num as VARCHAR(64) to support descriptive revision IDs
+def _custom_version_table_impl(
+    self: DefaultImpl,
+    *,
+    version_table: str,
+    version_table_schema: str | None,
+    version_table_pk: bool,
+    **kw: Any,
+) -> Table:
+    vt = Table(
+        version_table,
+        MetaData(),
+        Column("version_num", String(64), nullable=False),
+        schema=version_table_schema,
+    )
+    if version_table_pk:
+        vt.append_constraint(PrimaryKeyConstraint("version_num", name=f"{version_table}_pkc"))
+    return vt
+
+
+DefaultImpl.version_table_impl = _custom_version_table_impl
 
 config = context.config
 
@@ -52,6 +78,13 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    try:
+        connection.execute(
+            sa.text("ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+        )
+    except Exception:
+        pass
+
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -72,6 +105,7 @@ async def run_async_migrations() -> None:
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        await connection.commit()
 
     await connectable.dispose()
 

@@ -25,7 +25,7 @@ from app.modules.knowledge.normalization.models import (
 logger = logging.getLogger(__name__)
 
 _PHANTOM_HEADER_RE = re.compile(r"^Cột\s+\d+$", re.IGNORECASE)
-_PROGRAM_CODE_RE = re.compile(r"^\d{7}$")
+_PROGRAM_CODE_RE = re.compile(r"^\d{7}[A-Za-z]*$")
 _TASK_CODE_RE = re.compile(r"^\d+\.\d+$")
 _ROMAN_NUMERAL_RE = re.compile(r"^[IVXLCDM]+$")
 _LEAD_UNIT_RE = re.compile(
@@ -118,7 +118,7 @@ def _merge_second_header_row(
     headers: list[str], rows: list[CanonicalRow]
 ) -> tuple[list[str], list[CanonicalRow]]:
     """Merge a split two-level table header such as 2024 / Chỉ tiêu / Điểm."""
-    if not headers or not rows or len(rows[0].cells) != len(headers):
+    if not headers or not rows:
         return headers, rows
 
     first_row = rows[0]
@@ -131,9 +131,14 @@ def _merge_second_header_row(
     if any(len(v) > 50 or v.startswith("-") for v in first_values if v):
         return headers, rows
 
+    # Normalize lengths if headers is shorter due to colspan in level-1
+    max_cols = max(len(headers), len(first_values))
+    padded_headers = headers + [""] * max(0, max_cols - len(headers))
+    padded_first = first_values + [""] * max(0, max_cols - len(first_values))
+
     merged_headers: list[str] = []
     active_group = ""
-    for parent, child in zip(headers, first_values):
+    for parent, child in zip(padded_headers, padded_first):
         parent_clean = re.sub(r"\s+", " ", parent).strip()
         child_clean = re.sub(r"\s+", " ", child).strip()
         if re.fullmatch(r"20\d{2}", parent_clean):
@@ -352,6 +357,24 @@ def is_repeated_header(row_cells: list[CanonicalCell], expected_headers: list[st
     return (matches / non_empty_expected) >= 0.70
 
 
+def is_sub_header_row(row_cells: list[CanonicalCell]) -> bool:
+    """Check if a row is a second-level header row (e.g. Chỉ tiêu / Điểm trúng tuyển) repeating on a new page."""
+    if not row_cells or len(row_cells) < 4:
+        return False
+    values = [re.sub(r"\s+", " ", c.raw_value).strip() for c in row_cells]
+    first_three_empty = not any(values[: min(3, len(values))])
+    if not first_three_empty:
+        return False
+    sub_header_kws = ["chỉ tiêu", "trúng tuyển", "điểm", "nhập học", "xét tuyển", "tuyển sinh"]
+    non_empty = [v for v in values[3:] if v]
+    if len(non_empty) < 2:
+        return False
+    sub_count = sum(
+        1 for v in non_empty if any(kw in v.lower() for kw in sub_header_kws)
+    )
+    return (sub_count / len(non_empty)) >= 0.70
+
+
 def is_orphan_continuation_row(row: CanonicalRow, key_col_idx: int = 0) -> bool:
     """Detect if a row on top of a new page is an orphan continuation of the previous row.
 
@@ -360,10 +383,15 @@ def is_orphan_continuation_row(row: CanonicalRow, key_col_idx: int = 0) -> bool:
     """
     if not row.cells:
         return False
-    # If the row has its own distinct program code (e.g. 7 digits like 7310608),
-    # it is an independent business row with an inherited group header, NOT a continuation!
-    if any(_PROGRAM_CODE_RE.fullmatch(_as_text(c)) for c in row.cells):
+    # Never treat a repeated sub-header row as an orphan continuation row
+    if is_sub_header_row(row.cells):
         return False
+
+    # If any cell contains a definitive program code (7 digits) or task code, it is an independent row!
+    for c in row.cells:
+        val = c.raw_value.strip()
+        if _PROGRAM_CODE_RE.fullmatch(val) or _TASK_CODE_RE.fullmatch(val):
+            return False
     if key_col_idx < len(row.cells):
         key_val = row.cells[key_col_idx].raw_value.strip()
         # If key column is empty and at least one other cell has meaningful text
@@ -516,10 +544,69 @@ def _merge_split_roman_rows(rows: list[CanonicalRow]) -> list[CanonicalRow]:
     return merged
 
 
+def _forward_fill_hierarchical_columns(
+    headers: list[str], rows: list[CanonicalRow]
+) -> list[CanonicalRow]:
+    """Forward-fill category values in column 0 when vertically merged (rowspan)."""
+    if not headers or not rows or len(headers) < 2:
+        return rows
+
+    first_hdr = normalize_header(headers[0])
+    is_hierarchical = any(
+        kw in first_hdr for kw in ["môn", "ngành", "chương", "phần", "khối", "đơn vị", "nội dung"]
+    )
+    if not is_hierarchical:
+        return rows
+
+    active_parent = ""
+    filled_rows: list[CanonicalRow] = []
+
+    for r in rows:
+        if not r.cells:
+            filled_rows.append(r)
+            continue
+        c0_val = r.cells[0].raw_value.strip()
+        has_child_data = any(c.raw_value.strip() for c in r.cells[1:])
+
+        if c0_val:
+            active_parent = c0_val
+            filled_rows.append(r)
+        elif active_parent and has_child_data:
+            page_num = r.source_pages[0] if r.source_pages else 1
+            new_cells = [
+                _clone_cell_with_value(r.cells[0], active_parent, page_num),
+                *r.cells[1:],
+            ]
+            filled_rows.append(r.model_copy(update={"cells": new_cells}))
+        else:
+            filled_rows.append(r)
+
+    return filled_rows
+
+
+def _normalize_program_code_cells(rows: list[CanonicalRow]) -> list[CanonicalRow]:
+    """Normalize program/major codes that are line-wrapped inside narrow table cells (e.g. 7340301\nAC -> 7340301AC)."""
+    norm_rows: list[CanonicalRow] = []
+    for r in rows:
+        updated = False
+        new_cells = []
+        for c in r.cells:
+            compact = re.sub(r"\s+", "", c.raw_value)
+            if _PROGRAM_CODE_RE.fullmatch(compact) and compact != c.raw_value:
+                new_cells.append(c.model_copy(update={"raw_value": compact, "normalized_value": compact}))
+                updated = True
+            else:
+                new_cells.append(c)
+        norm_rows.append(r.model_copy(update={"cells": new_cells}) if updated else r)
+    return norm_rows
+
+
 def _finalize_table(table: CanonicalTable) -> CanonicalTable:
     """Apply structural cleanup once a logical table has been fully reconstructed."""
     clean_headers, clean_rows = clean_table_columns(table.headers, table.rows)
     clean_rows = _merge_split_roman_rows(_deduplicate_exact_business_rows(clean_rows))
+    clean_rows = _forward_fill_hierarchical_columns(clean_headers, clean_rows)
+    clean_rows = _normalize_program_code_cells(clean_rows)
     return table.model_copy(
         update={
             "headers": clean_headers,
@@ -534,19 +621,24 @@ def reconstruct_multi_page_tables(raw_tables: list[CanonicalTable]) -> list[Cano
     if not raw_tables:
         return []
 
-    # Pre-clean all candidate tables so schemas and column widths match cleanly
+    # Pre-clean tables with genuine headers so schemas and column widths match cleanly.
+    # Continuation pages without semantic headers preserve raw column positions to avoid dropping
+    # legitimate columns that are temporarily empty on a single page before stitching.
     cleaned_tables: list[CanonicalTable] = []
     for tbl in raw_tables:
-        clean_h, clean_r = clean_table_columns(tbl.headers, tbl.rows)
-        cleaned_tables.append(
-            tbl.model_copy(
-                update={
-                    "headers": clean_h,
-                    "rows": clean_r,
-                    "schema_key": table_schema_key(clean_h),
-                }
+        if _has_semantic_headers(tbl.headers):
+            clean_h, clean_r = clean_table_columns(tbl.headers, tbl.rows)
+            cleaned_tables.append(
+                tbl.model_copy(
+                    update={
+                        "headers": clean_h,
+                        "rows": clean_r,
+                        "schema_key": table_schema_key(clean_h),
+                    }
+                )
             )
-        )
+        else:
+            cleaned_tables.append(tbl)
 
     reconstructed: list[CanonicalTable] = []
     current_master: CanonicalTable | None = None
@@ -578,8 +670,8 @@ def reconstruct_multi_page_tables(raw_tables: list[CanonicalTable]) -> list[Cano
 
             new_rows: list[CanonicalRow] = []
             for row in candidate_rows:
-                # 1. Drop repeated column headers at the start of new page
-                if is_repeated_header(row.cells, current_master.headers):
+                # 1. Drop repeated column headers or sub-headers at the start of new page
+                if is_repeated_header(row.cells, current_master.headers) or is_sub_header_row(row.cells):
                     continue
 
                 # 2. Check if the first row of new page is an orphan continuation

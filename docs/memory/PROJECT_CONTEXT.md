@@ -7,23 +7,23 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-22 23:05 (UTC+7)
-- **Phiên số**: #196
+- **Thời gian cập nhật**: 2026-09-22 23:10 (UTC+7)
+- **Phiên số**: #200
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
-- 0. **Bóc Tách Kế Hoạch ĐGN AUN-QA 4.0 (KH130), Ghép Nối Đa Trang Dòng 16 & 23, Triệt Tiêu Số Trang Lề Trên Header (phiên #196)**:
+- 0. **Bóc Tách Kế Hoạch ĐGN AUN-QA 4.0 (KH130), Ghép Nối Đa Trang Dòng 16 & 23, Triệt Tiêu Số Trang Lề Trên Header (phiên #200)**:
   - Kiểm thử thực tế tệp `KH130 trien khai chuan bi DGN CTDT 3 CTDT AUN-QA 2026.pdf` (6 trang, 45 nhiệm vụ): Xác nhận toàn bộ 45 nhiệm vụ được bóc tách hoàn hảo vào đủ 6 cột chuẩn, 100% dòng phân cách `:---` được bảo toàn.
   - Ghép nối đa trang siêu chuẩn: Dòng 16 tự động hút phần text nối trang ở đỉnh Trang 3 (`KH-TC, TT. S&HL, các đơn vị liên quan`), Dòng 23 tự động nối tiếp câu ở đỉnh Trang 4 (`Bảo đảm tính hoạt động ổn định...`), 0 dòng mồ côi.
   - Triệt tiêu số trang lề trên (Header Pagination theo NĐ 30/2020/NĐ-CP Điều 9.4): Bổ sung kiểm tra `top_percent <= 8.0` cho `blocks.py` và `page_num > 1 and b_rect.y1 < height * 0.08` cho `pdf_parser.py`, cập nhật `_RE_PAGE_NUMBERS` trong `cleaner.py` bao quát số trang đơn độc `\d{1,3}`, xóa sạch hoàn toàn các số trang header `2`, `3`, `4`, `5`, `6`.
   - Verification: 10/10 unit tests trong `test_table_stitching_and_page_partition.py` passed, ruff check 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi. Live verification trên KH130 sạch 100% không còn số trang rác.
 
-- 0. **Khắc Phục Lệch Cột Row 3.1 ("Ban hành") & Bảo Toàn Dòng Phân Cách Bảng Markdown (:---) (phiên #195)**:
+- 0. **Khắc Phục Lệch Cột Row 3.1 ("Ban hành") & Bảo Toàn Dòng Phân Cách Bảng Markdown (:---) (phiên #199)**:
   - Khắc phục 1 (Chống nhầm động từ "Ban hành" thành Đơn vị chủ trì): Cập nhật `_LEAD_UNIT_RE` trong `table_reconstructor.py` bằng negative lookahead `ban(?!\s+hành)`, `phòng(?!\s+ngừa|\s+chống)`, `trường(?!\s+hợp)`, `viện(?!\s+dẫn)`. Ngăn chặn triệt để hiện tượng nội dung nhiệm vụ 3.1 ("Ban hành quy định đo lường...") bị nhận diện nhầm thành Đơn vị chủ trì, làm rỗng cột Nội dung và dồn Phòng KT&BĐCL, Trung tâm S&HL vào cột Sản phẩm.
   - Khắc phục 2 (Ưu tiên ánh xạ cột trực tiếp qua semantic_indices): Trong `_normalize_spacer_columns`, khi hàng có đủ số cột $\ge$ len(headers) và đã khớp mã nhiệm vụ & đơn vị chủ trì, ánh xạ trực tiếp `selected_cells` theo `semantic_indices` của trang thay vì chạy lại heuristic compact, giữ nguyên 100% cấu trúc trích xuất chuẩn xác của PyMuPDF.
   - Khắc phục 3 (Bảo toàn dòng phân cách bảng Markdown `|:---|:---|...|`): Sửa lỗi trong `_stitch_table_continuations` (`cleaner.py`). Trước đây hàm kiểm tra hàng tiếp theo mà không xét xem giữa 2 hàng có ranh giới trang (`---` hay `<!-- Trang N -->`) hay không, khiến dòng phân cách (separator row) ngay sau header của MỌI bảng bị nuốt chửng (khiến Markdown không render được bảng). Bổ sung điều kiện `has_boundary = any(...)` giúp bảo toàn toàn bộ 20 dòng separator của 20 trang phụ lục.
   - Verification: 10/10 unit tests trong `test_table_stitching_and_page_partition.py` passed, ruff check 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build 8.64s thành công. Kiểm thử live trên tệp Kế hoạch 2025-2026 xác nhận: Row 3.1 chuẩn 7 cột, 20 dòng phân cách bảng phục hồi 100%, Row 4.10, 7.2, 8.1 và Section VIII hoàn hảo.
 
-- 0. **Giải Pháp Bóc Tách Hoàn Chỉnh Toàn Diện: Chuẩn Hóa Bảng Đa Trang, Ghép Dòng Ngắt Đôi & Triệt Tiêu Số Trang Footer (phiên #194)**:
+- 0. **Giải Pháp Bóc Tách Hoàn Chỉnh Toàn Diện: Chuẩn Hóa Bảng Đa Trang, Ghép Dòng Ngắt Đôi & Triệt Tiêu Số Trang Footer (phiên #198)**:
   - Khắc phục 1 (Căn chỉnh cột bảng tiếp nối có cột spacer rỗng): Cập nhật `_compact_task_row` và `_normalize_spacer_columns` trong `table_reconstructor.py` hỗ trợ `semantic_indices`, đưa các bảng 9/11 cột về 7 cột danh nghĩa chuẩn và ánh xạ chính xác hàng tiếp nối (orphan continuation row) sang Cột 1 (Nội dung) thay vì bị lệch sang Cột 3/6. Khắc phục triệt để lỗi dòng 4.10, 7.2, 8.1.
   - Khắc phục 2 (Gộp số La Mã bị tách ngắt dòng): Thêm hàm `_merge_split_roman_rows` tự động nhận diện chữ số La Mã bị rớt dòng (`VII` + `I` $\rightarrow$ `VIII`), gộp thành 1 hàng duy nhất và loại bỏ hàng rỗng thừa.
   - Khắc phục 3 (Chống nhầm lẫn hàng dữ liệu dài thành subheader): Thêm chốt chặn trong `_merge_second_header_row` từ chối các hàng có ô dài >50 ký tự hoặc gạch đầu dòng, ngăn không cho hàng dữ liệu nhiệm vụ bị nuốt vào tiêu đề bảng.
@@ -31,13 +31,54 @@
   - Khắc phục 5 (Triệt tiêu số trang rác ở chân trang): Cập nhật `blocks.py` và `pdf_parser.py` lọc bỏ các khối số trang đơn độc ở chân trang (`y0 > 88%` và khớp `^\d{1,3}$` hoặc `Trang \d+`), giúp Markdown không bị dính số lẻ trước dấu `---`.
   - Khắc phục 6 (Đảm bảo quy tắc 1 dòng = 1 bản ghi): Mỗi hàng bảng Markdown xuất ra là 1 dòng vật lý duy nhất, xuống dòng nội bộ ô chuyển thành `<br>`, bảo đảm tính toàn vẹn khi vector hóa vào Qdrant.
   - Verification: 8/8 unit tests trong `test_table_stitching_and_page_partition.py` passed, full knowledge test suite 55/55 passed (100%), Ruff 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build 9.00s.
-- 0. **Tối Ưu Hóa Toàn Diện Bộ Bóc Tách PDF, Phân Mảnh Bảng Đa Trang & Triệt Tiêu Lặp Text Chân Trang (phiên #193)**:
+
+- 0. **Tối Ưu Hóa Toàn Diện Bộ Bóc Tách PDF, Phân Mảnh Bảng Đa Trang & Triệt Tiêu Lặp Text Chân Trang (phiên #197)**:
   - Khắc phục 1 (Thứ tự khối Trang 2 & 13): Cập nhật `backend/app/modules/knowledge/parsers/blocks.py` sắp xếp toàn bộ khối bảng và văn bản theo tọa độ đọc tự nhiên `(y, x)`, giúp phần mô tả Phương thức 1-5 & Mục 4 nằm trên bảng (Trang 2) và tiêu đề `PHỤ LỤC 1` nằm trên đỉnh trang (Trang 13).
   - Khắc phục 2 (Phân bổ bảng đa trang Trang 2..8): Cập nhật `markdown_renderer.py` cắt lát các hàng bảng đa trang theo `pnum in sorted(tbl.source_pages)`, sinh bảng Markdown độc lập kèm header cho từng trang, bảo toàn thứ tự nội dung và triệt tiêu hoàn toàn hiện tượng trang 3..8 bị trống hoặc rách hàng mồ côi khi fallback.
   - Khắc phục 3 (Line-Level Clipping chống lặp text Trang 12): Thêm cơ chế cắt lọc giao cắt biên giới bảng trong `blocks.py` và `pdf_parser.py`, triệt tiêu 100% text lặp của ngành 51 & 52 trước khối chữ ký "Nơi nhận:".
   - Khắc phục 4 (Bảo vệ ngành độc lập Trang 14): Cập nhật `table_reconstructor.py` (`is_orphan_continuation_row`) bảo vệ hàng có mã ngành 7 số (`7310608`), tự động kế thừa tên nhóm môn `active_group` ("Tiếng Anh") từ cuối trang trước cho ngành Đông phương học.
   - Khắc phục 5 (Sửa lỗi Serialization str vs int trong `build_studio_pages`): `ingestion_service.py` tra cứu `page_markdowns.get(page_number) or page_markdowns.get(str(page_number))` và đưa toàn bộ các trang có trong `page_markdowns` vào `page_numbers`.
   - Verification: 5 unit tests mới trong `test_table_stitching_and_page_partition.py` passed 100%, Pytest 27/27 passed, Ruff 0 lỗi, Biome 170 files 0 lỗi, TypeScript 0 lỗi, Vite build thành công 11.27s, live verification trên tệp PDF tuyển sinh 14 trang đạt 6/6 tiêu chí.
+
+- **Thời gian cập nhật**: 2026-09-22 14:30 (UTC+7)
+- **Phiên số**: #196
+- **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
+- **Mục tiêu đã hoàn thành**:
+- 0. **Khắc Phục Triệt Để 6 Vấn Đề Cấu Trúc Trong Bộ Bóc Tách Tài Liệu (PDF, OCR, Table Reconstructor & Cleaner) (phiên #196)**:
+  - Vấn đề: Bộ mã nguồn bóc tách tài liệu tuyển sinh ĐH Quy Nhơn 2026 từ PDF 14 trang gặp 6 vấn đề cấu trúc: (1) Đảo lộn trật tự đọc (bảng nhảy lên trước lời dẫn phương thức tuyển sinh); (2) Đứt gãy dòng ngắt trang tạo hàng mồ côi (STT 5, 23, 30, 39, 48); (3) Xé đôi bảng song song IELTS/VSTEP; (4) Header đa tầng (Chỉ tiêu, Điểm trúng tuyển) rớt vào hàng dữ liệu số 32 trên trang tiếp nối; (5) Rò rỉ rác OCR ngành 51, 52 đáy trang 12; (6) Nuốt hàng phân cách GFM table `|---|---|` và mã ngành ngắt dòng (`7340301\nAC`).
+  - Giải pháp Kỹ thuật tại lõi pipeline:
+    1. `pdf_parser.py`: Bổ sung `_fuse_side_by_side_tables` ghép ngang bảng song song $Y \ge 70\%$, phân biệt tiêu đề trùng; mở rộng margin buffer `_is_table_text` triệt tiêu 100% rác OCR; bổ sung guard `is_heading` bảo vệ tiêu đề mục.
+    2. `table_reconstructor.py`: Thêm `is_sub_header_row` nhận diện và loại bỏ sub-header lặp lại bảo vệ hàng 32; mở rộng `_PROGRAM_CODE_RE = r"^\d{7}[A-Za-z]*$"`; thêm `_normalize_program_code_cells` nối mã ngành bẻ dòng; thêm `_forward_fill_hierarchical_columns` điền tên môn Phụ lục 1.
+    3. `cleaner.py`: Bổ sung điều kiện `has_page_boundary` vào `_stitch_table_continuations` bảo toàn 100% dòng phân cách GFM table `|---|---|`.
+    4. `markdown_renderer.py`: Sắp xếp khối văn bản và bảng theo `top_y` tự nhiên từng trang; sinh căn lề thông minh `:---:` và `:---`.
+  - Verification: 100% kiểm định tự động `validate_admission_markdown.py` vượt qua trên cả 2 tệp bóc tách thực tế và golden format (53/53 ngành tuyển sinh, 52/52 ngành điểm chuẩn, 38/38 ngành Phụ lục 1, bảng 4 cột VSTEP/IELTS); Pytest `tests/test_table_reconstructor.py` & `tests/test_knowledge.py` 51/51 passed (100%); Ruff 0 lỗi; Biome 170 files 0 lỗi, tsc 0 lỗi; 414/414 files sạch Zero Mojibake.
+- 0. **Phân Tích & Chuẩn Hóa Tệp Bóc Tách Đề Án Tuyển Sinh 2026 Đạt Chuẩn GFM và Vector DB (phiên #195)**:
+  - Vấn đề: Người dùng kiểm thử tính năng bóc tách PDF 14 trang thành file Markdown `Thong tin tuyen sinh dai hoc 2026_Lan2-1_boc_tach.md`. Kiểm toán phát hiện 5 lỗi nghiêm trọng: (1) Đảo lộn trật tự logic văn bản (bảng ngành nhảy lên trước mô tả phương thức; bảng điểm chuẩn 32 ngành chèn ngang chia cắt Mục 8 học phí; bảng Phụ lục 1 đặt trước tiêu đề); (2) Các hàng bảng bị ngắt qua trang (STT 5, 23, 30, 39, 48) biến thành hàng mồ côi mất tên và mã ngành; (3) Bảng quy đổi VSTEP/IELTS bị xé nhỏ và mất tiêu đề VSTEP; (4) 100% bảng Markdown thiếu hàng phân cách `|---|---|`; (5) Trùng lặp Mục 8 và rò rỉ rác OCR ngành 51, 52 cuối trang 12.
+  - Giải pháp Kỹ thuật:
+    1. Xây dựng script `scripts/standardize_admission_markdown.py` chuẩn hóa toàn bộ tệp Markdown theo cấu trúc GFM vàng (Gold Standard), khôi phục trật tự đọc tuyến tính chuẩn văn bản hành chính, ghép nối 100% các hàng mồ côi vào ngành cha, chuẩn hóa bảng VSTEP/IELTS 4 cột đầy đủ tiêu đề, định dạng phân cách dòng bằng `<br>`, xóa bỏ rác OCR và khối trùng lặp.
+    2. Xây dựng script kiểm định tự động `scripts/validate_admission_markdown.py` kiểm toán 9 tiêu chí: UTF-8 sạch, cú pháp GFM table, trật tự đọc, 53/53 ngành tuyển sinh, 52/52 ngành điểm chuẩn, 38/38 ngành Phụ lục 1, zero orphan rows, zero OCR leakage.
+  - Verification: `validate_admission_markdown.py` 100% passed, Pytest `tests/test_knowledge.py` 33/33 passed (100%), Ruff 0 errors, `check_mojibake.py` 414/414 tệp sạch. Tệp Markdown sẵn sàng 100% để nạp vào Vector DB.
+- 0. **Khắc Phục Lỗi Index Kho Tri Thức, Ánh Xạ Mô Hình BGE-M3 & Đồng Bộ Credentials Provider Lúc Khởi Động (phiên #194)**:
+  - Vấn đề: Người dùng nạp tệp `Thong tin tuyen sinh dai hoc 2026_Lan2-1.pdf` vào Kho Tri thức Đề án Tuyển sinh (`col_admissions`), giao diện hiển thị badge màu đỏ `! Lỗi index`. Qua truy vấn CSDL, bản ghi `job_1c26a820413d` báo lỗi: `Mô hình embedding (BGE-M3/Cloudflare) không khả dụng. Hệ thống từ chối nạp dữ liệu giả mạo.` (503).
+  - Nguyên nhân cốt lõi:
+    1. `settings.CLOUDFLARE_ACCOUNT_ID` và API Token được lưu trong CSDL PostgreSQL nhưng chưa có bước tự động đồng bộ vào runtime `settings` khi server FastAPI khởi động (`lifespan`), khiến nhánh Cloudflare GPU nhanh bị bỏ qua vì thiếu `account_id`.
+    2. Nhánh local fallback gọi `SentenceTransformer(settings.EMBEDDING_MODEL)` với giá trị `@cf/baai/bge-m3` thay vì tên repository Hugging Face chuẩn `BAAI/bge-m3`, gây lỗi 404 RepositoryNotFoundError.
+    3. Cả 2 tầng đều không khả dụng, kích hoạt chốt chặn Anti-Mock từ chối dữ liệu giả mạo $\rightarrow$ `index_status = "index_failed"`.
+  - Giải pháp Kỹ thuật:
+    1. Thêm hàm `_resolve_local_model_name()` trong `vector_indexer.py` tự động chuyển đổi các alias Cloudflare (`@cf/baai/bge-m3` $\rightarrow$ `BAAI/bge-m3`) cho SentenceTransformers.
+    2. Thêm phương thức `sync_active_providers_to_runtime()` trong `ProviderService` và `ModelOpsService`.
+    3. Tích hợp gọi `sync_active_providers_to_runtime()` ngay trong hàm `lifespan` lúc khởi động server `app/main.py`, bảo đảm Cloudflare Workers AI Edge Embedding và các API khác luôn sẵn sàng phục vụ tức thì.
+    4. Bổ sung `refetchInterval` tự động thăm dò (3s) trên giao diện `collection-detail-page.tsx` khi có tài liệu đang `indexing`/`processing`.
+  - Verification: 70/70 pytests passed (100%), Ruff 0 lỗi, Biome 170 files 0 lỗi, tsc 0 lỗi. Tài liệu `doc_640939cf032e` đã được reindex thành công với 16/16 chunks vào Qdrant (`status: ready`, `index_status: indexed`).
+- 0. **Khắc Phục Lỗi Thiếu Bảng `platform_document_types` & Tối Ưu Hóa Chuỗi Migration Alembic Cho Seed Data (phiên #193)**:
+  - Vấn đề: Người dùng chạy seed dữ liệu (`db seed --document-types`, `db seed --all`, `seed_document_types.py`) gặp lỗi `UndefinedTableError: relation "platform_document_types" does not exist`. Khi thử migrate, gặp tiếp lỗi `StringDataRightTruncationError` do Alembic `version_num` mặc định `VARCHAR(32)` trong khi revision ID dài 43 ký tự, lỗi foreign key do 772 orphan facts trong `knowledge_facts`, lỗi thiếu bảng `conversation_threads` trong migration feedback, và thiếu `await connection.commit()` trong `alembic/env.py`.
+  - Giải pháp Kỹ thuật:
+    1. Override `DefaultImpl.version_table_impl` trong `backend/alembic/env.py` tạo `version_num VARCHAR(64)` và thực thi `ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)`. Bổ sung `await connection.commit()` đảm bảo async migration commit trọn vẹn.
+    2. Dọn dẹp orphan facts trong `20260919_facts_foreign_key_and_schema_sync.py` trước khi thiết lập foreign key `CASCADE`.
+    3. Thêm DDL tạo bảng `conversation_threads` và `conversation_messages` nếu chưa có trong `20260922_conversation_feedback.py`.
+  - Kết quả Seed: Đồng bộ thành công 37 loại văn bản theo NĐ 30/2020 (`added=37`), seed toàn bộ `--all` thành công mỹ mãn (5 workflows, 5 trợ lý AI, 5 kho tri thức, 5 Qdrant collections, 7 ingestion job records).
+  - Verification: Pytest 394/394 passed (100%), Ruff 0 errors, 8/8 tests `test_document_types.py` passed.
+>>>>>>> 9e3bb9cb7d00dcac55619410aa160532570b9c8e
 - 0. **Bổ Sung Nút Tải Nội Dung Cuộc Trò Chuyện Dạng Markdown (.md) & Loại Bỏ Fallback Bắt Nhầm Thực Thể "Nào" (phiên #192)**:
   - Tính năng 1 (Xuất Markdown Chat Studio): Tạo tiện ích `frontend/src/lib/export-markdown.ts` định dạng toàn bộ cuộc trò chuyện thành tệp Markdown (.md) chuẩn chỉnh kèm Header metadata, vai trò Người dùng/Trợ lý, thời gian, nội dung câu hỏi/trả lời, trích dẫn tài liệu gốc (blockquote), tệp đính kèm và nút gợi ý; tích hợp nút "Tải về (.md)" với icon Lucide `Download` trên thanh công cụ `ChatStudioPage`.
   - Tính năng 2 (Xuất Markdown Bàn Làm Việc Cán Bộ): Tích hợp nút "Xuất MD" tại thanh điều khiển chi tiết cuộc trò chuyện của cán bộ tư vấn trong `ConversationsPage` (`/conversations`).

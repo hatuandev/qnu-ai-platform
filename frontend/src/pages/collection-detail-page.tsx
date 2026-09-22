@@ -146,6 +146,13 @@ export function CollectionDetailPage({
   const { data: allDocuments = [] } = useQuery({
     queryKey: ["documents", currentCollection.id],
     queryFn: () => apiClient.getDocuments(currentCollection.id),
+    refetchInterval: (query) => {
+      const docs = query.state.data || [];
+      const hasPending = docs.some(
+        (d) => d.index_status === "indexing" || d.status === "processing"
+      );
+      return hasPending ? 3000 : false;
+    },
   });
 
   // Fetch ingestion tasks

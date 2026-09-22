@@ -28,14 +28,40 @@ def is_embedding_model_installed() -> bool:
     return importlib.util.find_spec("sentence_transformers") is not None
 
 
+def _resolve_local_model_name(model_name: str) -> str:
+    """Map Cloudflare-style model paths like @cf/baai/bge-m3 to Hugging Face repo IDs."""
+    if not model_name:
+        return "BAAI/bge-m3"
+    clean = model_name.strip()
+    if clean.startswith("@cf/baai/bge-m3"):
+        return "BAAI/bge-m3"
+    if clean.startswith("@cf/baai/bge-large"):
+        return "BAAI/bge-large-en-v1.5"
+    if clean.startswith("@cf/baai/bge-base"):
+        return "BAAI/bge-base-en-v1.5"
+    if clean.startswith("@cf/baai/bge-small"):
+        return "BAAI/bge-small-en-v1.5"
+    if clean.startswith("@cf/"):
+        return clean[4:]
+    return clean
+
+
+def reset_embedding_model_state() -> None:
+    """Reset cached embedding model state for recovery or re-initialization."""
+    global _embedding_model, _embedding_model_failed
+    _embedding_model = None
+    _embedding_model_failed = False
+
+
 def _load_model_sync() -> Any:
     """Load SentenceTransformer with local_files_only preference to avoid remote delays."""
     from sentence_transformers import SentenceTransformer
 
+    local_model = _resolve_local_model_name(settings.EMBEDDING_MODEL)
     try:
-        return SentenceTransformer(settings.EMBEDDING_MODEL, local_files_only=True)
+        return SentenceTransformer(local_model, local_files_only=True)
     except Exception:
-        return SentenceTransformer(settings.EMBEDDING_MODEL)
+        return SentenceTransformer(local_model)
 
 
 def _get_embedding_model() -> Any | None:

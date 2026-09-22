@@ -48,16 +48,110 @@ def _is_table_text(text_rect: fitz.Rect, table_rects: list[fitz.Rect]) -> bool:
         return False
     total_inter = 0.0
     for tr in table_rects:
-        inter = text_rect & tr
+        # Buffer margin of 6pt horizontally and 10pt vertically to capture rows hugging borders/footer
+        buffered_tr = fitz.Rect(tr.x0 - 6.0, tr.y0 - 4.0, tr.x1 + 6.0, tr.y1 + 10.0)
+        inter = text_rect & buffered_tr
         if not inter.is_empty:
             total_inter += inter.get_area()
         center_pt = fitz.Point(
             (text_rect.x0 + text_rect.x1) / 2.0,
             (text_rect.y0 + text_rect.y1) / 2.0,
         )
-        if tr.contains(center_pt):
+        if buffered_tr.contains(center_pt):
             return True
-    return (total_inter / text_rect.get_area()) >= 0.40
+        # If top edge of text rect starts inside table vertically and horizontally
+        if tr.y0 <= text_rect.y0 <= (tr.y1 + 6.0) and (tr.x0 - 10.0) <= center_pt.x <= (tr.x1 + 10.0):
+            return True
+    return (total_inter / text_rect.get_area()) >= 0.35
+
+
+class _RawTableItem:
+    """Container for raw extracted table matrix and bounding box before canonicalization."""
+
+    def __init__(self, bbox: tuple[float, float, float, float], rows: list[list[str]]):
+        self.bbox = bbox
+        self.rows = rows
+
+
+def _fuse_side_by_side_tables(tables: list[_RawTableItem]) -> list[_RawTableItem]:
+    """Fuse horizontally adjacent tables that share the same vertical Y-span (e.g. IELTS and VSTEP)."""
+    if len(tables) < 2:
+        return tables
+
+    sorted_tables = sorted(tables, key=lambda t: t.bbox[0])
+    fused: list[_RawTableItem] = []
+    skip_indices: set[int] = set()
+
+    for i in range(len(sorted_tables)):
+        if i in skip_indices:
+            continue
+        t1 = sorted_tables[i]
+        matched_j = None
+
+        for j in range(i + 1, len(sorted_tables)):
+            if j in skip_indices:
+                continue
+            t2 = sorted_tables[j]
+
+            y0_1, y1_1 = t1.bbox[1], t1.bbox[3]
+            y0_2, y1_2 = t2.bbox[1], t2.bbox[3]
+            h1 = max(1.0, y1_1 - y0_1)
+            h2 = max(1.0, y1_2 - y0_2)
+            v_overlap = max(0.0, min(y1_1, y1_2) - max(y0_1, y0_2))
+            overlap_ratio = v_overlap / min(h1, h2)
+
+            x1_1 = t1.bbox[2]
+            x0_2 = t2.bbox[0]
+            is_horiz_adjacent = (x0_2 >= t1.bbox[0]) and (x1_1 <= x0_2 + 35.0)
+
+            if overlap_ratio >= 0.70 and is_horiz_adjacent:
+                matched_j = j
+                break
+
+        if matched_j is not None:
+            t2 = sorted_tables[matched_j]
+            skip_indices.add(matched_j)
+
+            max_r = max(len(t1.rows), len(t2.rows))
+            cols1 = max((len(r) for r in t1.rows), default=0)
+            cols2 = max((len(r) for r in t2.rows), default=0)
+            new_rows: list[list[str]] = []
+            for r_idx in range(max_r):
+                r1 = t1.rows[r_idx] if r_idx < len(t1.rows) else [""] * cols1
+                r2 = t2.rows[r_idx] if r_idx < len(t2.rows) else [""] * cols2
+                r1_padded = r1 + [""] * max(0, cols1 - len(r1))
+                r2_padded = r2 + [""] * max(0, cols2 - len(r2))
+                new_rows.append(r1_padded + r2_padded)
+
+            # Disambiguate duplicate header names across fused tables (e.g. "Điểm quy đổi" -> "Điểm quy đổi IELTS")
+            if new_rows:
+                h1_names = [new_rows[0][c] for c in range(cols1)]
+                h2_names = [new_rows[0][cols1 + c] for c in range(cols2)]
+                for c in range(cols2):
+                    h2_val = h2_names[c].strip()
+                    if h2_val and h2_val in h1_names:
+                        ctx1 = next((w for w in h1_names if any(k in w.lower() for k in ["ielts", "toefl", "pt1"])), "")
+                        ctx2 = next((w for w in h2_names if any(k in w.lower() for k in ["vstep", "đgnl", "pt2"])), "")
+                        if "ielts" in ctx1.lower() or "vstep" in ctx2.lower():
+                            h1_idx = h1_names.index(h2_val)
+                            new_rows[0][h1_idx] = f"{h2_val} IELTS"
+                            new_rows[0][cols1 + c] = f"{h2_val} VSTEP"
+                        elif ctx1 or ctx2:
+                            h1_idx = h1_names.index(h2_val)
+                            new_rows[0][h1_idx] = f"{h2_val} ({ctx1})"
+                            new_rows[0][cols1 + c] = f"{h2_val} ({ctx2})"
+
+            new_bbox = (
+                min(t1.bbox[0], t2.bbox[0]),
+                min(t1.bbox[1], t2.bbox[1]),
+                max(t1.bbox[2], t2.bbox[2]),
+                max(t1.bbox[3], t2.bbox[3]),
+            )
+            fused.append(_RawTableItem(bbox=new_bbox, rows=new_rows))
+        else:
+            fused.append(t1)
+
+    return fused
 
 
 class PyMuPdfParser(BaseDocumentParser):
@@ -81,21 +175,39 @@ class PyMuPdfParser(BaseDocumentParser):
             # 1. Detect native tables on current page (suppressing nested sub-tables)
             raw_tab_list = list(getattr(find_page_tables(page), "tables", []) or [])
             page_tables = suppress_nested_tables(raw_tab_list)
+
+            # Convert to _RawTableItem and apply horizontal side-by-side fusion
+            raw_table_items: list[_RawTableItem] = []
+            for tab in page_tables:
+                extracted = tab.extract() or []
+                cleaned_rows = [
+                    [str(c or "").strip() for c in r]
+                    for r in extracted
+                    if any(str(c or "").strip() for c in r)
+                ]
+                if cleaned_rows:
+                    raw_table_items.append(_RawTableItem(bbox=tab.bbox, rows=cleaned_rows))
+
+            fused_table_items = _fuse_side_by_side_tables(raw_table_items)
             table_rects: list[fitz.Rect] = []
+            page_table_words: set[str] = set()
 
-            for t_idx, tab in enumerate(page_tables):
-                extracted = tab.extract()
-                if not extracted or len(extracted) < 2:
-                    continue
-
-                t_rect = fitz.Rect(tab.bbox)
+            for t_idx, item in enumerate(fused_table_items):
+                t_rect = fitz.Rect(item.bbox)
                 table_rects.append(t_rect)
 
-                headers = [str(c or "").strip() for c in extracted[0]]
+                headers = item.rows[0]
                 schema_key = table_schema_key(headers)
                 canonical_rows: list[CanonicalRow] = []
 
-                for r_idx, r_cells in enumerate(extracted[1:]):
+                # Index table cell words for content deduplication
+                for r in item.rows:
+                    for c in r:
+                        for word in str(c or "").strip().lower().split():
+                            if len(word) >= 3:
+                                page_table_words.add(word)
+
+                for r_idx, r_cells in enumerate(item.rows[1:]):
                     cells = [
                         CanonicalCell(
                             raw_value=str(c or "").strip(),
@@ -180,6 +292,21 @@ class PyMuPdfParser(BaseDocumentParser):
 
                 if not txt:
                     continue
+
+                # Content-level anti-leakage: if text block heavily overlaps table cells on this page
+                is_heading = bool(
+                    re.match(
+                        r"^\s*(?:\d+[\.\)]|[IVXLCDM]+[\.\)]|#+|\bĐiều\b|\bMục\b|\bChương\b|\bPhần\b|\bPhụ lục\b)",
+                        txt,
+                    )
+                )
+                if not is_heading and page_table_words:
+                    b_words = [w for w in txt.lower().split() if len(w) >= 3]
+                    if len(b_words) >= 4:
+                        overlap = sum(1 for w in b_words if w in page_table_words)
+                        if (overlap / len(b_words)) >= 0.40 and any(char.isdigit() for char in txt):
+                            # Table data leakage detected outside table bounding box -> suppress!
+                            continue
 
                 b_type = (
                     BlockType.HEADING
