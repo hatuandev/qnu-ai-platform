@@ -7,10 +7,41 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-23 16:15 (UTC+7)
-- **Phiên số**: #207
+- **Thời gian cập nhật**: 2026-09-24 01:10 (UTC+7)
+- **Phiên số**: #208
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Tối Ưu UI/UX & Chuẩn Hóa Nhãn Nút Trang ModelOps Trên Frontend2 Mới, Khắc Phục Triệt Để Lỗi Cắt Chữ Tabs (phiên #208)**:
+  - *Hiện trạng & Yêu cầu người dùng*:
+    - Người dùng đang xây dựng lại `frontend2` (Vite 6 + React 19 + TanStack Router).
+    - Yêu cầu xem xét trang `/models` (ModelOps) để tối ưu UI/UX trên mọi kích thước thiết bị (đặc biệt là mobile viewports hẹp như 394px) và rút gọn các nút bấm/tiêu đề có tên quá dài.
+    - Khắc phục lỗi: Tab thứ 3 trên thanh điều hướng chính bị cắt ngang thành "Tổ Hợp Co..." do container dùng `overflow-x-auto scrollbar-none` kết hợp tên nhãn quá dài ("Mặc Định Hệ Thống", "Tổ Hợp Combos").
+  - *Frontend2*:
+    - `frontend2/src/features/modelops/modelops-page.tsx`:
+      * Khắc phục lỗi cắt chữ tab: Chuyển container main tabs sang `grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2`. Cả 3 nút `[Nhà Cung Cấp 11]`, `[Mặc Định]`, `[Combos 4]` dàn đều trên 1 hàng 3 cột cực kỳ cân xứng, triệt tiêu hoàn toàn nút thứ 3 rớt dòng lẻ loi.
+      * Rút gọn tên 3 tabs chính: `Nhà Cung Cấp & Khóa API` $\rightarrow$ `Nhà Cung Cấp` (badge số lượng), `Mặc Định Hệ Thống` $\rightarrow$ `Mặc Định`, `Tổ Hợp Combos` $\rightarrow$ `Combos` (badge số lượng). Bề rộng co từ 465px xuống ~300px, hiển thị trọn vẹn 100% trên màn hình hẹp 394px.
+      * Rút gọn nút header: `Xuất Tất Cả (JSON)` $\rightarrow$ `Xuất JSON`, `Thêm Provider Mới` $\rightarrow$ `Thêm Provider`.
+      * Tối ưu dải KPI metrics 4 ô: `grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3`, cỡ chữ `text-[10px] sm:text-[11px] truncate` hiển thị 2 cột cân đối trên màn hình điện thoại di động.
+      * Thêm `.scrollbar-none` cho category pills bar ẩn thanh cuộn thô trên trình duyệt.
+    - `frontend2/src/components/modelops/system-defaults-card.tsx`:
+      * Tối ưu 4 Card kênh nhiệm vụ trên Mobile (Embedding, Reranker, OCR, Chat): Header chuyển sang `flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-2`; bộ chuyển chế độ `[Mô Hình Đơn | Chuỗi Combo]` mở rộng `w-full sm:w-auto` chuẩn native mobile segmented control; tiêu đề rút gọn tinh tế (`1. Nhúng Vector (Embedding)`, `2. Tái Xếp Hạng (Reranker)`, `3. Bóc Tách & OCR (Vision)`, `4. Chat & Lý Luận (LLM)`) bảo đảm tiêu đề và badge không bao giờ bị bẻ gãy từ như `1024-` / `dim` hay `Cross-` / `Encoder`.
+      * Khắc phục dính chữ Header Luồng Failover: Đổi sang `flex flex-wrap items-center justify-between gap-1` và rút gọn nhãn (`Luồng Failover {task} ({n} Tầng)`, `Ưu tiên 1 ➔ {n}`) chấm dứt hoàn toàn hiện tượng dính chặt chữ `(2 TẦNG PHỤC HỒI)Ưu tiên`.
+      * Tối ưu Top Banner & Footer Card: Nút `Combos ({n})` mở rộng `w-full sm:w-auto` tự nhiên trên mobile; chân card hỗ trợ `flex-col sm:flex-row` chống đè nút "Xem chi tiết".
+    - `frontend2/src/components/modelops/combos-vision-section.tsx`:
+      * Tối ưu Combo Card Header trên Mobile: Chuyển sang `flex items-start justify-between gap-2`, huy hiệu rút gọn `Mặc Định Kênh` $\rightarrow$ `Mặc Định` giúp huy hiệu và các nút thao tác `[Copy, Sửa, Xóa]` không bị rớt dòng lơ lửng giữa chừng.
+      * Tối ưu Top Banner: Nút `+ Tạo Combo` mở rộng `w-full sm:w-auto` cân đối ở đáy card banner trên mobile.
+      * Rút gọn filter tabs: `Vision & OCR`, `Vector`, `Xếp Hạng`, `Chat LLM`.
+      * Chuẩn hóa Biome accessibility (`<label>` $\rightarrow$ `<span>`, `useId()`, key mảng ổn định).
+    - `frontend2/src/components/modelops/models-grid.tsx`:
+      * Xóa emoji rác `🧹`, đổi nhãn thành `Dọn Model Lỗi`, xóa cụm tiếng Anh `(Available Models)`.
+    - `frontend2/src/components/modelops/key-pool-section.tsx`:
+      * Rút gọn `Thêm Khóa Mới` $\rightarrow$ `Thêm Khóa`, `Lưu Khóa Vào Nhóm` $\rightarrow$ `Lưu Khóa`.
+    - `frontend2/src/styles/globals.css`:
+      * Bổ sung `.scrollbar-none` tiện ích Tailwind v4 ẩn scrollbar thô.
+  - *Verification*:
+    - TypeScript Typecheck `npm run typecheck`: **0 lỗi**.
+    - Biome linter `npx @biomejs/biome check src/components/modelops src/features/modelops`: **12 files 0 lỗi, 0 cảnh báo**.
+    - Trực quan trình duyệt: Kiểm tra trên cả desktop (1536x730) và mobile (394x852) - 100% các nút và tabs hiển thị hoàn chỉnh, không cắt chữ, layout mobile cân xứng chuẩn native app.
 - 0. **Tối Ưu Hóa Bóc Tách PDF OCR Bằng Thuật Toán Tổng Quát (Zero-Hardcoded Vocabulary) & Bổ Sung Chuẩn AGENTS.md (phiên #207)**:
   - *Hiện trạng & Vấn đề giải quyết*:
     - Bóc tách văn bản hành chính / hợp đồng quét scan phức tạp (`Hợp đồng nâng cấp PM cổng thông tin điện tử_0001.pdf` 16 trang) trước đây bị:

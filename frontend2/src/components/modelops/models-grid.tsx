@@ -129,7 +129,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
         <div className="flex items-center gap-2.5">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <Bot className="h-4 w-4 text-primary" />
-            Mô Hình Khả Dụng (Available Models)
+            Mô Hình Khả Dụng
           </h2>
           <Badge
             variant="outline"
@@ -445,7 +445,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
             title="Tự động loại bỏ các model không còn hỗ trợ khỏi cấu hình Provider"
           >
             <Trash2 className="h-3 w-3" />
-            <span>Dọn Dẹp Model Lỗi</span>
+            <span>Dọn Model Lỗi</span>
           </Button>
         </div>
       )}

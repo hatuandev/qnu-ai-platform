@@ -45,9 +45,9 @@ import type {
   SystemModelDefaults,
 } from "../../types/modelops";
 import {
+  getModelCapabilities,
   STRATEGY_META,
   TASK_TYPE_META,
-  getModelCapabilities,
 } from "./modelops-helpers";
 
 export interface CombosVisionSectionProps {
@@ -99,6 +99,7 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
 
   const comboNameId = useId();
   const comboStrategyId = useId();
+  const comboDescriptionId = useId();
 
   // Đếm số lượng combos theo từng loại tác vụ
   const counts = useMemo(() => {
@@ -418,27 +419,27 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <Card className="p-4 bg-gradient-to-r from-card via-card to-primary/5 border-primary/20 shadow-xs">
+      <Card className="p-3.5 sm:p-4 bg-gradient-to-r from-card via-card to-primary/5 border-primary/20 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
-              <Layers className="size-5" />
+          <div className="flex items-start sm:items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5 sm:mt-0">
+              <Layers className="size-4.5 sm:size-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-foreground">
-                  Trung Tâm Quản Lý Combos Đa Nhiệm (Multi-task Combos Hub)
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-foreground">
+                  Tổ Hợp Mô Hình (Model Combos)
                 </h3>
                 <Badge
                   variant="outline"
-                  className="text-[10px] font-mono border-primary/30 text-primary bg-primary/5"
+                  className="text-[9px] sm:text-[10px] font-mono border-primary/30 text-primary bg-primary/5 shrink-0"
                 >
-                  {combos.length} Combos Sẵn Sàng
+                  {combos.length} Combos
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Thiết lập chuỗi dự phòng (Fallback Chains), cân bằng tải (Round
-                Robin) hoặc chạy song song (Fusion) cho từng tác vụ AI.
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-none">
+                Thiết lập chuỗi dự phòng (Fallback), cân bằng tải (Round Robin)
+                hoặc song song (Fusion) cho từng tác vụ AI.
               </p>
             </div>
           </div>
@@ -446,10 +447,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
           <Button
             size="sm"
             onClick={() => handleOpenCreateModal("ocr")}
-            className="gap-1.5 self-start sm:self-center shrink-0 shadow-xs"
+            className="h-8 px-3 text-xs gap-1.5 w-full sm:w-auto justify-center shrink-0 shadow-xs"
           >
             <Plus className="size-3.5" />
-            <span>Tạo Combo Mới</span>
+            <span>Tạo Combo</span>
           </Button>
         </div>
       </Card>
@@ -457,12 +458,12 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
       {/* Filter Tabs & Search Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
           <Button
             variant={selectedTaskFilter === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedTaskFilter("all")}
-            className="h-8 text-xs gap-1.5 rounded-full"
+            className="h-8 text-xs gap-1.5 rounded-full shrink-0"
           >
             <span>Tất Cả</span>
             <Badge
@@ -477,10 +478,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
             variant={selectedTaskFilter === "ocr" ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedTaskFilter("ocr")}
-            className="h-8 text-xs gap-1.5 rounded-full"
+            className="h-8 text-xs gap-1.5 rounded-full shrink-0"
           >
             <Eye className="size-3" />
-            <span>OCR Thị Giác</span>
+            <span>Vision & OCR</span>
             <Badge
               variant="secondary"
               className="text-[9px] px-1 py-0 h-4 bg-background/50 font-mono"
@@ -493,10 +494,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
             variant={selectedTaskFilter === "embedding" ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedTaskFilter("embedding")}
-            className="h-8 text-xs gap-1.5 rounded-full"
+            className="h-8 text-xs gap-1.5 rounded-full shrink-0"
           >
             <Cpu className="size-3" />
-            <span>Nhúng Vector</span>
+            <span>Vector</span>
             <Badge
               variant="secondary"
               className="text-[9px] px-1 py-0 h-4 bg-background/50 font-mono"
@@ -509,10 +510,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
             variant={selectedTaskFilter === "reranker" ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedTaskFilter("reranker")}
-            className="h-8 text-xs gap-1.5 rounded-full"
+            className="h-8 text-xs gap-1.5 rounded-full shrink-0"
           >
             <Zap className="size-3" />
-            <span>Tái Xếp Hạng</span>
+            <span>Xếp Hạng</span>
             <Badge
               variant="secondary"
               className="text-[9px] px-1 py-0 h-4 bg-background/50 font-mono"
@@ -525,10 +526,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
             variant={selectedTaskFilter === "chat" ? "default" : "outline"}
             size="sm"
             onClick={() => setSelectedTaskFilter("chat")}
-            className="h-8 text-xs gap-1.5 rounded-full"
+            className="h-8 text-xs gap-1.5 rounded-full shrink-0"
           >
             <Brain className="size-3" />
-            <span>LLM Chat</span>
+            <span>Chat LLM</span>
             <Badge
               variant="secondary"
               className="text-[9px] px-1 py-0 h-4 bg-background/50 font-mono"
@@ -578,7 +579,7 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
             className="h-8 text-xs gap-1.5 mx-auto"
           >
             <Plus className="size-3.5" />
-            <span>Tạo Combo Cho Tác Vụ Này</span>
+            <span>Tạo Combo</span>
           </Button>
         </Card>
       ) : (
@@ -600,18 +601,18 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
               >
                 {/* Card Top: Badges & Actions */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
                       <Badge
                         variant="outline"
-                        className={`text-[10px] font-mono ${taskMeta.badgeClass}`}
+                        className={`text-[10px] font-mono shrink-0 ${taskMeta.badgeClass}`}
                       >
                         {taskMeta.shortLabel}
                       </Badge>
 
                       <Badge
                         variant="outline"
-                        className={`text-[10px] font-mono ${stratMeta.badgeClass}`}
+                        className={`text-[10px] font-mono shrink-0 ${stratMeta.badgeClass}`}
                       >
                         {combo.strategy}
                       </Badge>
@@ -619,15 +620,15 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                       {combo.is_default && (
                         <Badge
                           variant="default"
-                          className="text-[10px] font-mono flex items-center gap-1 bg-primary text-primary-foreground"
+                          className="text-[10px] font-mono flex items-center gap-1 bg-primary text-primary-foreground shrink-0"
                         >
                           <Star className="size-2.5 fill-current" />
-                          <span>Mặc Định Kênh</span>
+                          <span>Mặc Định</span>
                         </Badge>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -686,7 +687,7 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
 
                       return (
                         <div
-                          key={`${combo.id}-${step.provider_id}-${step.model_name}-${idx}`}
+                          key={`${combo.id}-${step.provider_id}-${step.model_name}`}
                           className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs ${
                             isActive
                               ? isFirst
@@ -730,8 +731,8 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                 </div>
 
                 {/* Card Bottom: Make Default Button */}
-                <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[11px]">
-                  <span className="text-muted-foreground text-[10px]">
+                <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[11px] gap-2">
+                  <span className="text-muted-foreground text-[10px] truncate max-w-[130px] sm:max-w-none">
                     ID: <code className="font-mono">{combo.id}</code>
                   </span>
                   {!combo.is_default && (
@@ -739,10 +740,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={() => handleSetDefault(combo)}
-                      className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                      className="h-7 text-xs px-2.5 gap-1 border-primary/30 text-primary hover:bg-primary/10 shrink-0"
                     >
                       <Star className="size-3" />
-                      <span>Gắn làm Mặc Định Kênh</span>
+                      <span>Đặt Mặc Định</span>
                     </Button>
                   )}
                 </div>
@@ -775,9 +776,9 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
           <div className="space-y-4 py-2">
             {/* 1. Chọn Task Type */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">
+              <span className="text-xs font-semibold text-foreground block">
                 Loại Tác Vụ Cốt Lõi (Task Type):
-              </label>
+              </span>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {(
                   [
@@ -878,10 +879,14 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
 
             {/* 3. Mô tả */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">
+              <label
+                htmlFor={comboDescriptionId}
+                className="text-xs font-semibold text-foreground"
+              >
                 Mô Tả Nghiệp Vụ:
               </label>
               <Input
+                id={comboDescriptionId}
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
                 placeholder="Chuỗi failover bảo vệ hạn ngạch..."
@@ -982,7 +987,7 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
 
                     return (
                       <div
-                        key={`form-step-${item.provider_id}-${item.model_name}-${idx}`}
+                        key={`form-step-${item.provider_id}-${item.model_name}`}
                         className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card text-xs"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -1082,7 +1087,7 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
               disabled={!formName.trim() || formModels.length === 0}
               onClick={handleSaveCombo}
             >
-              Lưu Cấu Hình Combo
+              Lưu Combo
             </Button>
           </DialogFooter>
         </DialogContent>

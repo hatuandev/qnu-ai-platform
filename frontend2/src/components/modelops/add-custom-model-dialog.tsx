@@ -128,7 +128,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
         <DialogHeader className="space-y-1">
           <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            Thêm Mô Hình Tùy Chỉnh (Add Custom Model)
+            Thêm Mô Hình Tùy Chỉnh
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Cấu hình ID mô hình tương thích với Provider {selectedProvider.name}{" "}

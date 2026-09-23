@@ -19,14 +19,13 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageHeader } from "@/components/admin/page-header";
-import { Input } from "@/components/ui/input";
 import { AddCustomModelDialog } from "@/components/modelops/add-custom-model-dialog";
 import { CombosVisionSection } from "@/components/modelops/combos-vision-section";
 import { ImportProvidersDialog } from "@/components/modelops/import-providers-dialog";
 import { KeyPoolSection } from "@/components/modelops/key-pool-section";
 import {
-  type ProviderCategory,
   getProviderCategory,
+  type ProviderCategory,
 } from "@/components/modelops/modelops-helpers";
 import { ModelsGrid } from "@/components/modelops/models-grid";
 import { ProviderCard } from "@/components/modelops/provider-card";
@@ -36,20 +35,21 @@ import { SystemDefaultsCard } from "@/components/modelops/system-defaults-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
+  apiClient,
   type ModelProvider,
   type ProviderModelsTestResponse,
   type SingleModelTestResult,
   type SystemModelDefaults,
-  apiClient,
 } from "@/services/api-client";
 
-export type { ProviderCategory };
-export { getProviderCategory };
 export {
   getModelCapabilities,
   getModelDisplayName,
 } from "@/components/modelops/modelops-helpers";
+export type { ProviderCategory };
+export { getProviderCategory };
 
 export interface ModelOpsPageProps {
   currentPath?: string;
@@ -735,7 +735,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
             className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Quay lại danh sách Provider</span>
+            <span>Quay lại</span>
           </Button>
           <Card className="p-8 text-center text-xs text-muted-foreground">
             Không tìm thấy Provider với ID &quot;{selectedProviderId}&quot;. Có
@@ -883,13 +883,13 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         title="Quản Lý Provider & ModelOps"
         description="Quản lý các nhà cung cấp mô hình LLM, nhóm khóa API xoay vòng (Key Pool), và chính sách phục hồi dự phòng Circuit Breaker."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <Button
               variant="outline"
               size="sm"
               disabled={isExportingAll}
               onClick={handleExportAll}
-              className="gap-1.5"
+              className="h-8 px-2.5 sm:px-3 text-xs gap-1.5"
               title="Xuất cấu hình tất cả các Provider ra tệp JSON"
             >
               {isExportingAll ? (
@@ -897,15 +897,13 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
               ) : (
                 <Download className="size-3.5 text-muted-foreground" />
               )}
-              <span>
-                {isExportingAll ? "Đang xuất..." : "Xuất Tất Cả (JSON)"}
-              </span>
+              <span>{isExportingAll ? "Đang xuất..." : "Xuất JSON"}</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsImportModalOpen(true)}
-              className="gap-1.5"
+              className="h-8 px-2.5 sm:px-3 text-xs gap-1.5"
               title="Nhập cấu hình Provider từ tệp JSON (đơn lẻ hoặc toàn bộ)"
             >
               <FileJson className="size-3.5 text-primary" />
@@ -914,105 +912,105 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
             <Button
               size="sm"
               onClick={() => openCreateModal("openai")}
-              className="gap-1.5"
+              className="h-8 px-2.5 sm:px-3 text-xs gap-1.5"
             >
               <Plus className="size-3.5" />
-              <span>Thêm Provider Mới</span>
+              <span>Thêm Provider</span>
             </Button>
           </div>
         }
       />
 
       {/* Executive Health & Metrics Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <Card className="p-3 sm:p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
+            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider block truncate">
               Nhà Cung Cấp
             </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-foreground">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-lg sm:text-xl font-bold text-foreground">
                 {providers.length}
               </span>
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                {activeProvidersCount} đang bật
+              <span className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-medium truncate">
+                {activeProvidersCount} bật
               </span>
             </div>
           </div>
-          <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Server className="size-4" />
+          <div className="size-8 sm:size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Server className="size-3.5 sm:size-4" />
           </div>
         </Card>
 
-        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+        <Card className="p-3 sm:p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
+            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider block truncate">
               Mô Hình Khả Dụng
             </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-foreground">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-lg sm:text-xl font-bold text-foreground">
                 {totalUniqueModelsCount}
               </span>
-              <span className="text-[11px] text-muted-foreground">
-                Chat & Vision OCR
+              <span className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
+                Chat & Vision
               </span>
             </div>
           </div>
-          <div className="size-9 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-            <Cpu className="size-4" />
+          <div className="size-8 sm:size-9 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+            <Cpu className="size-3.5 sm:size-4" />
           </div>
         </Card>
 
-        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+        <Card className="p-3 sm:p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
+            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider block truncate">
               Khóa API Trong Pool
             </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold text-foreground">
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-lg sm:text-xl font-bold text-foreground">
                 {totalKeysCount}
               </span>
-              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+              <span className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-medium truncate">
                 Xoay vòng JIT
               </span>
             </div>
           </div>
-          <div className="size-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-            <KeyRound className="size-4" />
+          <div className="size-8 sm:size-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <KeyRound className="size-3.5 sm:size-4" />
           </div>
         </Card>
 
-        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+        <Card className="p-3 sm:p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
+            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider block truncate">
               Circuit Breaker
             </span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 truncate">
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 Hoạt Động Tốt
               </span>
             </div>
           </div>
-          <div className="size-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-            <ShieldCheck className="size-4" />
+          <div className="size-8 sm:size-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <ShieldCheck className="size-3.5 sm:size-4" />
           </div>
         </Card>
       </div>
 
       {/* Main Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2.5">
+      <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 border-b border-border pb-2.5">
         <Button
           variant={mainViewMode === "providers" ? "default" : "outline"}
           size="sm"
           onClick={() => setMainViewMode("providers")}
-          className="h-8 text-xs gap-1.5 rounded-md"
+          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
         >
-          <Server className="size-3.5" />
-          <span>Nhà Cung Cấp & Khóa API</span>
+          <Server className="size-3.5 shrink-0" />
+          <span className="truncate">Nhà Cung Cấp</span>
           <Badge
             variant="secondary"
-            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
+            className="text-[9px] px-1 py-0 h-4 bg-background/40 text-inherit border-none font-mono shrink-0"
           >
             {providers.length}
           </Badge>
@@ -1022,23 +1020,23 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
           variant={mainViewMode === "defaults" ? "default" : "outline"}
           size="sm"
           onClick={() => setMainViewMode("defaults")}
-          className="h-8 text-xs gap-1.5 rounded-md"
+          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
         >
-          <Sparkles className="size-3.5" />
-          <span>Định Tuyến & Mặc Định</span>
+          <Sparkles className="size-3.5 shrink-0" />
+          <span className="truncate">Mặc Định</span>
         </Button>
 
         <Button
           variant={mainViewMode === "combos" ? "default" : "outline"}
           size="sm"
           onClick={() => setMainViewMode("combos")}
-          className="h-8 text-xs gap-1.5 rounded-md"
+          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
         >
-          <Layers className="size-3.5" />
-          <span>Chuỗi Dự Phòng & Combos</span>
+          <Layers className="size-3.5 shrink-0" />
+          <span className="truncate">Combos</span>
           <Badge
             variant="secondary"
-            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
+            className="text-[9px] px-1 py-0 h-4 bg-background/40 text-inherit border-none font-mono shrink-0"
           >
             {systemDefaults?.model_combos?.length || 1}
           </Badge>
@@ -1050,7 +1048,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         <div className="space-y-4">
           {/* Category Tabs & Realtime Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
               <Button
                 variant={activeCategoryTab === "all" ? "default" : "outline"}
                 size="sm"

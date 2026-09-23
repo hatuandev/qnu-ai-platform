@@ -144,7 +144,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                 className="h-8 text-xs gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{showAddKeyForm ? "Đóng Form" : "Thêm Khóa Mới"}</span>
+                <span>{showAddKeyForm ? "Đóng Form" : "Thêm Khóa"}</span>
               </Button>
             </div>
           </div>
@@ -290,7 +290,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                   }
                   className="h-8 text-xs"
                 >
-                  {isAddingKey ? "Đang lưu..." : "Lưu Khóa Vào Nhóm"}
+                  {isAddingKey ? "Đang lưu..." : "Lưu Khóa"}
                 </Button>
               </div>
             </form>

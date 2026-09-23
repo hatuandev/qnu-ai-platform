@@ -471,7 +471,7 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
               ) : (
                 <UploadCloud className="h-3.5 w-3.5" />
               )}
-              <span>{isImporting ? "Đang nạp..." : "Thực Hiện Nhập"}</span>
+              <span>{isImporting ? "Đang nạp..." : "Nhập Cấu Hình"}</span>
             </Button>
           </div>
         </div>

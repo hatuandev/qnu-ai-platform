@@ -67,7 +67,7 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
             className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Quay lại danh sách Nhà cung cấp</span>
+            <span>Danh sách Provider</span>
           </Button>
           <span className="text-muted-foreground/60">/</span>
           <span className="font-semibold text-foreground flex items-center gap-2">
