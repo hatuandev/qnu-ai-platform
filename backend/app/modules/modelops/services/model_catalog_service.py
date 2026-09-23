@@ -65,14 +65,125 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     },
 ]
 
-DEFAULT_QNU_COMBO: dict[str, Any] = {
+DEFAULT_QNU_EMBEDDING_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_cloudflare",
+        "provider_name": "Cloudflare Workers AI",
+        "model_name": "@cf/baai/bge-m3",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 1: Cloudflare BGE-M3 (1024D) — Máy chủ Edge toàn cầu, tốc độ cao không tốn quota API",
+    },
+    {
+        "provider_id": "prov_gemini",
+        "provider_name": "Google Gemini Cloud",
+        "model_name": "text-embedding-004",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 2: Google text-embedding-004 — Chất lượng truy xuất ngữ nghĩa tiếng Việt chuẩn xác",
+    },
+    {
+        "provider_id": "prov_sentence_transformers",
+        "provider_name": "Local SentenceTransformers",
+        "model_name": "BAAI/bge-m3",
+        "provider_type": "local",
+        "is_active": True,
+        "description": "Ưu tiên 3 (Cứu sinh): Local PyTorch BGE-M3 nội bộ trường ĐH Quy Nhơn — Hoạt động offline 100%",
+    },
+]
+
+DEFAULT_QNU_RERANKER_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_cloudflare",
+        "provider_name": "Cloudflare Workers AI",
+        "model_name": "@cf/baai/bge-reranker-base",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 1: Cloudflare BGE-Reranker-Base — Cross-Encoder Edge GPU tái chấm điểm Top-K",
+    },
+    {
+        "provider_id": "prov_sentence_transformers",
+        "provider_name": "Local SentenceTransformers",
+        "model_name": "bge-reranker-large",
+        "provider_type": "local",
+        "is_active": True,
+        "description": "Ưu tiên 2: Local Cross-Encoder BGE Large — Suy luận cục bộ bảo mật",
+    },
+]
+
+DEFAULT_QNU_CHAT_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_ace0d9fe",
+        "provider_name": "Google Gemini",
+        "model_name": "gemini-2.5-flash",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 1: Gemini 2.5 Flash — Tốc độ phản hồi cực nhanh, suy luận thông minh",
+    },
+    {
+        "provider_id": "prov_openai",
+        "provider_name": "OpenAI",
+        "model_name": "gpt-4o-mini",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 2: OpenAI GPT-4o-mini — Ổn định và chi phí tối ưu",
+    },
+    {
+        "provider_id": "prov_ollama",
+        "provider_name": "Ollama Local GPU",
+        "model_name": "qwen2.5:7b",
+        "provider_type": "local",
+        "is_active": True,
+        "description": "Ưu tiên 3: Ollama Local Qwen 2.5 7B — Dự phòng nội bộ không phụ thuộc internet",
+    },
+]
+
+DEFAULT_QNU_OCR_COMBO: dict[str, Any] = {
     "id": "combo_qnu_ocr_master",
     "name": "qnu-ocr-master",
+    "task_type": "ocr",
     "strategy": "fallback",
     "models": DEFAULT_QNU_OCR_COMBO_CHAIN,
     "is_default": True,
     "description": "Combo OCR đa tầng mặc định ĐH Quy Nhơn (Tự động failover khi hết Quota 429)",
 }
+
+DEFAULT_QNU_EMBEDDING_COMBO: dict[str, Any] = {
+    "id": "combo_qnu_embedding_shield",
+    "name": "qnu-embedding-resilience",
+    "task_type": "embedding",
+    "strategy": "fallback",
+    "models": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,
+    "is_default": True,
+    "description": "Chuỗi nhúng vector dự phòng 3 tầng (Cloudflare Edge ➔ Gemini ➔ PyTorch Local)",
+}
+
+DEFAULT_QNU_RERANKER_COMBO: dict[str, Any] = {
+    "id": "combo_qnu_reranker_shield",
+    "name": "qnu-reranker-resilience",
+    "task_type": "reranker",
+    "strategy": "fallback",
+    "models": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
+    "is_default": True,
+    "description": "Chuỗi tái xếp hạng RAG dự phòng (Cloudflare Edge Cross-Encoder ➔ Local RRF)",
+}
+
+DEFAULT_QNU_CHAT_COMBO: dict[str, Any] = {
+    "id": "combo_qnu_chat_shield",
+    "name": "qnu-chat-resilience",
+    "task_type": "chat",
+    "strategy": "fallback",
+    "models": DEFAULT_QNU_CHAT_COMBO_CHAIN,
+    "is_default": False,
+    "description": "Chuỗi LLM hội thoại và lý luận dự phòng đa nhà cung cấp (Gemini ➔ GPT-4o-mini ➔ Ollama Local)",
+}
+
+DEFAULT_INITIAL_COMBOS: list[dict[str, Any]] = [
+    DEFAULT_QNU_OCR_COMBO,
+    DEFAULT_QNU_EMBEDDING_COMBO,
+    DEFAULT_QNU_RERANKER_COMBO,
+    DEFAULT_QNU_CHAT_COMBO,
+]
 
 DEFAULT_VISION_ADAPTER: dict[str, Any] = {
     "enabled": True,
@@ -97,27 +208,63 @@ class ModelCatalogService:
         res = await db.execute(stmt)
         cfg_record = res.scalar_one_or_none()
 
-        default_data = {
+        default_data: dict[str, Any] = {
             "default_embedding_provider_id": "prov_cloudflare",
             "default_embedding_model": "@cf/baai/bge-m3",
+            "default_embedding_mode": "combo",
+            "default_embedding_combo_id": "combo_qnu_embedding_shield",
+            "embedding_combo_chain": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,
+
             "default_reranker_provider_id": "prov_cloudflare",
             "default_reranker_model": "@cf/baai/bge-reranker-base",
+            "default_reranker_mode": "combo",
+            "default_reranker_combo_id": "combo_qnu_reranker_shield",
+            "reranker_combo_chain": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
+
             "default_ocr_provider_id": "prov_ace0d9fe",
             "default_ocr_model": "gemini-2.5-flash",
             "default_ocr_mode": "combo",
+            "default_ocr_combo_id": "combo_qnu_ocr_master",
             "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,
-            "model_combos": [DEFAULT_QNU_COMBO],
+
+            "default_chat_provider_id": "prov_ace0d9fe",
+            "default_chat_model": "gemini-2.5-flash",
+            "default_chat_mode": "single",
+            "default_chat_combo_id": "combo_qnu_chat_shield",
+            "chat_combo_chain": DEFAULT_QNU_CHAT_COMBO_CHAIN,
+
+            "model_combos": DEFAULT_INITIAL_COMBOS,
             "vision_adapter": DEFAULT_VISION_ADAPTER,
         }
 
         if cfg_record and cfg_record.extra_config and "defaults" in cfg_record.extra_config:
             default_data.update(cfg_record.extra_config["defaults"])
+            # Upgrade existing stored combos if task_type is missing
+            combos_list = default_data.get("model_combos") or []
+            existing_ids = {c.get("id") for c in combos_list}
+            for c in combos_list:
+                if not c.get("task_type"):
+                    c["task_type"] = "ocr"
+            # Add missing default combos for embedding/reranker/chat
+            for initial_c in DEFAULT_INITIAL_COMBOS:
+                if initial_c["id"] not in existing_ids:
+                    combos_list.append(initial_c)
+            default_data["model_combos"] = combos_list
+
+            if not default_data.get("embedding_combo_chain"):
+                default_data["embedding_combo_chain"] = DEFAULT_QNU_EMBEDDING_COMBO_CHAIN
+            if not default_data.get("reranker_combo_chain"):
+                default_data["reranker_combo_chain"] = DEFAULT_QNU_RERANKER_COMBO_CHAIN
             if not default_data.get("ocr_combo_chain"):
                 default_data["ocr_combo_chain"] = DEFAULT_QNU_OCR_COMBO_CHAIN
+            if not default_data.get("chat_combo_chain"):
+                default_data["chat_combo_chain"] = DEFAULT_QNU_CHAT_COMBO_CHAIN
             if not default_data.get("default_ocr_mode"):
                 default_data["default_ocr_mode"] = "combo"
-            if not default_data.get("model_combos"):
-                default_data["model_combos"] = [DEFAULT_QNU_COMBO]
+            if not default_data.get("default_embedding_mode"):
+                default_data["default_embedding_mode"] = "combo"
+            if not default_data.get("default_reranker_mode"):
+                default_data["default_reranker_mode"] = "combo"
             if not default_data.get("vision_adapter"):
                 default_data["vision_adapter"] = DEFAULT_VISION_ADAPTER
         else:
@@ -282,33 +429,99 @@ class ModelCatalogService:
             defaults["default_reranker_model"] = update_data.default_reranker_model
             settings.RERANKER_MODEL = update_data.default_reranker_model
 
+        # Embedding Mode & Chain
+        if update_data.default_embedding_mode is not None:
+            defaults["default_embedding_mode"] = update_data.default_embedding_mode
+        if update_data.default_embedding_combo_id is not None:
+            defaults["default_embedding_combo_id"] = update_data.default_embedding_combo_id
+        if update_data.embedding_combo_chain is not None:
+            defaults["embedding_combo_chain"] = [
+                item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                for item in update_data.embedding_combo_chain
+            ]
+
+        # Reranker Mode & Chain
+        if update_data.default_reranker_mode is not None:
+            defaults["default_reranker_mode"] = update_data.default_reranker_mode
+        if update_data.default_reranker_combo_id is not None:
+            defaults["default_reranker_combo_id"] = update_data.default_reranker_combo_id
+        if update_data.reranker_combo_chain is not None:
+            defaults["reranker_combo_chain"] = [
+                item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                for item in update_data.reranker_combo_chain
+            ]
+
+        # OCR Mode & Chain
         if update_data.default_ocr_provider_id is not None:
             defaults["default_ocr_provider_id"] = update_data.default_ocr_provider_id
-
         if update_data.default_ocr_model is not None:
             defaults["default_ocr_model"] = update_data.default_ocr_model
-
         if update_data.default_ocr_mode is not None:
             defaults["default_ocr_mode"] = update_data.default_ocr_mode
-
+        if update_data.default_ocr_combo_id is not None:
+            defaults["default_ocr_combo_id"] = update_data.default_ocr_combo_id
         if update_data.ocr_combo_chain is not None:
             defaults["ocr_combo_chain"] = [
                 item.model_dump() if hasattr(item, "model_dump") else dict(item)
                 for item in update_data.ocr_combo_chain
             ]
 
+        # Chat Mode & Chain
+        if update_data.default_chat_provider_id is not None:
+            defaults["default_chat_provider_id"] = update_data.default_chat_provider_id
+        if update_data.default_chat_model is not None:
+            defaults["default_chat_model"] = update_data.default_chat_model
+        if update_data.default_chat_mode is not None:
+            defaults["default_chat_mode"] = update_data.default_chat_mode
+        if update_data.default_chat_combo_id is not None:
+            defaults["default_chat_combo_id"] = update_data.default_chat_combo_id
+        if update_data.chat_combo_chain is not None:
+            defaults["chat_combo_chain"] = [
+                item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                for item in update_data.chat_combo_chain
+            ]
+
+        # Model Combos Hub update
         if update_data.model_combos is not None:
             defaults["model_combos"] = [
                 item.model_dump() if hasattr(item, "model_dump") else dict(item)
                 for item in update_data.model_combos
             ]
-            default_combo = next((c for c in defaults["model_combos"] if c.get("is_default")), None)
-            if default_combo and default_combo.get("models"):
-                defaults["ocr_combo_chain"] = default_combo["models"]
-                first_model = default_combo["models"][0]
-                defaults["default_ocr_provider_id"] = first_model.get("provider_id", defaults.get("default_ocr_provider_id"))
-                defaults["default_ocr_model"] = first_model.get("model_name", defaults.get("default_ocr_model"))
-                defaults["default_ocr_mode"] = "combo"
+            # Synchronize default chains per task_type when combo is marked is_default
+            for combo in defaults["model_combos"]:
+                if combo.get("is_default") and combo.get("models"):
+                    task_t = combo.get("task_type") or "ocr"
+                    first_model = combo["models"][0]
+                    p_id = first_model.get("provider_id")
+                    m_name = first_model.get("model_name")
+                    if task_t == "embedding":
+                        defaults["embedding_combo_chain"] = combo["models"]
+                        defaults["default_embedding_combo_id"] = combo.get("id")
+                        if p_id:
+                            defaults["default_embedding_provider_id"] = p_id
+                        if m_name:
+                            defaults["default_embedding_model"] = m_name
+                    elif task_t == "reranker":
+                        defaults["reranker_combo_chain"] = combo["models"]
+                        defaults["default_reranker_combo_id"] = combo.get("id")
+                        if p_id:
+                            defaults["default_reranker_provider_id"] = p_id
+                        if m_name:
+                            defaults["default_reranker_model"] = m_name
+                    elif task_t == "ocr":
+                        defaults["ocr_combo_chain"] = combo["models"]
+                        defaults["default_ocr_combo_id"] = combo.get("id")
+                        if p_id:
+                            defaults["default_ocr_provider_id"] = p_id
+                        if m_name:
+                            defaults["default_ocr_model"] = m_name
+                    elif task_t == "chat":
+                        defaults["chat_combo_chain"] = combo["models"]
+                        defaults["default_chat_combo_id"] = combo.get("id")
+                        if p_id:
+                            defaults["default_chat_provider_id"] = p_id
+                        if m_name:
+                            defaults["default_chat_model"] = m_name
 
         if update_data.vision_adapter is not None:
             defaults["vision_adapter"] = (

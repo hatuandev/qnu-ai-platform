@@ -1,0 +1,1425 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Cloud,
+  Cpu,
+  Download,
+  FileJson,
+  KeyRound,
+  Layers,
+  Plus,
+  RefreshCw,
+  Search,
+  Server,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { EmptyState } from "@/components/admin/empty-state";
+import { PageHeader } from "@/components/admin/page-header";
+import { Input } from "@/components/ui/input";
+import { AddCustomModelDialog } from "@/components/modelops/add-custom-model-dialog";
+import { CombosVisionSection } from "@/components/modelops/combos-vision-section";
+import { ImportProvidersDialog } from "@/components/modelops/import-providers-dialog";
+import { KeyPoolSection } from "@/components/modelops/key-pool-section";
+import {
+  type ProviderCategory,
+  getProviderCategory,
+} from "@/components/modelops/modelops-helpers";
+import { ModelsGrid } from "@/components/modelops/models-grid";
+import { ProviderCard } from "@/components/modelops/provider-card";
+import { ProviderDetailHeader } from "@/components/modelops/provider-detail-header";
+import { ProviderModal } from "@/components/modelops/provider-modal";
+import { SystemDefaultsCard } from "@/components/modelops/system-defaults-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  type ModelProvider,
+  type ProviderModelsTestResponse,
+  type SingleModelTestResult,
+  type SystemModelDefaults,
+  apiClient,
+} from "@/services/api-client";
+
+export type { ProviderCategory };
+export { getProviderCategory };
+export {
+  getModelCapabilities,
+  getModelDisplayName,
+} from "@/components/modelops/modelops-helpers";
+
+export interface ModelOpsPageProps {
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
+}
+
+export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
+  currentPath,
+  onNavigate,
+}) => {
+  const queryClient = useQueryClient();
+
+  // Selected Provider for Detail View
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    () => {
+      if (currentPath?.startsWith("/models/")) {
+        const id = currentPath.replace("/models/", "").trim();
+        return id || null;
+      }
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/models/")
+      ) {
+        const id = window.location.pathname.replace("/models/", "").trim();
+        return id || null;
+      }
+      return null;
+    },
+  );
+
+  useEffect(() => {
+    if (currentPath) {
+      if (currentPath.startsWith("/models/")) {
+        const id = currentPath.replace("/models/", "").trim();
+        setSelectedProviderId(id || null);
+      } else if (currentPath === "/models") {
+        setSelectedProviderId(null);
+      }
+    }
+  }, [currentPath]);
+
+  // Master View Main Tab (Providers as DEFAULT!)
+  const [mainViewMode, setMainViewMode] = useState<
+    "providers" | "defaults" | "combos"
+  >("providers");
+  const [combosTaskFilter, setCombosTaskFilter] = useState<string>("all");
+
+  const handleNavigateToCombos = (taskFilter?: string) => {
+    if (taskFilter) {
+      setCombosTaskFilter(taskFilter);
+    }
+    setMainViewMode("combos");
+  };
+
+  // Master View Category Filter Tab
+  const [activeCategoryTab, setActiveCategoryTab] =
+    useState<ProviderCategory>("all");
+
+  // Realtime search query
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Dialog State for Provider Create/Edit
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<ModelProvider | null>(
+    null,
+  );
+  const [initialType, setInitialType] =
+    useState<ModelProvider["type"]>("openai");
+
+  // Testing status for entire Provider
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    id: string;
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  // Testing single key status
+  const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
+  const [keyTestFeedback, setKeyTestFeedback] = useState<
+    Record<string, string>
+  >({});
+
+  // Simulating Key Rotation status
+  const [simulatingRotation, setSimulatingRotation] = useState(false);
+  const [rotationResult, setRotationResult] = useState<{
+    success: boolean;
+    rotated: boolean;
+    message: string;
+  } | null>(null);
+
+  // Copy feedback state
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  // Testing models state
+  const [isTestingAllModels, setIsTestingAllModels] = useState(false);
+  const [testingModelName, setTestingModelName] = useState<string | null>(null);
+  const [modelTestResults, setModelTestResults] = useState<
+    Record<string, SingleModelTestResult>
+  >({});
+  const [modelTestSummary, setModelTestSummary] =
+    useState<ProviderModelsTestResponse | null>(null);
+
+  // Add Custom Model Dialog state
+  const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
+
+  // Import / Export state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [isExportingSingle, setIsExportingSingle] = useState(false);
+
+  // -------------------------------------------------------------
+  // DATA FETCHING & QUERIES
+  // -------------------------------------------------------------
+  const providersQuery = useQuery({
+    queryKey: ["model-providers"],
+    queryFn: () => apiClient.getModelProviders(),
+  });
+
+  const providers = providersQuery.data || [];
+  const isLoading = providersQuery.isLoading;
+
+  const cloudProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "cloud"),
+    [providers],
+  );
+  const localProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "local"),
+    [providers],
+  );
+  const customProviders = useMemo(
+    () => providers.filter((p) => getProviderCategory(p) === "custom"),
+    [providers],
+  );
+
+  const activeProvidersCount = useMemo(
+    () => providers.filter((p) => p.is_active).length,
+    [providers],
+  );
+
+  const totalUniqueModelsCount = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of providers) {
+      for (const m of p.models || []) {
+        set.add(m);
+      }
+    }
+    return set.size;
+  }, [providers]);
+
+  const totalKeysCount = useMemo(() => {
+    return providers.reduce((acc, p) => {
+      if (p.keys_count !== undefined) {
+        return acc + p.keys_count;
+      }
+      if (p.api_keys && p.api_keys.length > 0) {
+        return acc + p.api_keys.length;
+      }
+      return acc + (p.api_key_masked ? 1 : 0);
+    }, 0);
+  }, [providers]);
+
+  const filteredProviders = useMemo(() => {
+    let list = providers;
+    if (activeCategoryTab !== "all") {
+      list = list.filter((p) => getProviderCategory(p) === activeCategoryTab);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.type?.toLowerCase().includes(q) ||
+          p.code?.toLowerCase().includes(q) ||
+          p.models?.some((m) => m.toLowerCase().includes(q)),
+      );
+    }
+    return list;
+  }, [providers, activeCategoryTab, searchQuery]);
+
+  const defaultsQuery = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+  });
+  const systemDefaults = defaultsQuery.data?.defaults;
+  const availableEmbeddings = defaultsQuery.data?.available_embeddings || [];
+  const availableRerankers = defaultsQuery.data?.available_rerankers || [];
+  const availableOcrs = defaultsQuery.data?.available_ocrs || [];
+
+  const allAvailableModels = useMemo(() => {
+    const list: Array<{
+      provider_id: string;
+      provider_name: string;
+      provider_type: string;
+      model_name: string;
+      category: "cloud" | "local" | "custom";
+      description?: string;
+    }> = [];
+    for (const p of providers) {
+      if (!p.is_active) continue;
+      const cat = getProviderCategory(p);
+      for (const m of p.models || []) {
+        list.push({
+          provider_id: p.id,
+          provider_name: p.name,
+          provider_type: p.type || p.code || "cloud",
+          model_name: m,
+          category: cat,
+          description: `${m} (${p.name})`,
+        });
+      }
+    }
+    return list;
+  }, [providers]);
+
+  const updateDefaultsMutation = useMutation({
+    mutationFn: (payload: Partial<SystemModelDefaults>) =>
+      apiClient.updateSystemModelDefaults(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
+    },
+  });
+
+  const setDefaultMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      role,
+      modelName,
+    }: {
+      providerId: string;
+      role: "embedding" | "reranker" | "ocr";
+      modelName: string;
+    }) => apiClient.setProviderModelAsDefault(providerId, role, modelName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
+      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
+    },
+  });
+
+  const { data: presets = [] } = useQuery({
+    queryKey: ["provider-presets"],
+    queryFn: () => apiClient.getProviderPresets(),
+  });
+
+  const {
+    data: providerKeys = [],
+    isLoading: loadingKeys,
+    refetch: refetchKeys,
+  } = useQuery({
+    queryKey: ["provider-keys", selectedProviderId],
+    queryFn: () =>
+      selectedProviderId
+        ? apiClient.getProviderKeys(selectedProviderId)
+        : Promise.resolve([]),
+    enabled: !!selectedProviderId,
+  });
+
+  const selectedProvider =
+    providers.find((p) => p.id === selectedProviderId) || null;
+
+  const unavailableModelsCount = useMemo(() => {
+    if (!selectedProvider) return 0;
+    return (selectedProvider.models || []).filter(
+      (m) => modelTestResults[m]?.status === "unavailable",
+    ).length;
+  }, [selectedProvider, modelTestResults]);
+
+  // -------------------------------------------------------------
+  // MUTATIONS
+  // -------------------------------------------------------------
+  const createMutation = useMutation({
+    mutationFn: (
+      payload: Parameters<typeof apiClient.createModelProvider>[0],
+    ) => apiClient.createModelProvider(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+      setIsModalOpen(false);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Parameters<typeof apiClient.updateModelProvider>[1];
+    }) => apiClient.updateModelProvider(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+      setIsModalOpen(false);
+      setEditingProvider(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiClient.deleteModelProvider(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+      handleBackToList();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (id: string) => apiClient.toggleModelProvider(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    },
+  });
+
+  const addKeyMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      payload,
+    }: {
+      providerId: string;
+      payload: Parameters<typeof apiClient.addProviderKey>[1];
+    }) => apiClient.addProviderKey(providerId, payload),
+    onSuccess: () => {
+      refetchKeys();
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    },
+  });
+
+  const deleteKeyMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      keyId,
+    }: {
+      providerId: string;
+      keyId: string;
+    }) => apiClient.deleteProviderKey(providerId, keyId),
+    onSuccess: () => {
+      refetchKeys();
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    },
+  });
+
+  const toggleKeyMutation = useMutation({
+    mutationFn: ({
+      providerId,
+      keyId,
+      isActive,
+    }: {
+      providerId: string;
+      keyId: string;
+      isActive: boolean;
+    }) =>
+      apiClient.updateProviderKey(providerId, keyId, { is_active: isActive }),
+    onSuccess: () => {
+      refetchKeys();
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    },
+  });
+
+  // -------------------------------------------------------------
+  // HANDLERS
+  // -------------------------------------------------------------
+  const handleSelectProvider = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    setTestResult(null);
+    setRotationResult(null);
+    setKeyTestFeedback({});
+    setModelTestResults({});
+    setModelTestSummary(null);
+    setIsTestingAllModels(false);
+    setTestingModelName(null);
+    const nextPath = `/models/${providerId}`;
+    if (onNavigate) {
+      onNavigate(nextPath);
+    } else if (typeof window !== "undefined") {
+      window.history.pushState(null, "", nextPath);
+    }
+  };
+
+  const handleBackToList = () => {
+    setSelectedProviderId(null);
+    setTestResult(null);
+    setRotationResult(null);
+    setKeyTestFeedback({});
+    setModelTestResults({});
+    setModelTestSummary(null);
+    setIsTestingAllModels(false);
+    setTestingModelName(null);
+    const nextPath = "/models";
+    if (onNavigate) {
+      onNavigate(nextPath);
+    } else if (typeof window !== "undefined") {
+      window.history.pushState(null, "", nextPath);
+    }
+  };
+
+  const openCreateModal = (defaultType: ModelProvider["type"] = "openai") => {
+    setEditingProvider(null);
+    setInitialType(defaultType);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (provider: ModelProvider) => {
+    setEditingProvider(provider);
+    setInitialType(provider.type || "openai");
+    setIsModalOpen(true);
+  };
+
+  const handleTestConnection = async (providerId: string) => {
+    setTestingId(providerId);
+    setTestResult(null);
+    try {
+      const res = await apiClient.testModelProvider(providerId);
+      setTestResult({
+        id: providerId,
+        success: res.success,
+        message: `${res.message} (${res.latency_ms} ms)`,
+      });
+    } catch {
+      setTestResult({
+        id: providerId,
+        success: false,
+        message:
+          "Không thể kết nối tới nhà cung cấp. Vui lòng kiểm tra API Key hoặc Base URL.",
+      });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const handleTestAllModels = async (providerId: string) => {
+    setIsTestingAllModels(true);
+    try {
+      const res = await apiClient.testProviderModels(providerId);
+      setModelTestSummary(res);
+      const resultMap: Record<string, SingleModelTestResult> = {};
+      for (const r of res.results) {
+        resultMap[r.model_name] = r;
+      }
+      setModelTestResults(resultMap);
+    } catch {
+      setModelTestSummary(null);
+    } finally {
+      setIsTestingAllModels(false);
+    }
+  };
+
+  const handleTestSingleModel = async (
+    providerId: string,
+    modelName: string,
+  ) => {
+    setTestingModelName(modelName);
+    try {
+      const res = await apiClient.testProviderModels(providerId, modelName);
+      if (res.results && res.results.length > 0) {
+        setModelTestResults((prev) => ({
+          ...prev,
+          [modelName]: res.results[0],
+        }));
+      }
+    } catch {
+      setModelTestResults((prev) => ({
+        ...prev,
+        [modelName]: {
+          model_name: modelName,
+          success: false,
+          status: "error",
+          latency_ms: 0,
+          message: "Lỗi mạng hoặc không thể gửi request kiểm tra",
+          tested_at: new Date().toISOString(),
+        },
+      }));
+    } finally {
+      setTestingModelName(null);
+    }
+  };
+
+  const handleCleanUnavailableModels = (provider: ModelProvider) => {
+    const deadModels = (provider.models || []).filter(
+      (m) => modelTestResults[m]?.status === "unavailable",
+    );
+    if (deadModels.length === 0) return;
+    const remaining = (provider.models || []).filter(
+      (m) => modelTestResults[m]?.status !== "unavailable",
+    );
+    updateMutation.mutate({
+      id: provider.id,
+      payload: { models: remaining },
+    });
+    setModelTestResults((prev) => {
+      const copy = { ...prev };
+      for (const d of deadModels) {
+        delete copy[d];
+      }
+      return copy;
+    });
+    if (modelTestSummary) {
+      setModelTestSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              total_models: remaining.length,
+              unavailable_models: 0,
+            }
+          : null,
+      );
+    }
+  };
+
+  const handleRemoveModel = (provider: ModelProvider, modelName: string) => {
+    const currentModels = provider.models || [];
+    const updated = currentModels.filter((m) => m !== modelName);
+    updateMutation.mutate({
+      id: provider.id,
+      payload: { models: updated },
+    });
+  };
+
+  const handleQuickAddPresetModel = (
+    provider: ModelProvider,
+    modelName: string,
+  ) => {
+    const currentModels = provider.models || [];
+    if (!currentModels.includes(modelName)) {
+      const updated = [...currentModels, modelName];
+      updateMutation.mutate({
+        id: provider.id,
+        payload: { models: updated },
+      });
+    }
+  };
+
+  const handleConfirmAddCustomModel = (
+    modelId: string,
+    _isVision: boolean,
+    _isReasoning: boolean,
+    defaultRole: "none" | "embedding" | "reranker" | "ocr",
+    testResult: SingleModelTestResult | null,
+  ) => {
+    if (!selectedProvider) return;
+    const currentModels = selectedProvider.models || [];
+    if (!currentModels.includes(modelId)) {
+      const updated = [...currentModels, modelId];
+      updateMutation.mutate({
+        id: selectedProvider.id,
+        payload: { models: updated },
+      });
+      if (testResult) {
+        setModelTestResults((prev) => ({
+          ...prev,
+          [modelId]: testResult,
+        }));
+      }
+      if (defaultRole !== "none") {
+        setDefaultMutation.mutate({
+          providerId: selectedProvider.id,
+          role: defaultRole,
+          modelName: modelId,
+        });
+      }
+    }
+  };
+
+  const handleSimulateRotation = async (providerId: string) => {
+    setSimulatingRotation(true);
+    setRotationResult(null);
+    try {
+      const res = await apiClient.simulateKeyRotation(providerId, {
+        tokens_consumed: 3500,
+        trigger_rate_limit: true,
+        cooldown_seconds: 60,
+      });
+      setRotationResult({
+        success: res.success,
+        rotated: res.rotated,
+        message: res.message,
+      });
+      refetchKeys();
+      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    } catch (err: unknown) {
+      const errorObj = err as Error;
+      setRotationResult({
+        success: false,
+        rotated: false,
+        message: errorObj.message || "Mô phỏng xoay vòng thất bại.",
+      });
+    } finally {
+      setSimulatingRotation(false);
+    }
+  };
+
+  const handleTestSingleKey = async (providerId: string, keyId: string) => {
+    setTestingKeyId(keyId);
+    try {
+      const res = await apiClient.testProviderKey(providerId, keyId);
+      setKeyTestFeedback((prev) => ({
+        ...prev,
+        [keyId]: `${res.message} (${res.latency_ms}ms)`,
+      }));
+    } catch {
+      setKeyTestFeedback((prev) => ({
+        ...prev,
+        [keyId]: "Kiểm tra khóa thất bại.",
+      }));
+    } finally {
+      setTestingKeyId(null);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
+
+  const downloadJsonFile = (data: unknown, filename: string) => {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], {
+      type: "application/json;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = async () => {
+    try {
+      setIsExportingAll(true);
+      const data = await apiClient.exportAllProviders(true);
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      downloadJsonFile(data, `qnu-ai-providers-all-${dateStr}.json`);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Xuất toàn bộ Provider thất bại";
+      alert(msg);
+    } finally {
+      setIsExportingAll(false);
+    }
+  };
+
+  const handleExportSingle = async (
+    providerId: string,
+    providerName: string,
+    providerType: string,
+  ) => {
+    try {
+      setIsExportingSingle(true);
+      const data = await apiClient.exportProvider(providerId, true);
+      const safeName = providerName.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+      downloadJsonFile(data, `provider-${providerType}-${safeName}.json`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Xuất Provider thất bại";
+      alert(msg);
+    } finally {
+      setIsExportingSingle(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // DETAIL VIEW (When Provider is selected)
+  // -------------------------------------------------------------
+  if (selectedProviderId) {
+    if (isLoading) {
+      return (
+        <div className="p-12 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-3">
+          <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+          <span>Đang tải thông tin chi tiết Provider...</span>
+        </div>
+      );
+    }
+
+    if (!selectedProvider) {
+      return (
+        <div className="space-y-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBackToList}
+            className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Quay lại danh sách Provider</span>
+          </Button>
+          <Card className="p-8 text-center text-xs text-muted-foreground">
+            Không tìm thấy Provider với ID &quot;{selectedProviderId}&quot;. Có
+            thể Provider này đã bị xóa.
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Provider Detail Header */}
+        <ProviderDetailHeader
+          selectedProvider={selectedProvider}
+          isTesting={testingId === selectedProvider.id}
+          testResult={testResult}
+          copiedUrl={copiedUrl}
+          isExporting={isExportingSingle}
+          onBackToList={handleBackToList}
+          onCopyUrl={copyToClipboard}
+          onToggleActive={() => toggleMutation.mutate(selectedProvider.id)}
+          onTestConnection={() => handleTestConnection(selectedProvider.id)}
+          onExport={() =>
+            handleExportSingle(
+              selectedProvider.id,
+              selectedProvider.name,
+              selectedProvider.type,
+            )
+          }
+          onEdit={() => openEditModal(selectedProvider)}
+          onDelete={() => {
+            if (
+              window.confirm(
+                `Bạn có chắc chắn muốn xóa Provider '${selectedProvider.name}'? Thao tác này không thể hoàn tác.`,
+              )
+            ) {
+              deleteMutation.mutate(selectedProvider.id);
+            }
+          }}
+        />
+
+        {/* Available Models Full-Width Card Grid */}
+        <ModelsGrid
+          selectedProvider={selectedProvider}
+          presets={presets}
+          systemDefaults={systemDefaults}
+          modelTestResults={modelTestResults}
+          modelTestSummary={modelTestSummary}
+          unavailableModelsCount={unavailableModelsCount}
+          isTestingAllModels={isTestingAllModels}
+          testingModelName={testingModelName}
+          onOpenAddModelModal={() => setIsAddModelModalOpen(true)}
+          onTestAllModels={handleTestAllModels}
+          onTestSingleModel={handleTestSingleModel}
+          onRemoveModel={handleRemoveModel}
+          onCleanUnavailableModels={handleCleanUnavailableModels}
+          onQuickAddPresetModel={handleQuickAddPresetModel}
+        />
+
+        {/* Key Pool & Specs Section */}
+        <KeyPoolSection
+          selectedProvider={selectedProvider}
+          providerKeys={providerKeys}
+          loadingKeys={loadingKeys}
+          simulatingRotation={simulatingRotation}
+          rotationResult={rotationResult}
+          testingKeyId={testingKeyId}
+          keyTestFeedback={keyTestFeedback}
+          isAddingKey={addKeyMutation.isPending}
+          onSimulateRotation={handleSimulateRotation}
+          onSaveNewKey={(payload) =>
+            addKeyMutation.mutate({
+              providerId: selectedProvider.id,
+              payload,
+            })
+          }
+          onTestSingleKey={handleTestSingleKey}
+          onDeleteKey={(providerId, keyId) =>
+            deleteKeyMutation.mutate({ providerId, keyId })
+          }
+          onToggleKeyActive={(providerId, keyId, isActive) =>
+            toggleKeyMutation.mutate({ providerId, keyId, isActive })
+          }
+        />
+
+        {/* Add Custom Model Dialog */}
+        <AddCustomModelDialog
+          isOpen={isAddModelModalOpen}
+          onClose={() => setIsAddModelModalOpen(false)}
+          selectedProvider={selectedProvider}
+          presets={presets}
+          onConfirmAdd={handleConfirmAddCustomModel}
+        />
+
+        {/* Modal edit provider reuse */}
+        <ProviderModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingProvider(null);
+          }}
+          editingProvider={editingProvider}
+          presets={presets}
+          initialType={initialType}
+          onSave={(data) => {
+            if (editingProvider) {
+              updateMutation.mutate({
+                id: editingProvider.id,
+                payload: {
+                  name: data.name,
+                  provider_type: data.type,
+                  api_base_url: data.api_base_url || undefined,
+                  api_key: data.api_key || undefined,
+                  account_id: data.account_id || undefined,
+                  models: data.models,
+                  is_active: data.is_active,
+                },
+              });
+            } else {
+              createMutation.mutate({
+                name: data.name,
+                provider_type: data.type,
+                api_base_url: data.api_base_url || undefined,
+                api_key: data.api_key || undefined,
+                account_id: data.account_id || undefined,
+                models: data.models,
+                is_active: data.is_active,
+              });
+            }
+          }}
+          isSaving={createMutation.isPending || updateMutation.isPending}
+        />
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // MASTER LIST VIEW
+  // -------------------------------------------------------------
+  return (
+    <div className="space-y-6 pb-10">
+      {/* Top Header Chuẩn QLKTX */}
+      <PageHeader
+        eyebrow="ModelOps / Hạ Tầng AI"
+        title="Quản Lý Provider & ModelOps"
+        description="Quản lý các nhà cung cấp mô hình LLM, nhóm khóa API xoay vòng (Key Pool), và chính sách phục hồi dự phòng Circuit Breaker."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isExportingAll}
+              onClick={handleExportAll}
+              className="gap-1.5"
+              title="Xuất cấu hình tất cả các Provider ra tệp JSON"
+            >
+              {isExportingAll ? (
+                <RefreshCw className="size-3.5 animate-spin text-primary" />
+              ) : (
+                <Download className="size-3.5 text-muted-foreground" />
+              )}
+              <span>
+                {isExportingAll ? "Đang xuất..." : "Xuất Tất Cả (JSON)"}
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsImportModalOpen(true)}
+              className="gap-1.5"
+              title="Nhập cấu hình Provider từ tệp JSON (đơn lẻ hoặc toàn bộ)"
+            >
+              <FileJson className="size-3.5 text-primary" />
+              <span>Nhập JSON</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => openCreateModal("openai")}
+              className="gap-1.5"
+            >
+              <Plus className="size-3.5" />
+              <span>Thêm Provider Mới</span>
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Executive Health & Metrics Strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Nhà Cung Cấp
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-foreground">
+                {providers.length}
+              </span>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                {activeProvidersCount} đang bật
+              </span>
+            </div>
+          </div>
+          <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Server className="size-4" />
+          </div>
+        </Card>
+
+        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Mô Hình Khả Dụng
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-foreground">
+                {totalUniqueModelsCount}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Chat & Vision OCR
+              </span>
+            </div>
+          </div>
+          <div className="size-9 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+            <Cpu className="size-4" />
+          </div>
+        </Card>
+
+        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Khóa API Trong Pool
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-foreground">
+                {totalKeysCount}
+              </span>
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                Xoay vòng JIT
+              </span>
+            </div>
+          </div>
+          <div className="size-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <KeyRound className="size-4" />
+          </div>
+        </Card>
+
+        <Card className="p-3.5 bg-card border-border/80 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Circuit Breaker
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                Hoạt Động Tốt
+              </span>
+            </div>
+          </div>
+          <div className="size-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <ShieldCheck className="size-4" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Main Navigation Tabs */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2.5">
+        <Button
+          variant={mainViewMode === "providers" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMainViewMode("providers")}
+          className="h-8 text-xs gap-1.5 rounded-md"
+        >
+          <Server className="size-3.5" />
+          <span>Nhà Cung Cấp & Khóa API</span>
+          <Badge
+            variant="secondary"
+            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
+          >
+            {providers.length}
+          </Badge>
+        </Button>
+
+        <Button
+          variant={mainViewMode === "defaults" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMainViewMode("defaults")}
+          className="h-8 text-xs gap-1.5 rounded-md"
+        >
+          <Sparkles className="size-3.5" />
+          <span>Định Tuyến & Mặc Định</span>
+        </Button>
+
+        <Button
+          variant={mainViewMode === "combos" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMainViewMode("combos")}
+          className="h-8 text-xs gap-1.5 rounded-md"
+        >
+          <Layers className="size-3.5" />
+          <span>Chuỗi Dự Phòng & Combos</span>
+          <Badge
+            variant="secondary"
+            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
+          >
+            {systemDefaults?.model_combos?.length || 1}
+          </Badge>
+        </Button>
+      </div>
+
+      {/* Main View Content */}
+      {mainViewMode === "providers" && (
+        <div className="space-y-4">
+          {/* Category Tabs & Realtime Search Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <Button
+                variant={activeCategoryTab === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveCategoryTab("all")}
+                className="h-8 text-xs gap-1.5 rounded-full"
+              >
+                <span>Tất Cả</span>
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
+                >
+                  {providers.length}
+                </Badge>
+              </Button>
+
+              <Button
+                variant={activeCategoryTab === "cloud" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveCategoryTab("cloud")}
+                className="h-8 text-xs gap-1.5 rounded-full"
+              >
+                <Cloud className="size-3.5" />
+                <span>Cloud AI</span>
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
+                >
+                  {cloudProviders.length}
+                </Badge>
+              </Button>
+
+              <Button
+                variant={activeCategoryTab === "local" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveCategoryTab("local")}
+                className="h-8 text-xs gap-1.5 rounded-full"
+              >
+                <Cpu className="size-3.5" />
+                <span>Local Campus</span>
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
+                >
+                  {localProviders.length}
+                </Badge>
+              </Button>
+
+              <Button
+                variant={activeCategoryTab === "custom" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveCategoryTab("custom")}
+                className="h-8 text-xs gap-1.5 rounded-full"
+              >
+                <SlidersHorizontal className="size-3.5" />
+                <span>Custom</span>
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
+                >
+                  {customProviders.length}
+                </Badge>
+              </Button>
+            </div>
+
+            {/* Realtime Search Input */}
+            <div className="relative w-full sm:w-72 shrink-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm Provider hoặc Model..."
+                className="pl-8 h-8 text-xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Provider List / Search Results */}
+          {isLoading ? (
+            <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+              <span>Đang tải danh sách nhà cung cấp...</span>
+            </div>
+          ) : providers.length === 0 ? (
+            <Card className="p-8 border-dashed border-border bg-card/50">
+              <EmptyState
+                icon={Server}
+                title="Chưa Có Provider Nào Được Cấu Hình"
+                description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
+                action={{
+                  label: "Thêm Provider Mới",
+                  onClick: () => openCreateModal("openai"),
+                }}
+              />
+            </Card>
+          ) : searchQuery.trim() ? (
+            filteredProviders.length === 0 ? (
+              <Card className="p-8 border-dashed border-border bg-card/40 text-center">
+                <p className="text-xs font-semibold text-foreground">
+                  Không tìm thấy Provider hoặc Model nào khớp với &quot;
+                  {searchQuery}&quot;
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Thử tìm kiếm với tên hãng (OpenAI, Gemini...), hoặc mã model
+                  (gpt-4o, bge-m3...).
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchQuery("")}
+                  className="mt-3 text-xs text-primary"
+                >
+                  Xóa bộ lọc tìm kiếm
+                </Button>
+              </Card>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    Tìm thấy <strong>{filteredProviders.length}</strong> nhà
+                    cung cấp khớp với &quot;{searchQuery}&quot;
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSearchQuery("")}
+                    className="h-6 text-[11px]"
+                  >
+                    Xóa tìm kiếm
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                  {filteredProviders.map((prov) => (
+                    <ProviderCard
+                      key={prov.id}
+                      provider={prov}
+                      onSelect={handleSelectProvider}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="space-y-6">
+              {/* Nhóm Cloud */}
+              {(activeCategoryTab === "all" ||
+                activeCategoryTab === "cloud") && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                        <Cloud className="size-3.5" />
+                      </div>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                        Cloud AI Providers
+                      </h2>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-mono"
+                      >
+                        {cloudProviders.length}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openCreateModal("openai")}
+                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
+                    >
+                      <Plus className="size-3" />
+                      <span>Thêm Cloud</span>
+                    </Button>
+                  </div>
+                  {cloudProviders.length === 0 ? (
+                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
+                      Chưa có Provider đám mây nào.
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                      {cloudProviders.map((prov) => (
+                        <ProviderCard
+                          key={prov.id}
+                          provider={prov}
+                          onSelect={handleSelectProvider}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Nhóm Local */}
+              {(activeCategoryTab === "all" ||
+                activeCategoryTab === "local") && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Cpu className="size-3.5" />
+                      </div>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                        Local Campus AI (Máy Chủ Nội Bộ QNU)
+                      </h2>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-mono"
+                      >
+                        {localProviders.length}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openCreateModal("ollama")}
+                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
+                    >
+                      <Plus className="size-3" />
+                      <span>Thêm Local</span>
+                    </Button>
+                  </div>
+                  {localProviders.length === 0 ? (
+                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
+                      Chưa có Provider cục bộ nào.
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                      {localProviders.map((prov) => (
+                        <ProviderCard
+                          key={prov.id}
+                          provider={prov}
+                          onSelect={handleSelectProvider}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Nhóm Custom */}
+              {(activeCategoryTab === "all" ||
+                activeCategoryTab === "custom") && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <SlidersHorizontal className="size-3.5" />
+                      </div>
+                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                        Custom AI Gateways
+                      </h2>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-mono"
+                      >
+                        {customProviders.length}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openCreateModal("custom")}
+                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
+                    >
+                      <Plus className="size-3" />
+                      <span>Thêm Custom</span>
+                    </Button>
+                  </div>
+                  {customProviders.length === 0 ? (
+                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
+                      Chưa có Provider tùy chỉnh nào.
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                      {customProviders.map((prov) => (
+                        <ProviderCard
+                          key={prov.id}
+                          provider={prov}
+                          onSelect={handleSelectProvider}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {mainViewMode === "defaults" && (
+        <SystemDefaultsCard
+          systemDefaults={systemDefaults}
+          availableEmbeddings={availableEmbeddings}
+          availableRerankers={availableRerankers}
+          availableOcrs={availableOcrs}
+          allAvailableModels={allAvailableModels}
+          isLoading={defaultsQuery.isLoading}
+          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
+          onNavigateToCombos={handleNavigateToCombos}
+        />
+      )}
+
+      {mainViewMode === "combos" && (
+        <CombosVisionSection
+          systemDefaults={systemDefaults}
+          availableOcrs={availableOcrs}
+          availableEmbeddings={availableEmbeddings}
+          availableRerankers={availableRerankers}
+          allAvailableModels={allAvailableModels}
+          initialTaskFilter={combosTaskFilter}
+          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
+        />
+      )}
+
+      {/* Provider Modal (Create / Edit with Presets) */}
+      <ProviderModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingProvider(null);
+        }}
+        editingProvider={editingProvider}
+        presets={presets}
+        initialType={initialType}
+        onSave={(data) => {
+          if (editingProvider) {
+            updateMutation.mutate({
+              id: editingProvider.id,
+              payload: {
+                name: data.name,
+                provider_type: data.type,
+                api_base_url: data.api_base_url || undefined,
+                api_key: data.api_key || undefined,
+                account_id: data.account_id || undefined,
+                models: data.models,
+                is_active: data.is_active,
+              },
+            });
+          } else {
+            createMutation.mutate({
+              name: data.name,
+              provider_type: data.type,
+              api_base_url: data.api_base_url || undefined,
+              api_key: data.api_key || undefined,
+              account_id: data.account_id || undefined,
+              models: data.models,
+              is_active: data.is_active,
+            });
+          }
+        }}
+        isSaving={createMutation.isPending || updateMutation.isPending}
+      />
+
+      {/* Import Providers Dialog */}
+      <ImportProvidersDialog
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+        }}
+      />
+    </div>
+  );
+};

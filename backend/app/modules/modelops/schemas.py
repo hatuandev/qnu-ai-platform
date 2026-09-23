@@ -370,6 +370,7 @@ class OCRComboItem(BaseModel):
 class ModelComboItem(BaseModel):
     id: str = Field(default_factory=lambda: f"combo_{uuid4().hex[:8]}")
     name: str
+    task_type: Literal["ocr", "embedding", "reranker", "chat"] = "ocr"
     strategy: Literal["fallback", "round_robin", "fusion"] = "fallback"
     models: list[OCRComboItem] = Field(default_factory=list)
     is_default: bool = False
@@ -383,14 +384,35 @@ class VisionAdapterConfig(BaseModel):
 
 
 class SystemModelDefaults(BaseModel):
+    # Embedding
     default_embedding_provider_id: str = "prov_cloudflare"
     default_embedding_model: str = "@cf/baai/bge-m3"
+    default_embedding_mode: Literal["combo", "single"] = "single"
+    default_embedding_combo_id: str | None = None
+    embedding_combo_chain: list[OCRComboItem] = Field(default_factory=list)
+
+    # Reranker
     default_reranker_provider_id: str = "prov_cloudflare"
     default_reranker_model: str = "@cf/baai/bge-reranker-base"
+    default_reranker_mode: Literal["combo", "single"] = "single"
+    default_reranker_combo_id: str | None = None
+    reranker_combo_chain: list[OCRComboItem] = Field(default_factory=list)
+
+    # Vision & OCR
     default_ocr_provider_id: str = "prov_ace0d9fe"
     default_ocr_model: str = "gemini-2.5-flash"
     default_ocr_mode: Literal["combo", "single"] = "combo"
+    default_ocr_combo_id: str | None = "combo_qnu_ocr_master"
     ocr_combo_chain: list[OCRComboItem] = Field(default_factory=list)
+
+    # Chat & Reasoning
+    default_chat_provider_id: str = "prov_ace0d9fe"
+    default_chat_model: str = "gemini-2.5-flash"
+    default_chat_mode: Literal["combo", "single"] = "single"
+    default_chat_combo_id: str | None = None
+    chat_combo_chain: list[OCRComboItem] = Field(default_factory=list)
+
+    # Hub combos & Vision adapter
     model_combos: list[ModelComboItem] = Field(default_factory=list)
     vision_adapter: VisionAdapterConfig = Field(default_factory=VisionAdapterConfig)
 
@@ -398,12 +420,28 @@ class SystemModelDefaults(BaseModel):
 class SystemModelDefaultsUpdate(BaseModel):
     default_embedding_provider_id: str | None = None
     default_embedding_model: str | None = None
+    default_embedding_mode: Literal["combo", "single"] | None = None
+    default_embedding_combo_id: str | None = None
+    embedding_combo_chain: list[OCRComboItem] | None = None
+
     default_reranker_provider_id: str | None = None
     default_reranker_model: str | None = None
+    default_reranker_mode: Literal["combo", "single"] | None = None
+    default_reranker_combo_id: str | None = None
+    reranker_combo_chain: list[OCRComboItem] | None = None
+
     default_ocr_provider_id: str | None = None
     default_ocr_model: str | None = None
     default_ocr_mode: Literal["combo", "single"] | None = None
+    default_ocr_combo_id: str | None = None
     ocr_combo_chain: list[OCRComboItem] | None = None
+
+    default_chat_provider_id: str | None = None
+    default_chat_model: str | None = None
+    default_chat_mode: Literal["combo", "single"] | None = None
+    default_chat_combo_id: str | None = None
+    chat_combo_chain: list[OCRComboItem] | None = None
+
     model_combos: list[ModelComboItem] | None = None
     vision_adapter: VisionAdapterConfig | None = None
 

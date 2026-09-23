@@ -18,6 +18,10 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
      - **Ưu tiên Thuật toán & Phương pháp Tổng quát**: Khi giải quyết các bài toán về bóc tách dữ liệu (Parsing, OCR, Chunking, Ingestion, Text Cleaning, Table Reconstruction) hoặc bất kỳ biến đổi dữ liệu nào, **bắt buộc phải ưu tiên sử dụng thuật toán hình thái học (Morphological), cấu trúc cú pháp (Syntactic), cấu trúc dữ liệu (Data Structures) hoặc các phương pháp toán học / NLP tổng quát dựa trên các bất biến (Invariants)**.
      - **Tuyệt đối CẤM Hardcode Từ Điển / Danh Sách Từ Vựng Cứng**: Nghiêm cấm việc tạo các mảng từ khóa, từ ghép hay từ điển gõ tay (ví dụ mảng `_COMMON_SPLIT_WORD_PAIRS = [("giới", "thiệu"), ...]`) để vá lỗi tạm thời. Cách làm này không giải quyết được gốc rễ bài toán, gây phình to mã nguồn và phá vỡ tính tổng quát của hệ thống.
      - **Bắt buộc Đề Xuất Giải Pháp Trước Cho Người Dùng**: Khi xử lý các vấn đề phức tạp về dữ liệu hoặc cấu trúc, Agent **bắt buộc phải phân tích, xây dựng đề xuất phương pháp / thuật toán rõ ràng và báo cáo cho người dùng biết trước** để thảo luận, thống nhất trước khi áp dụng vào codebase.
+  8. **Component Reuse First & UI Primitives Standardization (Tận dụng tối đa Component UI có sẵn & Chuẩn hóa Primitives)**:
+     - **Ưu tiên Tái sử dụng**: Khi xây dựng bất kỳ giao diện, form, modal, bảng dữ liệu, hay nút điều khiển nào trên Frontend, Agent **bắt buộc phải kiểm tra và tái sử dụng triệt để các component UI đã có sẵn** trong `@/components/ui/` (Radix UI / shadcn: `Button`, `Checkbox`, `Switch`, `Input`, `Dialog`, `Select`, `Badge`, `Card`, `Tabs`, `Table`, `Sheet`, `Popover`, `Tooltip`, `Textarea`, `DropdownMenu`, `RadioGroup`, `Progress`, `Skeleton`, `Kbd`, `Spinner`, `Accordion`, `Separator`, v.v.) và các helpers tại `@/components/admin/` (`Field`, `EmptyState`, `KpiMetric`, `StatusBadge`, `ConfirmDialog`, `FileUpload`).
+     - **Tuyệt đối CẤM dùng thẻ HTML thô sơ (Zero Raw Native Form Elements)**: Cấm dùng `<input type="checkbox">`, `<input type="radio">`, `<button>`, `<select>`, `<input type="text">` thuần của trình duyệt vì sẽ gây xung đột thẩm mỹ (ví dụ checkbox bị đổi thành màu xanh dương Windows/Chrome thay vì xanh Academic Green của hệ thống).
+     - **Điều kiện Tạo Mới Component UI**: **Chỉ tạo component UI mới khi và chỉ khi trong `@/components/ui/` hoàn toàn chưa có thành phần tương đương**. Khi tạo mới, bắt buộc phải đặt trong `src/components/ui/`, xây dựng trên nền tảng Radix UI / headless primitives chuẩn, áp dụng design tokens OKLCH, hỗ trợ `forwardRef`, đầy đủ TypeScript types, và export dùng chung cho toàn bộ dự án.
 
 ---
 
@@ -122,6 +126,15 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
      - Compact toolbar / Table actions: `size-3.5` (14px).
      - Feature headers / Hero tiles: `size-5` (20px) đặt trong container nền bo tròn `size-8 rounded-lg bg-primary/10 text-primary`.
    - **Màu sắc ngữ nghĩa**: Luôn áp dụng semantic classes (`text-muted-foreground`, `text-primary`, `text-success`, `text-destructive`), không để icon mang màu thô không kiểm soát.
+9. **Quy Chuẩn Tận Dụng Component UI Sẵn Có & Điều Kiện Tạo Mới (Component Reuse First Policy)**:
+   - **Tận dụng 100% Component có sẵn**: Trước khi viết bất kỳ form nhập liệu, danh sách, modal hay bảng nào, Agent bắt buộc phải tra cứu thư mục `src/components/ui/`. Nếu component tương ứng đã tồn tại (ví dụ: `Checkbox`, `Switch`, `Button`, `Dialog`, `Select`, `Input`, `Badge`, `Tabs`, `Table`, `Sheet`, `Popover`, `Tooltip`, `DropdownMenu`), **bắt buộc phải import và sử dụng trực tiếp**, kết hợp với các helpers quản trị tại `src/components/admin/` (`Field`, `EmptyState`, `KpiMetric`, `StatusBadge`, `ConfirmDialog`, `FileUpload`).
+   - **Tuyệt đối CẤM tự ý viết lại hoặc dùng HTML thô**: Không dùng thẻ HTML nguyên bản (như `<input type="checkbox">`, `<button className="...">`, `<select>`) hoặc tự code lại logic trùng lặp.
+   - **Quy trình khi thực sự cần Component mới**:
+     - *Bước 1 (Kiểm tra)*: Xác nhận chắc chắn trong `src/components/ui/` chưa có component đáp ứng nghiệp vụ.
+     - *Bước 2 (Kiến trúc chuẩn)*: Xây dựng component mới đặt tại `src/components/ui/<name>.tsx` dựa trên Radix UI Primitive hoặc cấu trúc chuẩn shadcn/ui.
+     - *Bước 3 (Đồng bộ Token & Accessibility)*: Tuân thủ token màu OKLCH (`border-primary`, `bg-primary`, `text-primary-foreground`, `focus-visible:ring-ring`), hỗ trợ Dark/Light mode, `forwardRef`, điều hướng bàn phím, và WAI-ARIA.
+     - *Bước 4 (Export toàn cục)*: Export component rõ ràng trong file để mọi trang, modal khác có thể tái sử dụng ngay.
+
 
 ---
 

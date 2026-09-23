@@ -102,6 +102,19 @@ frontend/src/
   - Compact toolbar / Table actions: `size-3.5` (14px).
   - Feature headers / Hero tiles: `size-5` (20px) đặt trong container nền bo tròn `size-8 rounded-lg bg-primary/10 text-primary`.
 - **Màu sắc ngữ nghĩa**: Luôn áp dụng semantic classes (`text-muted-foreground`, `text-primary`, `text-success`, `text-destructive`).
+### 3.6. Tận Dụng Tối Đa Component UI Sẵn Có & Điều Kiện Tạo Component Mới (Component Reuse First)
+- **Tận dụng 100% Component Primitives trong `@/components/ui/`**:
+  Khi phát triển bất kỳ tính năng, trang, modal, popover, sheet, drawer hay form nghiệp vụ nào, kỹ sư và AI Agent **bắt buộc phải tái sử dụng các component primitives có sẵn** trong thư mục `src/components/ui/` (`Button`, `Checkbox`, `Switch`, `Input`, `Dialog`, `Select`, `Badge`, `Card`, `Tabs`, `Table`, `Sheet`, `Popover`, `Tooltip`, `DropdownMenu`, `Textarea`, `Progress`, `Skeleton`, `Kbd`, `Spinner`, `RadioGroup`, `Accordion`, `Separator`, v.v.) kết hợp cùng các helpers quản trị tầng 2 tại `src/components/admin/` (`Field`, `EmptyState`, `KpiMetric`, `StatusBadge`, `ConfirmDialog`, `FileUpload`).
+- **Nghiêm Cấm Dùng Thẻ HTML Nguyên Bản (No Raw Native Form Controls)**:
+  Tuyệt đối cấm sử dụng các thẻ HTML thô sơ như `<input type="checkbox">`, `<input type="radio">`, `<button>`, `<select>`, `<input type="text">` hay tự viết inline CSS/classes thủ công khi component chuẩn tương ứng đã có sẵn trong `@/components/ui/`. Thẻ HTML thô sơ không chỉ phá vỡ tính nhất quán thẩm mỹ mà còn gây lỗi hiển thị màu sắc mặc định của hệ điều hành (ví dụ: checkbox màu xanh dương của Windows thay vì màu xanh Academic Green chuẩn của ĐH Quy Nhơn).
+- **Điều Kiện & Quy Chuẩn Tạo Component UI Mới**:
+  - **Chỉ tạo mới khi và chỉ khi thư viện `@/components/ui/` hoàn toàn chưa có component tương đương**.
+  - Component mới phải được đặt tại `src/components/ui/<component-name>.tsx`.
+  - Phải kế thừa từ headless primitives của **Radix UI** (hoặc cấu trúc chuẩn shadcn/ui).
+  - Phải hỗ trợ `React.forwardRef` với kiểu TypeScript tường minh (`React.ComponentRef`, `React.ComponentPropsWithoutRef`).
+  - Phải ứng dụng đầy đủ design tokens OKLCH (`border-primary`, `bg-primary`, `text-primary-foreground`, `focus-visible:ring-ring`, `shadow-xs`), tương thích hoàn toàn cả Light Mode và Dark Mode.
+  - Phải export rõ ràng để toàn bộ dự án có thể tái sử dụng lâu dài, tránh tình trạng viết code cục bộ phân tán.
+
 
 ---
 

@@ -123,6 +123,14 @@ function renderDocumentBadge(doc: KnowledgeDocument | null) {
 ### 2.5. Tách Component Nhỏ Gọn (Sub-Component Extraction)
 - Nếu một thẻ JSX hoặc đoạn lặp danh sách dài quá 30 dòng, hãy tách thành sub-component riêng (trong cùng file hoặc file riêng nếu dùng chung):
   - Ví dụ: `ChunkCardItem`, `FactTableRow`, `StageProgressStep`.
+### 2.6. Tận Dụng Component UI Có Sẵn & Chỉ Tạo Mới Khi Chưa Tồn Tại (Component Reuse First)
+- **Luôn tìm và dùng lại component trong `@/components/ui/`**:
+  - ❌ *Cấm dùng HTML thô*: Không viết `<input type="checkbox">`, `<button className="...">`, `<select>` hay tự vẽ điều khiển form thuần.
+  - ✅ *Dùng component chuẩn*: Nhập `Checkbox`, `Switch`, `Button`, `Input`, `Dialog`, `Select`, `Badge`, `Card`, `Tabs`, `Table`, `Sheet` từ `@/components/ui/`.
+- **Nguyên tắc tạo mới**:
+  - Chỉ tạo component mới khi và chỉ khi trong `@/components/ui/` **hoàn toàn chưa có thành phần tương đương**.
+  - Component mới phải đặt tại `src/components/ui/<name>.tsx`, dựng trên Radix UI / shadcn, hỗ trợ `forwardRef`, đầy đủ TypeScript types, tuân thủ token màu OKLCH (`border-primary`, `bg-primary`, `text-primary-foreground`), và export dùng chung.
+
 
 ---
 

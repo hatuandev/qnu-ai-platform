@@ -1,0 +1,189 @@
+import type { AdministrativeTemplate } from "@/types/domain-templates";
+
+export const ADMINISTRATIVE_TEMPLATES: AdministrativeTemplate[] = [
+  {
+    id: "tpl_to_trinh_mua_sam",
+    title: "Tờ trình Mua sắm Trang thiết bị Phòng Lab AI",
+    category: "to_trinh",
+    document_type: "TỜ TRÌNH",
+    department: "KHOA CÔNG NGHỆ THÔNG TIN",
+    description:
+      "Mẫu tờ trình đề xuất kinh phí trang bị máy chủ GPU và thiết bị phục vụ nghiên cứu AI.",
+    standard: "Nghị định 30/2020/NĐ-CP",
+    placeholders: [
+      "{{so_van_ban}}",
+      "{{kinh_phi_du_kien}}",
+      "{{muc_dich_su_dung}}",
+      "{{thoi_gian_trien_khai}}",
+    ],
+    default_title:
+      "Về việc phê duyệt chủ trương nâng cấp hạ tầng phòng thí nghiệm Trí tuệ Nhân tạo",
+    default_paragraphs: [
+      "Căn cứ Quyết định số 1024/QĐ-ĐHQN về việc phát triển các nhóm nghiên cứu mạnh giai đoạn 2025-2030;",
+      "Nhằm đáp ứng nhu cầu đào tạo và thực hành mô hình ngôn ngữ lớn (LLM) và Thị giác máy tính cho sinh viên ngành Trí tuệ Nhân tạo;",
+      "Khoa Công nghệ Thông tin kính trình Ban Giám hiệu xem xét, phê duyệt chủ trương mua sắm bổ sung 04 máy chủ tính toán GPU chuyên dụng với dự toán kinh phí dự kiến là 450.000.000 VNĐ.",
+      "Kính đề nghị Ban Giám hiệu xem xét, phê duyệt để Khoa có cơ sở triển khai các bước tiếp theo theo quy định hiện hành.",
+    ],
+    default_signer_title: "TRƯỞNG KHOA",
+    default_signer_name: "TS. Lê Văn Tuấn",
+    default_recipients: [
+      "Ban Giám hiệu",
+      "Phòng Kế hoạch - Tài chính",
+      "Phòng Quản trị - Thiết bị",
+      "Lưu: VT, Khoa CNTT.",
+    ],
+  },
+  {
+    id: "tpl_quyet_dinh_khen_thuong",
+    title: "Quyết định Khen thưởng Sinh viên Đạt giải NCKH",
+    category: "quyet_dinh",
+    document_type: "QUYẾT ĐỊNH",
+    department: "PHÒNG KHOA HỌC & CÔNG NGHỆ",
+    description:
+      "Mẫu quyết định trao tặng giấy khen và tiền thưởng cho đề tài NCKH xuất sắc cấp Trường.",
+    standard: "Nghị định 30/2020/NĐ-CP",
+    placeholders: [
+      "{{so_quyet_dinh}}",
+      "{{danh_sach_sinh_vien}}",
+      "{{muc_tien_thuong}}",
+    ],
+    default_title:
+      "Về việc tặng Giấy khen của Hiệu trưởng cho sinh viên đạt giải Nhất Sinh viên Nghiên cứu Khoa học 2026",
+    default_paragraphs: [
+      "Căn cứ Điều lệ Trường Đại học ban hành kèm theo Quyết định của Thủ tướng Chính phủ;",
+      "Căn cứ Quy chế Nghiên cứu Khoa học sinh viên Trường Đại học Quy Nhơn ban hành ngày 15/09/2023;",
+      "Xét đề nghị của Trưởng phòng Khoa học và Công nghệ và Trưởng phòng Công tác Chính trị - Sinh viên;",
+      "Điều 1: Tặng Giấy khen của Hiệu trưởng kèm theo tiền thưởng 5.000.000 VNĐ cho nhóm sinh viên ngành Kỹ thuật Phần mềm đạt Giải Nhất Hội thi NCKH cấp Trường năm học 2025-2026 với đề tài 'Xây dựng Nền tảng Hỏi đáp QNU AI Platform'.",
+      "Điều 2: Các ông (bà) Trưởng phòng Hành chính - Tổng hợp, Kế hoạch - Tài chính, Khoa học & Công nghệ và các cá nhân có tên tại Điều 1 chịu trách nhiệm thi hành Quyết định này.",
+    ],
+    default_signer_title: "HIỆU TRƯỞNG",
+    default_signer_name: "PGS.TS. Đỗ Ngọc Mỹ",
+    default_recipients: [
+      "Như Điều 2",
+      "Đảng ủy, BGH",
+      "Đoàn Thanh niên",
+      "Lưu: VT, KHCN.",
+    ],
+  },
+  {
+    id: "tpl_thong_bao_hoc_vu",
+    title: "Thông báo Kế hoạch Thi & Kiểm tra Học kỳ II",
+    category: "thong_bao",
+    document_type: "THÔNG BÁO",
+    department: "PHÒNG ĐÀO TẠO",
+    description:
+      "Mẫu thông báo lịch thi kết thúc học phần và quy định phòng thi cho sinh viên toàn trường.",
+    standard: "Nghị định 30/2020/NĐ-CP",
+    placeholders: [
+      "{{so_thong_bao}}",
+      "{{hoc_ky}}",
+      "{{nam_hoc}}",
+      "{{ngay_bat_dau_thi}}",
+    ],
+    default_title:
+      "Về việc tổ chức thi kết thúc học phần Học kỳ II năm học 2025-2026",
+    default_paragraphs: [
+      "Phòng Đào tạo thông báo đến các Khoa chuyên môn và toàn thể sinh viên lịch thi chính thức Học kỳ II năm học 2025-2026 bắt đầu từ ngày 15/06/2026 đến hết ngày 30/06/2026.",
+      "Sinh viên có trách nhiệm kiểm tra lịch thi, phòng thi cụ thể trên Cổng thông tin đào tạo (UIS) trước ngày thi 07 ngày.",
+      "Thí sinh phải mang theo Thẻ sinh viên hoặc Căn cước công dân khi vào phòng thi; nghiêm cấm mang thiết bị di động, đồng hồ thông minh vào phòng thi.",
+    ],
+    default_signer_title: "TRƯỞNG PHÒNG ĐÀO TẠO",
+    default_signer_name: "TS. Nguyễn Thanh Bình",
+    default_recipients: [
+      "Các Khoa đào tạo",
+      "Các phòng ban chức năng",
+      "Sinh viên các khóa",
+      "Lưu: ĐT.",
+    ],
+  },
+  {
+    id: "tpl_de_thi_bloom",
+    title: "Ma trận Phân phối Đề thi Kết thúc Học phần Chuẩn Bloom",
+    category: "de_thi",
+    document_type: "MA TRẬN ĐỀ THI",
+    department: "TRUNG TÂM KHẢO THÍ & ĐẢM BẢO CHẤT LƯỢNG",
+    description:
+      "Khung ma trận 4 cấp độ tư duy (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao) chuẩn quy chế khảo thí.",
+    standard: "Thang đo tư duy Bloom",
+    placeholders: [
+      "{{mon_hoc}}",
+      "{{ma_hoc_phan}}",
+      "{{thoi_gian_thi}}",
+      "{{so_chu_de}}",
+    ],
+    default_title:
+      "Ma trận đề thi kết thúc học phần Lập trình Cơ sở Dữ liệu (IT204)",
+    default_paragraphs: [
+      "Học phần: Lập trình Cơ sở Dữ liệu — Mã học phần: IT204 — Số tín chỉ: 3 (2 lý thuyết, 1 thực hành).",
+      "Hình thức đánh giá: Trắc nghiệm kết hợp Tự luận trên máy tính — Thời gian làm bài: 60 phút.",
+      "Tỷ lệ phân bổ cấp độ nhận thức: Nhận biết 30%, Thông hiểu 30%, Vận dụng 25%, Vận dụng cao 15%.",
+    ],
+    default_signer_title: "TRƯỞNG BỘ MÔN",
+    default_signer_name: "TS. Huỳnh Trọng Thìn",
+    default_recipients: [
+      "Khoa CNTT",
+      "TT Khảo thí & ĐBCL",
+      "Giảng viên phụ trách",
+      "Lưu: BM.",
+    ],
+  },
+  {
+    id: "tpl_ke_hoach_hoi_thao",
+    title: "Kế hoạch Tổ chức Hội nghị Khoa học Trẻ QNU",
+    category: "ke_hoach",
+    document_type: "KẾ HOẠCH",
+    department: "ĐOÀN THANH NIÊN - HỘI SINH VIÊN",
+    description:
+      "Mẫu kế hoạch chi tiết tổ chức sự kiện học thuật, timeline và phân công nhiệm vụ.",
+    standard: "Nghị định 30/2020/NĐ-CP",
+    placeholders: [
+      "{{ten_hoi_thao}}",
+      "{{dia_diem}}",
+      "{{thanh_phan_tham_du}}",
+    ],
+    default_title:
+      "Tổ chức Diễn đàn Khoa học Sinh viên và Khởi nghiệp Đổi mới Sáng tạo 2026",
+    default_paragraphs: [
+      "Mục đích: Khích lệ phong trào nghiên cứu khoa học, đổi mới sáng tạo và chuyển đổi số trong đoàn viên thanh niên.",
+      "Thời gian và địa điểm: Ngày 26/03/2026 tại Hội trường A, Trường Đại học Quy Nhơn.",
+      "Thành phần tham dự: Toàn thể sinh viên, học viên cao học và các doanh nghiệp đối tác công nghệ trên địa bàn tỉnh Bình Định.",
+    ],
+    default_signer_title: "BÍ THƯ ĐOÀN TRƯỜNG",
+    default_signer_name: "ThS. Cao Kỳ Nam",
+    default_recipients: [
+      "Đảng ủy, BGH (để báo cáo)",
+      "Các Liên chi đoàn",
+      "Lưu: ĐTN.",
+    ],
+  },
+  {
+    id: "tpl_cong_van_thuc_tap",
+    title: "Công văn Tiếp nhận Sinh viên Thực tập Doanh nghiệp",
+    category: "cong_van",
+    document_type: "CÔNG VĂN",
+    department: "TRƯỜNG ĐẠI HỌC QUY NHƠN",
+    description:
+      "Mẫu công văn gửi các công ty công nghệ đề nghị tiếp nhận sinh viên thực tập tốt nghiệp.",
+    standard: "Nghị định 30/2020/NĐ-CP",
+    placeholders: [
+      "{{ten_doanh_nghiep}}",
+      "{{so_luong_sinh_vien}}",
+      "{{chuyen_nganh}}",
+    ],
+    default_title:
+      "Về việc cử sinh viên ngành Công nghệ Thông tin thực tập tốt nghiệp tại Doanh nghiệp",
+    default_paragraphs: [
+      "Trường Đại học Quy Nhơn trân trọng gửi lời chào và lời chúc hợp tác thành công đến Ban Giám đốc Quý Công ty.",
+      "Thực hiện kế hoạch đào tạo năm học 2025-2026, Nhà trường trân trọng đề nghị Quý Công ty tạo điều kiện tiếp nhận 15 sinh viên khóa 45 ngành Công nghệ Thông tin đến thực tập chuyên môn từ ngày 01/07/2026 đến ngày 31/08/2026.",
+      "Nhà trường cam kết sinh viên tuân thủ nghiêm ngặt nội quy lao động và bảo mật thông tin của Quý Doanh nghiệp.",
+    ],
+    default_signer_title: "KT. HIỆU TRƯỞNG - PHÓ HIỆU TRƯỞNG",
+    default_signer_name: "PGS.TS. Nguyễn Đình Hiền",
+    default_recipients: [
+      "Ban Giám đốc Quý Công ty",
+      "Khoa CNTT",
+      "Phòng Đào tạo",
+      "Lưu: VT, HSSV.",
+    ],
+  },
+];

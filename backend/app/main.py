@@ -39,65 +39,72 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         port=settings.PORT,
     )
 
-    # Verify database schema readiness & storage bucket
+    # Verify database schema readiness & storage bucket (non-blocking timeouts for local dev)
+    import asyncio
     from app.core.storage import storage_service
 
-    await storage_service.ensure_bucket()
+    try:
+        await asyncio.wait_for(storage_service.ensure_bucket(), timeout=2.0)
+    except Exception as exc:
+        logger.warning("Storage ensure_bucket skipped or timed out: %s", exc)
 
     try:
         from sqlalchemy import inspect, text
 
-        async with engine.connect() as conn:
-            # 1. Connection check
-            await conn.execute(text("SELECT 1"))
+        async def _verify_db_schema() -> None:
+            async with engine.connect() as conn:
+                # 1. Connection check
+                await conn.execute(text("SELECT 1"))
 
-            # 2. Schema readiness check (Alembic & Core tables)
-            has_alembic = await conn.run_sync(
-                lambda sync_conn: inspect(sync_conn).has_table("alembic_version")
-            )
-            tables = await conn.run_sync(
-                lambda sync_conn: set(inspect(sync_conn).get_table_names())
-            )
-            required_tables = {
-                "assistants",
-                "knowledge_documents",
-                "workflow_definitions",
-                "model_provider_configs",
-            }
-            missing = required_tables - tables
-
-            if not has_alembic or missing:
-                err_msg = (
-                    f"Database schema is not ready. Missing tables: {missing or 'alembic_version'}. "
-                    "Run 'python -m app.cli db migrate' to initialize schema."
+                # 2. Schema readiness check (Alembic & Core tables)
+                has_alembic = await conn.run_sync(
+                    lambda sync_conn: inspect(sync_conn).has_table("alembic_version")
                 )
-                if settings.ENVIRONMENT == "production":
-                    logger.error(err_msg)
-                    raise RuntimeError(err_msg)
+                tables = await conn.run_sync(
+                    lambda sync_conn: set(inspect(sync_conn).get_table_names())
+                )
+                required_tables = {
+                    "assistants",
+                    "knowledge_documents",
+                    "workflow_definitions",
+                    "model_provider_configs",
+                }
+                missing = required_tables - tables
 
-                if settings.DEV_AUTO_MIGRATE:
-                    logger.info("DEV_AUTO_MIGRATE is enabled. Running migrations...")
-                    from app.cli import run_db_migrate
-                    run_db_migrate()
+                if not has_alembic or missing:
+                    err_msg = (
+                        f"Database schema is not ready. Missing tables: {missing or 'alembic_version'}. "
+                        "Run 'python -m app.cli db migrate' to initialize schema."
+                    )
+                    if settings.ENVIRONMENT == "production":
+                        logger.error(err_msg)
+                        raise RuntimeError(err_msg)
+
+                    if settings.DEV_AUTO_MIGRATE:
+                        logger.info("DEV_AUTO_MIGRATE is enabled. Running migrations...")
+                        from app.cli import run_db_migrate
+                        run_db_migrate()
+                    else:
+                        logger.warning(err_msg)
                 else:
-                    logger.warning(err_msg)
-            else:
-                logger.info("Database schema readiness verified: OK")
+                    logger.info("Database schema readiness verified: OK")
 
-        # Optional dev auto-seed (default disabled in production)
-        if settings.DEV_AUTO_SEED:
-            logger.info("DEV_AUTO_SEED is enabled. Running seed...")
-            from app.cli import run_db_seed
-            await run_db_seed(seed_all=True)
+                # Optional dev auto-seed (default disabled in production)
+                if settings.DEV_AUTO_SEED:
+                    logger.info("DEV_AUTO_SEED is enabled. Running seed...")
+                    from app.cli import run_db_seed
+                    await run_db_seed(seed_all=True)
 
-        # Synchronize active AI model provider credentials into runtime settings
-        try:
-            from app.modules.modelops.service import modelops_service
-            async with AsyncSessionFactory() as session:
-                synced = await modelops_service.sync_active_providers_to_runtime(session)
-                logger.info("Synchronized %d active model provider credentials into runtime settings", synced)
-        except Exception as exc:
-            logger.warning("Model provider credentials sync warning: %s", exc)
+                # Synchronize active AI model provider credentials into runtime settings
+                try:
+                    from app.modules.modelops.service import modelops_service
+                    async with AsyncSessionFactory() as session:
+                        synced = await modelops_service.sync_active_providers_to_runtime(session)
+                        logger.info("Synchronized %d active model provider credentials into runtime settings", synced)
+                except Exception as exc:
+                    logger.warning("Model provider credentials sync warning: %s", exc)
+
+        await asyncio.wait_for(_verify_db_schema(), timeout=2.5)
 
     except Exception as exc:
         if settings.ENVIRONMENT == "production":

@@ -77,7 +77,10 @@ htmlcov/
 .mypy_cache/
 
 # Frontend test artifacts & build info (AGENTS.md 9.1: không commit)
+*.tsbuildinfo
 frontend/playwright-report/
 frontend/test-results/
-frontend/tsconfig.*.tsbuildinfo
 frontend/dist/
+frontend2/playwright-report/
+frontend2/test-results/
+frontend2/dist/
