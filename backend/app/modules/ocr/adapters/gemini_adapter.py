@@ -99,15 +99,24 @@ class GeminiOCRAdapter(BaseOCRAdapter):
             "của Trường Đại học Quy Nhơn (QNU).\n"
             "Hãy bóc tách TOÀN BỘ nội dung của tài liệu này thành định dạng GitHub Flavored Markdown (GFM) "
             "chuẩn xác 100% theo các quy tắc bắt buộc sau:\n"
-            "1. BẢO TOÀN NỘI DUNG: Giữ nguyên 100% nội dung chữ, tiêu đề cấp mục (#, ##, ###), "
-            "số hiệu văn bản, ngày tháng, họ tên, các điều khoản, ghi chú, con dấu và chữ ký.\n"
-            "2. BẢNG BIỂU CHUẨN GFM: Mọi bảng biểu phải chuyển thành bảng Markdown hoàn chỉnh với hàng tiêu đề "
+            "1. BẢO TOÀN NỘI DUNG & CHÍNH TẢ: Giữ nguyên 100% nội dung chữ, tiêu đề cấp mục (#, ##, ###), "
+            "số hiệu văn bản, ngày tháng, họ tên, các điều khoản, ghi chú, con dấu và chữ ký. Nhận diện chính xác "
+            "thuật ngữ hành chính, công nghệ và tài chính (ví dụ: 'chỉ số' không viết nhầm thành 'số chỉ', 'kinh phí', 'ký kết', "
+            "'Trung tâm Số và Học liệu', mã số thuế, số tài khoản, tên ngân hàng).\n"
+            "2. BẢNG BIỂU CHUẨN GFM & BẢO TOÀN Ô DỮ LIỆU: Mọi bảng biểu phải chuyển thành bảng Markdown hoàn chỉnh với hàng tiêu đề "
             "và hàng phân cách '|:---|:---|' rõ ràng. Giữ nguyên vẹn toàn bộ các hàng và cột.\n"
-            "3. PHÂN TÁCH TRANG CHUẨN XÁC: Nếu tài liệu có nhiều trang, BẮT BUỘC phải đặt nhãn phân cách trang:\n"
-            "<!-- Trang X -->\n"
-            "[Nội dung trang X]\n\n---\n\n"
-            "4. KHÔNG BỊA ĐẶT / KHÔNG TẮT: Tuyệt đối cấm tự ý tóm tắt, cắt xén, bỏ bớt hàng bảng hoặc phát sinh thông tin sai lệch.\n"
-            "5. CHUẨN UTF-8: Đảm bảo toàn bộ ký tự tiếng Việt hiển thị sạch sẽ theo chuẩn Unicode NFC."
+            "   - NGUYÊN TẮC 1 HÀNG = 1 BẢN GHI: Mỗi mục/nhiệm vụ (như mục 1.1, 1.2, 2.1...) phải nằm trọn vẹn trong một hàng bảng duy nhất. "
+            "Nếu mục đó có nhiều đoạn/gạch đầu dòng mô tả chi tiết, hãy đặt toàn bộ nội dung mô tả đó vào ô mô tả của hàng đó "
+            "(ngăn cách các đoạn bằng dấu xuống dòng hoặc '<br>'), TUYỆT ĐỐI KHÔNG bẻ thành các hàng bảng mồ côi có cột STT rỗng.\n"
+            "3. BẢNG BIỂU ĐA TRANG (MULTI-PAGE TABLE CONTINUATION): Nếu một bảng biểu kéo dài qua nhiều trang, BẮT BUỘC phải duy trì "
+            "liên tục cấu trúc bảng. TUYỆT ĐỐI KHÔNG chèn ký tự phân cách trang '---' vào giữa các hàng của bảng làm gãy cú pháp GFM.\n"
+            "4. CHỐNG BẺ ĐÔI TỪ QUA TRANG (NO WORD SPLITTING): Nếu từ ngữ hoặc câu văn bị ngắt dòng ở cuối trang "
+            "(ví dụ: 'banner, giới' ở cuối trang trước và 'thiệu, hình ảnh' ở đầu trang sau), BẮT BUỘC phải hoàn tất trọn vẹn từ ngữ đó "
+            "('banner, giới thiệu, hình ảnh...'), tuyệt đối không để từ tiếng Việt bị chặt đôi qua trang.\n"
+            "5. PHÂN TÁCH TRANG CHUẨN XÁC: Đặt nhãn phân cách trang: <!-- Trang X --> tại đầu mỗi trang văn bản. "
+            "Chỉ dùng '---' để phân cách giữa các trang văn bản thông thường, KHÔNG dùng '---' bên trong khối bảng biểu.\n"
+            "6. KHÔNG BỊA ĐẶT / KHÔNG TẮT: Tuyệt đối cấm tự ý tóm tắt, cắt xén, bỏ bớt hàng bảng hoặc phát sinh thông tin sai lệch.\n"
+            "7. CHUẨN UTF-8: Đảm bảo toàn bộ ký tự tiếng Việt hiển thị sạch sẽ theo chuẩn Unicode NFC."
         )
 
         payload = {
@@ -302,10 +311,16 @@ class GeminiOCRAdapter(BaseOCRAdapter):
             if text:
                 all_text.append(f"<!-- Trang {p_num} -->\n\n{text}")
 
+        raw_joined = "\n\n---\n\n".join(all_text)
+        from app.modules.ocr.cleaner import post_process_ocr_output
+
+        cleaned_text, cleaned_pages = post_process_ocr_output(raw_joined, pages_out)
+
         return {
             "engine_used": self.name,
-            "total_pages": len(pages_out),
+            "total_pages": len(cleaned_pages or pages_out),
             "overall_confidence": 0.99,
-            "pages": pages_out,
-            "raw_text": "\n\n---\n\n".join(all_text),
+            "pages": cleaned_pages or pages_out,
+            "raw_text": cleaned_text,
         }
+

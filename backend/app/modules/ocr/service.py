@@ -617,6 +617,16 @@ class OCRService:
         error_msg: str | None = None,
     ) -> OCRExtractResponse:
         """Persist the audit log and shape the final OCR response."""
+        raw_text = result_dict.get("raw_text", "")
+        pages_in = result_dict.get("pages", [])
+        if raw_text and raw_text.strip():
+            from app.modules.ocr.cleaner import post_process_ocr_output
+
+            cleaned_text, cleaned_pages = post_process_ocr_output(raw_text, pages_in)
+            result_dict["raw_text"] = cleaned_text
+            if cleaned_pages:
+                result_dict["pages"] = cleaned_pages
+
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         total_pages = int(result_dict.get("total_pages", 1))
         confidence = float(result_dict.get("overall_confidence", 0.90))

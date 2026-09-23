@@ -14,6 +14,10 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
   4. **UI/UX Gold Standard & Zero Lint Errors**: Đồng bộ 100% nhận diện ĐH Quy Nhơn (Academic Teal `oklch(0.46 0.13 160)`), thiết kế cao cấp, chuyển đổi Dark/Light mode mượt mà; 0 lỗi Biome linter, 0 lỗi TypeScript typecheck.
   5. **Zero Mojibake & Chuẩn Hóa UTF-8 Tiếng Việt**: 100% tệp mã nguồn, dữ liệu bóc tách, template, API responses và UI hiển thị phải sử dụng chuẩn mã hóa UTF-8 sạch. Tuyệt đối cấm lỗi vỡ font, lỗi mã hóa ký tự rác (Mojibake, dấu hỏi chấm `?`, ký tự thay thế `\ufffd`, chuỗi rác như `Quyt `<nh...`, `B~ GIA?O D C...`, `?oAn ?cc TA1ng...`). Mọi luồng OCR và trích xuất tài liệu phải qua tầng chuẩn hóa Unicode NFC.
   6. **Zero Hardcoded Models & Dynamic Provider Resolution**: Tuyệt đối cấm gán cứng (hardcode) tên mô hình (LLM chat, Vision OCR, Embedding, Reranker) trong runtime nghiệp vụ, routers, services hoặc DAG nodes. Tính năng Quản lý Nhà cung cấp (Providers / ModelOps) sinh ra để người dùng tự do thêm, sửa, đổi bất kỳ model nào. Hệ thống runtime bắt buộc phải tôn trọng 100% tên mô hình được người dùng chỉ định (`preferred_model_name`), phân giải động theo cấu hình nhà cung cấp và truyền nguyên vẹn sang Adapter; nghiêm cấm việc tự ý lọc bỏ, nuốt lỗi hoặc ép chuyển về model mặc định cũ (như `gemini-2.5-flash` hay `gpt-4o-mini`).
+  7. **Algorithmic-First, Zero-Hardcoded Vocabulary & Propose-Before-Implement (Tôn chỉ Thuật toán tổng quát & Đề xuất giải pháp trước)**:
+     - **Ưu tiên Thuật toán & Phương pháp Tổng quát**: Khi giải quyết các bài toán về bóc tách dữ liệu (Parsing, OCR, Chunking, Ingestion, Text Cleaning, Table Reconstruction) hoặc bất kỳ biến đổi dữ liệu nào, **bắt buộc phải ưu tiên sử dụng thuật toán hình thái học (Morphological), cấu trúc cú pháp (Syntactic), cấu trúc dữ liệu (Data Structures) hoặc các phương pháp toán học / NLP tổng quát dựa trên các bất biến (Invariants)**.
+     - **Tuyệt đối CẤM Hardcode Từ Điển / Danh Sách Từ Vựng Cứng**: Nghiêm cấm việc tạo các mảng từ khóa, từ ghép hay từ điển gõ tay (ví dụ mảng `_COMMON_SPLIT_WORD_PAIRS = [("giới", "thiệu"), ...]`) để vá lỗi tạm thời. Cách làm này không giải quyết được gốc rễ bài toán, gây phình to mã nguồn và phá vỡ tính tổng quát của hệ thống.
+     - **Bắt buộc Đề Xuất Giải Pháp Trước Cho Người Dùng**: Khi xử lý các vấn đề phức tạp về dữ liệu hoặc cấu trúc, Agent **bắt buộc phải phân tích, xây dựng đề xuất phương pháp / thuật toán rõ ràng và báo cáo cho người dùng biết trước** để thảo luận, thống nhất trước khi áp dụng vào codebase.
 
 ---
 
@@ -324,6 +328,24 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - **Tôn trọng 100% cấu hình người dùng**: Khi người dùng đã chọn hoặc nhập một model (ví dụ: `gemini-3.5-flash`, `gemini-3.1-pro`, `qwen2.5-72b-instruct`, `mistral-ocr-2503`), hệ thống runtime phải chuyển chính xác model đó tới API Provider. Tuyệt đối không được tự ý fallback về model cũ nếu chưa có sự cố 429/timeout thực sự.
 - **Không lọc cứng danh sách model**: Provider Adapter và Inference Service phải chấp nhận bất kỳ mã model hợp lệ nào mà nhà cung cấp hỗ trợ, không được dùng điều kiện `model in hardcoded_list` để từ chối hoặc đè model của người dùng.
 - **Cấm che giấu lỗi bằng hardcode fallback**: Không được viết `primary = getattr(...) or "gpt-4o-mini"` để làm đẹp bài test hay che giấu việc người dùng chưa cấu hình. Hãy báo lỗi rõ ràng nếu thiếu cấu hình bắt buộc.
+
+### 8.12. Ưu Tiên Thuật Toán Tổng Quát & Đề Xuất Giải Pháp Trước Khi Xử Lý Dữ Liệu (Algorithmic-First & Propose-Before-Implement)
+> *"Giải quyết bài toán dữ liệu bằng thuật toán và cấu trúc tổng quát, tuyệt đối không dùng danh sách từ vựng gõ tay tạm bợ; luôn đề xuất phương pháp cho người dùng trước khi thực thi."*
+- **Tư duy Algorithmic-First (Dựa trên Invariants)**:
+  - Mọi bài toán xử lý chuỗi, ngắt dòng, phân trang, gộp bảng hoặc làm sạch lỗi OCR phải được mô hình hóa thành bài toán thuật toán dựa trên các đặc trưng bất biến (Invariants) của cấu trúc ngôn ngữ và tài liệu:
+    * Dấu hiệu phân trang (`---`, `<!-- Trang X -->`).
+    * Trạng thái câu viết tiếp (`islower()` của ký tự đầu ô/dòng sau; ký tự kết thúc không phải dấu ngắt câu `.!?:` của ô/dòng trước).
+    * Cấu trúc ma trận ô/cột của hàng bảng Markdown (`_split_table_cells`), vị trí ô STT/ID định danh và các ô nội dung mô tả.
+    * Gạch nối từ ngữ cuối dòng (Hyphenation invariant `(\w+)-\s*\n+(\w+)`).
+- **Triệt Tiêu Hoàn Toàn Hardcode Từ Điển / Danh Sách Từ Vựng Cứng**:
+  - Không bao giờ được tạo danh sách từ ghép cứng (`[("giới", "thiệu"), ("nghiên", "cứu"), ...]`). Ngôn ngữ tự nhiên có vô vàn thuật ngữ chuyên ngành; danh sách cứng chỉ giải quyết được vài từ nhìn thấy trước mắt và sẽ lập tức thất bại với các văn bản khác.
+  - Phải dùng thuật toán hình thái học (Morphological Stitcher) hoặc phân tích cấu trúc cell/line để xử lý tổng quát 100% mọi từ ngữ trong tiếng Việt và tiếng Anh.
+- **Quy Tắc "Đề Xuất Trước - Thực Thi Sau" (Propose Before Implementation)**:
+  - Khi đối mặt với các vấn đề kỹ thuật về xử lý dữ liệu bóc tách phức tạp, Agent **bắt buộc phải đề xuất trước cho người dùng**:
+    1. Trình bày rõ nguyên nhân gốc rễ (Root Cause) của lỗi dữ liệu.
+    2. Đề xuất phương pháp / thuật toán dự định sử dụng (nêu rõ cơ chế hoạt động và tính tổng quát).
+    3. Đánh giá tính cô lập (đảm bảo không ảnh hưởng tiêu cực tới các luồng dữ liệu khác như DOCX hay PDF Text).
+  - Sau khi người dùng nắm được hướng đi, mới tiến hành triển khai vào mã nguồn.
 
 ---
 

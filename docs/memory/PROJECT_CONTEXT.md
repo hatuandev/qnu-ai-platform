@@ -7,10 +7,37 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-23 15:40 (UTC+7)
-- **Phiên số**: #206
+- **Thời gian cập nhật**: 2026-09-23 16:15 (UTC+7)
+- **Phiên số**: #207
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Tối Ưu Hóa Bóc Tách PDF OCR Bằng Thuật Toán Tổng Quát (Zero-Hardcoded Vocabulary) & Bổ Sung Chuẩn AGENTS.md (phiên #207)**:
+  - *Hiện trạng & Vấn đề giải quyết*:
+    - Bóc tách văn bản hành chính / hợp đồng quét scan phức tạp (`Hợp đồng nâng cấp PM cổng thông tin điện tử_0001.pdf` 16 trang) trước đây bị:
+      1. Bảng kéo dài nhiều trang bị cắt vụn nát bởi `---` ngắt trang, mất header/separator ở trang tiếp theo;
+      2. Từ ngữ bị chặt đôi qua ranh giới trang (như `banner, giới` / `thiệu, hình ảnh`);
+      3. Dòng trong cùng một ô bảng bị bẻ thành nhiều hàng riêng biệt làm mất STT;
+      4. Ràng buộc người dùng: Tuyệt đối không được ảnh hưởng tới luồng DOCX (`DocxParser`) và PDF text (`PDFInspector`, `PyMuPDFParser`).
+      5. Triệt tiêu mảng từ khóa hardcode `_COMMON_SPLIT_WORD_PAIRS = [("giới", "thiệu"), ...]`, thay bằng giải thuật tổng quát và bổ sung quy chuẩn vào `AGENTS.md`.
+  - *Backend*:
+    - Nâng cấp Prompt chuyên gia trong `GeminiOCRAdapter` (`backend/app/modules/ocr/adapters/gemini_adapter.py`): Bổ sung quy tắc bảng biểu liên trang không chèn `---`, quy tắc chống bẻ đôi từ qua trang, và quy tắc toàn vẹn ô mô tả 1 hàng = 1 bản ghi ngữ nghĩa.
+    - Xây dựng module hậu xử lý độc lập cho OCR `backend/app/modules/ocr/cleaner.py`:
+      * `repair_ocr_split_words_across_pages`: Triệt tiêu hoàn toàn mảng từ khóa cứng; sử dụng thuật toán hình thái học và cấu trúc ô/cột tổng quát dựa trên các bất biến cú pháp (`islower()`, cột ID rỗng, không ngắt câu) để hàn gắn từ và mệnh đề ranh giới trang không từ điển; xử lý hyphenation tổng quát.
+      * `stitch_ocr_multipage_tables`: Hàn gắn các bảng bị `---` xé rách thành 1 Master Table hoàn chỉnh; tự động loại bỏ header lặp lại giữa chừng.
+      * `merge_ocr_orphan_table_rows`: Gộp các hàng rỗng STT vào ô mô tả của hàng cha (chữ thường nối bằng dấu cách, câu mới nối bằng `<br>`); giữ tính liên tục bảng khi gặp comment trang `<!-- Trang X -->`.
+      * `clean_ocr_table_syntax`: Loại bỏ separator rác chen giữa các hàng dữ liệu bảng, chuẩn hóa chính tả OCR ("số chỉ" $\rightarrow$ "chỉ số", "kí kết" $\rightarrow$ "ký kết").
+      * `post_process_ocr_output`: Hàm điều phối tổng thể cho kết quả OCR.
+    - Tích hợp `post_process_ocr_output` vào `_build_response` của `OCRService` (`ocr/service.py`) và trong adapter, đảm bảo toàn bộ luồng OCR (Gemini, Mistral, Combo, Rescue) tự động được chuẩn hóa; trong khi luồng DOCX/PDF text hoàn toàn độc lập, không đi qua hàm này.
+    - Viết mới 6 unit tests trong `backend/tests/test_ocr_cleaner.py` (100% passed).
+    - Chuẩn hóa toàn bộ tệp mẫu thực tế `Hợp đồng nâng cấp PM cổng thông tin điện tử_0001_boc_tach.md` thành 1 Master Table hoàn chỉnh 74 hàng liên tục.
+  - *Tài liệu Quản trị*:
+    - Bổ sung **Mục 1.7** (Tôn chỉ kỹ thuật) và **Mục 8.12** (Quy chuẩn Clean Code Vibe Coding) vào `AGENTS.md`: Bắt buộc ưu tiên thuật toán hình thái học / cấu trúc tổng quát (Algorithmic-First), cấm tuyệt đối hardcode từ vựng/từ điển gõ tay, và bắt buộc đề xuất phương pháp cho người dùng biết trước khi triển khai (Propose-Before-Implement).
+  - *Verification*:
+    - Pytest Full OCR & Knowledge (bao gồm DOCX, PDF text, table reconstructor, cleaners): 75/75 passed (100%).
+    - Ruff check: All checks passed (0 lỗi).
+    - Biome: 171 files checked, 0 errors.
+    - TypeScript: tsc --noEmit (0 lỗi).
+    - Vite build: thành công trong 4.67s.
 - 0. **Rà Soát Triệt Tiêu Toàn Diện Hardcoded Models, Tôn Trọng Cấu Hình Nhà Cung Cấp Động 100% & Bổ Sung Chuẩn AGENTS.md (phiên #206)**:
   - *Vấn đề phát hiện*:
     1. Trong `inference_service.py`: Khi người dùng truyền `preferred_model_name = "gemini-3.5-flash"` (hoặc model tùy biến), code cũ kiểm tra `if req.preferred_model_name in p_models`. Nếu mảng `p_models` trong DB là danh sách seed cũ chưa kịp cập nhật, hệ thống tự động bỏ qua `preferred_model_name` và ép rơi về model mặc định `p["model_name"]` (`gemini-2.5-flash`), dẫn đến hiện tượng người dùng đổi 3.5 nhưng runtime vẫn chạy 2.5.
