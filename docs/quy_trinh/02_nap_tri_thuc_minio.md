@@ -108,8 +108,16 @@ flowchart TD
      - **`scanned` / `image_based`**: Toàn bộ là bản scan hoặc ảnh $\rightarrow$ Chuyển thẳng sang Pha 2 (Cứu hộ OCR tự động).
      - **`mixed`**: Tài liệu hỗn hợp $\rightarrow$ Xác định danh sách chính xác `pages_needing_ocr` để chỉ cứu hộ những trang scan, bảo toàn tốc độ cho các trang số hóa.
    - Song song, `PyMuPDF` trích xuất `extract_page_blocks` (khối hình học Bounding Boxes) và render ảnh PNG (`get_pixmap()`) lưu vào MinIO cache phục vụ giao diện đối soát trực quan Scan Studio.
-2. **Pha 2 — Cứu hộ OCR tự động (Automatic OCR Rescue)**:
-   - Khi phát hiện trang scan hoặc tài liệu `mixed`, hệ thống tự động định tuyến cứu hộ qua **Mistral OCR Cloud** (`mistral-ocr-latest`) cho độ chính xác cao và tốc độ 1-2s; nếu mạng lỗi hoặc thiếu API key, hệ thống tự động rơi về **Local OCR** (`easyocr` / `docling`).
+2. **Pha 2 — Cứu hộ OCR Tự Động Đa Tầng (Multi-Tier Combo OCR & Sequential Failover Chain)**:
+   - Khi phát hiện trang scan hoặc tài liệu `mixed`, hệ thống áp dụng cơ chế **Combo OCR Mặc Định Hệ Thống (Zero-Quota-Failure Policy)**:
+     - Chuỗi thực thi tuần tự ưu tiên từ trên xuống dưới theo cấu hình tại Quản trị ModelOps:
+       * **Bước 1 (Chính)**: `gemini-2.5-flash` (`Google Gemini Cloud`) — tốc độ 1-2s, nhận diện cấu trúc bảng phức tạp, công thức và chữ viết tay.
+       * **Bước 2 (Dự phòng 1)**: `gemini-2.5-flash-lite` (`Google Gemini Cloud`) — chi phí tối ưu, tự động kích hoạt khi Bước 1 chạm hạn mức quota.
+       * **Bước 3 (Dự phòng 2)**: `mistral-ocr-2503` (`Mistral Cloud`) — chuyên xử lý tài liệu scan tiếng Việt chất lượng thấp, con dấu đỏ và khối ký tên.
+       * **Bước 4 (Dự phòng 3)**: `docling-tableformer` (`Local Edge Engine`) — trích xuất bảng biểu ma trận cục bộ không phụ thuộc mạng ngoài.
+       * **Bước 5 (Cứu sinh cuối cùng)**: `easyocr-vie` (`Local Edge Engine`) — OCR offline trên CPU/CUDA bảo đảm quá trình bóc tách 0 gián đoạn.
+     - **Chính sách Zero-Quota-Failure**: Nếu model đang gọi trả về lỗi `HTTP 429` (Quota Exceeded / Rate Limit), lỗi `503` hoặc timeout, hệ thống tự động ghi nhận vào `cascade_trace` và lập tức chuyển quyền xử lý sang model tiếp theo trong chuỗi mà không báo lỗi làm gián đoạn người dùng.
+     - **Linh hoạt cấu hình**: Quản trị viên có thể bật/tắt từng model, điều chỉnh thứ tự ưu tiên hoặc bổ sung model OCR mới từ danh mục có sẵn tại màn hình `/modelops`.
 
 ### Bước 4: Bảo toàn bảng biểu Markdown GFM, Phân vùng vĩ mô & Lưu trữ `page_markdowns`
 - **Bảo toàn bảng biểu GFM**: Hàm `_format_table_markdown` chuyển đổi ma trận bảng số hóa thành bảng Markdown chuẩn GitHub Flavored Markdown (`| Tiêu đề 1 | Tiêu đề 2 |`), ngăn ngừa triệt để lỗi mất dữ liệu bảng tuyển sinh hay điểm chuẩn.

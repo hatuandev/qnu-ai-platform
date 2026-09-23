@@ -94,15 +94,36 @@ async def test_heavy_adapters_report_availability_honestly():
 
 @pytest.mark.asyncio
 async def test_list_engines_reflects_real_availability():
-    """Engine catalog must expose 5 engines with honest active flags."""
+    """Engine catalog must expose 6 engines with honest active flags."""
     service = OCRService()
     engines = service.list_engines()
     by_name = {e.name: e for e in engines}
-    assert set(by_name) == {"pymupdf_ocr", "docling", "easyocr", "mock_ocr", "mistral_ocr"}
+    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "docling", "easyocr", "mock_ocr", "mistral_ocr"}
     assert by_name["pymupdf_ocr"].is_active is True
+    assert by_name["gemini_ocr"].is_active is service._adapters["gemini_ocr"].is_available()
     assert by_name["docling"].is_active is service._adapters["docling"].is_available()
     assert by_name["easyocr"].is_active is service._adapters["easyocr"].is_available()
     assert by_name["mistral_ocr"].is_active is service._adapters["mistral_ocr"].is_available()
+
+
+@pytest.mark.asyncio
+async def test_gemini_adapter_properties_and_availability():
+    """Gemini OCR adapter exposes correct name, display_name, and availability check."""
+    from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
+
+    adapter = GeminiOCRAdapter(model_name="gemini-2.5-flash")
+    assert adapter.name == "gemini_ocr"
+    assert "Google Gemini Vision OCR" in adapter.display_name
+    assert adapter.model_name == "gemini-2.5-flash"
+
+    with patch("app.core.config.settings.GEMINI_API_KEY", ""):
+        empty_adapter = GeminiOCRAdapter()
+        assert empty_adapter.is_available() is False
+
+    with patch("app.core.config.settings.GEMINI_API_KEY", "test_key_fake_123"):
+        active_adapter = GeminiOCRAdapter()
+        assert active_adapter.is_available() is True
+
 
 
 @pytest.mark.asyncio
@@ -392,4 +413,185 @@ async def test_studio_sample_document():
     assert len(sample.pages[0].regions) > 0
     assert any(p.has_table for p in sample.pages)
     assert any(p.is_signed for p in sample.pages)
+
+
+@pytest.mark.asyncio
+async def test_ocr_combo_chain_sequential_failover_on_quota():
+    """When Step 1 in OCR combo hits 429 Quota Exceeded, system sequentially moves to Step 2."""
+    service = OCRService()
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock()
+    mock_session.commit = AsyncMock()
+
+    custom_combo = [
+        {"provider_id": "prov_gemini", "model_name": "gemini-2.5-flash", "is_active": True},
+        {"provider_id": "prov_mistral", "model_name": "mistral-ocr-latest", "is_active": True},
+        {"provider_id": "prov_docling", "model_name": "docling", "is_active": True},
+    ]
+
+    class FailingQuotaAdapter:
+        name = "gemini-2.5-flash"
+
+        def is_available(self) -> bool:
+            return True
+
+        async def extract(self, content: bytes, filename: str) -> dict:
+            raise RuntimeError("429 Resource has been exhausted (Quota exceeded for project)")
+
+    class SuccessfulSecondaryAdapter:
+        name = "mistral-ocr-latest"
+
+        def is_available(self) -> bool:
+            return True
+
+        async def extract(self, content: bytes, filename: str) -> dict:
+            return {
+                "engine_used": "mistral-ocr-latest",
+                "total_pages": 1,
+                "overall_confidence": 0.98,
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "extracted_text": "Bóc tách thành công qua Mistral OCR dự phòng khi Gemini hết Quota",
+                        "confidence": 0.98,
+                        "word_count": 13,
+                        "line_count": 1,
+                        "has_tables": False,
+                    }
+                ],
+                "raw_text": "Bóc tách thành công qua Mistral OCR dự phòng khi Gemini hết Quota",
+            }
+
+    with (
+        patch.object(service, "_get_active_combo_chain", return_value=custom_combo),
+        patch.object(service, "_resolve_adapter", side_effect=lambda m: FailingQuotaAdapter() if "gemini" in m else SuccessfulSecondaryAdapter()),
+    ):
+        resp = await service.extract_document(
+            session=mock_session,
+            content=b"dummy_scan_bytes",
+            filename="tai_lieu_scan.png",
+            engine_name="combo",
+        )
+
+        assert resp.success is True
+        assert resp.fallback_triggered is True
+        assert resp.fallback_engine == "mistral-ocr-latest"
+        assert resp.engine_used == "mistral-ocr-latest"
+        assert "Mistral OCR dự phòng khi Gemini hết Quota" in resp.raw_text
+        assert len(resp.cascade_trace) >= 2
+        assert any("429" in t or "Quota" in t for t in resp.cascade_trace)
+        assert any("Thành công" in t for t in resp.cascade_trace)
+
+
+@pytest.mark.asyncio
+async def test_ocr_combo_explicit_engine_failure_triggers_combo_fallback():
+    """When user requests single engine 'gemini_ocr' but it fails (429), system falls back through combo chain."""
+    service = OCRService()
+    mock_session = AsyncMock()
+    mock_session.add = MagicMock()
+    mock_session.commit = AsyncMock()
+
+    custom_combo = [
+        {"provider_id": "prov_gemini", "model_name": "gemini-2.5-flash", "is_active": True},
+        {"provider_id": "prov_mistral", "model_name": "mistral-ocr-latest", "is_active": True},
+    ]
+
+    class QuotaErrorAdapter:
+        name = "gemini_ocr"
+
+        def is_available(self) -> bool:
+            return True
+
+        async def extract(self, content: bytes, filename: str) -> dict:
+            raise RuntimeError("HTTP 429 Too Many Requests: Monthly Token Quota Exceeded")
+
+    class BackupAdapter:
+        name = "mistral-ocr-latest"
+
+        def is_available(self) -> bool:
+            return True
+
+        async def extract(self, content: bytes, filename: str) -> dict:
+            return {
+                "engine_used": "mistral-ocr-latest",
+                "total_pages": 1,
+                "overall_confidence": 0.96,
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "extracted_text": "Noi dung duoc cuu nguy boi Mistral OCR",
+                        "confidence": 0.96,
+                        "word_count": 8,
+                        "line_count": 1,
+                        "has_tables": False,
+                    }
+                ],
+                "raw_text": "Noi dung duoc cuu nguy boi Mistral OCR",
+            }
+
+    with (
+        patch.object(service, "_get_active_combo_chain", return_value=custom_combo),
+        patch.object(service, "_resolve_adapter", side_effect=lambda m: QuotaErrorAdapter() if "gemini" in m else BackupAdapter()),
+    ):
+        resp = await service.extract_document(
+            session=mock_session,
+            content=b"dummy_bytes",
+            filename="qd_scan.jpg",
+            engine_name="gemini_ocr",
+        )
+
+        assert resp.success is True
+        assert resp.fallback_triggered is True
+        assert resp.fallback_engine == "mistral-ocr-latest"
+        assert "cuu nguy boi Mistral OCR" in resp.raw_text
+
+
+@pytest.mark.asyncio
+async def test_resolve_adapter_dynamically_respects_default_ocr_model():
+    """Verify that _resolve_adapter dynamically instantiates GeminiOCRAdapter with the configured default_ocr_model."""
+    service = OCRService()
+
+    # When dynamic default model is provided
+    adapter_31 = service._resolve_adapter("gemini_ocr", default_gemini_model="gemini-3.1-flash-lite")
+    assert getattr(adapter_31, "model_name", None) == "gemini-3.1-flash-lite"
+
+    adapter_custom = service._resolve_adapter("gemini", default_gemini_model="gemini-3.5-flash-lite")
+    assert getattr(adapter_custom, "model_name", None) == "gemini-3.5-flash-lite"
+
+    # When no default model is provided, fallback to default static adapter
+    adapter_default = service._resolve_adapter("gemini_ocr")
+    assert getattr(adapter_default, "model_name", None) == "gemini-2.5-flash"
+
+
+@pytest.mark.asyncio
+async def test_auto_routing_routes_to_combo_when_combo_mode_enabled():
+    """When default_ocr_mode is 'combo', extract_document('auto') delegates to _extract_combo_chain."""
+    service = OCRService()
+    mock_session = AsyncMock()
+
+    mock_defaults = {
+        "default_ocr_mode": "combo",
+        "default_ocr_model": "gemini-3.1-flash-lite",
+        "ocr_combo_chain": [
+            {"provider_id": "prov_gemini", "model_name": "gemini-3.1-flash-lite", "is_active": True}
+        ],
+    }
+
+    mock_combo_resp = MagicMock()
+    mock_combo_resp.engine_used = "gemini-3.1-flash-lite"
+
+    with (
+        patch.object(service, "_get_system_defaults", return_value=mock_defaults),
+        patch.object(service, "_extract_combo_chain", return_value=mock_combo_resp) as mock_combo_fn,
+    ):
+        resp = await service.extract_document(
+            session=mock_session,
+            content=b"test_content",
+            filename="document.pdf",
+            engine_name="auto",
+        )
+        assert mock_combo_fn.called
+        assert resp.engine_used == "gemini-3.1-flash-lite"
+
+
 

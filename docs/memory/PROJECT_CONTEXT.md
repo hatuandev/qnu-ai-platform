@@ -7,10 +7,80 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-23 00:15 (UTC+7)
-- **Phiên số**: #202
+- **Thời gian cập nhật**: 2026-09-23 15:40 (UTC+7)
+- **Phiên số**: #206
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Rà Soát Triệt Tiêu Toàn Diện Hardcoded Models, Tôn Trọng Cấu Hình Nhà Cung Cấp Động 100% & Bổ Sung Chuẩn AGENTS.md (phiên #206)**:
+  - *Vấn đề phát hiện*:
+    1. Trong `inference_service.py`: Khi người dùng truyền `preferred_model_name = "gemini-3.5-flash"` (hoặc model tùy biến), code cũ kiểm tra `if req.preferred_model_name in p_models`. Nếu mảng `p_models` trong DB là danh sách seed cũ chưa kịp cập nhật, hệ thống tự động bỏ qua `preferred_model_name` và ép rơi về model mặc định `p["model_name"]` (`gemini-2.5-flash`), dẫn đến hiện tượng người dùng đổi 3.5 nhưng runtime vẫn chạy 2.5.
+    2. Trong Workflow `llm_generate_node.py`: Node LLM quên truyền `preferred_model_name`, `fallback_model_name`, `preferred_provider_id` từ `AssistantRuntimeProfile` vào `LLMGenerateRequest`.
+    3. Trong `MistralOCRAdapter`: `model_name` bị gán cứng `"mistral-ocr-latest"` thay vì nhận tham số động.
+    4. Trong `readiness.py`: Dòng `getattr(...) or "gpt-4o-mini"` che lấp lỗi cấu hình sai.
+    5. Trong `assistant_chat_service.py`: Hàm `_extract_primary_model` hardcode chuỗi `"gpt-4o-mini"` ở 6 nơi thay vì dùng `settings.DEFAULT_LLM_MODEL`.
+    6. Trong `vector_indexer.py` và `reranker.py`: Cưỡng ép fallback về model cố định nếu string không bắt đầu bằng `@cf/`.
+  - *Backend*:
+    - Bổ sung hàm `_is_model_compatible_with_provider` trong `inference_service.py` phân tích độ tương thích động theo họ model (Gemini, GPT, Claude, Mistral, Qwen/DeepSeek/Llama, Custom Proxies).
+    - Nâng cấp `_match_score` và phân giải `chosen_model` trong cả `generate()` và `stream_generate()` tôn trọng 100% `req.preferred_model_name` khi người dùng chỉ định.
+    - Cập nhật `llm_generate_node.py` trích xuất và truyền đầy đủ `preferred_model_name`, `fallback_model_name`, `preferred_provider_id` từ `profile.model_policy` và `config`.
+    - Cập nhật `MistralOCRAdapter` nhận `model_name: str | None = None` và truyền `self._model_name` động.
+    - Nâng cấp `_resolve_adapter` và `_extract_auto` trong `OCRService` hỗ trợ dynamic Mistral adapter và tự động đẩy dynamic cloud model lên đầu danh sách candidates.
+    - Sửa `readiness.py` bỏ hardcode ngụy tạo; sửa `assistant_chat_service.py` dùng `settings.DEFAULT_LLM_MODEL`.
+    - Chuẩn hóa tiền tố Cloudflare embedding/reranker model động.
+    - Bổ sung 2 test cases mới, toàn bộ 40/40 tests ModelOps/OCR và 12/12 tests Assistants passed 100%, Ruff 0 lỗi.
+  - *Tài liệu Quản Trị*:
+    - Bổ sung **Zero Hardcoded Models & Dynamic Provider Resolution Policy** vào `AGENTS.md` (Mục 1.6 Tôn chỉ kỹ thuật, Mục 3.5 Backend Core Rules, Mục 8.11 Clean Code Vibe Coding).
+  - *Verification*: Ruff 0 lỗi, Pytest 52/52 passed, Biome 171 files 0 lỗi, tsc 0 lỗi, Vite build thành công (5.17s).
+- 0. **Đồng Bộ Động Model OCR & Điều Hướng Auto Router Sang Combo Chain Từ Cấu Hình Hệ Thống (phiên #205.1)**:
+  - *Vấn đề*: Người dùng cấu hình model OCR mới trong ModelOps (chọn mô hình trong Combo hoặc mô hình đơn lẻ), nhưng khi nạp tệp scan từ Kho Tri Thức thì log terminal vẫn luôn nhận `gemini-2.5-flash` do bộ định tuyến `_extract_auto` và `_resolve_adapter` trong `OCRService` bị ghim cứng adapter tĩnh chưa liên kết CSDL.
+  - *Backend*:
+    - Bổ sung `_get_system_defaults` trong `OCRService` truy vấn cấu hình từ CSDL PostgreSQL (`system_model_defaults`).
+    - Cập nhật `_resolve_adapter(name_or_model, default_gemini_model, **kwargs)` tự động khởi tạo `GeminiOCRAdapter(model_name=default_gemini_model)` khi người dùng yêu cầu Gemini OCR.
+    - Cập nhật `extract_document`: Nếu yêu cầu là `requested in ("auto", "none", "")` và `default_ocr_mode == "combo"`, tự động chuyển tiếp trực tiếp sang chuỗi `_extract_combo_chain`; nếu `default_ocr_mode == "single"`, truyền `default_ocr_model` sang `_extract_auto`.
+    - Nâng cấp `_extract_auto`: Tiếp nhận `default_ocr_model` và khởi tạo `GeminiOCRAdapter` với model name động đã cấu hình thay vì cố định `gemini-2.5-flash`.
+  - *Verification*: Bổ sung 2 test cases mới, toàn bộ 18/18 tests trong `tests/test_ocr.py` passed (100%), Ruff 0 lỗi, Biome 171 files 0 lỗi, tsc 0 lỗi.
+- 0. **Thiết Kế Giao Diện Combos & Vision Adapter Chuẩn 9Router Proxy Theo UI Rule QNU (phiên #205)**:
+  - *Ý tưởng 9Router*: Áp dụng mô hình tổ hợp mô hình "Combos (Model combos with fallback)" và "Vision Adapter" từ 9Router Proxy.
+  - *Tuân thủ 100% UI Rule*: Sử dụng màu chủ đạo Academic Teal `oklch(0.46 0.13 160)`, triệt tiêu hoàn toàn emoji ký tự, 100% Lucide React icons, tokens ngữ nghĩa và bo góc chuẩn (`rounded-md` cho nút/input, `rounded-lg` cho card/dialog).
+  - *Backend*:
+    - Bổ sung schema `ModelComboItem` và `VisionAdapterConfig` vào `schemas.py`.
+    - Mở rộng `SystemModelDefaults` và `SystemModelDefaultsUpdate` hỗ trợ quản lý nhiều combo và vision pool.
+    - Cập nhật `ModelCatalogService` khởi tạo combo mẫu chuẩn QNU `combo_qnu_ocr_master` và `vision_adapter`, tự động đồng bộ sang OCR default khi có combo được đánh dấu mặc định.
+  - *Frontend*:
+    - Cập nhật `types/modelops.ts` với `ModelComboItem` và `VisionAdapterConfig`.
+    - Xây dựng component `CombosVisionSection` (`combos-vision-section.tsx`):
+      1. Khối Header & Card giới thiệu 3 chiến lược (Fallback tuần tự dự phòng, Round Robin xoay vòng phân tải, Fusion truy vấn song song).
+      2. Danh sách Combos Cards sang trọng hiển thị dải các mô hình, huy hiệu chiến lược, huy hiệu mặc định Kho Tri Thức và thanh công cụ thao tác.
+      3. Phân hệ Vision Adapter (Vision image/scan/tables pool, Audio pool).
+      4. Dialog "Tạo / Chỉnh Sửa Combo" (Create/Edit Combo Modal) với name input, strategy select, danh sách models có sắp xếp thứ tự và nút thêm model viền nét đứt.
+      5. Dialog "Thêm Mô Hình Vào Combo" (Add Model to Combo Modal) với search bar, phân nhóm theo Provider và danh sách Model Pills/Chips có capability icons (`Eye` cho Vision/OCR, `Brain` cho Reasoning, `Zap` cho Tốc độ cao, `Cpu` cho Local Engine) với hiệu ứng toggle selection teal mượt mà.
+    - Tích hợp Segmented Tab phân hệ trên `modelops-page.tsx` cho phép chuyển đổi nhanh chóng giữa "Combos & Vision Adapter", "Nhà Cung Cấp & Khóa API" và "Mặc Định Hệ Thống".
+  - *Verification*: Ruff 0 lỗi, Pytest 36/36 passed (100%), Biome 171 files 0 lỗi, tsc 0 lỗi, Vite build thành công (6.83s).
+- 0. **Combo OCR Dự Phòng Linh Hoạt & Tự Động Failover Khi Hết Quota (Zero-Quota-Failure Policy) (phiên #204)**:
+  - *Kiến trúc Combo OCR*: Cho phép định nghĩa một chuỗi gồm nhiều mô hình OCR theo thứ tự ưu tiên (Step 1 -> Step 2 -> Step 3...), gắn chuỗi này làm OCR mặc định của toàn hệ thống/Kho Tri Thức.
+  - *Sequential Failover trên Quota*: Khi chạy OCR bóc tách, hệ thống gọi tuần tự từng model. Nếu model gặp lỗi 429 Quota Exceeded (Rate limit), lỗi timeout hoặc lỗi kết nối, hệ thống tự động ghi trace và chuyển sang model tiếp theo trong chuỗi, bảo đảm 0 gián đoạn ingestion.
+  - *Backend*:
+    - Bổ sung schema `OCRComboItem`, mở rộng `SystemModelDefaults` và `SystemModelDefaultsUpdate` hỗ trợ `default_ocr_mode` (`"combo"` | `"single"`) và `ocr_combo_chain`.
+    - Khởi tạo chuỗi chuẩn QNU 5 bước `DEFAULT_QNU_OCR_COMBO_CHAIN` (Gemini 2.5 Flash -> Gemini Flash-Lite -> Mistral OCR -> Docling -> EasyOCR), lưu trữ bền vững trong PostgreSQL metadata.
+    - Mở rộng `OCRExtractResponse` có `fallback_engine: str | None` và `cascade_trace: list[str]`.
+    - Nâng cấp `OCRService` (`ocr/service.py`) triển khai `_get_active_combo_chain`, luồng `_extract_combo_chain` failover tuần tự, `_resolve_adapter` ưu tiên tra cứu registry.
+    - Test Suite: Bổ sung 2 test cases trong `tests/test_ocr.py`, toàn bộ 36/36 tests backend passed 100%, Ruff 0 lỗi.
+  - *Frontend*:
+    - Bổ sung type `OCRComboItem` trong `types/modelops.ts`.
+    - Nâng cấp `SystemDefaultsCard` (`system-defaults-card.tsx`): Dải sơ đồ Visual Pipeline trực quan, bảng quản lý bước (bật/tắt bằng Switch, tăng/giảm thứ tự ưu tiên bằng ArrowUp/Down, xóa bằng Trash2), dropdown bổ sung model mới từ `availableOcrs`, nút khôi phục chuỗi QNU chuẩn, thông báo Zero Quota Failure Policy.
+    - Nâng cấp `document-ingest-page.tsx`: Thêm tùy chọn và đặt mặc định là "Combo OCR Mặc Định Hệ Thống", tuân thủ 100% Zero-Emoji Standard.
+    - Test Suite: Biome 170 files 0 lỗi, TypeScript tsc 0 lỗi, Vite build thành công (6.49s).
+- 0. **Seed Google Gemini Vision OCR, Phân Biệt Rõ Model OCR vs Text & Thiết Lập OCR Mặc Định Cho Kho Tri Thức (phiên #203)**:
+  - Cập nhật danh mục mô hình Google Gemini 2.5 và 3.x vào `STANDARD_QNU_PROVIDERS` (`provider_service.py`) và CSDL PostgreSQL (`model_provider_configs` - `prov_ace0d9fe`):
+    - *OCR / Vision*: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-2.5-pro`, `gemini-3.1-flash-lite`, `gemini-3.1-flash-image`, `gemini-3.1-pro-preview`.
+    - *Thuần Text*: `gemma-4-26b-a4b-it`, `gemma-4-31b-it`.
+    - Cấu hình `model_specs` với các trường `can_ocr: bool`, `can_vision: bool`, `type: "vision_ocr" | "text"` và mô tả chi tiết.
+  - Cập nhật `ModelCatalogService` (`model_catalog_service.py`) nhận diện các model có `can_ocr`/`vision` vào `available_ocrs`, tự động loại trừ các mô hình thuần text `gemma-*`.
+  - Thiết lập Google Gemini `gemini-2.5-flash` làm `default_ocr_model` cho Kho tri thức trong CSDL `system_model_defaults`.
+  - Triển khai `GeminiOCRAdapter` (`backend/app/modules/ocr/adapters/gemini_adapter.py`) bóc tách Markdown GFM chuẩn xác từ PDF scan và hình ảnh qua Google Gemini Vision API; tích hợp `SmartLayoutDetector` nhận diện bounding boxes cho bảng biểu, con dấu và chữ ký.
+  - Đăng ký `gemini_ocr` vào `OCRService` (`ocr/service.py`) với vị trí ưu tiên hàng đầu trong auto OCR và cơ chế fallback an toàn.
+  - Nâng cấp `models-grid.tsx` trên Frontend bổ sung bộ lọc `OCR & Bóc tách (Vision OCR)`, gắn huy hiệu `OCR` (sky) và `Text` (muted) trực quan; Cập nhật `system-defaults-card.tsx` và `document-ingest-page.tsx`.
+  - Verification: Ruff 0 lỗi, Pytest 414/414 passed (100%), Biome 170 files 0 lỗi, tsc 0 lỗi, Vite build thành công (10.96s).
 - 0. **Triệt Tiêu 100% Hardcoded Keywords, Nhận Diện Header Bảng Dựa Trên Hình Thái & Cấu Trúc Đa Miền (Zero-Keyword Morphological Table Header Detection) (phiên #202)**:
   - Loại bỏ hoàn toàn danh sách từ khóa cố định tiếng Việt (`header_keywords`) và regex từ khóa trong `pdf_parser.py` và `table_reconstructor.py`.
   - Chuyển dịch toàn diện sang 5 tiêu chuẩn nhận diện hình thái học zero-keyword:

@@ -13,12 +13,72 @@ from app.core.exceptions import AppException
 from app.modules.modelops.models import ModelProviderConfig
 from app.modules.modelops.schemas import (
     ModelOption,
+    OCRComboItem,
     SystemModelDefaults,
     SystemModelDefaultsResponse,
     SystemModelDefaultsUpdate,
 )
 
 logger = logging.getLogger(__name__)
+
+
+DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_ace0d9fe",
+        "provider_name": "Google Gemini",
+        "model_name": "gemini-2.5-flash",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 1: Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM siêu tốc (~2s)",
+    },
+    {
+        "provider_id": "prov_ace0d9fe",
+        "provider_name": "Google Gemini",
+        "model_name": "gemini-2.5-flash-lite",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 2: Google Gemini 2.5 Flash-Lite — Phản hồi nhanh, tối ưu quota dự phòng",
+    },
+    {
+        "provider_id": "prov_mistral",
+        "provider_name": "Mistral AI",
+        "model_name": "mistral-ocr-latest",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 3: Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+    },
+    {
+        "provider_id": "prov_docling",
+        "provider_name": "Docling Local",
+        "model_name": "docling",
+        "provider_type": "local",
+        "is_active": True,
+        "description": "Ưu tiên 4: IBM Docling TableFormer — Bóc tách cấu trúc bảng biểu offline nội bộ",
+    },
+    {
+        "provider_id": "prov_easyocr",
+        "provider_name": "EasyOCR Local",
+        "model_name": "easyocr",
+        "provider_type": "local",
+        "is_active": True,
+        "description": "Ưu tiên 5: EasyOCR Local Engine — Nhận diện hình ảnh và con dấu offline",
+    },
+]
+
+DEFAULT_QNU_COMBO: dict[str, Any] = {
+    "id": "combo_qnu_ocr_master",
+    "name": "qnu-ocr-master",
+    "strategy": "fallback",
+    "models": DEFAULT_QNU_OCR_COMBO_CHAIN,
+    "is_default": True,
+    "description": "Combo OCR đa tầng mặc định ĐH Quy Nhơn (Tự động failover khi hết Quota 429)",
+}
+
+DEFAULT_VISION_ADAPTER: dict[str, Any] = {
+    "enabled": True,
+    "strategy": "fallback",
+    "models": DEFAULT_QNU_OCR_COMBO_CHAIN,
+}
 
 
 class ModelCatalogService:
@@ -42,12 +102,24 @@ class ModelCatalogService:
             "default_embedding_model": "@cf/baai/bge-m3",
             "default_reranker_provider_id": "prov_cloudflare",
             "default_reranker_model": "@cf/baai/bge-reranker-base",
-            "default_ocr_provider_id": "prov_mistral",
-            "default_ocr_model": "mistral-ocr-latest",
+            "default_ocr_provider_id": "prov_ace0d9fe",
+            "default_ocr_model": "gemini-2.5-flash",
+            "default_ocr_mode": "combo",
+            "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,
+            "model_combos": [DEFAULT_QNU_COMBO],
+            "vision_adapter": DEFAULT_VISION_ADAPTER,
         }
 
         if cfg_record and cfg_record.extra_config and "defaults" in cfg_record.extra_config:
             default_data.update(cfg_record.extra_config["defaults"])
+            if not default_data.get("ocr_combo_chain"):
+                default_data["ocr_combo_chain"] = DEFAULT_QNU_OCR_COMBO_CHAIN
+            if not default_data.get("default_ocr_mode"):
+                default_data["default_ocr_mode"] = "combo"
+            if not default_data.get("model_combos"):
+                default_data["model_combos"] = [DEFAULT_QNU_COMBO]
+            if not default_data.get("vision_adapter"):
+                default_data["vision_adapter"] = DEFAULT_VISION_ADAPTER
         else:
             if not cfg_record:
                 cfg_record = ModelProviderConfig(
@@ -113,7 +185,28 @@ class ModelCatalogService:
                             description=f"Xếp hạng lại tương quan ngữ nghĩa qua {p.name}",
                         )
                     )
-                if "ocr" in m_lower or p_type in ("docling", "mistral"):
+                p_specs = p_extra.get("model_specs") or {}
+                m_spec = p_specs.get(m) or {}
+
+                is_ocr_candidate = False
+                if "can_ocr" in m_spec:
+                    is_ocr_candidate = bool(m_spec.get("can_ocr"))
+                else:
+                    is_ocr_candidate = (
+                        "ocr" in m_lower
+                        or p_type in ("docling", "mistral")
+                        or (
+                            p_type in ("gemini", "google")
+                            and any(kw in m_lower for kw in ("flash", "vision", "pro", "image"))
+                            and not m_lower.startswith("gemma")
+                        )
+                    )
+
+                if is_ocr_candidate:
+                    desc = (
+                        m_spec.get("description")
+                        or f"Bóc tách văn bản, bảng biểu và nhận diện OCR qua {p.name}"
+                    )
                     available_ocrs.append(
                         ModelOption(
                             provider_id=p.id,
@@ -121,7 +214,7 @@ class ModelCatalogService:
                             provider_type=p.provider_type,
                             model_name=m,
                             category=category,
-                            description=f"Bóc tách văn bản và bảng biểu qua {p.name}",
+                            description=desc,
                         )
                     )
 
@@ -195,18 +288,49 @@ class ModelCatalogService:
         if update_data.default_ocr_model is not None:
             defaults["default_ocr_model"] = update_data.default_ocr_model
 
+        if update_data.default_ocr_mode is not None:
+            defaults["default_ocr_mode"] = update_data.default_ocr_mode
+
+        if update_data.ocr_combo_chain is not None:
+            defaults["ocr_combo_chain"] = [
+                item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                for item in update_data.ocr_combo_chain
+            ]
+
+        if update_data.model_combos is not None:
+            defaults["model_combos"] = [
+                item.model_dump() if hasattr(item, "model_dump") else dict(item)
+                for item in update_data.model_combos
+            ]
+            default_combo = next((c for c in defaults["model_combos"] if c.get("is_default")), None)
+            if default_combo and default_combo.get("models"):
+                defaults["ocr_combo_chain"] = default_combo["models"]
+                first_model = default_combo["models"][0]
+                defaults["default_ocr_provider_id"] = first_model.get("provider_id", defaults.get("default_ocr_provider_id"))
+                defaults["default_ocr_model"] = first_model.get("model_name", defaults.get("default_ocr_model"))
+                defaults["default_ocr_mode"] = "combo"
+
+        if update_data.vision_adapter is not None:
+            defaults["vision_adapter"] = (
+                update_data.vision_adapter.model_dump()
+                if hasattr(update_data.vision_adapter, "model_dump")
+                else dict(update_data.vision_adapter)
+            )
+
         extra["defaults"] = defaults
         cfg_record.extra_config = extra
         await db.commit()
 
         logger.info(
-            "Updated system model defaults: embedding=%s (%s), reranker=%s (%s), ocr=%s (%s)",
+            "Updated system model defaults: embedding=%s (%s), reranker=%s (%s), ocr=%s (%s), ocr_mode=%s, combo_steps=%d",
             defaults.get("default_embedding_model"),
             defaults.get("default_embedding_provider_id"),
             defaults.get("default_reranker_model"),
             defaults.get("default_reranker_provider_id"),
             defaults.get("default_ocr_model"),
             defaults.get("default_ocr_provider_id"),
+            defaults.get("default_ocr_mode"),
+            len(defaults.get("ocr_combo_chain") or []),
         )
 
         return await self.get_system_model_defaults(db)
@@ -226,11 +350,30 @@ class ModelCatalogService:
         elif role_lower == "ocr":
             update_data.default_ocr_provider_id = provider_id
             update_data.default_ocr_model = model_name
+        elif role_lower in ("fallback_ocr", "ocr_fallback"):
+            # Add or update to top of fallback chain
+            cur = await self.get_system_model_defaults(db)
+            chain = list(cur.defaults.ocr_combo_chain)
+            # Prepend or update
+            chain.insert(
+                1,
+                OCRComboItem(
+                    provider_id=provider_id,
+                    provider_name=provider_id,
+                    model_name=model_name,
+                    provider_type="cloud",
+                    is_active=True,
+                    description=f"Dự phòng: {model_name}",
+                ),
+            )
+            update_data.ocr_combo_chain = chain
+        elif role_lower in ("ocr_combo", "combo"):
+            update_data.default_ocr_mode = "combo"
         else:
             raise AppException(
                 status_code=400,
                 title="Vai trò không hợp lệ",
-                detail=f"Vai trò [{role}] không được hỗ trợ. Chỉ chấp nhận embedding, reranker, ocr.",
+                detail=f"Vai trò [{role}] không được hỗ trợ. Chấp nhận embedding, reranker, ocr, fallback_ocr, ocr_combo.",
                 code="INVALID_ROLE",
             )
 

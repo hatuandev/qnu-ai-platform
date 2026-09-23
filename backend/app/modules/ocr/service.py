@@ -20,6 +20,7 @@ from app.core.storage import storage_service
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.docling_adapter import DoclingOCRAdapter
 from app.modules.ocr.adapters.easyocr_adapter import EasyOCRAdapter
+from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
@@ -49,11 +50,14 @@ class OCRService:
     def __init__(self) -> None:
         self._adapters: dict[str, BaseOCRAdapter] = {
             "pymupdf_ocr": PyMuPDFOCRAdapter(),
+            "gemini_ocr": GeminiOCRAdapter(),
             "mistral_ocr": MistralOCRAdapter(),
             "docling": DoclingOCRAdapter(),
             "easyocr": EasyOCRAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
+        self._adapters["gemini"] = self._adapters["gemini_ocr"]
+        self._adapters["gemini_vision"] = self._adapters["gemini_ocr"]
         self._adapters["mistral"] = self._adapters["mistral_ocr"]
         self.default_engine = "pymupdf_ocr"
 
@@ -61,6 +65,7 @@ class OCRService:
         """List registered OCR engines with real availability status."""
         catalog = [
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
+            ("eng_gemini", "gemini_ocr", "gemini", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.99, False),
             ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
             ("eng_docling", "docling", "docling", ["docx", "xlsx", "pdf", "tables", "layout", "markdown"], 0.97, False),
             ("eng_easyocr", "easyocr", "easyocr", ["png", "jpg", "scan", "stamp"], 0.90, False),
@@ -75,7 +80,7 @@ class OCRService:
                     name=name,
                     display_name=adapter.display_name,
                     engine_type=engine_type,
-                    provider_category="cloud" if name == "mistral_ocr" else "local",
+                    provider_category="cloud" if name in ("gemini_ocr", "mistral_ocr") else "local",
                     capabilities=capabilities,
                     avg_confidence=confidence,
                     is_active=adapter.is_available(),
@@ -83,6 +88,74 @@ class OCRService:
                 )
             )
         return engines
+
+    def _resolve_adapter(
+        self, name_or_model: str, default_gemini_model: str | None = None, **kwargs: Any
+    ) -> BaseOCRAdapter:
+        """Resolve or dynamically instantiate the appropriate OCR adapter for a model name or engine name."""
+        norm = (name_or_model or "").strip().lower()
+
+        # If gemini_ocr/gemini/gemini_vision is requested, use dynamic model if configured
+        if norm in ("gemini_ocr", "gemini", "gemini_vision"):
+            if default_gemini_model and (
+                "gemini" in default_gemini_model.lower()
+                or default_gemini_model.lower().startswith("gemma")
+            ):
+                return GeminiOCRAdapter(model_name=default_gemini_model)
+            return self._adapters["gemini_ocr"]
+
+        # Check existing registered adapter keys
+        if norm in self._adapters:
+            return self._adapters[norm]
+
+        # Check for Google Gemini models
+        if "gemini" in norm or norm.startswith("gemma"):
+            return GeminiOCRAdapter(model_name=name_or_model)
+
+        # Check for Mistral OCR
+        if "mistral" in norm:
+            if norm != "mistral_ocr":
+                return MistralOCRAdapter(model_name=name_or_model)
+            return self._adapters["mistral_ocr"]
+
+        # Check for Docling
+        if "docling" in norm:
+            return self._adapters["docling"]
+
+        # Check for EasyOCR
+        if "easyocr" in norm:
+            return self._adapters["easyocr"]
+
+        # Default fallback adapter
+        return self._adapters.get(norm) or self._adapters[self.default_engine]
+
+    async def _get_system_defaults(self, session: AsyncSession | None) -> dict[str, Any]:
+        """Retrieve system_model_defaults dictionary from database."""
+        if session:
+            try:
+                from sqlalchemy import select
+
+                from app.modules.modelops.models import ModelProviderConfig
+
+                stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults")
+                res = await session.execute(stmt)
+                cfg = res.scalar_one_or_none()
+                if cfg and cfg.extra_config and "defaults" in cfg.extra_config:
+                    return cfg.extra_config["defaults"]
+            except Exception as exc:
+                logger.debug("Could not fetch system_model_defaults: %s", exc)
+        return {}
+
+    async def _get_active_combo_chain(self, session: AsyncSession | None) -> list[dict[str, Any]]:
+        """Retrieve configured OCR combo chain from PostgreSQL system_model_defaults."""
+        defaults = await self._get_system_defaults(session)
+        chain = defaults.get("ocr_combo_chain")
+        if chain and isinstance(chain, list) and len(chain) > 0:
+            return chain
+
+        from app.modules.modelops.services.model_catalog_service import DEFAULT_QNU_OCR_COMBO_CHAIN
+
+        return DEFAULT_QNU_OCR_COMBO_CHAIN
 
     async def extract_document(
         self,
@@ -92,27 +165,44 @@ class OCRService:
         engine_name: str | None = None,
         tenant_id: str = "tenant_qnu",
     ) -> OCRExtractResponse:
-        """Extract text from document bytes with automatic graceful fallback."""
+        """Extract text from document bytes with automatic graceful fallback or multi-model combo failover."""
         start_time = time.perf_counter()
         requested = (engine_name or "").strip().lower() or "auto"
 
-        if requested == "auto":
-            return await self._extract_auto(session, content, filename, tenant_id, start_time)
+        defaults = await self._get_system_defaults(session)
+        default_ocr_mode = defaults.get("default_ocr_mode")
+        default_ocr_model = defaults.get("default_ocr_model")
 
-        adapter = self._adapters.get(requested)
-        if adapter is None:
-            logger.warning("requested_ocr_engine_not_found_fallback_to_default", engine=requested)
-            adapter = self._adapters[self.default_engine]
+        if requested in ("auto", "none", ""):
+            # If system defaults is configured in combo mode, route automatically to combo chain
+            if default_ocr_mode == "combo":
+                return await self._extract_combo_chain(session, content, filename, tenant_id, start_time)
+            return await self._extract_auto(
+                session, content, filename, tenant_id, start_time, default_ocr_model=default_ocr_model
+            )
+
+        if requested == "combo":
+            return await self._extract_combo_chain(session, content, filename, tenant_id, start_time)
+
+        try:
+            adapter = self._resolve_adapter(requested, default_gemini_model=default_ocr_model)
+        except TypeError:
+            adapter = self._resolve_adapter(requested)
 
         fallback_triggered = False
+        fallback_engine: str | None = None
+        cascade_trace: list[str] = []
+
         if not adapter.is_available():
-            if requested in ("mistral_ocr", "mistral"):
-                logger.warning("mistral_ocr_missing_key_fallback_to_local", requested=requested)
+            if requested in ("gemini_ocr", "gemini", "gemini_vision", "mistral_ocr", "mistral"):
+                logger.warning("cloud_ocr_missing_key_fallback_to_local", requested=requested)
                 for local_cand in ("easyocr", "docling", self.default_engine):
-                    cand_adapter = self._adapters[local_cand]
-                    if cand_adapter.is_available():
+                    cand_adapter = self._adapters.get(local_cand)
+                    if cand_adapter and cand_adapter.is_available():
                         adapter = cand_adapter
                         fallback_triggered = True
+                        fallback_engine = local_cand
+                        cascade_trace.append(f"{requested}: Thiếu API Key -> Chuyển sang {local_cand}")
                         break
             else:
                 hint = _ENGINE_INSTALL_HINTS.get(requested, "lien he quan tri vien")
@@ -122,30 +212,62 @@ class OCRService:
                     status_code=400,
                     details={"engine": requested, "install_hint": hint},
                 )
+
         result_dict = None
         error_msg = None
 
         try:
             result_dict = await adapter.extract(content, filename)
         except Exception as exc:
-            logger.error("primary_ocr_failed_triggering_fallback", engine=adapter.name, error=str(exc))
+            logger.warning("primary_ocr_failed_triggering_fallback", engine=adapter.name, error=str(exc))
             fallback_triggered = True
-            fallback_adapter = self._adapters["mock_ocr"]
-            try:
-                result_dict = await fallback_adapter.extract(content, filename)
-                result_dict["engine_used"] = fallback_adapter.name
-            except Exception as fb_exc:
-                error_msg = f"OCR and fallback both failed: {fb_exc}"
-                logger.error("ocr_fallback_failed", error=error_msg)
-                raise AppException(error_msg, status_code=500) from fb_exc
+
+            # Try combo chain first
+            combo_chain = await self._get_active_combo_chain(session)
+            for step in combo_chain:
+                step_model = step.get("model_name") if isinstance(step, dict) else getattr(step, "model_name", str(step))
+                if not step_model or step_model.lower() == requested or step_model.lower() == adapter.name.lower():
+                    continue
+
+                fb_adapter = self._resolve_adapter(step_model)
+                if not fb_adapter.is_available():
+                    continue
+
+                try:
+                    fb_res = await fb_adapter.extract(content, filename)
+                    raw_text = (fb_res.get("raw_text") or "").strip()
+                    if raw_text:
+                        result_dict = fb_res
+                        result_dict["engine_used"] = step_model
+                        fallback_engine = step_model
+                        cascade_trace.append(f"{step_model}: Thành công")
+                        break
+                except Exception as fb_exc:
+                    logger.debug("combo_candidate_failed", model=step_model, error=str(fb_exc))
+                    continue
+
+            # Fallback to mock safety net if all failed
+            if result_dict is None or not (result_dict.get("raw_text") or "").strip():
+                fallback_adapter = self._adapters["mock_ocr"]
+                try:
+                    result_dict = await fallback_adapter.extract(content, filename)
+                    result_dict["engine_used"] = fallback_adapter.name
+                    fallback_engine = fallback_adapter.name
+                    cascade_trace.append("mock_ocr: Kích hoạt lưới an toàn")
+                except Exception as fb_exc:
+                    error_msg = f"OCR and fallback both failed: {fb_exc}"
+                    logger.error("ocr_fallback_failed", error=error_msg)
+                    raise AppException(error_msg, status_code=500) from fb_exc
 
         return await self._build_response(
             session=session,
-            result_dict=result_dict,
+            result_dict=result_dict or {"engine_used": adapter.name, "raw_text": "", "pages": []},
             filename=filename,
             tenant_id=tenant_id,
             start_time=start_time,
             fallback_triggered=fallback_triggered,
+            fallback_engine=fallback_engine,
+            cascade_trace=cascade_trace,
             error_msg=error_msg,
         )
 
@@ -156,11 +278,12 @@ class OCRService:
         filename: str,
         tenant_id: str,
         start_time: float,
+        default_ocr_model: str | None = None,
     ) -> OCRExtractResponse:
         """Smart routing:
         1. For digital text PDFs: Fast PyMuPDF extraction first (10-30ms).
-        2. For scanned PDFs & Images: Prioritize Mistral OCR (Cloud API, 1-2s).
-           If Mistral API key is not configured, gracefully fall back to Local OCR (EasyOCR/Docling).
+        2. For scanned PDFs & Images: Prioritize Google Gemini Vision OCR / Mistral OCR (Cloud API, 1-2s).
+           If Cloud API keys are not configured, gracefully fall back to Local OCR (EasyOCR/Docling).
         3. For Office files (.docx, .doc, .xlsx, .xls): Prioritize Docling TableFormer.
         """
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "pdf"
@@ -169,9 +292,9 @@ class OCRService:
         if ext in ("docx", "doc", "xlsx", "xls"):
             candidate_order = ("docling", "easyocr", "pymupdf_ocr")
         elif ext in ("png", "jpg", "jpeg", "webp", "bmp", "tiff"):
-            candidate_order = ("mistral_ocr", "easyocr", "docling")
+            candidate_order = ("gemini_ocr", "mistral_ocr", "easyocr", "docling")
         else:
-            candidate_order = ("mistral_ocr", "easyocr", "docling")
+            candidate_order = ("gemini_ocr", "mistral_ocr", "easyocr", "docling")
 
         # For PDF and text files, run Firecrawl Rust-based PDF Inspector for fast classification
         default_adapter = self._adapters[self.default_engine]
@@ -228,6 +351,8 @@ class OCRService:
                     tenant_id=tenant_id,
                     start_time=start_time,
                     fallback_triggered=False,
+                    fallback_engine=None,
+                    cascade_trace=["pdf_inspector_fast_path: Văn bản số nguyên bản, không cần OCR"],
                     error_msg=None,
                 )
 
@@ -250,16 +375,43 @@ class OCRService:
                 tenant_id=tenant_id,
                 start_time=start_time,
                 fallback_triggered=False,
+                fallback_engine=None,
+                cascade_trace=["digital_text_primary: Trích xuất trực tiếp thành công"],
                 error_msg=None,
             )
 
         # Scanned PDF or images or office files:
         # Loop through candidates in priority order:
-        # Mistral OCR (if key configured) -> Local OCR (EasyOCR / Docling)
-        for candidate in candidate_order:
-            upgrade = self._adapters.get(candidate)
+        # Dynamic cloud models (Gemini / Mistral) -> Local OCR (EasyOCR / Docling)
+        gemini_adapter = (
+            GeminiOCRAdapter(model_name=default_ocr_model)
+            if default_ocr_model
+            and (
+                "gemini" in default_ocr_model.lower()
+                or default_ocr_model.lower().startswith("gemma")
+            )
+            else self._adapters["gemini_ocr"]
+        )
+        mistral_adapter = (
+            MistralOCRAdapter(model_name=default_ocr_model)
+            if default_ocr_model and "mistral" in default_ocr_model.lower()
+            else self._adapters["mistral_ocr"]
+        )
+
+        effective_candidates = list(candidate_order)
+        if default_ocr_model and "mistral" in default_ocr_model.lower() and "mistral_ocr" in effective_candidates:
+            effective_candidates.remove("mistral_ocr")
+            effective_candidates.insert(0, "mistral_ocr")
+
+        for candidate in effective_candidates:
+            if candidate == "gemini_ocr":
+                upgrade = gemini_adapter
+            elif candidate == "mistral_ocr":
+                upgrade = mistral_adapter
+            else:
+                upgrade = self._adapters.get(candidate)
+
             if not upgrade or not upgrade.is_available():
-                # E.g. Mistral has no key -> automatically skips to Local OCR!
                 logger.debug("auto_ocr_candidate_skipped_unavailable", candidate=candidate)
                 continue
             try:
@@ -281,6 +433,8 @@ class OCRService:
                     tenant_id=tenant_id,
                     start_time=start_time,
                     fallback_triggered=True,
+                    fallback_engine=candidate,
+                    cascade_trace=[f"{candidate}: Nâng cấp bóc tách thành công"],
                     error_msg=None,
                 )
 
@@ -298,6 +452,155 @@ class OCRService:
             tenant_id=tenant_id,
             start_time=start_time,
             fallback_triggered=False,
+            fallback_engine=None,
+            cascade_trace=["auto_scan: Không có văn bản nào được nhận diện"],
+            error_msg=None,
+        )
+
+    async def _extract_combo_chain(
+        self,
+        session: AsyncSession,
+        content: bytes,
+        filename: str,
+        tenant_id: str,
+        start_time: float,
+    ) -> OCRExtractResponse:
+        """Sequential Failover across all models configured in ocr_combo_chain."""
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "pdf"
+
+        # Check for clean digital text PDF fast path first
+        if ext == "pdf":
+            from app.modules.knowledge.parsers.pdf_inspector import PDFInspector
+
+            inspection = PDFInspector.inspect_bytes(content)
+            if inspection.can_skip_ocr and inspection.markdown:
+                default_adapter = self._adapters[self.default_engine]
+                try:
+                    result_dict = await default_adapter.extract(content, filename)
+                except Exception:
+                    result_dict = None
+
+                if not result_dict or not (result_dict.get("raw_text") or "").strip():
+                    page_list = [
+                        {
+                            "page_number": p.page_number,
+                            "text": p.markdown,
+                            "confidence": inspection.confidence,
+                            "blocks": [],
+                        }
+                        for p in inspection.pages_detail
+                    ] or [
+                        {
+                            "page_number": 1,
+                            "text": inspection.markdown,
+                            "confidence": inspection.confidence,
+                            "blocks": [],
+                        }
+                    ]
+                    result_dict = {
+                        "raw_text": inspection.markdown,
+                        "pages": page_list,
+                        "engine_used": "pdf_inspector_fast_path",
+                        "total_pages": inspection.page_count or 1,
+                        "latency_ms": inspection.processing_time_ms,
+                    }
+
+                return await self._build_response(
+                    session=session,
+                    result_dict=result_dict,
+                    filename=filename,
+                    tenant_id=tenant_id,
+                    start_time=start_time,
+                    fallback_triggered=False,
+                    fallback_engine=None,
+                    cascade_trace=["pdf_inspector_fast_path: Văn bản số nguyên bản, không cần OCR"],
+                    error_msg=None,
+                )
+
+        # Scanned PDF, image, or document requiring OCR:
+        combo_chain = await self._get_active_combo_chain(session)
+        cascade_trace: list[str] = []
+        result_dict = None
+        fallback_triggered = False
+        fallback_engine = None
+
+        for idx, step in enumerate(combo_chain):
+            step_model = step.get("model_name") if isinstance(step, dict) else getattr(step, "model_name", str(step))
+            if not step_model:
+                continue
+
+            adapter = self._resolve_adapter(step_model)
+            if not adapter.is_available():
+                msg = f"{step_model}: Bỏ qua (Chưa có API Key hoặc thiếu gói phụ thuộc)"
+                cascade_trace.append(msg)
+                continue
+
+            try:
+                step_start = time.perf_counter()
+                res = await adapter.extract(content, filename)
+                raw_text = (res.get("raw_text") or "").strip()
+                if raw_text:
+                    step_ms = round((time.perf_counter() - step_start) * 1000, 1)
+                    msg = f"{step_model}: Thành công ({step_ms}ms, {len(raw_text)} ký tự)"
+                    cascade_trace.append(msg)
+                    result_dict = res
+                    result_dict["engine_used"] = step_model
+                    if idx > 0:
+                        fallback_triggered = True
+                        fallback_engine = step_model
+                    break
+                else:
+                    cascade_trace.append(f"{step_model}: Kết quả bóc tách trống")
+            except Exception as exc:
+                exc_str = str(exc)
+                is_quota = any(kw in exc_str.lower() for kw in ("429", "quota", "rate limit", "resource exhausted"))
+                reason = "Hết hạn ngạch (429 Quota Exceeded)" if is_quota else f"Lỗi: {exc_str[:80]}"
+                cascade_trace.append(f"{step_model}: Thất bại ({reason}) -> Tự động chuyển mô hình tiếp theo")
+                logger.warning(
+                    "combo_ocr_step_failed_continuing_sequence",
+                    step=idx + 1,
+                    model=step_model,
+                    error=exc_str,
+                    is_quota=is_quota,
+                )
+                continue
+
+        # If all items in combo_chain failed, try local fallback
+        if result_dict is None or not (result_dict.get("raw_text") or "").strip():
+            for local_cand in ("easyocr", "docling", self.default_engine):
+                cand_adapter = self._adapters[local_cand]
+                if cand_adapter.is_available():
+                    try:
+                        res = await cand_adapter.extract(content, filename)
+                        if (res.get("raw_text") or "").strip():
+                            cascade_trace.append(f"{local_cand}: Cứu nguy nội bộ thành công")
+                            result_dict = res
+                            result_dict["engine_used"] = local_cand
+                            fallback_triggered = True
+                            fallback_engine = local_cand
+                            break
+                    except Exception as rescue_exc:
+                        logger.debug("local_rescue_failed", candidate=local_cand, error=str(rescue_exc))
+                        continue
+
+        if result_dict is None:
+            result_dict = {
+                "engine_used": "none",
+                "raw_text": "",
+                "pages": [],
+                "total_pages": 0,
+                "overall_confidence": 0.0,
+            }
+
+        return await self._build_response(
+            session=session,
+            result_dict=result_dict,
+            filename=filename,
+            tenant_id=tenant_id,
+            start_time=start_time,
+            fallback_triggered=fallback_triggered,
+            fallback_engine=fallback_engine,
+            cascade_trace=cascade_trace,
             error_msg=None,
         )
 
@@ -309,6 +612,8 @@ class OCRService:
         tenant_id: str,
         start_time: float,
         fallback_triggered: bool,
+        fallback_engine: str | None = None,
+        cascade_trace: list[str] | None = None,
         error_msg: str | None = None,
     ) -> OCRExtractResponse:
         """Persist the audit log and shape the final OCR response."""
@@ -351,6 +656,8 @@ class OCRService:
             success=True,
             engine_used=result_dict.get("engine_used", self.default_engine),
             fallback_triggered=fallback_triggered,
+            fallback_engine=fallback_engine,
+            cascade_trace=cascade_trace or [],
             total_pages=total_pages,
             overall_confidence=confidence,
             latency_ms=latency_ms,

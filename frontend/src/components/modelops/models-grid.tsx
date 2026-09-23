@@ -10,8 +10,10 @@ import {
   Loader2,
   Plus,
   RotateCw,
+  ScanText,
   Star,
   Trash2,
+  Type,
   X,
   Zap,
 } from "lucide-react";
@@ -73,12 +75,17 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
   onCleanUnavailableModels,
   onQuickAddPresetModel,
 }) => {
-  const [modelFilter, setModelFilter] = useState<"all" | "vision" | "reasoning" | "default">("all");
+  const [modelFilter, setModelFilter] = useState<
+    "all" | "ocr" | "vision" | "reasoning" | "default"
+  >("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
 
   const filteredModels = useMemo(() => {
     const allM = selectedProvider.models || [];
     if (modelFilter === "all") return allM;
+    if (modelFilter === "ocr") {
+      return allM.filter((m) => getModelCapabilities(m).isOcr);
+    }
     if (modelFilter === "vision") {
       return allM.filter((m) => getModelCapabilities(m).hasVision);
     }
@@ -133,7 +140,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
             <Select
               value={modelFilter}
               onValueChange={(val) =>
-                setModelFilter(val as "all" | "vision" | "reasoning" | "default")
+                setModelFilter(val as "all" | "ocr" | "vision" | "reasoning" | "default")
               }
             >
               <SelectTrigger className="h-8 w-44 text-xs font-medium">
@@ -141,6 +148,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả mô hình</SelectItem>
+                <SelectItem value="ocr">OCR & Bóc tách (Vision OCR)</SelectItem>
                 <SelectItem value="vision">Vision (Thị giác)</SelectItem>
                 <SelectItem value="reasoning">Reasoning (Suy luận)</SelectItem>
                 <SelectItem value="default">Mặc định hệ thống</SelectItem>
@@ -229,6 +237,27 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                     {m}
                   </span>
 
+                  {capabilities.isOcr && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1 py-0 h-3.5 bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30 gap-0.5 font-medium"
+                      title="Mô hình hỗ trợ bóc tách tài liệu và nhận diện OCR"
+                    >
+                      <ScanText className="h-2.5 w-2.5" />
+                      OCR
+                    </Badge>
+                  )}
+                  {!capabilities.hasVision && !capabilities.isOcr && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1 py-0 h-3.5 bg-muted/60 text-muted-foreground border-border/60 gap-0.5 font-normal"
+                      title="Mô hình thuần văn bản (Text-only, không hỗ trợ OCR/Thị giác)"
+                    >
+                      <Type className="h-2.5 w-2.5" />
+                      Text
+                    </Badge>
+                  )}
+
                   {isDefEmbedding && (
                     <Badge
                       variant="secondary"
@@ -253,22 +282,32 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                       className="text-[9px] px-1 py-0 h-3.5 bg-sky-500/20 text-sky-500 border-none gap-0.5"
                     >
                       <Star className="h-2.5 w-2.5 fill-sky-500" />
-                      OCR
+                      Default OCR
                     </Badge>
                   )}
                 </div>
 
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="truncate max-w-[130px] italic">{displayName}</span>
+                  <span
+                    className="truncate max-w-[130px] italic"
+                    title={capabilities.capabilityLabel}
+                  >
+                    {displayName}
+                  </span>
                   <div className="flex items-center gap-1 text-muted-foreground/70 shrink-0">
-                    {capabilities.hasVision && (
+                    {capabilities.isOcr && (
+                      <span title="Chuyên gia OCR / Bóc tách tài liệu">
+                        <ScanText className="h-3 w-3 text-sky-500" />
+                      </span>
+                    )}
+                    {capabilities.hasVision && !capabilities.isOcr && (
                       <span title="Hỗ trợ Vision / Đa phương thức">
-                        <Eye className="h-3 w-3" />
+                        <Eye className="h-3 w-3 text-primary" />
                       </span>
                     )}
                     {capabilities.hasReasoning && (
                       <span title="Hỗ trợ Suy luận chuyên sâu (Reasoning)">
-                        <Brain className="h-3 w-3" />
+                        <Brain className="h-3 w-3 text-amber-500" />
                       </span>
                     )}
                   </div>

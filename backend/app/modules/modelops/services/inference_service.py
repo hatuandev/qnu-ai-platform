@@ -45,6 +45,48 @@ VALID_CHAT_PROVIDER_TYPES: set[str] = {
 NON_CHAT_MODEL_KEYWORDS: tuple[str, ...] = ("bge-", "embed", "rerank", "tableformer")
 
 
+def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None) -> bool:
+    """Check if model name belongs to or is accepted by provider dynamically."""
+    if not model_name or not str(model_name).strip():
+        return False
+    m_clean = str(model_name).strip()
+    m_lower = m_clean.lower()
+    p_models = [str(x).strip().lower() for x in (p.get("models") or [])]
+    p_def_model = str(p.get("model_name", "")).strip().lower()
+
+    # 1. Exact match in provider models list or default model
+    if m_lower in p_models or m_lower == p_def_model:
+        return True
+
+    p_type = str(p.get("provider_type", "")).strip().lower()
+    p_id = str(p.get("id", "")).strip().lower()
+
+    # 2. Family & provider type matching
+    if any(k in m_lower for k in ("gemini", "gemma")):
+        return p_type in ("gemini", "google") or "gemini" in p_id or "google" in p_id
+    if any(k in m_lower for k in ("gpt-", "chatgpt", "o1-", "o3-", "o1", "o3")):
+        return p_type in ("openai", "azure") or "openai" in p_id
+    if "claude" in m_lower:
+        return p_type in ("anthropic", "claude") or "claude" in p_id
+    if any(k in m_lower for k in ("mistral", "codestral", "ministral", "pixtral")):
+        return p_type in ("mistral",) or "mistral" in p_id
+    if any(k in m_lower for k in ("qwen", "deepseek", "llama", "phi-", "mixtral")):
+        return p_type in (
+            "local",
+            "vllm",
+            "local_vllm",
+            "ollama",
+            "groq",
+            "cloudflare",
+            "custom",
+            "openrouter",
+            "nvidia",
+        )
+
+    # 3. Custom / OpenRouter / OpenAI compatible proxies allow arbitrary model names
+    return p_type in ("openai_compatible", "custom", "local", "vllm", "local_vllm", "openrouter", "groq")
+
+
 class InferenceService:
     """Executes LLM inference (generate & stream) with Key Pool rotation, Dynamic Fallback, and Quota accounting."""
 
@@ -108,14 +150,16 @@ class InferenceService:
                 if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
                     score += 100
                 p_models = p.get("models") or []
-                if req.preferred_model_name and (
-                    req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
-                ):
-                    score += 50
-                if req.fallback_model_name and (
-                    req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name
-                ):
-                    score += 25
+                if req.preferred_model_name:
+                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
+                        score += 50
+                    elif _is_model_compatible_with_provider(p, req.preferred_model_name):
+                        score += 40
+                if req.fallback_model_name:
+                    if req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name:
+                        score += 25
+                    elif _is_model_compatible_with_provider(p, req.fallback_model_name):
+                        score += 20
                 return score
 
             providers = sorted(providers, key=_match_score, reverse=True)
@@ -166,13 +210,13 @@ class InferenceService:
                     if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
                 ]
 
-                if req.preferred_model_name and (
-                    req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
+                # Resolve chosen_model dynamically respecting user's configuration
+                if (
+                    (req.preferred_provider_id and p.get("id") == req.preferred_provider_id and req.preferred_model_name)
+                    or (req.preferred_model_name and _is_model_compatible_with_provider(p, req.preferred_model_name))
                 ):
                     chosen_model = req.preferred_model_name
-                elif req.fallback_model_name and (
-                    req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name
-                ):
+                elif req.fallback_model_name and _is_model_compatible_with_provider(p, req.fallback_model_name):
                     chosen_model = req.fallback_model_name
                 else:
                     if chat_candidates and any(
@@ -335,14 +379,16 @@ class InferenceService:
                 if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
                     score += 100
                 p_models = p.get("models") or []
-                if req.preferred_model_name and (
-                    req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
-                ):
-                    score += 50
-                if req.fallback_model_name and (
-                    req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name
-                ):
-                    score += 25
+                if req.preferred_model_name:
+                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
+                        score += 50
+                    elif _is_model_compatible_with_provider(p, req.preferred_model_name):
+                        score += 40
+                if req.fallback_model_name:
+                    if req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name:
+                        score += 25
+                    elif _is_model_compatible_with_provider(p, req.fallback_model_name):
+                        score += 20
                 return score
 
             providers = sorted(providers, key=_match_score, reverse=True)
@@ -384,13 +430,13 @@ class InferenceService:
                     if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
                 ]
 
-                if req.preferred_model_name and (
-                    req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name
+                # Resolve chosen_model dynamically respecting user's configuration
+                if (
+                    (req.preferred_provider_id and p.get("id") == req.preferred_provider_id and req.preferred_model_name)
+                    or (req.preferred_model_name and _is_model_compatible_with_provider(p, req.preferred_model_name))
                 ):
                     chosen_model = req.preferred_model_name
-                elif req.fallback_model_name and (
-                    req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name
-                ):
+                elif req.fallback_model_name and _is_model_compatible_with_provider(p, req.fallback_model_name):
                     chosen_model = req.fallback_model_name
                 else:
                     if chat_candidates and any(

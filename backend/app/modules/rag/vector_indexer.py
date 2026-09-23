@@ -160,7 +160,13 @@ class VectorIndexer:
         if not account_id or not token:
             raise ValueError("Cloudflare credentials not configured.")
 
-        model = settings.EMBEDDING_MODEL if "@cf/" in settings.EMBEDDING_MODEL else "@cf/baai/bge-m3"
+        raw_model = settings.EMBEDDING_MODEL.strip()
+        if raw_model.startswith("@cf/"):
+            model = raw_model
+        elif "/" in raw_model:
+            model = f"@cf/{raw_model}"
+        else:
+            model = f"@cf/baai/{raw_model}"
         url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
         headers = {
             "Authorization": f"Bearer {token}",

@@ -36,6 +36,8 @@ class OCRExtractResponse(BaseModel):
     success: bool
     engine_used: str
     fallback_triggered: bool = False
+    fallback_engine: str | None = None
+    cascade_trace: list[str] = Field(default_factory=list)
     total_pages: int
     overall_confidence: float
     latency_ms: float

@@ -89,6 +89,30 @@ export interface ModelOption {
   description?: string;
 }
 
+export interface OCRComboItem {
+  provider_id: string;
+  provider_name: string;
+  model_name: string;
+  provider_type?: string;
+  is_active?: boolean;
+  description?: string;
+}
+
+export interface ModelComboItem {
+  id: string;
+  name: string;
+  strategy: "fallback" | "round_robin" | "fusion";
+  models: OCRComboItem[];
+  is_default?: boolean;
+  description?: string;
+}
+
+export interface VisionAdapterConfig {
+  enabled: boolean;
+  strategy: "fallback" | "round_robin";
+  models: OCRComboItem[];
+}
+
 export interface SystemModelDefaults {
   default_embedding_provider_id: string;
   default_embedding_model: string;
@@ -96,6 +120,10 @@ export interface SystemModelDefaults {
   default_reranker_model: string;
   default_ocr_provider_id: string;
   default_ocr_model: string;
+  default_ocr_mode?: "combo" | "single";
+  ocr_combo_chain?: OCRComboItem[];
+  model_combos?: ModelComboItem[];
+  vision_adapter?: VisionAdapterConfig;
 }
 
 export interface SystemModelDefaultsResponse {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -357,13 +358,41 @@ class ModelOption(BaseModel):
     description: str | None = None
 
 
+class OCRComboItem(BaseModel):
+    provider_id: str
+    provider_name: str
+    model_name: str
+    provider_type: str = "cloud"  # "cloud" | "local" | "custom"
+    is_active: bool = True
+    description: str | None = None
+
+
+class ModelComboItem(BaseModel):
+    id: str = Field(default_factory=lambda: f"combo_{uuid4().hex[:8]}")
+    name: str
+    strategy: Literal["fallback", "round_robin", "fusion"] = "fallback"
+    models: list[OCRComboItem] = Field(default_factory=list)
+    is_default: bool = False
+    description: str | None = None
+
+
+class VisionAdapterConfig(BaseModel):
+    enabled: bool = True
+    strategy: Literal["fallback", "round_robin"] = "fallback"
+    models: list[OCRComboItem] = Field(default_factory=list)
+
+
 class SystemModelDefaults(BaseModel):
     default_embedding_provider_id: str = "prov_cloudflare"
     default_embedding_model: str = "@cf/baai/bge-m3"
     default_reranker_provider_id: str = "prov_cloudflare"
     default_reranker_model: str = "@cf/baai/bge-reranker-base"
-    default_ocr_provider_id: str = "prov_mistral"
-    default_ocr_model: str = "mistral-ocr-latest"
+    default_ocr_provider_id: str = "prov_ace0d9fe"
+    default_ocr_model: str = "gemini-2.5-flash"
+    default_ocr_mode: Literal["combo", "single"] = "combo"
+    ocr_combo_chain: list[OCRComboItem] = Field(default_factory=list)
+    model_combos: list[ModelComboItem] = Field(default_factory=list)
+    vision_adapter: VisionAdapterConfig = Field(default_factory=VisionAdapterConfig)
 
 
 class SystemModelDefaultsUpdate(BaseModel):
@@ -373,6 +402,10 @@ class SystemModelDefaultsUpdate(BaseModel):
     default_reranker_model: str | None = None
     default_ocr_provider_id: str | None = None
     default_ocr_model: str | None = None
+    default_ocr_mode: Literal["combo", "single"] | None = None
+    ocr_combo_chain: list[OCRComboItem] | None = None
+    model_combos: list[ModelComboItem] | None = None
+    vision_adapter: VisionAdapterConfig | None = None
 
 
 class SystemModelDefaultsResponse(BaseModel):
@@ -383,8 +416,8 @@ class SystemModelDefaultsResponse(BaseModel):
 
 
 class SetDefaultModelRequest(BaseModel):
-    role: Literal["embedding", "reranker", "ocr"] = Field(
-        ..., description="Vai trò mặc định cần gán: embedding, reranker, hoặc ocr"
+    role: Literal["embedding", "reranker", "ocr", "fallback_ocr", "ocr_combo"] = Field(
+        ..., description="Vai trò mặc định cần gán: embedding, reranker, ocr, fallback_ocr, hoặc ocr_combo"
     )
     model_name: str = Field(..., min_length=1, description="Tên mô hình cần gán làm mặc định")
 

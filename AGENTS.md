@@ -13,6 +13,7 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
   3. **Zero Hallucination (Chống bịa đặt)**: Dữ liệu câu trả lời của Trợ lý AI phải bám sát 100% tài liệu chính thức của Trường Đại học Quy Nhơn; nếu thiếu căn cứ, bắt buộc phải kích hoạt No-Answer Policy để hướng dẫn tới phòng ban phụ trách.
   4. **UI/UX Gold Standard & Zero Lint Errors**: Đồng bộ 100% nhận diện ĐH Quy Nhơn (Academic Teal `oklch(0.46 0.13 160)`), thiết kế cao cấp, chuyển đổi Dark/Light mode mượt mà; 0 lỗi Biome linter, 0 lỗi TypeScript typecheck.
   5. **Zero Mojibake & Chuẩn Hóa UTF-8 Tiếng Việt**: 100% tệp mã nguồn, dữ liệu bóc tách, template, API responses và UI hiển thị phải sử dụng chuẩn mã hóa UTF-8 sạch. Tuyệt đối cấm lỗi vỡ font, lỗi mã hóa ký tự rác (Mojibake, dấu hỏi chấm `?`, ký tự thay thế `\ufffd`, chuỗi rác như `Quyt `<nh...`, `B~ GIA?O D C...`, `?oAn ?cc TA1ng...`). Mọi luồng OCR và trích xuất tài liệu phải qua tầng chuẩn hóa Unicode NFC.
+  6. **Zero Hardcoded Models & Dynamic Provider Resolution**: Tuyệt đối cấm gán cứng (hardcode) tên mô hình (LLM chat, Vision OCR, Embedding, Reranker) trong runtime nghiệp vụ, routers, services hoặc DAG nodes. Tính năng Quản lý Nhà cung cấp (Providers / ModelOps) sinh ra để người dùng tự do thêm, sửa, đổi bất kỳ model nào. Hệ thống runtime bắt buộc phải tôn trọng 100% tên mô hình được người dùng chỉ định (`preferred_model_name`), phân giải động theo cấu hình nhà cung cấp và truyền nguyên vẹn sang Adapter; nghiêm cấm việc tự ý lọc bỏ, nuốt lỗi hoặc ép chuyển về model mặc định cũ (như `gemini-2.5-flash` hay `gpt-4o-mini`).
 
 ---
 
@@ -62,6 +63,10 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    uv run --extra dev pytest -v
    ```
    - **Cấm test giả (Anti-Mock-Test)**: Test không được pass nhờ đường fallback/mock (ví dụ service trả catalog seed khi DB lỗi, embedding giả khi Qdrant offline). Mỗi suite phải có ít nhất 1 ca phủ đường lỗi (DB down, API lỗi, RAG trống kết quả) để hành vi fallback lộ rõ và tuân thủ No-Answer Policy.
+5. **Dynamic Model Resolution Policy (Chính sách phân giải mô hình động)**:
+   - Tất cả các lệnh gọi LLM (`generate`, `stream_generate`) trong `InferenceService`, `LLMGenerateNodeHandler`, `AssistantChatService`, `RAGService` bắt buộc phải đọc `preferred_model_name`, `fallback_model_name`, `preferred_provider_id` từ yêu cầu hoặc cấu hình (`AssistantModelPolicy`).
+   - Tuyệt đối không được ép model về danh sách cứng nếu tên model tương thích với loại nhà cung cấp (Google Gemini, OpenAI, Mistral, Anthropic, Custom/Ollama/vLLM).
+   - Module OCR bắt buộc hỗ trợ cấu hình động `default_ocr_model` và chuỗi `ocr_combo_chain` từ `system_model_defaults`, không được ghim cứng model Vision/OCR nào.
 
 ---
 
@@ -313,6 +318,12 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - **Bảo toàn Bảng Mã Khi Export & Download**:
   - Frontend: Khi tạo Blob tải xuống (Markdown, CSV, TXT, JSON), bắt buộc phải khai báo charset rõ ràng: `new Blob([content], { type: "text/markdown;charset=utf-8" })`.
   - Riêng với tệp CSV xuất cho Microsoft Excel trên Windows: Bắt buộc chèn thêm tiền tố BOM UTF-8 (`\uFEFF`) ở đầu chuỗi để Excel tự động nhận diện đúng font tiếng Việt có dấu mà không bị vỡ font.
+
+### 8.11. Cấm Tuyệt Đối Hardcode Model & Bắt Buộc Tôn Trọng Cấu Hình Nhà Cung Cấp (Zero Hardcoded Models Policy)
+> *"Người dùng tạo ra giao diện Nhà cung cấp là để làm chủ các mô hình AI mới nhất. Hệ thống không được phép phản bội cấu hình của người dùng bằng các chuỗi hardcode ngầm trong mã nguồn."*
+- **Tôn trọng 100% cấu hình người dùng**: Khi người dùng đã chọn hoặc nhập một model (ví dụ: `gemini-3.5-flash`, `gemini-3.1-pro`, `qwen2.5-72b-instruct`, `mistral-ocr-2503`), hệ thống runtime phải chuyển chính xác model đó tới API Provider. Tuyệt đối không được tự ý fallback về model cũ nếu chưa có sự cố 429/timeout thực sự.
+- **Không lọc cứng danh sách model**: Provider Adapter và Inference Service phải chấp nhận bất kỳ mã model hợp lệ nào mà nhà cung cấp hỗ trợ, không được dùng điều kiện `model in hardcoded_list` để từ chối hoặc đè model của người dùng.
+- **Cấm che giấu lỗi bằng hardcode fallback**: Không được viết `primary = getattr(...) or "gpt-4o-mini"` để làm đẹp bài test hay che giấu việc người dùng chưa cấu hình. Hãy báo lỗi rõ ràng nếu thiếu cấu hình bắt buộc.
 
 ---
 

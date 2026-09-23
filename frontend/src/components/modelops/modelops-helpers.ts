@@ -22,27 +22,58 @@ export const getProviderCategory = (prov: ModelProvider): "cloud" | "local" | "c
   return "cloud";
 };
 
-export const getModelCapabilities = (
-  modelName: string
-): { hasVision: boolean; hasReasoning: boolean } => {
+export interface ModelCapabilityInfo {
+  hasVision: boolean;
+  hasReasoning: boolean;
+  isOcr: boolean;
+  capabilityLabel: string;
+}
+
+export const getModelCapabilities = (modelName: string): ModelCapabilityInfo => {
   const mLower = modelName.toLowerCase();
+  const isGemma = mLower.startsWith("gemma");
+  const isBge = mLower.includes("bge") || mLower.includes("embed") || mLower.includes("rerank");
+
+  const isOcr =
+    !isGemma &&
+    !isBge &&
+    (mLower.includes("ocr") ||
+      mLower.includes("docling") ||
+      mLower.includes("flash-image") ||
+      mLower.startsWith("gemini") ||
+      mLower.includes("gemini") ||
+      mLower.includes("4o") ||
+      mLower.includes("sonnet") ||
+      mLower.includes("vision"));
+
   const hasVision =
-    mLower.includes("vision") ||
-    mLower.includes("flash") ||
-    mLower.includes("4o") ||
-    mLower.includes("sonnet") ||
-    mLower.includes("opus") ||
-    mLower.includes("ocr") ||
-    mLower.includes("docling");
+    !isGemma &&
+    (isOcr ||
+      mLower.includes("vision") ||
+      mLower.includes("flash") ||
+      mLower.includes("4o") ||
+      mLower.includes("sonnet") ||
+      mLower.includes("opus"));
+
   const hasReasoning =
     mLower.includes("reason") ||
     mLower.includes("o1") ||
     mLower.includes("o3") ||
     mLower.includes("r1") ||
     mLower.includes("thinking") ||
-    mLower.includes("pro") ||
+    (mLower.includes("pro") && !isBge) ||
     mLower.includes("high");
-  return { hasVision, hasReasoning };
+
+  let capabilityLabel = "Thuần Văn Bản (Text-Only)";
+  if (isOcr) {
+    capabilityLabel = "Bóc Tách Văn Bản & Bảng Biểu (Vision OCR)";
+  } else if (hasVision) {
+    capabilityLabel = "Thị Giác Máy Tính (Vision)";
+  } else if (hasReasoning) {
+    capabilityLabel = "Suy Luận Phức Tạp (Reasoning)";
+  }
+
+  return { hasVision, hasReasoning, isOcr, capabilityLabel };
 };
 
 export const getModelDisplayName = (modelName: string): string => {
@@ -59,11 +90,12 @@ export const getModelDisplayName = (modelName: string): string => {
 export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
   openai: ["gpt-4o", "gpt-4o-mini", "o1-mini"],
   gemini: [
-    "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
-    "gemini-flash-lite-latest",
     "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-image",
+    "gemini-3.1-pro-preview",
     "gemma-4-26b-a4b-it",
     "gemma-4-31b-it",
   ],

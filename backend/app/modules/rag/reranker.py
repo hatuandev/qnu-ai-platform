@@ -33,11 +33,13 @@ class RerankerClient:
         if not account_id or not token:
             return candidates[:top_k]
 
-        model = (
-            settings.RERANKER_MODEL
-            if "@cf/" in settings.RERANKER_MODEL
-            else "@cf/baai/bge-reranker-base"
-        )
+        raw_model = settings.RERANKER_MODEL.strip()
+        if raw_model.startswith("@cf/"):
+            model = raw_model
+        elif "/" in raw_model:
+            model = f"@cf/{raw_model}"
+        else:
+            model = f"@cf/baai/{raw_model}"
         url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
         headers = {
             "Authorization": f"Bearer {token}",

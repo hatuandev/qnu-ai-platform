@@ -17,10 +17,16 @@ logger = logging.getLogger(__name__)
 
 
 class MistralOCRAdapter(BaseOCRAdapter):
-    """Adapter sending documents to Mistral OCR Cloud API (mistral-ocr-latest)."""
+    """Adapter sending documents to Mistral OCR Cloud API."""
 
-    def __init__(self, api_key: str | None = None, base_url: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model_name: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self._api_key = api_key
+        self._model_name = model_name or "mistral-ocr-latest"
         self._base_url = (base_url or "https://api.mistral.ai/v1").rstrip("/")
 
     @property
@@ -29,7 +35,11 @@ class MistralOCRAdapter(BaseOCRAdapter):
 
     @property
     def display_name(self) -> str:
-        return "Mistral OCR (Cloud API Vision & Document Intelligence)"
+        return f"Mistral OCR ({self._model_name})"
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
 
     @property
     def api_key(self) -> str | None:
@@ -56,7 +66,7 @@ class MistralOCRAdapter(BaseOCRAdapter):
         data_url = f"data:{mime_type};base64,{b64_data}"
 
         payload = {
-            "model": "mistral-ocr-latest",
+            "model": self._model_name,
             "document": {
                 "type": "document_url",
                 "document_url": data_url,

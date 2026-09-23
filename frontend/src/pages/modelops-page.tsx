@@ -5,16 +5,19 @@ import {
   Cpu,
   Download,
   FileJson,
+  Layers,
   Plus,
   RefreshCw,
   Server,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "../components/admin/empty-state";
 import { PageHeader } from "../components/admin/page-header";
 import { AddCustomModelDialog } from "../components/modelops/add-custom-model-dialog";
+import { CombosVisionSection } from "../components/modelops/combos-vision-section";
 import { ImportProvidersDialog } from "../components/modelops/import-providers-dialog";
 import { KeyPoolSection } from "../components/modelops/key-pool-section";
 import {
@@ -76,6 +79,9 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
       }
     }
   }, [currentPath]);
+
+  // Master View Main Tab (Combos vs Providers vs Defaults)
+  const [mainViewMode, setMainViewMode] = useState<"combos" | "providers" | "defaults">("combos");
 
   // Master View Category Filter Tab
   const [activeCategoryTab, setActiveCategoryTab] = useState<ProviderCategory>("all");
@@ -156,6 +162,32 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
   const availableEmbeddings = defaultsQuery.data?.available_embeddings || [];
   const availableRerankers = defaultsQuery.data?.available_rerankers || [];
   const availableOcrs = defaultsQuery.data?.available_ocrs || [];
+
+  const allAvailableModels = useMemo(() => {
+    const list: Array<{
+      provider_id: string;
+      provider_name: string;
+      provider_type: string;
+      model_name: string;
+      category: "cloud" | "local" | "custom";
+      description?: string;
+    }> = [];
+    for (const p of providers) {
+      if (!p.is_active) continue;
+      const cat = getProviderCategory(p);
+      for (const m of p.models || []) {
+        list.push({
+          provider_id: p.id,
+          provider_name: p.name,
+          provider_type: p.type || p.code || "cloud",
+          model_name: m,
+          category: cat,
+          description: `${m} (${p.name})`,
+        });
+      }
+    }
+    return list;
+  }, [providers]);
 
   const updateDefaultsMutation = useMutation({
     mutationFn: (payload: Partial<SystemModelDefaults>) =>
@@ -783,284 +815,365 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
         }
       />
 
-      {/* System Default Routing Card */}
-      <SystemDefaultsCard
-        systemDefaults={systemDefaults}
-        availableEmbeddings={availableEmbeddings}
-        availableRerankers={availableRerankers}
-        availableOcrs={availableOcrs}
-        isLoading={defaultsQuery.isLoading}
-        onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
-      />
-
-      {/* Category Tabs / Filters */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+      {/* Phân hệ Tab: Combos & Vision Adapter vs Quản Lý Providers vs Mặc Định Hệ Thống */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-2.5">
         <Button
-          variant={activeCategoryTab === "all" ? "default" : "outline"}
+          variant={mainViewMode === "combos" ? "default" : "outline"}
           size="sm"
-          onClick={() => setActiveCategoryTab("all")}
-          className="h-8 text-xs gap-1.5 rounded-full"
+          onClick={() => setMainViewMode("combos")}
+          className="h-8 text-xs gap-1.5 rounded-md"
         >
-          <span>Tất Cả</span>
+          <Layers className="size-3.5" />
+          <span>Combos & Vision Adapter</span>
           <Badge
             variant="secondary"
-            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
+          >
+            {systemDefaults?.model_combos?.length || 1} Combos
+          </Badge>
+        </Button>
+
+        <Button
+          variant={mainViewMode === "providers" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMainViewMode("providers")}
+          className="h-8 text-xs gap-1.5 rounded-md"
+        >
+          <Server className="size-3.5" />
+          <span>Nhà Cung Cấp & Khóa API</span>
+          <Badge
+            variant="secondary"
+            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
           >
             {providers.length}
           </Badge>
         </Button>
 
         <Button
-          variant={activeCategoryTab === "cloud" ? "default" : "outline"}
+          variant={mainViewMode === "defaults" ? "default" : "outline"}
           size="sm"
-          onClick={() => setActiveCategoryTab("cloud")}
-          className="h-8 text-xs gap-1.5 rounded-full"
+          onClick={() => setMainViewMode("defaults")}
+          className="h-8 text-xs gap-1.5 rounded-md"
         >
-          <Cloud className="h-3.5 w-3.5" />
-          <span>Cloud (Đám Mây)</span>
-          <Badge
-            variant="secondary"
-            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
-          >
-            {cloudProviders.length}
-          </Badge>
-        </Button>
-
-        <Button
-          variant={activeCategoryTab === "local" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setActiveCategoryTab("local")}
-          className="h-8 text-xs gap-1.5 rounded-full"
-        >
-          <Cpu className="h-3.5 w-3.5" />
-          <span>Local (Cục Bộ)</span>
-          <Badge
-            variant="secondary"
-            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
-          >
-            {localProviders.length}
-          </Badge>
-        </Button>
-
-        <Button
-          variant={activeCategoryTab === "custom" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setActiveCategoryTab("custom")}
-          className="h-8 text-xs gap-1.5 rounded-full"
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          <span>Custom (Tùy Chỉnh)</span>
-          <Badge
-            variant="secondary"
-            className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
-          >
-            {customProviders.length}
-          </Badge>
+          <Sparkles className="size-3.5" />
+          <span>Mặc Định Hệ Thống (Routing)</span>
         </Button>
       </div>
 
-      {/* Grouped Provider Sections */}
-      <div className="space-y-8">
-        {isLoading ? (
-          <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-            <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-            <span>Đang tải danh sách nhà cung cấp...</span>
+      {/* Main View Content Switching */}
+      {mainViewMode === "combos" && (
+        <CombosVisionSection
+          systemDefaults={systemDefaults}
+          availableOcrs={availableOcrs}
+          allAvailableModels={allAvailableModels}
+          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
+        />
+      )}
+
+      {mainViewMode === "defaults" && (
+        <SystemDefaultsCard
+          systemDefaults={systemDefaults}
+          availableEmbeddings={availableEmbeddings}
+          availableRerankers={availableRerankers}
+          availableOcrs={availableOcrs}
+          isLoading={defaultsQuery.isLoading}
+          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
+        />
+      )}
+
+      {mainViewMode === "providers" && (
+        <>
+          {/* Category Tabs / Filters */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+            <Button
+              variant={activeCategoryTab === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("all")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <span>Tất Cả</span>
+              <Badge
+                variant="secondary"
+                className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+              >
+                {providers.length}
+              </Badge>
+            </Button>
+
+            <Button
+              variant={activeCategoryTab === "cloud" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("cloud")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <Cloud className="h-3.5 w-3.5" />
+              <span>Cloud (Đám Mây)</span>
+              <Badge
+                variant="secondary"
+                className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+              >
+                {cloudProviders.length}
+              </Badge>
+            </Button>
+
+            <Button
+              variant={activeCategoryTab === "local" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("local")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <Cpu className="h-3.5 w-3.5" />
+              <span>Local (Cục Bộ)</span>
+              <Badge
+                variant="secondary"
+                className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+              >
+                {localProviders.length}
+              </Badge>
+            </Button>
+
+            <Button
+              variant={activeCategoryTab === "custom" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("custom")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>Custom (Tùy Chỉnh)</span>
+              <Badge
+                variant="secondary"
+                className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
+              >
+                {customProviders.length}
+              </Badge>
+            </Button>
           </div>
-        ) : providers.length === 0 ? (
-          <Card className="p-8 border-dashed border-border bg-card/50">
-            <EmptyState
-              icon={Server}
-              title="Chưa Có Provider Nào Được Cấu Hình"
-              description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
-              action={
-                <Button
-                  size="sm"
-                  onClick={() => openCreateModal("openai")}
-                  className="text-xs h-8 gap-1.5"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Thêm Provider Mới</span>
-                </Button>
-              }
-            />
-          </Card>
-        ) : (
-          <>
-            {/* Nhóm Cloud */}
-            {(activeCategoryTab === "all" || activeCategoryTab === "cloud") && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-500">
-                      <Cloud className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-bold text-foreground">Nhóm Cloud (Đám Mây)</h2>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono text-sky-600 dark:text-sky-400 border-sky-500/30"
-                        >
-                          {cloudProviders.length} Provider{cloudProviders.length !== 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Nhà cung cấp dịch vụ mô hình AI và Edge GPU vận hành trên nền tảng đám mây
-                        (Cloudflare, Mistral, OpenAI, Gemini...)
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openCreateModal("cloudflare")}
-                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>Thêm Cloud</span>
-                  </Button>
-                </div>
 
-                {cloudProviders.length === 0 ? (
-                  <Card className="p-6 border-dashed border-border bg-card/40 text-center">
-                    <p className="text-xs text-muted-foreground">Chưa có Provider đám mây nào.</p>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {cloudProviders.map((prov) => (
-                      <ProviderCard key={prov.id} provider={prov} onSelect={handleSelectProvider} />
-                    ))}
-                  </div>
-                )}
+          {/* Grouped Provider Sections */}
+          <div className="space-y-8">
+            {isLoading ? (
+              <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                <span>Đang tải danh sách nhà cung cấp...</span>
               </div>
-            )}
-
-            {/* Nhóm Local */}
-            {(activeCategoryTab === "all" || activeCategoryTab === "local") && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-500">
-                      <Cpu className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-bold text-foreground">
-                          Nhóm Local (Cục Bộ / On-Premise)
-                        </h2>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                        >
-                          {localProviders.length} Provider{localProviders.length !== 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Mô hình AI bóc tách và tính toán chạy trực tiếp trên máy chủ nội bộ ĐH Quy
-                        Nhơn (SentenceTransformers BGE-M3, Docling OCR, Ollama...)
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openCreateModal("ollama")}
-                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>Thêm Local</span>
-                  </Button>
-                </div>
-
-                {localProviders.length === 0 ? (
-                  <Card className="p-6 border-dashed border-border bg-card/40 text-center">
-                    <p className="text-xs text-muted-foreground">Chưa có Provider cục bộ nào.</p>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {localProviders.map((prov) => (
-                      <ProviderCard key={prov.id} provider={prov} onSelect={handleSelectProvider} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Nhóm Custom */}
-            {(activeCategoryTab === "all" || activeCategoryTab === "custom") && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-500">
-                      <SlidersHorizontal className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-sm font-bold text-foreground">
-                          Nhóm Custom (Tùy Chỉnh / Tự Cấu Hình)
-                        </h2>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono text-amber-600 dark:text-amber-400 border-amber-500/30"
-                        >
-                          {customProviders.length} Provider{customProviders.length !== 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Cổng API tùy chỉnh tương thích giao thức OpenAI API (vLLM, TGI, LocalAI,
-                        FastAPI tự phát triển...)
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openCreateModal("custom")}
-                    className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>Thêm Custom</span>
-                  </Button>
-                </div>
-
-                {customProviders.length === 0 ? (
-                  <Card className="p-5 border-dashed border-border/80 bg-card/30 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                        <SlidersHorizontal className="h-4 w-4" />
-                      </div>
-                      <div className="text-xs">
-                        <p className="font-medium text-foreground">
-                          Chưa có Provider tùy chỉnh nào
-                        </p>
-                        <p className="text-muted-foreground text-[11px]">
-                          Thêm endpoint riêng để kết nối mô hình chuyên biệt hoặc máy chủ tự host
-                          của phòng ban.
-                        </p>
-                      </div>
-                    </div>
+            ) : providers.length === 0 ? (
+              <Card className="p-8 border-dashed border-border bg-card/50">
+                <EmptyState
+                  icon={Server}
+                  title="Chưa Có Provider Nào Được Cấu Hình"
+                  description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
+                  action={
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={() => openCreateModal("custom")}
-                      className="h-8 text-xs gap-1.5 shrink-0"
+                      onClick={() => openCreateModal("openai")}
+                      className="text-xs h-8 gap-1.5"
                     >
-                      <Plus className="h-3 w-3" />
-                      <span>Thêm Custom Provider</span>
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Thêm Provider Mới</span>
                     </Button>
-                  </Card>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {customProviders.map((prov) => (
-                      <ProviderCard key={prov.id} provider={prov} onSelect={handleSelectProvider} />
-                    ))}
+                  }
+                />
+              </Card>
+            ) : (
+              <>
+                {/* Nhóm Cloud */}
+                {(activeCategoryTab === "all" || activeCategoryTab === "cloud") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-500">
+                          <Cloud className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-bold text-foreground">
+                              Nhóm Cloud (Đám Mây)
+                            </h2>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono text-sky-600 dark:text-sky-400 border-sky-500/30"
+                            >
+                              {cloudProviders.length} Provider
+                              {cloudProviders.length !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Nhà cung cấp dịch vụ mô hình AI và Edge GPU vận hành trên nền tảng đám
+                            mây (Cloudflare, Mistral, OpenAI, Gemini...)
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openCreateModal("cloudflare")}
+                        className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Thêm Cloud</span>
+                      </Button>
+                    </div>
+
+                    {cloudProviders.length === 0 ? (
+                      <Card className="p-6 border-dashed border-border bg-card/40 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          Chưa có Provider đám mây nào.
+                        </p>
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {cloudProviders.map((prov) => (
+                          <ProviderCard
+                            key={prov.id}
+                            provider={prov}
+                            onSelect={handleSelectProvider}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+
+                {/* Nhóm Local */}
+                {(activeCategoryTab === "all" || activeCategoryTab === "local") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-500">
+                          <Cpu className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-bold text-foreground">
+                              Nhóm Local (Cục Bộ / On-Premise)
+                            </h2>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                            >
+                              {localProviders.length} Provider
+                              {localProviders.length !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Mô hình AI bóc tách và tính toán chạy trực tiếp trên máy chủ nội bộ ĐH
+                            Quy Nhơn (SentenceTransformers BGE-M3, Docling OCR, Ollama...)
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openCreateModal("ollama")}
+                        className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Thêm Local</span>
+                      </Button>
+                    </div>
+
+                    {localProviders.length === 0 ? (
+                      <Card className="p-6 border-dashed border-border bg-card/40 text-center">
+                        <p className="text-xs text-muted-foreground">
+                          Chưa có Provider cục bộ nào.
+                        </p>
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {localProviders.map((prov) => (
+                          <ProviderCard
+                            key={prov.id}
+                            provider={prov}
+                            onSelect={handleSelectProvider}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Nhóm Custom */}
+                {(activeCategoryTab === "all" || activeCategoryTab === "custom") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-500">
+                          <SlidersHorizontal className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-sm font-bold text-foreground">
+                              Nhóm Custom (Tùy Chỉnh / Tự Cấu Hình)
+                            </h2>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-mono text-amber-600 dark:text-amber-400 border-amber-500/30"
+                            >
+                              {customProviders.length} Provider
+                              {customProviders.length !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Cổng API tùy chỉnh tương thích giao thức OpenAI API (vLLM, TGI, LocalAI,
+                            FastAPI tự phát triển...)
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openCreateModal("custom")}
+                        className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Thêm Custom</span>
+                      </Button>
+                    </div>
+
+                    {customProviders.length === 0 ? (
+                      <Card className="p-5 border-dashed border-border/80 bg-card/30 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                            <SlidersHorizontal className="h-4 w-4" />
+                          </div>
+                          <div className="text-xs">
+                            <p className="font-medium text-foreground">
+                              Chưa có Provider tùy chỉnh nào
+                            </p>
+                            <p className="text-muted-foreground text-[11px]">
+                              Thêm endpoint riêng để kết nối mô hình chuyên biệt hoặc máy chủ tự
+                              host của phòng ban.
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openCreateModal("custom")}
+                          className="h-8 text-xs gap-1.5 shrink-0"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>Thêm Custom Provider</span>
+                        </Button>
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {customProviders.map((prov) => (
+                          <ProviderCard
+                            key={prov.id}
+                            provider={prov}
+                            onSelect={handleSelectProvider}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Resilience & Dynamic Fallback Policy */}
       <ResiliencePolicyCard

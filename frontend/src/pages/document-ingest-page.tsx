@@ -35,7 +35,9 @@ import { type KnowledgeCollection, apiClient } from "../services/api-client";
 import { listDocumentTypes } from "../services/document-types-api";
 
 const OCR_ENGINE_PARAM: Record<string, string | undefined> = {
+  combo: "combo",
   auto: undefined,
+  gemini: "gemini_ocr",
   mistral: "mistral_ocr",
   docling: "docling",
   pymupdf: "pymupdf_ocr",
@@ -57,7 +59,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
   const [docTitle, setDocTitle] = useState<string>("");
   const [docType, setDocType] = useState<string>("");
   const [year, setYear] = useState<string>("");
-  const [ocrEngine, setOcrEngine] = useState<string>("auto");
+  const [ocrEngine, setOcrEngine] = useState<string>("combo");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recommendation, setRecommendation] = useState<FileRecommendation | null>(null);
   const [isFastTrack, setIsFastTrack] = useState<boolean>(false);
@@ -345,8 +347,14 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   <SelectValue placeholder="Chọn bộ máy OCR" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="combo">
+                    Combo OCR Mặc Định Hệ Thống (Tự động chuyển mô hình khi hết Quota)
+                  </SelectItem>
                   <SelectItem value="auto">
-                    ✨ Tự động nhận diện tối ưu theo tệp (Khuyên dùng...)
+                    Tự động nhận diện tối ưu theo tệp (Auto Router)
+                  </SelectItem>
+                  <SelectItem value="gemini">
+                    Google Gemini Vision OCR (Đa phương thức thế hệ mới)
                   </SelectItem>
                   <SelectItem value="mistral">
                     Mistral OCR Cloud API (Chuyên văn bản scan tiếng Việt & con dấu, siêu tốc)
@@ -414,11 +422,15 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   <div>
                     <span className="text-foreground font-medium">• Bộ máy OCR:</span>{" "}
                     <span className="text-primary font-medium">
-                      {ocrEngine === "docling"
-                        ? "IBM Docling TableFormer (Bảo toàn 100% bảng)"
-                        : ocrEngine === "pymupdf"
-                          ? "PyMuPDF Fast (Bóc tách native siêu tốc)"
-                          : "Tự động nhận diện tối ưu theo tệp"}
+                      {ocrEngine === "combo"
+                        ? "Combo OCR Mặc Định Hệ Thống (Tự động failover khi hết Quota)"
+                        : ocrEngine === "gemini"
+                          ? "Google Gemini Vision OCR (Đa phương thức thế hệ mới)"
+                          : ocrEngine === "docling"
+                            ? "IBM Docling TableFormer (Bảo toàn 100% bảng)"
+                            : ocrEngine === "pymupdf"
+                              ? "PyMuPDF Fast (Bóc tách native siêu tốc)"
+                              : "Tự động nhận diện tối ưu theo tệp"}
                     </span>
                   </div>
                   <div>

@@ -573,6 +573,8 @@ async def test_system_model_defaults_api():
             data = res.json()
             assert data["defaults"]["default_embedding_provider_id"] == "prov_cloudflare"
             assert data["defaults"]["default_embedding_model"] == "@cf/baai/bge-m3"
+            assert data["defaults"]["default_ocr_mode"] == "combo"
+            assert len(data["defaults"]["ocr_combo_chain"]) >= 2
             assert len(data["available_embeddings"]) >= 2
     finally:
         app.dependency_overrides.pop(get_db, None)
@@ -984,6 +986,114 @@ async def test_export_and_import_providers():
     res_import_new = await modelops_service.import_providers(mock_db, import_req_new)
     assert res_import_new["success"] is True
     assert res_import_new["imported"] == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_model_resolution_respects_custom_and_future_models():
+    """Verify runtime dynamically resolves and honors preferred_model_name (e.g. gemini-3.5-flash) without hardcoded fallback."""
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = None
+    mock_db.execute.return_value = mock_res
+
+    # Provider initially only lists old default models in DB
+    gemini_config = {
+        "id": "prov_gemini",
+        "name": "Google Gemini",
+        "provider_type": "gemini",
+        "model_name": "gemini-2.5-flash",
+        "models": ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+        "api_key": "mock",
+        "api_base_url": None,
+        "timeout_seconds": 15,
+        "is_active": True,
+    }
+
+    with patch.object(
+        modelops_service._inference,
+        "_call_get_active_providers",
+        new_callable=AsyncMock,
+        return_value=[gemini_config],
+    ), patch.object(
+        modelops_service._inference,
+        "_call_check_quota_available",
+        new_callable=AsyncMock,
+        return_value=MagicMock(allowed=True),
+    ), patch.object(
+        modelops_service._inference,
+        "_call_record_usage_log",
+        new_callable=AsyncMock,
+    ):
+        # User explicitly wants to use newly released gemini-3.5-flash
+        req = LLMGenerateRequest(
+            messages=[ChatMessage(role="user", content="Thử nghiệm mô hình 3.5 mới")],
+            preferred_model_name="gemini-3.5-flash",
+        )
+        resp = await modelops_service.generate(mock_db, req)
+
+        # MUST be gemini-3.5-flash, strictly NEVER demoted to gemini-2.5-flash!
+        assert resp.model == "gemini-3.5-flash"
+        assert resp.provider == "gemini"
+
+
+@pytest.mark.asyncio
+async def test_llm_generate_node_forwards_assistant_profile_models():
+    """Verify LLMGenerateNodeHandler extracts preferred_model_name from AssistantRuntimeProfile."""
+    from app.modules.assistants.schemas import AssistantModelPolicy
+    from app.modules.workflows.nodes.base import WorkflowContext
+    from app.modules.workflows.nodes.llm_generate_node import LLMGenerateNodeHandler
+    from app.modules.workflows.schemas import WorkflowNodeSpec
+
+    handler = LLMGenerateNodeHandler()
+    node_spec = WorkflowNodeSpec(
+        id="llm_generate_1",
+        name="LLM Node",
+        type="llm_generate",
+        config={"temperature": 0.1},
+    )
+
+    mock_profile = MagicMock()
+    mock_profile.assistant_code = "asst_dynamic_test"
+    mock_profile.system_prompt = "Bạn là trợ lý kiểm thử."
+    mock_profile.model_policy = AssistantModelPolicy(
+        primary_model="gemini-3.5-flash",
+        fallback_model="qwen2.5-72b-instruct",
+        temperature=0.15,
+        max_tokens=1500,
+    )
+
+    mock_db = AsyncMock()
+    context = WorkflowContext(
+        workflow_id="wf_test",
+        tenant_id="tenant_qnu",
+        conversation_id="conv_test",
+        inputs={"message": "Kiểm thử truyền model động"},
+        db=mock_db,
+        assistant_profile=mock_profile,
+    )
+
+    with patch.object(
+        modelops_service,
+        "generate",
+        new_callable=AsyncMock,
+        return_value=MagicMock(
+            content="Phản hồi từ model 3.5",
+            provider="gemini",
+            model="gemini-3.5-flash",
+            total_tokens=120,
+        ),
+    ) as mock_generate:
+        result = await handler.execute(node_spec, context)
+        assert result.status == "completed"
+
+        # Check call arguments to modelops_service.generate
+        assert mock_generate.call_count == 1
+        called_req = mock_generate.call_args[0][1]
+        assert called_req.preferred_model_name == "gemini-3.5-flash"
+        assert called_req.fallback_model_name == "qwen2.5-72b-instruct"
+        assert called_req.temperature == 0.15
+        assert called_req.max_tokens == 1500
+
 
 
 

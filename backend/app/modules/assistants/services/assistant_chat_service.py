@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.assistants.runtime import build_runtime_profile, prepare_user_message
 from app.modules.assistants.schemas import (
@@ -43,22 +44,23 @@ def _get_assistant_service():
 
 
 def _extract_primary_model(assistant: Any) -> str:
+    fallback_default = settings.DEFAULT_LLM_MODEL
     config = getattr(assistant, "config", None)
     if not config:
-        return "gpt-4o-mini"
+        return fallback_default
     if hasattr(config, "model_policy"):
         mp = config.model_policy
-        if hasattr(mp, "primary_model"):
-            return mp.primary_model or "gpt-4o-mini"
-        if isinstance(mp, dict):
-            return mp.get("primary_model") or "gpt-4o-mini"
+        if hasattr(mp, "primary_model") and mp.primary_model:
+            return mp.primary_model
+        if isinstance(mp, dict) and mp.get("primary_model"):
+            return mp["primary_model"]
     elif isinstance(config, dict):
         mp = config.get("model_policy", {})
-        if isinstance(mp, dict):
-            return mp.get("primary_model") or "gpt-4o-mini"
-        if hasattr(mp, "primary_model"):
-            return mp.primary_model or "gpt-4o-mini"
-    return "gpt-4o-mini"
+        if isinstance(mp, dict) and mp.get("primary_model"):
+            return mp["primary_model"]
+        if hasattr(mp, "primary_model") and mp.primary_model:
+            return mp.primary_model
+    return fallback_default
 
 
 def _format_message_with_attachments(message: str, attachments: list[dict[str, Any]]) -> str:

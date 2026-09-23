@@ -203,9 +203,14 @@ class AssistantReadinessEngine:
         policy: Any,
     ) -> tuple[ReadinessCheckItem, str | None, str | None]:
         """Verify primary and fallback models for operational resilience."""
-        primary = getattr(policy, "primary_model", None) or "gpt-4o-mini"
-        fallback = getattr(policy, "fallback_model", None) or "gemini-2.5-flash-lite"
-        temperature = getattr(policy, "temperature", 0.2)
+        if isinstance(policy, dict):
+            primary = policy.get("primary_model")
+            fallback = policy.get("fallback_model")
+            temperature = policy.get("temperature", 0.2)
+        else:
+            primary = getattr(policy, "primary_model", None)
+            fallback = getattr(policy, "fallback_model", None)
+            temperature = getattr(policy, "temperature", 0.2)
 
         if not primary:
             return (
@@ -219,6 +224,20 @@ class AssistantReadinessEngine:
                 ),
                 "Thiếu Primary Model trong chính sách ModelOps.",
                 None,
+            )
+
+        if not fallback:
+            return (
+                ReadinessCheckItem(
+                    category="model",
+                    name="ModelOps & Dự phòng chuyển đổi",
+                    status="warning",
+                    score=75,
+                    message=f"Đã có Primary '{primary}' nhưng chưa cấu hình Fallback Model.",
+                    details={"primary_model": primary, "fallback_model": None, "temperature": temperature},
+                ),
+                None,
+                "Khuyến nghị cấu hình thêm Fallback Model để đảm bảo tính chịu lỗi khi Primary gặp sự cố.",
             )
 
         if primary == fallback:
