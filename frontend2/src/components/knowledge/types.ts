@@ -10,6 +10,14 @@ export const STATUS_BADGE: Record<
     label: "Hiệu lực",
     className: "bg-success/10 text-success border-success/30",
   },
+  ready: {
+    label: "Hiệu lực",
+    className: "bg-success/10 text-success border-success/30",
+  },
+  indexed: {
+    label: "Hiệu lực",
+    className: "bg-success/10 text-success border-success/30",
+  },
   pending: {
     label: "Chờ duyệt",
     className: "bg-warning/10 text-warning border-warning/30",

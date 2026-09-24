@@ -143,3 +143,14 @@ export function activateDocumentType(code: string): Promise<DocumentTypeItem> {
 export function syncDocumentTypes(): Promise<DocumentTypeSyncResult> {
   return request<DocumentTypeSyncResult>("/sync", { method: "POST" });
 }
+
+export const documentTypesApi = {
+  listDocumentTypes,
+  getDocumentTypes: listDocumentTypes,
+  getDocumentType,
+  createDocumentType,
+  updateDocumentType,
+  deactivateDocumentType,
+  activateDocumentType,
+  syncDocumentTypes,
+};

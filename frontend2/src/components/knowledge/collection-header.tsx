@@ -48,49 +48,71 @@ export function CollectionHeader({
   const isCloudflareModel = embeddingModelDisplay.includes("@cf/");
 
   return (
-    <div className="bg-card border border-border rounded-lg p-5 sm:p-6 shadow-xs space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onBack}
-            className="size-9 rounded-md shrink-0 text-muted-foreground hover:text-foreground"
-            title="Quay lại danh sách kho"
-            aria-label="Quay lại danh sách kho"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-bold text-foreground">
-                {collection.name}
-              </h1>
+    <div className="bg-card border border-border rounded-lg p-3.5 sm:p-5 shadow-xs space-y-3">
+      {/* Top Header Section */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              className="h-8 px-2.5 rounded-md shrink-0 text-muted-foreground hover:text-foreground text-xs gap-1.5"
+              title="Quay lại danh sách kho"
+              aria-label="Quay lại danh sách kho"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Kho</span>
+            </Button>
+
+            <div className="flex items-center gap-1.5 sm:hidden">
               <Badge
                 variant="outline"
-                className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-medium text-xs"
+                className="bg-success/10 text-success border-success/30 font-medium text-[11px] py-0"
               >
                 Sẵn sàng
               </Badge>
-              <span className="font-mono text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+              <span className="font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                 {collection.code}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              {collection.description}
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-bold text-foreground break-words">
+                {collection.name}
+              </h1>
+              <div className="hidden sm:flex items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className="bg-success/10 text-success border-success/30 font-medium text-xs py-0"
+                >
+                  Sẵn sàng
+                </Badge>
+                <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  {collection.code}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">
+              {collection.description ||
+                "Chưa có mô tả chi tiết cho kho tri thức này."}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        {/* Action Buttons: 3 cols grid + full width primary CTA on mobile, inline flex on desktop */}
+        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 w-full lg:w-auto shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={onOpenReconcile}
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
+            title="Đối soát dữ liệu giữa PostgreSQL, Qdrant và MinIO"
           >
             <ShieldCheck className="size-3.5 text-primary" />
-            <span>Đối soát Kho</span>
+            <span>Đối soát</span>
           </Button>
 
           <Button
@@ -98,38 +120,40 @@ export function CollectionHeader({
             size="sm"
             onClick={onReindex}
             disabled={isReindexing}
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
+            title="Tính toán lại toàn bộ vector embeddings trong kho"
           >
             <RefreshCw
               className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
             />
-            <span>{isReindexing ? "Đang Reindex..." : "Reindex Kho"}</span>
+            <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
           </Button>
 
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
             onClick={onOpenConfig}
+            title="Chỉnh sửa tên và mô tả kho"
           >
             <Settings className="size-3.5" />
-            <span>Cấu hình</span>
+            <span>Sửa</span>
           </Button>
 
           <Button
             size="sm"
             onClick={onStartIngest}
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+            className="col-span-3 sm:col-span-1 h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
           >
             <Upload className="size-3.5" />
-            <span>+ Nạp tài liệu</span>
+            <span>Nạp tài liệu</span>
           </Button>
         </div>
       </div>
 
       {/* Sub Meta Info Line */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t border-border/60 flex-wrap">
-        <span className="flex items-center gap-1.5 font-mono text-xs text-primary">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground pt-2.5 border-t border-border/60">
+        <span className="inline-flex items-center gap-1.5 font-mono text-xs text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20">
           {isCloudflareModel ? (
             <Zap className="size-3.5 text-amber-500 shrink-0" />
           ) : (
@@ -139,28 +163,36 @@ export function CollectionHeader({
           {!collection.embedding_model && systemDefaultEmbeddingModel && (
             <Badge
               variant="outline"
-              className="text-xs px-1.5 py-0 border-primary/30 text-primary bg-primary/5 font-sans font-normal"
+              className="text-[10px] px-1 py-0 border-primary/30 text-primary bg-primary/10 font-sans font-normal"
             >
-              Mặc định hệ thống
+              Mặc định
             </Badge>
           )}
         </span>
-        <span>•</span>
-        <span className="text-xs">Cập nhật: {collection.updated_at}</span>
-        <span>•</span>
-        <span className="text-xs font-medium text-foreground">
-          {documentCount} văn bản ({collection.chunk_count} chunks)
+
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded">
+          <span className="text-muted-foreground">Chiến lược:</span>
+          <strong className="text-foreground font-medium">
+            {collection.chunking_strategy}
+          </strong>
         </span>
+
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded font-medium text-foreground">
+          <span>{documentCount} văn bản</span>
+          <span className="text-muted-foreground font-mono font-normal">
+            ({collection.chunk_count} chunks)
+          </span>
+        </span>
+
         {reindexJobId && (
-          <span className="text-xs text-emerald-600 font-semibold ml-auto flex items-center gap-1">
-            <CheckCircle2 className="size-3.5" /> Đã tạo job reindex (
-            {reindexJobId}) — theo dõi ở tab Tác vụ!
+          <span className="text-xs text-success font-medium ml-auto flex items-center gap-1">
+            <CheckCircle2 className="size-3.5" /> Job {reindexJobId}
           </span>
         )}
       </div>
 
       {actionError && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
           <CircleAlert className="size-4 shrink-0 mt-0.5" />
           <span>{actionError}</span>
         </div>

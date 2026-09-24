@@ -110,6 +110,18 @@ export const knowledgeApi = {
     }
   },
 
+  async deleteCollection(collectionId: string): Promise<void> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}`,
+      {
+        method: "DELETE",
+      },
+    );
+    if (!res.ok && res.status !== 204 && res.status !== 404) {
+      throw new Error(`Xóa kho tri thức thất bại (HTTP ${res.status}).`);
+    }
+  },
+
   async reindexCollection(
     collectionId: string,
   ): Promise<{ job_id: string; status: string }> {
@@ -538,5 +550,15 @@ export const knowledgeApi = {
       throw new Error(`Đồng bộ sửa lỗi chỉ mục thất bại (HTTP ${res.status}).`);
     }
     return (await res.json()) as ReconcileFixResponse;
+  },
+
+  async getReconciliationReport(
+    collectionId: string,
+  ): Promise<KnowledgeReconciliationReport> {
+    return this.reconcileCollection(collectionId);
+  },
+
+  getDocumentDownloadUrl(documentId: string): string {
+    return `${BASE_URL}/knowledge/documents/${documentId}/download`;
   },
 };

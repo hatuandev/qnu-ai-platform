@@ -29,7 +29,8 @@ export interface KnowledgeDocument {
     | "pending"
     | "failed"
     | "approved"
-    | "archived";
+    | "archived"
+    | "ready";
   index_status?: "pending" | "indexing" | "indexed" | "index_failed";
   index_error?: string | null;
   ocr_method: string;

@@ -7,10 +7,74 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-24 10:05 (UTC+7)
-- **Phiên số**: #210
+- **Thời gian cập nhật**: 2026-09-24 16:10 (UTC+7)
+- **Phiên số**: #213
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Điều Chỉnh Responsive Grid 4 Cards Desktop, 2 Cards Tablet, 1 Card Mobile & Tối Ưu Bố Cục Thẻ Trợ Lý AI (phiên #213)**:
+  - *Hiện trạng & Yêu cầu*:
+    - Điều chỉnh cấu hình grid thẻ Trợ lý AI trên `http://localhost:3000/assistants` theo đúng tỷ lệ: 4 cards trên Desktop, 2 cards trên Tablet, 1 card trên Mobile.
+    - Tối ưu kích thước, padding và dải nút hành động chân thẻ để vừa vặn, không bị xô lệch trên lưới 4 cột.
+  - *Kiến trúc & Triển khai*:
+    - Thay thế `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` thành `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4` trên `AssistantsPage`.
+    - Tinh chỉnh `AssistantCard`: Đặt `p-4 pb-2` trên CardHeader và CardContent.
+    - Tái cấu trúc cụm nút hành động: 2 nút chính cân xứng ("Thử nghiệm" và "Quản trị") kết hợp Dropdown Menu tiện ích (đưa "Sơ đồ DAG" lên đầu, kèm "Nhân bản", "Lịch sử", "Mã nhúng", "Xuất bundle").
+    - Nâng cấp Deep Routing: Hỗ trợ query search `tab` ("overview", "models", "tools", "playground", "workflow") trên tuyến `/assistants/$assistantId`, click nút "Thử nghiệm" nhảy thẳng vào tab Playground SSE chat.
+  - *Verification*:
+    - Frontend2 Biome check: 0 errors, 0 warnings.
+    - Frontend2 Typecheck `tsc --noEmit`: 0 errors.
+    - Frontend2 Vite build: Thành công 100% trong 1.64s.
+- 0. **Thiết Kế & Triển Khai Hoàn Chỉnh Phân Hệ Trợ Lý AI (`/assistants`) Trên Frontend2 Chuẩn Master-Detail Deep Routing (phiên #212)**:
+  - *Hiện trạng & Yêu cầu*:
+    - Xây dựng hoàn chỉnh phân hệ Trợ lý AI trên `frontend2` (Vite 6 + React 19 + TanStack Router + Tailwind v4 + Radix UI + Biome).
+    - Triển khai kiến trúc Master-Detail Deep Routing theo Mục 4.5 của `AGENTS.md`: Tách biệt Master List View (`/assistants`) và Dedicated Detail View (`/assistants/:assistantId`).
+    - Bố trí trực quan vòng đời 7 lớp tạo lập Trợ lý AI (Mục 2 của `AGENTS.md` & `qnu-chatbot-builder`).
+    - Tuân thủ 100% các quy chuẩn: OKLCH Academic Teal, 100% `lucide-react`, Zero Emoji (Mục 4.8), Component Reuse First (Mục 4.9), Cross-Device Responsive (Mục 4.10) và Nhãn nút ngắn gọn 1-2 từ (Mục 4.11).
+  - *Kiến trúc & Triển khai*:
+    - Định tuyến file-based TanStack Router:
+      * `frontend2/src/routes/assistants.tsx`: Layout route bọc `<Outlet />`.
+      * `frontend2/src/routes/assistants.index.tsx`: Tuyến danh sách `/assistants/` hiển thị `AssistantsPage`.
+      * `frontend2/src/routes/assistants.$assistantId.tsx`: Tuyến chi tiết `/assistants/:assistantId` hiển thị `AssistantDetailPage`.
+    - Màn hình Master View `AssistantsPage`:
+      * Dải KPI Telemetry Strip 4 ô gộp trong Card nguyên khối: Trợ lý AI, Đạt chuẩn TM-08 (Groundedness $\ge 0.90$), Kho tri thức liên kết, Quy trình DAG.
+      * Toolbar tìm kiếm Debounced, bộ lọc Lĩnh vực (Select 165px chống cắt chữ), bộ lọc Trạng thái và chuyển đổi Grid/Table.
+      * Thẻ `AssistantCard` chuẩn Executive Card với switch hoạt động, dải thông số kỹ thuật (Model, Kho tri thức, TM-08 Grounded) và các nút thao tác ngắn gọn ("Thử nghiệm", "Sơ đồ DAG", "Quản trị").
+    - Màn hình Dedicated Detail View `AssistantDetailPage`:
+      * `AssistantHeader`: Nút quay lại adaptive, Readiness Telemetry 5 tiêu chí TM-08, các nút hành động ("Lưu", "Phát hành", "Sơ đồ DAG", "Thử nghiệm").
+      * 5 Tabs chuyên sâu (`AssistantWorkspaceNav`): Cấu hình (2 cột cân xứng), Mô hình & An toàn (tham số + Guardrails), Công cụ & Quản trị (Function Calling + HITL + Danger Zone), Sơ đồ DAG (Ownership Private/Shared, Fork riêng), Thử nghiệm (`AssistantPlaygroundTab` với SSE streaming token qua `useRAGStream`, đối soát citations và gợi ý 1-click).
+    - Modal tạo mới `CreateAssistantDialog`: 3 chế độ (Mẫu QNU hạt nhân, Tự sinh spec AI, Tùy chỉnh thủ công).
+  - *Verification*:
+    - Backend Pytest: 426/426 passed (100%).
+    - Frontend2 Biome check: 20 files checked, 0 errors, 0 warnings.
+    - Frontend2 Typecheck `tsc --noEmit`: 0 errors.
+    - Frontend2 Vite build: Đóng gói thành công trong 1.46s (chunk `assistants.index` 31.74 kB, `assistants._assistantId` 75.31 kB).
+- 0. **Thiết Kế & Triển Khai Hoàn Chỉnh Phân Hệ Kho Tri Thức (`/knowledge`) Trên Frontend2 Chuẩn Master-Detail Deep Routing (phiên #211)**:
+  - *Hiện trạng & Yêu cầu*:
+    - Cần chuyển đổi phân hệ Kho Tri Thức từ `frontend` sang nền tảng Next-Gen `frontend2` (Vite 6 + React 19 + TanStack Router + Tailwind v4 + Radix UI + Biome).
+    - Áp dụng kiến trúc Master-Detail Deep Routing theo Mục 4.5 của `AGENTS.md`: tách biệt Master List View (`/knowledge`) và Dedicated Detail View (`/knowledge/:collectionId`), triệt tiêu việc dồn ép vào một trang tabbed monolithic.
+    - Tuân thủ 100% quy chuẩn Academic Teal, Zero Emoji (Mục 4.8), Component Reuse First (Mục 4.9), Cross-Device Responsive (Mục 4.10) và Nhãn nút ngắn gọn (Mục 4.11).
+  - *Kiến trúc & Triển khai*:
+    - Định tuyến file-based TanStack Router:
+      * `frontend2/src/routes/knowledge.tsx`: Layout route bọc `<Outlet />`.
+      * `frontend2/src/routes/knowledge.index.tsx`: Tuyến danh sách `/knowledge/`, hiển thị `KnowledgePage`.
+      * `frontend2/src/routes/knowledge.$collectionId.tsx`: Tuyến chi tiết độc lập `/knowledge/:collectionId`, hiển thị `CollectionDetailPage`.
+    - Màn hình Master View `KnowledgePage`:
+      * KPI Telemetry Strip 4 ô gộp trong thẻ `Card` nguyên khối có vách ngăn tinh tế: Kho tri thức, Văn bản bóc tách, Vector chunks (BGE-M3 1024D), Cơ sở dữ liệu (Qdrant + Postgres RRF k=60).
+      * Toolbar tìm kiếm Debounced thời gian thực, bộ lọc Chunking strategy, bộ lọc OCR Engine, chuyển đổi Grid/Table view.
+      * Thẻ bộ sưu tập với nút "Mở kho" outline thanh thoát (`bg-primary/10 border-primary/20 hover:bg-primary`).
+    - Màn hình Dedicated Detail View `CollectionDetailPage`:
+      * `CollectionHeader`: Nút quay lại adaptive, badge trạng thái và mã kho, nút hành động tinh gọn (Đối soát, Reindex, Sửa, Nạp tài liệu).
+      * 4 Tabs nghiệp vụ chuyên sâu: Tài liệu (quản lý, lọc, xem trước, tải file gốc, reindex), Facts số (bảng dữ liệu cấu trúc điểm chuẩn/học phí/chỉ tiêu, nhập Excel), Tiến trình (lịch sử ARQ Ingestion, log inspector), Thử nghiệm (Sandbox hybrid RRF retrieval).
+      * Đã ẩn badge số đếm `(0)` thừa trên tabs; mở rộng trigger select filter lên 165-175px chống cắt chữ; format tên văn bản hành chính và huy hiệu xanh khi đã index.
+    - Modal nạp tài liệu `DocumentUploadDialog`:
+      * Kéo thả tệp, nhập tiêu đề, chọn loại văn bản taxonomy, chọn bộ máy OCR (PyMuPDF, Docling, Gemini Vision, Mistral OCR) và toggle Fast-Track vector hóa tức thì.
+    - Sửa lỗi TypeScript type union trên `KnowledgeDocument.status` bổ sung `"ready"`.
+  - *Verification*:
+    - Backend Pytest: 426/426 passed (100%).
+    - Backend Ruff: 0 lỗi.
+    - Frontend2 Biome check: 25 files checked, 0 errors, 0 warnings.
+    - Frontend2 Typecheck `tsc --noEmit`: 0 errors.
+    - Frontend2 Vite build: Đóng gói thành công trong 1.47s (chunk `knowledge.index` 17.04 kB, `knowledge._collectionId` 48.21 kB).
 - 0. **Thiết Kế Trang Chi Tiết Provider `/models/$providerId` Độc Lập Chuẩn Master-Detail Deep Routing, Bổ Sung Quy Chuẩn Responsive & Nhãn Nút Ngắn Gọn Vào AGENTS.md (phiên #210)**:
   - *Hiện trạng & Vấn đề phát hiện qua ảnh chụp của người dùng*:
     - Người dùng truy cập hoặc F5 tại URL `http://localhost:3000/models/prov_c9d9d380`, trình duyệt hiển thị màn hình lỗi: *"Không tìm thấy trang - Trang bạn yêu cầu không tồn tại."* (404 Not Found).

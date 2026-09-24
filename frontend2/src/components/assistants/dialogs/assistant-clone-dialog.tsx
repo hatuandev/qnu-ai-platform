@@ -121,8 +121,12 @@ export function AssistantCloneDialog({
             </Field>
 
             <div className="rounded-lg border p-3 bg-muted/20 space-y-1.5">
-              <label className="flex items-center gap-2 font-medium cursor-pointer text-foreground select-none">
+              <label
+                htmlFor="fork-workflow-check"
+                className="flex items-center gap-2 font-medium cursor-pointer text-foreground select-none"
+              >
                 <Checkbox
+                  id="fork-workflow-check"
                   checked={forkWorkflow}
                   onCheckedChange={(checked) =>
                     setForkWorkflow(checked === true)
