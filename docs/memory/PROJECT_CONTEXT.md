@@ -7,10 +7,31 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-24 16:55 (UTC+7)
-- **Phiên số**: #214
+- **Thời gian cập nhật**: 2026-09-24 17:05 (UTC+7)
+- **Phiên số**: #215
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Tối Ưu Hóa Toàn Diện Responsive Mobile & Triệt Tiêu Toàn Bộ Nút/Dropdown Dư Thừa Phân Hệ Loại Văn Bản (`/document-types`) (phiên #215)**:
+  - *Hiện trạng & Yêu cầu*:
+    - Tiếp nhận ảnh chụp thực tế trên thiết bị di động (`media_1790243122709.png`, `media_1790244268122.png`) từ người dùng.
+    - Khắc phục triệt để lỗi viền đứt đoạn do Tailwind `divide-y` trên lưới 2 cột của KPI Telemetry Strip.
+    - Cân đối cụm nút hành động "Đồng bộ" & "Thêm loại", không để lệch góc trái và hở khoảng trống lớn bên phải.
+    - Tinh gọn thanh công cụ Toolbar từ 4 dòng xuống 2 hàng liền mạch, không để các Select bị lửng lơ hoặc nút chuyển Grid/Table rớt dòng một mình.
+    - Tiếp nhận góp ý sắc đáng của người dùng về việc lặp nút (`Chi tiết`, `Chỉnh sửa`, `Xem tài liệu` đều trỏ về 1 trang) ➔ Xóa bỏ hoàn toàn nút ba chấm `...` và `DropdownMenu` trùng lặp trên cả `DocumentTypeCard` và `Table View`, thay bằng 1 nút phẳng phiu duy nhất `[⚙ Chi tiết]`.
+    - Tối ưu hóa thẻ `DocumentTypeCard` gọn gàng, giảm padding, bỏ khoảng trắng nhân tạo `min-h-8`.
+    - Tối ưu hóa `DocumentTypeDetailPage` chống tràn ngang tiêu đề và dàn đều dải nút chân header.
+  - *Kiến trúc & Triển khai*:
+    - Tinh chỉnh `frontend2/src/components/admin/kpi-metric.tsx`: Hỗ trợ `className?: string`, padding responsive `p-3.5 sm:p-5`.
+    - Tái cấu trúc lưới KPI trong `DocumentTypesPage`: Bỏ `divide-y`/`divide-x`, áp dụng ma trận viền 2x2 đối xứng (`border-r`, `border-b`) trên mobile tạo hình chữ thập phân chia chính giữa hoàn hảo; 4 cột phân cách bằng 3 đường dọc trên desktop.
+    - Cụm nút hành động đầu trang: `grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto` dàn đều 50/50 trên mobile.
+    - Toolbar liền mạch: Hàng 1 ô tìm kiếm full width + 2 Select chia đôi 50/50, Hàng 2 gộp cụm chip lọc nhanh và nút chuyển Grid/Table trên cùng một dòng.
+    - Xóa bỏ hoàn toàn DropdownMenu và các nút thừa: Thay bằng 1 nút duy nhất `Chi tiết` (`w-full` trên thẻ, `h-7 px-2.5` trên bảng), tích hợp click trực tiếp vào chip mã code `{item.code}` để sao chép vào clipboard có toast.
+    - Thẻ `DocumentTypeCard`: Padding `p-3.5 sm:p-4`, thêm `shrink-0` cho Badge nhóm, chuyển `min-h-8` sang `min-h-0 sm:min-h-8`.
+    - Trang chi tiết `DocumentTypeDetailPage`: Tiêu đề adaptive `max-w-[150px] xs:max-w-[200px] sm:max-w-none truncate`, nút quay lại `hidden xs:inline`, dải nút chân header `w-full justify-between sm:justify-end`.
+  - *Verification*:
+    - Frontend2 Biome check: 0 errors, 0 warnings.
+    - Frontend2 Typecheck `tsc --noEmit`: 0 errors toàn codebase.
+    - Frontend2 Vite build: Thành công 100% trong 1.37s.
 - 0. **Thiết Kế & Triển Khai Hoàn Chỉnh Phân Hệ Loại Văn Bản (`/document-types`) Trên Frontend2 Chuẩn Master-Detail Deep Routing (phiên #214)**:
   - *Hiện trạng & Yêu cầu*:
     - Xây dựng hoàn chỉnh phân hệ Quản lý Loại Văn Bản trên `frontend2` (Vite 6 + React 19 + TanStack Router + Tailwind v4 + Radix UI + Biome) tại `http://localhost:3000/document-types`.

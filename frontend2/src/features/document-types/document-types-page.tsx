@@ -4,13 +4,11 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  FileCheck2,
   FileText,
   GraduationCap,
   LayoutGrid,
   List,
   Loader2,
-  MoreHorizontal,
   Plus,
   RefreshCw,
   Scale,
@@ -31,13 +29,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -187,11 +178,11 @@ export function DocumentTypesPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8.5 sm:h-8 text-xs gap-1.5 w-full sm:w-auto justify-center"
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
             title="Đồng bộ danh mục taxonomy mẫu từ core"
@@ -204,7 +195,7 @@ export function DocumentTypesPage() {
 
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8.5 sm:h-8 text-xs gap-1.5 w-full sm:w-auto justify-center shadow-xs"
             onClick={() => setIsCreateOpen(true)}
           >
             <Plus className="size-3.5" />
@@ -215,100 +206,114 @@ export function DocumentTypesPage() {
 
       {/* 2. KPI Telemetry Strip 4 ô gộp trong Card nguyên khối */}
       <Card className="overflow-hidden border border-border/80 shadow-2xs">
-        <CardContent className="grid grid-cols-2 lg:grid-cols-4 p-0 divide-y sm:divide-y-0 sm:divide-x divide-border">
-          <KpiMetric
-            icon={FileText}
-            label="Tổng loại văn bản"
-            value={totalCount.toString()}
-            helper="Thể thức CSDL chuẩn hóa"
-          />
-          <KpiMetric
-            icon={Scale}
-            label="Chuẩn NĐ 30/2020"
-            value={`${nd30Count} loại`}
-            helper="Văn bản hành chính nhà nước"
-          />
-          <KpiMetric
-            icon={GraduationCap}
-            label="Đào tạo & Học thuật"
-            value={`${academicCount} loại`}
-            helper="Đề án, chương trình, quy chế"
-          />
-          <KpiMetric
-            icon={CheckCircle2}
-            label="Đang hoạt động"
-            value={`${activeCount} / ${totalCount}`}
-            helper="Khả dụng nạp Kho tri thức"
-          />
+        <CardContent className="grid grid-cols-2 lg:grid-cols-4 p-0">
+          <div className="border-r border-b border-border lg:border-b-0">
+            <KpiMetric
+              icon={FileText}
+              label="Tổng loại văn bản"
+              value={totalCount.toString()}
+              helper="Thể thức CSDL chuẩn hóa"
+            />
+          </div>
+          <div className="border-b border-border lg:border-r lg:border-b-0">
+            <KpiMetric
+              icon={Scale}
+              label="Chuẩn NĐ 30/2020"
+              value={`${nd30Count} loại`}
+              helper="Văn bản hành chính nhà nước"
+            />
+          </div>
+          <div className="border-r border-border lg:border-r">
+            <KpiMetric
+              icon={GraduationCap}
+              label="Đào tạo & Học thuật"
+              value={`${academicCount} loại`}
+              helper="Đề án, chương trình, quy chế"
+            />
+          </div>
+          <div>
+            <KpiMetric
+              icon={CheckCircle2}
+              label="Đang hoạt động"
+              value={`${activeCount} / ${totalCount}`}
+              helper="Khả dụng nạp Kho tri thức"
+            />
+          </div>
         </CardContent>
       </Card>
 
       {/* 3. Filter Bar & View Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           {/* Ô tìm kiếm debounced */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative w-full sm:max-w-xs md:max-w-sm">
             <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm theo tên hoặc mã loại văn bản..."
-              className="h-8 pl-8 text-xs"
+              className="h-8.5 sm:h-8 pl-8 text-xs w-full"
             />
           </div>
 
-          {/* Bộ lọc Nhóm phân loại (175px chống cắt chữ) */}
-          <Select
-            value={category}
-            onValueChange={(val) =>
-              setCategory(val as DocumentTypeCategory | "all")
-            }
-          >
-            <SelectTrigger className="h-8 w-[175px] text-xs">
-              <SelectValue placeholder="Nhóm văn bản" />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <SelectItem
-                  key={opt.value}
-                  value={opt.value}
-                  className="text-xs"
-                >
-                  {opt.label}
+          {/* Nhóm bộ lọc Select: 2 cột chia đôi trên mobile, flex ngang trên desktop */}
+          <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
+            {/* Bộ lọc Nhóm phân loại (chống cắt chữ) */}
+            <Select
+              value={category}
+              onValueChange={(val) =>
+                setCategory(val as DocumentTypeCategory | "all")
+              }
+            >
+              <SelectTrigger className="h-8.5 sm:h-8 w-full sm:w-[175px] text-xs">
+                <SelectValue placeholder="Nhóm văn bản" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="text-xs"
+                  >
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Bộ lọc Trạng thái */}
+            <Select
+              value={statusFilter}
+              onValueChange={(val) =>
+                setStatusFilter(val as "all" | "active" | "inactive")
+              }
+            >
+              <SelectTrigger className="h-8.5 sm:h-8 w-full sm:w-[140px] text-xs">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">
+                  Tất cả trạng thái
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                <SelectItem value="active" className="text-xs">
+                  Đang hoạt động
+                </SelectItem>
+                <SelectItem value="inactive" className="text-xs">
+                  Đã tạm dừng
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-          {/* Bộ lọc Trạng thái */}
-          <Select
-            value={statusFilter}
-            onValueChange={(val) =>
-              setStatusFilter(val as "all" | "active" | "inactive")
-            }
-          >
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Trạng thái" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">
-                Tất cả trạng thái
-              </SelectItem>
-              <SelectItem value="active" className="text-xs">
-                Đang hoạt động
-              </SelectItem>
-              <SelectItem value="inactive" className="text-xs">
-                Đã tạm dừng
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
+        {/* Dòng 2: Quick chips bên trái & View Mode Switcher bên phải (trên cùng 1 dòng liền mạch) */}
+        <div className="flex items-center justify-between gap-2 w-full">
           {/* Quick toggle chips */}
-          <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-md border text-xs">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-muted/40 p-0.5 rounded-md border text-xs">
             <button
               type="button"
               onClick={() => setStandardFilter("all")}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                 standardFilter === "all"
                   ? "bg-background text-foreground shadow-2xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -319,7 +324,7 @@ export function DocumentTypesPage() {
             <button
               type="button"
               onClick={() => setStandardFilter("nd30")}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                 standardFilter === "nd30"
                   ? "bg-background text-foreground shadow-2xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -330,7 +335,7 @@ export function DocumentTypesPage() {
             <button
               type="button"
               onClick={() => setStandardFilter("custom")}
-              className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                 standardFilter === "custom"
                   ? "bg-background text-foreground shadow-2xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
@@ -339,28 +344,28 @@ export function DocumentTypesPage() {
               Tùy chỉnh
             </button>
           </div>
-        </div>
 
-        {/* View Mode Switcher */}
-        <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30 shrink-0 self-end sm:self-auto">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setViewMode("grid")}
-            title="Xem dạng thẻ lưới"
-          >
-            <LayoutGrid className="size-3.5" />
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setViewMode("table")}
-            title="Xem dạng danh sách bảng"
-          >
-            <List className="size-3.5" />
-          </Button>
+          {/* View Mode Switcher */}
+          <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30 shrink-0">
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setViewMode("grid")}
+              title="Xem dạng thẻ lưới"
+            >
+              <LayoutGrid className="size-3.5" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setViewMode("table")}
+              title="Xem dạng danh sách bảng"
+            >
+              <List className="size-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -408,12 +413,6 @@ export function DocumentTypesPage() {
               key={item.code}
               item={item}
               onOpen={() =>
-                navigate({
-                  to: "/document-types/$code",
-                  params: { code: item.code },
-                })
-              }
-              onEdit={() =>
                 navigate({
                   to: "/document-types/$code",
                   params: { code: item.code },
@@ -481,9 +480,18 @@ export function DocumentTypesPage() {
                             >
                               {item.name}
                             </button>
-                            <span className="font-mono text-[10px] text-muted-foreground block truncate">
-                              {item.code}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyCode(item.code);
+                              }}
+                              title="Sao chép mã thể thức"
+                              className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-primary transition-colors bg-muted/50 hover:bg-primary/10 px-1 py-0.5 rounded cursor-pointer group/code mt-0.5"
+                            >
+                              <span className="truncate">{item.code}</span>
+                              <Copy className="size-2.5 opacity-60 group-hover/code:opacity-100 shrink-0" />
+                            </button>
                           </div>
                         </div>
                       </TableCell>
@@ -540,64 +548,21 @@ export function DocumentTypesPage() {
                       </TableCell>
 
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() =>
-                              navigate({
-                                to: "/document-types/$code",
-                                params: { code: item.code },
-                              })
-                            }
-                            title="Chi tiết"
-                          >
-                            <Settings className="size-3 text-primary" />
-                            <span className="sr-only">Chi tiết</span>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                              >
-                                <MoreHorizontal className="size-3" />
-                                <span className="sr-only">Thao tác</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-40 text-xs"
-                            >
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  navigate({
-                                    to: "/document-types/$code",
-                                    params: { code: item.code },
-                                  })
-                                }
-                              >
-                                <FileCheck2 className="size-3.5 mr-2 text-primary" />
-                                <span>Chỉnh sửa</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleCopyCode(item.code)}
-                              >
-                                <Copy className="size-3.5 mr-2 text-primary" />
-                                <span>Sao chép mã</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => navigate({ to: "/knowledge" })}
-                              >
-                                <GraduationCap className="size-3.5 mr-2 text-primary" />
-                                <span>Kho tri thức</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2.5 text-xs gap-1 border-primary/20 text-primary hover:bg-primary/10 font-medium"
+                          onClick={() =>
+                            navigate({
+                              to: "/document-types/$code",
+                              params: { code: item.code },
+                            })
+                          }
+                          title="Xem chi tiết thể thức và cấu hình"
+                        >
+                          <Settings className="size-3 shrink-0" />
+                          <span>Chi tiết</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );

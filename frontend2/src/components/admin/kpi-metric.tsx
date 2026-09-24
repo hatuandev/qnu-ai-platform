@@ -10,6 +10,7 @@ export function KpiMetric({
   trend = "neutral",
   helper,
   icon: Icon,
+  className,
 }: {
   label: string;
   value: string;
@@ -17,9 +18,10 @@ export function KpiMetric({
   trend?: Trend;
   helper?: string;
   icon?: React.ComponentType<{ className?: string }>;
+  className?: string;
 }) {
   return (
-    <div className="min-w-0 p-4 sm:p-5">
+    <div className={cn("min-w-0 p-3.5 sm:p-5", className)}>
       <div className="flex items-center justify-between gap-3">
         <span className="type-caption text-muted-foreground">{label}</span>
         {Icon ? (

@@ -1,13 +1,10 @@
 import {
-  BookOpen,
   Building2,
   Check,
   Copy,
   FileSpreadsheet,
   FileText,
   GraduationCap,
-  MoreHorizontal,
-  Pencil,
   Scale,
   Settings,
 } from "lucide-react";
@@ -21,13 +18,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import type {
   DocumentTypeCategory,
@@ -37,7 +27,6 @@ import type {
 interface DocumentTypeCardProps {
   item: DocumentTypeItem;
   onOpen: () => void;
-  onEdit?: () => void;
   onToggleActive?: (active: boolean) => void;
   isToggling?: boolean;
 }
@@ -75,7 +64,6 @@ export function formatCategoryLabel(category: DocumentTypeCategory): string {
 export function DocumentTypeCard({
   item,
   onOpen,
-  onEdit,
   onToggleActive,
   isToggling,
 }: DocumentTypeCardProps) {
@@ -93,7 +81,7 @@ export function DocumentTypeCard({
 
   return (
     <Card className="group flex h-full flex-col border-border/80 transition-all hover:border-primary/50 hover:shadow-xs">
-      <CardHeader className="space-y-2.5 p-4 pb-2">
+      <CardHeader className="space-y-2 p-3.5 sm:p-4 pb-2 sm:pb-2.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
@@ -107,10 +95,19 @@ export function DocumentTypeCard({
                 {item.name}
               </CardTitle>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-[10px] text-muted-foreground truncate">
-                  {item.code}
-                </span>
-                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  title="Sao chép mã thể thức"
+                  className="inline-flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-primary transition-colors bg-muted/60 hover:bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer group/code"
+                >
+                  <span className="truncate">{item.code}</span>
+                  <Copy className="size-2.5 opacity-60 group-hover/code:opacity-100 shrink-0" />
+                </button>
+                <Badge
+                  variant="outline"
+                  className="text-[9px] px-1 py-0 h-4 shrink-0"
+                >
                   {formatCategoryLabel(item.category)}
                 </Badge>
               </div>
@@ -127,13 +124,13 @@ export function DocumentTypeCard({
           </div>
         </div>
 
-        <CardDescription className="line-clamp-2 text-xs leading-relaxed text-muted-foreground min-h-8">
+        <CardDescription className="line-clamp-2 text-xs leading-relaxed text-muted-foreground min-h-0 sm:min-h-8">
           {item.description ||
             "Chưa có hướng dẫn thể thức chi tiết cho loại văn bản này."}
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="mt-auto space-y-2.5 p-4 pt-0">
+      <CardContent className="mt-auto space-y-2 p-3.5 sm:p-4 pt-0">
         {/* Badges strip */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           {item.nd30 ? (
@@ -196,47 +193,18 @@ export function DocumentTypeCard({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 pt-1">
+        {/* Action Button - 1 nút duy nhất, rõ nghĩa và phẳng phiu */}
+        <div className="pt-1">
           <Button
             variant="outline"
             size="sm"
-            className="h-8 flex-1 text-xs gap-1 px-2 border-primary/20 text-primary hover:bg-primary/10"
+            className="h-8 w-full text-xs gap-1.5 border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/40 font-medium"
             onClick={onOpen}
-            title="Xem chi tiết và cấu hình"
+            title="Xem chi tiết và cấu hình thể thức văn bản"
           >
-            <Settings className="size-3 shrink-0" />
-            <span className="truncate">Chi tiết</span>
+            <Settings className="size-3.5 shrink-0" />
+            <span>Chi tiết</span>
           </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground shrink-0"
-                title="Thao tác khác"
-              >
-                <MoreHorizontal className="size-3.5" />
-                <span className="sr-only">Thao tác</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 text-xs">
-              <DropdownMenuItem onClick={onEdit || onOpen}>
-                <Pencil className="size-3.5 mr-2 text-primary" />
-                <span>Chỉnh sửa</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleCopyCode}>
-                <Copy className="size-3.5 mr-2 text-primary" />
-                <span>Sao chép mã</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onOpen}>
-                <BookOpen className="size-3.5 mr-2 text-primary" />
-                <span>Xem tài liệu</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </CardContent>
     </Card>

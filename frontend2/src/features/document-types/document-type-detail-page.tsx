@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  Copy,
   ExternalLink,
   FileCheck,
   Loader2,
@@ -198,32 +199,48 @@ export function DocumentTypeDetailPage({ code }: DocumentTypeDetailPageProps) {
     <div className="space-y-5">
       {/* 1. Top Navigation & Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/70">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            className="h-8 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground shrink-0"
             onClick={() => navigate({ to: "/document-types" })}
           >
             <ArrowLeft className="size-3.5" />
-            <span>Danh mục</span>
+            <span className="hidden xs:inline">Danh mục</span>
           </Button>
 
-          <div className="h-4 w-px bg-border" />
+          <div className="h-4 w-px bg-border shrink-0" />
 
-          <div className="flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Icon className="size-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-foreground">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h1 className="text-sm sm:text-base font-bold text-foreground truncate max-w-[150px] xs:max-w-[200px] sm:max-w-none">
                   {item.name}
                 </h1>
-                <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                  {item.code}
-                </span>
-                <Badge variant="outline" className="text-[10px] h-4.5 px-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(item.code);
+                      toast.success(`Đã sao chép mã “${item.code}”!`);
+                    } catch {
+                      toast.error("Không thể sao chép mã.");
+                    }
+                  }}
+                  title="Sao chép mã thể thức"
+                  className="inline-flex items-center gap-1 font-mono text-[10px] sm:text-xs text-muted-foreground hover:text-primary transition-colors bg-muted hover:bg-primary/10 px-1.5 py-0.5 rounded cursor-pointer group/code"
+                >
+                  <span className="truncate">{item.code}</span>
+                  <Copy className="size-2.5 opacity-60 group-hover/code:opacity-100 shrink-0" />
+                </button>
+                <Badge
+                  variant="outline"
+                  className="text-[9px] sm:text-[10px] h-4.5 px-1.5 shrink-0"
+                >
                   {formatCategoryLabel(item.category)}
                 </Badge>
               </div>
@@ -231,9 +248,9 @@ export function DocumentTypeDetailPage({ code }: DocumentTypeDetailPageProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 self-end sm:self-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
           {/* Switch hoạt động nhanh */}
-          <div className="flex items-center gap-2 bg-muted/30 px-3 py-1 rounded-md border text-xs">
+          <div className="flex items-center gap-2 bg-muted/30 px-2.5 py-1 rounded-md border text-xs">
             <span className="text-muted-foreground text-[11px]">
               {item.is_active ? "Đang hoạt động" : "Đã tạm dừng"}
             </span>
@@ -251,7 +268,7 @@ export function DocumentTypeDetailPage({ code }: DocumentTypeDetailPageProps) {
             type="submit"
             form="doc-type-form"
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className="h-8 text-xs gap-1.5 min-w-[70px]"
             disabled={updateMutation.isPending}
           >
             {updateMutation.isPending ? (
