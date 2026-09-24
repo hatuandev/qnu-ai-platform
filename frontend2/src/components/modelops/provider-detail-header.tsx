@@ -13,6 +13,7 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Trash2,
+  Zap,
 } from "lucide-react";
 import type React from "react";
 import { ProviderIcon } from "../../components/icons/provider-icon";
@@ -58,54 +59,40 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
   return (
     <>
       {/* Navigation Breadcrumb */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBackToList}
-            className="h-8 px-2.5 text-xs gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Danh sách Provider</span>
-          </Button>
-          <span className="text-muted-foreground/60">/</span>
-          <span className="font-semibold text-foreground flex items-center gap-2">
-            <ProviderIcon code={selectedProvider.type} size={18} />
-            {selectedProvider.name}
-          </span>
-        </div>
-
-        <Badge
-          variant="outline"
-          className="font-mono text-xs text-primary border-primary/30"
+      <div className="flex items-center gap-1.5 sm:gap-2 text-xs min-w-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBackToList}
+          className="h-8 px-2 sm:px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground -ml-1 shrink-0"
         >
-          Chi Tiết Provider
-        </Badge>
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Danh sách Provider</span>
+          <span className="sm:hidden">Provider</span>
+        </Button>
+        <span className="text-muted-foreground/60 shrink-0">/</span>
+        <span className="font-semibold text-foreground flex items-center gap-1.5 truncate">
+          <ProviderIcon code={selectedProvider.type} size={16} />
+          <span className="truncate">{selectedProvider.name}</span>
+        </span>
       </div>
 
       {/* Hero Provider Header Card */}
-      <Card className="p-6 space-y-4 border-border/80 shadow-xs bg-card">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5 min-w-0">
-            <div className="p-2.5 rounded-lg bg-muted/40 border border-border/60 shrink-0 mt-0.5 flex items-center justify-center">
-              <ProviderIcon code={selectedProvider.type} size={36} />
+      <Card className="p-3.5 sm:p-5 lg:p-6 space-y-3.5 sm:space-y-4 border-border/80 shadow-xs bg-card">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex items-start gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-lg bg-muted/40 border border-border/60 shrink-0 mt-0.5 flex items-center justify-center">
+              <ProviderIcon code={selectedProvider.type} size={30} />
             </div>
-            <div className="space-y-1 min-w-0">
+            <div className="space-y-1.5 min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">
                   {selectedProvider.name}
                 </h1>
-                <Badge
-                  variant="secondary"
-                  className="font-mono text-[11px] uppercase tracking-wider"
-                >
-                  {selectedProvider.type}
-                </Badge>
                 {cat === "cloud" ? (
                   <Badge
                     variant="outline"
-                    className="text-[11px] font-mono border-border/80 text-foreground gap-1"
+                    className="text-[10px] sm:text-[11px] font-mono border-border/80 text-foreground gap-1"
                   >
                     <Cloud className="h-3 w-3 text-muted-foreground" />
                     Cloud
@@ -113,7 +100,7 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
                 ) : cat === "local" ? (
                   <Badge
                     variant="outline"
-                    className="text-[11px] font-mono border-border/80 text-foreground gap-1"
+                    className="text-[10px] sm:text-[11px] font-mono border-border/80 text-foreground gap-1"
                   >
                     <Cpu className="h-3 w-3 text-muted-foreground" />
                     Local
@@ -121,55 +108,59 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
                 ) : (
                   <Badge
                     variant="outline"
-                    className="text-[11px] font-mono border-border/80 text-foreground gap-1"
+                    className="text-[10px] sm:text-[11px] font-mono border-border/80 text-foreground gap-1"
                   >
                     <SlidersHorizontal className="h-3 w-3 text-muted-foreground" />
                     Custom
                   </Badge>
                 )}
-                <Badge
-                  variant={selectedProvider.is_active ? "success" : "outline"}
-                  className="text-[11px]"
-                >
-                  {selectedProvider.is_active
-                    ? "Đang Hoạt Động"
-                    : "Đang Tạm Dừng"}
-                </Badge>
               </div>
 
-              {selectedProvider.api_base_url ? (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                  <Globe className="h-3 w-3 text-primary shrink-0" />
-                  <span className="truncate max-w-md">
-                    {selectedProvider.api_base_url}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onCopyUrl(selectedProvider.api_base_url || "")
-                    }
-                    className="p-1 hover:text-foreground rounded transition-colors"
-                    title="Sao chép URL"
-                  >
-                    {copiedUrl ? (
-                      <Check className="h-3 w-3 text-success" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </button>
+              {/* Inline URL & Live Operational Telemetry */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {selectedProvider.api_base_url ? (
+                  <div className="flex items-center gap-1.5 font-mono">
+                    <Globe className="h-3 w-3 text-primary shrink-0" />
+                    <span className="truncate max-w-[200px] sm:max-w-md">
+                      {selectedProvider.api_base_url}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onCopyUrl(selectedProvider.api_base_url || "")
+                      }
+                      className="p-0.5 hover:text-foreground rounded transition-colors"
+                      title="Sao chép URL"
+                    >
+                      {copiedUrl ? (
+                        <Check className="h-3 w-3 text-success" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <span>Endpoint mặc định</span>
+                )}
+
+                <span className="text-border hidden sm:inline">|</span>
+
+                <div className="flex items-center gap-1 text-[11px]">
+                  <Zap className="size-3 text-sky-500" />
+                  <strong className="text-foreground font-mono font-medium">
+                    {selectedProvider.latency_ms || 0}
+                  </strong>{" "}
+                  ms
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Sử dụng endpoint mặc định của nhà cung cấp
-                </p>
-              )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/60">
-            <div className="flex items-center gap-2 bg-muted/40 px-3 py-1.5 rounded-md border border-border">
+          {/* Action Toolbar */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/60">
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-muted/40 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md border border-border h-8 sm:h-9">
               <span className="text-xs font-medium text-foreground">
-                {selectedProvider.is_active ? "Bật Hoạt Động" : "Tạm Dừng"}
+                Hoạt động
               </span>
               <Switch
                 checked={selectedProvider.is_active}
@@ -183,14 +174,14 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
               size="sm"
               disabled={isTesting}
               onClick={onTestConnection}
-              className="h-9 text-xs gap-1.5"
+              className="h-8 sm:h-9 text-xs gap-1.5 px-2.5 sm:px-3"
             >
               {isTesting ? (
                 <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
               ) : (
                 <Play className="h-3.5 w-3.5 text-primary" />
               )}
-              <span>{isTesting ? "Đang kiểm tra..." : "Test Kết Nối"}</span>
+              <span>{isTesting ? "Đang test..." : "Kiểm tra"}</span>
             </Button>
 
             <Button
@@ -198,8 +189,8 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
               size="sm"
               disabled={isExporting}
               onClick={onExport}
-              className="h-9 text-xs gap-1.5"
-              title="Xuất cấu hình của Provider này ra tệp JSON"
+              className="h-8 sm:h-9 text-xs gap-1.5 px-2.5 sm:px-3"
+              title="Xuất cấu hình JSON"
             >
               {isExporting ? (
                 <RefreshCw className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -213,17 +204,17 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
               variant="outline"
               size="sm"
               onClick={onEdit}
-              className="h-9 text-xs gap-1.5"
+              className="h-8 sm:h-9 text-xs gap-1.5 px-2.5 sm:px-3"
             >
               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Chỉnh Sửa</span>
+              <span>Sửa</span>
             </Button>
 
             <Button
               variant="ghost"
               size="sm"
               onClick={onDelete}
-              className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              className="h-8 sm:h-9 w-8 sm:w-9 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               title="Xóa Provider"
             >
               <Trash2 className="h-4 w-4" />
@@ -233,11 +224,10 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
 
         {hasTestMsg && (
           <div
-            className={`p-3 rounded-md text-xs flex items-center gap-2 ${
-              testResult.success
+            className={`p-2.5 sm:p-3 rounded-md text-xs flex items-center gap-2 ${testResult.success
                 ? "bg-success/10 text-success border border-success/30"
                 : "bg-destructive/10 text-destructive border border-destructive/30"
-            }`}
+              }`}
           >
             {testResult.success ? (
               <CheckCircle2 className="h-4 w-4 shrink-0" />

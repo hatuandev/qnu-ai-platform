@@ -319,6 +319,19 @@ async def simulate_provider_key_rotation(
     return SimulateKeyRotationResponse(**res)
 
 
+@router.post(
+    "/providers/{provider_id}/keys/{key_id}/reveal",
+    summary="Lộ ra giá trị thật của một khóa API (sau khi giải mã) để sao chép vào clipboard",
+)
+async def reveal_provider_key(
+    provider_id: str,
+    key_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Trả về giá trị plaintext của API key sau khi giải mã — chỉ dành cho Admin UI copy."""
+    return await modelops_service.reveal_provider_key(db, provider_id, key_id)
+
+
 # ---------------- Quotas ----------------
 
 

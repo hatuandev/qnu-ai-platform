@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Verify database schema readiness & storage bucket (non-blocking timeouts for local dev)
     import asyncio
+
     from app.core.storage import storage_service
 
     try:

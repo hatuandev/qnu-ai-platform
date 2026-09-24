@@ -19,6 +19,7 @@ import { useState } from "react";
 import { formatFileSize, STATUS_BADGE } from "@/components/knowledge/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -35,7 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { KnowledgeDocument } from "@/types";
 
 interface CollectionDocumentsTabProps {

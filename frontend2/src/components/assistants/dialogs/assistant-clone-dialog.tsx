@@ -2,6 +2,7 @@ import { Copy, Loader2 } from "lucide-react";
 import * as React from "react";
 import { Field } from "@/components/admin/field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface AssistantCloneDialogProps {
   open: boolean;

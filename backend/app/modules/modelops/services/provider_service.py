@@ -1596,6 +1596,45 @@ class ProviderService:
 
         return {"success": True, "deleted_id": key_id}
 
+    async def reveal_provider_key(
+        self, db: AsyncSession, provider_id: str, key_id: str
+    ) -> dict[str, Any]:
+        """Decrypt and return the plaintext API key value for clipboard copy in Admin UI."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        res = await db.execute(stmt)
+        config = res.scalar_one_or_none()
+
+        target_key: dict[str, Any] | None = None
+        if config:
+            for k in (config.extra_config or {}).get("api_keys", []):
+                if k.get("id") == key_id:
+                    target_key = k
+                    break
+        elif provider_id in _DEFAULT_PROVIDER_KEYS:
+            for k in _DEFAULT_PROVIDER_KEYS[provider_id]:
+                if k.get("id") == key_id:
+                    target_key = k
+                    break
+
+        if not target_key:
+            raise AppException(
+                status_code=404,
+                title="Khóa không tồn tại",
+                detail=f"Không tìm thấy khóa API '{key_id}'.",
+                code="KEY_NOT_FOUND",
+            )
+
+        raw_key = target_key.get("api_key", "")
+        plain = decrypt_secret(raw_key) if raw_key else None
+        if not plain:
+            raise AppException(
+                status_code=422,
+                title="Không thể giải mã khóa",
+                detail="Khóa API không thể giải mã. Vui lòng cập nhật lại khóa.",
+                code="KEY_DECRYPT_FAILED",
+            )
+        return {"api_key": plain}
+
     async def test_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str
     ) -> dict[str, Any]:

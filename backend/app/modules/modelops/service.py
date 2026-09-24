@@ -178,6 +178,11 @@ class ModelOpsService:
     ) -> dict[str, Any]:
         return await self._provider.test_provider_key(db, provider_id, key_id)
 
+    async def reveal_provider_key(
+        self, db: AsyncSession, provider_id: str, key_id: str
+    ) -> dict[str, Any]:
+        return await self._provider.reveal_provider_key(db, provider_id, key_id)
+
     async def simulate_key_rotation(
         self,
         db: AsyncSession,

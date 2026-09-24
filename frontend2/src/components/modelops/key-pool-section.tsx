@@ -19,6 +19,7 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
 import type { ModelProvider, ProviderApiKey } from "../../services/api-client";
+import { apiClient } from "../../services/api-client";
 
 export interface KeyPoolSectionProps {
   selectedProvider: ModelProvider;
@@ -72,12 +73,28 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
   const [newKeyPriority, setNewKeyPriority] = useState(1);
   const [newKeyQuota, setNewKeyQuota] = useState("");
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [revealingKeyId, setRevealingKeyId] = useState<string | null>(null);
 
-  const handleCopyKey = (keyId: string, text: string) => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedKeyId(keyId);
-      setTimeout(() => setCopiedKeyId(null), 2000);
+  const handleCopyKey = async (providerId: string, keyId: string) => {
+    if (revealingKeyId) return;
+    setRevealingKeyId(keyId);
+    try {
+      const { api_key } = await apiClient.revealProviderKey(providerId, keyId);
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(api_key);
+        setCopiedKeyId(keyId);
+        setTimeout(() => setCopiedKeyId(null), 2000);
+      }
+    } catch {
+      // Fallback: copy masked value
+      const item = providerKeys.find((k) => k.id === keyId);
+      if (item && typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(item.api_key_masked);
+        setCopiedKeyId(keyId);
+        setTimeout(() => setCopiedKeyId(null), 2000);
+      }
+    } finally {
+      setRevealingKeyId(null);
     }
   };
 
@@ -134,7 +151,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                   className={`h-3.5 w-3.5 text-warning ${simulatingRotation ? "animate-spin" : ""}`}
                 />
                 <span>
-                  {simulatingRotation ? "Đang test..." : "Test 429 Failover"}
+                  {simulatingRotation ? "Đang test..." : "Thử Failover"}
                 </span>
               </Button>
 
@@ -144,7 +161,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                 className="h-8 text-xs gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{showAddKeyForm ? "Đóng Form" : "Thêm Khóa"}</span>
+                <span>{showAddKeyForm ? "Đóng" : "Thêm khóa"}</span>
               </Button>
             </div>
           </div>
@@ -290,7 +307,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                   }
                   className="h-8 text-xs"
                 >
-                  {isAddingKey ? "Đang lưu..." : "Lưu Khóa"}
+                  {isAddingKey ? "Đang lưu..." : "Lưu"}
                 </Button>
               </div>
             </form>
@@ -357,16 +374,16 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                             </code>
                             <button
                               type="button"
+                              disabled={revealingKeyId === keyItem.id}
                               onClick={() =>
-                                handleCopyKey(
-                                  keyItem.id,
-                                  keyItem.api_key_masked,
-                                )
+                                handleCopyKey(selectedProvider.id, keyItem.id)
                               }
-                              className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
-                              title="Sao chép mã khóa"
+                              className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors disabled:opacity-50 disabled:cursor-wait"
+                              title="Sao chép API key thật"
                             >
-                              {copiedKeyId === keyItem.id ? (
+                              {revealingKeyId === keyItem.id ? (
+                                <RefreshCw className="h-3 w-3 animate-spin" />
+                              ) : copiedKeyId === keyItem.id ? (
                                 <Check className="h-3 w-3 text-success" />
                               ) : (
                                 <Copy className="h-3 w-3" />
@@ -486,9 +503,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                         >
                           <Play className="h-3 w-3 text-primary" />
                           <span>
-                            {isKeyTesting
-                              ? "Đang kiểm tra..."
-                              : "Test Khóa Này"}
+                            {isKeyTesting ? "Đang test..." : "Kiểm tra"}
                           </span>
                         </Button>
 

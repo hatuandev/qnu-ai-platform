@@ -194,9 +194,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
             ) : (
               <Zap className="h-3.5 w-3.5" />
             )}
-            <span>
-              {isTestingAllModels ? "Đang Kiểm Tra..." : "Test Tất Cả"}
-            </span>
+            <span>{isTestingAllModels ? "Đang test..." : "Test tất cả"}</span>
           </Button>
         </div>
       </div>
@@ -423,7 +421,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
           title="Thêm mô hình tùy chỉnh mới vào Provider"
         >
           <Plus className="h-4 w-4" />
-          <span>Thêm Mô Hình (Add Model)</span>
+          <span>Thêm model</span>
         </button>
       </div>
 

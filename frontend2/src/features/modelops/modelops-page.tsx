@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Cloud,
@@ -61,6 +62,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
   onNavigate,
 }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Selected Provider for Detail View
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
@@ -421,8 +423,11 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     const nextPath = `/models/${providerId}`;
     if (onNavigate) {
       onNavigate(nextPath);
-    } else if (typeof window !== "undefined") {
-      window.history.pushState(null, "", nextPath);
+    } else {
+      navigate({
+        to: "/models/$providerId",
+        params: { providerId },
+      });
     }
   };
 
@@ -438,8 +443,8 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     const nextPath = "/models";
     if (onNavigate) {
       onNavigate(nextPath);
-    } else if (typeof window !== "undefined") {
-      window.history.pushState(null, "", nextPath);
+    } else {
+      navigate({ to: "/models" });
     }
   };
 
@@ -1008,12 +1013,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         >
           <Server className="size-3.5 shrink-0" />
           <span className="truncate">Nhà Cung Cấp</span>
-          <Badge
-            variant="secondary"
-            className="text-[9px] px-1 py-0 h-4 bg-background/40 text-inherit border-none font-mono shrink-0"
-          >
-            {providers.length}
-          </Badge>
         </Button>
 
         <Button
@@ -1034,12 +1033,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         >
           <Layers className="size-3.5 shrink-0" />
           <span className="truncate">Combos</span>
-          <Badge
-            variant="secondary"
-            className="text-[9px] px-1 py-0 h-4 bg-background/40 text-inherit border-none font-mono shrink-0"
-          >
-            {systemDefaults?.model_combos?.length || 1}
-          </Badge>
         </Button>
       </div>
 

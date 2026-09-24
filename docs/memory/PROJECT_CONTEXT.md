@@ -7,10 +7,46 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-24 01:10 (UTC+7)
-- **Phiên số**: #208
+- **Thời gian cập nhật**: 2026-09-24 10:05 (UTC+7)
+- **Phiên số**: #210
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Thiết Kế Trang Chi Tiết Provider `/models/$providerId` Độc Lập Chuẩn Master-Detail Deep Routing, Bổ Sung Quy Chuẩn Responsive & Nhãn Nút Ngắn Gọn Vào AGENTS.md (phiên #210)**:
+  - *Hiện trạng & Vấn đề phát hiện qua ảnh chụp của người dùng*:
+    - Người dùng truy cập hoặc F5 tại URL `http://localhost:3000/models/prov_c9d9d380`, trình duyệt hiển thị màn hình lỗi: *"Không tìm thấy trang - Trang bạn yêu cầu không tồn tại."* (404 Not Found).
+    - Trên màn hình iPhone thực tế: breadcrumb bị tràn ép chữ, badge "Chi Tiết Provider" gập dòng chồng chéo, các nút bấm Hero card dài dòng chiếm nhiều hàng, cụm tabs có số đếm và bị cắt chữ cạnh phải.
+  - *Kiến trúc & Giải pháp UI/UX*:
+    - Tách cấu trúc Route chuẩn TanStack Router:
+      * `frontend2/src/routes/models.tsx`: Layout route chứa `<Outlet />`.
+      * `frontend2/src/routes/models.index.tsx`: Route danh sách chính (`/models/`), hiển thị `ModelOpsPage`.
+      * `frontend2/src/routes/models.$providerId.tsx`: Route chi tiết độc lập (`/models/$providerId`), tiếp nhận `providerId` và render `ProviderDetailPage`.
+    - Bổ sung 2 quy chuẩn bắt buộc vào `AGENTS.md` & `qnu-frontend-architect/SKILL.md`:
+      * Mục 4.10: **Quy Chuẩn Thiết Kế Đa Thiết Bị & Responsive (Cross-Device & Responsive Standard)**.
+      * Mục 4.11: **Quy Chuẩn Đặt Tên Nút Bấm & Nhãn Điều Khiển Ngắn Gọn (Concise Action Labels & Microcopy Standard)**.
+    - Xây dựng component mới `frontend2/src/features/modelops/provider-detail-page.tsx`:
+      * Breadcrumb chuẩn kèm nút quay lại di động: `← Provider / Mistral AI`, ẩn badge phụ trên màn hình nhỏ.
+      * Hero Header Card (`ProviderDetailHeader`): Logo, Tên, Badge loại, nhãn nút rút gọn (`Hoạt động`, `Kiểm tra`, `Xuất JSON`, `Sửa`, `Xóa`).
+      * Executive KPI Telemetry Strip 4 ô: Mô hình, Khóa API, Độ trễ (Ping), Circuit Breaker.
+      * Tabs phân hệ chuyên sâu tối giản: `Mô hình`, `Khóa API`, `Chịu lỗi & Mạng`, xóa 100% số đếm badge thừa, hỗ trợ cuộn ngang êm ái.
+      * Chuẩn hóa nhãn nút trong `models-grid.tsx` (`Test tất cả`, `Thêm model`, `Dọn model lỗi`) và `key-pool-section.tsx` (`Thử Failover`, `Thêm khóa`, `Lưu`, `Kiểm tra`).
+  - *Verification*:
+    - TypeScript Typecheck `npm run typecheck`: **0 lỗi** toàn bộ codebase.
+    - Biome linter `npx @biomejs/biome check`: **0 lỗi** trên toàn bộ các route và components ModelOps.
+    - Vite build `npm run build`: Đóng gói thành công trong 1.53s (chunk `models._providerId-sHTLwhbW.js` 16.94 kB).
+    - Triệt tiêu 100% lỗi 404, giao diện hiển thị hoàn hảo trên màn hình iPhone di động.
+- 0. **Lược Bỏ Toàn Bộ Số Đếm (Badge Count) Khỏi Main Navigation Tabs Trang ModelOps Trên Frontend2 & Frontend (phiên #209)**:
+  - *Hiện trạng & Yêu cầu người dùng*:
+    - Người dùng gửi ảnh chụp màn hình 3 tabs chính: `[Nhà Cung Cấp 11]`, `[Mặc Định]`, `[Combos 4]` và yêu cầu bỏ các con số trên tabs bên Frontend.
+  - *Frontend2 & Frontend*:
+    - `frontend2/src/features/modelops/modelops-page.tsx`:
+      * Xóa bỏ component `<Badge>` số lượng `{providers.length}` trong nút `Nhà Cung Cấp` và `{systemDefaults?.model_combos?.length || 1}` trong nút `Combos`.
+      * Cả 3 tabs chính `[Nhà Cung Cấp]`, `[Mặc Định]`, `[Combos]` giờ đây hiển thị phẳng phiu, tối giản và đồng đều, thanh thoát trên mọi màn hình.
+    - `frontend/src/pages/modelops-page.tsx`:
+      * Đồng bộ xóa bỏ badges số lượng khỏi các nút navigation tabs tương tự (`Combos & Vision Adapter`, `Nhà Cung Cấp & Khóa API`).
+  - *Verification*:
+    - TypeScript Typecheck `npm run typecheck`: **0 lỗi** trên cả `frontend2` và `frontend`.
+    - Biome linter: **0 lỗi** trên cả 2 frontends.
+    - Vite build: đóng gói thành công 100% trong 2.10s.
 - 0. **Tối Ưu UI/UX & Chuẩn Hóa Nhãn Nút Trang ModelOps Trên Frontend2 Mới, Khắc Phục Triệt Để Lỗi Cắt Chữ Tabs (phiên #208)**:
   - *Hiện trạng & Yêu cầu người dùng*:
     - Người dùng đang xây dựng lại `frontend2` (Vite 6 + React 19 + TanStack Router).

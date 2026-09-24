@@ -115,6 +115,48 @@ frontend/src/
   - Phải ứng dụng đầy đủ design tokens OKLCH (`border-primary`, `bg-primary`, `text-primary-foreground`, `focus-visible:ring-ring`, `shadow-xs`), tương thích hoàn toàn cả Light Mode và Dark Mode.
   - Phải export rõ ràng để toàn bộ dự án có thể tái sử dụng lâu dài, tránh tình trạng viết code cục bộ phân tán.
 
+### 3.7. Quy Chuẩn Thiết Kế Đa Thiết Bị & Responsive (Cross-Device & Responsive Standard)
+- **Hệ Thống Breakpoints Chuẩn**:
+  - Mobile: `< 640px` (điện thoại thông minh dọc)
+  - Phablet / Small Tablet: `640px - 767px` (`sm`)
+  - Tablet / Small Laptop: `768px - 1023px` (`md`)
+  - Desktop Tiêu Chuẩn: `1024px - 1279px` (`lg` - Sidebar chuyển từ Sheet/Drawer sang thanh cố định)
+  - Màn Hình Rộng: `≥ 1280px` (`xl`, `2xl`)
+- **Cấm Tuyệt Đối Cuộn Ngang Toàn Trang (Zero Horizontal Page Scroll)**:
+  - Tuyệt đối cấm gán chiều rộng cố định tính bằng pixel lớn (`w-[1000px]`, `min-w-[800px]`) trên các container chính.
+  - Luôn dùng `w-full`, `max-w-...`, Flexbox wrap (`flex-wrap`) và CSS Grid linh hoạt (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`).
+- **Khung Vỏ Ứng Dụng & Thanh Bên Đáp Ứng (Responsive Shell & Drawer)**:
+  - Khi màn hình `< 1024px`, thanh AppSidebar phải tự động thu gọn và hiển thị dưới dạng ngăn kéo trượt (`Sheet / Drawer`) kích hoạt từ nút bấm trên Topbar.
+  - Topbar tự động co gọn thanh tìm kiếm (`CommandMenu` chuyển thành icon kính lúp trên mobile).
+- **Bảng Dữ Liệu & Khối Báo Cáo Trên Màn Hình Nhỏ**:
+  - Mọi bảng `Table` bắt buộc phải được bọc trong container `w-full overflow-x-auto` để cuộn ngang nội bộ bảng mà không làm xô lệch toàn trang.
+  - Trên màn hình hẹp (<640px), ưu tiên xếp chồng dạng thẻ (`Card-based view`) hoặc cuộn ngang phân tách rõ ràng.
+- **Điều Khiển Tabs & Thanh Điều Hướng (Responsive Tabs & Breadcrumbs)**:
+  - Cụm Tabs trên mobile phải hỗ trợ cuộn ngang (`overflow-x-auto no-scrollbar`) hoặc chia cột đều (`grid grid-cols-N`), tuyệt đối không để chữ bị cắt xén (clipping) hoặc rớt dòng gây vỡ giao diện.
+  - Breadcrumbs trên mobile phải tinh gọn: ẩn các badge phụ thừa thãi (như badge *"Chi Tiết Provider"*), thu gọn nút quay lại thành nhãn 1 từ (ví dụ `← Provider`).
+- **Hộp Thoại & Ngăn Kéo (Adaptive Modals & Dialogs)**:
+  - `Dialog` trên Desktop hiển thị popup trung tâm, nhưng trên Mobile phải có `w-[95vw]` hoặc tự động chuyển thành ngăn kéo trượt từ đáy màn hình (`Drawer / Bottom Sheet`) để dễ thao tác bằng một tay.
+
+### 3.8. Quy Chuẩn Đặt Tên Nút Bấm & Nhãn Điều Khiển Ngắn Gọn (Concise Action Labels & Microcopy Standard)
+- **Tôn chỉ "Ít Từ - Rõ Nghĩa" (Concise & Context-Aware)**:
+  - Tuyệt đối **không đặt tên nút bấm dài dòng, rườm rà** (như *"Test Kết Nối"*, *"Kiểm Tra Kết Nối Hạ Tầng"*, *"Thêm Mô Hình Mới Vào Nhà Cung Cấp"*, *"Danh Sách Mô Hình"*).
+  - Mọi nhãn nút bấm phải súc tích, ưu tiên 1 đến 2 từ kết hợp icon Lucide thanh lịch.
+- **Bảng Quy Chuẩn Đối Chiếu**:
+  - ❌ *"Test Kết Nối"* / *"Kiểm Tra Kết Nối"* ➔ ✅ **"Kiểm tra"** (kèm icon `Play` hoặc `Activity`).
+  - ❌ *"Chỉnh Sửa"* / *"Chỉnh Sửa Thông Tin"* ➔ ✅ **"Sửa"** (kèm icon `Pencil`).
+  - ❌ *"Xuất Toàn Bộ Cấu Hình JSON"* ➔ ✅ **"Xuất JSON"** (kèm icon `Download`).
+  - ❌ *"Thêm Mô Hình"* / *"Thêm Mô Hình (Add Model)"* ➔ ✅ **"Thêm model"** (kèm icon `Plus`).
+  - ❌ *"Thêm Khóa API Mới"* ➔ ✅ **"Thêm khóa"** (kèm icon `Plus`).
+  - ❌ *"Bật Hoạt Động"* / *"Bật Hoạt Động Provider"* ➔ ✅ **"Hoạt động"** (kèm Switch).
+  - ❌ *"Test 429 Failover"* ➔ ✅ **"Thử Failover"** (kèm icon `Zap`).
+  - ❌ *"Test Khóa Này"* ➔ ✅ **"Kiểm tra"** (kèm icon `Play`).
+  - ❌ *"Dọn Model Lỗi"* / *"Dọn Dẹp Các Model Đang Chết"* ➔ ✅ **"Dọn model lỗi"** (kèm icon `Trash2`).
+- **Nhãn Tabs Cực Kỳ Tối Giản & Cấm Số Đếm Thừa**:
+  - ❌ *"Danh Sách Mô Hình (10)"* ➔ ✅ **"Mô hình"**.
+  - ❌ *"Kho Khóa API (Key Pool)"* ➔ ✅ **"Khóa API"**.
+  - ❌ *"Chính Sách Chịu Lỗi & Cấu Hình"* ➔ ✅ **"Chịu lỗi & Mạng"**.
+  - Tuyệt đối cấm gắn các badge số đếm rườm rà lên nhãn tab khi không có yêu cầu đặc thù.
+
 
 ---
 

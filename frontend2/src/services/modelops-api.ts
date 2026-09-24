@@ -270,6 +270,18 @@ export const modelopsApi = {
     return await res.json();
   },
 
+  async revealProviderKey(
+    providerId: string,
+    keyId: string,
+  ): Promise<{ api_key: string }> {
+    const res = await fetch(
+      `${BASE_URL}/modelops/providers/${providerId}/keys/${keyId}/reveal`,
+      { method: "POST" },
+    );
+    if (!res.ok) throw new Error("Không thể lấy giá trị khóa API");
+    return await res.json();
+  },
+
   async simulateKeyRotation(
     providerId: string,
     payload: {

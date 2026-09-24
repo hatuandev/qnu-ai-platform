@@ -825,12 +825,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
         >
           <Layers className="size-3.5" />
           <span>Combos & Vision Adapter</span>
-          <Badge
-            variant="secondary"
-            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
-          >
-            {systemDefaults?.model_combos?.length || 1} Combos
-          </Badge>
         </Button>
 
         <Button
@@ -841,12 +835,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
         >
           <Server className="size-3.5" />
           <span>Nhà Cung Cấp & Khóa API</span>
-          <Badge
-            variant="secondary"
-            className="text-[9px] px-1.5 py-0 h-4 bg-background/40 text-inherit border-none font-mono"
-          >
-            {providers.length}
-          </Badge>
         </Button>
 
         <Button
