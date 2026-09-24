@@ -170,13 +170,6 @@ export function CollectionHeader({
           )}
         </span>
 
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded">
-          <span className="text-muted-foreground">Chiến lược:</span>
-          <strong className="text-foreground font-medium">
-            {collection.chunking_strategy}
-          </strong>
-        </span>
-
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded font-medium text-foreground">
           <span>{documentCount} văn bản</span>
           <span className="text-muted-foreground font-mono font-normal">

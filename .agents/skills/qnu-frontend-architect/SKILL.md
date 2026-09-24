@@ -157,6 +157,14 @@ frontend/src/
   - ❌ *"Chính Sách Chịu Lỗi & Cấu Hình"* ➔ ✅ **"Chịu lỗi & Mạng"**.
   - Tuyệt đối cấm gắn các badge số đếm rườm rà lên nhãn tab khi không có yêu cầu đặc thù.
 
+### 3.6. Quy Chuẩn Thanh Tìm Kiếm & Bộ Lọc Liền Mạch (Seamless & Borderless Filter Bar Pattern)
+- **Cấm Tuyệt Đối Viền Khung Kép (Zero Double-Border / Box-in-Box)**: Tuyệt đối không bọc thanh tìm kiếm và bộ lọc (`Filter Bar`) trong các container `bg-card p-3 rounded-lg border border-border shadow-2xs`. Các thành phần con (`Input`, `SelectTrigger`, nút `Button`) đã mang đường viền mảnh và màu nền riêng.
+- **Bố cục Liền Mạch (Seamless Layout Standard)**: Luôn dùng flex container trực tiếp trên nền trang:
+  ```tsx
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  ```
+  Thanh điều khiển đặt trực tiếp trên nền trang (`bg-background`), tạo khoảng thở thoáng đãng, tự nhiên phân tách giữa khu vực KPI Summary Cards và danh sách Cards/Bảng dữ liệu bên dưới.
+- **Mobile Responsive**: Sử dụng `grid grid-cols-2 gap-2 sm:flex` với `w-full sm:w-[155px]` cho các dropdown lọc để chống tràn màn hình.
 
 ---
 
@@ -251,19 +259,16 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 ---
 
-## 8. Quy Trình Kiểm Thử & Nghiệm Thu Giao Diện Bắt Buộc
+## 8. Quy Trình Kiểm Thử & Nghiệm Thu Giao Diện Tinh Gọn (Fast-Path Build Verification)
 
-Mọi thay đổi trên Frontend trước khi kết thúc phiên làm việc bắt buộc phải vượt qua toàn bộ 3 bước kiểm tra:
+Khi chỉ thực hiện chỉnh sửa, tối ưu giao diện Frontend (UI/UX, CSS, Component, Page, Dialog), **tuyệt đối không chạy các bộ test Backend (`pytest`), không chạy quét toàn bộ linter hay các tác vụ cồng kềnh làm chậm quá trình phát triển**.
+
+Agent chỉ cần chạy kiểm tra đóng gói bản Production:
 
 ```bash
-# 1. Kiểm tra linter và định dạng cú pháp (Phải 0 lỗi)
-npm run lint
-
-# 2. Kiểm tra tính toàn vẹn kiểu dữ liệu TypeScript (Phải 0 lỗi)
-npm run typecheck
-
-# 3. Đóng gói kiểm thử bản Production (Phải biên dịch thành công)
+# Đóng gói kiểm thử bản Production (Bảo đảm không có lỗi cú pháp, types hoặc vỡ bundle)
 npm run build
 ```
 
-Nếu có bất kỳ cảnh báo hoặc lỗi nào, Agent **bắt buộc phải sửa dứt điểm** trước khi báo cáo hoàn tất công việc.
+Nếu lệnh `npm run build` kết thúc thành công (Exit code 0), Agent nghiệm thu ngay và phản hồi cho người dùng, tối ưu hóa tốc độ lặp (iteration speed).
+

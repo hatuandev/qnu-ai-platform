@@ -7,10 +7,34 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-24 16:10 (UTC+7)
-- **Phiên số**: #213
+- **Thời gian cập nhật**: 2026-09-24 16:55 (UTC+7)
+- **Phiên số**: #214
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
+- 0. **Thiết Kế & Triển Khai Hoàn Chỉnh Phân Hệ Loại Văn Bản (`/document-types`) Trên Frontend2 Chuẩn Master-Detail Deep Routing (phiên #214)**:
+  - *Hiện trạng & Yêu cầu*:
+    - Xây dựng hoàn chỉnh phân hệ Quản lý Loại Văn Bản trên `frontend2` (Vite 6 + React 19 + TanStack Router + Tailwind v4 + Radix UI + Biome) tại `http://localhost:3000/document-types`.
+    - Chuẩn hóa thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP và phân loại văn bản học thuật Trường ĐH Quy Nhơn.
+    - Áp dụng kiến trúc Master-Detail Deep Routing (Mục 4.5 của `AGENTS.md`): Tuyến danh sách `/document-types/` và tuyến chi tiết độc lập `/document-types/:code`.
+    - Tuân thủ cấu hình responsive 4-2-1 cards, 100% Radix/shadcn UI, Zero Emoji và nhãn nút ngắn gọn 1-2 từ.
+  - *Kiến trúc & Triển khai*:
+    - Định tuyến file-based TanStack Router:
+      * `frontend2/src/routes/document-types.tsx`: Layout route bọc `<Outlet />`.
+      * `frontend2/src/routes/document-types.index.tsx`: Tuyến danh sách hiển thị `DocumentTypesPage`.
+      * `frontend2/src/routes/document-types.$code.tsx`: Tuyến chi tiết chuyên sâu hiển thị `DocumentTypeDetailPage`.
+    - Màn hình Master View `DocumentTypesPage`:
+      * Dải KPI Telemetry Strip 4 ô gộp trong Card nguyên khối: Tổng loại văn bản, Chuẩn NĐ 30/2020, Đào tạo & Học thuật, Đang hoạt động.
+      * Seamless Toolbar: Ô tìm kiếm debounced (tên/code mono), bộ lọc Nhóm phân loại (175px), bộ lọc Trạng thái, chip lọc nhanh "Tất cả | Chuẩn NĐ 30 | Tùy chỉnh", chuyển đổi Grid/Table.
+      * Thẻ `DocumentTypeCard` với lưới 4-2-1 (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`), icon chuyên ngành trong `bg-primary/10`, switch trạng thái, badges NĐ 30, dải thông số kỹ thuật (Mức ưu tiên RAG 1-10, Thời hạn bảo quản, Số tài liệu thực tế liên kết) và nút hành động tinh gọn.
+      * Data Table View bọc trong `overflow-x-auto` chống xô lệch.
+    - Màn hình Dedicated Detail View `DocumentTypeDetailPage`:
+      * Nút quay lại adaptive `← Danh mục`, switch trạng thái, nút "Lưu".
+      * Bố cục 2 cột chuyên sâu: Cột trái quản lý thông số thể thức và mức độ ưu tiên RAG (progress bar trực quan); Cột phải quản lý căn cứ pháp lý NĐ 30/2020, xuất xứ đồng bộ `qnu-ai-core`, tài liệu đang áp dụng và Danger Zone.
+    - Modal tạo mới `CreateDocumentTypeDialog`: 100% component Radix/shadcn UI chuẩn regex code validation.
+  - *Verification*:
+    - Frontend2 Biome check: 7 files mới đạt 0 errors, 0 warnings.
+    - Frontend2 Typecheck `tsc --noEmit`: 0 errors toàn codebase.
+    - Frontend2 Vite build: Thành công 100% trong 1.58s (tạo 3 chunks độc lập `document-types.index`, `document-types._code`, `document-type-card`).
 - 0. **Điều Chỉnh Responsive Grid 4 Cards Desktop, 2 Cards Tablet, 1 Card Mobile & Tối Ưu Bố Cục Thẻ Trợ Lý AI (phiên #213)**:
   - *Hiện trạng & Yêu cầu*:
     - Điều chỉnh cấu hình grid thẻ Trợ lý AI trên `http://localhost:3000/assistants` theo đúng tỷ lệ: 4 cards trên Desktop, 2 cards trên Tablet, 1 card trên Mobile.

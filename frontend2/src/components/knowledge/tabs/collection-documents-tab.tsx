@@ -302,7 +302,7 @@ export function CollectionDocumentsTab({
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="flex flex-col gap-2.5 bg-card p-3 rounded-lg border border-border shadow-2xs">
+      <div className="flex flex-col gap-2.5">
         {/* Row 1: Search Input & Summary Count */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="relative flex-1">

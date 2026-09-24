@@ -109,7 +109,7 @@ export function CollectionTasksTab({
       )}
 
       {/* Filter Bar for Tasks */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-card p-3 rounded-lg border border-border shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 w-full sm:w-80">
           <Search className="size-4 text-muted-foreground shrink-0" />
           <Input

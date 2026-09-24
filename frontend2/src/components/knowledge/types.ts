@@ -73,8 +73,4 @@ export function formatFileSize(bytes: number): string {
 
 export type CollectionSubView = "list" | "ingest" | "verify";
 
-export type CollectionDetailTab =
-  | "documents"
-  | "facts"
-  | "tasks"
-  | "playground";
+export type CollectionDetailTab = "documents" | "facts" | "tasks";

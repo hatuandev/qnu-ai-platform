@@ -76,7 +76,7 @@ export function CollectionFactsTab({
       </div>
 
       {/* Search bar for facts */}
-      <div className="flex items-center gap-2 bg-card p-3 rounded-lg border border-border shadow-2xs">
+      <div className="flex items-center gap-2">
         <Search className="size-4 text-muted-foreground shrink-0" />
         <Input
           placeholder="Tìm theo thực thể (ngành, khoa), tên thuộc tính hoặc giá trị..."

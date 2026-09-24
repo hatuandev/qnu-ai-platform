@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, FileText, Table2, Zap } from "lucide-react";
+import { Activity, FileText, Table2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -14,12 +14,8 @@ import { DocumentUploadDialog } from "@/components/knowledge/dialogs/document-up
 import { TaskLogDialog } from "@/components/knowledge/dialogs/task-log-dialog";
 import { CollectionDocumentsTab } from "@/components/knowledge/tabs/collection-documents-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
-import { CollectionPlaygroundTab } from "@/components/knowledge/tabs/collection-playground-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
-import type {
-  CollectionDetailTab,
-  SandboxSearchResult,
-} from "@/components/knowledge/types";
+import type { CollectionDetailTab } from "@/components/knowledge/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/services/api-client";
 import { jobsApi } from "@/services/jobs-api";
@@ -84,13 +80,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const [isReindexing, setIsReindexing] = useState(false);
   const [reindexJobId, setReindexJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  // Playground Sandbox State
-  const [sandboxQuery, setSandboxQuery] = useState("");
-  const [isSearchingSandbox, setIsSearchingSandbox] = useState(false);
-  const [sandboxResults, setSandboxResults] = useState<
-    SandboxSearchResult[] | null
-  >(null);
 
   // 1. Fetch Collections
   const { data: collections = [] } = useQuery({
@@ -381,35 +370,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   };
 
-  const handleSandboxSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sandboxQuery.trim()) return;
-    setIsSearchingSandbox(true);
-    try {
-      const res = await knowledgeApi.testCollection(
-        collection.id,
-        sandboxQuery.trim(),
-        5,
-      );
-      setSandboxResults(
-        res.map((item) => ({
-          id: item.chunk_id,
-          title: item.document_id,
-          clause: item.section || "Nội dung",
-          text: item.content,
-          score: item.score,
-          method: "Hybrid RRF",
-        })),
-      );
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Truy vấn thử nghiệm thất bại.",
-      );
-    } finally {
-      setIsSearchingSandbox(false);
-    }
-  };
-
   return (
     <div className="space-y-5">
       {/* 1. Header Hero & Navigation Bar */}
@@ -459,14 +419,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             >
               <Activity className="size-3.5" />
               <span>Tiến trình</span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="playground"
-              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
-            >
-              <Zap className="size-3.5" />
-              <span>Thử nghiệm</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -541,17 +493,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onDeleteTask={(task) => {
               toast.info(`Xóa task ${task.id}`);
             }}
-          />
-        </TabsContent>
-
-        {/* Tab 4: Thử Nghiệm Sandbox */}
-        <TabsContent value="playground" className="mt-0 focus-visible:ring-0">
-          <CollectionPlaygroundTab
-            sandboxQuery={sandboxQuery}
-            setSandboxQuery={setSandboxQuery}
-            isSearchingSandbox={isSearchingSandbox}
-            sandboxResults={sandboxResults}
-            onSandboxSearch={handleSandboxSearch}
           />
         </TabsContent>
       </Tabs>

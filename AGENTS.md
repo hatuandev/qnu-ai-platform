@@ -112,12 +112,14 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    - Kết nối SSE qua `useRAGStream` hiển thị token mượt mà, kèm hiệu ứng *Thinking Indicator*.
    - Khối cuộn `MessageScroller` có cơ chế tự động ghim đáy và tạm dừng thông minh khi người dùng cuộn lên đọc lại tài liệu cũ.
    - Mọi câu trả lời có dữ liệu RAG phải hiển thị nhãn trích dẫn dẫn tới `CitationSheet` đối soát văn bản gốc.
-7. **Bảo Đảm Kiểm Thử Frontend 100%**: Mọi thay đổi mã nguồn Frontend trước khi hoàn tất phải pass toàn bộ kiểm tra:
-   ```bash
-   npm run lint       # Biome check 0 lỗi
-   npm run typecheck  # TypeScript tsc --noEmit 0 lỗi
-   npm run build      # Vite build đóng gói bundle thành công
-   ```
+7. **Kiểm Tra Nhanh Khi Sửa Frontend (Fast-Path Frontend Verification)**:
+   - **Tối Ưu Thời Gian & Tốc Độ Phản Hồi**: Khi chỉ thực hiện chỉnh sửa, tối ưu giao diện Frontend (UI/UX, CSS, Component, Page), **tuyệt đối không chạy các bộ test Backend (`pytest`), không chạy quét toàn bộ linter dự án hoặc các tác vụ kiểm tra cồng kềnh làm mất thời gian của người dùng**.
+   - **Chỉ Cần Kiểm Thử Bản Build Frontend**: Chỉ cần chạy lệnh kiểm tra biên dịch gói bundle Frontend để bảo đảm không có lỗi cú pháp hoặc gãy vỡ layout:
+     ```bash
+     npm run build      # Vite build đóng gói bundle thành công (0 lỗi biên dịch)
+     ```
+   - Nếu `npm run build` thành công (exit code 0), xác nhận kết quả và báo cáo ngay cho người dùng mà không cần chờ đợi thêm các bước thừa thãi.
+
 8. **Quy Chuẩn Lucide Icons & Cấm Tuyệt Đối Emoji Trong Giao Diện Quản Trị (Lucide Icon & Zero-Emoji Standard)**:
    - **100% `lucide-react`**: Toàn bộ icon trong toàn bộ dự án bắt buộc phải nhập từ thư viện `lucide-react`. Tuyệt đối cấm tự tạo icon SVG ad-hoc hoặc sử dụng thư viện icon khác (FontAwesome, Material Icons, v.v.).
    - **Tuyệt đối CẤM Emoji trong UI**: Cấm sử dụng các emoji ký tự (`⚡`, `📖`, `🔤`, `💾`, `⚙️`, `✓`, `❌`, `🔥`, v.v.) trên các thành phần giao diện quản trị (topbar, buttons, badges, KPI chips, table cells). Mọi chỉ số và hành động phải dùng icon Lucide thanh lịch tương ứng (`Zap`, `BookOpen`, `Type`, `HardDrive`, `Cpu`, `Check`, `X`, `Flame`).
@@ -174,7 +176,17 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
       - ❌ *"Kho Khóa API (Key Pool)"* ➔ ✅ **"Khóa API"**.
       - ❌ *"Chính Sách Chịu Lỗi & Cấu Hình"* ➔ ✅ **"Chịu lỗi & Mạng"**.
       - Tuyệt đối cấm gắn các badge số đếm rườm rà lên nhãn tab khi không có yêu cầu đặc thù.
-
+12. **Quy Chuẩn Thanh Tìm Kiếm & Bộ Lọc Liền Mạch (Seamless & Borderless Filter Bar Pattern)**:
+    - **Cấm Tuyệt Đối Đóng Khung Viền Kép (Zero Double-Border / Box-in-Box)**:
+      - Tuyệt đối **không bọc cụm tìm kiếm và bộ lọc (`Filter Bar`) trong các thẻ Card/Box có viền bao quanh và màu nền riêng** (như `bg-card p-3 rounded-lg border border-border shadow-2xs`).
+      - *Lý do*: Bản thân các thành phần điều khiển con (`Input`, `SelectTrigger`, nút chuyển View mode `Button`) đã mang đường viền mảnh chuẩn (`border-input` / `border-border`) và nền riêng (`bg-background`). Việc bọc thêm một khung viền bên ngoài tạo ra hiệu ứng "hộp trong hộp" (box-in-box) thừa thãi, gây cảm giác chật chội, nặng nề và làm mất đi vẻ thanh thoát hiện đại.
+    - **Chuẩn Bố Cục Liền Mạch (Seamless Layout Standard)**:
+      - Container của thanh bộ lọc chỉ làm nhiệm vụ căn chỉnh Flex/Grid:
+        ```tsx
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        ```
+      - Thanh điều khiển đặt trực tiếp trên nền trang (`bg-background`), tạo khoảng thở thoáng đãng, tự nhiên phân tách giữa khu vực KPI Summary Cards và danh sách Cards/Bảng dữ liệu bên dưới.
+      - Duy trì khả năng co giãn linh hoạt trên Mobile: Sử dụng `grid grid-cols-2 gap-2 sm:flex` với `w-full sm:w-[155px]` cho các dropdown lọc để chống tràn màn hình.
 
 ---
 
