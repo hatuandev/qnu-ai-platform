@@ -7,8 +7,9 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-25 23:40 (UTC+7)
-- **Phiên số**: #222
+- **Thời gian cập nhật**: 2026-09-25 23:55 (UTC+7)
+- **Phiên số**: #223 (deploy Dokploy: README fix #222 xong, thêm start_period healthcheck; còn nghi phạm hạ tầng ngoài, chờ log `docker logs qnu_backend`)
+- **Phiên số trước**: #222
 - **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
 - **Phiên số trước**: #215
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
