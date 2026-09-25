@@ -1,13 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  ExternalLink,
-  GitFork,
-  Loader2,
-  Network,
-  Save,
-} from "lucide-react";
+import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AssistantHeader } from "@/components/assistants/assistant-header";
@@ -26,13 +19,7 @@ import { AssistantPersonaSection } from "@/components/assistants/sections/assist
 import { AssistantToolsSection } from "@/components/assistants/sections/assistant-tools-section";
 import type { AssistantEditForm } from "@/components/assistants/types";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   activateAssistant,
   cloneAssistant,
@@ -52,6 +39,7 @@ import { modelopsApi } from "@/services/modelops-api";
 import { workflowsApi } from "@/services/workflows-api";
 import type { AssistantItem } from "@/types/assistants";
 import { AssistantPlaygroundTab } from "./assistant-playground-tab";
+import { AssistantWorkflowTab } from "./assistant-workflow-tab";
 
 interface AssistantDetailPageProps {
   assistantId: string;
@@ -74,7 +62,7 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     workflow_id: item.workflow_id,
     collection_id: item.collection_id,
     sample_questions: questions.map((q, idx) => ({
-      id: `sq-${idx}-${Date.now().toString(36)}`,
+      id: `sq-${idx}`,
       text: q,
     })),
     primary_model: cfg?.model_policy?.primary_model || "gpt-4o-mini",
@@ -456,65 +444,11 @@ export function AssistantDetailPage({
       {subView === "playground" ? (
         <AssistantPlaygroundTab assistant={item} />
       ) : subView === "workflow" ? (
-        /* Workflow Studio Card */
-        <Card className="border-border/80 shadow-xs">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Network className="size-4 text-primary" />
-                  <span>Quy Trình Điều Phối DAG Trợ Lý</span>
-                </CardTitle>
-                <CardDescription className="text-xs mt-1">
-                  Trợ lý này đang liên kết với quy trình mã{" "}
-                  <code className="font-mono text-foreground font-semibold">
-                    {item.workflow_id}
-                  </code>
-                  .
-                </CardDescription>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => forkWorkflowMutation.mutate()}
-                  disabled={forkWorkflowMutation.isPending}
-                  title="Tách luồng xử lý riêng biệt để không ảnh hưởng tới trợ lý khác"
-                >
-                  <GitFork className="size-3.5 text-primary" />
-                  <span>Nhân bản riêng</span>
-                </Button>
-
-                <Button
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={() =>
-                    navigate({
-                      to: `/workflows/${item.workflow_id}` as never,
-                    })
-                  }
-                >
-                  <ExternalLink className="size-3.5" />
-                  <span>Mở DAG Canvas</span>
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4 text-xs">
-            <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-2">
-              <span className="font-semibold text-foreground block">
-                Chế độ quyền sở hữu:
-              </span>
-              <p className="text-muted-foreground leading-relaxed">
-                {item.workflow_ownership === "private"
-                  ? "Workflow này là luồng riêng (Private) được tối ưu hóa đặc thù cho trợ lý này."
-                  : "Workflow này là luồng dùng chung (Shared) của toàn hệ thống. Mọi chỉnh sửa trên canvas sẽ ảnh hưởng đồng thời tới các trợ lý khác đang dùng chung."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <AssistantWorkflowTab
+          assistant={item}
+          onForkWorkflow={() => forkWorkflowMutation.mutate()}
+          isForking={forkWorkflowMutation.isPending}
+        />
       ) : subView === "models" ? (
         /* Tab 2: Models & Guardrails */
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -157,14 +157,42 @@ frontend/src/
   - ❌ *"Chính Sách Chịu Lỗi & Cấu Hình"* ➔ ✅ **"Chịu lỗi & Mạng"**.
   - Tuyệt đối cấm gắn các badge số đếm rườm rà lên nhãn tab khi không có yêu cầu đặc thù.
 
-### 3.6. Quy Chuẩn Thanh Tìm Kiếm & Bộ Lọc Liền Mạch (Seamless & Borderless Filter Bar Pattern)
+### 3.9. Quy Chuẩn Thanh Tìm Kiếm & Bộ Lọc Phân Tách Hai Phía (Left-Right Split Filter Bar Pattern)
 - **Cấm Tuyệt Đối Viền Khung Kép (Zero Double-Border / Box-in-Box)**: Tuyệt đối không bọc thanh tìm kiếm và bộ lọc (`Filter Bar`) trong các container `bg-card p-3 rounded-lg border border-border shadow-2xs`. Các thành phần con (`Input`, `SelectTrigger`, nút `Button`) đã mang đường viền mảnh và màu nền riêng.
-- **Bố cục Liền Mạch (Seamless Layout Standard)**: Luôn dùng flex container trực tiếp trên nền trang:
-  ```tsx
-  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-  ```
-  Thanh điều khiển đặt trực tiếp trên nền trang (`bg-background`), tạo khoảng thở thoáng đãng, tự nhiên phân tách giữa khu vực KPI Summary Cards và danh sách Cards/Bảng dữ liệu bên dưới.
-- **Mobile Responsive**: Sử dụng `grid grid-cols-2 gap-2 sm:flex` với `w-full sm:w-[155px]` cho các dropdown lọc để chống tràn màn hình.
+- **Bố Cục Phân Tách Hai Phía (Left: Search — Right: Filters)**:
+  - Container thanh điều khiển luôn dùng `flex justify-between items-center`:
+    ```tsx
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+    ```
+  - **Bên trái (`justify-start`)**: Duy nhất ô tìm kiếm (`Input`), có icon kính lúp và nút xóa nhanh `×`.
+  - **Bên phải (`justify-end`)**: Nhóm toàn bộ các điều khiển lọc (`Select` phân loại, `Select` trạng thái, nút `Đặt lại` khi active).
+- **Khống Chế Độ Rộng Ô Tìm Kiếm (Zero Full-Width Desktop Search Stretch)**:
+  - ❌ **Tuyệt đối CẤM dùng `flex-1` đơn độc trên ô tìm kiếm**: Làm ô tìm kiếm trên Desktop bị kéo giãn tới 800px-1000px, tạo khoảng trống mênh mông bất hợp lý và đẩy bộ lọc dạt xa về mép phải.
+  - ✅ **Độ rộng chuẩn Desktop**: Khống chế trong khoảng `sm:w-72 lg:w-80` hoặc `sm:max-w-xs` (288px - 320px).
+  - ✅ **Độ rộng thích ứng Mobile (`< 640px`)**: Tự động co giãn `w-full` ở trên, cụm bộ lọc chuyển xuống dưới chia 50/50 (`grid grid-cols-2 gap-2 w-full`).
+- **Placeholder Súc Tích Chuẩn Microcopy**:
+  - ❌ Cấm viết câu dài: `Tìm theo tên hiển thị, mã type (query.rewrite...), mô tả...`.
+  - ✅ Chỉ dùng 2-4 từ: `Tìm kiếm node...`, `Tìm theo tên, mã...`, `Tìm kiếm trợ lý...`.
+
+### 3.10. Quy Chuẩn Thẻ Thống Kê & Đếm Tinh Gọn (Zero-Fluff Counter & Minimal KPI Strip)
+- **Tôn Chỉ Trọng Tâm & Dữ Liệu Cao (High Data-to-Ink Ratio)**:
+  - Thẻ thống kê (`KpiMetric` / Counter Card) sinh ra để người dùng nắm bắt chỉ số tức thì trong 1 giây.
+  - Cấu trúc tối giản 3 phần: **Tiêu đề chỉ số** (`label`) + **Icon Lucide thanh lịch** (`icon`) + **Con số định lượng lớn** (`value`) (kèm huy hiệu xu hướng/chênh lệch `delta` nếu có).
+- **Tuyệt Đối CẤM Phụ Đề Dư Thừa & Lặp Lại (Zero Redundant Helper Text)**:
+  - ❌ **Cấm tuyệt đối lặp lại con số**: Đã có số to `14` ở trên thì bên dưới cấm lặp lại phụ đề kiểu `14 manifests chuẩn Core`.
+  - ❌ **Cấm phụ đề sáo rỗng hoặc liệt kê vụn vặt**: Nghiêm cấm các chuỗi như `Đầu vào, AI, RAG, HITL...`, `Tương thích QNU AI Core`, `Cổng Input & Output schemas`.
+  - ✅ **Quy tắc**: Nếu tiêu đề và con số đã tự thân rõ nghĩa, **bắt buộc bỏ hoàn toàn thuộc tính `helper`** (để `helper={undefined}`). Khối KPI phải giữ chiều cao gọn gàng, thoáng đãng. Chỉ dùng `helper` khi thực sự cần chú thích mốc thời gian đặc thù (ví dụ: `24 giờ qua` hoặc `Theo chuẩn UTC+7`).
+
+### 3.11. Quy Chuẩn Nút Chuyển Đổi Chế Độ Xem (View Mode Switcher Standard)
+- **Bắt Buộc Dùng `<ViewModeToggle />` Dùng Chung**:
+  - Mọi trang danh sách hỗ trợ chuyển đổi giao diện Thẻ Lưới và Danh Sách/Bảng (`/document-types`, `/knowledge`, `/capabilities/nodes`, `/assistants`, v.v.) **BẮT BUỘC PHẢI SỬ DỤNG component dùng chung** `<ViewModeToggle value={viewMode} onChange={setViewMode} />` từ `@/components/ui/view-mode-toggle`.
+  - **Cấm Tuyệt Đối Vibe Coding Tự Chế Style Lệch Pha**: Không tự viết thẻ `<div><Button>...</Button></div>` thủ công, không dùng nút text "Thẻ / Bảng", không dùng `variant="default"` màu đen/quá đậm hoặc sai kích thước icon/button.
+- **Thiết Kế Chuẩn Mực (Gold Standard theo `/document-types`)**:
+  - **Khung chứa**: `flex items-center gap-1 border border-border rounded-md p-0.5 bg-muted/30 shrink-0`.
+  - **Nút con**: `variant={isActive ? "secondary" : "ghost"}` `size="sm"` `className="h-7 w-7 p-0"`. Trạng thái đang chọn có nền `secondary` nhẹ nhàng, trạng thái không chọn là `ghost`.
+  - **Icon**: `<LayoutGrid className="size-3.5" />` (Grid) và `<List className="size-3.5" />` (Table/List) từ `lucide-react`.
+  - **Tooltip/Title**: "Xem dạng thẻ lưới" và "Xem dạng danh sách bảng".
+  - **Linh hoạt kiểu dữ liệu**: Hỗ trợ đồng thời cả `value: "grid" | "table"` và `value: "grid" | "list"`.
 
 ---
 

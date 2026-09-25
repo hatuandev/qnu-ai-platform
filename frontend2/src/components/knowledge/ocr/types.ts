@@ -23,45 +23,45 @@ export interface OcrRegionStyle {
 export const REGION_COLORS: Record<string, OcrRegionStyle> = {
   header: {
     bg: "rgba(100, 116, 139, 0.08)",
-    border: "#475569",
+    border: "#64748b",
     text: "#334155",
-    badge: "#334155",
+    badge: "#475569",
   },
   title: {
-    bg: "rgba(2, 132, 199, 0.08)",
-    border: "#0284c7",
-    text: "#0369a1",
-    badge: "#0284c7",
+    bg: "rgba(13, 148, 136, 0.08)",
+    border: "#0d9488",
+    text: "#0f766e",
+    badge: "#0d9488",
   },
   text: {
-    bg: "rgba(147, 51, 234, 0.07)",
-    border: "#9333ea",
-    text: "#7e22ce",
-    badge: "#9333ea",
+    bg: "rgba(100, 116, 139, 0.06)",
+    border: "#94a3b8",
+    text: "#475569",
+    badge: "#64748b",
   },
   list: {
-    bg: "rgba(16, 185, 129, 0.07)",
+    bg: "rgba(13, 148, 136, 0.06)",
+    border: "#14b8a6",
+    text: "#0f766e",
+    badge: "#0d9488",
+  },
+  table: {
+    bg: "rgba(13, 148, 136, 0.12)",
+    border: "#0d9488",
+    text: "#0f766e",
+    badge: "#0d9488",
+  },
+  signature: {
+    bg: "rgba(16, 185, 129, 0.08)",
     border: "#059669",
     text: "#047857",
     badge: "#059669",
   },
-  table: {
-    bg: "rgba(217, 119, 6, 0.08)",
-    border: "#d97706",
-    text: "#b45309",
-    badge: "#d97706",
-  },
-  signature: {
+  stamp: {
     bg: "rgba(225, 29, 72, 0.08)",
     border: "#e11d48",
     text: "#be123c",
     badge: "#e11d48",
-  },
-  stamp: {
-    bg: "rgba(220, 38, 38, 0.08)",
-    border: "#dc2626",
-    text: "#b91c1c",
-    badge: "#dc2626",
   },
 };
 
@@ -121,18 +121,20 @@ export interface OcrToolbarProps {
   onFitWidth?: () => void;
   showBoxes: boolean;
   onToggleBoxes: (show: boolean) => void;
-  layoutMode: OcrViewLayoutMode;
-  onToggleLayoutMode: (mode: OcrViewLayoutMode) => void;
-  regionFilter: OcrRegionFilter;
-  onRegionFilterChange: (filter: OcrRegionFilter) => void;
-  selectedEngine: string;
-  onSelectEngine: (engine: string) => void;
+  layoutMode?: OcrViewLayoutMode;
+  onToggleLayoutMode?: (mode: OcrViewLayoutMode) => void;
+  regionFilter?: OcrRegionFilter;
+  onRegionFilterChange?: (filter: OcrRegionFilter) => void;
+  selectedEngine?: string;
+  onSelectEngine?: (engine: string) => void;
   disabled?: boolean;
 }
 
 export interface OcrInspectorProps {
   pageData: StudioOCRPage | null;
   allPages?: StudioOCRPage[];
+  documentTitle?: string;
+  documentFilename?: string;
   rightTab: OcrRightTab;
   onTabChange: (tab: OcrRightTab) => void;
   markdownViewMode: OcrViewMode;

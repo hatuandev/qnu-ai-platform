@@ -13,13 +13,19 @@ export interface WorkflowNodeSpec {
   policy: Record<string, unknown>;
 }
 
+export type WorkflowEndpoint =
+  | string
+  | { node_id: string; port?: string | null; [key: string]: unknown };
+
 export interface WorkflowEdgeSpec {
-  source: string;
-  target: string;
+  source: WorkflowEndpoint;
+  target: WorkflowEndpoint;
   source_port?: string | null;
   target_port?: string | null;
   condition?: string | null;
   label?: string | null;
+  id?: string;
+  priority?: number;
 }
 
 export interface WorkflowDagSpec {

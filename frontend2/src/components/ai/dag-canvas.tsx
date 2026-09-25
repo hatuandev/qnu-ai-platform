@@ -10,9 +10,11 @@ import {
   Panel,
   Position,
   ReactFlow,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import {
   AlertCircle,
   Bot,
@@ -29,7 +31,7 @@ import {
   Wrench,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect } from "react";
 import { Badge } from "../ui/badge";
 
 export interface WorkflowNodeData {
@@ -500,10 +502,30 @@ export interface DAGCanvasProps {
   className?: string;
 }
 
+const DEFAULT_EXECUTION_STATES: Record<
+  string,
+  {
+    status: "idle" | "running" | "completed" | "waiting" | "failed";
+    durationMs?: number;
+    error?: string;
+  }
+> = {};
+
+const NODE_TYPES = {
+  chatInput: ChatInputNode,
+  conditionRoute: ConditionRouteNode,
+  ragKnowledge: RAGKnowledgeNode,
+  llmGenerate: LLMGenerateNode,
+  toolCall: ToolNode,
+  guardrail: GuardrailNode,
+  humanApproval: HumanApprovalNode,
+  chatOutput: ChatOutputNode,
+};
+
 export const DAGCanvas: React.FC<DAGCanvasProps> = ({
-  initialNodes,
-  initialEdges,
-  executionStates = {},
+  initialNodes = [],
+  initialEdges = [],
+  executionStates = DEFAULT_EXECUTION_STATES,
   onNodeSelect,
   workflowName = "QNU Assistant Workflow",
   className,
@@ -521,21 +543,22 @@ export const DAGCanvas: React.FC<DAGCanvasProps> = ({
     setEdges(initialEdges);
   }, [initialEdges, setEdges]);
 
-  // Merge dynamic executionStates into node data
+  // Merge dynamic executionStates into node data safely
   useEffect(() => {
+    if (!executionStates || Object.keys(executionStates).length === 0) {
+      return;
+    }
+
     setNodes((prevNodes) =>
       prevNodes.map((node) => {
         const exec = executionStates[node.id];
-        if (!exec) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              status: "idle",
-              durationMs: undefined,
-              error: undefined,
-            },
-          };
+        if (!exec) return node;
+        if (
+          node.data.status === exec.status &&
+          node.data.durationMs === exec.durationMs &&
+          node.data.error === exec.error
+        ) {
+          return node;
         }
         return {
           ...node,
@@ -549,20 +572,6 @@ export const DAGCanvas: React.FC<DAGCanvasProps> = ({
       }),
     );
   }, [executionStates, setNodes]);
-
-  const nodeTypes = useMemo(
-    () => ({
-      chatInput: ChatInputNode,
-      conditionRoute: ConditionRouteNode,
-      ragKnowledge: RAGKnowledgeNode,
-      llmGenerate: LLMGenerateNode,
-      toolCall: ToolNode,
-      guardrail: GuardrailNode,
-      humanApproval: HumanApprovalNode,
-      chatOutput: ChatOutputNode,
-    }),
-    [],
-  );
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -580,99 +589,101 @@ export const DAGCanvas: React.FC<DAGCanvasProps> = ({
   }, [onNodeSelect]);
 
   return (
-    <div className={`w-full h-full relative ${className || ""}`}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
-        onPaneClick={handlePaneClick}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.25 }}
-        minZoom={0.3}
-        maxZoom={1.8}
-        defaultEdgeOptions={{
-          animated: true,
-          style: { strokeWidth: 2, stroke: "var(--primary)" },
-        }}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls
-          showInteractive={false}
-          className="bg-card border border-border shadow-xs"
-        />
-        <MiniMap
-          zoomable
-          pannable
-          className="bg-card border border-border rounded-surface shadow-xs"
-          nodeColor={(node) => {
-            switch (node.type) {
-              case "chatInput":
-                return "#14b8a6";
-              case "conditionRoute":
-                return "#f59e0b";
-              case "ragKnowledge":
-                return "#3b82f6";
-              case "llmGenerate":
-                return "#a855f7";
-              case "toolCall":
-                return "#06b6d4";
-              case "guardrail":
-                return "#6366f1";
-              case "humanApproval":
-                return "#f97316";
-              case "chatOutput":
-                return "#10b981";
-              default:
-                return "#64748b";
-            }
+    <div className={`w-full h-full relative min-h-[500px] ${className || ""}`}>
+      <ReactFlowProvider>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
+          nodeTypes={NODE_TYPES}
+          fitView
+          fitViewOptions={{ padding: 0.25 }}
+          minZoom={0.3}
+          maxZoom={1.8}
+          defaultEdgeOptions={{
+            animated: true,
+            style: { strokeWidth: 2, stroke: "var(--primary)" },
           }}
-        />
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+          <Controls
+            showInteractive={false}
+            className="bg-card border border-border shadow-xs"
+          />
+          <MiniMap
+            zoomable
+            pannable
+            className="bg-card border border-border rounded-surface shadow-xs"
+            nodeColor={(node) => {
+              switch (node.type) {
+                case "chatInput":
+                  return "#14b8a6";
+                case "conditionRoute":
+                  return "#f59e0b";
+                case "ragKnowledge":
+                  return "#3b82f6";
+                case "llmGenerate":
+                  return "#a855f7";
+                case "toolCall":
+                  return "#06b6d4";
+                case "guardrail":
+                  return "#6366f1";
+                case "humanApproval":
+                  return "#f97316";
+                case "chatOutput":
+                  return "#10b981";
+                default:
+                  return "#64748b";
+              }
+            }}
+          />
 
-        <Panel position="top-left" className="m-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-xs">
-            <Layers className="size-3.5 text-primary" />
-            <span className="font-semibold text-foreground">
-              {workflowName}
-            </span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-muted-foreground font-mono">
-              {nodes.length} nodes, {edges.length} edges
-            </span>
-          </div>
-        </Panel>
+          <Panel position="top-left" className="m-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-xs">
+              <Layers className="size-3.5 text-primary" />
+              <span className="font-semibold text-foreground">
+                {workflowName}
+              </span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground font-mono">
+                {nodes.length} nodes, {edges.length} edges
+              </span>
+            </div>
+          </Panel>
 
-        <Panel position="bottom-left" className="m-3">
-          <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-teal-500" /> Input
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-amber-500" /> Route
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-blue-500" /> RAG
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-purple-500" /> LLM
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-cyan-500" /> Tool
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-indigo-500" /> Guard
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-orange-500" /> Approval
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="size-2 rounded-full bg-emerald-500" /> Output
-            </span>
-          </div>
-        </Panel>
-      </ReactFlow>
+          <Panel position="bottom-left" className="m-3">
+            <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-teal-500" /> Input
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-amber-500" /> Route
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-blue-500" /> RAG
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-purple-500" /> LLM
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-cyan-500" /> Tool
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-indigo-500" /> Guard
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-orange-500" /> Approval
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-emerald-500" /> Output
+              </span>
+            </div>
+          </Panel>
+        </ReactFlow>
+      </ReactFlowProvider>
     </div>
   );
 };

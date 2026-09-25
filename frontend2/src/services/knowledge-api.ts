@@ -294,9 +294,27 @@ export const knowledgeApi = {
       );
     }
     if (!res.ok) {
-      throw new Error(
-        `Tải lên thất bại (HTTP ${res.status}). Vui lòng thử lại.`,
-      );
+      let errorMsg = `Tải lên thất bại (HTTP ${res.status}). Vui lòng thử lại.`;
+      try {
+        const errorData = await res.json();
+        if (res.status === 409 || errorData?.code === "entity_already_exists") {
+          errorMsg =
+            errorData?.detail ||
+            errorData?.message ||
+            `Tệp '${file.name}' đã tồn tại trong kho tri thức này (Trùng lặp tệp).`;
+        } else if (errorData?.detail) {
+          errorMsg = errorData.detail;
+        } else if (errorData?.message) {
+          errorMsg = errorData.message;
+        } else if (errorData?.title) {
+          errorMsg = errorData.title;
+        }
+      } catch {
+        if (res.status === 409) {
+          errorMsg = `Tệp '${file.name}' đã tồn tại trong kho tri thức này (Trùng lặp tệp).`;
+        }
+      }
+      throw new Error(errorMsg);
     }
     const d = (await res.json()) as Record<string, unknown>;
     const fn = (d.filename as string) || (d.file_name as string) || file.name;

@@ -3,7 +3,6 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
   BookOpen,
-  Database,
   FileText,
   Layers,
   MoreVertical,
@@ -58,6 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type {
   KnowledgeCollection,
@@ -289,7 +289,7 @@ export const KnowledgePage: React.FC = () => {
 
       {/* 2. KPI Metrics Summary Cards */}
       <Card className="overflow-hidden border bg-card shadow-xs">
-        <CardContent className="grid p-0 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x">
+        <CardContent className="grid p-0 grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x">
           <KpiMetric
             icon={BookOpen}
             label="Kho tri thức"
@@ -307,12 +307,6 @@ export const KnowledgePage: React.FC = () => {
             label="Vector Chunks"
             value={metrics.totalChunks.toLocaleString("vi-VN")}
             helper="Chỉ mục BGE-M3 (1024D)"
-          />
-          <KpiMetric
-            icon={Database}
-            label="Cơ sở dữ liệu"
-            value="Qdrant + Postgres"
-            helper="Hybrid Search RRF k=60"
           />
         </CardContent>
       </Card>
@@ -359,27 +353,8 @@ export const KnowledgePage: React.FC = () => {
             </SelectContent>
           </Select>
 
-          {/* View Mode Toggle */}
-          <div className="col-span-2 sm:col-span-1 flex items-center border border-border rounded-md p-0.5 bg-muted/30">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
-              className="h-7 px-2.5 text-xs rounded-xs flex-1 sm:flex-initial"
-              title="Xem dạng thẻ"
-            >
-              Thẻ
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("table")}
-              className="h-7 px-2.5 text-xs rounded-xs flex-1 sm:flex-initial"
-              title="Xem dạng bảng"
-            >
-              Bảng
-            </Button>
-          </div>
+          {/* View Mode Switcher */}
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
       </div>
 

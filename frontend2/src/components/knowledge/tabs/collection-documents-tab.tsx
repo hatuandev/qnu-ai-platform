@@ -1,20 +1,23 @@
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   CircleAlert,
   Download,
   Eye,
   FileText,
-  Info,
   RefreshCw,
+  RotateCcw,
   Scan,
   Search,
   Trash2,
+  X,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DataTableBulkActions } from "@/components/admin/data-table/data-table-bulk-actions";
+import { DataTablePagination } from "@/components/admin/data-table/data-table-pagination";
 import { formatFileSize, STATUS_BADGE } from "@/components/knowledge/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +42,7 @@ import type { KnowledgeDocument } from "@/types";
 
 interface CollectionDocumentsTabProps {
   documents: KnowledgeDocument[];
-  totalDocumentsCount: number;
+  totalDocumentsCount?: number;
   searchQuery: string;
   onSearchChange: (val: string) => void;
   typeFilter: string;
@@ -95,9 +98,49 @@ const PRIORITY_LABELS: Record<string, string> = {
   normal: "Tham khảo",
 };
 
+function getCleanMetadata(doc: {
+  title?: string;
+  filename?: string;
+  file_size?: number;
+  version?: string;
+}) {
+  const titleNorm = (doc.title || "").trim().toLowerCase();
+  const rawFilename = (doc.filename || "").trim();
+  const filenameWithoutExt = rawFilename
+    .replace(/\.[^/.]+$/, "")
+    .trim()
+    .toLowerCase();
+  const ext = rawFilename.includes(".")
+    ? rawFilename.split(".").pop()?.toUpperCase()
+    : null;
+  const isRedundant = Boolean(
+    titleNorm &&
+      (titleNorm === filenameWithoutExt ||
+        titleNorm === rawFilename.toLowerCase()),
+  );
+
+  return {
+    showFilename: !isRedundant && Boolean(rawFilename),
+    filename: rawFilename,
+    ext,
+    fileSize: formatFileSize(doc.file_size || 0),
+    version: doc.version || "v1.0",
+  };
+}
+
+export type SortField =
+  | "title"
+  | "document_type"
+  | "chunk_count"
+  | "status"
+  | "file_size"
+  | "created_at";
+
+export type SortOrder = "asc" | "desc";
+
 export function CollectionDocumentsTab({
   documents,
-  totalDocumentsCount,
+  totalDocumentsCount: _totalDocumentsCount,
   searchQuery,
   onSearchChange,
   typeFilter,
@@ -118,24 +161,129 @@ export function CollectionDocumentsTab({
   onBatchDelete,
 }: CollectionDocumentsTabProps) {
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
-  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [isBatchActionRunning, setIsBatchActionRunning] =
     useState<boolean>(false);
   const [quickApprovingId, setQuickApprovingId] = useState<string | null>(null);
 
-  const allVisibleIds = documents.map((d) => d.id);
-  const isAllSelected =
-    allVisibleIds.length > 0 &&
-    allVisibleIds.every((id) => selectedDocIds.has(id));
-  const isSomeSelected =
-    allVisibleIds.some((id) => selectedDocIds.has(id)) && !isAllSelected;
+  const hasActiveFilters = Boolean(
+    searchQuery ||
+      typeFilter !== "all" ||
+      statusFilter !== "all" ||
+      priorityFilter !== "all",
+  );
+
+  const handleResetFilters = () => {
+    onSearchChange("");
+    onTypeFilterChange("all");
+    onStatusFilterChange("all");
+    onPriorityFilterChange("all");
+  };
+
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  // Pagination state
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Reset to page 1 when search, filters, or sorting change
+  const filterKey = `${searchQuery}_${typeFilter}_${statusFilter}_${priorityFilter}_${sortField}_${sortOrder}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const handleToggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortOrder(
+        field === "chunk_count" || field === "file_size" ? "desc" : "asc",
+      );
+    }
+  };
+
+  // Sort documents client-side
+  const sortedDocuments = useMemo(() => {
+    return [...documents].sort((a, b) => {
+      let diff = 0;
+      switch (sortField) {
+        case "title": {
+          const titleA = (a.title || a.filename || "").trim();
+          const titleB = (b.title || b.filename || "").trim();
+          diff = titleA.localeCompare(titleB, "vi", { sensitivity: "base" });
+          break;
+        }
+        case "document_type": {
+          const typeA = a.document_type || a.document_type_code || "";
+          const typeB = b.document_type || b.document_type_code || "";
+          diff = typeA.localeCompare(typeB, "vi");
+          break;
+        }
+        case "chunk_count":
+          diff = (a.chunk_count || 0) - (b.chunk_count || 0);
+          break;
+        case "status": {
+          const statusA = a.status || "";
+          const statusB = b.status || "";
+          diff = statusA.localeCompare(statusB);
+          break;
+        }
+        case "file_size":
+          diff = (a.file_size || 0) - (b.file_size || 0);
+          break;
+        case "created_at": {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          diff = timeA - timeB;
+          break;
+        }
+        default:
+          diff = 0;
+          break;
+      }
+      return sortOrder === "asc" ? diff : -diff;
+    });
+  }, [documents, sortField, sortOrder]);
+
+  const totalDocs = sortedDocuments.length;
+  const pageCount = Math.max(1, Math.ceil(totalDocs / pageSize));
+  const validPage = Math.min(page, pageCount);
+
+  // Paginated slice
+  const paginatedDocuments = useMemo(() => {
+    const start = (validPage - 1) * pageSize;
+    return sortedDocuments.slice(start, start + pageSize);
+  }, [sortedDocuments, validPage, pageSize]);
+
+  // Selection operates on currently visible page
+  const currentPageIds = useMemo(
+    () => paginatedDocuments.map((d) => d.id),
+    [paginatedDocuments],
+  );
+
+  const isAllCurrentSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedDocIds.has(id));
+  const isSomeCurrentSelected =
+    currentPageIds.some((id) => selectedDocIds.has(id)) &&
+    !isAllCurrentSelected;
 
   const handleToggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedDocIds(new Set());
+    const next = new Set(selectedDocIds);
+    if (isAllCurrentSelected) {
+      for (const id of currentPageIds) {
+        next.delete(id);
+      }
     } else {
-      setSelectedDocIds(new Set(allVisibleIds));
+      for (const id of currentPageIds) {
+        next.add(id);
+      }
     }
+    setSelectedDocIds(next);
   };
 
   const handleToggleDoc = (docId: string) => {
@@ -189,146 +337,40 @@ export function CollectionDocumentsTab({
 
   return (
     <div className="space-y-4">
-      {/* Mini Stepper Guide (Collapsible) */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden transition-all shadow-xs">
-        <button
-          type="button"
-          onClick={() => setIsGuideOpen(!isGuideOpen)}
-          className="w-full flex items-center justify-between p-3 text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors cursor-pointer text-left gap-2"
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="size-5 rounded bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Info className="size-3.5" />
-            </div>
-            <span className="truncate">
-              Quy trình 3 chặng vòng đời tài liệu trong Kho Tri Thức
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-muted-foreground text-[11px] font-normal shrink-0">
-            <span className="hidden sm:inline">
-              {isGuideOpen ? "Thu gọn" : "Xem chi tiết"}
-            </span>
-            {isGuideOpen ? (
-              <ChevronUp className="size-3.5" />
-            ) : (
-              <ChevronDown className="size-3.5" />
-            )}
-          </div>
-        </button>
-
-        {isGuideOpen && (
-          <div className="p-4 pt-1 border-t border-border/70 bg-muted/20 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3 rounded-md bg-card border border-border space-y-1">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="size-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-mono">
-                  1
-                </span>
-                <span>Chặng 1: Nạp & Bóc Tách</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                File được lưu trữ an toàn trên MinIO S3, PyMuPDF/OCR quét chữ và
-                layout OpenCV nhận diện con dấu, bảng biểu số liệu.
-              </p>
-              <div className="flex items-center gap-1 pt-1">
-                <Badge variant="outline" className="text-[10px]">
-                  uploaded
-                </Badge>
-                <span className="text-muted-foreground text-[10px]">→</span>
-                <Badge variant="outline" className="text-[10px]">
-                  extracting
-                </Badge>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-md bg-card border border-border space-y-1">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="size-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-mono">
-                  2
-                </span>
-                <span>Chặng 2: Thẩm Định & Duyệt</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Cán bộ đối soát mắt song song trên Scan Studio hoặc bấm nút{" "}
-                <strong>Duyệt nhanh 1-Click</strong>. Data Quality Gate tự động
-                chặn bảng vỡ.
-              </p>
-              <div className="flex items-center gap-1 pt-1">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] text-warning bg-warning/10 border-warning/30"
-                >
-                  pending
-                </Badge>
-                <span className="text-muted-foreground text-[10px]">→</span>
-                <Badge
-                  variant="outline"
-                  className="text-[10px] text-success bg-success/10 border-success/30"
-                >
-                  approved
-                </Badge>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-md bg-card border border-border space-y-1">
-              <div className="flex items-center gap-2 font-semibold text-foreground">
-                <span className="size-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-mono">
-                  3
-                </span>
-                <span>Chặng 3: Sẵn Sàng AI</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Hệ thống nạp Vector BGE-M3 1024D vào Qdrant và cập nhật
-                PostgreSQL FTS. Trợ lý AI chính thức được phép tra cứu RAG không
-                bịa đặt.
-              </p>
-              <div className="flex items-center gap-1 pt-1">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] text-info bg-info/10 border-info/30"
-                >
-                  indexing
-                </Badge>
-                <span className="text-muted-foreground text-[10px]">→</span>
-                <Badge
-                  variant="outline"
-                  className="text-[10px] text-success bg-success/15 border-success/30 font-semibold"
-                >
-                  ready / Hiệu lực
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Search and Filters Bar */}
-      <div className="flex flex-col gap-2.5">
-        {/* Row 1: Search Input & Summary Count */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="relative flex-1">
-            <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Tìm tiêu đề, tên tệp..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="h-8 pl-8 text-xs w-full"
-            />
-          </div>
-          <div className="text-xs text-muted-foreground text-right shrink-0">
-            Hiển thị{" "}
-            <strong className="text-foreground">{documents.length}</strong> /{" "}
-            {totalDocumentsCount} tài liệu
-          </div>
+      {/* Unified Search and Filters Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+        {/* Search Input */}
+        <div className="relative w-full lg:w-72 xl:w-80 shrink-0">
+          <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Tìm tiêu đề, tên tệp..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="h-8 pl-8 pr-8 text-xs w-full"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              title="Xóa từ khóa tìm kiếm"
+            >
+              <X className="size-3" />
+            </button>
+          )}
         </div>
 
-        {/* Row 2: Select Filters: 2 cols on mobile, flex on tablet/desktop */}
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full lg:w-auto">
+        {/* Filters & Reset */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
           <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-            <SelectTrigger sizeVariant="sm" className="w-full sm:w-[155px]">
-              <SelectValue placeholder="Loại văn bản" />
+            <SelectTrigger
+              sizeVariant="sm"
+              className="w-[calc(50%-4px)] sm:w-[135px]"
+            >
+              <SelectValue placeholder="Loại" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả loại văn bản</SelectItem>
+              <SelectItem value="all">Tất cả loại</SelectItem>
               <SelectItem value="quy_che">Quy chế</SelectItem>
               <SelectItem value="thong_bao">Thông báo</SelectItem>
               <SelectItem value="de_an">Đề án</SelectItem>
@@ -339,7 +381,10 @@ export function CollectionDocumentsTab({
           </Select>
 
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger sizeVariant="sm" className="w-full sm:w-[155px]">
+            <SelectTrigger
+              sizeVariant="sm"
+              className="w-[calc(50%-4px)] sm:w-[140px]"
+            >
               <SelectValue placeholder="Trạng thái" />
             </SelectTrigger>
             <SelectContent>
@@ -353,58 +398,92 @@ export function CollectionDocumentsTab({
           </Select>
 
           <Select value={priorityFilter} onValueChange={onPriorityFilterChange}>
-            <SelectTrigger
-              sizeVariant="sm"
-              className="col-span-2 sm:col-span-1 w-full sm:w-[155px]"
-            >
+            <SelectTrigger sizeVariant="sm" className="w-full sm:w-[130px]">
               <SelectValue placeholder="Mức ưu tiên" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả mức ưu tiên</SelectItem>
+              <SelectItem value="all">Tất cả ưu tiên</SelectItem>
               <SelectItem value="core">Ưu tiên Cốt lõi</SelectItem>
               <SelectItem value="high">Ưu tiên Bổ trợ</SelectItem>
               <SelectItem value="normal">Ưu tiên Tham khảo</SelectItem>
             </SelectContent>
           </Select>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0 gap-1"
+              title="Đặt lại toàn bộ bộ lọc"
+            >
+              <RotateCcw className="size-3" />
+              <span className="hidden sm:inline">Đặt lại</span>
+            </Button>
+          )}
         </div>
       </div>
 
       {/* 1. Mobile Card-Based View (< 640px) */}
       <div className="sm:hidden space-y-2.5">
-        {/* Mobile Batch Select-All Toolbar */}
-        {documents.length > 0 && (
+        {/* Mobile Batch Select-All & Quick Sort Toolbar */}
+        {totalDocs > 0 && (
           <div className="flex items-center justify-between p-2.5 bg-muted/40 rounded-lg border border-border text-xs">
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={
-                  isAllSelected
+                  isAllCurrentSelected
                     ? true
-                    : isSomeSelected
+                    : isSomeCurrentSelected
                       ? "indeterminate"
                       : false
                 }
                 onCheckedChange={handleToggleSelectAll}
-                aria-label="Chọn tất cả tài liệu"
+                aria-label="Chọn tất cả tài liệu trang này"
               />
               <span className="font-medium text-foreground">
-                Chọn tất cả ({documents.length})
+                Chọn trang ({paginatedDocuments.length})
               </span>
             </div>
-            {selectedDocIds.size > 0 && (
-              <span className="text-[11px] text-primary font-medium">
-                Đã chọn {selectedDocIds.size}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedDocIds.size > 0 && (
+                <span className="text-[11px] text-primary font-medium">
+                  ({selectedDocIds.size})
+                </span>
+              )}
+              <Select
+                value={`${sortField}-${sortOrder}`}
+                onValueChange={(val) => {
+                  const [f, o] = val.split("-") as [SortField, SortOrder];
+                  setSortField(f);
+                  setSortOrder(o);
+                }}
+              >
+                <SelectTrigger className="h-7 text-[11px] w-[115px] border-border/60 bg-background">
+                  <ArrowUpDown className="size-3 mr-1 text-muted-foreground" />
+                  <SelectValue placeholder="Sắp xếp" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at-desc">Mới nhất</SelectItem>
+                  <SelectItem value="title-asc">Tên A → Z</SelectItem>
+                  <SelectItem value="title-desc">Tên Z → A</SelectItem>
+                  <SelectItem value="chunk_count-desc">Nhiều chunks</SelectItem>
+                  <SelectItem value="file_size-desc">Dung lượng</SelectItem>
+                  <SelectItem value="status-asc">Trạng thái</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
 
-        {documents.length === 0 ? (
+        {paginatedDocuments.length === 0 ? (
           <div className="p-8 text-center bg-card rounded-lg border border-border text-xs text-muted-foreground">
             Không tìm thấy tài liệu phù hợp trong kho này.
           </div>
         ) : (
-          documents.map((doc) => {
+          paginatedDocuments.map((doc) => {
             const isSelected = selectedDocIds.has(doc.id);
+            const meta = getCleanMetadata(doc);
             return (
               <div
                 key={doc.id}
@@ -432,9 +511,31 @@ export function CollectionDocumentsTab({
                     >
                       {doc.title}
                     </button>
-                    <p className="text-[11px] text-muted-foreground font-mono truncate mt-0.5">
-                      {doc.filename}
-                    </p>
+                    {meta.showFilename ? (
+                      <p
+                        className="text-[11px] text-muted-foreground font-mono truncate mt-0.5"
+                        title={meta.filename}
+                      >
+                        {meta.filename}
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
+                        {meta.ext && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0 font-mono font-semibold uppercase bg-muted/60 text-muted-foreground border-border"
+                          >
+                            {meta.ext}
+                          </Badge>
+                        )}
+                        <span>•</span>
+                        <span className="font-mono">{meta.fileSize}</span>
+                        <span>•</span>
+                        <span className="text-primary font-medium font-mono">
+                          {meta.version}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1">
                     <Badge
@@ -490,12 +591,16 @@ export function CollectionDocumentsTab({
                   <span className="font-mono text-primary font-medium">
                     {doc.chunk_count} chunks
                   </span>
-                  <span>•</span>
-                  <span className="font-mono">
-                    {formatFileSize(doc.file_size)}
-                  </span>
-                  <span>•</span>
-                  <span className="font-mono">{doc.version || "v1.0"}</span>
+                  {meta.showFilename && (
+                    <>
+                      <span>•</span>
+                      <span className="font-mono">{meta.fileSize}</span>
+                      <span>•</span>
+                      <span className="font-mono text-primary">
+                        {meta.version}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {/* Actions row */}
@@ -535,14 +640,14 @@ export function CollectionDocumentsTab({
                         </Button>
                       )}
                     <Button
-                      variant="ghost"
-                      size="icon"
+                      size="sm"
                       onClick={() => onStartVerify(doc.id)}
-                      className="size-7 text-muted-foreground hover:text-primary"
-                      title="Mở Studio Bóc Tách"
+                      className="h-7 text-xs px-2 gap-1 border border-primary/25 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-medium transition-colors shrink-0"
+                      title="Mở Studio Bóc Tách & Đối Soát"
                       aria-label="Mở Studio Bóc Tách"
                     >
-                      <Scan className="size-3.5" />
+                      <Scan className="size-3" />
+                      <span>Studio</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -591,25 +696,101 @@ export function CollectionDocumentsTab({
               <TableHead className="w-10 text-center">
                 <Checkbox
                   checked={
-                    isAllSelected
+                    isAllCurrentSelected
                       ? true
-                      : isSomeSelected
+                      : isSomeCurrentSelected
                         ? "indeterminate"
                         : false
                   }
                   onCheckedChange={handleToggleSelectAll}
-                  aria-label="Chọn tất cả tài liệu"
+                  aria-label="Chọn tất cả tài liệu trang này"
                 />
               </TableHead>
-              <TableHead>Tài liệu & Tên tệp gốc</TableHead>
-              <TableHead>Loại văn bản</TableHead>
-              <TableHead>Chunks Vector</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleToggleSort("title")}
+                  className="-ml-2 h-8 px-2 font-semibold text-muted-foreground hover:text-foreground text-xs gap-1.5"
+                  title="Sắp xếp theo tên tài liệu"
+                >
+                  <span>Tài liệu & Tên tệp gốc</span>
+                  {sortField === "title" ? (
+                    sortOrder === "asc" ? (
+                      <ArrowUp className="size-3 text-primary" />
+                    ) : (
+                      <ArrowDown className="size-3 text-primary" />
+                    )
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40 hover:opacity-100" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleToggleSort("document_type")}
+                  className="-ml-2 h-8 px-2 font-semibold text-muted-foreground hover:text-foreground text-xs gap-1.5"
+                  title="Sắp xếp theo loại văn bản"
+                >
+                  <span>Loại văn bản</span>
+                  {sortField === "document_type" ? (
+                    sortOrder === "asc" ? (
+                      <ArrowUp className="size-3 text-primary" />
+                    ) : (
+                      <ArrowDown className="size-3 text-primary" />
+                    )
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40 hover:opacity-100" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleToggleSort("chunk_count")}
+                  className="-ml-2 h-8 px-2 font-semibold text-muted-foreground hover:text-foreground text-xs gap-1.5"
+                  title="Sắp xếp theo số lượng chunks"
+                >
+                  <span>Chunks Vector</span>
+                  {sortField === "chunk_count" ? (
+                    sortOrder === "asc" ? (
+                      <ArrowUp className="size-3 text-primary" />
+                    ) : (
+                      <ArrowDown className="size-3 text-primary" />
+                    )
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40 hover:opacity-100" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleToggleSort("status")}
+                  className="-ml-2 h-8 px-2 font-semibold text-muted-foreground hover:text-foreground text-xs gap-1.5"
+                  title="Sắp xếp theo trạng thái"
+                >
+                  <span>Trạng thái</span>
+                  {sortField === "status" ? (
+                    sortOrder === "asc" ? (
+                      <ArrowUp className="size-3 text-primary" />
+                    ) : (
+                      <ArrowDown className="size-3 text-primary" />
+                    )
+                  ) : (
+                    <ArrowUpDown className="size-3 opacity-40 hover:opacity-100" />
+                  )}
+                </Button>
+              </TableHead>
+              <TableHead className="text-right w-56">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.length === 0 ? (
+            {paginatedDocuments.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={6}
@@ -619,8 +800,9 @@ export function CollectionDocumentsTab({
                 </TableCell>
               </TableRow>
             ) : (
-              documents.map((doc) => {
+              paginatedDocuments.map((doc) => {
                 const isSelected = selectedDocIds.has(doc.id);
+                const meta = getCleanMetadata(doc);
                 return (
                   <TableRow
                     key={doc.id}
@@ -642,21 +824,40 @@ export function CollectionDocumentsTab({
                         <div className="flex size-8 items-center justify-center rounded bg-primary/10 text-primary shrink-0 mt-0.5">
                           <FileText className="size-4" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <button
                             type="button"
-                            className="text-left font-semibold text-xs text-foreground hover:text-primary transition-colors cursor-pointer"
+                            className="text-left font-semibold text-xs text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1 block"
                             onClick={() => onPreviewDoc(doc)}
+                            title={doc.title}
                           >
                             {doc.title}
                           </button>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mt-0.5">
-                            <span>{doc.filename}</span>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            {meta.showFilename ? (
+                              <span
+                                className="font-mono truncate max-w-[220px]"
+                                title={meta.filename}
+                              >
+                                {meta.filename}
+                              </span>
+                            ) : (
+                              meta.ext && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 font-mono font-semibold uppercase bg-muted/60 text-muted-foreground border-border"
+                                >
+                                  {meta.ext}
+                                </Badge>
+                              )
+                            )}
                             <span>•</span>
-                            <span>{formatFileSize(doc.file_size)}</span>
+                            <span className="font-mono text-[11px]">
+                              {meta.fileSize}
+                            </span>
                             <span>•</span>
-                            <span className="text-primary font-medium">
-                              {doc.version || "v1.0"}
+                            <span className="text-primary font-medium font-mono text-[11px]">
+                              {meta.version}
                             </span>
                           </div>
                         </div>
@@ -733,7 +934,7 @@ export function CollectionDocumentsTab({
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
                         {/* 1-Click Quick Approve for Pending documents */}
                         {doc.status === "pending" && onQuickApprove && (
                           <Button
@@ -741,7 +942,7 @@ export function CollectionDocumentsTab({
                             size="icon"
                             onClick={() => handleQuickApproveAction(doc.id)}
                             disabled={quickApprovingId === doc.id}
-                            className="size-7 text-success hover:text-success hover:bg-success/10"
+                            className="size-7 text-success hover:text-success hover:bg-success/10 shrink-0"
                             title="Duyệt nhanh tài liệu & nạp vào Vector DB ngay lập tức"
                             aria-label="Duyệt nhanh tài liệu"
                           >
@@ -760,7 +961,7 @@ export function CollectionDocumentsTab({
                               size="icon"
                               onClick={() => onReindexDoc(doc.id)}
                               disabled={reindexingDocId === doc.id}
-                              className="size-7 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                              className="size-7 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0"
                               title="Thử lại lập chỉ mục vector (Reindex)"
                               aria-label="Thử lại lập chỉ mục vector"
                             >
@@ -769,21 +970,24 @@ export function CollectionDocumentsTab({
                               />
                             </Button>
                           )}
+
+                        {/* Primary CTA: Studio OCR & Verify */}
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          size="sm"
                           onClick={() => onStartVerify(doc.id)}
-                          className="size-7 text-muted-foreground hover:text-primary"
+                          className="h-7 text-xs px-2.5 gap-1.5 border border-primary/25 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-medium transition-colors shrink-0 shadow-2xs"
                           title="Mở Studio Bóc Tách & Đối Soát (Split-Pane)"
                           aria-label="Mở Studio Bóc Tách & Đối Soát"
                         >
-                          <Scan className="size-3.5" />
+                          <Scan className="size-3" />
+                          <span>Studio OCR</span>
                         </Button>
+
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => onPreviewDoc(doc)}
-                          className="size-7 text-muted-foreground hover:text-foreground"
+                          className="size-7 text-muted-foreground hover:text-foreground shrink-0"
                           title="Xem trước Chunks Inspector"
                           aria-label="Xem trước Chunks"
                         >
@@ -794,7 +998,7 @@ export function CollectionDocumentsTab({
                           size="icon"
                           onClick={() => onDownloadDoc(doc)}
                           disabled={downloadingId === doc.id}
-                          className="size-7 text-muted-foreground hover:text-foreground"
+                          className="size-7 text-muted-foreground hover:text-foreground shrink-0"
                           title="Tải tệp gốc"
                           aria-label="Tải tệp gốc"
                         >
@@ -804,7 +1008,7 @@ export function CollectionDocumentsTab({
                           variant="ghost"
                           size="icon"
                           onClick={() => onDeleteDoc(doc)}
-                          className="size-7 text-destructive hover:text-destructive"
+                          className="size-7 text-destructive hover:text-destructive shrink-0"
                           title="Xóa tài liệu"
                           aria-label="Xóa tài liệu"
                         >
@@ -819,6 +1023,22 @@ export function CollectionDocumentsTab({
           </TableBody>
         </Table>
       </div>
+
+      {/* 3. Pagination Controls (Shared for both Desktop Table & Mobile Cards) */}
+      {totalDocs > 0 && (
+        <DataTablePagination
+          page={validPage}
+          pageSize={pageSize}
+          pageCount={pageCount}
+          total={totalDocs}
+          onPageChange={setPage}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          className="pt-1 px-0.5"
+        />
+      )}
 
       {/* Floating Bottom-Center Bulk Actions Bar */}
       <DataTableBulkActions

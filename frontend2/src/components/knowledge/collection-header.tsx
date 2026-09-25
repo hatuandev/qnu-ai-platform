@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Cpu,
+  MoreHorizontal,
   RefreshCw,
   Settings,
   ShieldCheck,
@@ -11,6 +12,12 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { KnowledgeCollection } from "@/types";
 
 interface CollectionHeaderProps {
@@ -48,9 +55,9 @@ export function CollectionHeader({
   const isCloudflareModel = embeddingModelDisplay.includes("@cf/");
 
   return (
-    <div className="bg-card border border-border rounded-lg p-3.5 sm:p-5 shadow-xs space-y-3">
+    <div className="bg-card border border-border rounded-lg p-3 sm:p-5 shadow-xs space-y-2.5">
       {/* Top Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
             <Button
@@ -80,7 +87,7 @@ export function CollectionHeader({
 
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-foreground break-words">
+              <h1 className="text-sm sm:text-base md:text-lg font-bold text-foreground break-words leading-tight">
                 {collection.name}
               </h1>
               <div className="hidden sm:flex items-center gap-1.5">
@@ -95,59 +102,107 @@ export function CollectionHeader({
                 </span>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 sm:line-clamp-1">
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
               {collection.description ||
                 "Chưa có mô tả chi tiết cho kho tri thức này."}
             </p>
           </div>
         </div>
 
-        {/* Action Buttons: 3 cols grid + full width primary CTA on mobile, inline flex on desktop */}
-        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 w-full lg:w-auto shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenReconcile}
-            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
-            title="Đối soát dữ liệu giữa PostgreSQL, Qdrant và MinIO"
-          >
-            <ShieldCheck className="size-3.5 text-primary" />
-            <span>Đối soát</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onReindex}
-            disabled={isReindexing}
-            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
-            title="Tính toán lại toàn bộ vector embeddings trong kho"
-          >
-            <RefreshCw
-              className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
-            />
-            <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1 sm:gap-1.5 px-2"
-            onClick={onOpenConfig}
-            title="Chỉnh sửa tên và mô tả kho"
-          >
-            <Settings className="size-3.5" />
-            <span>Sửa</span>
-          </Button>
-
+        {/* Action Buttons: Primary Ingest + Dropdown on Mobile; Inline on desktop */}
+        <div className="flex items-center gap-2 w-full lg:w-auto shrink-0">
           <Button
             size="sm"
             onClick={onStartIngest}
-            className="col-span-3 sm:col-span-1 h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
+            className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
           >
             <Upload className="size-3.5" />
             <span>Nạp tài liệu</span>
           </Button>
+
+          {/* Mobile Secondary Actions (Dropdown Menu) */}
+          <div className="sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="size-8 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                  title="Tác vụ quản trị kho"
+                  aria-label="Tác vụ khác"
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52 text-xs">
+                <DropdownMenuItem
+                  onClick={onOpenReconcile}
+                  className="gap-2 text-xs cursor-pointer py-2"
+                >
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  <span>Đối soát dữ liệu</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onReindex}
+                  disabled={isReindexing}
+                  className="gap-2 text-xs cursor-pointer py-2"
+                >
+                  <RefreshCw
+                    className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
+                  />
+                  <span>
+                    {isReindexing ? "Đang reindex..." : "Reindex vector"}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={onOpenConfig}
+                  className="gap-2 text-xs cursor-pointer py-2"
+                >
+                  <Settings className="size-3.5" />
+                  <span>Cấu hình kho</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop Secondary Actions (Inline Buttons) */}
+          <div className="hidden sm:flex sm:items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenReconcile}
+              className="h-8 text-xs gap-1.5 px-2.5"
+              title="Đối soát dữ liệu giữa PostgreSQL, Qdrant và MinIO"
+            >
+              <ShieldCheck className="size-3.5 text-primary" />
+              <span>Đối soát</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReindex}
+              disabled={isReindexing}
+              className="h-8 text-xs gap-1.5 px-2.5"
+              title="Tính toán lại toàn bộ vector embeddings trong kho"
+            >
+              <RefreshCw
+                className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
+              />
+              <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5 px-2.5"
+              onClick={onOpenConfig}
+              title="Chỉnh sửa tên và mô tả kho"
+            >
+              <Settings className="size-3.5" />
+              <span>Sửa</span>
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,13 +1,7 @@
-import { FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import { type OcrCanvasProps, REGION_COLORS } from "./types";
-
-// Cấu hình Worker cho PDF.js trong môi trường Vite / Web
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 export const OcrCanvas: React.FC<OcrCanvasProps> = ({
   pageData,
@@ -19,7 +13,6 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
   selectedRegion,
   onSelectRegion,
   documentTitle,
-  pdfUrl,
   onPageChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,9 +29,8 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
       }
     >
   >({});
-  const [pdfError, setPdfError] = useState(false);
 
-  // Đo đạc kích thước thực tế của container để tự động Fit-to-Width (chống che khuất lề trang)
+  // Fit-to-Width dynamic calculation
   useEffect(() => {
     if (!containerRef.current) return;
     const updateWidth = () => {
@@ -84,7 +76,7 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
       },
       {
         root: containerRef.current,
-        threshold: 0.4,
+        threshold: 0.35,
       },
     );
 
@@ -99,16 +91,21 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
     return () => observer.disconnect();
   }, [layoutMode, allPages, onPageChange]);
 
+  const activePage =
+    pageData || (allPages && allPages.length > 0 ? allPages[0] : null);
+
   const displayPages =
     layoutMode === "continuous" && allPages && allPages.length > 0
       ? allPages
-      : pageData
-        ? [pageData]
+      : activePage
+        ? [activePage]
         : [];
+
+  const totalPagesCount = allPages?.length || (pageData ? 1 : 0);
 
   if (displayPages.length === 0) {
     return (
-      <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-[#18181b] text-zinc-400">
+      <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-zinc-950 text-zinc-400">
         <div className="text-center py-20">
           <FileText className="size-12 mx-auto mb-2 opacity-30 text-zinc-500" />
           <p className="text-xs">Không có dữ liệu trang tài liệu</p>
@@ -117,12 +114,10 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
     );
   }
 
-  const shouldUsePdf = Boolean(pdfUrl && !pdfError);
-
   const renderPageContent = (page: (typeof displayPages)[0]) => {
-    const imageUrl = page.imageUrl?.startsWith("/")
-      ? page.imageUrl
-      : `/api/v1/ocr/studio/page-image/${documentTitle || "demo"}/page_${page.pageNumber}.jpg`;
+    const imageUrl =
+      page.imageUrl ||
+      `/platform/v1alpha1/knowledge/documents/${documentTitle || "demo"}/pages/${page.pageNumber}/image`;
 
     const pageRegions =
       layoutMode === "continuous" ? page.regions : filteredRegions;
@@ -136,11 +131,9 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
     const aspectRatio =
       pageDim?.aspectRatio ?? (isLandscape ? Math.SQRT2 : 1 / Math.SQRT2);
 
-    // Tính toán chiều rộng render vừa vặn với container (Fit-to-Width) có áp dụng zoomLevel
-    // Trang ngang tự động tận dụng tối đa containerWidth để không bị che mất cột
     const idealBaseWidth = isLandscape
       ? Math.min(containerWidth, 1200)
-      : Math.min(containerWidth, 800);
+      : Math.min(containerWidth, 840);
     const pageRenderWidth = Math.round((idealBaseWidth * zoomLevel) / 100);
 
     const baseW = isLandscape ? 1131 : 800;
@@ -150,12 +143,12 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
       <div
         key={`page-wrapper-${page.pageNumber}`}
         data-page-number={page.pageNumber}
-        className="flex flex-col items-center shrink-0 my-4"
+        className="flex flex-col items-center shrink-0 my-3 sm:my-5 relative"
         style={{
           width: `${pageRenderWidth}px`,
         }}
       >
-        {/* Page Container with Dynamic Aspect-Ratio Matching (Khớp 100% kích thước với Page PDF) */}
+        {/* Page Container with Dynamic Aspect-Ratio Matching */}
         <div
           id={`page-canvas-${page.pageNumber}`}
           className="relative bg-white shadow-2xl rounded-xs border border-zinc-700/60 transition-transform select-none overflow-hidden"
@@ -174,80 +167,46 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
             </div>
           )}
 
-          {/* Tầng 1: Render PDF thật qua react-pdf HOẶC Fallback ảnh scan */}
-          {shouldUsePdf ? (
-            <div className="w-full h-full block">
-              <Page
-                pageNumber={page.pageNumber}
-                width={pageRenderWidth}
-                renderTextLayer={true}
-                renderAnnotationLayer={false}
-                className="select-text block"
-                onLoadSuccess={(pageObj) => {
-                  const ow = pageObj.originalWidth;
-                  const oh = pageObj.originalHeight;
-                  if (ow > 0 && oh > 0) {
-                    setPageDimensions((prev) => ({
-                      ...prev,
-                      [page.pageNumber]: {
-                        width: ow,
-                        height: oh,
-                        isLandscape: ow > oh,
-                        aspectRatio: ow / oh,
-                      },
-                    }));
-                  }
-                  setLoadedImages((prev) => ({
-                    ...prev,
-                    [page.pageNumber]: true,
-                  }));
-                }}
-                onError={() => {
-                  setPdfError(true);
-                }}
-              />
-            </div>
-          ) : (
-            <img
-              src={imageUrl}
-              alt={`Trang ${page.pageNumber}`}
-              className={`w-full h-full object-contain block rounded-xs select-none pointer-events-none transition-opacity duration-300 ${
-                isLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              onLoad={(e) => {
-                const nw = e.currentTarget.naturalWidth;
-                const nh = e.currentTarget.naturalHeight;
-                if (nw > 0 && nh > 0) {
-                  setPageDimensions((prev) => ({
-                    ...prev,
-                    [page.pageNumber]: {
-                      width: nw,
-                      height: nh,
-                      isLandscape: nw > nh,
-                      aspectRatio: nw / nh,
-                    },
-                  }));
-                }
+          {/* Tầng 1: Render trực tiếp ảnh trang phân giải cao từ Backend */}
+          <img
+            src={imageUrl}
+            alt={`Trang ${page.pageNumber}`}
+            className={`w-full h-full object-contain block rounded-xs select-none pointer-events-none transition-opacity duration-300 ${
+              isLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={(e) => {
+              const nw = e.currentTarget.naturalWidth;
+              const nh = e.currentTarget.naturalHeight;
+              if (nw > 0 && nh > 0) {
+                setPageDimensions((prev) => ({
+                  ...prev,
+                  [page.pageNumber]: {
+                    width: nw,
+                    height: nh,
+                    isLandscape: nw > nh,
+                    aspectRatio: nw / nh,
+                  },
+                }));
+              }
+              setLoadedImages((prev) => ({
+                ...prev,
+                [page.pageNumber]: true,
+              }));
+            }}
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes("/ocr-cache/doc_ts_2026/")) {
+                target.src = `/ocr-cache/doc_ts_2026/page_${page.pageNumber}.jpg`;
+              } else {
                 setLoadedImages((prev) => ({
                   ...prev,
                   [page.pageNumber]: true,
                 }));
-              }}
-              onError={(e) => {
-                const target = e.currentTarget;
-                if (!target.src.includes("/ocr-cache/doc_ts_2026/")) {
-                  target.src = `/ocr-cache/doc_ts_2026/page_${page.pageNumber}.jpg`;
-                } else {
-                  setLoadedImages((prev) => ({
-                    ...prev,
-                    [page.pageNumber]: true,
-                  }));
-                }
-              }}
-            />
-          )}
+              }
+            }}
+          />
 
-          {/* Tầng 3: Visual Document AI Bounding Boxes Layer */}
+          {/* Tầng 2: Visual Document AI Bounding Boxes Layer */}
           {showBoxes && (
             <div className="absolute inset-0 pointer-events-none z-10">
               {pageRegions.map((region, idx) => {
@@ -255,7 +214,7 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
                   REGION_COLORS[region.type] || REGION_COLORS.text;
                 const isSelected = selectedRegion === region;
 
-                // Safe coordinate normalization thích ứng với hướng giấy
+                // Safe coordinate normalization
                 const safeLeft = Math.max(
                   0,
                   Math.min(
@@ -299,8 +258,8 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
                     aria-label={`Vùng ${region.label}: ${region.text.slice(0, 30)}`}
                     className={`absolute border-[1.5px] transition-all cursor-pointer group text-left p-0 rounded-[2px] pointer-events-auto ${
                       isSelected
-                        ? "ring-2 ring-teal-400 ring-offset-1 z-30"
-                        : "z-10 hover:ring-1 hover:ring-teal-400/80 hover:brightness-95"
+                        ? "ring-2 ring-primary ring-offset-1 z-30 shadow-md brightness-105"
+                        : "z-10 hover:ring-1 hover:ring-primary/80 hover:brightness-95"
                     }`}
                     style={{
                       top: `${safeTop}%`,
@@ -314,7 +273,7 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
                     }}
                     title={`${region.label}: ${region.text}`}
                   >
-                    {/* Pill Badge Nhãn Chuẩn Mistral Document AI */}
+                    {/* Pill Badge Document AI */}
                     <span
                       className="absolute -top-[13px] left-[-1px] px-1 py-0 text-[8px] font-mono font-medium lowercase rounded-t-[2px] rounded-br-[2px] text-white shadow-xs pointer-events-none leading-[13px] h-[13px] z-20 select-none whitespace-nowrap"
                       style={{ backgroundColor: colorStyle.badge }}
@@ -334,23 +293,48 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-auto p-4 md:p-6 bg-[#18181b] relative select-none scroll-smooth"
+      className="flex-1 overflow-auto p-4 md:p-6 bg-zinc-950 relative select-none scroll-smooth flex flex-col items-center justify-start min-h-0"
     >
+      {/* Document Pages Container */}
       <div className="w-fit min-w-full flex flex-col items-center">
-        {shouldUsePdf ? (
-          <Document
-            file={pdfUrl}
-            onLoadSuccess={() => setPdfError(false)}
-            onError={() => setPdfError(true)}
-            loading={null}
-            className="w-fit min-w-full flex flex-col items-center"
-          >
-            {displayPages.map(renderPageContent)}
-          </Document>
-        ) : (
-          displayPages.map(renderPageContent)
-        )}
+        {displayPages.map(renderPageContent)}
       </div>
+
+      {/* Floating Single Page Navigation Controls */}
+      {layoutMode === "single" && activePage && totalPagesCount > 1 && (
+        <>
+          {/* Floating Prev Button */}
+          <button
+            type="button"
+            onClick={() => onPageChange?.(activePage.pageNumber - 1)}
+            disabled={activePage.pageNumber <= 1}
+            className="absolute left-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 shadow-lg flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-all hover:scale-105 active:scale-95 z-20 backdrop-blur-xs"
+            title="Trang trước (Phím J hoặc ←)"
+            aria-label="Trang trước"
+          >
+            <ChevronLeft className="size-4.5" />
+          </button>
+
+          {/* Floating Next Button */}
+          <button
+            type="button"
+            onClick={() => onPageChange?.(activePage.pageNumber + 1)}
+            disabled={activePage.pageNumber >= totalPagesCount}
+            className="absolute right-3 top-1/2 -translate-y-1/2 size-9 rounded-full bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 border border-zinc-700/80 shadow-lg flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition-all hover:scale-105 active:scale-95 z-20 backdrop-blur-xs"
+            title="Trang sau (Phím K hoặc →)"
+            aria-label="Trang sau"
+          >
+            <ChevronRight className="size-4.5" />
+          </button>
+
+          {/* Floating Bottom Page Indicator Pill */}
+          <div className="sticky bottom-3 mx-auto px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700/80 shadow-md text-zinc-200 text-xs font-mono font-medium flex items-center gap-2 z-20 backdrop-blur-xs">
+            <span>Trang {activePage.pageNumber}</span>
+            <span className="text-zinc-500">/</span>
+            <span>{totalPagesCount}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 };

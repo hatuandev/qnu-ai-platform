@@ -20,6 +20,7 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
      - **Bắt buộc Đề Xuất Giải Pháp Trước Cho Người Dùng**: Khi xử lý các vấn đề phức tạp về dữ liệu hoặc cấu trúc, Agent **bắt buộc phải phân tích, xây dựng đề xuất phương pháp / thuật toán rõ ràng và báo cáo cho người dùng biết trước** để thảo luận, thống nhất trước khi áp dụng vào codebase.
   8. **Component Reuse First & UI Primitives Standardization (Tận dụng tối đa Component UI có sẵn & Chuẩn hóa Primitives)**:
      - **Ưu tiên Tái sử dụng**: Khi xây dựng bất kỳ giao diện, form, modal, bảng dữ liệu, hay nút điều khiển nào trên Frontend, Agent **bắt buộc phải kiểm tra và tái sử dụng triệt để các component UI đã có sẵn** trong `@/components/ui/` (Radix UI / shadcn: `Button`, `Checkbox`, `Switch`, `Input`, `Dialog`, `Select`, `Badge`, `Card`, `Tabs`, `Table`, `Sheet`, `Popover`, `Tooltip`, `Textarea`, `DropdownMenu`, `RadioGroup`, `Progress`, `Skeleton`, `Kbd`, `Spinner`, `Accordion`, `Separator`, v.v.) và các helpers tại `@/components/admin/` (`Field`, `EmptyState`, `KpiMetric`, `StatusBadge`, `ConfirmDialog`, `FileUpload`).
+     - **Chuẩn hóa Nút Chuyển Chế Độ Xem (ViewModeToggle)**: Mọi chức năng chuyển đổi giữa chế độ thẻ lưới (Grid) và danh sách / bảng (Table/List) **BẮT BUỘC PHẢI DÙNG** `<ViewModeToggle value={viewMode} onChange={setViewMode} />` từ `@/components/ui/view-mode-toggle`. Tuyệt đối cấm tự code nút switcher riêng rẽ hoặc tạo phong cách nút khác nhau giữa các trang khi Vibe Coding.
      - **Tuyệt đối CẤM dùng thẻ HTML thô sơ (Zero Raw Native Form Elements)**: Cấm dùng `<input type="checkbox">`, `<input type="radio">`, `<button>`, `<select>`, `<input type="text">` thuần của trình duyệt vì sẽ gây xung đột thẩm mỹ (ví dụ checkbox bị đổi thành màu xanh dương Windows/Chrome thay vì xanh Academic Green của hệ thống).
      - **Điều kiện Tạo Mới Component UI**: **Chỉ tạo component UI mới khi và chỉ khi trong `@/components/ui/` hoàn toàn chưa có thành phần tương đương**. Khi tạo mới, bắt buộc phải đặt trong `src/components/ui/`, xây dựng trên nền tảng Radix UI / headless primitives chuẩn, áp dụng design tokens OKLCH, hỗ trợ `forwardRef`, đầy đủ TypeScript types, và export dùng chung cho toàn bộ dự án.
 
@@ -187,6 +188,39 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
         ```
       - Thanh điều khiển đặt trực tiếp trên nền trang (`bg-background`), tạo khoảng thở thoáng đãng, tự nhiên phân tách giữa khu vực KPI Summary Cards và danh sách Cards/Bảng dữ liệu bên dưới.
       - Duy trì khả năng co giãn linh hoạt trên Mobile: Sử dụng `grid grid-cols-2 gap-2 sm:flex` với `w-full sm:w-[155px]` cho các dropdown lọc để chống tràn màn hình.
+13. **Quy Chuẩn Thẻ Thống Kê & Đếm Tinh Gọn (Zero-Fluff Counter & Minimal KPI Strip)**:
+    - **Tôn Chỉ Trọng Tâm & Dữ Liệu Cao (High Data-to-Ink Ratio)**:
+      - Thẻ thống kê (`KpiMetric` / Counter Card) sinh ra để người dùng nắm bắt chỉ số tức thì trong 1 giây.
+      - Bắt buộc tuân thủ cấu trúc tối giản 3 phần: **Tiêu đề chỉ số** (`label`) + **Icon Lucide thanh lịch** (`icon`) + **Con số định lượng lớn** (`value`) (kèm huy hiệu trạng thái/chênh lệch `delta` nếu có).
+    - **Tuyệt Đối CẤM Phụ Đề Dư Thừa & Lặp Lại (Zero Redundant Helper Text)**:
+      - ❌ **Cấm tuyệt đối lặp lại con số**: Đã có con số lớn `14` ở trên thì bên dưới cấm lặp lại phụ đề kiểu `14 manifests chuẩn Core`.
+      - ❌ **Cấm phụ đề sáo rỗng hoặc liệt kê vụn vặt**: Nghiêm cấm các chuỗi như `Đầu vào, AI, RAG, HITL...`, `Tương thích QNU AI Core`, `Cổng Input & Output schemas`.
+      - ✅ **Quy tắc vàng**: Nếu tiêu đề và con số đã tự thân rõ nghĩa, **bắt buộc bỏ hoàn toàn thuộc tính `helper`** (để `helper={undefined}`). Khối KPI phải giữ chiều cao gọn gàng, thoáng đãng, không chiếm dụng không gian dọc của trang. Chỉ dùng `helper` khi thực sự cần chú thích mốc thời gian hoặc công thức đặc thù (ví dụ: `24 giờ qua` hoặc `Theo chuẩn UTC+7`).
+14. **Quy Chuẩn Bố Cục Thanh Tìm Kiếm & Bộ Lọc Phân Tách Hai Phía (Left-Right Split Filter Bar Pattern)**:
+    - **Bố Cục Phân Tách Hai Phía (Left: Search — Right: Filters)**:
+      - Khi thiết kế thanh tìm kiếm và bộ lọc trên danh sách thực thể, bắt buộc phân tách 2 đầu rõ ràng bằng `justify-between`:
+        ```tsx
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        ```
+      - **Bên trái (`justify-start`)**: Chỉ đặt duy nhất ô nhập liệu tìm kiếm (`Input`), có icon kính lúp bên trái và nút xóa nhanh `×` bên phải khi có ký tự.
+      - **Bên phải (`justify-end`)**: Nhóm toàn bộ các điều khiển lọc (`Select` phân loại, `Select` trạng thái, nút `Đặt lại` bộ lọc khi active).
+    - **Khống Chế Độ Rộng Ô Tìm Kiếm (Zero Full-Width Desktop Search Stretch)**:
+      - ❌ **Tuyệt đối CẤM dùng `flex-1` đơn độc trên ô tìm kiếm**: Khi không giới hạn độ rộng, ô tìm kiếm trên màn hình Desktop sẽ bị kéo giãn tới 800px–1000px, tạo ra khoảng trống mênh mông bất hợp lý và đẩy các nút lọc dạt xa về mép phải màn hình.
+      - ✅ **Độ rộng chuẩn Desktop**: Bắt buộc khống chế trong khoảng `sm:w-72 lg:w-80` hoặc `sm:max-w-xs` (288px – 320px).
+      - ✅ **Độ rộng thích ứng Mobile (`< 640px`)**: Tự động co giãn `w-full` ở trên, cụm bộ lọc chuyển xuống dưới chia 50/50 (`grid grid-cols-2 gap-2 w-full`).
+    - **Placeholder Súc Tích Chuẩn Microcopy (Concise Placeholder Standard)**:
+      - ❌ **Cấm viết cả câu dài**: `Tìm theo tên hiển thị, mã type (query.rewrite...), mô tả...`.
+      - ✅ **Chỉ dùng 2 đến 4 từ**: `Tìm kiếm node...`, `Tìm theo tên, mã...`, `Tìm kiếm trợ lý...`.
+15. **Quy Chuẩn Nút Chuyển Đổi Chế Độ Xem (View Mode Switcher / Grid-Table Toggle Standard)**:
+    - **Bắt Buộc Dùng `<ViewModeToggle />` Dùng Chung**:
+      - Mọi màn hình danh sách có hỗ trợ chuyển đổi giữa dạng thẻ lưới và dạng bảng/danh sách (`/document-types`, `/knowledge`, `/capabilities/nodes`, `/assistants`, v.v.) **BẮT BUỘC PHẢI SỬ DỤNG component dùng chung** `<ViewModeToggle value={viewMode} onChange={setViewMode} />` từ `@/components/ui/view-mode-toggle`.
+      - **Cấm Tuyệt Đối Vibe Coding Tự Chế Style Lệch Pha**: Nghiêm cấm việc mỗi lần vibe coding lại tự viết `<div><Button>...</Button></div>` với style khác nhau (như trang thì dùng nút chữ "Thẻ / Bảng", trang thì dùng `variant="default"` màu đen/nổi quá mức, trang thì dùng `rounded-sm` hay `size-7`).
+    - **Thiết Kế Chuẩn Mực (Gold Standard theo `/document-types`)**:
+      - **Container**: `flex items-center gap-1 border border-border rounded-md p-0.5 bg-muted/30 shrink-0`.
+      - **Nút con (Buttons)**: `variant={isActive ? "secondary" : "ghost"}` `size="sm"` `className="h-7 w-7 p-0"`. Trạng thái đang chọn có nền `secondary` nhẹ nhàng, tinh tế; trạng thái không chọn là `ghost`.
+      - **Icon**: `<LayoutGrid className="size-3.5" />` (cho Grid) và `<List className="size-3.5" />` (cho Table/List) từ `lucide-react`.
+      - **Accessibility & Tooltip**: Có thuộc tính `title` tiếng Việt rõ nghĩa: "Xem dạng thẻ lưới" và "Xem dạng danh sách bảng".
+      - **Tính Tương Thích Type Cao**: `ViewModeToggle` tự động hỗ trợ cả hai kiểu type phổ biến trong dự án: `"grid" | "table"` hoặc `"grid" | "list"`.
 
 ---
 

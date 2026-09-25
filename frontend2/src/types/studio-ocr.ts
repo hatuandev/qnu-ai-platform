@@ -8,6 +8,7 @@ export interface StudioOCRRegion {
   left: number;
   width: number;
   height: number;
+  confidence?: number;
 }
 
 export interface StudioOCRPage {

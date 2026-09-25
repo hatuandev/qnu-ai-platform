@@ -311,8 +311,7 @@ export function DashboardPage() {
                 return (
                   <div
                     key={assistant.id}
-                    onClick={() => void navigate({ to: "/assistants" as any })}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-muted/30 transition-all cursor-pointer gap-3 group"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-muted/30 transition-all gap-3 group"
                   >
                     <div className="flex items-start sm:items-center gap-3">
                       <div className="size-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -343,6 +342,9 @@ export function DashboardPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() =>
+                          void navigate({ to: "/assistants" as any })
+                        }
                         className="h-7 text-xs px-2.5 gap-1 group-hover:border-primary/50 cursor-pointer"
                       >
                         Trò chuyện
@@ -368,41 +370,44 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div
-                  onClick={() => void navigate({ to: "/workflows" as any })}
-                  className="p-3.5 rounded-xl border border-border/60 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all cursor-pointer space-y-1.5"
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: "/assistants" })}
+                  className="p-3.5 rounded-xl border border-border/60 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all cursor-pointer space-y-1.5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="size-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
                     <Workflow className="size-4" />
                   </div>
                   <h5 className="text-xs font-semibold text-foreground">
-                    Workflow Canvas DAG
+                    Sơ Đồ DAG Trợ Lý AI
                   </h5>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Điều phối luồng xử lý đồ thị topo với kiểm định con người
-                    HITL
+                    Điều phối luồng thực thi đồ thị topo và quy trình phản hồi
+                    của Trợ lý
                   </p>
-                </div>
+                </button>
 
-                <div
-                  onClick={() => void navigate({ to: "/ocr-lab" as any })}
-                  className="p-3.5 rounded-xl border border-border/60 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all cursor-pointer space-y-1.5"
+                <button
+                  type="button"
+                  onClick={() => void navigate({ to: "/knowledge" })}
+                  className="p-3.5 rounded-xl border border-border/60 hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-all cursor-pointer space-y-1.5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="size-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
                     <Scan className="size-4" />
                   </div>
                   <h5 className="text-xs font-semibold text-foreground">
-                    OCR Studio Lab
+                    Kho Tri Thức & Studio OCR
                   </h5>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Bóc tách scan công văn, nhận diện bảng biểu và trích xuất
-                    con dấu
+                    Bóc tách scan công văn, nhận diện bảng biểu và thẩm định
+                    trực tiếp trong kho tri thức
                   </p>
-                </div>
+                </button>
 
-                <div
+                <button
+                  type="button"
                   onClick={() => void navigate({ to: "/models" as any })}
-                  className="p-3.5 rounded-xl border border-border/60 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer space-y-1.5"
+                  className="p-3.5 rounded-xl border border-border/60 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer space-y-1.5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
                     <Cpu className="size-4" />
@@ -413,7 +418,7 @@ export function DashboardPage() {
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Định tuyến thông minh OpenAI, Gemini và Local vLLM/Ollama
                   </p>
-                </div>
+                </button>
               </div>
             </CardContent>
           </Card>

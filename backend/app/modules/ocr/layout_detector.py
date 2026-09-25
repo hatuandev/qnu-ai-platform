@@ -670,12 +670,12 @@ class SmartLayoutDetector:
             w = tb["width"]
             h = tb["height"]
 
-            if page_number == 1 and t < 15.0:
-                rtype = "header"
-                lbl = "header"
-            elif self._is_doc_or_section_title(txt):
+            if self._is_doc_or_section_title(txt):
                 rtype = "title"
                 lbl = "title"
+            elif page_number == 1 and t < 15.0:
+                rtype = "header"
+                lbl = "header"
             elif self._is_list_marker(txt):
                 rtype = "list"
                 lbl = "list"
@@ -747,11 +747,18 @@ class SmartLayoutDetector:
             right_headers: list[dict[str, Any]] = []
             other_boxes: list[dict[str, Any]] = []
             for b in content_boxes:
-                if float(b["top"]) < 15.0 and b["type"] == "header":
+                txt = b.get("text", "").strip()
+                is_doc_title_keyword = any(txt.upper().startswith(kw) for kw in (
+                    "KẾ HOẠCH", "KE HOACH", "QUYẾT ĐỊNH", "QUYET DINH",
+                    "THÔNG BÁO", "THONG BAO", "PHƯƠNG ÁN", "PHUONG AN",
+                    "ĐỀ ÁN", "DE AN", "TỜ TRÌNH", "TO TRINH",
+                    "BÁO CÁO", "BAO CAO", "HƯỚNG DẪN", "HUONG DAN",
+                    "QUY ĐỊNH", "QUY DINH", "QUY CHẾ", "QUY CHE",
+                ))
+                if float(b["top"]) < 15.0 and b["type"] == "header" and not is_doc_title_keyword:
                     w = float(b["width"])
                     left_val = float(b["left"])
                     if w > 60.0:
-                        txt = b.get("text", "")
                         if "ngày" in txt or "tháng" in txt:
                             left_headers.append({
                                 **b,
@@ -771,6 +778,8 @@ class SmartLayoutDetector:
                     else:
                         right_headers.append(b)
                 else:
+                    if is_doc_title_keyword:
+                        b = {**b, "type": "title", "label": "title"}
                     other_boxes.append(b)
 
             if left_headers:
@@ -822,9 +831,13 @@ class SmartLayoutDetector:
                     "KẾ HOẠCH", "KE HOACH",
                     "QUYẾT ĐỊNH", "QUYET DINH",
                     "THÔNG BÁO", "THONG BAO",
+                    "PHƯƠNG ÁN", "PHUONG AN",
+                    "ĐỀ ÁN", "DE AN",
                     "TỜ TRÌNH", "TO TRINH",
                     "BÁO CÁO", "BAO CAO",
                     "HƯỚNG DẪN", "HUONG DAN",
+                    "QUY ĐỊNH", "QUY DINH",
+                    "QUY CHẾ", "QUY CHE",
                 ))
             )
             prev_is_main_doc_title = (
@@ -833,9 +846,13 @@ class SmartLayoutDetector:
                     "KẾ HOẠCH", "KE HOACH",
                     "QUYẾT ĐỊNH", "QUYET DINH",
                     "THÔNG BÁO", "THONG BAO",
+                    "PHƯƠNG ÁN", "PHUONG AN",
+                    "ĐỀ ÁN", "DE AN",
                     "TỜ TRÌNH", "TO TRINH",
                     "BÁO CÁO", "BAO CAO",
                     "HƯỚNG DẪN", "HUONG DAN",
+                    "QUY ĐỊNH", "QUY DINH",
+                    "QUY CHẾ", "QUY CHE",
                 ))
             )
 

@@ -31,6 +31,7 @@
   --radius-sm: var(--radius-micro);
   --radius-md: var(--radius-control);
   --radius-lg: var(--radius-surface);
+  --breakpoint-xs: 30rem;
 }
 
 @layer base {
@@ -116,11 +117,13 @@
     }
   }
 
-  .scrollbar-none {
+  .scrollbar-none,
+  .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  .scrollbar-none::-webkit-scrollbar {
+  .scrollbar-none::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
 }

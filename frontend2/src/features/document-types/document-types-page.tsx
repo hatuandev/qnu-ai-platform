@@ -6,8 +6,6 @@ import {
   Copy,
   FileText,
   GraduationCap,
-  LayoutGrid,
-  List,
   Loader2,
   Plus,
   RefreshCw,
@@ -46,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import {
   activateDocumentType,
   type DocumentTypeCategory,
@@ -346,26 +345,7 @@ export function DocumentTypesPage() {
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30 shrink-0">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setViewMode("grid")}
-              title="Xem dạng thẻ lưới"
-            >
-              <LayoutGrid className="size-3.5" />
-            </Button>
-            <Button
-              variant={viewMode === "table" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setViewMode("table")}
-              title="Xem dạng danh sách bảng"
-            >
-              <List className="size-3.5" />
-            </Button>
-          </div>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
       </div>
 

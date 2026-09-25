@@ -916,6 +916,28 @@ class IngestionService:
         if has_placeholder:
             return True
 
+        has_misclassified_header = any(
+            str(b.get("type", "")).lower() == "header"
+            and any(
+                kw in str(b.get("text", "")).upper()
+                for kw in (
+                    "KẾ HOẠCH", "KE HOACH",
+                    "QUYẾT ĐỊNH", "QUYET DINH",
+                    "THÔNG BÁO", "THONG BAO",
+                    "TỜ TRÌNH", "TO TRINH",
+                    "BÁO CÁO", "BAO CAO",
+                    "PHƯƠNG ÁN", "PHUONG AN",
+                    "ĐỀ ÁN", "DE AN",
+                    "QUY ĐỊNH", "QUY DINH",
+                    "QUY CHẾ", "QUY CHE",
+                    "HƯỚNG DẪN", "HUONG DAN",
+                )
+            )
+            for b in all_blocks
+        )
+        if has_misclassified_header:
+            return True
+
         has_semantic = any(
             str(b.get("type", "")).lower() in ("signature", "table", "title", "header", "list")
             for b in all_blocks

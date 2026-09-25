@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Activity, FileText, Table2 } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CollectionHeader } from "@/components/knowledge/collection-header";
@@ -12,6 +12,10 @@ import { CollectionReconcileDialog } from "@/components/knowledge/dialogs/collec
 import { DocumentPreviewDialog } from "@/components/knowledge/dialogs/document-preview-dialog";
 import { DocumentUploadDialog } from "@/components/knowledge/dialogs/document-upload-dialog";
 import { TaskLogDialog } from "@/components/knowledge/dialogs/task-log-dialog";
+import {
+  DocumentStudioWorkspace,
+  StudioErrorBoundary,
+} from "@/components/knowledge/ocr";
 import { CollectionDocumentsTab } from "@/components/knowledge/tabs/collection-documents-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
@@ -29,13 +33,26 @@ import type {
 
 export interface CollectionDetailPageProps {
   collectionId: string;
+  initialDocId?: string;
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   collectionId,
+  initialDocId,
 }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Active in-place OCR Studio Document (null = show normal tabs, string = in-place Studio)
+  const [activeStudioDocId, setActiveStudioDocId] = useState<string | null>(
+    initialDocId || null,
+  );
+
+  useEffect(() => {
+    if (initialDocId) {
+      setActiveStudioDocId(initialDocId);
+    }
+  }, [initialDocId]);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<CollectionDetailTab>("documents");
@@ -64,6 +81,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   );
   const [deleteDocTarget, setDeleteDocTarget] =
     useState<KnowledgeDocument | null>(null);
+  const [isConfirmCleanupOpen, setIsConfirmCleanupOpen] = useState(false);
+  const [deleteTaskTarget, setDeleteTaskTarget] =
+    useState<IngestionTask | null>(null);
 
   // Reconcile Dialog States
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
@@ -252,12 +272,86 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       toast.success("Đã xóa tài liệu khỏi kho.");
       queryClient.invalidateQueries({ queryKey: ["documents", collection.id] });
       queryClient.invalidateQueries({ queryKey: ["collections"] });
+      queryClient.invalidateQueries({
+        queryKey: ["collection-facts", collection.id],
+      });
       setDeleteDocTarget(null);
     },
     onError: (err: Error) => {
       toast.error(`Xóa tài liệu thất bại: ${err.message}`);
     },
   });
+
+  // Task Actions & Cleanup Mutations
+  const canCleanupTasks = useMemo(() => {
+    return allTasks.some(
+      (t: IngestionTask) =>
+        t.status === "completed" ||
+        t.status === "failed" ||
+        t.status === "cancelled",
+    );
+  }, [allTasks]);
+
+  const cleanupTasksMutation = useMutation({
+    mutationFn: () => jobsApi.cleanupJobs(collection.id),
+    onSuccess: (res) => {
+      toast.success(
+        res.deleted_count > 0
+          ? `Đã dọn dẹp ${res.deleted_count} tác vụ cũ.`
+          : "Không có tác vụ nào cần dọn dẹp.",
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["ingestion-tasks", collection.id],
+      });
+      setIsConfirmCleanupOpen(false);
+    },
+    onError: (err: Error) => {
+      toast.error(`Dọn dẹp tác vụ thất bại: ${err.message}`);
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => jobsApi.deleteJob(taskId),
+    onSuccess: () => {
+      toast.success("Đã xóa tác vụ khỏi danh sách.");
+      queryClient.invalidateQueries({
+        queryKey: ["ingestion-tasks", collection.id],
+      });
+      setDeleteTaskTarget(null);
+    },
+    onError: (err: Error) => {
+      toast.error(`Xóa tác vụ thất bại: ${err.message}`);
+    },
+  });
+
+  const [runningTaskActionId, setRunningTaskActionId] = useState<string | null>(
+    null,
+  );
+
+  const handleTaskAction = async (
+    taskId: string,
+    action: "retry" | "cancel",
+  ) => {
+    setRunningTaskActionId(taskId);
+    try {
+      if (action === "retry") {
+        await jobsApi.retryJob(taskId);
+        toast.success("Đã kích hoạt chạy lại tác vụ.");
+      } else {
+        await jobsApi.cancelJob(taskId);
+        toast.success("Đã gửi yêu cầu hủy tác vụ.");
+      }
+      queryClient.invalidateQueries({
+        queryKey: ["ingestion-tasks", collection.id],
+      });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : `Thao tác ${action} thất bại.`,
+      );
+    } finally {
+      setRunningTaskActionId(null);
+    }
+  };
 
   // Handlers
   const handleReindexCollection = async () => {
@@ -348,6 +442,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       }
       toast.success(`Đã phê duyệt ${docIds.length} tài liệu.`);
       refetchDocs();
+      queryClient.invalidateQueries({
+        queryKey: ["collection-facts", collection.id],
+      });
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Phê duyệt tài liệu thất bại.",
@@ -363,12 +460,32 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       toast.success(`Đã xóa ${docIds.length} tài liệu.`);
       refetchDocs();
       queryClient.invalidateQueries({ queryKey: ["collections"] });
+      queryClient.invalidateQueries({
+        queryKey: ["collection-facts", collection.id],
+      });
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Xóa tài liệu thất bại.",
       );
     }
   };
+
+  // If a document is currently active in Studio mode, render full in-place workspace
+  if (activeStudioDocId) {
+    return (
+      <StudioErrorBoundary onReset={() => setActiveStudioDocId(null)}>
+        <DocumentStudioWorkspace
+          collection={collection}
+          documentId={activeStudioDocId}
+          onBack={() => setActiveStudioDocId(null)}
+          onApproveSuccess={() => {
+            refetchDocs();
+            refetchTasks();
+          }}
+        />
+      </StudioErrorBoundary>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -441,7 +558,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             downloadingId={null}
             onReindexDoc={handleReindexSingleDoc}
             onStartVerify={(docId) => {
-              toast.info(`Mở trình thẩm định tài liệu ${docId}`);
+              setActiveStudioDocId(docId);
             }}
             onPreviewDoc={setPreviewDoc}
             onDownloadDoc={(doc) => {
@@ -480,19 +597,15 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onSearchChange={setTaskSearchQuery}
             statusFilter={taskStatusFilter}
             onStatusFilterChange={setTaskStatusFilter}
-            taskActionId={null}
-            isCleaningTasks={false}
-            canCleanup={false}
+            taskActionId={runningTaskActionId}
+            isCleaningTasks={cleanupTasksMutation.isPending}
+            canCleanup={canCleanupTasks}
             taskSuccessMessage={null}
             onRefresh={() => refetchTasks()}
-            onOpenConfirmCleanup={() => {}}
+            onOpenConfirmCleanup={() => setIsConfirmCleanupOpen(true)}
             onViewLog={setSelectedTaskLog}
-            onTaskAction={(taskId, action) => {
-              toast.info(`Thao tác ${action} trên task ${taskId}`);
-            }}
-            onDeleteTask={(task) => {
-              toast.info(`Xóa task ${task.id}`);
-            }}
+            onTaskAction={handleTaskAction}
+            onDeleteTask={(task) => setDeleteTaskTarget(task)}
           />
         </TabsContent>
       </Tabs>
@@ -508,6 +621,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           refetchDocs();
           refetchTasks();
         }}
+        onOpenStudio={(docId) => setActiveStudioDocId(docId)}
       />
 
       {/* Cấu Hình Kho */}
@@ -577,6 +691,36 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         isLoading={deleteDocMutation.isPending}
         onConfirm={() => {
           if (deleteDocTarget) deleteDocMutation.mutate(deleteDocTarget.id);
+        }}
+      />
+
+      {/* Xác Nhận Dọn Dẹp Tác Vụ Cũ */}
+      <ConfirmDialog
+        open={isConfirmCleanupOpen}
+        onOpenChange={setIsConfirmCleanupOpen}
+        title="Dọn dẹp tác vụ cũ"
+        description="Bạn có chắc chắn muốn dọn dẹp các tác vụ đã hoàn tất, thất bại hoặc đã hủy? Lịch sử chạy của các tác vụ này sẽ được giải phóng."
+        confirmText="Dọn dẹp ngay"
+        cancelText="Hủy"
+        variant="destructive"
+        isLoading={cleanupTasksMutation.isPending}
+        onConfirm={() => cleanupTasksMutation.mutate()}
+      />
+
+      {/* Xác Nhận Xóa Tác Vụ */}
+      <ConfirmDialog
+        open={Boolean(deleteTaskTarget)}
+        onOpenChange={(v) => {
+          if (!v) setDeleteTaskTarget(null);
+        }}
+        title="Xóa tác vụ"
+        description={`Bạn có chắc chắn muốn xóa tác vụ "${deleteTaskTarget?.task_name}" khỏi danh sách?`}
+        confirmText="Xóa tác vụ"
+        cancelText="Hủy"
+        variant="destructive"
+        isLoading={deleteTaskMutation.isPending}
+        onConfirm={() => {
+          if (deleteTaskTarget) deleteTaskMutation.mutate(deleteTaskTarget.id);
         }}
       />
     </div>

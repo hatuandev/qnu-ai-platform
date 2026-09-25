@@ -9,8 +9,6 @@ import {
   Download,
   FileUp,
   History,
-  LayoutGrid,
-  List,
   Loader2,
   MessageSquare,
   MoreHorizontal,
@@ -59,6 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import {
   type AssistantBundle,
   activateAssistant,
@@ -405,26 +404,11 @@ export function AssistantsPage() {
           </Select>
         </div>
 
-        <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/30 shrink-0 self-end sm:self-auto">
-          <Button
-            variant={viewMode === "grid" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setViewMode("grid")}
-            title="Xem dạng thẻ lưới"
-          >
-            <LayoutGrid className="size-3.5" />
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setViewMode("table")}
-            title="Xem dạng danh sách bảng"
-          >
-            <List className="size-3.5" />
-          </Button>
-        </div>
+        <ViewModeToggle
+          value={viewMode}
+          onChange={setViewMode}
+          className="self-end sm:self-auto"
+        />
       </div>
 
       {/* 4. Assistants Main Content */}

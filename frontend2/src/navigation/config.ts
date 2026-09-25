@@ -8,11 +8,9 @@ import {
   MessagesSquare,
   Network,
   Palette,
-  Scan,
   Share2,
   ShieldCheck,
   UserRoundCog,
-  Workflow,
   Wrench,
 } from "lucide-react";
 import type { NavGroup } from "@/navigation/types";
@@ -104,12 +102,6 @@ export const navigationGroups: NavGroup[] = [
     label: "Nâng Cao",
     items: [
       {
-        id: "workflows",
-        title: "Thư Viện Workflow",
-        to: "/workflows",
-        icon: Workflow,
-      },
-      {
         id: "nodes",
         title: "Thư Viện Nodes",
         to: "/capabilities/nodes",
@@ -126,12 +118,6 @@ export const navigationGroups: NavGroup[] = [
         title: "Loại Văn Bản",
         to: "/document-types",
         icon: FileText,
-      },
-      {
-        id: "ocr-lab",
-        title: "OCR Studio Lab",
-        to: "/ocr-lab",
-        icon: Scan,
       },
       {
         id: "design-system",
