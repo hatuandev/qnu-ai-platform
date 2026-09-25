@@ -117,4 +117,4 @@ Nền tảng trang bị bộ bóc tách tài liệu thông minh chuyên sâu cho
 - **Hợp Nhất Bảng Song Song (Side-by-Side Fusion)**:
   - Tự động phát hiện các bảng in ngang cùng trục Y (như bảng IELTS và VSTEP) để gộp thành bảng chuẩn 4 cột.
 - **Bảo Vệ Toàn Vẹn Dữ Liệu RAG**:
-  - Chuẩn hóa Unicode NFC, chống Mojibake 100%, bảo toàn 100% dòng phân cách GFM `|:---|`.
+  - Chuẩn hóa Unicode NFC, chống Mojibake 100%, bảo toàn 100% dòng phân cách GFM `|:---|`.

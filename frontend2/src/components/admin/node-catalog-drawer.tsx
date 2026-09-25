@@ -313,7 +313,7 @@ export const NodeCatalogDrawer: React.FC<NodeCatalogDrawerProps> = ({
   return (
     <aside
       aria-label="Thư Viện Nodes"
-      className="absolute top-14 left-4 z-20 w-80 max-h-[80vh] flex flex-col rounded-surface bg-card/95 backdrop-blur-md border border-border shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-3 duration-200"
+      className="absolute top-3 left-3 z-30 w-80 max-h-[calc(100%-1.5rem)] flex flex-col rounded-surface bg-card/95 backdrop-blur-md border border-border shadow-xl overflow-hidden animate-in fade-in slide-in-from-left-3 duration-200"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">

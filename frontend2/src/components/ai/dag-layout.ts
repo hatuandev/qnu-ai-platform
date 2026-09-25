@@ -255,6 +255,23 @@ export function computeDagLayout(
 }
 
 /**
+ * Summarizes the first 3 configuration properties into a concise preview line.
+ */
+export function summarizeConfig(
+  config: Record<string, unknown> | undefined,
+): string {
+  if (!config || typeof config !== "object") return "Mặc định";
+  const entries = Object.entries(config).slice(0, 3);
+  if (entries.length === 0) return "Mặc định";
+  return entries
+    .map(
+      ([key, value]) =>
+        `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`,
+    )
+    .join(", ");
+}
+
+/**
  * Converts a raw backend WorkflowDagSpec into ReactFlow nodes and edges.
  */
 export function convertDagSpecToReactFlow(
@@ -288,13 +305,23 @@ export function convertDagSpecToReactFlow(
         version: node.version,
         config: node.config,
         policy: node.policy,
+        configSummary: summarizeConfig(node.config),
+        timeoutSeconds:
+          typeof node.policy?.timeout_seconds === "number"
+            ? node.policy.timeout_seconds
+            : undefined,
         description:
-          typeof node.policy.description === "string"
+          typeof node.policy?.description === "string"
             ? node.policy.description
             : undefined,
         status: exec?.status || "idle",
         durationMs: exec?.durationMs,
         error: exec?.error,
+        // Properties used by PropertyInspector
+        workflowNodeType: node.type,
+        workflowNodeVersion: node.version,
+        workflowConfig: node.config,
+        workflowPolicy: node.policy,
       },
     };
   });

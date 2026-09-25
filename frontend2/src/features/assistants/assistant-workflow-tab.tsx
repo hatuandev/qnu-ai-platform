@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   GitFork,
   History,
+  Layers,
   Lock,
   Network,
   Play,
@@ -111,11 +112,7 @@ export function AssistantWorkflowTab({
   // 4. Convert DAG Spec to ReactFlow format
   const { nodes, edges } = useMemo(() => {
     if (!activeDagSpec) return { nodes: [], edges: [] };
-    return convertDagSpecToReactFlow(
-      activeDagSpec,
-      executionStates,
-      direction,
-    );
+    return convertDagSpecToReactFlow(activeDagSpec, executionStates, direction);
   }, [activeDagSpec, executionStates, direction]);
 
   // 5. Save Draft Mutation
@@ -328,7 +325,7 @@ export function AssistantWorkflowTab({
   const isPrivate = assistant.workflow_ownership === "private";
 
   return (
-    <Card className="border-border/80 shadow-xs flex flex-col overflow-hidden">
+    <Card className="border-border/80 shadow-xs flex flex-col overflow-hidden relative">
       {/* 1. Studio Header Toolbar */}
       <CardHeader className="p-3 sm:p-4 border-b border-border/70 bg-card/60 backdrop-blur-xs space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -375,6 +372,19 @@ export function AssistantWorkflowTab({
                 className="text-[10px] px-1 py-0 font-mono hidden sm:inline-flex"
               >
                 Rev #{draft.revision}
+              </Badge>
+            )}
+
+            {activeDagSpec && (
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0.5 font-mono hidden md:inline-flex items-center gap-1 bg-muted/80 text-foreground"
+              >
+                <Layers className="size-2.5 text-primary" />
+                <span>
+                  {activeDagSpec.nodes?.length || 0} nodes ·{" "}
+                  {activeDagSpec.edges?.length || 0} liên kết
+                </span>
               </Badge>
             )}
 
@@ -544,7 +554,10 @@ export function AssistantWorkflowTab({
       </CardHeader>
 
       {/* 2. Interactive Studio Canvas Area */}
-      <CardContent className="p-0 relative flex-1 min-h-[640px] h-[680px] w-full overflow-hidden bg-background">
+      <CardContent
+        className="p-0 relative w-full overflow-hidden bg-background"
+        style={{ height: "700px", minHeight: "640px" }}
+      >
         {isLoading || (!activeDagSpec && !draft) ? (
           <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-muted-foreground min-h-[640px]">
             <RefreshCw className="size-6 animate-spin text-primary" />
@@ -560,7 +573,7 @@ export function AssistantWorkflowTab({
             executionStates={executionStates}
             onNodeSelect={setSelectedNode}
             workflowName={`DAG — ${assistant.name}`}
-            className="w-full h-full"
+            className="w-full h-full absolute inset-0"
           />
         )}
 
@@ -623,15 +636,16 @@ export function AssistantWorkflowTab({
             onDeleteNode={handleDeleteNode}
           />
         )}
+
+        {/* Node Catalog Drawer (positioned inside canvas relative container) */}
+        <NodeCatalogDrawer
+          isOpen={isNodeCatalogOpen}
+          onClose={() => setIsNodeCatalogOpen(false)}
+          onSelectNodeToAdd={handleAddNodeFromCatalog}
+        />
       </CardContent>
 
       {/* 3. Modals & Drawers */}
-      {/* Node Catalog Drawer */}
-      <NodeCatalogDrawer
-        isOpen={isNodeCatalogOpen}
-        onClose={() => setIsNodeCatalogOpen(false)}
-        onSelectNodeToAdd={handleAddNodeFromCatalog}
-      />
 
       {/* In-Canvas Test Runner */}
       <InCanvasTestRunner

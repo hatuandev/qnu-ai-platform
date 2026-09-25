@@ -13,7 +13,6 @@ import {
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
-  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -22,7 +21,6 @@ import {
   CheckCircle2,
   Clock,
   GitBranch,
-  Layers,
   Loader2,
   MessageSquare,
   Search,
@@ -180,7 +178,10 @@ const ConditionRouteNode = ({
       </div>
       <p className="text-xs font-semibold text-foreground">{data.label}</p>
       {data.configSummary && (
-        <p className="text-[10px] font-mono text-muted-foreground mt-1 bg-muted/60 p-1 rounded-micro line-clamp-1">
+        <p
+          className="text-[10px] font-mono text-muted-foreground mt-1 bg-muted/60 p-1 rounded-micro line-clamp-1 max-w-[240px] truncate"
+          title={data.configSummary}
+        >
           {data.configSummary}
         </p>
       )}
@@ -528,23 +529,15 @@ const DAGCanvasInner: React.FC<DAGCanvasProps> = ({
   initialEdges = [],
   executionStates = DEFAULT_EXECUTION_STATES,
   onNodeSelect,
-  workflowName = "QNU Assistant Workflow",
   className,
 }) => {
-  const { fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync initial nodes and trigger auto fit-view
+  // Sync initial nodes when workflow changes
   useEffect(() => {
     setNodes(initialNodes);
-    if (initialNodes.length > 0) {
-      const timer = setTimeout(() => {
-        fitView({ padding: 0.25, duration: 250 });
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [initialNodes, setNodes, fitView]);
+  }, [initialNodes, setNodes]);
 
   // Sync initial edges when workflow changes
   useEffect(() => {
@@ -598,8 +591,8 @@ const DAGCanvasInner: React.FC<DAGCanvasProps> = ({
 
   return (
     <div
-      className={`w-full h-full relative min-h-[600px] ${className || ""}`}
-      style={{ width: "100%", height: "100%", minHeight: "600px" }}
+      className={`w-full h-full relative min-h-[640px] ${className || ""}`}
+      style={{ width: "100%", height: "100%", minHeight: "640px" }}
     >
       <ReactFlow
         nodes={nodes}
@@ -613,7 +606,8 @@ const DAGCanvasInner: React.FC<DAGCanvasProps> = ({
         fitViewOptions={{ padding: 0.25 }}
         minZoom={0.3}
         maxZoom={1.8}
-        style={{ width: "100%", height: "100%" }}
+        proOptions={{ hideAttribution: true }}
+        style={{ width: "100%", height: "100%", minHeight: "640px" }}
         defaultEdgeOptions={{
           animated: true,
           style: { strokeWidth: 2, stroke: "var(--primary)" },
@@ -621,13 +615,15 @@ const DAGCanvasInner: React.FC<DAGCanvasProps> = ({
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls
+          position="bottom-right"
           showInteractive={false}
-          className="bg-card border border-border shadow-xs"
+          className="bg-card/95 backdrop-blur-xs border border-border shadow-md rounded-control"
         />
         <MiniMap
+          position="bottom-right"
           zoomable
           pannable
-          className="bg-card border border-border rounded-surface shadow-xs"
+          className="bg-card/95 backdrop-blur-xs border border-border rounded-surface shadow-xs"
           nodeColor={(node) => {
             switch (node.type) {
               case "chatInput":
@@ -652,43 +648,31 @@ const DAGCanvasInner: React.FC<DAGCanvasProps> = ({
           }}
         />
 
-        <Panel position="top-left" className="m-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-xs">
-            <Layers className="size-3.5 text-primary" />
-            <span className="font-semibold text-foreground">
-              {workflowName}
-            </span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-muted-foreground font-mono">
-              {nodes.length} nodes, {edges.length} edges
-            </span>
-          </div>
-        </Panel>
-
-        <Panel position="bottom-left" className="m-3">
-          <div className="flex flex-wrap items-center gap-3 px-3 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1">
+        {/* Legend dock: Centered at the bottom to avoid clashing with left drawer & right minimap */}
+        <Panel position="bottom-center" className="mb-3">
+          <div className="flex flex-wrap items-center gap-3 px-3.5 py-1.5 rounded-control bg-card/90 backdrop-blur-xs border border-border shadow-xs text-[11px] text-muted-foreground select-none">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-teal-500" /> Input
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-amber-500" /> Route
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-blue-500" /> RAG
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-purple-500" /> LLM
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-cyan-500" /> Tool
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-indigo-500" /> Guard
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-orange-500" /> Approval
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-emerald-500" /> Output
             </span>
           </div>
