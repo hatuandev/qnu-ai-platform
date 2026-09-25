@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     fontconfig \
     fonts-liberation \
+    libgl1 \
+    libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/* \
  && fc-cache -f > /dev/null || true
 

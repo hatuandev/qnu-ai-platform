@@ -7,8 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-25 23:59 (UTC+7)
-- **Phiên số**: #224 (deploy Dokploy: crash loop do thiếu DEV_ACCESS_PASSWORD đã fix qua compose + login 503; test team cũ về encryption key vẫn rớt 1, chờ quyết định chính sách)
+- **Thời gian cập nhật**: 2026-09-26 00:05 (UTC+7)
+- **Phiên số**: #225 (deploy Dokploy: DB đã kết nối; migrate crash thiếu libxcb do cv2 top-level — đã thêm libgl1/glib vào Dockerfile, chờ rebuild)
 - **Phiên số trước**: #222
 - **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
 - **Phiên số trước**: #215
