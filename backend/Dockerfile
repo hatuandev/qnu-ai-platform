@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # Stage 1: Fast & Reliable UV Binary Extraction
-FROM ghcr.io/astral-sh/uv:0.4.20 AS uv_bin
+FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 
 # Stage 2: Final Production Runtime Image
 FROM python:3.12-slim
@@ -15,7 +15,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     UV_HTTP_TIMEOUT=300 \
-    UV_CONCURRENT_DOWNLOADS=4 \
+    UV_CONCURRENT_DOWNLOADS=2 \
     UV_TORCH_BACKEND=cpu \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH" \
@@ -45,11 +45,14 @@ WORKDIR /app
 # 4. Dependency caching layer: Copy dependency manifests first
 COPY pyproject.toml uv.lock* ./
 
-# 5. Install third-party dependencies into .venv (leverages Docker layer cache & auto-retry on slow VPS network)
+# 5. Install third-party dependencies into .venv
+# Pre-install official CPU-only PyTorch (~180MB) instead of multi-gigabyte CUDA binaries (>5GB)
+# Then install remaining dependencies targeting CPU PyTorch
 RUN uv venv /app/.venv \
- && (uv pip install -r pyproject.toml --python /app/.venv/bin/python || \
-     (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install -r pyproject.toml --python /app/.venv/bin/python) || \
-     (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install -r pyproject.toml --python /app/.venv/bin/python))
+ && uv pip install --no-cache --find-links https://download.pytorch.org/whl/cpu torch torchvision \
+ && (uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python || \
+     (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python) || \
+     (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python))
 
 # 6. Copy application source code, migrations, and entrypoint
 COPY app/ ./app

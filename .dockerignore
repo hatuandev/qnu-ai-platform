@@ -7,8 +7,12 @@
 **/*.pyo
 **/*.pyd
 **/.pytest_cache
+**/.pytest_temp
 **/.ruff_cache
 **/.mypy_cache
+**/.venv
+**/venv
+**/env
 **/node_modules
 **/.next
 **/dist
