@@ -166,3 +166,17 @@ def test_production_security_validation_fails_on_default_secrets():
     )
     assert valid_settings.ENVIRONMENT == "production"
 
+
+def test_production_security_allows_empty_dev_access_password():
+    """Empty DEV_ACCESS_PASSWORD (compose default when DEV_AUTH is off) must pass validation."""
+    settings = Settings(
+        ENVIRONMENT="production",
+        SECRET_KEY="a-secure-production-secret-key-that-is-long-enough",
+        INTERNAL_API_KEY="a-secure-internal-api-key-production-0987654321",
+        DEV_ACCESS_PASSWORD="",
+        DATABASE_URL="postgresql+asyncpg://user:pass@prod-db.qnu.edu.vn:5432/qnudb",
+        S3_SECRET_KEY="a-secure-s3-secret-key-production-098765432109876",
+        PROVIDER_ENCRYPTION_KEY="another-secure-key-for-providers-fernet-encryption",
+    )
+    assert settings.DEV_ACCESS_PASSWORD == ""
+

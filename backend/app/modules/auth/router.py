@@ -21,6 +21,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Access Gate"])
 async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
     """Verify dev access key and issue a secure HttpOnly session cookie."""
     expected_password = settings.DEV_ACCESS_PASSWORD
+    if not expected_password or not expected_password.strip():
+        raise AppException(
+            "Dev Access Gate chưa được cấu hình trên máy chủ.",
+            code="auth_not_configured",
+            status_code=503,
+        )
     if not hmac.compare_digest(req.access_key.strip(), expected_password.strip()):
         raise AppException(
             "Mật khẩu truy cập Dev không chính xác.",

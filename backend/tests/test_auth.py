@@ -59,6 +59,24 @@ async def test_auth_login_invalid_password():
         assert "Mật khẩu truy cập Dev" in data["detail"]
 
 
+@pytest.mark.asyncio
+async def test_auth_login_rejects_when_password_unconfigured():
+    """Login must fail closed (503) instead of comparing against an empty password."""
+    from unittest.mock import patch
+
+    import app.modules.auth.router as auth_router
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        with patch.object(auth_router.settings, "DEV_ACCESS_PASSWORD", ""):
+            resp = await client.post(
+                "/platform/v1alpha1/auth/login",
+                json={"access_key": "   "},
+            )
+            assert resp.status_code == 503
+            assert resp.json().get("code") == "auth_not_configured"
+
+
 
 
 @pytest.mark.asyncio
