@@ -24,8 +24,8 @@ services:
       - qnu_network
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "${BACKEND_PORT:-8001}:8001"
+    expose:
+      - "8001"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - PORT=8001
@@ -120,8 +120,8 @@ services:
     restart: unless-stopped
     networks:
       - qnu_network
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
+    expose:
+      - "80"
     depends_on:
       backend:
         condition: service_healthy
