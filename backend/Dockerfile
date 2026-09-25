@@ -20,14 +20,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # 1. Install required system packages:
 # - curl: for container healthchecks
-# - fonts-liberation: metric-compatible Times New Roman required for Decree 30/2020/NĐ-CP documents
+# - fontconfig & fonts-liberation: metric-compatible Times New Roman required for Decree 30/2020/NĐ-CP documents
 # - ca-certificates: secure HTTPS outbound calls to OpenAI/Gemini APIs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    fontconfig \
     fonts-liberation \
  && rm -rf /var/lib/apt/lists/* \
- && fc-cache -f > /dev/null
+ && fc-cache -f > /dev/null || true
 
 # 2. Copy UV package manager binary from official Astral image
 COPY --from=uv_bin /uv /uvx /bin/
@@ -41,15 +42,18 @@ WORKDIR /app
 # 4. Dependency caching layer: Copy dependency manifests first
 COPY pyproject.toml uv.lock* ./
 
-# 5. Install dependencies into system environment or .venv
+# 5. Install third-party dependencies into .venv (leverages Docker layer cache)
 RUN uv venv /app/.venv \
- && (uv pip install -e . --python /app/.venv/bin/python || uv pip install . --python /app/.venv/bin/python)
+ && uv pip install -r pyproject.toml --python /app/.venv/bin/python
 
 # 6. Copy application source code, migrations, and entrypoint
 COPY app/ ./app
 COPY alembic/ ./alembic
 COPY alembic.ini ./alembic.ini
 COPY entrypoint.sh ./entrypoint.sh
+
+# 6b. Install project package in editable mode without re-fetching dependencies
+RUN uv pip install -e . --no-deps --python /app/.venv/bin/python
 
 # 7. Create storage directories for uploads/artifacts and set non-root ownership
 RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups /app/configs \
