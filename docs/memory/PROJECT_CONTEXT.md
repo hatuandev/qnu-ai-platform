@@ -7,8 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-26 00:05 (UTC+7)
-- **Phiên số**: #225 (deploy Dokploy: DB đã kết nối; migrate crash thiếu libxcb do cv2 top-level — đã thêm libgl1/glib vào Dockerfile, chờ rebuild)
+- **Thời gian cập nhật**: 2026-09-26 00:20 (UTC+7)
+- **Phiên số**: #226 (deploy Dokploy: migrate no-op câm → seed chết lặp; đã thêm fail-loud verify schema. Cần ground truth server: `ls /app/alembic/versions` + `db check` để sửa data-plane)
 - **Phiên số trước**: #222
 - **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
 - **Phiên số trước**: #215

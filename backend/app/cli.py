@@ -150,6 +150,18 @@ def run_db_migrate() -> int:
         config = _get_alembic_config()
         command.upgrade(config, "head")
         logger.info("Database migration to HEAD completed successfully.")
+
+        # Fail-loud verification: never let seed run against a half-migrated
+        # schema. Alembic can exit 0 while creating nothing (stale version stamp,
+        # empty versions dir, swallowed env error) — catch that here instead of
+        # producing misleading downstream seed failures.
+        if not asyncio.run(check_db_schema()):
+            logger.error(
+                "Post-migration schema verification FAILED: core tables are missing. "
+                "Inspect 'alembic_version' and run 'python -m app.cli db check' "
+                "instead of seeding against an incomplete schema."
+            )
+            return 1
         return 0
     except Exception as exc:
         logger.error("Database migration failed: %s", exc)
