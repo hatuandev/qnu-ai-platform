@@ -59,6 +59,7 @@ COPY app/ ./app
 COPY alembic/ ./alembic
 COPY alembic.ini ./alembic.ini
 COPY entrypoint.sh ./entrypoint.sh
+COPY README.md ./README.md
 
 # 6b. Install project package in editable mode without re-fetching dependencies
 RUN uv pip install -e . --no-deps --python /app/.venv/bin/python

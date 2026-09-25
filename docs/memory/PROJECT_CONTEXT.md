@@ -7,8 +7,10 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-24 17:05 (UTC+7)
-- **Phiên số**: #215
+- **Thời gian cập nhật**: 2026-09-25 23:40 (UTC+7)
+- **Phiên số**: #222
+- **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
+- **Phiên số trước**: #215
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
 - 0. **Tối Ưu Hóa Toàn Diện Responsive Mobile & Triệt Tiêu Toàn Bộ Nút/Dropdown Dư Thừa Phân Hệ Loại Văn Bản (`/document-types`) (phiên #215)**:
