@@ -14,7 +14,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    UV_SYSTEM_PYTHON=1 \
+    UV_HTTP_TIMEOUT=300 \
+    UV_CONCURRENT_DOWNLOADS=4 \
+    UV_TORCH_BACKEND=cpu \
+    UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app
 
@@ -42,9 +45,11 @@ WORKDIR /app
 # 4. Dependency caching layer: Copy dependency manifests first
 COPY pyproject.toml uv.lock* ./
 
-# 5. Install third-party dependencies into .venv (leverages Docker layer cache)
+# 5. Install third-party dependencies into .venv (leverages Docker layer cache & auto-retry on slow VPS network)
 RUN uv venv /app/.venv \
- && uv pip install -r pyproject.toml --python /app/.venv/bin/python
+ && (uv pip install -r pyproject.toml --python /app/.venv/bin/python || \
+     (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install -r pyproject.toml --python /app/.venv/bin/python) || \
+     (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install -r pyproject.toml --python /app/.venv/bin/python))
 
 # 6. Copy application source code, migrations, and entrypoint
 COPY app/ ./app
