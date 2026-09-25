@@ -86,7 +86,7 @@
               "match": {
                 "intent": "xin chào|hello|hi|chào|cm ơn|cảm ơn|tạm biệt|bye"
               },
-              "to": "greeting_output"
+              "to": "greeting_llm"
             }
           ],
           "default_node": "query_rewrite"
@@ -99,14 +99,32 @@
         }
       },
       {
+        "id": "greeting_llm",
+        "type": "llm.generate",
+        "version": "1.0.0",
+        "display_name": "AI Chào hỏi & Giao tiếp tự nhiên",
+        "config": {
+          "module_code": "general",
+          "system_prompt": "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU.AI).\nKhi người dùng gửi lời chào hỏi hoặc mở đầu cuộc trò chuyện (ví dụ: 'xin chào', 'hello', 'hi', 'chào bạn'...), hãy chào lại một cách tự nhiên, ấm áp, lịch sự và thân thiện. Giới thiệu bạn luôn sẵn sàng hỗ trợ tra cứu và giải đáp thông tin, đồng thời hỏi người dùng đang quan tâm đến nội dung gì để bạn hỗ trợ. Giữ câu trả lời súc tích trong 2-3 câu ngắn gọn.",
+          "temperature": 0.7,
+          "max_tokens": 300,
+          "fallback_text": "Chào bạn! Mình là Trợ lý AI của Trường Đại học Quy Nhơn (QNU.AI). Rất vui được hỗ trợ bạn! Bạn đang quan tâm đến thông tin nào, hãy nhắn cho mình nhé!"
+        },
+        "policy": {
+          "timeout_seconds": 15,
+          "max_attempts": 2,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "greeting_output",
         "type": "output.chat",
         "version": "1.0.0",
-        "display_name": "Lời chào dùng chung",
+        "display_name": "Phản hồi lời chào",
         "config": {
           "include_citations": false,
-          "format": "markdown",
-          "output_template": "Chào bạn! Mình là Trợ lý AI của Trường Đại học Quy Nhơn. Bạn đang quan tâm đến thông tin nào, hãy nhắn cho mình nhé!"
+          "format": "markdown"
         },
         "policy": {
           "timeout_seconds": 2,
@@ -221,6 +239,18 @@
         "id": "edge_route_to_greeting",
         "source": {
           "node_id": "condition_route",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "greeting_llm",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_greeting_to_output",
+        "source": {
+          "node_id": "greeting_llm",
           "port": "response"
         },
         "target": {

@@ -1,15 +1,11 @@
 import {
   CheckCircle2,
   ExternalLink,
-  GitFork,
-  Loader2,
-  Lock,
+  Layers,
   Network,
   ShieldAlert,
-  Users,
   Wrench,
 } from "lucide-react";
-import { Field } from "@/components/admin/field";
 import type { AssistantEditForm } from "@/components/assistants/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,37 +16,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import type { WorkflowDefinition } from "@/services/workflows-api";
 import type { AssistantItem } from "@/types/assistants";
 
 interface AssistantToolsSectionProps {
   form: AssistantEditForm;
   onChange: (updated: AssistantEditForm) => void;
-  workflows: WorkflowDefinition[];
+  workflows?: WorkflowDefinition[];
   onNavigate: (path: string) => void;
   assistant?: AssistantItem;
-  onForkWorkflow?: () => void;
-  isForkingWorkflow?: boolean;
 }
 
 export function AssistantToolsSection({
   form,
   onChange,
-  workflows,
   onNavigate,
   assistant,
-  onForkWorkflow,
-  isForkingWorkflow,
 }: AssistantToolsSectionProps) {
-  const selectedWorkflow = workflows.find((wf) => wf.id === form.workflow_id);
-  const isPrivate = assistant?.workflow_ownership === "private";
+  const assistantCode = assistant?.code || assistant?.id || "";
 
   return (
     <Card>
@@ -59,137 +43,109 @@ export function AssistantToolsSection({
           <div className="flex items-center gap-2">
             <Wrench className="size-4 text-primary" />
             <CardTitle className="text-sm font-bold">
-              Quy Trình Điều Phối & Công Cụ (Workflow DAG)
+              Cơ Chế Phê Duyệt & Công Cụ Hành Động
             </CardTitle>
           </div>
-          {assistant && (
-            <Badge
-              variant={isPrivate ? "default" : "outline"}
-              className={`text-xs gap-1 ${
-                isPrivate
-                  ? "bg-primary/10 text-primary border-primary/30"
-                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-              }`}
-            >
-              {isPrivate ? (
-                <>
-                  <Lock className="size-3" />
-                  Quy trình riêng
-                </>
-              ) : (
-                <>
-                  <Users className="size-3" />
-                  Dùng chung
-                </>
-              )}
-            </Badge>
-          )}
+          <Badge
+            variant="outline"
+            className="text-xs bg-primary/5 text-primary border-primary/20"
+          >
+            Nội bộ trợ lý
+          </Badge>
         </div>
         <CardDescription className="text-xs">
-          Liên kết Trợ lý với đồ thị thực thi nhiệm vụ chuyên sâu, Function
-          Calling và phê duyệt Human-in-the-loop.
+          Quản lý chính sách phê duyệt của con người (HITL), kiểm soát kích hoạt
+          công cụ (Function Calling) và xem luồng suy luận trực thuộc.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Field
-          htmlFor="detail-assistant-workflow"
-          label="Quy Trình Điều Phối (Workflow DAG)"
-        >
-          <div className="space-y-2">
-            <Select
-              value={form.workflow_id}
-              onValueChange={(val) => onChange({ ...form, workflow_id: val })}
-            >
-              <SelectTrigger id="detail-assistant-workflow">
-                <SelectValue placeholder="Chọn quy trình workflow" />
-              </SelectTrigger>
-              <SelectContent>
-                {workflows.map((wf) => (
-                  <SelectItem key={wf.id} value={wf.id}>
-                    {wf.display_name} ({wf.id})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              {form.workflow_id && (
-                <Button
-                  className="flex-1 h-8 text-xs gap-1.5"
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    onNavigate(
-                      `/assistants/${encodeURIComponent(assistant?.code || assistant?.id || "")}/workflow`,
-                    )
-                  }
-                >
-                  <Network className="size-3.5 text-primary" />
-                  Mở đồ thị DAG Studio:{" "}
-                  {selectedWorkflow?.display_name || form.workflow_id}
-                  <ExternalLink className="size-3 ml-auto opacity-50" />
-                </Button>
-              )}
-
-              {assistant && !isPrivate && onForkWorkflow && (
-                <Button
-                  className="h-8 text-xs gap-1.5 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
-                  type="button"
-                  variant="outline"
-                  disabled={isForkingWorkflow}
-                  onClick={onForkWorkflow}
-                  title="Nhân bản quy trình này thành một workflow riêng cho trợ lý"
-                >
-                  {isForkingWorkflow ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <GitFork className="size-3.5" />
-                  )}
-                  Tách thành quy trình riêng
-                </Button>
-              )}
+        {/* 1. Embedded DAG Workflow Summary Box */}
+        <div className="rounded-lg border p-3.5 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+              <Network className="size-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-foreground">
+                Sơ Đồ Luồng Suy Luận Trực Thuộc
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Đồ thị DAG nội bộ điều phối các bước tiếp nhận câu hỏi, tra cứu
+                kho tri thức và sinh lời giải đáp.
+              </p>
             </div>
           </div>
-        </Field>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5 shrink-0 self-start sm:self-center"
+            onClick={() =>
+              onNavigate(
+                `/assistants/${encodeURIComponent(assistantCode)}/workflow`,
+              )
+            }
+          >
+            <span>Mở sơ đồ DAG</span>
+            <ExternalLink className="size-3 text-muted-foreground" />
+          </Button>
+        </div>
 
-        {/* Thông tin phiên bản xuất bản đã ghim */}
+        {/* 2. Published Version Pin */}
         {assistant && (
           <div className="rounded-lg border p-2.5 bg-muted/20 flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
-              <Lock className="size-3.5 text-primary" />
-              Phiên bản Workflow đã ghim:
+              <Layers className="size-3.5 text-primary" />
+              Phiên bản luồng suy luận đã ghim:
             </span>
             <span className="font-mono text-xs font-semibold text-foreground">
               {assistant.published_workflow_version_id
                 ? `v${assistant.published_workflow_version_id.slice(0, 8)}...`
-                : "Chưa ghim (Dùng bản mới nhất)"}
+                : "Dùng bản nháp mới nhất"}
             </span>
           </div>
         )}
 
-        {/* Thông tin chính sách kiểm soát tác vụ */}
-        <div className="rounded-lg border p-3 bg-muted/20 space-y-2.5 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-foreground flex items-center gap-1.5">
-              <ShieldAlert className="size-3.5 text-warning" />
-              Chế độ Phê duyệt & Kiểm soát Hành động
-            </span>
-            <Badge
-              variant={form.human_approval_required ? "warning" : "outline"}
-              className="text-xs"
-            >
-              {form.human_approval_required ? "HITL Kích hoạt" : "Tự động"}
-            </Badge>
+        {/* 3. Human-in-the-Loop Approval Policy */}
+        <div className="rounded-lg border p-3.5 bg-muted/20 space-y-3 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="size-4 text-warning shrink-0" />
+              <div>
+                <p className="font-semibold text-foreground text-xs">
+                  Phê Duyệt Của Cán Bộ Trước Khi Hành Động (HITL)
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Bắt buộc cán bộ phụ trách xác nhận thủ công các tác vụ nhạy
+                  cảm.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge
+                variant={form.human_approval_required ? "warning" : "outline"}
+                className="text-xs"
+              >
+                {form.human_approval_required ? "Bật" : "Tắt"}
+              </Badge>
+              <Switch
+                checked={form.human_approval_required}
+                onCheckedChange={(checked) =>
+                  onChange({ ...form, human_approval_required: checked })
+                }
+                aria-label="Bật/Tắt chế độ phê duyệt của người"
+              />
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed pt-1 border-t border-border/50">
             {form.human_approval_required
-              ? "Mọi hành động nhạy cảm (xuất file văn bản NĐ 30, tạo đề thi, cập nhật dữ liệu) đều yêu cầu cán bộ phụ trách xác nhận thủ công trước khi thực thi."
-              : "Trợ lý thực thi các bước theo luồng tiêu chuẩn đã cấu hình trên đồ thị DAG."}
+              ? "Khi kích hoạt, mọi hành động tác động dữ liệu (như kết xuất văn bản hành chính Word NĐ 30, biên soạn ma trận đề thi) đều phải qua bước phê duyệt Human-in-the-loop."
+              : "Trợ lý sẽ tự động hoàn tất và kết xuất kết quả theo các bước đã cấu hình trên sơ đồ luồng suy luận."}
           </p>
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-0.5">
             <CheckCircle2 className="size-3.5 text-success shrink-0" />
             <span className="text-xs text-muted-foreground">
-              Tuân thủ chuẩn OpenAPI Schema Function Calling & Ghi vết kiểm toán
+              Tuân thủ chuẩn Function Calling OpenAPI Schema & Ghi vết kiểm toán
               (Audit Trail).
             </span>
           </div>

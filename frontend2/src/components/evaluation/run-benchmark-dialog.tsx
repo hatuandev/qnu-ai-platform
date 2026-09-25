@@ -124,17 +124,20 @@ export const RunBenchmarkDialog: React.FC<RunBenchmarkDialogProps> = ({
               {assistants.length === 0 ? (
                 <>
                   <option value="admissions">
-                    Trợ lý Tuyển sinh (admissions)
+                    Trợ lý ảo Tư vấn Tuyển sinh (admissions)
                   </option>
                   <option value="regulations">
-                    Trợ lý Quy chế học vụ (regulations)
+                    Trợ lý ảo Tư vấn Quy chế, Quy định (regulations)
                   </option>
-                  <option value="library">Trợ lý Thư viện (library)</option>
+                  <option value="library">
+                    Trợ lý ảo Tra cứu & Khai thác Tài nguyên Thư viện (library)
+                  </option>
                   <option value="drafting">
-                    Trợ lý Soạn thảo văn bản (drafting)
+                    Trợ lý ảo Hỗ trợ Soạn thảo Văn bản (drafting)
                   </option>
-                  <option value="exam_matrix">
-                    Trợ lý Đề thi & Ma trận Bloom (exam_matrix)
+                  <option value="question_bank">
+                    Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi
+                    (question_bank)
                   </option>
                 </>
               ) : (

@@ -105,7 +105,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 except Exception as exc:
                     logger.warning("Model provider credentials sync warning: %s", exc)
 
-        await asyncio.wait_for(_verify_db_schema(), timeout=2.5)
+        await asyncio.wait_for(_verify_db_schema(), timeout=10.0)
 
     except Exception as exc:
         if settings.ENVIRONMENT == "production":

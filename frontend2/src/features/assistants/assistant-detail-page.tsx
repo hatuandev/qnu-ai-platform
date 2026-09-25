@@ -25,7 +25,6 @@ import {
   cloneAssistant,
   deactivateAssistant,
   exportAssistantBundle,
-  forkAssistantWorkflow,
   generateAssistantSpec,
   getAssistant,
   getAssistantReadiness,
@@ -251,22 +250,6 @@ export function AssistantDetailPage({
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const forkWorkflowMutation = useMutation({
-    mutationFn: () => forkAssistantWorkflow(assistantId),
-    onSuccess: (res) => {
-      toast.success(
-        res.message ||
-          `Đã nhân bản workflow riêng: “${res.new_workflow_name}”!`,
-      );
-      if (form) {
-        setForm({ ...form, workflow_id: res.new_workflow_id });
-      }
-      queryClient.invalidateQueries({ queryKey: ["assistants", assistantId] });
-      queryClient.invalidateQueries({ queryKey: ["workflow-definitions"] });
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
   const exportMutation = useMutation({
     mutationFn: () => exportAssistantBundle(assistantId),
     onSuccess: (bundle) => {
@@ -444,11 +427,7 @@ export function AssistantDetailPage({
       {subView === "playground" ? (
         <AssistantPlaygroundTab assistant={item} />
       ) : subView === "workflow" ? (
-        <AssistantWorkflowTab
-          assistant={item}
-          onForkWorkflow={() => forkWorkflowMutation.mutate()}
-          isForking={forkWorkflowMutation.isPending}
-        />
+        <AssistantWorkflowTab assistant={item} />
       ) : subView === "models" ? (
         /* Tab 2: Models & Guardrails */
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -490,8 +469,6 @@ export function AssistantDetailPage({
               workflows={workflows}
               onNavigate={(path) => navigate({ to: path as never })}
               assistant={item}
-              onForkWorkflow={() => forkWorkflowMutation.mutate()}
-              isForkingWorkflow={forkWorkflowMutation.isPending}
             />
 
             <AssistantDangerZone

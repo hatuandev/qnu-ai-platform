@@ -1,7 +1,12 @@
 # QNU.AI Platform — Nền Tảng Điều Phối Trợ Lý AI Toàn Diện
 
 > **QNU.AI Platform** là nền tảng AI trung gian (AI Middleware & Workflow Platform) và bộ công cụ điều hành Trợ lý Số Thông minh phục vụ Chuyển đổi số Trường Đại học Quy Nhơn.
-> Dự án hợp nhất 05 lĩnh vực chuyên môn (Tuyển sinh, Quy chế - Quy định, Tài nguyên Thư viện, Soạn thảo văn bản và Ngân hàng câu hỏi chuẩn Bloom) trên một hạ tầng AI hiện đại, tinh gọn và đạt chuẩn Production.
+> Hệ thống thiết kế và vận hành 05 mô-đun trợ lý ảo chuyên trách theo thuyết minh đề tài:
+> 1. **Mô-đun trợ lý ảo tư vấn tuyển sinh** — Trợ lý AI: *Trợ lý ảo Tư vấn Tuyển sinh* (`admissions`) \| Kho tri thức: *Kho Tri Thức Đề Án Tuyển Sinh* (`col_admissions`)
+> 2. **Mô-đun trợ lý ảo tư vấn quy chế, quy định** — Trợ lý AI: *Trợ lý ảo Tư vấn Quy chế, Quy định* (`regulations`) \| Kho tri thức: *Kho Tri Thức Quy Chế & Quy Định Đào Tạo* (`col_regulations`)
+> 3. **Mô-đun trợ lý ảo hỗ trợ soạn thảo văn bản** — Trợ lý AI: *Trợ lý ảo Hỗ trợ Soạn thảo Văn bản* (`drafting`) \| Kho tri thức: *Kho Tri Thức Thể Thức & Biểu Mẫu Văn Bản* (`col_drafting`)
+> 4. **Mô-đun trợ lý ảo tra cứu, tư vấn khai thác tài nguyên thư viện** — Trợ lý AI: *Trợ lý ảo Tra cứu & Khai thác Tài nguyên Thư viện* (`library`) \| Kho tri thức: *Kho Tri Thức Tài Nguyên Thư Viện & Học Liệu Số* (`col_library`)
+> 5. **Mô-đun trợ lý ảo hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra** — Trợ lý AI: *Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi theo Chuẩn Đầu ra* (`question_bank`) \| Kho tri thức: *Kho Tri Thức Ngân Hàng Câu Hỏi & Chuẩn Đầu Ra* (`col_question_bank`)
 
 ---
 

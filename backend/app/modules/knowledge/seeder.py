@@ -138,7 +138,7 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     if not col:
         col = KnowledgeCollection(
             id=REGULATIONS_COLLECTION_ID,
-            name="Kho Tri Thức Quy Chế Học Vụ",
+            name="Kho Tri Thức Quy Chế & Quy Định Đào Tạo",
             module_code="regulations",
             description="Quy chế đào tạo đại học chính quy theo hệ thống tín chỉ, thang điểm và chuẩn đầu ra QNU.",
             tenant_id="tenant_qnu",
@@ -287,7 +287,7 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
     if not col:
         col = KnowledgeCollection(
             id=DECREE_30_COLLECTION_ID,
-            name="Kho Mẫu Văn Bản Chuẩn NĐ 30",
+            name="Kho Tri Thức Thể Thức & Biểu Mẫu Văn Bản",
             module_code="drafting",
             description="Mẫu văn bản hành chính, quyết định, tờ trình, quy cách căn lề theo NĐ 30/2020.",
             tenant_id="tenant_qnu",
@@ -583,7 +583,7 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
     if not col:
         col = KnowledgeCollection(
             id=LIBRARY_COLLECTION_ID,
-            name="Kho Tri Thức Cẩm Nang Thư Viện & Học Liệu Số",
+            name="Kho Tri Thức Tài Nguyên Thư Viện & Học Liệu Số",
             module_code="library",
             description="Quy chế mượn trả sách, tra cứu OPAC, cơ sở dữ liệu số (ScienceDirect, IEEE, Springer), phòng tự học 24/7 và dịch vụ kiểm tra đạo văn Turnitin QNU.",
             tenant_id="tenant_qnu",
@@ -732,7 +732,7 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
     if not col:
         col = KnowledgeCollection(
             id=QUESTION_BANK_COLLECTION_ID,
-            name="Kho Tri Thức Ngân Hàng Câu Hỏi & Đề Thi",
+            name="Kho Tri Thức Ngân Hàng Câu Hỏi & Chuẩn Đầu Ra",
             module_code="question_bank",
             description="Quy định xây dựng ngân hàng câu hỏi, ma trận đề thi theo thang đo Bloom, tiêu chuẩn MCQ và barem chấm điểm QNU.",
             tenant_id="tenant_qnu",

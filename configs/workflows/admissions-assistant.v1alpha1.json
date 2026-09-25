@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "admissions-assistant",
-    "display_name": "Trợ lý Tuyển sinh QNU",
+    "display_name": "Trợ lý ảo Tư vấn Tuyển sinh",
     "description": "Trợ lý thông minh giải đáp thông tin đề án tuyển sinh, chỉ tiêu, mã ngành, học phí và điểm chuẩn các năm.",
     "scope": {
       "tenant_id": "tenant_qnu",
@@ -85,7 +85,7 @@
               "match": {
                 "intent": "xin chào|hello|hi|chào|cm ơn|cảm ơn|tạm biệt|bye"
               },
-              "to": "greeting_output"
+              "to": "greeting_llm"
             }
           ],
           "default_node": "query_rewrite"
@@ -98,14 +98,32 @@
         }
       },
       {
+        "id": "greeting_llm",
+        "type": "llm.generate",
+        "version": "1.0.0",
+        "display_name": "AI Chào hỏi & Giao tiếp tự nhiên",
+        "config": {
+          "module_code": "admissions",
+          "system_prompt": "Bạn là Trợ lý ảo Tư vấn Tuyển sinh chính thức và thân thiện của Trường Đại học Quy Nhơn (QNU.AI).\nKhi người dùng gửi lời chào hỏi hoặc mở đầu cuộc trò chuyện (ví dụ: 'xin chào', 'hello', 'hi', 'chào bạn', 'chào em', 'chào thầy cô'...), hãy:\n1. Chào lại một cách tự nhiên, ấm áp, lịch sự và cởi mở như một cán bộ tư vấn tuyển sinh thật sự. Xưng 'mình' và gọi người dùng là 'bạn'.\n2. Giới thiệu ngắn gọn bạn là Trợ lý Tuyển sinh QNU, luôn sẵn sàng đồng hành cùng bạn.\n3. Chủ động gợi ý 2-3 chủ đề tiêu biểu bạn có thể hỗ trợ (như phương thức xét tuyển, điểm chuẩn trúng tuyển, thông tin ngành học, học phí, học bổng hoặc đời sống sinh viên tại QNU) và hỏi bạn ấy đang quan tâm đến nội dung nào.\n4. Giữ câu trả lời súc tích, tự nhiên trong khoảng 2-4 câu ngắn gọn, văn phong hội thoại ấm áp, tuyệt đối KHÔNG liệt kê danh mục dài dòng, không dùng từ ngữ cứng nhắc.",
+          "temperature": 0.7,
+          "max_tokens": 400,
+          "fallback_text": "Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh Trường Đại học Quy Nhơn (QNU.AI). Rất vui được hỗ trợ bạn! Bạn đang quan tâm đến ngành học hay phương thức xét tuyển nào tại QNU ạ?"
+        },
+        "policy": {
+          "timeout_seconds": 15,
+          "max_attempts": 2,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "greeting_output",
         "type": "output.chat",
         "version": "1.0.0",
-        "display_name": "Lời chào & Gợi ý câu hỏi",
+        "display_name": "Phản hồi lời chào",
         "config": {
           "include_citations": false,
-          "format": "markdown",
-          "output_template": "Chào bạn! Mình là Trợ lý Tuyển sinh Trường Đại học Quy Nhơn (QNU.AI). Mình rất vui được hỗ trợ bạn!\n\nBạn có thể hỏi mình nhanh về các chủ đề phổ biến dưới đây nhé:\n- **Phương thức & Đề án**: Các phương thức xét tuyển và điều kiện nộp hồ sơ mới nhất\n- **Điểm chuẩn & Chỉ tiêu**: Điểm chuẩn trúng tuyển và chỉ tiêu theo từng ngành\n- **Học phí & Học bổng**: Mức học phí theo tín chỉ và chính sách học bổng hỗ trợ sinh viên\n- **Ký túc xá & Cơ sở vật chất**: Môi trường học tập và hỗ trợ sinh viên tại QNU\n\nBạn đang quan tâm đến ngành học hoặc thông tin tuyển sinh nào, hãy nhắn cho mình nha!"
+          "format": "markdown"
         },
         "policy": {
           "timeout_seconds": 2,
@@ -222,6 +240,18 @@
         "id": "edge_route_to_greeting",
         "source": {
           "node_id": "condition_route",
+          "port": "response"
+        },
+        "target": {
+          "node_id": "greeting_llm",
+          "port": "message"
+        },
+        "priority": 100
+      },
+      {
+        "id": "edge_greeting_to_output",
+        "source": {
+          "node_id": "greeting_llm",
           "port": "response"
         },
         "target": {

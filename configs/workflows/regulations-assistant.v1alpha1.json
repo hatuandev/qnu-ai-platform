@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "regulations-assistant",
-    "display_name": "Trợ lý Quy chế QNU",
+    "display_name": "Trợ lý ảo Tư vấn Quy chế, Quy định",
     "description": "Vertical slice kiểm chứng RAG, citation và no-answer trên QNU.AI Core V2.",
     "scope": {
       "tenant_id": "tenant_qnu",

@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "library-assistant",
-    "display_name": "Trợ lý Thư viện & NCKH QNU",
+    "display_name": "Trợ lý ảo Tra cứu & Khai thác Tài nguyên Thư viện",
     "description": "Trợ lý tra cứu danh mục giáo trình, sách chuyên khảo, luận văn tốt nghiệp và đề tài nghiên cứu khoa học các khoa.",
     "scope": {
       "tenant_id": "tenant_qnu",

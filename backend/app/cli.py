@@ -90,10 +90,63 @@ async def check_db_schema() -> bool:
         return False
 
 
-def run_db_migrate() -> int:
-    """Run alembic upgrade head programmatically."""
-    logger.info("Running database migration to HEAD...")
+async def ensure_postgres_database_exists(database_url: str) -> None:
+    """Ensure the target PostgreSQL database exists.
+
+    If not found, connects to the default 'postgres' maintenance database and creates it.
+    """
+    from urllib.parse import urlparse, urlunparse
+
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    parsed = urlparse(database_url)
+    target_db = parsed.path.lstrip("/")
+    if not target_db or target_db in ("postgres", "template1"):
+        return
+
+    maintenance_url = urlunparse(parsed._replace(path="/postgres"))
+    logger.info("Checking PostgreSQL database '%s' existence via maintenance connection...", target_db)
+    engine_maint = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
     try:
+        async with engine_maint.connect() as conn:
+            res = await conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": target_db},
+            )
+            if not res.scalar_one_or_none():
+                logger.info("Database '%s' does not exist. Auto-creating database now...", target_db)
+                safe_name = target_db.replace('"', '""')
+                await conn.execute(text(f'CREATE DATABASE "{safe_name}"'))
+                logger.info("Database '%s' created successfully.", target_db)
+            else:
+                logger.info("Database '%s' already exists: OK.", target_db)
+    except Exception as exc:
+        logger.warning(
+            "Could not auto-create database '%s' (may already exist or insufficient permissions): %s",
+            target_db,
+            exc,
+        )
+    finally:
+        await engine_maint.dispose()
+
+
+def run_db_migrate() -> int:
+    """Ensure database exists and run alembic upgrade head programmatically."""
+    logger.info("Preparing database and running migrations to HEAD...")
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                pool.submit(asyncio.run, ensure_postgres_database_exists(settings.DATABASE_URL)).result()
+        else:
+            asyncio.run(ensure_postgres_database_exists(settings.DATABASE_URL))
+
         config = _get_alembic_config()
         command.upgrade(config, "head")
         logger.info("Database migration to HEAD completed successfully.")

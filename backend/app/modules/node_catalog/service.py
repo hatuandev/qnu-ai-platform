@@ -86,7 +86,9 @@ class NodeCatalogService:
     """Discover approved Core manifests without depending on a database seed."""
 
     def __init__(self, nodes_dir: Path | None = None) -> None:
-        self.nodes_dir = nodes_dir or Path(__file__).resolve().parents[4] / "configs" / "nodes"
+        from app.core.paths import get_configs_dir
+
+        self.nodes_dir = nodes_dir or (get_configs_dir() / "nodes")
 
     async def list_nodes(
         self,

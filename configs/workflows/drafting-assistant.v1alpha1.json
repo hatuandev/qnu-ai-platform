@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "drafting-assistant",
-    "display_name": "Trợ lý Soạn thảo QNU",
+    "display_name": "Trợ lý ảo Hỗ trợ Soạn thảo Văn bản",
     "description": "Vertical slice kiểm chứng clarification, retrieval mẫu NĐ30, approval và artifact trên cùng Workflow Runtime.",
     "scope": {
       "tenant_id": "tenant_qnu",

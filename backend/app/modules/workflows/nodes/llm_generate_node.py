@@ -26,9 +26,9 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
         config = node_spec.config or {}
         profile = context.assistant_profile
         system_prompt = (
-            profile.system_prompt
-            if profile
-            else config.get("system_prompt")
+            config.get("system_prompt")
+            or config.get("instruction")
+            or (profile.system_prompt if profile else None)
             or "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn."
         )
         user_message = (
@@ -78,17 +78,24 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
         if context.db:
             try:
                 resp = await modelops_service.generate(context.db, gen_req)
+                content = resp.content
+                provider = resp.provider
+                tokens = resp.total_tokens
             except Exception as exc:
-                logger.warning("LLM node '%s' generation failed: %s", node_spec.id, exc)
-                raise AppException(
-                    f"Node LLM '{node_spec.id}' không thể sinh nội dung: {exc}",
-                    code="llm_generation_failed",
-                    status_code=502,
-                    details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
-                ) from exc
-            content = resp.content
-            provider = resp.provider
-            tokens = resp.total_tokens
+                fallback_text = config.get("fallback_text")
+                if fallback_text:
+                    logger.warning("LLM node '%s' generation failed: %s, using fallback_text", node_spec.id, exc)
+                    content = fallback_text
+                    provider = "fallback"
+                    tokens = 0
+                else:
+                    logger.warning("LLM node '%s' generation failed: %s", node_spec.id, exc)
+                    raise AppException(
+                        f"Node LLM '{node_spec.id}' không thể sinh nội dung: {exc}",
+                        code="llm_generation_failed",
+                        status_code=502,
+                        details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
+                    ) from exc
         else:
             content = f"Văn bản sinh ra từ trợ lý QNU: '{user_message[:100]}'."
             provider = "openai"

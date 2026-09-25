@@ -1,0 +1,113 @@
+# ==============================================================================
+# QNU.AI Platform — Dokploy Production Compose Stack
+# Dành riêng cho triển khai trên Dokploy khi hạ tầng (Postgres, Redis, Qdrant, MinIO,
+# Gotenberg) đã được cài đặt sẵn trên máy chủ.
+#
+# Cụm dịch vụ bao gồm:
+#   1. backend  : FastAPI Core API + Tự động Migration & Auto-seed dữ liệu
+#   2. worker   : ARQ Async Worker (Bóc tách văn bản, OCR, Re-indexing)
+#   3. frontend : React 19 + Vite phục vụ qua Nginx Alpine (cổng 80)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Backend Core API (FastAPI)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qnu_backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=8001
+      - WORKERS=${BACKEND_WORKERS:-4}
+      - AUTO_SEED=${AUTO_SEED:-true}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-qnu_knowledge_chunks}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-s3}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-qnu-ai-documents}
+      - S3_SECURE=${S3_SECURE:-false}
+      - GOTENBERG_URL=${GOTENBERG_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL:-gpt-4o-mini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME:-gemini-2.5-flash-lite}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY:-}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - SECRET_KEY=${SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+      - DEV_AUTH_ENABLED=${DEV_AUTH_ENABLED:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
+    volumes:
+      - ./configs:/app/configs:ro
+      - qnu_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. Asynchronous Background Task Worker (ARQ + Redis)
+  # ----------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qnu_worker
+    restart: unless-stopped
+    command: ["arq", "app.workers.arq_worker.WorkerSettings"]
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - AUTO_SEED=false
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-s3}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-qnu-ai-documents}
+      - GOTENBERG_URL=${GOTENBERG_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+    volumes:
+      - ./configs:/app/configs:ro
+      - qnu_storage:/app/storage
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 3. Frontend Web Application (React 19 + Vite + Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend2
+      dockerfile: Dockerfile
+    container_name: qnu_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  qnu_storage:
+    name: qnu_platform_storage

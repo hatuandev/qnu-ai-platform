@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "question-bank-assistant",
-    "display_name": "Trợ lý Ngân hàng Câu hỏi & Đề thi QNU",
+    "display_name": "Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi theo Chuẩn Đầu ra",
     "description": "Trợ lý tra cứu quy định ngân hàng câu hỏi, ma trận đề thi theo thang đo Bloom và kiểm định câu hỏi thi theo chuẩn đầu ra CLO/PLO.",
     "scope": {
       "tenant_id": "tenant_qnu",

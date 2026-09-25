@@ -55,8 +55,10 @@ class WorkflowService:
     """Service for managing declarative DAG workflows and executing them."""
 
     def __init__(self) -> None:
+        from app.core.paths import get_configs_dir
+
         # Base directory for workflow template JSON files
-        self.workflows_dir = Path(__file__).resolve().parents[4] / "configs" / "workflows"
+        self.workflows_dir = get_configs_dir() / "workflows"
 
     @staticmethod
     def _read_json_file(file_path: Path) -> dict:

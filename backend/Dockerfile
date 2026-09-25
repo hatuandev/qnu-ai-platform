@@ -43,15 +43,17 @@ COPY pyproject.toml uv.lock* ./
 
 # 5. Install dependencies into system environment or .venv
 RUN uv venv /app/.venv \
- && uv pip sync --python /app/.venv/bin/python pyproject.toml || uv pip install -r pyproject.toml
+ && (uv pip install -e . --python /app/.venv/bin/python || uv pip install . --python /app/.venv/bin/python)
 
-# 6. Copy application source code and configurations
+# 6. Copy application source code, migrations, and entrypoint
 COPY app/ ./app
 COPY alembic/ ./alembic
 COPY alembic.ini ./alembic.ini
+COPY entrypoint.sh ./entrypoint.sh
 
 # 7. Create storage directories for uploads/artifacts and set non-root ownership
-RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups \
+RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups /app/configs \
+ && chmod +x /app/entrypoint.sh \
  && chown -R qnu:qnu /app
 
 # 8. Switch to non-root user
@@ -61,8 +63,11 @@ USER qnu
 EXPOSE 8001
 
 # Container Healthcheck Probe
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8001/health/live || exit 1
+
+# Entrypoint automatically checks DB, runs migrations & seeds initial data
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command: Launch production Uvicorn server with 4 asynchronous workers
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]

@@ -2,17 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   AlertTriangle,
-  GitFork,
   History,
   Layers,
-  Lock,
   Network,
   Play,
   Plus,
   RefreshCw,
   Rocket,
   Save,
-  Share2,
   ShieldCheck,
   Sliders,
   X,
@@ -53,15 +50,9 @@ import type { AssistantItem } from "@/types/assistants";
 
 interface AssistantWorkflowTabProps {
   assistant: AssistantItem;
-  onForkWorkflow: () => void;
-  isForking: boolean;
 }
 
-export function AssistantWorkflowTab({
-  assistant,
-  onForkWorkflow,
-  isForking,
-}: AssistantWorkflowTabProps) {
+export function AssistantWorkflowTab({ assistant }: AssistantWorkflowTabProps) {
   const queryClient = useQueryClient();
   const workflowId = assistant.workflow_id;
 
@@ -322,8 +313,6 @@ export function AssistantWorkflowTab({
     );
   }
 
-  const isPrivate = assistant.workflow_ownership === "private";
-
   return (
     <Card className="border-border/80 shadow-xs flex flex-col overflow-hidden relative">
       {/* 1. Studio Header Toolbar */}
@@ -336,35 +325,8 @@ export function AssistantWorkflowTab({
             </div>
 
             <CardTitle className="text-xs sm:text-sm font-bold text-foreground">
-              Quy Trình DAG Trợ Lý
+              Sơ Đồ Luồng Suy Luận
             </CardTitle>
-
-            <span className="text-muted-foreground/60 hidden sm:inline">•</span>
-
-            <code className="text-[11px] font-mono font-medium text-foreground bg-muted px-1.5 py-0.5 rounded">
-              {workflowId}
-            </code>
-
-            <Badge
-              variant="outline"
-              className={
-                isPrivate
-                  ? "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5 text-[10px] gap-1 px-1.5 py-0.5"
-                  : "border-primary/30 text-primary bg-primary/5 text-[10px] gap-1 px-1.5 py-0.5"
-              }
-            >
-              {isPrivate ? (
-                <>
-                  <Lock className="size-2.5" />
-                  Riêng trợ lý
-                </>
-              ) : (
-                <>
-                  <Share2 className="size-2.5" />
-                  Dùng chung
-                </>
-              )}
-            </Badge>
 
             {draft && (
               <Badge
@@ -398,21 +360,6 @@ export function AssistantWorkflowTab({
 
           {/* Right: Studio Actions Toolbar */}
           <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-            {/* Fork Workflow (if shared) */}
-            {!isPrivate && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-medium"
-                onClick={onForkWorkflow}
-                disabled={isForking}
-                title="Tách thành luồng riêng độc lập để tùy biến cho riêng trợ lý này"
-              >
-                <GitFork className="size-3" />
-                <span className="hidden sm:inline">Tách riêng</span>
-              </Button>
-            )}
-
             {/* Layout Orientation Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>

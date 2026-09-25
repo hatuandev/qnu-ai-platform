@@ -113,26 +113,7 @@ export function AssistantHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action 1: Direct Full-Screen DAG Studio Link */}
-          {targetWorkflowId && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() =>
-                onNavigate(
-                  `/assistants/${encodeURIComponent(assistantCode)}/workflow`,
-                )
-              }
-              title="Mở đồ thị điều phối DAG trong màn hình Studio riêng biệt"
-            >
-              <Network className="size-3.5" />
-              <span>Sơ đồ DAG Studio</span>
-            </Button>
-          )}
-
-          {/* Action 2: Primary Chat Test */}
+          {/* Action 1: Primary Chat Test */}
           <Button
             type="button"
             variant="outline"
@@ -148,7 +129,7 @@ export function AssistantHeader({
             <span>Thử chat</span>
           </Button>
 
-          {/* Action 3: Save Changes (Shown on all config tabs) */}
+          {/* Action 2: Save Changes (Shown on all config tabs) */}
           {["overview", "models", "tools"].includes(subView) && onSave && (
             <Button
               disabled={isSaving}
@@ -162,7 +143,7 @@ export function AssistantHeader({
             </Button>
           )}
 
-          {/* Action 4: More Actions Dropdown Menu */}
+          {/* Action 3: More Actions Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -186,7 +167,7 @@ export function AssistantHeader({
                   }
                 >
                   <Network className="size-3.5 mr-2 text-primary" />
-                  <span>Mở đồ thị DAG Studio</span>
+                  <span>Xem sơ đồ luồng DAG</span>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onOpenClone}>
