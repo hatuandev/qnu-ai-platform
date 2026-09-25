@@ -140,7 +140,10 @@ async function requestWorkflow<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${WORKFLOWS_API_BASE_URL}${path}`, init);
+    response = await fetch(`${WORKFLOWS_API_BASE_URL}${path}`, {
+      credentials: "include",
+      ...init,
+    });
   } catch {
     throw new Error(
       "Không kết nối được Backend Workflow. Hãy kiểm tra dịch vụ đang chạy.",

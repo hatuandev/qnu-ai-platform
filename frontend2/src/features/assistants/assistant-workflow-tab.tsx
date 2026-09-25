@@ -100,6 +100,8 @@ export function AssistantWorkflowTab({
   });
 
   // 3. Sync draft spec into working copy
+  const activeDagSpec = workingDagSpec || draft?.dag_spec || null;
+
   useEffect(() => {
     if (draft?.dag_spec && !isDirty) {
       setWorkingDagSpec(draft.dag_spec);
@@ -108,13 +110,13 @@ export function AssistantWorkflowTab({
 
   // 4. Convert DAG Spec to ReactFlow format
   const { nodes, edges } = useMemo(() => {
-    if (!workingDagSpec) return { nodes: [], edges: [] };
+    if (!activeDagSpec) return { nodes: [], edges: [] };
     return convertDagSpecToReactFlow(
-      workingDagSpec,
+      activeDagSpec,
       executionStates,
       direction,
     );
-  }, [workingDagSpec, executionStates, direction]);
+  }, [activeDagSpec, executionStates, direction]);
 
   // 5. Save Draft Mutation
   const saveMutation = useMutation({
@@ -543,7 +545,7 @@ export function AssistantWorkflowTab({
 
       {/* 2. Interactive Studio Canvas Area */}
       <CardContent className="p-0 relative flex-1 min-h-[640px] h-[680px] w-full overflow-hidden bg-background">
-        {isLoading ? (
+        {isLoading || (!activeDagSpec && !draft) ? (
           <div className="flex flex-col items-center justify-center h-full w-full gap-3 text-muted-foreground min-h-[640px]">
             <RefreshCw className="size-6 animate-spin text-primary" />
             <p className="text-xs font-medium">
@@ -552,6 +554,7 @@ export function AssistantWorkflowTab({
           </div>
         ) : (
           <DAGCanvas
+            key={`${workflowId}-${direction}-${activeDagSpec?.nodes?.length || 0}`}
             initialNodes={nodes}
             initialEdges={edges}
             executionStates={executionStates}
