@@ -47,12 +47,12 @@ COPY pyproject.toml uv.lock* ./
 
 # 5. Install third-party dependencies into .venv
 # Pre-install official CPU-only PyTorch (~180MB) instead of multi-gigabyte CUDA binaries (>5GB)
-# Then install remaining dependencies targeting CPU PyTorch
+# Then install remaining dependencies from standard PyPI with unsafe-best-match strategy
 RUN uv venv /app/.venv \
  && uv pip install --no-cache --find-links https://download.pytorch.org/whl/cpu torch torchvision \
- && (uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python || \
-     (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python) || \
-     (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install --no-cache --extra-index-url https://download.pytorch.org/whl/cpu -r pyproject.toml --python /app/.venv/bin/python))
+ && (uv pip install --no-cache --index-strategy unsafe-best-match -r pyproject.toml --python /app/.venv/bin/python || \
+     (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install --no-cache --index-strategy unsafe-best-match -r pyproject.toml --python /app/.venv/bin/python) || \
+     (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install --no-cache --index-strategy unsafe-best-match -r pyproject.toml --python /app/.venv/bin/python))
 
 # 6. Copy application source code, migrations, and entrypoint
 COPY app/ ./app
