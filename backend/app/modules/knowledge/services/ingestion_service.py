@@ -1314,9 +1314,10 @@ class IngestionService:
 
         from app.core.config import get_settings
 
-        gotenberg_url = get_settings().GOTENBERG_URL.rstrip("/")
+        app_settings = get_settings()
+        gotenberg_url = app_settings.clean_gotenberg_url
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=120.0, auth=app_settings.gotenberg_auth) as client:
                 response = await client.post(
                     f"{gotenberg_url}/forms/libreoffice/convert",
                     files={"files": (file_name, file_bytes)},

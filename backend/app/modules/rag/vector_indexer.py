@@ -101,7 +101,7 @@ class VectorIndexer:
 
     def __init__(self, qdrant_url: str | None = None):
         self.url = qdrant_url or settings.QDRANT_URL
-        self.client = AsyncQdrantClient(url=self.url, api_key=settings.QDRANT_API_KEY)
+        self.client = AsyncQdrantClient(url=self.url, api_key=settings.QDRANT_API_KEY or None)
         self.vector_size = settings.VECTOR_SIZE
 
     def _get_collection_name(self, collection_id: str) -> str:

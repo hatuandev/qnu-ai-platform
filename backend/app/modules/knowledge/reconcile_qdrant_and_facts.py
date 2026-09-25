@@ -31,7 +31,7 @@ settings = get_settings()
 
 async def reconcile_qdrant_collections(db: AsyncSession) -> dict[str, Any]:
     """Migrate legacy points, verify parity, and remove legacy Qdrant collection."""
-    client = AsyncQdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+    client = AsyncQdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY or None)
     cols_res = await client.get_collections()
     col_names = [c.name for c in cols_res.collections]
     logger.info("Existing Qdrant collections: %s", col_names)

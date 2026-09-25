@@ -87,12 +87,12 @@ async def convert_docx_to_pdf_gotenberg(docx_bytes: bytes, filename: str) -> byt
 
     Gracefully returns None if Gotenberg is unreachable or fails, allowing fallback.
     """
-    gotenberg_url = settings.GOTENBERG_URL.rstrip("/")
+    gotenberg_url = settings.clean_gotenberg_url
     target_url = f"{gotenberg_url}/forms/libreoffice/convert"
     docx_name = filename if filename.endswith(".docx") else f"{filename}.docx"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0, auth=settings.gotenberg_auth) as client:
             response = await client.post(
                 target_url,
                 files={"files": (docx_name, docx_bytes)},

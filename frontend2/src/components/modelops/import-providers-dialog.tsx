@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "../../components/ui/radio-group";
 import { apiClient } from "../../services/api-client";
 import type {
   ConflictStrategy,
@@ -364,23 +365,23 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
                 <span className="text-xs font-semibold text-foreground block">
                   Chiến Lược Xử Lý Khi Trùng Lặp:
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <RadioGroup
+                  value={conflictStrategy}
+                  onValueChange={(val) => setConflictStrategy(val as ConflictStrategy)}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-2"
+                >
                   <label
                     htmlFor="strategy-overwrite"
-                    className={`flex items-start gap-2 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
+                    className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
                       conflictStrategy === "overwrite"
                         ? "border-primary bg-primary/5 text-foreground"
                         : "border-border text-muted-foreground hover:bg-muted/30"
                     }`}
                   >
-                    <input
+                    <RadioGroupItem
                       id="strategy-overwrite"
-                      type="radio"
-                      name="conflict-strategy"
                       value="overwrite"
-                      checked={conflictStrategy === "overwrite"}
-                      onChange={() => setConflictStrategy("overwrite")}
-                      className="mt-0.5"
+                      className="mt-0.5 shrink-0"
                     />
                     <div>
                       <strong className="block font-medium text-foreground">
@@ -394,20 +395,16 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
 
                   <label
                     htmlFor="strategy-skip"
-                    className={`flex items-start gap-2 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
+                    className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
                       conflictStrategy === "skip"
                         ? "border-primary bg-primary/5 text-foreground"
                         : "border-border text-muted-foreground hover:bg-muted/30"
                     }`}
                   >
-                    <input
+                    <RadioGroupItem
                       id="strategy-skip"
-                      type="radio"
-                      name="conflict-strategy"
                       value="skip"
-                      checked={conflictStrategy === "skip"}
-                      onChange={() => setConflictStrategy("skip")}
-                      className="mt-0.5"
+                      className="mt-0.5 shrink-0"
                     />
                     <div>
                       <strong className="block font-medium text-foreground">
@@ -421,20 +418,16 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
 
                   <label
                     htmlFor="strategy-create-new"
-                    className={`flex items-start gap-2 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
+                    className={`flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer text-xs transition-colors ${
                       conflictStrategy === "create_new"
                         ? "border-primary bg-primary/5 text-foreground"
                         : "border-border text-muted-foreground hover:bg-muted/30"
                     }`}
                   >
-                    <input
+                    <RadioGroupItem
                       id="strategy-create-new"
-                      type="radio"
-                      name="conflict-strategy"
                       value="create_new"
-                      checked={conflictStrategy === "create_new"}
-                      onChange={() => setConflictStrategy("create_new")}
-                      className="mt-0.5"
+                      className="mt-0.5 shrink-0"
                     />
                     <div>
                       <strong className="block font-medium text-foreground">
@@ -445,7 +438,7 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
                       </span>
                     </div>
                   </label>
-                </div>
+                </RadioGroup>
               </div>
             </div>
           )}
@@ -471,7 +464,7 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
               ) : (
                 <UploadCloud className="h-3.5 w-3.5" />
               )}
-              <span>{isImporting ? "Đang nạp..." : "Nhập Cấu Hình"}</span>
+              <span>{isImporting ? "Đang nạp..." : "Nhập JSON"}</span>
             </Button>
           </div>
         </div>

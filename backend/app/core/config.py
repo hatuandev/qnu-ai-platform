@@ -6,7 +6,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,13 +44,78 @@ class Settings(BaseSettings):
             return v
         return ["*"]
 
+    @field_validator(
+        "QDRANT_API_KEY",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "MISTRAL_API_KEY",
+        "CLOUDFLARE_API_KEY",
+        "CLOUDFLARE_API_TOKEN",
+        "GOTENBERG_USERNAME",
+        "GOTENBERG_PASSWORD",
+        mode="before",
+    )
+    @classmethod
+    def empty_str_to_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     # --- PostgreSQL 16 ---
-    DATABASE_URL: str = "postgresql+asyncpg://qnu:qnu_password_secure_2026@localhost:5432/qnu_ai_platform"
+    DATABASE_URL: str = Field(
+        default="postgresql+asyncpg://qnu:qnu_password_secure_2026@localhost:5432/qnu_ai_platform",
+        validation_alias=AliasChoices("DATABASE_URL", "CONNECTION_STRING", "POSTGRES_URL"),
+    )
     DB_POOL_SIZE: int = 15
     DB_MAX_OVERFLOW: int = 10
     DB_TIMEOUT_SECONDS: float = 30.0
     DEV_AUTO_MIGRATE: bool = False
     DEV_AUTO_SEED: bool = False
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def parse_database_url(cls, v: Any) -> Any:
+        if not isinstance(v, str):
+            return v
+        v = v.strip()
+        if not v:
+            return v
+
+        # Tự động chuyển đổi nếu là chuỗi kết nối dạng ADO.NET / Npgsql (Host=...;Port=...;Database=...;Username=...;Password=...)
+        if "=" in v and (";" in v or "host=" in v.lower() or "server=" in v.lower()):
+            import urllib.parse
+
+            parts: dict[str, str] = {}
+            for token in v.split(";"):
+                token = token.strip()
+                if not token or "=" not in token:
+                    continue
+                k, val = token.split("=", 1)
+                parts[k.strip().lower()] = val.strip()
+
+            host = parts.get("host") or parts.get("server") or "localhost"
+            port = parts.get("port") or "5432"
+            database = parts.get("database") or parts.get("initial catalog") or "qnu_ai_platform"
+            username = parts.get("username") or parts.get("user id") or parts.get("user") or "admin"
+            password = parts.get("password") or parts.get("pwd") or ""
+
+            enc_user = urllib.parse.quote_plus(username)
+            enc_pass = urllib.parse.quote_plus(password)
+
+            ssl_mode = parts.get("ssl mode", "").lower()
+            ssl_query = ""
+            if ssl_mode in ("require", "verify-ca", "verify-full"):
+                ssl_query = f"?ssl={ssl_mode}"
+
+            return f"postgresql+asyncpg://{enc_user}:{enc_pass}@{host}:{port}/{database}{ssl_query}"
+
+        # Đảm bảo dùng asyncpg driver cho SQLAlchemy async
+        if v.startswith("postgres://"):
+            return "postgresql+asyncpg://" + v[len("postgres://"):]
+        if v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            return "postgresql+asyncpg://" + v[len("postgresql://"):]
+
+        return v
 
     # --- Qdrant Vector DB ---
     QDRANT_URL: str = "http://localhost:6333"
@@ -65,16 +130,69 @@ class Settings(BaseSettings):
     STORAGE_DRIVER: str = "s3"  # 's3' (MinIO S3 Object Storage) hoặc 'local'
     LOCAL_STORAGE_PATH: str = "./storage"
 
-    # S3 / MinIO Settings
-    S3_ENDPOINT: str = "http://localhost:9000"
-    S3_ACCESS_KEY: str = "qnu_minio_admin"
-    S3_SECRET_KEY: str = "qnu_minio_secret_2026"
-    S3_BUCKET: str = "qnu-ai-documents"
-    S3_SECURE: bool = False
+    # S3 / MinIO Settings (Hỗ trợ cả chuẩn S3_* và chuẩn Dokploy MINIO_* / FILE_STORAGE_*)
+    S3_ENDPOINT: str = Field(
+        default="http://localhost:9000",
+        validation_alias=AliasChoices("S3_ENDPOINT", "FILE_STORAGE_ENDPOINT", "MINIO_ENDPOINT"),
+    )
+    S3_ACCESS_KEY: str = Field(
+        default="qnu_minio_admin",
+        validation_alias=AliasChoices(
+            "S3_ACCESS_KEY", "MINIO_ROOT_USER", "FILE_STORAGE_ACCESS_KEY", "MINIO_ACCESS_KEY"
+        ),
+    )
+    S3_SECRET_KEY: str = Field(
+        default="qnu_minio_secret_2026",
+        validation_alias=AliasChoices(
+            "S3_SECRET_KEY", "MINIO_ROOT_PASSWORD", "FILE_STORAGE_SECRET_KEY", "MINIO_SECRET_KEY"
+        ),
+    )
+    S3_BUCKET: str = Field(
+        default="qnu-ai-documents",
+        validation_alias=AliasChoices("S3_BUCKET", "FILE_STORAGE_BUCKET", "MINIO_BUCKET"),
+    )
+    S3_SECURE: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("S3_SECURE", "FILE_STORAGE_USE_SSL", "MINIO_USE_SSL"),
+    )
     S3_REGION: str = "us-east-1"
 
     # --- Gotenberg PDF Converter ---
-    GOTENBERG_URL: str = "http://localhost:3005"
+    GOTENBERG_URL: str = Field(
+        default="http://localhost:3005",
+        validation_alias=AliasChoices("GOTENBERG_URL", "GOTENBERG_BASE_URL", "GOTENBERG_BASEURL"),
+    )
+    GOTENBERG_USERNAME: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GOTENBERG_USERNAME", "GOTENBERG_USER"),
+    )
+    GOTENBERG_PASSWORD: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GOTENBERG_PASSWORD", "GOTENBERG_PASS"),
+    )
+
+    @property
+    def gotenberg_auth(self) -> tuple[str, str] | None:
+        """Returns Basic Auth tuple for Gotenberg if credentials are provided."""
+        if self.GOTENBERG_USERNAME and self.GOTENBERG_PASSWORD:
+            return (self.GOTENBERG_USERNAME, self.GOTENBERG_PASSWORD)
+        if "@" in self.GOTENBERG_URL:
+            import urllib.parse
+            parsed = urllib.parse.urlsplit(self.GOTENBERG_URL)
+            if parsed.username and parsed.password:
+                return (parsed.username, parsed.password)
+        return None
+
+    @property
+    def clean_gotenberg_url(self) -> str:
+        """Returns clean Gotenberg base URL stripped of any embedded auth or trailing slash."""
+        url = self.GOTENBERG_URL.rstrip("/")
+        if "@" in url:
+            import urllib.parse
+            parsed = urllib.parse.urlsplit(url)
+            port_part = f":{parsed.port}" if parsed.port else ""
+            return f"{parsed.scheme}://{parsed.hostname}{port_part}"
+        return url
 
     # --- Embedding & Reranker ---
     EMBEDDING_PROVIDER: str = "cloudflare"  # 'cloudflare' or 'sentence_transformers'
@@ -126,6 +244,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_security(self) -> Settings:
         """Enforce strict fail-fast validation on secrets in production environment."""
+        # Tự động kích hoạt SSL nếu endpoint là HTTPS
+        if self.S3_ENDPOINT and self.S3_ENDPOINT.lower().startswith("https://"):
+            self.S3_SECURE = True
+
         if self.ENVIRONMENT.lower() in ("production", "prod"):
             insecure_defaults = [
                 ("SECRET_KEY", self.SECRET_KEY, "change-in-production"),

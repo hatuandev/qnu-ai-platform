@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -1911,10 +1911,15 @@ class ProviderService:
                 errors.append(f"Bản ghi thiếu 'name' hoặc 'provider_type': {p_data}")
                 continue
 
-            # Check existing provider
-            stmt = select(ModelProviderConfig).where(
-                (ModelProviderConfig.name == name) | (ModelProviderConfig.provider_type == p_type)
-            )
+            # Check existing provider by ID, name, or specific cloud provider type
+            p_id = p_data.get("id")
+            conditions = [ModelProviderConfig.name == name]
+            if p_id:
+                conditions.append(ModelProviderConfig.id == p_id)
+            if p_type not in ("custom", "local_vllm", "generic_openai", "other"):
+                conditions.append(ModelProviderConfig.provider_type == p_type)
+
+            stmt = select(ModelProviderConfig).where(or_(*conditions))
             res = await db.execute(stmt)
             existing = res.scalars().first()
 
@@ -1950,7 +1955,21 @@ class ProviderService:
 
                 for ink in incoming_keys:
                     k_sec = ink.get("api_key")
-                    if k_sec and not any(k.get("name") == ink.get("name") for k in current_keys):
+                    if not k_sec:
+                        continue
+                    existing_key = next((k for k in current_keys if k.get("name") == ink.get("name")), None)
+                    if existing_key:
+                        existing_key["api_key"] = encrypt_secret(k_sec.strip())
+                        existing_key["api_key_masked"] = mask_api_key(k_sec)
+                        if ink.get("account_id") or account_id:
+                            existing_key["account_id"] = ink.get("account_id") or account_id
+                        if ink.get("priority") is not None:
+                            existing_key["priority"] = ink.get("priority")
+                        if ink.get("is_active") is not None:
+                            existing_key["is_active"] = ink.get("is_active")
+                        if ink.get("quota_limit") is not None:
+                            existing_key["quota_limit"] = ink.get("quota_limit")
+                    else:
                         enc = encrypt_secret(k_sec.strip())
                         current_keys.append(
                             {
