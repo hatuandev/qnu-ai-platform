@@ -1,18 +1,19 @@
 # ==============================================================================
-# QNU.AI Platform — Local Infrastructure Stack (Docker Compose)
-# Dành cho môi trường phát triển cục bộ: Postgres, Qdrant, Redis, MinIO, Gotenberg
+# QNU.AI Platform — Unified Docker Compose Stack
+# Tương thích 100% cả Dokploy Production lẫn Môi trường Phát triển Cục bộ (Local Dev)
 #
-# Khởi chạy toàn bộ cụm hạ tầng nền:
-#   docker compose up -d
+# 1. Triển khai trên Dokploy (Hạ tầng đã có sẵn):
+#    docker compose up -d
+#    -> Chỉ khởi chạy 3 dịch vụ ứng dụng: backend, worker, frontend.
+#    -> Tự động kết nối tới PostgreSQL, Redis, Qdrant, MinIO, Gotenberg đã có.
+#    -> Tự động tạo CSDL (nếu chưa có), migrate 29 bảng và seed 5 Trợ lý AI.
 #
-# Kiểm tra trạng thái các container:
-#   docker compose ps
+# 2. Khởi chạy cụm hạ tầng CSDL khi dev cục bộ:
+#    docker compose --profile infra up -d
+#    -> Khởi chạy: postgres, redis, qdrant, minio, gotenberg.
 #
-# Tắt cụm hạ tầng (giữ nguyên dữ liệu volume):
-#   docker compose down
-#
-# Xóa sạch dữ liệu volumes:
-#   docker compose down -v
+# 3. Khởi chạy toàn bộ trọn gói (cả hạ tầng lẫn ứng dụng):
+#    docker compose --profile full up -d
 # ==============================================================================
 
 networks:
@@ -21,13 +22,132 @@ networks:
     driver: bridge
 
 services:
+  # ============================================================================
+  # NHÓM 1: CÁC DỊCH VỤ ỨNG DỤNG CỐT LÕI (Mặc định chạy trên Production / Dokploy)
+  # ============================================================================
+
   # ----------------------------------------------------------------------------
-  # 1. PostgreSQL 16 — Relational Database, Knowledge Facts & Vietnamese FTS
+  # 1. Backend Core API (FastAPI) — Tự động Migration & Auto-seed dữ liệu
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qnu_backend
+    restart: unless-stopped
+    networks:
+      - qnu_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=8001
+      - WORKERS=${BACKEND_WORKERS:-4}
+      - AUTO_SEED=${AUTO_SEED:-true}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-qnu}:${POSTGRES_PASSWORD:-qnu_password_secure_2026}@postgres:5432/${POSTGRES_DB:-qnu_ai_platform}}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-qnu_knowledge_chunks}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-s3}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-qnu_minio_admin}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-qnu_minio_secret_2026}
+      - S3_BUCKET=${S3_BUCKET:-qnu-ai-documents}
+      - S3_SECURE=${S3_SECURE:-false}
+      - GOTENBERG_URL=${GOTENBERG_URL:-http://gotenberg:3000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - DEFAULT_LLM_MODEL=${DEFAULT_LLM_MODEL:-gpt-4o-mini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME:-gemini-2.5-flash-lite}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY:-}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:-}
+      - SECRET_KEY=${SECRET_KEY:-8f4a1c6e9d2b7f3a5e8c1b4d7f0a3c6e9b2d5f8a1c4e7b0d3f6a9c2e5b8d1f4a}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-qnu_internal_secure_token_prod_2026}
+      - DEV_AUTH_ENABLED=${DEV_AUTH_ENABLED:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-["*"]}
+    volumes:
+      - ./configs:/app/configs:ro
+      - qnu_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. Async Background Task Worker (ARQ + Redis) — Bóc tách, OCR, Reindex
+  # ----------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: qnu_worker
+    restart: unless-stopped
+    command: ["arq", "app.workers.arq_worker.WorkerSettings"]
+    networks:
+      - qnu_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - AUTO_SEED=false
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-qnu}:${POSTGRES_PASSWORD:-qnu_password_secure_2026}@postgres:5432/${POSTGRES_DB:-qnu_ai_platform}}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-s3}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-qnu_minio_admin}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-qnu_minio_secret_2026}
+      - S3_BUCKET=${S3_BUCKET:-qnu-ai-documents}
+      - GOTENBERG_URL=${GOTENBERG_URL:-http://gotenberg:3000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-8f4a1c6e9d2b7f3a5e8c1b4d7f0a3c6e9b2d5f8a1c4e7b0d3f6a9c2e5b8d1f4a}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-qnu_internal_secure_token_prod_2026}
+    volumes:
+      - ./configs:/app/configs:ro
+      - qnu_storage:/app/storage
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ----------------------------------------------------------------------------
+  # 3. Frontend Web Application (React 19 + Vite + Nginx)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend2
+      dockerfile: Dockerfile
+    container_name: qnu_frontend
+    restart: unless-stopped
+    networks:
+      - qnu_network
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ============================================================================
+  # NHÓM 2: DỊCH VỤ HẠ TẦNG (Chỉ bật khi cần giả lập CSDL nội bộ / dev local)
+  # Kích hoạt bằng cờ: docker compose --profile infra up -d
+  # Trên Dokploy đã có sẵn cụm này nên Dokploy sẽ tự động bỏ qua nhóm này!
+  # ============================================================================
+
+  # ----------------------------------------------------------------------------
+  # 4. PostgreSQL 16 (Quan hệ, Facts & FTS tiếng Việt)
   # ----------------------------------------------------------------------------
   postgres:
     image: postgres:16
     container_name: qnu_postgres
     restart: unless-stopped
+    profiles: ["infra", "full"]
     networks:
       - qnu_network
     environment:
@@ -45,12 +165,13 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 2. Qdrant — High-Performance Vector Database (BGE-M3 1024-dim Embeddings)
+  # 5. Qdrant — High-Performance Vector Database (1024-dim)
   # ----------------------------------------------------------------------------
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qnu_qdrant
     restart: unless-stopped
+    profiles: ["infra", "full"]
     networks:
       - qnu_network
     ports:
@@ -65,12 +186,13 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 3. Redis — Semantic Cache & ARQ Async Job Queue Broker
+  # 6. Redis — Semantic Cache & ARQ Async Job Queue Broker
   # ----------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: qnu_redis
     restart: unless-stopped
+    profiles: ["infra", "full"]
     networks:
       - qnu_network
     ports:
@@ -84,12 +206,13 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 4. MinIO — S3-Compatible Object Storage (Raw PDFs, OCR & Scanned Archives)
+  # 7. MinIO — S3-Compatible Object Storage (Raw PDFs, OCR & Scanned Archives)
   # ----------------------------------------------------------------------------
   minio:
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     container_name: qnu_minio
     restart: unless-stopped
+    profiles: ["infra", "full"]
     networks:
       - qnu_network
     command: server /data --console-address ":9001"
@@ -108,12 +231,13 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 5. Gotenberg 8 — Headless LibreOffice / Chromium PDF Converter (Nghị định 30)
+  # 8. Gotenberg 8 — Headless LibreOffice / Chromium PDF Converter (Nghị định 30)
   # ----------------------------------------------------------------------------
   gotenberg:
     image: gotenberg/gotenberg:8
     container_name: qnu_gotenberg
     restart: unless-stopped
+    profiles: ["infra", "full"]
     networks:
       - qnu_network
     ports:
@@ -124,48 +248,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # ----------------------------------------------------------------------------
-  # 6. QNU AI Platform Backend — FastAPI Core Application
-  # ----------------------------------------------------------------------------
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: qnu_backend
-    restart: unless-stopped
-    profiles: ["app", "full"]
-    networks:
-      - qnu_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    ports:
-      - "${BACKEND_PORT:-8001}:8001"
-    environment:
-      - ENVIRONMENT=production
-      - PORT=8001
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-qnu}:${POSTGRES_PASSWORD:-qnu_password_secure_2026}@postgres:5432/${POSTGRES_DB:-qnu_ai_platform}
-      - REDIS_URL=redis://redis:6379/0
-      - QDRANT_HOST=qdrant
-      - QDRANT_PORT=6333
-      - S3_ENDPOINT=minio:9000
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-qnu_minio_admin}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-qnu_minio_secret_2026}
-    volumes:
-      - ./backend/storage:/app/storage
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health/ready"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-
 volumes:
+  qnu_storage:
+    name: qnu_platform_storage
   postgres_data:
     name: qnu_postgres_data
   qdrant_data:

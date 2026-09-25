@@ -2,7 +2,7 @@
 
 # Khởi chạy toàn bộ cụm hạ tầng Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)
 infra-up:
-	docker compose up -d
+	docker compose --profile infra up -d
 
 # Dừng cụm hạ tầng Docker
 infra-down:

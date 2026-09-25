@@ -8,7 +8,7 @@ param (
 switch ($Command) {
     "infra-up" {
         Write-Host "Dang khoi dong ha tang Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)..." -ForegroundColor Green
-        docker compose up -d
+        docker compose --profile infra up -d
     }
     "infra-down" {
         Write-Host "Dang dung ha tang Docker..." -ForegroundColor Yellow
