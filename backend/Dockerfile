@@ -69,7 +69,7 @@ RUN uv pip install -e . --no-deps --python /app/.venv/bin/python
 # 7. Create storage directories for uploads/artifacts and set non-root ownership
 RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups /app/configs \
  && chmod +x /app/entrypoint.sh \
- && chown -R qnu:qnu /app
+ && chown -R qnu:qnu /app/storage /app/configs
 
 # 8. Switch to non-root user
 USER qnu
