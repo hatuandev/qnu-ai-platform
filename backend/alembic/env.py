@@ -54,12 +54,16 @@ config = context.config
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Overwrite sqlalchemy.url with project settings
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 target_metadata = Base.metadata
+
+# Session-independent, project-specific key used to serialize Alembic runs.
+# The transaction-scoped lock is released automatically on commit or rollback.
+MIGRATION_ADVISORY_LOCK_KEY = 1_367_258_177
 
 
 def run_migrations_offline() -> None:
@@ -78,9 +82,16 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    connection.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {"lock_key": MIGRATION_ADVISORY_LOCK_KEY},
+    )
+
     try:
         connection.execute(
-            sa.text("ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+            sa.text(
+                "ALTER TABLE IF EXISTS alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"
+            )
         )
     except Exception:
         pass

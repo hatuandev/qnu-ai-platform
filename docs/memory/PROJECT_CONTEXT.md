@@ -7,8 +7,8 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-26 00:20 (UTC+7)
-- **Phiên số**: #226 (deploy Dokploy: migrate no-op câm → seed chết lặp; đã thêm fail-loud verify schema. Cần ground truth server: `ls /app/alembic/versions` + `db check` để sửa data-plane)
+- **Thời gian cập nhật**: 2026-09-26 00:35 (UTC+7)
+- **Phiên số**: #227 (deploy Dokploy: chết câm sau alembic context, đều ~10s, không traceback; đã loại OOM lúc import. Chờ phép chia đôi: ExitCode/OOMKilled + `db check` trên server)
 - **Phiên số trước**: #222
 - **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
 - **Phiên số trước**: #215
