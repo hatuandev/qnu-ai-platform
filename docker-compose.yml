@@ -80,6 +80,7 @@ services:
       dockerfile: Dockerfile
     container_name: qnu_worker
     restart: unless-stopped
+    entrypoint: []
     command: ["arq", "app.workers.arq_worker.WorkerSettings"]
     networks:
       - qnu_network
@@ -115,6 +116,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      disable: true
 
   # ----------------------------------------------------------------------------
   # 3. Frontend Web Application (React 19 + Vite + Nginx)
