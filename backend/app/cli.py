@@ -3,6 +3,7 @@
 Usage:
     python -m app.cli db check
     python -m app.cli db migrate
+    python -m app.cli db bootstrap
     python -m app.cli db seed [--all] [--assistants] [--knowledge] [--workflows] [--document-types] [--model-defaults]
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from collections.abc import Sequence
 
@@ -27,6 +29,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("qnu-cli")
 
+BOOTSTRAP_LOCK_NAME = "qnu-ai-platform-bootstrap"
+DEFAULT_BOOTSTRAP_ATTEMPTS = 12
+DEFAULT_BOOTSTRAP_RETRY_SECONDS = 5.0
+DEFAULT_SEED_ATTEMPTS = 3
+
 
 def _get_alembic_config() -> Config:
     """Load Alembic configuration pointing to backend/alembic.ini."""
@@ -39,6 +46,20 @@ def _get_alembic_config() -> Config:
     config.set_main_option("script_location", str(alembic_dir))
     config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
     return config
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("value must be at least 1")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("value must be greater than 0")
+    return parsed
 
 
 async def check_db_schema() -> bool:
@@ -130,42 +151,141 @@ async def ensure_postgres_database_exists(database_url: str) -> None:
         await engine_maint.dispose()
 
 
-def run_db_migrate() -> int:
-    """Ensure database exists and run alembic upgrade head programmatically."""
+def _upgrade_database_schema() -> None:
+    """Run Alembic in a worker thread where its async runner owns the event loop."""
+    config = _get_alembic_config()
+    command.upgrade(config, "head")
+
+
+async def migrate_database(*, ensure_database: bool = True) -> bool:
+    """Ensure the database exists, migrate it, and verify the resulting schema."""
     logger.info("Preparing database and running migrations to HEAD...")
     try:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
+        if ensure_database:
+            await ensure_postgres_database_exists(settings.DATABASE_URL)
 
-        if loop and loop.is_running():
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                pool.submit(asyncio.run, ensure_postgres_database_exists(settings.DATABASE_URL)).result()
-        else:
-            asyncio.run(ensure_postgres_database_exists(settings.DATABASE_URL))
-
-        config = _get_alembic_config()
-        command.upgrade(config, "head")
+        await asyncio.to_thread(_upgrade_database_schema)
         logger.info("Database migration to HEAD completed successfully.")
 
         # Fail-loud verification: never let seed run against a half-migrated
         # schema. Alembic can exit 0 while creating nothing (stale version stamp,
         # empty versions dir, swallowed env error) — catch that here instead of
         # producing misleading downstream seed failures.
-        if not asyncio.run(check_db_schema()):
+        if not await check_db_schema():
             logger.error(
                 "Post-migration schema verification FAILED: core tables are missing. "
                 "Inspect 'alembic_version' and run 'python -m app.cli db check' "
                 "instead of seeding against an incomplete schema."
             )
-            return 1
-        return 0
+            return False
+        return True
     except Exception as exc:
         logger.error("Database migration failed: %s", exc)
+        return False
+
+
+def run_db_migrate() -> int:
+    """Synchronous CLI wrapper for the async migration workflow."""
+    return 0 if asyncio.run(migrate_database()) else 1
+
+
+async def wait_for_postgres(*, max_attempts: int, retry_seconds: float) -> bool:
+    """Wait for the externally managed PostgreSQL service with bounded retries."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await ensure_postgres_database_exists(settings.DATABASE_URL)
+            async with engine.connect() as conn:
+                result = await conn.execute(text("SELECT 1"))
+                if result.scalar_one() == 1:
+                    logger.info("PostgreSQL is ready (attempt %d/%d).", attempt, max_attempts)
+                    return True
+        except Exception as exc:
+            logger.warning(
+                "PostgreSQL is not ready (attempt %d/%d): %s",
+                attempt,
+                max_attempts,
+                exc,
+            )
+            await engine.dispose()
+
+        if attempt < max_attempts:
+            await asyncio.sleep(retry_seconds)
+
+    return False
+
+
+async def acquire_bootstrap_lock(conn, *, max_attempts: int, retry_seconds: float) -> bool:
+    """Serialize migration and seed across overlapping Dokploy deployments."""
+    for attempt in range(1, max_attempts + 1):
+        result = await conn.execute(
+            text("SELECT pg_try_advisory_lock(hashtext(:lock_name))"),
+            {"lock_name": BOOTSTRAP_LOCK_NAME},
+        )
+        if result.scalar_one():
+            logger.info("Acquired PostgreSQL bootstrap lock.")
+            return True
+
+        logger.info(
+            "Another deployment is bootstrapping; waiting (attempt %d/%d).",
+            attempt,
+            max_attempts,
+        )
+        if attempt < max_attempts:
+            await asyncio.sleep(retry_seconds)
+
+    return False
+
+
+async def run_db_bootstrap(
+    *,
+    max_attempts: int,
+    retry_seconds: float,
+    seed_attempts: int,
+) -> int:
+    """Run the complete one-shot production bootstrap workflow."""
+    logger.info("Starting one-shot database bootstrap...")
+    if not await wait_for_postgres(
+        max_attempts=max_attempts,
+        retry_seconds=retry_seconds,
+    ):
+        logger.error("PostgreSQL did not become ready within the configured retry window.")
         return 1
+
+    async with engine.connect() as lock_conn:
+        acquired = await acquire_bootstrap_lock(
+            lock_conn,
+            max_attempts=max_attempts,
+            retry_seconds=retry_seconds,
+        )
+        if not acquired:
+            logger.error("Could not acquire the PostgreSQL bootstrap lock.")
+            return 1
+
+        try:
+            if not await migrate_database(ensure_database=False):
+                return 1
+
+            for attempt in range(1, seed_attempts + 1):
+                logger.info("Running idempotent platform seed (attempt %d/%d)...", attempt, seed_attempts)
+                if await run_db_seed(seed_all=True) == 0:
+                    if not await check_db_schema():
+                        logger.error("Final database verification failed after seeding.")
+                        return 1
+                    logger.info("Production bootstrap completed successfully.")
+                    return 0
+
+                if attempt < seed_attempts:
+                    logger.warning("Seed attempt failed; retrying in %.1f seconds.", retry_seconds)
+                    await asyncio.sleep(retry_seconds)
+
+            logger.error("Platform seed failed after %d attempts.", seed_attempts)
+            return 1
+        finally:
+            await lock_conn.execute(
+                text("SELECT pg_advisory_unlock(hashtext(:lock_name))"),
+                {"lock_name": BOOTSTRAP_LOCK_NAME},
+            )
+            logger.info("Released PostgreSQL bootstrap lock.")
 
 
 async def run_db_seed(
@@ -186,7 +306,11 @@ async def run_db_seed(
     from app.core.storage import storage_service
 
     logger.info("Ensuring storage bucket...")
-    await storage_service.ensure_bucket()
+    try:
+        await storage_service.ensure_bucket()
+    except Exception as exc:
+        logger.error("Storage bucket readiness failed: %s", exc)
+        return 1
 
     async with AsyncSessionFactory() as db:
         try:
@@ -235,6 +359,7 @@ async def run_db_seed(
             logger.info("Database seed completed successfully.")
             return 0
         except Exception as exc:
+            await db.rollback()
             logger.error("Database seed failed: %s", exc)
             return 1
 
@@ -371,6 +496,36 @@ def main(argv: Sequence[str] | None = None) -> int:
     # `db migrate`
     db_subparsers.add_parser("migrate", help="Upgrade schema to Alembic HEAD")
 
+    # `db bootstrap`
+    bootstrap_parser = db_subparsers.add_parser(
+        "bootstrap",
+        help="Wait for PostgreSQL, migrate, idempotently seed, and verify",
+    )
+    bootstrap_parser.add_argument(
+        "--max-attempts",
+        type=_positive_int,
+        default=_positive_int(
+            os.getenv("BOOTSTRAP_MAX_ATTEMPTS", str(DEFAULT_BOOTSTRAP_ATTEMPTS))
+        ),
+        help="Maximum PostgreSQL/lock readiness attempts",
+    )
+    bootstrap_parser.add_argument(
+        "--retry-seconds",
+        type=_positive_float,
+        default=_positive_float(
+            os.getenv("BOOTSTRAP_RETRY_SECONDS", str(DEFAULT_BOOTSTRAP_RETRY_SECONDS))
+        ),
+        help="Delay between readiness and seed retries",
+    )
+    bootstrap_parser.add_argument(
+        "--seed-attempts",
+        type=_positive_int,
+        default=_positive_int(
+            os.getenv("BOOTSTRAP_SEED_ATTEMPTS", str(DEFAULT_SEED_ATTEMPTS))
+        ),
+        help="Maximum idempotent seed attempts",
+    )
+
     # `db seed`
     seed_parser = db_subparsers.add_parser("seed", help="Seed initial/idempotent data")
     seed_parser.add_argument("--all", action="store_true", help="Seed all datasets")
@@ -417,6 +572,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0 if passed else 1
         if args.db_action == "migrate":
             return run_db_migrate()
+        if args.db_action == "bootstrap":
+            return asyncio.run(
+                run_db_bootstrap(
+                    max_attempts=args.max_attempts,
+                    retry_seconds=args.retry_seconds,
+                    seed_attempts=args.seed_attempts,
+                )
+            )
         if args.db_action == "seed":
             return asyncio.run(
                 run_db_seed(

@@ -876,7 +876,10 @@ class WorkflowService:
                 dag_spec = self._parse_spec_from_json(data)
                 validation = workflow_compiler.validate(dag_spec)
                 if not validation.is_valid:
-                    continue
+                    raise ValueError(
+                        f"Invalid checked-in workflow {json_file.name}: "
+                        f"{validation.model_dump(mode='json')}"
+                    )
 
                 serialized_spec = self._serialize_dag_spec(dag_spec)
                 content_hash = self._content_hash(dag_spec)
@@ -884,6 +887,74 @@ class WorkflowService:
                 stmt = select(WorkflowDefinition).where(WorkflowDefinition.id == workflow_id)
                 res = await db.execute(stmt)
                 wf_def = res.scalar_one_or_none()
+
+                draft_stmt = select(WorkflowDraft).where(WorkflowDraft.workflow_id == workflow_id)
+                draft_res = await db.execute(draft_stmt)
+                draft = draft_res.scalar_one_or_none()
+
+                ver_stmt = select(WorkflowVersion).where(
+                    WorkflowVersion.workflow_id == workflow_id,
+                    WorkflowVersion.version_number == 1,
+                )
+                ver_res = await db.execute(ver_stmt)
+                version = ver_res.scalar_one_or_none()
+
+                newer_version_res = await db.execute(
+                    select(WorkflowVersion.id)
+                    .where(
+                        WorkflowVersion.workflow_id == workflow_id,
+                        WorkflowVersion.version_number > 1,
+                    )
+                    .limit(1)
+                )
+                has_user_version = newer_version_res.scalar_one_or_none() is not None
+                draft_diverged = False
+                definition_diverged = False
+                if version is not None and draft is not None:
+                    try:
+                        draft_diverged = (
+                            self._content_hash(WorkflowDagSpec.model_validate(draft.dag_spec))
+                            != version.content_hash
+                        )
+                    except (TypeError, ValueError):
+                        draft_diverged = True
+                if version is not None and wf_def is not None:
+                    try:
+                        definition_diverged = (
+                            self._content_hash(WorkflowDagSpec.model_validate(wf_def.dag_spec))
+                            != version.content_hash
+                        )
+                    except (TypeError, ValueError):
+                        definition_diverged = True
+                is_user_managed = wf_def is not None and (
+                    wf_def.ownership == "private"
+                    or (draft is not None and draft.updated_by not in (None, "system_seeder"))
+                    or (
+                        version is not None
+                        and version.published_by not in (None, "system_seeder")
+                    )
+                    or has_user_version
+                    or draft_diverged
+                    or definition_diverged
+                )
+                if is_user_managed:
+                    logger.info(
+                        "Preserving user-managed workflow %s; checked-in seed was not applied.",
+                        workflow_id,
+                    )
+                    continue
+
+                if (
+                    wf_def is not None
+                    and draft is not None
+                    and version is not None
+                    and version.content_hash == content_hash
+                ):
+                    if wf_def.published_version_id != version.id:
+                        wf_def.published_version_id = version.id
+                    synced += 1
+                    continue
+
                 if wf_def is None:
                     wf_def = WorkflowDefinition(
                         id=workflow_id,
@@ -904,9 +975,6 @@ class WorkflowService:
                     wf_def.module_code = module_code
                     wf_def.dag_spec = serialized_spec
 
-                draft_stmt = select(WorkflowDraft).where(WorkflowDraft.workflow_id == workflow_id)
-                draft_res = await db.execute(draft_stmt)
-                draft = draft_res.scalar_one_or_none()
                 if draft is None:
                     draft = WorkflowDraft(
                         workflow_id=workflow_id,
@@ -919,13 +987,8 @@ class WorkflowService:
                 else:
                     draft.dag_spec = serialized_spec
                     draft.revision += 1
+                    draft.updated_by = "system_seeder"
 
-                ver_stmt = select(WorkflowVersion).where(
-                    WorkflowVersion.workflow_id == workflow_id,
-                    WorkflowVersion.version_number == 1,
-                )
-                ver_res = await db.execute(ver_stmt)
-                version = ver_res.scalar_one_or_none()
                 if version is None:
                     version = WorkflowVersion(
                         workflow_id=workflow_id,
@@ -941,13 +1004,15 @@ class WorkflowService:
                     version.dag_spec = serialized_spec
                     version.content_hash = content_hash
                     version.validation_report = validation.model_dump(mode="json")
+                    version.published_by = "system_seeder"
 
                 if wf_def.published_version_id != version.id:
                     wf_def.published_version_id = version.id
 
                 synced += 1
-            except Exception as exc:
-                logger.warning("Failed to sync default workflow %s: %s", json_file.name, exc)
+            except Exception:
+                logger.exception("Failed to sync default workflow %s", json_file.name)
+                raise
 
         await db.commit()
         return synced

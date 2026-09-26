@@ -332,15 +332,9 @@ async def seed_standard_assistants(db: AsyncSession) -> AssistantSeedResponse:
 
         code = str(item["code"])
         if code in existing_by_code:
-            existing_record = existing_by_code[code]
-            if hasattr(existing_record, "config"):
-                existing_cfg = dict(existing_record.config or {})
-                existing_cfg["sample_questions"] = item["config"]["sample_questions"]
-                if "guardrails" in existing_cfg and isinstance(existing_cfg["guardrails"], dict):
-                    existing_cfg["guardrails"]["no_answer_message"] = item["config"]["guardrails"]["no_answer_message"]
-                else:
-                    existing_cfg["guardrails"] = item["config"]["guardrails"]
-                existing_record.config = existing_cfg
+            # Existing assistants may have been customized in the admin UI.
+            # The production bootstrap only repairs missing defaults and never
+            # overwrites user-owned prompts, guardrails, or sample questions.
             continue
         db.add(
             AssistantModel(

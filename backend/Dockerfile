@@ -71,6 +71,7 @@ RUN uv pip install -e . --no-deps --python /app/.venv/bin/python
 
 # 7. Create storage directories for uploads/artifacts and set non-root ownership
 RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups \
+ && sed -i 's/\r$//' /app/entrypoint.sh \
  && chmod +x /app/entrypoint.sh \
  && chown -R qnu:qnu /app/storage /app/configs
 
@@ -84,7 +85,8 @@ EXPOSE 8001
 HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8001/health/live || exit 1
 
-# Entrypoint automatically checks DB, runs migrations & seeds initial data
+# Runtime entrypoint only launches the requested process. Database bootstrap is
+# handled by the one-shot Compose service before API and worker startup.
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command: Launch production Uvicorn server with 4 asynchronous workers
