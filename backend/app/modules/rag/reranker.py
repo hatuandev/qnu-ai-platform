@@ -5,11 +5,14 @@ from __future__ import annotations
 import logging
 import time
 
-from app.core.config import get_settings
+from app.core.database import AsyncSessionFactory
+from app.modules.modelops.services.model_runtime_resolver import (
+    ModelRuntimeConfig,
+    model_runtime_resolver,
+)
 from app.modules.rag.fusion import FusionCandidate
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class RerankerClient:
@@ -23,17 +26,18 @@ class RerankerClient:
         self,
         query: str,
         candidates: list[FusionCandidate],
+        runtime: ModelRuntimeConfig,
         top_k: int = 5,
     ) -> list[FusionCandidate]:
         """Rerank candidates using Cloudflare Workers AI @cf/baai/bge-reranker-base."""
         import httpx
 
-        account_id = settings.CLOUDFLARE_ACCOUNT_ID
-        token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
+        account_id = runtime.account_id
+        token = runtime.api_key
         if not account_id or not token:
             return candidates[:top_k]
 
-        raw_model = settings.RERANKER_MODEL.strip()
+        raw_model = runtime.model_name.strip()
         if raw_model.startswith("@cf/"):
             model = raw_model
         elif "/" in raw_model:
@@ -50,7 +54,7 @@ class RerankerClient:
             "contexts": [{"text": c.content} for c in candidates],
         }
 
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds)) as client:
             resp = await client.post(url, headers=headers, json=payload)
             if resp.status_code == 200:
                 data = resp.json().get("result", {})
@@ -74,6 +78,11 @@ class RerankerClient:
 
         return candidates[:top_k]
 
+    async def _resolve_reranker_runtime(self) -> ModelRuntimeConfig:
+        """Load the current reranker provider and model from ModelOps."""
+        async with AsyncSessionFactory() as db:
+            return await model_runtime_resolver.resolve(db, "reranker")
+
     async def rerank(
         self,
         query: str,
@@ -91,15 +100,11 @@ class RerankerClient:
         start_time = time.perf_counter()
         provider = "rrf_fallback"
 
-        # 1. Try Cloudflare Workers AI Cross-Encoder if configured
-        if (
-            getattr(settings, "RERANKER_PROVIDER", "").lower() == "cloudflare"
-            and (settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY)
-            and settings.CLOUDFLARE_ACCOUNT_ID
-            and not settings.CLOUDFLARE_ACCOUNT_ID.startswith("cf-acc-")
-        ):
-            try:
-                ranked = await self._rerank_cloudflare(query, candidates, top_k)
+        # 1. Resolve Cloudflare Workers AI Cross-Encoder from ModelOps.
+        try:
+            runtime = await self._resolve_reranker_runtime()
+            if runtime.provider_type == "cloudflare" and runtime.api_key and runtime.account_id:
+                ranked = await self._rerank_cloudflare(query, candidates, runtime, top_k)
                 provider = "cloudflare"
                 logger.info(
                     "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
@@ -109,10 +114,10 @@ class RerankerClient:
                     len(ranked),
                 )
                 return ranked
-            except Exception as exc:
-                logger.warning(
-                    "Cloudflare reranker failed or timed out: %s. Falling back to RRF score.", exc
-                )
+        except Exception as exc:
+            logger.warning(
+                "ModelOps reranker unavailable: %s. Falling back to RRF score.", exc
+            )
 
         # 2. Custom external HTTP reranker endpoint (if configured)
         if self.endpoint_url:

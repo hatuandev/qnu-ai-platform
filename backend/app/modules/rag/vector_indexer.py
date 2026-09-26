@@ -14,12 +14,18 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qmodels
 
 from app.core.config import get_settings
+from app.core.database import AsyncSessionFactory
 from app.core.exceptions import AppException
+from app.modules.modelops.services.model_runtime_resolver import (
+    ModelRuntimeConfig,
+    model_runtime_resolver,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _embedding_model: Any = None
+_embedding_model_name: str | None = None
 _embedding_model_failed = False
 
 
@@ -48,48 +54,53 @@ def _resolve_local_model_name(model_name: str) -> str:
 
 def reset_embedding_model_state() -> None:
     """Reset cached embedding model state for recovery or re-initialization."""
-    global _embedding_model, _embedding_model_failed
+    global _embedding_model, _embedding_model_failed, _embedding_model_name
     _embedding_model = None
+    _embedding_model_name = None
     _embedding_model_failed = False
 
 
-def _load_model_sync() -> Any:
+def _load_model_sync(model_name: str | None = None) -> Any:
     """Load SentenceTransformer with local_files_only preference to avoid remote delays."""
     from sentence_transformers import SentenceTransformer
 
-    local_model = _resolve_local_model_name(settings.EMBEDDING_MODEL)
+    local_model = _resolve_local_model_name(model_name or settings.EMBEDDING_MODEL)
     try:
         return SentenceTransformer(local_model, local_files_only=True)
     except Exception:
         return SentenceTransformer(local_model)
 
 
-def _get_embedding_model() -> Any | None:
+def _get_embedding_model(model_name: str | None = None) -> Any | None:
     """Lazily load the shared BGE-M3 encoder (sync entrypoint for tests/callers)."""
-    global _embedding_model, _embedding_model_failed
-    if _embedding_model is not None:
+    global _embedding_model, _embedding_model_failed, _embedding_model_name
+    requested_model = model_name or settings.EMBEDDING_MODEL
+    if _embedding_model is not None and _embedding_model_name == requested_model:
         return _embedding_model
     if _embedding_model_failed or not is_embedding_model_installed():
         return None
     try:
-        _embedding_model = _load_model_sync()
-        logger.info("Loaded embedding model: %s", settings.EMBEDDING_MODEL)
+        _embedding_model = _load_model_sync(requested_model)
+        _embedding_model_name = requested_model
+        logger.info("Loaded embedding model: %s", requested_model)
     except Exception as exc:
         _embedding_model_failed = True
         logger.warning("Embedding model unavailable, using mock vectors: %s", exc)
     return _embedding_model
 
 
-async def _get_embedding_model_async() -> Any | None:
+async def _get_embedding_model_async(model_name: str | None = None) -> Any | None:
     """Asynchronously load model offloaded to thread so event loop never freezes."""
-    global _embedding_model, _embedding_model_failed
-    if _embedding_model is not None:
+    global _embedding_model, _embedding_model_failed, _embedding_model_name
+    requested_model = model_name or settings.EMBEDDING_MODEL
+    if _embedding_model is not None and _embedding_model_name == requested_model:
         return _embedding_model
     if _embedding_model_failed or not is_embedding_model_installed():
         return None
     try:
-        _embedding_model = await asyncio.to_thread(_load_model_sync)
-        logger.info("Loaded embedding model asynchronously: %s", settings.EMBEDDING_MODEL)
+        _embedding_model = await asyncio.to_thread(_load_model_sync, requested_model)
+        _embedding_model_name = requested_model
+        logger.info("Loaded embedding model asynchronously: %s", requested_model)
     except Exception as exc:
         _embedding_model_failed = True
         logger.warning("Embedding model async load failed, using mock vectors: %s", exc)
@@ -151,16 +162,25 @@ class VectorIndexer:
             return [round(float(x), 6) for x in vec[: self.vector_size]]
         return [round(float(x), 6) for x in vec] + [0.0] * (self.vector_size - len(vec))
 
-    async def _embed_texts_cloudflare(self, texts: list[str]) -> list[list[float]]:
+    async def _resolve_embedding_runtime(self) -> ModelRuntimeConfig:
+        """Load the current embedding provider and model from ModelOps."""
+        async with AsyncSessionFactory() as db:
+            return await model_runtime_resolver.resolve(db, "embedding")
+
+    async def _embed_texts_cloudflare(
+        self,
+        texts: list[str],
+        runtime: ModelRuntimeConfig,
+    ) -> list[list[float]]:
         """Batch encode texts using Cloudflare Workers AI @cf/baai/bge-m3."""
         import httpx
 
-        account_id = settings.CLOUDFLARE_ACCOUNT_ID
-        token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
+        account_id = runtime.account_id
+        token = runtime.api_key
         if not account_id or not token:
             raise ValueError("Cloudflare credentials not configured.")
 
-        raw_model = settings.EMBEDDING_MODEL.strip()
+        raw_model = runtime.model_name.strip()
         if raw_model.startswith("@cf/"):
             model = raw_model
         elif "/" in raw_model:
@@ -175,7 +195,7 @@ class VectorIndexer:
 
         all_vectors: list[list[float]] = []
         batch_size = 16
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds)) as client:
             for i in range(0, len(texts), batch_size):
                 batch = texts[i : i + batch_size]
                 resp = await client.post(url, headers=headers, json={"text": batch})
@@ -191,30 +211,30 @@ class VectorIndexer:
 
         return all_vectors
 
-    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+    async def embed_texts(
+        self,
+        texts: list[str],
+        runtime: ModelRuntimeConfig | None = None,
+    ) -> list[list[float]]:
         """Batch-encode texts with the explicitly configured embedding provider."""
         if not texts:
             return []
 
-        provider = settings.EMBEDDING_PROVIDER.strip().lower()
+        runtime = runtime or await self._resolve_embedding_runtime()
+        provider = runtime.provider_type
         if provider == "cloudflare":
-            token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
-            account_id = settings.CLOUDFLARE_ACCOUNT_ID
-            if not token or not account_id or account_id.startswith("cf-acc-"):
+            if not runtime.api_key or not runtime.account_id:
                 raise AppException(
-                    "Cloudflare Workers AI chưa được cấu hình đầy đủ cho embedding.",
+                    "Provider Cloudflare thiếu Account ID hoặc API token.",
                     code="EMBEDDING_PROVIDER_NOT_CONFIGURED",
                     status_code=503,
                     details={
-                        "provider": provider,
-                        "required_settings": [
-                            "CLOUDFLARE_ACCOUNT_ID",
-                            "CLOUDFLARE_API_TOKEN hoặc CLOUDFLARE_API_KEY",
-                        ],
+                        "provider_id": runtime.provider_id,
+                        "required_fields": ["account_id", "api_key"],
                     },
                 )
             try:
-                vectors = await self._embed_texts_cloudflare(texts)
+                vectors = await self._embed_texts_cloudflare(texts, runtime)
                 if len(vectors) != len(texts):
                     raise RuntimeError(
                         f"Cloudflare returned {len(vectors)} vectors for {len(texts)} texts."
@@ -231,15 +251,15 @@ class VectorIndexer:
 
         if provider not in {"local", "sentence_transformers"}:
             raise AppException(
-                f"Nhà cung cấp embedding không được hỗ trợ: {settings.EMBEDDING_PROVIDER}",
+                f"Nhà cung cấp embedding không được hỗ trợ: {runtime.provider_type}",
                 code="EMBEDDING_PROVIDER_UNSUPPORTED",
                 status_code=503,
-                details={"provider": settings.EMBEDDING_PROVIDER},
+                details={"provider": runtime.provider_id},
             )
 
         # Local inference is only used when explicitly selected. Cloudflare
         # failures never reach this branch or trigger a model download.
-        model = await _get_embedding_model_async()
+        model = await _get_embedding_model_async(runtime.model_name)
         if model is None:
             if settings.ENVIRONMENT not in ("test", "testing"):
                 raise AppException(
@@ -312,7 +332,8 @@ class VectorIndexer:
                 )
 
         missing = [str(c["content"]) for c in chunks if not c.get("vector")]
-        encoded = await self.embed_texts(missing) if missing else []
+        embedding_runtime = await self._resolve_embedding_runtime() if missing else None
+        encoded = await self.embed_texts(missing, embedding_runtime) if missing else []
         encoded_iter = iter(encoded)
 
         for c in chunks:
@@ -336,7 +357,11 @@ class VectorIndexer:
             document_status = c.get("document_status")
             is_retrievable = c.get("is_retrievable")
             content_hash = c.get("content_hash")
-            embedding_model = c.get("embedding_model") or settings.EMBEDDING_MODEL
+            embedding_model = (
+                c.get("embedding_model")
+                if c.get("vector")
+                else embedding_runtime.model_name if embedding_runtime else None
+            )
             payload_schema_version = c.get("payload_schema_version") or "v1"
 
             payload = {

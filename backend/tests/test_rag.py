@@ -56,14 +56,36 @@ def test_reciprocal_rank_fusion_legal_priority_boost():
 @pytest.mark.asyncio
 async def test_reranker_fallback():
     """Verify Reranker falls back to RRF ordering when external service is offline."""
-    from unittest.mock import patch
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.modelops.services.model_runtime_resolver import ModelRuntimeConfig
 
     candidates = [
         FusionCandidate(chunk_id="c1", document_id="d1", content="Nội dung 1", rrf_score=0.03),
         FusionCandidate(chunk_id="c2", document_id="d1", content="Nội dung 2", rrf_score=0.02),
     ]
-    with patch.object(
-        reranker_client, "_rerank_cloudflare", side_effect=RuntimeError("Cloudflare API offline")
+    runtime = ModelRuntimeConfig(
+        provider_id="prov_cloudflare",
+        provider_type="cloudflare",
+        model_name="@cf/baai/bge-reranker-base",
+        api_base_url=None,
+        api_key="test-token",
+        account_id="test-account",
+        timeout_seconds=3,
+    )
+    with (
+        patch.object(
+            reranker_client,
+            "_resolve_reranker_runtime",
+            new_callable=AsyncMock,
+            return_value=runtime,
+        ),
+        patch.object(
+            reranker_client,
+            "_rerank_cloudflare",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("Cloudflare API offline"),
+        ),
     ):
         reranked = await reranker_client.rerank("câu hỏi", candidates, top_k=1)
     assert len(reranked) == 1
@@ -125,13 +147,28 @@ def test_mock_embedding_deterministic():
 @pytest.mark.asyncio
 async def test_local_embedding_uses_test_vectors_without_model():
     """Explicit local embedding may use deterministic vectors only in tests."""
-    from unittest.mock import patch
+    from unittest.mock import AsyncMock, patch
 
-    from app.modules.rag.vector_indexer import VectorIndexer, settings
+    from app.modules.modelops.services.model_runtime_resolver import ModelRuntimeConfig
+    from app.modules.rag.vector_indexer import VectorIndexer
 
     indexer = VectorIndexer()
+    runtime = ModelRuntimeConfig(
+        provider_id="prov_local",
+        provider_type="sentence_transformers",
+        model_name="BAAI/bge-m3",
+        api_base_url=None,
+        api_key=None,
+        account_id=None,
+        timeout_seconds=60,
+    )
     with (
-        patch.object(settings, "EMBEDDING_PROVIDER", "sentence_transformers"),
+        patch.object(
+            indexer,
+            "_resolve_embedding_runtime",
+            new_callable=AsyncMock,
+            return_value=runtime,
+        ),
         patch("app.modules.rag.vector_indexer._get_embedding_model_async", return_value=None),
     ):
         vectors = await indexer.embed_texts(["hoc phi", "chi tieu"])
@@ -146,14 +183,26 @@ async def test_cloudflare_embedding_never_falls_back_to_local_download():
     from unittest.mock import AsyncMock, patch
 
     from app.core.exceptions import AppException
-    from app.modules.rag.vector_indexer import VectorIndexer, settings
+    from app.modules.modelops.services.model_runtime_resolver import ModelRuntimeConfig
+    from app.modules.rag.vector_indexer import VectorIndexer
 
     indexer = VectorIndexer()
+    runtime = ModelRuntimeConfig(
+        provider_id="prov_cloudflare",
+        provider_type="cloudflare",
+        model_name="@cf/baai/bge-m3",
+        api_base_url=None,
+        api_key=None,
+        account_id=None,
+        timeout_seconds=20,
+    )
     with (
-        patch.object(settings, "EMBEDDING_PROVIDER", "cloudflare"),
-        patch.object(settings, "CLOUDFLARE_ACCOUNT_ID", None),
-        patch.object(settings, "CLOUDFLARE_API_TOKEN", None),
-        patch.object(settings, "CLOUDFLARE_API_KEY", None),
+        patch.object(
+            indexer,
+            "_resolve_embedding_runtime",
+            new_callable=AsyncMock,
+            return_value=runtime,
+        ),
         patch(
             "app.modules.rag.vector_indexer._get_embedding_model_async",
             new_callable=AsyncMock,

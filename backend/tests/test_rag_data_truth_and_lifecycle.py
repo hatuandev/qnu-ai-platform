@@ -12,6 +12,7 @@ from app.core.redis import SemanticCache
 from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
 from app.modules.knowledge.services.ingestion_service import IngestionService
 from app.modules.knowledge.services.reconciliation_service import ReconciliationService
+from app.modules.modelops.services.model_runtime_resolver import ModelRuntimeConfig
 from app.modules.rag.facts import FactLayer
 from app.modules.rag.retriever import HybridRetriever
 from app.modules.rag.vector_indexer import VectorIndexer
@@ -57,6 +58,17 @@ async def test_indexer_accepts_valid_v1_payload():
     indexer = VectorIndexer()
     indexer.client = AsyncMock()
     indexer.embed_texts = AsyncMock(return_value=[[0.1] * indexer.vector_size])
+    indexer._resolve_embedding_runtime = AsyncMock(
+        return_value=ModelRuntimeConfig(
+            provider_id="prov_test",
+            provider_type="cloudflare",
+            model_name="@cf/baai/bge-m3",
+            api_base_url=None,
+            api_key="test-token",
+            account_id="test-account",
+            timeout_seconds=20,
+        )
+    )
 
     valid_chunks = [
         {
@@ -91,6 +103,7 @@ async def test_indexer_accepts_valid_v1_payload():
     assert p["payload_schema_version"] == "v1"
     assert p["is_retrievable"] is True
     assert p["document_status"] == "ready"
+    assert p["embedding_model"] == "@cf/baai/bge-m3"
 
 
 @pytest.mark.asyncio

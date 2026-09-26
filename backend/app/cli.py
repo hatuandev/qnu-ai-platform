@@ -196,6 +196,11 @@ async def run_db_seed(
 
     async with AsyncSessionFactory() as db:
         try:
+            if seed_all or model_defaults or knowledge:
+                logger.info("Initializing system model defaults...")
+                await modelops_service.get_system_model_defaults(db)
+                logger.info("System model defaults initialized.")
+
             if seed_all or document_types:
                 logger.info("Syncing document types catalog (ND 30)...")
                 await document_types_service.sync_from_catalog(db)
@@ -215,11 +220,6 @@ async def run_db_seed(
                 logger.info("Seeding default knowledge collections...")
                 await seed_default_knowledge(db)
                 logger.info("Default knowledge collections seeded.")
-
-            if seed_all or model_defaults:
-                logger.info("Initializing system model defaults...")
-                await modelops_service.get_system_model_defaults(db)
-                logger.info("System model defaults initialized.")
 
             if seed_all or ingestion_jobs:
                 logger.info("Syncing ingestion job records...")
