@@ -12,7 +12,7 @@ python -m app.cli db migrate
 # 2. Idempotent Data Seeding
 # Seeds 05 official assistants, 05 workflow DAGs, Decree 30 taxonomy,
 # default facts, and model defaults. Also verifies Qdrant collections & MinIO bucket.
-if [ "${AUTO_SEED:-true}" = "true" ]; then
+if [ "${AUTO_SEED:-false}" = "true" ]; then
     echo "==> [2/3] Seeding Initial Platform Data (Workflows, Assistants, Knowledge, Taxonomy)..."
     python -m app.cli db seed --all
 else

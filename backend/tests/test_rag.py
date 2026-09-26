@@ -123,18 +123,47 @@ def test_mock_embedding_deterministic():
 
 
 @pytest.mark.asyncio
-async def test_embed_texts_falls_back_without_model():
-    """embed_texts must return mock vectors (never crash) when ST is missing."""
+async def test_local_embedding_uses_test_vectors_without_model():
+    """Explicit local embedding may use deterministic vectors only in tests."""
     from unittest.mock import patch
 
-    from app.modules.rag.vector_indexer import VectorIndexer
+    from app.modules.rag.vector_indexer import VectorIndexer, settings
 
     indexer = VectorIndexer()
-    with patch("app.modules.rag.vector_indexer._get_embedding_model", return_value=None):
+    with (
+        patch.object(settings, "EMBEDDING_PROVIDER", "sentence_transformers"),
+        patch("app.modules.rag.vector_indexer._get_embedding_model_async", return_value=None),
+    ):
         vectors = await indexer.embed_texts(["hoc phi", "chi tieu"])
     assert len(vectors) == 2
     assert all(len(v) == indexer.vector_size for v in vectors)
     assert vectors[0] != vectors[1]
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_embedding_never_falls_back_to_local_download():
+    """Cloudflare configuration failures must fail closed without loading a local model."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.core.exceptions import AppException
+    from app.modules.rag.vector_indexer import VectorIndexer, settings
+
+    indexer = VectorIndexer()
+    with (
+        patch.object(settings, "EMBEDDING_PROVIDER", "cloudflare"),
+        patch.object(settings, "CLOUDFLARE_ACCOUNT_ID", None),
+        patch.object(settings, "CLOUDFLARE_API_TOKEN", None),
+        patch.object(settings, "CLOUDFLARE_API_KEY", None),
+        patch(
+            "app.modules.rag.vector_indexer._get_embedding_model_async",
+            new_callable=AsyncMock,
+        ) as local_loader,
+        pytest.raises(AppException) as exc_info,
+    ):
+        await indexer.embed_texts(["hoc phi"])
+
+    assert exc_info.value.code == "EMBEDDING_PROVIDER_NOT_CONFIGURED"
+    local_loader.assert_not_awaited()
 
 
 def test_fit_dim_pads_and_truncates():

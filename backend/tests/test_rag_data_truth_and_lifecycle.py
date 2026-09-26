@@ -56,8 +56,7 @@ async def test_indexer_accepts_valid_v1_payload():
     """VectorIndexer must successfully validate and upsert chunks with all 11 required fields."""
     indexer = VectorIndexer()
     indexer.client = AsyncMock()
-    indexer._embeddings = AsyncMock()
-    indexer._embeddings.aembed_documents = AsyncMock(return_value=[[0.1] * 1536])
+    indexer.embed_texts = AsyncMock(return_value=[[0.1] * indexer.vector_size])
 
     valid_chunks = [
         {
@@ -99,8 +98,7 @@ async def test_search_dense_positive_allowlist():
     """Dense search must enforce positive allowlist filters and NO must_not exclusions."""
     indexer = VectorIndexer()
     indexer.client = AsyncMock()
-    indexer._embeddings = AsyncMock()
-    indexer._embeddings.aembed_query = AsyncMock(return_value=[0.1] * 1536)
+    indexer.embed_texts = AsyncMock(return_value=[[0.1] * indexer.vector_size])
 
     mock_hit = MagicMock()
     mock_hit.id = "p1"

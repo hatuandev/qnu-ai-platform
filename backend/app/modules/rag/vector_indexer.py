@@ -192,34 +192,61 @@ class VectorIndexer:
         return all_vectors
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Batch-encode texts with BGE-M3 (Cloudflare Workers AI preferred, local fallback)."""
+        """Batch-encode texts with the explicitly configured embedding provider."""
         if not texts:
             return []
 
-        # 1. Cloudflare Workers AI Edge Embedding (ultra-fast serverless GPU)
-        if (
-            getattr(settings, "EMBEDDING_PROVIDER", "").lower() == "cloudflare"
-            and (settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY)
-            and settings.CLOUDFLARE_ACCOUNT_ID
-            and not settings.CLOUDFLARE_ACCOUNT_ID.startswith("cf-acc-")
-        ):
+        provider = settings.EMBEDDING_PROVIDER.strip().lower()
+        if provider == "cloudflare":
+            token = settings.CLOUDFLARE_API_TOKEN or settings.CLOUDFLARE_API_KEY
+            account_id = settings.CLOUDFLARE_ACCOUNT_ID
+            if not token or not account_id or account_id.startswith("cf-acc-"):
+                raise AppException(
+                    "Cloudflare Workers AI chưa được cấu hình đầy đủ cho embedding.",
+                    code="EMBEDDING_PROVIDER_NOT_CONFIGURED",
+                    status_code=503,
+                    details={
+                        "provider": provider,
+                        "required_settings": [
+                            "CLOUDFLARE_ACCOUNT_ID",
+                            "CLOUDFLARE_API_TOKEN hoặc CLOUDFLARE_API_KEY",
+                        ],
+                    },
+                )
             try:
                 vectors = await self._embed_texts_cloudflare(texts)
-                if len(vectors) == len(texts):
-                    return [self._fit_dim(v) for v in vectors]
+                if len(vectors) != len(texts):
+                    raise RuntimeError(
+                        f"Cloudflare returned {len(vectors)} vectors for {len(texts)} texts."
+                    )
+                return [self._fit_dim(v) for v in vectors]
             except Exception as exc:
-                logger.warning(
-                    "Cloudflare embedding unavailable (%s), falling back to local model.", exc
-                )
+                logger.error("Cloudflare embedding unavailable: %s", exc)
+                raise AppException(
+                    f"Cloudflare Workers AI không khả dụng: {exc}",
+                    code="EMBEDDING_PROVIDER_UNAVAILABLE",
+                    status_code=503,
+                    details={"provider": provider},
+                ) from exc
 
-        # 2. Local SentenceTransformer BGE-M3 (with timeout & thread offload)
+        if provider not in {"local", "sentence_transformers"}:
+            raise AppException(
+                f"Nhà cung cấp embedding không được hỗ trợ: {settings.EMBEDDING_PROVIDER}",
+                code="EMBEDDING_PROVIDER_UNSUPPORTED",
+                status_code=503,
+                details={"provider": settings.EMBEDDING_PROVIDER},
+            )
+
+        # Local inference is only used when explicitly selected. Cloudflare
+        # failures never reach this branch or trigger a model download.
         model = await _get_embedding_model_async()
         if model is None:
             if settings.ENVIRONMENT not in ("test", "testing"):
                 raise AppException(
-                    "Mô hình embedding (BGE-M3/Cloudflare) không khả dụng. Hệ thống từ chối nạp dữ liệu giả mạo.",
+                    "Mô hình embedding local không khả dụng.",
                     code="EMBEDDING_UNAVAILABLE",
                     status_code=503,
+                    details={"provider": provider},
                 )
             return [self.mock_embedding(t, self.vector_size) for t in texts]
         try:
@@ -256,6 +283,34 @@ class VectorIndexer:
         cname = await self.ensure_collection(collection_id)
         points: list[qmodels.PointStruct] = []
 
+        # Reject malformed payloads before making any paid/remote embedding call.
+        for chunk in chunks:
+            chunk_id = str(chunk.get("id") or chunk.get("chunk_id", ""))
+            required_values = {
+                "tenant_id": chunk.get("tenant_id"),
+                "workspace_id": chunk.get("workspace_id"),
+                "collection_id": collection_id,
+                "document_id": chunk.get("document_id"),
+                "document_revision": chunk.get("document_revision"),
+                "chunk_id": chunk_id,
+                "document_status": chunk.get("document_status"),
+                "is_retrievable": chunk.get("is_retrievable"),
+                "content_hash": chunk.get("content_hash"),
+            }
+            missing_fields = [
+                field
+                for field, value in required_values.items()
+                if value is None or value == ""
+            ]
+            if missing_fields:
+                raise AppException(
+                    f"Thiếu các trường metadata bắt buộc cho chunk '{chunk_id}': "
+                    f"{', '.join(missing_fields)}.",
+                    code="INVALID_POINT_PAYLOAD",
+                    status_code=400,
+                    details={"chunk_id": chunk_id, "missing_fields": missing_fields},
+                )
+
         missing = [str(c["content"]) for c in chunks if not c.get("vector")]
         encoded = await self.embed_texts(missing) if missing else []
         encoded_iter = iter(encoded)
@@ -283,34 +338,6 @@ class VectorIndexer:
             content_hash = c.get("content_hash")
             embedding_model = c.get("embedding_model") or settings.EMBEDDING_MODEL
             payload_schema_version = c.get("payload_schema_version") or "v1"
-
-            missing_fields = []
-            if not tenant_id:
-                missing_fields.append("tenant_id")
-            if not workspace_id:
-                missing_fields.append("workspace_id")
-            if not collection_id:
-                missing_fields.append("collection_id")
-            if not document_id:
-                missing_fields.append("document_id")
-            if document_revision is None:
-                missing_fields.append("document_revision")
-            if not chunk_id:
-                missing_fields.append("chunk_id")
-            if not document_status:
-                missing_fields.append("document_status")
-            if is_retrievable is None:
-                missing_fields.append("is_retrievable")
-            if not content_hash:
-                missing_fields.append("content_hash")
-
-            if missing_fields:
-                raise AppException(
-                    f"Thiếu các trường metadata bắt buộc cho chunk '{chunk_id}': {', '.join(missing_fields)}.",
-                    code="INVALID_POINT_PAYLOAD",
-                    status_code=400,
-                    details={"chunk_id": chunk_id, "missing_fields": missing_fields},
-                )
 
             payload = {
                 "chunk_id": chunk_id,
