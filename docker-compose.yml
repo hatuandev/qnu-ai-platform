@@ -8,6 +8,8 @@ networks:
   qnu_network:
     name: qnu_network
     driver: bridge
+  dokploy-network:
+    external: true
 
 services:
 
@@ -22,6 +24,7 @@ services:
     restart: unless-stopped
     networks:
       - qnu_network
+      - dokploy-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
@@ -84,6 +87,7 @@ services:
     command: ["arq", "app.workers.arq_worker.WorkerSettings"]
     networks:
       - qnu_network
+      - dokploy-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
