@@ -56,62 +56,6 @@ class CollectionService:
         )
         res = await db.execute(query)
         cols = list(res.scalars().all())
-        if not cols:
-            seed_data = [
-                (
-                    "col_admissions",
-                    "Kho Tri Thức Đề Án Tuyển Sinh",
-                    "admissions",
-                    "Đề án tuyển sinh chính quy, bảng chỉ tiêu, điểm chuẩn và thông tin học phí.",
-                ),
-                (
-                    "col_regulations",
-                    "Kho Tri Thức Quy Chế & Quy Định Đào Tạo",
-                    "regulations",
-                    "Quy chế đào tạo tín chỉ, quy định chuẩn đầu ra, điều kiện tốt nghiệp.",
-                ),
-                (
-                    "col_library",
-                    "Kho Tri Thức Tài Nguyên Thư Viện & Học Liệu Số",
-                    "library",
-                    "Quy trình mượn trả tài liệu, giáo trình số, hướng dẫn cơ sở dữ liệu.",
-                ),
-                (
-                    "col_drafting",
-                    "Kho Tri Thức Thể Thức & Biểu Mẫu Văn Bản",
-                    "drafting",
-                    "Mẫu văn bản hành chính, quyết định, tờ trình, quy cách căn lề theo NĐ 30/2020.",
-                ),
-                (
-                    "col_question_bank",
-                    "Kho Tri Thức Ngân Hàng Câu Hỏi & Chuẩn Đầu Ra",
-                    "question_bank",
-                    "Quy định ma trận khảo thí, chuẩn đầu ra học phần và 4 mức độ Bloom.",
-                ),
-            ]
-            for cid, cname, mcode, cdesc in seed_data:
-                item = KnowledgeCollection(
-                    id=cid,
-                    name=cname,
-                    module_code=mcode,
-                    description=cdesc,
-                    tenant_id=tenant_id,
-                    workspace_id=workspace_id,
-                    collection_metadata={
-                        "chunking_strategy": (
-                            "ClauseBasedChunker"
-                            if mcode in ("regulations", "drafting")
-                            else "SemanticChunker"
-                        ),
-                        "ocr_profile": "Docling",
-                        "document_count": 8,
-                        "chunk_count": 246,
-                    },
-                )
-                db.add(item)
-            await db.commit()
-            res = await db.execute(query)
-            cols = list(res.scalars().all())
         await self._attach_collection_stats(db, cols)
         return cols
 

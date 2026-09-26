@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import uuid
 
 from sqlalchemy import select
@@ -58,6 +59,25 @@ from app.modules.knowledge.seed_data_regulations import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SEED_TENANT_ID = "tenant_qnu"
+DEFAULT_SEED_WORKSPACE_ID = "workspace_qnu"
+
+
+def _normalize_seed_collection_scope(collection: KnowledgeCollection) -> None:
+    """Keep canonical seed collections visible in the default authenticated workspace."""
+    collection.tenant_id = DEFAULT_SEED_TENANT_ID
+    collection.workspace_id = DEFAULT_SEED_WORKSPACE_ID
+
+
+def _seed_vector_recovery_enabled() -> bool:
+    """Return whether this process may perform optional seed-time vector indexing."""
+    return os.getenv("SEED_VECTOR_RECOVERY_ENABLED", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
 
 async def _ensure_seed_storage(storage_path: str, raw_text: str) -> None:
     """Ensure raw text is saved to storage driver for provenance and file download (P0.1)."""
@@ -73,6 +93,10 @@ async def _ensure_seed_storage(storage_path: str, raw_text: str) -> None:
 
 async def _ensure_qdrant_points(db: AsyncSession, collection_id: str) -> None:
     """Check if Qdrant points exist for collection; if 0, re-index existing chunks from DB (P1.2 self-recovery)."""
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector recovery for collection %s.", collection_id)
+        return
+
     try:
         from app.core.config import get_settings
         from app.modules.rag.vector_indexer import vector_indexer
@@ -269,14 +293,16 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     # 1. Ensure col_regulations collection exists
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == REGULATIONS_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if col:
+        _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=REGULATIONS_COLLECTION_ID,
             name="Kho Tri Thức Quy Chế & Quy Định Đào Tạo",
             module_code="regulations",
             description="Quy chế đào tạo đại học chính quy theo hệ thống tín chỉ, thang điểm và chuẩn đầu ra QNU.",
-            tenant_id="tenant_qnu",
-            workspace_id="workspace_academic",
+            tenant_id=DEFAULT_SEED_TENANT_ID,
+            workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
                 "ocr_profile": "Docling",
@@ -376,6 +402,14 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
         REGULATIONS_COLLECTION_ID,
     )
 
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector indexing for %s.", REGULATIONS_COLLECTION_ID)
+        return {
+            "documents_seeded": 1,
+            "chunks_seeded": len(chunk_objs),
+            "facts_seeded": len(fact_objs),
+        }
+
     # 6. Index into Qdrant
     try:
         from app.core.config import get_settings
@@ -423,14 +457,16 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
     # 1. Ensure col_drafting collection exists
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == DECREE_30_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if col:
+        _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=DECREE_30_COLLECTION_ID,
             name="Kho Tri Thức Thể Thức & Biểu Mẫu Văn Bản",
             module_code="drafting",
             description="Mẫu văn bản hành chính, quyết định, tờ trình, quy cách căn lề theo NĐ 30/2020.",
-            tenant_id="tenant_qnu",
-            workspace_id="workspace_research",
+            tenant_id=DEFAULT_SEED_TENANT_ID,
+            workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
                 "ocr_profile": "Docling",
@@ -529,6 +565,14 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
         DECREE_30_COLLECTION_ID,
     )
 
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector indexing for %s.", DECREE_30_COLLECTION_ID)
+        return {
+            "documents_seeded": 1,
+            "chunks_seeded": len(chunk_objs),
+            "facts_seeded": len(fact_objs),
+        }
+
     # 6. Optional: Index into Qdrant if online
     try:
         from app.core.config import get_settings
@@ -576,14 +620,16 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
     # 1. Ensure col_admissions collection exists
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == ADMISSIONS_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if col:
+        _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=ADMISSIONS_COLLECTION_ID,
             name="Kho Tri Thức Đề Án Tuyển Sinh",
             module_code="admissions",
             description="Đề án và thông báo tuyển sinh đại học chính quy, phương thức xét tuyển, chỉ tiêu, điểm chuẩn, học phí và ký túc xá QNU.",
-            tenant_id="tenant_qnu",
-            workspace_id="workspace_admissions",
+            tenant_id=DEFAULT_SEED_TENANT_ID,
+            workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
                 "ocr_profile": "Docling",
@@ -683,6 +729,14 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
         ADMISSIONS_COLLECTION_ID,
     )
 
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector indexing for %s.", ADMISSIONS_COLLECTION_ID)
+        return {
+            "documents_seeded": 1,
+            "chunks_seeded": len(chunk_objs),
+            "facts_seeded": len(fact_objs),
+        }
+
     # 6. Index into Qdrant
     try:
         from app.core.config import get_settings
@@ -730,14 +784,16 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
     # 1. Ensure col_library collection exists
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == LIBRARY_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if col:
+        _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=LIBRARY_COLLECTION_ID,
             name="Kho Tri Thức Tài Nguyên Thư Viện & Học Liệu Số",
             module_code="library",
             description="Quy chế mượn trả sách, tra cứu OPAC, cơ sở dữ liệu số (ScienceDirect, IEEE, Springer), phòng tự học 24/7 và dịch vụ kiểm tra đạo văn Turnitin QNU.",
-            tenant_id="tenant_qnu",
-            workspace_id="workspace_library",
+            tenant_id=DEFAULT_SEED_TENANT_ID,
+            workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
                 "ocr_profile": "PyMuPDF",
@@ -837,6 +893,14 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
         LIBRARY_COLLECTION_ID,
     )
 
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector indexing for %s.", LIBRARY_COLLECTION_ID)
+        return {
+            "documents_seeded": 1,
+            "chunks_seeded": len(chunk_objs),
+            "facts_seeded": len(fact_objs),
+        }
+
     # 6. Index into Qdrant
     try:
         from app.core.config import get_settings
@@ -884,14 +948,16 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
     # 1. Ensure col_question_bank collection exists
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == QUESTION_BANK_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
+    if col:
+        _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=QUESTION_BANK_COLLECTION_ID,
             name="Kho Tri Thức Ngân Hàng Câu Hỏi & Chuẩn Đầu Ra",
             module_code="question_bank",
             description="Quy định xây dựng ngân hàng câu hỏi, ma trận đề thi theo thang đo Bloom, tiêu chuẩn MCQ và barem chấm điểm QNU.",
-            tenant_id="tenant_qnu",
-            workspace_id="workspace_question_bank",
+            tenant_id=DEFAULT_SEED_TENANT_ID,
+            workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
                 "ocr_profile": "PyMuPDF",
@@ -999,6 +1065,14 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
         len(fact_objs),
         QUESTION_BANK_COLLECTION_ID,
     )
+
+    if not _seed_vector_recovery_enabled():
+        logger.info("Deferred seed-time vector indexing for %s.", QUESTION_BANK_COLLECTION_ID)
+        return {
+            "documents_seeded": doc_created,
+            "chunks_seeded": len(chunk_objs),
+            "facts_seeded": len(fact_objs),
+        }
 
     # 6. Index into Qdrant if new chunks were created
     if chunk_objs:

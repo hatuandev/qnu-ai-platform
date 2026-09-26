@@ -4,7 +4,7 @@ Usage:
     python -m app.cli db check
     python -m app.cli db migrate
     python -m app.cli db bootstrap
-    python -m app.cli db seed [--all] [--assistants] [--knowledge] [--workflows] [--document-types] [--model-defaults]
+    python -m app.cli db seed [--all] [--providers] [--assistants] [--knowledge] [--workflows] [--document-types] [--model-defaults]
 """
 
 from __future__ import annotations
@@ -165,6 +165,10 @@ async def migrate_database(*, ensure_database: bool = True) -> bool:
             await ensure_postgres_database_exists(settings.DATABASE_URL)
 
         await asyncio.to_thread(_upgrade_database_schema)
+        # Alembic's fileConfig sets the root level to WARNING. Keep lifecycle
+        # messages visible after it returns so Dokploy shows bootstrap progress.
+        logging.getLogger().setLevel(logging.INFO)
+        logger.setLevel(logging.INFO)
         logger.info("Database migration to HEAD completed successfully.")
 
         # Fail-loud verification: never let seed run against a half-migrated
@@ -268,6 +272,9 @@ async def run_db_bootstrap(
             for attempt in range(1, seed_attempts + 1):
                 logger.info("Running idempotent platform seed (attempt %d/%d)...", attempt, seed_attempts)
                 if await run_db_seed(seed_all=True) == 0:
+                    if not await verify_core_seed_data():
+                        logger.error("Core seed verification failed after seeding.")
+                        return 1
                     if not await check_db_schema():
                         logger.error("Final database verification failed after seeding.")
                         return 1
@@ -291,6 +298,7 @@ async def run_db_bootstrap(
 async def run_db_seed(
     *,
     seed_all: bool = False,
+    providers: bool = False,
     assistants: bool = False,
     knowledge: bool = False,
     workflows: bool = False,
@@ -299,7 +307,18 @@ async def run_db_seed(
     ingestion_jobs: bool = False,
 ) -> int:
     """Execute idempotent database seed operations."""
-    if not any([seed_all, assistants, knowledge, workflows, document_types, model_defaults, ingestion_jobs]):
+    if not any(
+        [
+            seed_all,
+            providers,
+            assistants,
+            knowledge,
+            workflows,
+            document_types,
+            model_defaults,
+            ingestion_jobs,
+        ]
+    ):
         logger.warning("No seed targets selected. Use --all or specific flags (--assistants, --knowledge, etc.).")
         return 0
 
@@ -314,6 +333,16 @@ async def run_db_seed(
 
     async with AsyncSessionFactory() as db:
         try:
+            if seed_all or providers or model_defaults or knowledge:
+                from app.modules.modelops.service import modelops_service
+
+                logger.info("Seeding default model providers...")
+                seeded_providers = await modelops_service.seed_default_providers(
+                    db,
+                    overwrite=False,
+                )
+                logger.info("Default model providers seeded (%d presets).", len(seeded_providers))
+
             if seed_all or model_defaults or knowledge:
                 from app.modules.modelops.service import modelops_service
 
@@ -362,6 +391,84 @@ async def run_db_seed(
             await db.rollback()
             logger.error("Database seed failed: %s", exc)
             return 1
+
+
+async def verify_core_seed_data() -> bool:
+    """Verify provider presets and visible default knowledge were persisted."""
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection
+    from app.modules.knowledge.seed_data_admissions import ADMISSIONS_COLLECTION_ID
+    from app.modules.knowledge.seed_data_library import LIBRARY_COLLECTION_ID
+    from app.modules.knowledge.seed_data_nd30 import DECREE_30_COLLECTION_ID
+    from app.modules.knowledge.seed_data_question_bank import QUESTION_BANK_COLLECTION_ID
+    from app.modules.knowledge.seed_data_regulations import REGULATIONS_COLLECTION_ID
+    from app.modules.modelops.models import ModelProviderConfig
+    from app.modules.modelops.services.provider_service import STANDARD_QNU_PROVIDERS
+
+    required_provider_ids = {str(provider["id"]) for provider in STANDARD_QNU_PROVIDERS}
+    required_collection_ids = {
+        ADMISSIONS_COLLECTION_ID,
+        LIBRARY_COLLECTION_ID,
+        DECREE_30_COLLECTION_ID,
+        QUESTION_BANK_COLLECTION_ID,
+        REGULATIONS_COLLECTION_ID,
+    }
+
+    async with AsyncSessionFactory() as db:
+        provider_ids = set(
+            (
+                await db.execute(
+                    select(ModelProviderConfig.id).where(
+                        ModelProviderConfig.id.in_(required_provider_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        visible_collection_ids = set(
+            (
+                await db.execute(
+                    select(KnowledgeCollection.id).where(
+                        KnowledgeCollection.id.in_(required_collection_ids),
+                        KnowledgeCollection.tenant_id == "tenant_qnu",
+                        KnowledgeCollection.workspace_id == "workspace_qnu",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        chunked_collection_ids = set(
+            (
+                await db.execute(
+                    select(KnowledgeChunk.collection_id)
+                    .where(KnowledgeChunk.collection_id.in_(required_collection_ids))
+                    .distinct()
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    missing_providers = required_provider_ids - provider_ids
+    missing_collections = required_collection_ids - visible_collection_ids
+    collections_without_chunks = required_collection_ids - chunked_collection_ids
+    if missing_providers or missing_collections or collections_without_chunks:
+        logger.error(
+            "Seed verification mismatch: missing_providers=%s, missing_collections=%s, "
+            "collections_without_chunks=%s",
+            sorted(missing_providers),
+            sorted(missing_collections),
+            sorted(collections_without_chunks),
+        )
+        return False
+
+    logger.info(
+        "Core seed verification passed: %d providers and %d visible knowledge collections.",
+        len(provider_ids),
+        len(visible_collection_ids),
+    )
+    return True
 
 
 async def run_knowledge_reconcile(collection_id: str | None = None, auto_fix: bool = False) -> int:
@@ -529,6 +636,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # `db seed`
     seed_parser = db_subparsers.add_parser("seed", help="Seed initial/idempotent data")
     seed_parser.add_argument("--all", action="store_true", help="Seed all datasets")
+    seed_parser.add_argument("--providers", action="store_true", help="Seed model provider presets")
     seed_parser.add_argument("--assistants", action="store_true", help="Seed standard assistants")
     seed_parser.add_argument("--knowledge", action="store_true", help="Seed default knowledge")
     seed_parser.add_argument("--workflows", action="store_true", help="Sync default workflows")
@@ -584,6 +692,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return asyncio.run(
                 run_db_seed(
                     seed_all=args.all,
+                    providers=args.providers,
                     assistants=args.assistants,
                     knowledge=args.knowledge,
                     workflows=args.workflows,
