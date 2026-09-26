@@ -23,8 +23,9 @@ services:
     container_name: qnu_backend
     restart: unless-stopped
     networks:
-      - qnu_network
-      - dokploy-network
+      qnu_network:
+        aliases:
+          - qnu-backend
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
@@ -84,7 +85,6 @@ services:
     command: ["arq", "app.workers.arq_worker.WorkerSettings"]
     networks:
       - qnu_network
-      - dokploy-network
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
