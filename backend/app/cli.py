@@ -274,7 +274,11 @@ async def run_knowledge_reconcile(collection_id: str | None = None, auto_fix: bo
             if discrepancies:
                 logger.warning("  Found %d discrepancies in collection '%s':", len(discrepancies), col.id)
                 for disc in discrepancies:
-                    logger.warning("    - [%s] %s", disc.get("type"), disc.get("message"))
+                    logger.warning(
+                        "    - [%s] %s",
+                        disc.get("type"),
+                        disc.get("details") or disc.get("message"),
+                    )
                     total_issues += 1
             else:
                 logger.info("  Parity status: 100% HEALTHY.")

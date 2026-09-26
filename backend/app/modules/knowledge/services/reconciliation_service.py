@@ -210,26 +210,8 @@ class ReconciliationService:
         chunk_exec = await db.execute(
             select(KnowledgeChunk).where(KnowledgeChunk.collection_id == collection_id)
         )
-        all_chunks: list[KnowledgeChunk] = []
-        db_chunks_count = 0
-        try:
-            if hasattr(chunk_exec, "scalar") and callable(chunk_exec.scalar):
-                val = chunk_exec.scalar()
-                if isinstance(val, (int, float)) and val > 0:
-                    db_chunks_count = int(val)
-        except Exception:
-            pass
-
-        if db_chunks_count == 0 and hasattr(chunk_exec, "scalars"):
-            try:
-                sc = chunk_exec.scalars()
-                if hasattr(sc, "all") and callable(sc.all):
-                    raw_chunks = sc.all()
-                    if isinstance(raw_chunks, (list, tuple, set)):
-                        all_chunks = list(raw_chunks)
-                        db_chunks_count = len(all_chunks)
-            except Exception:
-                pass
+        all_chunks = list(chunk_exec.scalars().all())
+        db_chunks_count = len(all_chunks)
 
         chunk_by_id = {c.id: c for c in all_chunks}
         doc_by_id = {d.id: d for d in docs}

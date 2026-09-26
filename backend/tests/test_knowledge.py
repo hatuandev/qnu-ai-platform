@@ -948,8 +948,15 @@ async def test_reconcile_collection_audits_parity(monkeypatch):
     doc_exec = MagicMock()
     doc_exec.scalars.return_value = doc_scalars
 
+    chunks = [
+        MagicMock(id=f"chunk_ok_{index}", document_id=doc_ok.id)
+        for index in range(5)
+    ] + [
+        MagicMock(id=f"chunk_missing_{index}", document_id=doc_missing_vec.id)
+        for index in range(3)
+    ]
     chunk_count_exec = MagicMock()
-    chunk_count_exec.scalar.return_value = 8
+    chunk_count_exec.scalars.return_value.all.return_value = chunks
 
     db.execute.side_effect = [doc_exec, chunk_count_exec]
 
@@ -1005,7 +1012,6 @@ async def test_reconcile_flags_ready_document_without_chunks(monkeypatch):
     docs_result = MagicMock()
     docs_result.scalars.return_value.all.return_value = [document]
     chunks_result = MagicMock()
-    chunks_result.scalar.return_value = None
     chunks_result.scalars.return_value.all.return_value = []
     db = MagicMock()
     db.execute = AsyncMock(side_effect=[docs_result, chunks_result])
