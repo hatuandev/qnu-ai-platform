@@ -18,8 +18,8 @@ services:
   # ----------------------------------------------------------------------------
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: qnu_backend
     restart: unless-stopped
     networks:
@@ -33,6 +33,7 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - PORT=8001
       - WORKERS=${BACKEND_WORKERS:-4}
+      - CONFIGS_DIR=/app/configs
       - AUTO_SEED=${AUTO_SEED:-false}
       - DATABASE_URL=${DATABASE_URL:-${CONNECTION_STRING:-postgresql+asyncpg://${POSTGRES_USER:-qnu}:${POSTGRES_PASSWORD:-qnu_password_secure_2026}@postgres:5432/${POSTGRES_DB:-qnu_ai_platform}}}
       - CONNECTION_STRING=${CONNECTION_STRING:-}
@@ -62,7 +63,6 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS in Dokploy Environment}
     volumes:
-      - ./configs:/app/configs:ro
       - qnu_storage:/app/storage
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health/live"]
@@ -76,8 +76,8 @@ services:
   # ----------------------------------------------------------------------------
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: qnu_worker
     restart: unless-stopped
     entrypoint: []
@@ -89,6 +89,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - CONFIGS_DIR=/app/configs
       - AUTO_SEED=false
       - DATABASE_URL=${DATABASE_URL:-${CONNECTION_STRING:-postgresql+asyncpg://${POSTGRES_USER:-qnu}:${POSTGRES_PASSWORD:-qnu_password_secure_2026}@postgres:5432/${POSTGRES_DB:-qnu_ai_platform}}}
       - CONNECTION_STRING=${CONNECTION_STRING:-}
@@ -111,7 +112,6 @@ services:
       - INTERNAL_API_KEY=${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in Dokploy Environment}
       - DEV_ACCESS_PASSWORD=${DEV_ACCESS_PASSWORD:?Set DEV_ACCESS_PASSWORD in Dokploy Environment}
     volumes:
-      - ./configs:/app/configs:ro
       - qnu_storage:/app/storage
     depends_on:
       backend:

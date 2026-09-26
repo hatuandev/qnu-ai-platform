@@ -44,8 +44,10 @@ RUN groupadd -g 10001 qnu \
 
 WORKDIR /app
 
-# 4. Dependency caching layer: Copy dependency manifests first
-COPY pyproject.toml uv.lock* ./
+# 4. Dependency caching layer: Copy dependency manifests first.
+# The production image is built from the repository root so versioned platform
+# configs can be baked into the image instead of relying on a host bind mount.
+COPY backend/pyproject.toml backend/uv.lock* ./
 
 # 5. Install third-party dependencies into .venv
 # Pre-install official CPU-only PyTorch (~180MB) instead of multi-gigabyte CUDA binaries (>5GB)
@@ -56,18 +58,19 @@ RUN uv venv /app/.venv \
      (echo "Retrying dependency install (attempt 2)..." && sleep 5 && uv pip install --no-cache --index-strategy unsafe-best-match -r pyproject.toml --python /app/.venv/bin/python) || \
      (echo "Retrying dependency install (attempt 3)..." && sleep 10 && uv pip install --no-cache --index-strategy unsafe-best-match -r pyproject.toml --python /app/.venv/bin/python))
 
-# 6. Copy application source code, migrations, and entrypoint
-COPY app/ ./app
-COPY alembic/ ./alembic
-COPY alembic.ini ./alembic.ini
-COPY entrypoint.sh ./entrypoint.sh
-COPY README.md ./README.md
+# 6. Copy application source code, migrations, entrypoint, and versioned configs
+COPY backend/app/ ./app
+COPY backend/alembic/ ./alembic
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/entrypoint.sh ./entrypoint.sh
+COPY backend/README.md ./README.md
+COPY configs/ ./configs
 
 # 6b. Install project package in editable mode without re-fetching dependencies
 RUN uv pip install -e . --no-deps --python /app/.venv/bin/python
 
 # 7. Create storage directories for uploads/artifacts and set non-root ownership
-RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups /app/configs \
+RUN mkdir -p /app/storage/uploads /app/storage/artifacts /app/storage/backups \
  && chmod +x /app/entrypoint.sh \
  && chown -R qnu:qnu /app/storage /app/configs
 
