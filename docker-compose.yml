@@ -130,6 +130,7 @@ services:
     restart: unless-stopped
     networks:
       - qnu_network
+      - dokploy-network
     expose:
       - "80"
     depends_on:
