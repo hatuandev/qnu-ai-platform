@@ -454,6 +454,7 @@ async def test_reconciliation_detects_discrepancies():
     )
 
     with patch("app.modules.rag.vector_indexer.vector_indexer.client") as mock_qdrant_client:
+        mock_qdrant_client.collection_exists = AsyncMock(return_value=True)
         mock_qdrant_client.count = AsyncMock(return_value=MagicMock(count=2))
         mock_qdrant_client.scroll = AsyncMock(return_value=([point_legacy, point_orphan], None))
 

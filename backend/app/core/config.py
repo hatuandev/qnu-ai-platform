@@ -266,12 +266,9 @@ class Settings(BaseSettings):
                     "You MUST override these variables in production environment."
                 )
             if not self.PROVIDER_ENCRYPTION_KEY:
-                import base64
-                import hashlib
-
-                # Deterministically derive 32-byte url-safe Fernet key from SECRET_KEY
-                derived = base64.urlsafe_b64encode(hashlib.sha256(self.SECRET_KEY.encode()).digest()).decode()
-                self.PROVIDER_ENCRYPTION_KEY = derived
+                raise ValueError(
+                    "Production security violation: PROVIDER_ENCRYPTION_KEY must be configured."
+                )
         return self
 
 

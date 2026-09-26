@@ -130,6 +130,140 @@ async def _ensure_qdrant_points(db: AsyncSession, collection_id: str) -> None:
         logger.warning("Self-recovery Qdrant check for %s skipped or failed (graceful): %s", collection_id, exc)
 
 
+async def _ensure_seed_chunks(
+    db: AsyncSession,
+    *,
+    collection_id: str,
+    document_id: str,
+    chunks: list[dict],
+) -> list[KnowledgeChunk]:
+    """Insert only missing deterministic seed chunks for an existing document."""
+    existing_ids = set(
+        (
+            await db.execute(
+                select(KnowledgeChunk.id).where(KnowledgeChunk.document_id == document_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    created: list[KnowledgeChunk] = []
+    for chunk in chunks:
+        if chunk["id"] in existing_ids:
+            continue
+        content = chunk["content"]
+        chunk_obj = KnowledgeChunk(
+            id=chunk["id"],
+            document_id=document_id,
+            collection_id=collection_id,
+            chunk_index=chunk["chunk_index"],
+            content=content,
+            chunk_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            token_count=len(content.split()),
+            section=chunk["title"],
+            page_number=chunk["metadata"].get("page", 1),
+            chunk_metadata=chunk["metadata"],
+        )
+        db.add(chunk_obj)
+        created.append(chunk_obj)
+    return created
+
+
+async def _ensure_seed_facts(
+    db: AsyncSession,
+    *,
+    collection_id: str,
+    document_id: str,
+    facts: list[dict],
+    default_entity_type: str | None = None,
+) -> list[KnowledgeFact]:
+    """Insert missing seed facts using their stable ID or natural identity."""
+    existing = list(
+        (
+            await db.execute(
+                select(KnowledgeFact).where(KnowledgeFact.document_id == document_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    existing_ids = {fact.id for fact in existing}
+    existing_identity = {
+        (fact.entity_name, fact.attribute_name, fact.attribute_value) for fact in existing
+    }
+
+    created: list[KnowledgeFact] = []
+    for fact in facts:
+        fact_id = fact.get("fact_key")
+        attribute_value = str(
+            fact["value"] if "value" in fact else fact["attribute_value"]
+        )
+        identity = (fact["entity_name"], fact["attribute_name"], attribute_value)
+        if (fact_id and fact_id in existing_ids) or identity in existing_identity:
+            continue
+
+        fact_obj = KnowledgeFact(
+            **({"id": fact_id} if fact_id else {}),
+            collection_id=collection_id,
+            document_id=document_id,
+            entity_name=fact["entity_name"],
+            entity_type=fact.get("category") or default_entity_type or "fact",
+            attribute_name=fact["attribute_name"],
+            attribute_value=attribute_value,
+            confidence=1.0,
+            raw_data=fact.get("fact_metadata") or dict(fact),
+        )
+        db.add(fact_obj)
+        created.append(fact_obj)
+        existing_identity.add(identity)
+        if fact_id:
+            existing_ids.add(fact_id)
+    return created
+
+
+async def _repair_existing_seed_document(
+    db: AsyncSession,
+    *,
+    document: KnowledgeDocument,
+    collection_id: str,
+    raw_text: str,
+    chunks: list[dict],
+    facts: list[dict],
+    default_fact_type: str | None = None,
+) -> dict[str, int]:
+    """Repair a partially seeded document without deleting or replacing user data."""
+    await _ensure_seed_storage(document.storage_path, raw_text)
+    created_chunks = await _ensure_seed_chunks(
+        db,
+        collection_id=collection_id,
+        document_id=document.id,
+        chunks=chunks,
+    )
+    created_facts = await _ensure_seed_facts(
+        db,
+        collection_id=collection_id,
+        document_id=document.id,
+        facts=facts,
+        default_entity_type=default_fact_type,
+    )
+    if created_chunks:
+        document.index_status = "pending"
+        document.index_error = None
+    await db.commit()
+    await _ensure_qdrant_points(db, collection_id)
+    logger.info(
+        "Repaired seed document %s: added %d chunks and %d facts.",
+        document.id,
+        len(created_chunks),
+        len(created_facts),
+    )
+    return {
+        "documents_seeded": 0,
+        "chunks_seeded": len(created_chunks),
+        "facts_seeded": len(created_facts),
+    }
+
+
 async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     """Seed official QNU Academic Regulations into col_regulations if not present."""
     # 1. Ensure col_regulations collection exists
@@ -160,9 +294,14 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     if existing_doc:
         logger.info("QNU Academic Regulations document already present in col_regulations.")
         file_content = "\n\n".join(c["content"] for c in REGULATIONS_CHUNKS)
-        await _ensure_seed_storage(existing_doc.storage_path, file_content)
-        await _ensure_qdrant_points(db, REGULATIONS_COLLECTION_ID)
-        return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+        return await _repair_existing_seed_document(
+            db,
+            document=existing_doc,
+            collection_id=REGULATIONS_COLLECTION_ID,
+            raw_text=file_content,
+            chunks=REGULATIONS_CHUNKS,
+            facts=REGULATIONS_FACTS,
+        )
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in REGULATIONS_CHUNKS)
@@ -309,9 +448,15 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
     if existing_doc:
         logger.info("Decree 30/2020/ND-CP document already present in col_drafting.")
         file_content_mock = "\n\n".join(c["content"] for c in DECREE_30_CHUNKS)
-        await _ensure_seed_storage(existing_doc.storage_path, file_content_mock)
-        await _ensure_qdrant_points(db, DECREE_30_COLLECTION_ID)
-        return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+        return await _repair_existing_seed_document(
+            db,
+            document=existing_doc,
+            collection_id=DECREE_30_COLLECTION_ID,
+            raw_text=file_content_mock,
+            chunks=DECREE_30_CHUNKS,
+            facts=DECREE_30_FACTS,
+            default_fact_type="legal_norm",
+        )
 
     # 3. Create KnowledgeDocument
     file_content_mock = "\n\n".join(c["content"] for c in DECREE_30_CHUNKS)
@@ -456,9 +601,14 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
     if existing_doc:
         logger.info("QNU Admissions document already present in col_admissions.")
         file_content = "\n\n".join(c["content"] for c in ADMISSIONS_CHUNKS)
-        await _ensure_seed_storage(existing_doc.storage_path, file_content)
-        await _ensure_qdrant_points(db, ADMISSIONS_COLLECTION_ID)
-        return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+        return await _repair_existing_seed_document(
+            db,
+            document=existing_doc,
+            collection_id=ADMISSIONS_COLLECTION_ID,
+            raw_text=file_content,
+            chunks=ADMISSIONS_CHUNKS,
+            facts=ADMISSIONS_FACTS,
+        )
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in ADMISSIONS_CHUNKS)
@@ -605,9 +755,14 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
     if existing_doc:
         logger.info("QNU Library document already present in col_library.")
         file_content = "\n\n".join(c["content"] for c in LIBRARY_CHUNKS)
-        await _ensure_seed_storage(existing_doc.storage_path, file_content)
-        await _ensure_qdrant_points(db, LIBRARY_COLLECTION_ID)
-        return {"documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+        return await _repair_existing_seed_document(
+            db,
+            document=existing_doc,
+            collection_id=LIBRARY_COLLECTION_ID,
+            raw_text=file_content,
+            chunks=LIBRARY_CHUNKS,
+            facts=LIBRARY_FACTS,
+        )
 
     # 3. Create KnowledgeDocument
     file_content = "\n\n".join(c["content"] for c in LIBRARY_CHUNKS)
@@ -755,8 +910,14 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
     chunk_objs: list[KnowledgeChunk] = []
     file_content = "\n\n".join(c["content"] for c in QUESTION_BANK_CHUNKS)
     if existing_doc:
-        await _ensure_seed_storage(existing_doc.storage_path, file_content)
-        await _ensure_qdrant_points(db, QUESTION_BANK_COLLECTION_ID)
+        return await _repair_existing_seed_document(
+            db,
+            document=existing_doc,
+            collection_id=QUESTION_BANK_COLLECTION_ID,
+            raw_text=file_content,
+            chunks=QUESTION_BANK_CHUNKS,
+            facts=QUESTION_BANK_FACTS,
+        )
     else:
         # 3. Create KnowledgeDocument
         await _ensure_seed_storage(f"uploads/{QUESTION_BANK_COLLECTION_ID}/{QUESTION_BANK_FILENAME}", file_content)

@@ -957,6 +957,7 @@ async def test_reconcile_collection_audits_parity(monkeypatch):
     from app.modules.rag.vector_indexer import vector_indexer
     count_res = MagicMock()
     count_res.count = 5
+    vector_indexer.client.collection_exists = AsyncMock(return_value=True)
     vector_indexer.client.count = AsyncMock(return_value=count_res)
 
     res = await knowledge_service.reconcile_collection(db, "col_test_reconcile")
@@ -968,6 +969,126 @@ async def test_reconcile_collection_audits_parity(monkeypatch):
     assert res["qdrant_points_count"] == 5
     assert res["is_consistent"] is False
     assert len(res["discrepancies"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_reconcile_flags_ready_document_without_chunks(monkeypatch):
+    """A ready document with no chunks must never be reported as healthy."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.core.storage import storage_service
+    from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
+    from app.modules.knowledge.services.reconciliation_service import ReconciliationService
+    from app.modules.rag.vector_indexer import vector_indexer
+
+    service = ReconciliationService()
+    collection = KnowledgeCollection(
+        id="col_partial_seed",
+        name="Kho seed dở dang",
+        module_code="general",
+    )
+    document = KnowledgeDocument(
+        id="doc_partial_seed",
+        collection_id=collection.id,
+        status="ready",
+        index_status="indexed",
+        is_active=True,
+        title="Tài liệu chưa có chunk",
+        file_name="partial.pdf",
+        file_type="pdf",
+        file_size_bytes=128,
+        file_hash="partial-hash",
+        storage_path="uploads/partial.pdf",
+    )
+    service._get_collection = AsyncMock(return_value=collection)
+
+    docs_result = MagicMock()
+    docs_result.scalars.return_value.all.return_value = [document]
+    chunks_result = MagicMock()
+    chunks_result.scalar.return_value = None
+    chunks_result.scalars.return_value.all.return_value = []
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[docs_result, chunks_result])
+
+    monkeypatch.setattr(storage_service, "exists", AsyncMock(return_value=True))
+    monkeypatch.setattr(
+        vector_indexer.client,
+        "collection_exists",
+        AsyncMock(return_value=False),
+    )
+
+    report = await service.reconcile_collection(db, collection.id)
+
+    discrepancy_types = {item["type"] for item in report["discrepancies"]}
+    assert report["is_consistent"] is False
+    assert "missing_document_chunks" in discrepancy_types
+
+
+@pytest.mark.asyncio
+async def test_partial_seed_document_backfills_missing_chunks_and_facts(monkeypatch):
+    """Idempotent seed recovery should add missing records without deleting the document."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.knowledge import seeder
+    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeDocument, KnowledgeFact
+
+    document = KnowledgeDocument(
+        id="doc_partial_seed",
+        collection_id="col_partial_seed",
+        status="ready",
+        index_status="indexed",
+        is_active=True,
+        title="Tài liệu seed",
+        file_name="seed.pdf",
+        file_type="pdf",
+        file_size_bytes=128,
+        file_hash="seed-hash",
+        storage_path="uploads/seed.pdf",
+    )
+    empty_chunks = MagicMock()
+    empty_chunks.scalars.return_value.all.return_value = []
+    empty_facts = MagicMock()
+    empty_facts.scalars.return_value.all.return_value = []
+    db = MagicMock()
+    db.execute = AsyncMock(side_effect=[empty_chunks, empty_facts])
+    db.commit = AsyncMock()
+
+    monkeypatch.setattr(seeder, "_ensure_seed_storage", AsyncMock())
+    ensure_qdrant = AsyncMock()
+    monkeypatch.setattr(seeder, "_ensure_qdrant_points", ensure_qdrant)
+
+    result = await seeder._repair_existing_seed_document(
+        db,
+        document=document,
+        collection_id=document.collection_id,
+        raw_text="Nội dung seed",
+        chunks=[
+            {
+                "id": "chk_seed_01",
+                "chunk_index": 0,
+                "content": "Nội dung seed",
+                "title": "Mục 1",
+                "metadata": {"page": 1},
+            }
+        ],
+        facts=[
+            {
+                "fact_key": "fact_seed_01",
+                "entity_name": "QNU",
+                "category": "rule",
+                "attribute_name": "quy định",
+                "value": "Nội dung seed",
+            }
+        ],
+    )
+
+    added = [call.args[0] for call in db.add.call_args_list]
+    assert result == {"documents_seeded": 0, "chunks_seeded": 1, "facts_seeded": 1}
+    assert any(isinstance(item, KnowledgeChunk) for item in added)
+    assert any(isinstance(item, KnowledgeFact) for item in added)
+    assert document.index_status == "pending"
+    db.commit.assert_awaited_once()
+    ensure_qdrant.assert_awaited_once_with(db, document.collection_id)
 
 
 @pytest.mark.asyncio

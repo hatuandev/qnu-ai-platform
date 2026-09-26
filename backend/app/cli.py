@@ -184,12 +184,6 @@ async def run_db_seed(
         return 0
 
     from app.core.storage import storage_service
-    from app.modules.assistants.seeder import seed_standard_assistants
-    from app.modules.document_types.service import document_types_service
-    from app.modules.knowledge.seeder import seed_default_knowledge
-    from app.modules.knowledge.service import knowledge_service
-    from app.modules.modelops.service import modelops_service
-    from app.modules.workflows.service import workflow_service
 
     logger.info("Ensuring storage bucket...")
     await storage_service.ensure_bucket()
@@ -197,31 +191,43 @@ async def run_db_seed(
     async with AsyncSessionFactory() as db:
         try:
             if seed_all or model_defaults or knowledge:
+                from app.modules.modelops.service import modelops_service
+
                 logger.info("Initializing system model defaults...")
                 await modelops_service.get_system_model_defaults(db)
                 logger.info("System model defaults initialized.")
 
             if seed_all or document_types:
+                from app.modules.document_types.service import document_types_service
+
                 logger.info("Syncing document types catalog (ND 30)...")
                 await document_types_service.sync_from_catalog(db)
                 logger.info("Document types catalog synced.")
 
             if seed_all or workflows:
+                from app.modules.workflows.service import workflow_service
+
                 logger.info("Syncing default workflow definitions...")
                 await workflow_service.sync_default_workflows(db)
                 logger.info("Default workflows synced.")
 
             if seed_all or assistants:
+                from app.modules.assistants.seeder import seed_standard_assistants
+
                 logger.info("Seeding standard QNU AI assistants...")
                 await seed_standard_assistants(db)
                 logger.info("Standard assistants seeded.")
 
             if seed_all or knowledge:
+                from app.modules.knowledge.seeder import seed_default_knowledge
+
                 logger.info("Seeding default knowledge collections...")
                 await seed_default_knowledge(db)
                 logger.info("Default knowledge collections seeded.")
 
             if seed_all or ingestion_jobs:
+                from app.modules.knowledge.service import knowledge_service
+
                 logger.info("Syncing ingestion job records...")
                 await knowledge_service.sync_ingestion_job_records(db)
                 logger.info("Ingestion job records synced.")

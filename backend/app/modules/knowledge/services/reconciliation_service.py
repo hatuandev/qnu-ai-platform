@@ -233,6 +233,17 @@ class ReconciliationService:
 
         chunk_by_id = {c.id: c for c in all_chunks}
         doc_by_id = {d.id: d for d in docs}
+        active_indexable_doc_ids = {
+            d.id for d in docs if d.status in ("approved", "ready") and d.is_active
+        }
+        chunks_per_document: dict[str, int] = {}
+        for chunk in all_chunks:
+            chunks_per_document[chunk.document_id] = (
+                chunks_per_document.get(chunk.document_id, 0) + 1
+            )
+        approved_chunks_count = sum(
+            1 for chunk in all_chunks if chunk.document_id in active_indexable_doc_ids
+        )
 
         # Qdrant points count & inspection
         qdrant_points_count = 0
@@ -241,54 +252,62 @@ class ReconciliationService:
         try:
             from app.modules.rag.vector_indexer import vector_indexer
             cname = vector_indexer._get_collection_name(collection_id)
-            count_res = await vector_indexer.client.count(collection_name=cname)
-            qdrant_points_count = count_res.count
+            collection_exists = await vector_indexer.client.collection_exists(cname)
+            if not collection_exists and approved_chunks_count > 0:
+                discrepancies.append({
+                    "type": "missing_qdrant_collection",
+                    "document_id": None,
+                    "details": f"Qdrant chưa có collection '{cname}' cho {approved_chunks_count} chunks đã duyệt.",
+                })
+            elif collection_exists:
+                count_res = await vector_indexer.client.count(collection_name=cname)
+                qdrant_points_count = count_res.count
 
-            # Scroll up to 100 points to audit payload metadata schema
-            scroll_res = await vector_indexer.client.scroll(
-                collection_name=cname,
-                limit=100,
-                with_payload=True,
-                with_vectors=False,
-            )
-            points = scroll_res[0] if scroll_res else []
-            for pt in points:
-                p_load = pt.payload or {}
-                # 1. Check payload schema version
-                if p_load.get("payload_schema_version") != "v1":
-                    discrepancies.append({
-                        "type": "legacy_payload_schema",
-                        "point_id": str(pt.id),
-                        "details": f"Point '{pt.id}' có payload schema '{p_load.get('payload_schema_version')}', chưa chuẩn hóa v1.",
-                    })
-                # 2. Check tenant and workspace scope
-                if p_load.get("tenant_id") != col.tenant_id or p_load.get("workspace_id") != col.workspace_id:
-                    discrepancies.append({
-                        "type": "scope_mismatch",
-                        "point_id": str(pt.id),
-                        "details": f"Point '{pt.id}' thuộc tenant '{p_load.get('tenant_id')}'/workspace '{p_load.get('workspace_id')}', không khớp với bộ sưu tập.",
-                    })
-                # 3. Check orphan points
-                p_chunk_id = p_load.get("chunk_id")
-                if p_chunk_id and p_chunk_id not in chunk_by_id:
-                    discrepancies.append({
-                        "type": "orphan_qdrant_point",
-                        "point_id": str(pt.id),
-                        "details": f"Point '{pt.id}' tham chiếu chunk '{p_chunk_id}' không tồn tại trong CSDL.",
-                    })
-                # 4. Check unretrievable active points
-                p_doc_id = p_load.get("document_id")
-                parent_doc = doc_by_id.get(p_doc_id)
-                if (
-                    parent_doc
-                    and (not parent_doc.is_active or parent_doc.status not in ("approved", "ready"))
-                    and p_load.get("is_retrievable") is True
-                ):
-                    discrepancies.append({
-                        "type": "unretrievable_point_active",
-                        "point_id": str(pt.id),
-                        "details": f"Point '{pt.id}' thuộc tài liệu status '{parent_doc.status}' nhưng vẫn đang bật is_retrievable.",
-                    })
+                # Scroll up to 100 points to audit payload metadata schema
+                scroll_res = await vector_indexer.client.scroll(
+                    collection_name=cname,
+                    limit=100,
+                    with_payload=True,
+                    with_vectors=False,
+                )
+                points = scroll_res[0] if scroll_res else []
+                for pt in points:
+                    p_load = pt.payload or {}
+                    # 1. Check payload schema version
+                    if p_load.get("payload_schema_version") != "v1":
+                        discrepancies.append({
+                            "type": "legacy_payload_schema",
+                            "point_id": str(pt.id),
+                            "details": f"Point '{pt.id}' có payload schema '{p_load.get('payload_schema_version')}', chưa chuẩn hóa v1.",
+                        })
+                    # 2. Check tenant and workspace scope
+                    if p_load.get("tenant_id") != col.tenant_id or p_load.get("workspace_id") != col.workspace_id:
+                        discrepancies.append({
+                            "type": "scope_mismatch",
+                            "point_id": str(pt.id),
+                            "details": f"Point '{pt.id}' thuộc tenant '{p_load.get('tenant_id')}'/workspace '{p_load.get('workspace_id')}', không khớp với bộ sưu tập.",
+                        })
+                    # 3. Check orphan points
+                    p_chunk_id = p_load.get("chunk_id")
+                    if p_chunk_id and p_chunk_id not in chunk_by_id:
+                        discrepancies.append({
+                            "type": "orphan_qdrant_point",
+                            "point_id": str(pt.id),
+                            "details": f"Point '{pt.id}' tham chiếu chunk '{p_chunk_id}' không tồn tại trong CSDL.",
+                        })
+                    # 4. Check unretrievable active points
+                    p_doc_id = p_load.get("document_id")
+                    parent_doc = doc_by_id.get(p_doc_id)
+                    if (
+                        parent_doc
+                        and (not parent_doc.is_active or parent_doc.status not in ("approved", "ready"))
+                        and p_load.get("is_retrievable") is True
+                    ):
+                        discrepancies.append({
+                            "type": "unretrievable_point_active",
+                            "point_id": str(pt.id),
+                            "details": f"Point '{pt.id}' thuộc tài liệu status '{parent_doc.status}' nhưng vẫn đang bật is_retrievable.",
+                        })
         except Exception as exc:
             logger.warning("Failed to inspect points in Qdrant for collection %s: %s", collection_id, exc)
 
@@ -320,10 +339,14 @@ class ReconciliationService:
                     "details": f"Tài liệu '{d.title}' đã duyệt nhưng chưa lập chỉ mục thành công (index_status: {d.index_status}).",
                 })
 
-        # Check chunk vs point parity for ready/approved documents
-        approved_doc_ids = {d.id for d in docs if d.status in ("approved", "ready") and d.is_active}
-        approved_chunks_count = sum(1 for c in all_chunks if c.document_id in approved_doc_ids)
+            if d.id in active_indexable_doc_ids and chunks_per_document.get(d.id, 0) == 0:
+                discrepancies.append({
+                    "type": "missing_document_chunks",
+                    "document_id": d.id,
+                    "details": f"Tài liệu '{d.title}' đã duyệt nhưng không có chunk dữ liệu.",
+                })
 
+        # Check chunk vs point parity for ready/approved documents
         if qdrant_points_count < approved_chunks_count:
             discrepancies.append({
                 "type": "vector_points_deficit",

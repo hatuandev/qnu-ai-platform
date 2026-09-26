@@ -20,7 +20,7 @@ def get_configs_dir() -> Path:
     1. CONFIGS_DIR environment variable (if set and exists)
     2. /app/configs (Standard container path inside Docker)
     3. Traversal up the directory hierarchy looking for configs/workflows
-    4. Fallback: 4 levels up from this file + configs
+    4. Fallback beside the installed ``app`` package
     """
     # 1. Environment variable override
     env_dir = os.environ.get("CONFIGS_DIR")
@@ -41,6 +41,9 @@ def get_configs_dir() -> Path:
         if candidate.is_dir() and (candidate / "workflows").is_dir():
             return candidate.resolve()
 
-    # 4. Fallback relative to repository layout
-    fallback = current.parents[4] / "configs"
+    # 4. Safe fallback for slim/container installations where the directory
+    # exists but has not been populated yet. Avoid indexing a fixed parent
+    # depth because ``/app/app/core/paths.py`` has fewer parents than a local
+    # repository checkout.
+    fallback = current.parent.parent.parent / "configs"
     return fallback.resolve()
