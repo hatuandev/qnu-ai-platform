@@ -1,0 +1,50 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "drafting.quality",
+    "version": "1.0.0",
+    "display_name": "Kiểm định Nghĩa Văn bản",
+    "description": "Kiểm tra nghĩa bắt buộc theo loại văn bản, độc lập với số ký tự và số đoạn.",
+    "category": "control",
+    "labels": {"provider": "qnu_ai_core"}
+  },
+  "spec": {
+    "handler": {"kind": "core_api", "operation": "drafting.quality"},
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"length_independent": {"type": "boolean", "const": true}}
+    },
+    "input_schema": {
+      "type": "object",
+      "required": ["draft"],
+      "properties": {"draft": {"type": "object"}}
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["draft", "quality_report"],
+      "properties": {
+        "draft": {"type": "object"},
+        "quality_report": {"type": "object"},
+        "accepted": {"type": "object"},
+        "repair": {"type": "object"}
+      }
+    },
+    "capabilities": ["drafting.quality"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 3,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "input_hash",
+      "checkpoint": "none",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {"safe_trace_fields": ["passed", "required_roles"], "redacted_fields": ["draft"]},
+    "compatibility": {"min_runtime_version": "0.1.0", "status": "stable"}
+  }
+}

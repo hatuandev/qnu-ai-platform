@@ -14,6 +14,9 @@ from app.modules.workflows.nodes import (
     ConditionRouteNodeHandler,
     DraftingComposeNodeHandler,
     DraftingPlanNodeHandler,
+    DraftingQualityNodeHandler,
+    DraftingReferenceNodeHandler,
+    DraftingRepairNodeHandler,
     DraftingValidationNodeHandler,
     ExtractFieldsNodeHandler,
     HumanApprovalNodeHandler,
@@ -58,6 +61,9 @@ class NodeHandlerRegistry:
 
         self.register("core.drafting.compose", DraftingComposeNodeHandler())
         self.register("drafting.plan", DraftingPlanNodeHandler())
+        self.register("drafting.quality", DraftingQualityNodeHandler())
+        self.register("drafting.reference", DraftingReferenceNodeHandler())
+        self.register("drafting.repair", DraftingRepairNodeHandler())
         self.register("drafting.validate", DraftingValidationNodeHandler())
         self.register("artifact.resolve_format", ArtifactFormatNodeHandler())
 

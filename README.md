@@ -123,3 +123,18 @@ Nền tảng trang bị bộ bóc tách tài liệu thông minh chuyên sâu cho
   - Tự động phát hiện các bảng in ngang cùng trục Y (như bảng IELTS và VSTEP) để gộp thành bảng chuẩn 4 cột.
 - **Bảo Vệ Toàn Vẹn Dữ Liệu RAG**:
   - Chuẩn hóa Unicode NFC, chống Mojibake 100%, bảo toàn 100% dòng phân cách GFM `|:---|`.
+
+
+Soạn Tờ trình về việc phát triển 02 phân hệ phần mềm phục vụ đào tạo và quản lý.
+
+Đơn vị ban hành: Trung tâm Số và Học liệu.
+Địa danh ban hành: Gia Lai.
+Số hiệu: /TTr-SHL.
+Ngày ban hành: 26/09/2026.
+Kính gửi: Hiệu trưởng Trường Đại học Quy Nhơn.
+Căn cứ: Quyết định số 2699/QĐ-ĐHQN.
+Nội dung đề xuất: Phát triển phân hệ Ký túc xá và phân hệ Sổ tay Sinh viên điện tử.
+Nơi nhận: Hiệu trưởng (xin ý kiến); Lưu: VT, SHL.
+Người ký: TS. Nguyễn Thành Đạt.
+Chức vụ người ký: Giám đốc.
+Xuất cả DOCX và PDF.

@@ -4,7 +4,7 @@
   "metadata": {
     "name": "drafting-assistant",
     "display_name": "Trợ lý ảo Hỗ trợ Soạn thảo Văn bản",
-    "description": "Tạo dự thảo văn bản hành chính DOCX/PDF từ yêu cầu tự nhiên; không phụ thuộc kho tri thức.",
+    "description": "Tạo dự thảo DOCX/PDF theo cấu trúc thích ứng, dữ kiện có nguồn gốc và kiểm định ngữ nghĩa.",
     "scope": {
       "tenant_id": "tenant_qnu",
       "workspace_id": "workspace_research"
@@ -12,10 +12,10 @@
     "module_code": "drafting",
     "labels": {
       "template": "drafting",
-      "phase": "phase_1_docx_pdf"
+      "phase": "adaptive_document_ast"
     },
     "annotations": {
-      "purpose": "document_draft_docx_pdf_without_rag"
+      "purpose": "adaptive_grounded_document_drafting"
     }
   },
   "spec": {
@@ -43,6 +43,24 @@
           "type": "object",
           "description": "Thông tin hành chính đã được người dùng cung cấp rõ ràng."
         },
+        "organization_profile": {
+          "type": "object",
+          "description": "Hồ sơ đơn vị ban hành: tên đơn vị, địa danh, hậu tố ký hiệu và người ký mặc định."
+        },
+        "reference_context": {
+          "type": "string",
+          "maxLength": 16000,
+          "description": "Nội dung văn bản mẫu dùng để nhận diện hình thái; không tự sao chép dữ kiện."
+        },
+        "structure_mode": {
+          "enum": ["adaptive", "reference_led", "compact_narrative", "detailed_plan"],
+          "default": "adaptive"
+        },
+        "required_fields": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Các mã trường bắt buộc phải hỏi lại trước khi soạn."
+        },
         "format": {
           "type": "string",
           "default": "docx,pdf"
@@ -52,10 +70,10 @@
     "output_schema": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["status", "answer", "artifacts"],
+      "required": ["status", "answer"],
       "properties": {
         "status": {
-          "enum": ["draft_created", "draft_created_with_warnings"]
+          "enum": ["needs_clarification", "draft_ready", "draft_created", "draft_created_with_warnings"]
         },
         "answer": {
           "type": "string"
@@ -118,19 +136,52 @@
         }
       },
       {
+        "id": "analyze_reference",
+        "type": "drafting.reference",
+        "version": "1.0.0",
+        "display_name": "Phân tích cấu trúc mẫu tham chiếu",
+        "config": {
+          "max_reference_characters": 16000
+        },
+        "policy": {
+          "timeout_seconds": 3,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
         "id": "plan_draft",
         "type": "drafting.plan",
         "version": "1.0.0",
         "display_name": "Lập kế hoạch trường dữ liệu",
         "config": {
           "default_document_type": "to_trinh",
-          "knowledge_required": false
+          "knowledge_required": false,
+          "blocking_fields": [],
+          "organization_profile": {
+            "parent_organization": "TRƯỜNG ĐẠI HỌC QUY NHƠN",
+            "issue_place": "Quy Nhơn"
+          }
         },
         "policy": {
           "timeout_seconds": 3,
           "max_attempts": 1,
           "checkpoint_after": false,
           "required_permissions": ["drafting.plan"]
+        }
+      },
+      {
+        "id": "clarification_output",
+        "type": "output.chat",
+        "version": "1.0.0",
+        "display_name": "Yêu cầu bổ sung dữ kiện bắt buộc",
+        "config": {},
+        "policy": {
+          "timeout_seconds": 2,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
         }
       },
       {
@@ -144,6 +195,37 @@
           "max_tokens": 2400,
           "knowledge_required": false,
           "fabricate_missing_fields": false
+        },
+        "policy": {
+          "timeout_seconds": 45,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": ["drafting.compose"]
+        }
+      },
+      {
+        "id": "quality_gate",
+        "type": "drafting.quality",
+        "version": "1.0.0",
+        "display_name": "Kiểm định nghĩa bắt buộc",
+        "config": {
+          "length_independent": true
+        },
+        "policy": {
+          "timeout_seconds": 3,
+          "max_attempts": 1,
+          "checkpoint_after": false,
+          "required_permissions": []
+        }
+      },
+      {
+        "id": "repair_draft",
+        "type": "drafting.repair",
+        "version": "1.0.0",
+        "display_name": "Sửa bản nháp theo lỗi kiểm định",
+        "config": {
+          "temperature": 0.2,
+          "max_tokens": 3200
         },
         "policy": {
           "timeout_seconds": 45,
@@ -230,20 +312,50 @@
         "priority": 100
       },
       {
-        "id": "edge_extract_to_plan",
+        "id": "edge_extract_to_reference",
         "source": {"node_id": "extract_fields", "port": "fields"},
-        "target": {"node_id": "plan_draft", "port": "fields"},
+        "target": {"node_id": "analyze_reference", "port": "fields"},
+        "priority": 100
+      },
+      {
+        "id": "edge_reference_to_plan",
+        "source": {"node_id": "analyze_reference", "port": "reference_profile"},
+        "target": {"node_id": "plan_draft", "port": "reference_profile"},
+        "priority": 100
+      },
+      {
+        "id": "edge_plan_to_clarification",
+        "source": {"node_id": "plan_draft", "port": "needs_input"},
+        "target": {"node_id": "clarification_output", "port": "missing_fields"},
         "priority": 100
       },
       {
         "id": "edge_plan_to_compose",
-        "source": {"node_id": "plan_draft", "port": "plan"},
+        "source": {"node_id": "plan_draft", "port": "ready"},
         "target": {"node_id": "compose_draft", "port": "plan"},
+        "priority": 90
+      },
+      {
+        "id": "edge_compose_to_quality",
+        "source": {"node_id": "compose_draft", "port": "draft"},
+        "target": {"node_id": "quality_gate", "port": "draft"},
         "priority": 100
       },
       {
-        "id": "edge_compose_to_validate",
-        "source": {"node_id": "compose_draft", "port": "draft"},
+        "id": "edge_quality_to_validate",
+        "source": {"node_id": "quality_gate", "port": "accepted"},
+        "target": {"node_id": "validate_draft", "port": "draft"},
+        "priority": 100
+      },
+      {
+        "id": "edge_quality_to_repair",
+        "source": {"node_id": "quality_gate", "port": "repair"},
+        "target": {"node_id": "repair_draft", "port": "repair_bundle"},
+        "priority": 90
+      },
+      {
+        "id": "edge_repair_to_validate",
+        "source": {"node_id": "repair_draft", "port": "draft"},
         "target": {"node_id": "validate_draft", "port": "draft"},
         "priority": 100
       },
@@ -251,12 +363,6 @@
         "id": "edge_validate_to_format",
         "source": {"node_id": "validate_draft", "port": "draft"},
         "target": {"node_id": "resolve_format", "port": "draft"},
-        "priority": 100
-      },
-      {
-        "id": "edge_validate_to_export",
-        "source": {"node_id": "validate_draft", "port": "draft"},
-        "target": {"node_id": "export_docx", "port": "draft"},
         "priority": 100
       },
       {
@@ -274,7 +380,7 @@
     ],
     "policies": {
       "run_timeout_seconds": 180,
-      "max_steps": 12,
+      "max_steps": 18,
       "max_parallel_nodes": 1,
       "default_retry": {
         "max_attempts": 1,
@@ -289,7 +395,7 @@
     "compatibility": {
       "min_runtime_version": "0.1.0",
       "node_resolution": "exact",
-      "features": ["structured_drafting", "docx", "pdf", "optional_knowledge"]
+      "features": ["document_ast_v1", "adaptive_structure", "semantic_quality", "draft_watermark", "docx", "pdf"]
     }
   }
 }

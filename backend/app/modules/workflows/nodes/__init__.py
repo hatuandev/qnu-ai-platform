@@ -15,6 +15,11 @@ from app.modules.workflows.nodes.citation_guard_node import CitationGuardNodeHan
 from app.modules.workflows.nodes.condition_route_node import ConditionRouteNodeHandler
 from app.modules.workflows.nodes.drafting_compose_node import DraftingComposeNodeHandler
 from app.modules.workflows.nodes.drafting_plan_node import DraftingPlanNodeHandler
+from app.modules.workflows.nodes.drafting_quality_node import (
+    DraftingQualityNodeHandler,
+    DraftingRepairNodeHandler,
+)
+from app.modules.workflows.nodes.drafting_reference_node import DraftingReferenceNodeHandler
 from app.modules.workflows.nodes.drafting_validation_node import DraftingValidationNodeHandler
 from app.modules.workflows.nodes.extract_fields_node import ExtractFieldsNodeHandler
 from app.modules.workflows.nodes.human_approval_node import HumanApprovalNodeHandler
@@ -34,6 +39,9 @@ __all__ = [
     "ConditionRouteNodeHandler",
     "DraftingComposeNodeHandler",
     "DraftingPlanNodeHandler",
+    "DraftingQualityNodeHandler",
+    "DraftingReferenceNodeHandler",
+    "DraftingRepairNodeHandler",
     "DraftingValidationNodeHandler",
     "ExtractFieldsNodeHandler",
     "HumanApprovalNodeHandler",

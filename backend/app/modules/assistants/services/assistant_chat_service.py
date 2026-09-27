@@ -81,6 +81,31 @@ def _format_message_with_attachments(message: str, attachments: list[dict[str, A
     return message
 
 
+def _extract_reference_documents(attachments: list[dict[str, Any]]) -> list[str]:
+    """Expose attachment text to drafting workflows as structural references."""
+    references: list[str] = []
+    for attachment in attachments:
+        text_content = str(
+            attachment.get("text_content") or attachment.get("raw_text") or ""
+        ).strip()
+        if text_content:
+            references.append(text_content[:16000])
+    return references
+
+
+def _workflow_failure_answer(error_message: str | None, execution_id: str | None) -> str:
+    """Return an actionable workflow error instead of a misleading No-Answer reply."""
+    detail = error_message or "Quy trình đã dừng trước khi tạo được bản nháp."
+    execution_line = (
+        f"\n\n- **Mã xử lý:** `{execution_id}`" if execution_id else ""
+    )
+    return (
+        "Hệ thống chưa thể hoàn tất yêu cầu soạn thảo do lỗi trong quy trình xử lý. "
+        f"{detail}{execution_line}\n\n"
+        "Vui lòng kiểm tra lịch sử thực thi hoặc thử lại sau khi cấu hình được cập nhật."
+    )
+
+
 class AssistantChatService:
     """Service handling real-time chat invocations and streaming execution."""
 
@@ -155,6 +180,7 @@ class AssistantChatService:
         runtime_profile = build_runtime_profile(assistant)
         prepared_message = _format_message_with_attachments(request.message, request.attachments)
         sanitized_message = prepare_user_message(prepared_message, runtime_profile)
+        reference_documents = _extract_reference_documents(request.attachments)
         workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
             workflow_version_id=getattr(assistant, "published_workflow_version_id", None),
@@ -163,6 +189,7 @@ class AssistantChatService:
                 "is_approved": False,
                 "format": "docx,pdf",
                 "conversation_history": recent_history,
+                "reference_documents": reference_documents,
             },
             tenant_id=request.tenant_id,
             conversation_id=conversation_id,
@@ -190,6 +217,12 @@ class AssistantChatService:
                 f"- **Mã yêu cầu:** `{approval_id}`\n"
                 f"- **Trạng thái:** Chờ phê duyệt (Human-in-the-loop)\n\n"
                 f"Quản trị viên có thể xem xét và phê duyệt tại mục [Hộp Thư Phê Duyệt](/runs)."
+            )
+        elif workflow_response.status == "failed":
+            output_status = "failed"
+            answer = _workflow_failure_answer(
+                workflow_response.error_message,
+                workflow_response.execution_id,
             )
         else:
             answer = workflow_response.outputs.get("answer")
@@ -325,6 +358,7 @@ class AssistantChatService:
         runtime_profile = build_runtime_profile(assistant)
         prepared_message = _format_message_with_attachments(request.message, request.attachments)
         sanitized_message = prepare_user_message(prepared_message, runtime_profile)
+        reference_documents = _extract_reference_documents(request.attachments)
         workflow_request = WorkflowExecuteRequest(
             workflow_id=assistant.workflow_id,
             workflow_version_id=getattr(assistant, "published_workflow_version_id", None),
@@ -333,6 +367,7 @@ class AssistantChatService:
                 "is_approved": False,
                 "format": "docx,pdf",
                 "conversation_history": recent_history,
+                "reference_documents": reference_documents,
             },
             tenant_id=request.tenant_id,
             conversation_id=conversation_id,
@@ -385,6 +420,12 @@ class AssistantChatService:
                 f"- **Mã yêu cầu:** `{approval_id}`\n"
                 f"- **Trạng thái:** Chờ phê duyệt (Human-in-the-loop)\n\n"
                 f"Quản trị viên có thể xem xét và phê duyệt tại mục [Hộp Thư Phê Duyệt](/runs)."
+            )
+        elif workflow_response.status == "failed":
+            output_status = "failed"
+            answer = _workflow_failure_answer(
+                workflow_response.error_message,
+                workflow_response.execution_id,
             )
         else:
             answer = workflow_response.outputs.get("answer")

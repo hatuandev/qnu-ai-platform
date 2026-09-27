@@ -25,6 +25,8 @@ def _detect_template_code(text: str) -> str:
         return "quyet_dinh"
     if "thông báo" in normalized or "thong_bao" in normalized:
         return "thong_bao"
+    if "kế hoạch" in normalized or "ke_hoach" in normalized:
+        return "ke_hoach"
     return "to_trinh"
 
 
@@ -66,7 +68,15 @@ class ArtifactExportNodeHandler(BaseNodeHandler):
         port_inputs = context.node_inputs.get(node_spec.id, {})
         draft = port_inputs.get("draft") or context.node_data.get("draft")
         if isinstance(draft, dict) and isinstance(draft.get("context"), dict):
-            template_code = str(draft.get("template_code") or "")
+            # The validation node stores the canonical document type. Keep the
+            # explicit template_code override for future custom templates, but
+            # fall back to that type so the standard administrative templates
+            # are always selected after a validated drafting run.
+            template_code = str(
+                draft.get("template_code")
+                or draft.get("document_type")
+                or "to_trinh"
+            )
             document_context = draft["context"]
             title = str(draft.get("title") or "du_thao")
         else:
@@ -145,6 +155,8 @@ class ArtifactExportNodeHandler(BaseNodeHandler):
         context.outputs["missing_fields"] = draft.get("missing_fields", [])
         if missing_formats:
             context.node_data["assistant_status"] = "draft_created_with_warnings"
+        else:
+            context.node_data["assistant_status"] = "draft_created"
 
         return NodeExecutionResult(
             node_id=node_spec.id,

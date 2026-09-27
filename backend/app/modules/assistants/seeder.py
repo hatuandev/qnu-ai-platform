@@ -31,6 +31,7 @@ def _lifecycle_config(
     temperature: float = 0.2,
     require_structured_facts: bool = False,
     enabled_tools: list[str] | None = None,
+    human_approval_required: bool = True,
     no_answer_message: str,
 ) -> dict[str, Any]:
     return {
@@ -62,7 +63,7 @@ def _lifecycle_config(
         },
         "tools": {
             "enabled_tools": enabled_tools or [],
-            "human_approval_required": True,
+            "human_approval_required": human_approval_required,
         },
         "output_policy": {
             "formats": ["markdown", "table", "checklist"],
@@ -236,6 +237,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
             temperature=0.3,
             require_structured_facts=True,
             enabled_tools=["export_administrative_document"],
+            human_approval_required=False,
             no_answer_message=(
                 "Chào Thầy/Cô! Hiện tại hệ thống chưa tìm thấy biểu mẫu hoặc căn cứ pháp lý phù hợp trong kho văn bản hành chính của Trường ĐH Quy Nhơn.\n\n"
                 "Thầy/Cô có thể yêu cầu soạn thảo các thể thức văn bản theo Nghị định 30/2020/NĐ-CP như:\n"

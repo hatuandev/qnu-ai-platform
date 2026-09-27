@@ -36,16 +36,16 @@ class ExtractFieldsNodeHandler(BaseNodeHandler):
 
         # Heuristic detection for common drafting types
         lower_msg = unicodedata.normalize("NFC", str(user_message)).casefold()
-        detected_code = next(
-            (
-                definition["code"]
-                for definition in sorted(
-                    DOCUMENT_TYPE_CATALOG, key=lambda definition: len(definition["name"]), reverse=True
-                )
-                if definition["name"].casefold() in lower_msg
-            ),
-            None,
-        )
+        # A request can mention several document types, especially when its
+        # legal basis cites a Quyết định while asking for a Tờ trình. The
+        # requested type normally appears first, so select the earliest catalog
+        # occurrence and use the longest name only as a tie-breaker.
+        candidates = [
+            (position, -len(definition["name"]), definition["code"])
+            for definition in DOCUMENT_TYPE_CATALOG
+            if (position := lower_msg.find(definition["name"].casefold())) >= 0
+        ]
+        detected_code = min(candidates)[2] if candidates else None
         extracted_fields["doc_type"] = detected_code
         extracted_fields["document_type_code"] = normalize_document_type_code(detected_code)
         extracted_fields["document_type_status"] = "classified" if detected_code else "unclassified"

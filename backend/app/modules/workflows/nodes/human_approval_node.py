@@ -16,10 +16,39 @@ class HumanApprovalNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        is_approved = context.inputs.get("is_approved", False)
         config = node_spec.config or {}
+        profile_tools = (
+            getattr(context.assistant_profile, "tools", None)
+            if context.assistant_profile
+            else None
+        )
+        profile_requires_approval = getattr(
+            profile_tools, "human_approval_required", True
+        )
+        requires_approval = bool(
+            config.get("required", profile_requires_approval)
+        )
+        is_approved = context.inputs.get("is_approved", False)
+
+        if not requires_approval:
+            return NodeExecutionResult(
+                node_id=node_spec.id,
+                status="completed",
+                output={"approval_skipped": True, "reason": "assistant_policy"},
+            )
 
         if not is_approved:
+            draft = context.node_data.get("draft")
+            preview = None
+            missing_fields: list[str] = []
+            if isinstance(draft, dict):
+                preview = {
+                    "title": draft.get("title"),
+                    "document_type": draft.get("document_type_label")
+                    or draft.get("document_type"),
+                    "ast": draft.get("ast"),
+                }
+                missing_fields = list(draft.get("missing_fields") or [])
             return NodeExecutionResult(
                 node_id=node_spec.id,
                 status="paused_for_approval",
@@ -29,6 +58,8 @@ class HumanApprovalNodeHandler(BaseNodeHandler):
                         "description", "Cần cán bộ chuyên môn phê duyệt trước khi ban hành."
                     ),
                     "pending_approval": True,
+                    "preview": preview,
+                    "missing_fields": missing_fields,
                 },
             )
 
