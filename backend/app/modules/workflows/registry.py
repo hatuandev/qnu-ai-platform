@@ -7,10 +7,14 @@ import logging
 from app.modules.workflows.nodes import (
     APICallerNodeHandler,
     ArtifactExportNodeHandler,
+    ArtifactFormatNodeHandler,
     BaseNodeHandler,
     ChatInputNodeHandler,
     CitationGuardNodeHandler,
     ConditionRouteNodeHandler,
+    DraftingComposeNodeHandler,
+    DraftingPlanNodeHandler,
+    DraftingValidationNodeHandler,
     ExtractFieldsNodeHandler,
     HumanApprovalNodeHandler,
     LLMGenerateNodeHandler,
@@ -50,8 +54,12 @@ class NodeHandlerRegistry:
         self.register("llm.generate", llm_gen)
         self.register("modelops.generate", llm_gen)
         self.register("drafting.generate", llm_gen)
-        self.register("core.drafting.compose", llm_gen)
         self.register("question_bank.generate", llm_gen)
+
+        self.register("core.drafting.compose", DraftingComposeNodeHandler())
+        self.register("drafting.plan", DraftingPlanNodeHandler())
+        self.register("drafting.validate", DraftingValidationNodeHandler())
+        self.register("artifact.resolve_format", ArtifactFormatNodeHandler())
 
         artifact_export = ArtifactExportNodeHandler()
         self.register("artifact.export", artifact_export)

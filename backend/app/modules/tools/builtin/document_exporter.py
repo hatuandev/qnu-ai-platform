@@ -6,11 +6,7 @@ from typing import Any
 
 from app.core.config import get_settings
 from app.core.exceptions import AppException
-from app.modules.document_types.catalog import (
-    DOCUMENT_TYPE_CODES,
-    get_document_type_label,
-    normalize_document_type_code,
-)
+from app.modules.document_types.catalog import get_document_type_label, normalize_document_type_code
 from app.modules.tools.builtin.base import BaseTool
 
 settings = get_settings()
@@ -31,7 +27,7 @@ class DocumentExporterTool(BaseTool):
     def description(self) -> str:
         return (
             "Tạo và định dạng tệp Word (.docx) văn bản hành chính (Thông báo, Tờ trình, Quyết định) "
-            "tuân thủ nghiêm ngặt thể thức và kỹ thuật trình bày theo Nghị định 30/2020/NĐ-CP của Chính phủ."
+            "theo mẫu DOCX QNU đã cấu hình cho Nghị định 30/2020/NĐ-CP."
         )
 
     @property
@@ -52,7 +48,7 @@ class DocumentExporterTool(BaseTool):
                 "properties": {
                     "document_type": {
                         "type": "string",
-                        "enum": list(DOCUMENT_TYPE_CODES),
+                        "enum": ["to_trinh", "thong_bao", "quyet_dinh"],
                         "description": "Mã loại văn bản trong taxonomy qnu-ai-core",
                     },
                     "title": {
@@ -67,18 +63,15 @@ class DocumentExporterTool(BaseTool):
                     "signer_title": {
                         "type": "string",
                         "description": "Chức vụ người ký (ví dụ: HIỆU TRƯỞNG, TRƯỞNG KHOA)",
-                        "default": "HIỆU TRƯỞNG",
                     },
                     "signer_name": {
                         "type": "string",
                         "description": "Họ và tên người ký",
-                        "default": "PGS.TS. Đỗ Ngọc Mỹ",
                     },
                     "recipients": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Nơi nhận văn bản",
-                        "default": ["Như Điều 3", "Lưu: VT, ĐT."],
                     },
                 },
                 "required": ["document_type", "title", "body_paragraphs"],
@@ -96,24 +89,30 @@ class DocumentExporterTool(BaseTool):
                 code="document_type_invalid",
                 details={"document_type": requested_doc_type},
             )
+        if doc_type_code not in {"to_trinh", "thong_bao", "quyet_dinh"}:
+            raise AppException(
+                "Chưa có mẫu DOCX QNU được cấu hình cho loại văn bản này. Hiện hỗ trợ Tờ trình, Thông báo và Quyết định.",
+                code="document_template_not_supported",
+                details={"document_type": doc_type_code},
+            )
         doc_type = get_document_type_label(doc_type_code) or requested_doc_type
-        title = parameters.get("title", "Về việc triển khai công tác đào tạo")
+        title = parameters.get("title", "[BỔ SUNG TRÍCH YẾU]")
         paragraphs = parameters.get("body_paragraphs", [])
-        signer_title = parameters.get("signer_title", "HIỆU TRƯỞNG")
-        signer_name = parameters.get("signer_name", "PGS.TS. Đỗ Ngọc Mỹ")
-        recipients = parameters.get("recipients", ["Như Điều 3", "Lưu: VT, ĐT."])
+        signer_title = parameters.get("signer_title", "[BỔ SUNG CHỨC VỤ NGƯỜI KÝ]")
+        signer_name = parameters.get("signer_name", "[BỔ SUNG HỌ TÊN NGƯỜI KÝ]")
+        recipients = parameters.get("recipients", ["[BỔ SUNG NƠI NHẬN]"])
 
         from app.modules.tools.document_generator import export_document_package
 
         content_body = (
             "\n\n".join(paragraphs)
             if isinstance(paragraphs, list)
-            else str(paragraphs or "Kính trình Ban Giám hiệu xem xét và phê duyệt.")
+            else str(paragraphs or "[BỔ SUNG NỘI DUNG DỰ THẢO]")
         )
         recipients_str = (
             "\n".join(f"- {r}" for r in recipients)
             if isinstance(recipients, list)
-            else str(recipients or "- Như kính gửi;\n- Lưu: VT, ĐT.")
+            else str(recipients or "- [BỔ SUNG NƠI NHẬN]")
         )
 
         context_data = {
@@ -123,7 +122,8 @@ class DocumentExporterTool(BaseTool):
             "ho_ten_nguoi_ky": signer_name,
             "noi_nhan": recipients_str,
             "don_vi_ban_hanh": parameters.get("issuing_unit", "TRƯỜNG ĐẠI HỌC QUY NHƠN"),
-            "so_hieu": parameters.get("document_number", ".../TTr-ĐHQN"),
+            "so_hieu": parameters.get("document_number", "[CHƯA CẤP SỐ VĂN BẢN]"),
+            "is_draft": True,
         }
 
         formats = parameters.get("formats", ["docx", "pdf"])

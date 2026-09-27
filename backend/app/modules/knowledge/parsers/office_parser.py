@@ -309,34 +309,51 @@ class XlsxParser(BaseDocumentParser):
     async def parse(self, file_bytes: bytes, file_name: str) -> ParsedContent:
         import openpyxl
 
+        from app.modules.knowledge.excel_parser import (
+            detect_table_boundary_and_header,
+            filter_footer_noise,
+            unmerge_and_forward_fill,
+        )
+
         wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         full_text_parts: list[str] = []
         extracted_tables: list[ExtractedTable] = []
 
         for sheet_idx, sheet_name in enumerate(wb.sheetnames):
             sheet = wb[sheet_name]
-            rows_data: list[list[str]] = []
-            for row in sheet.iter_rows(values_only=True):
-                if any(row):  # Skip completely empty rows
-                    rows_data.append([str(c or "").strip() for c in row])
-
-            if len(rows_data) < 2:
+            matrix = unmerge_and_forward_fill(sheet)
+            if not matrix or len(matrix) < 2:
                 continue
 
-            headers = rows_data[0]
-            data_rows = rows_data[1:]
+            _, headers, data_start_idx = detect_table_boundary_and_header(matrix)
+            if not headers or data_start_idx == -1:
+                continue
 
-            header_line = "| " + " | ".join(headers) + " |"
-            sep_line = "| " + " | ".join(["---"] * len(headers)) + " |"
-            data_lines = ["| " + " | ".join(r) + " |" for r in data_rows]
+            clean_headers = [str(h).strip().replace("\n", " ") for h in headers]
+            raw_data_rows = matrix[data_start_idx:]
+            data_rows = filter_footer_noise(raw_data_rows)
+            if not data_rows:
+                continue
+
+            formatted_rows: list[list[str]] = []
+            for row in data_rows:
+                formatted_row = [
+                    str(row[c]).strip().replace("\n", " ") if c < len(row) and row[c] is not None else ""
+                    for c in range(len(clean_headers))
+                ]
+                formatted_rows.append(formatted_row)
+
+            header_line = "| " + " | ".join(clean_headers) + " |"
+            sep_line = "| " + " | ".join(["---"] * len(clean_headers)) + " |"
+            data_lines = ["| " + " | ".join(r) + " |" for r in formatted_rows]
             md_table = f"### Bảng: {sheet_name}\n" + "\n".join([header_line, sep_line] + data_lines)
 
             full_text_parts.append(md_table)
             extracted_tables.append(
                 ExtractedTable(
                     page_number=sheet_idx + 1,
-                    headers=headers,
-                    rows=data_rows,
+                    headers=clean_headers,
+                    rows=formatted_rows,
                     markdown_repr=md_table,
                 )
             )

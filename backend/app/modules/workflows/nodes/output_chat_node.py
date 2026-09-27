@@ -32,7 +32,14 @@ class OutputChatNodeHandler(BaseNodeHandler):
                 or "Trợ lý QNU đã xử lý xong yêu cầu của bạn."
             )
             citations = context.node_data.get("citations", [])
-            status = context.node_data.get("rag_status", "answered")
+            status = context.node_data.get(
+                "assistant_status",
+                context.node_data.get("rag_status", "answered"),
+            )
+
+        warnings = context.node_data.get("artifact_warnings", [])
+        if warnings:
+            final_answer = f"{final_answer}\n\nLưu ý: {'; '.join(warnings)}"
 
         suggested_questions = (
             context.node_data.get("suggested_questions")
@@ -55,6 +62,8 @@ class OutputChatNodeHandler(BaseNodeHandler):
                 "citations": citations,
                 "status": status,
                 "artifacts": artifacts,
+                "missing_fields": context.outputs.get("missing_fields", []),
+                "warnings": warnings,
                 "suggested_questions": suggested_questions,
             },
         )

@@ -188,3 +188,130 @@ async def test_collection_facts_api_routes() -> None:
             assert data["facts"][0]["entity_name"] == "Sư phạm Toán học"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_parse_excel_with_merged_cells() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "Khoa Su Pham"
+
+    ws.append(["Khối ngành", "Tên ngành", "Điểm chuẩn"])
+    ws.append(["Sư phạm", "Sư phạm Toán học", "26.0"])
+    ws.append([None, "Sư phạm Tin học", "25.0"])
+    ws.merge_cells(start_row=2, start_column=1, end_row=3, end_column=1)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    facts = parse_excel_facts(buf.getvalue(), "merged_su_pham.xlsx")
+
+    assert len(facts) >= 4
+    sp_tin = [f for f in facts if f["entity_name"] == "Sư phạm Tin học"]
+    assert len(sp_tin) >= 2
+    khoi_attr = next((f for f in sp_tin if "khoi_nganh" in f["attribute_name"]), None)
+    assert khoi_attr is not None
+    assert khoi_attr["attribute_value"] == "Sư phạm"
+
+
+def test_parse_excel_with_top_banners_and_two_tier_headers() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "TuyenSinh2025"
+
+    ws.append(["TRƯỜNG ĐẠI HỌC QUY NHƠN", None, None, None])
+    ws.append(["ĐỀ ÁN TUYỂN SINH NĂM 2025", None, None, None])
+    ws.append(["Mã ngành", "Tên ngành đào tạo", "Phương thức xét tuyển", "Phương thức xét tuyển"])
+    ws.append([None, None, "PT1 Điểm thi THPT", "PT2 Xét học bạ"])
+    ws.append(["7480201", "Công nghệ thông tin", "24.5", "26.0"])
+    ws.append(["7140209", "Sư phạm Toán học", "26.0", "28.0"])
+
+    ws.merge_cells(start_row=3, start_column=3, end_row=3, end_column=4)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    facts = parse_excel_facts(buf.getvalue(), "tuyen_sinh_2025.xlsx")
+
+    cntt_facts = [f for f in facts if f["entity_name"] == "Công nghệ thông tin"]
+    assert len(cntt_facts) >= 3
+    attr_names = [f["attribute_name"] for f in cntt_facts]
+    assert any("phuong_thuc" in a and "pt1" in a for a in attr_names)
+    assert any("phuong_thuc" in a and "pt2" in a for a in attr_names)
+
+
+def test_parse_excel_zero_keyword_non_major() -> None:
+    """Test zero-keyword entity recognition on laboratory equipment table."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "ThietBi"
+
+    ws.append(["STT", "Mã thiết bị", "Tên thiết bị thí nghiệm", "Số lượng", "Đơn giá"])
+    ws.append(["1", "TB01", "Kính hiển vi quang học OLYMPUS", "15", "45000000"])
+    ws.append(["2", "TB02", "Máy quang phổ hấp thụ nguyên tử", "2", "350000000"])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    facts = parse_excel_facts(buf.getvalue(), "danh_muc_thiet_bi.xlsx")
+
+    assert len(facts) >= 6
+    kinh_facts = [f for f in facts if f["entity_name"] == "Kính hiển vi quang học OLYMPUS"]
+    assert len(kinh_facts) >= 3
+    attr_names = [f["attribute_name"] for f in kinh_facts]
+    assert any("so_luong" in a for a in attr_names)
+    assert any("don_gia" in a for a in attr_names)
+    assert kinh_facts[0]["entity_type"] == "equipment"
+
+
+def test_parse_excel_footer_filtering() -> None:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "HocPhi"
+
+    ws.append(["STT", "Chương trình đào tạo", "Học phí học kỳ 1"])
+    ws.append(["1", "Khoa học máy tính", "14500000"])
+    ws.append(["2", "Kỹ thuật phần mềm", "14500000"])
+    ws.append(["Tổng cộng: 2 chương trình", None, "29000000"])
+    ws.append(["* Ghi chú: Mức học phí có thể điều chỉnh theo lộ trình NĐ 97", None, None])
+    ws.append(["HIỆU TRƯỞNG", None, None])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    facts = parse_excel_facts(buf.getvalue(), "hoc_phi.xlsx")
+
+    entity_names = {f["entity_name"] for f in facts}
+    assert "Khoa học máy tính" in entity_names
+    assert "Kỹ thuật phần mềm" in entity_names
+    assert not any("tổng cộng" in name.lower() for name in entity_names)
+    assert not any("ghi chú" in name.lower() for name in entity_names)
+    assert not any("hiệu trưởng" in name.lower() for name in entity_names)
+
+
+@pytest.mark.asyncio
+async def test_xlsx_parser_markdown_table() -> None:
+    from app.modules.knowledge.parsers.office_parser import XlsxParser
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "ChiTieu"
+
+    ws.append(["TRƯỜNG ĐH QUY NHƠN", None, None])
+    ws.append(["Ngành đào tạo", "Chỉ tiêu", "Tổ hợp xét tuyển"])
+    ws.append(["Công nghệ thông tin", "180", "A00, A01, D01"])
+    ws.append(["* Ghi chú: Chỉ tiêu dự kiến", None, None])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    parser = XlsxParser()
+    parsed = await parser.parse(buf.getvalue(), "chi_tieu.xlsx")
+
+    assert parsed.page_count == 1
+    assert len(parsed.tables) == 1
+    md = parsed.tables[0].markdown_repr
+    assert "| Ngành đào tạo | Chỉ tiêu | Tổ hợp xét tuyển |" in md
+    assert "| Công nghệ thông tin | 180 | A00, A01, D01 |" in md
+    assert "TRƯỜNG ĐH QUY NHƠN" not in md
+    assert "* Ghi chú" not in md

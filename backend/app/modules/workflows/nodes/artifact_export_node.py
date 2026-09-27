@@ -1,11 +1,13 @@
-"""Artifact Export Node Handler — Renders Word (.docx) & PDF documents and registers artifacts."""
+"""Render validated administrative drafts to DOCX and PDF artifacts."""
 
 from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from typing import Any
 
+from app.core.exceptions import AppException
 from app.modules.tools.document_generator import export_document_package
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
@@ -18,100 +20,131 @@ logger = logging.getLogger(__name__)
 
 
 def _detect_template_code(text: str) -> str:
-    """Detect appropriate document template based on user request or content."""
-    lower = text.lower()
-    if "quyết định" in lower or "quyet_dinh" in lower:
+    normalized = text.casefold()
+    if "quyết định" in normalized or "quyet_dinh" in normalized:
         return "quyet_dinh"
-    if "thông báo" in lower or "thong_bao" in lower:
+    if "thông báo" in normalized or "thong_bao" in normalized:
         return "thong_bao"
-    if "tờ trình" in lower or "to_trinh" in lower:
-        return "to_trinh"
     return "to_trinh"
 
 
 def _extract_title(text: str) -> str:
-    """Extract or formulate a concise title from the text."""
-    # Look for 'Về việc...' pattern
-    match = re.search(r"Về việc\s+([^\n\r.]+)", text, re.IGNORECASE)
+    match = re.search(r"về việc\s+([^\n\r.]+)", text, re.IGNORECASE)
     if match:
         return f"Về việc {match.group(1).strip()}"
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if lines:
-        first_line = lines[0]
-        # Strip markdown headers
-        clean = re.sub(r"^[#*_\-\s]+", "", first_line)
-        return clean[:100] if len(clean) > 5 else "Về việc triển khai nhiệm vụ công tác"
-    return "Về việc triển khai nhiệm vụ công tác"
+    for line in text.splitlines():
+        title = re.sub(r"^[#*_\-\s]+", "", line).strip()
+        if len(title) > 5:
+            return title[:300]
+    return "[BỔ SUNG TRÍCH YẾU]"
+
+
+def _safe_file_slug(value: str) -> str:
+    normalized = unicodedata.normalize("NFC", value)
+    clean = re.sub(r"[^\w-]+", "_", normalized, flags=re.UNICODE).strip("_")
+    return clean[:60] or "du_thao"
+
+
+def _normalize_formats(value: Any) -> list[str]:
+    if isinstance(value, str):
+        formats = [item.strip().lower() for item in value.split(",") if item.strip()]
+    elif isinstance(value, list):
+        formats = [str(item).strip().lower() for item in value if str(item).strip()]
+    else:
+        formats = ["docx", "pdf"]
+    if not formats or "both" in formats:
+        return ["docx", "pdf"]
+    return list(dict.fromkeys(formats))
 
 
 class ArtifactExportNodeHandler(BaseNodeHandler):
-    """Executes document rendering to DOCX and PDF, saving files to artifact storage."""
+    """Save requested formats from the validated, structured drafting output."""
 
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        config = node_spec.config or {}
-        raw_format = config.get("format", "docx,pdf")
-        if isinstance(raw_format, str):
-            formats = [f.strip() for f in raw_format.split(",") if f.strip()]
-        elif isinstance(raw_format, list):
-            formats = raw_format
+        port_inputs = context.node_inputs.get(node_spec.id, {})
+        draft = port_inputs.get("draft") or context.node_data.get("draft")
+        if isinstance(draft, dict) and isinstance(draft.get("context"), dict):
+            template_code = str(draft.get("template_code") or "")
+            document_context = draft["context"]
+            title = str(draft.get("title") or "du_thao")
         else:
-            formats = ["docx", "pdf"]
+            content = (
+                port_inputs.get("content")
+                or context.node_data.get("llm_content")
+                or (draft if isinstance(draft, str) else None)
+                or context.inputs.get("message")
+            )
+            if isinstance(draft, dict):
+                content = draft.get("content") or draft.get("body") or draft.get("text") or content
+            if not isinstance(content, str) or not content.strip():
+                raise AppException(
+                    "Node xuất tệp không nhận được nội dung dự thảo.",
+                    code="artifact_draft_not_validated",
+                    status_code=422,
+                    details={"node_id": node_spec.id},
+                )
+            config = node_spec.config or {}
+            title = _extract_title(content)
+            template_code = str(config.get("template_code") or _detect_template_code(content))
+            document_context = {
+                "is_draft": True,
+                "trich_yeu": title,
+                "noi_dung": content,
+            }
 
-        # Ensure both docx and pdf are produced when requested
-        if "both" in formats or not formats:
-            formats = ["docx", "pdf"]
-
-        # 1. Source content from upstream nodes
-        content_text = (
-            context.node_data.get("llm_content")
-            or context.node_data.get("draft")
-            or context.inputs.get("message")
-            or "Kính đề nghị Ban Giám hiệu xem xét và phê duyệt."
+        formats = _normalize_formats(
+            port_inputs.get("formats")
+            or context.node_data.get("artifact_formats")
+            or (node_spec.config or {}).get("format")
+            or context.inputs.get("format")
         )
-
-        template_code = config.get("template_code") or _detect_template_code(content_text)
-        title = _extract_title(content_text)
-
-        context_data: dict[str, Any] = {
-            "trich_yeu": title,
-            "noi_dung": content_text,
-            "chuc_vu_nguoi_ky": "HIỆU TRƯỞNG",
-            "ho_ten_nguoi_ky": "PGS.TS. Đỗ Ngọc Mỹ",
-            "noi_nhan": "- Như kính gửi;\n- Các đơn vị liên quan;\n- Lưu: VT, ĐT.",
-            "don_vi_ban_hanh": "TRƯỜNG ĐẠI HỌC QUY NHƠN",
-        }
-
-        if template_code == "quyet_dinh":
-            context_data["so_hieu"] = ".../QĐ-ĐHQN"
-        elif template_code == "thong_bao":
-            context_data["so_hieu"] = ".../TB-ĐHQN"
-        else:
-            context_data["so_hieu"] = ".../TTr-ĐHQN"
-
-        clean_title = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in title[:30].strip())
-        base_name = f"qnu_{template_code}_{clean_title}"
-
+        base_name = "_".join(
+            (
+                "qnu",
+                template_code,
+                _safe_file_slug(str(draft.get("title") or "du_thao")),
+                str(context.execution_id or "")[:8],
+            )
+        )
         try:
             artifacts = await export_document_package(
                 template_code=template_code,
-                context=context_data,
+                context=document_context,
                 formats=formats,
                 base_name=base_name,
             )
         except Exception as exc:
-            logger.warning("ArtifactExportNodeHandler export failed: %s", exc)
-            artifacts = []
+            logger.exception("Administrative draft export failed for node '%s'", node_spec.id)
+            raise AppException(
+                f"Không thể xuất tệp dự thảo: {exc}",
+                code="artifact_export_failed",
+                status_code=502,
+                details={"node_id": node_spec.id, "template_code": template_code},
+            ) from exc
 
-        # Propagate artifacts to context
-        existing = context.node_data.get("artifacts", [])
-        if isinstance(existing, list):
-            context.node_data["artifacts"] = existing + artifacts
-        else:
-            context.node_data["artifacts"] = artifacts
+        exported_formats = {str(artifact.get("type")) for artifact in artifacts}
+        missing_formats = sorted(set(formats) - exported_formats)
+        warnings = (
+            ["PDF chưa tạo được; kiểm tra trạng thái và cấu hình Gotenberg."]
+            if "pdf" in missing_formats
+            else []
+        )
+        if not artifacts:
+            raise AppException(
+                "Không tạo được tệp nào. Kiểm tra mẫu DOCX, kho lưu trữ và Gotenberg.",
+                code="artifact_export_empty",
+                status_code=502,
+                details={"requested_formats": formats},
+            )
 
-        context.outputs["artifacts"] = context.node_data["artifacts"]
+        context.node_data["artifacts"] = artifacts
+        context.node_data["artifact_warnings"] = warnings
+        context.outputs["artifacts"] = artifacts
+        context.outputs["missing_fields"] = draft.get("missing_fields", [])
+        if missing_formats:
+            context.node_data["assistant_status"] = "draft_created_with_warnings"
 
         return NodeExecutionResult(
             node_id=node_spec.id,
@@ -120,5 +153,7 @@ class ArtifactExportNodeHandler(BaseNodeHandler):
                 "status": "exported",
                 "template_code": template_code,
                 "artifacts": artifacts,
+                "missing_formats": missing_formats,
+                "warnings": warnings,
             },
         )

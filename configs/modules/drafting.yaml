@@ -233,33 +233,15 @@ drafting:
   # working without a config change.
   approval_required: false
   supported_document_types:
-    - cong_van
-    - quyet_dinh
     - to_trinh
     - thong_bao
-    - ke_hoach
-    - bao_cao
-    - bien_ban
-    - giay_moi
-    - du_an
-    - ban_ghi_nho
-    - nghi_quyet
-    - chi_thi
+    - quyet_dinh
   default_output_format: draft_document
-  templates_dir: templates/drafting
+  templates_dir: app/templates/documents
   templates:
-    cong_van: templates/drafting/cong_van.docx
-    quyet_dinh: templates/drafting/quyet_dinh.docx
-    to_trinh: templates/drafting/to_trinh.docx
-    giay_moi: templates/drafting/giay_moi.docx
-    thong_bao: templates/drafting/thong_bao.docx  # TODO template file chưa có
-    ke_hoach: templates/drafting/ke_hoach.docx  # TODO template file chưa có
-    bao_cao: templates/drafting/bao_cao.docx  # TODO template file chưa có
-    bien_ban: templates/drafting/bien_ban.docx  # TODO template file chưa có
-    du_an: templates/drafting/du_an.docx  # TODO template file chưa có
-    ban_ghi_nho: templates/drafting/ban_ghi_nho.docx  # TODO template file chưa có
-    nghi_quyet: templates/drafting/nghi_quyet.docx  # TODO template file chưa có
-    chi_thi: templates/drafting/chi_thi.docx  # TODO template file chưa có
+    to_trinh: app/templates/documents/mau_to_trinh_nd30.docx
+    thong_bao: app/templates/documents/mau_thong_bao_nd30.docx
+    quyet_dinh: app/templates/documents/mau_quyet_dinh_nd30.docx
   # Slot → Jinja placeholder name. Templates follow the QNU drafting
   # convention by default; designers override per template when needed.
   slot_bindings:

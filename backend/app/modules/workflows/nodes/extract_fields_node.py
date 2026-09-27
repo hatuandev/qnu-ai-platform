@@ -23,7 +23,9 @@ class ExtractFieldsNodeHandler(BaseNodeHandler):
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
         user_message = (
-            context.node_data.get("user_message")
+            context.node_inputs.get(node_spec.id, {}).get("text")
+            or context.node_data.get("normalized_query")
+            or context.node_data.get("user_message")
             or context.inputs.get("message", "")
         )
 
@@ -59,5 +61,5 @@ class ExtractFieldsNodeHandler(BaseNodeHandler):
         return NodeExecutionResult(
             node_id=node_spec.id,
             status="completed",
-            output={"extracted_fields": extracted_fields},
+            output={"fields": extracted_fields, "extracted_fields": extracted_fields},
         )

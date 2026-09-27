@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +20,17 @@ from app.modules.tools.service import ToolService
 
 router = APIRouter(prefix="/tools", tags=["Tool Gateway & Function Calling"])
 service = ToolService()
+
+
+def _content_disposition(filename: str) -> str:
+    """Build an RFC 5987 download header that preserves Vietnamese filenames."""
+    normalized = unicodedata.normalize("NFC", filename)
+    ascii_name = unicodedata.normalize("NFKD", normalized).encode("ascii", "ignore").decode()
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._")
+    if not ascii_name:
+        ascii_name = "qnu-document"
+    encoded_name = quote(normalized, safe="")
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded_name}"
 
 
 @router.get("", response_model=list[ToolDefinitionResponse])
@@ -72,8 +86,8 @@ async def download_artifact(filename: str) -> Response:
         content=file_bytes,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": _content_disposition(filename),
+            "Cache-Control": "private, no-store",
         },
     )
 

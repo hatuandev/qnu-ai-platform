@@ -29,6 +29,7 @@ class WorkflowContext:
     correlation_id: str | None = None
     execution_id: str | None = None
     node_traces: list[NodeExecutionTrace] = field(default_factory=list)
+    node_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass

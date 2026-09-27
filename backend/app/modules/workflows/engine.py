@@ -92,6 +92,12 @@ class WorkflowDAGEngine:
                 )
 
             node_start_time = time.perf_counter()
+            context.node_inputs[current_node_id] = self._collect_node_inputs(
+                current_node_id,
+                edges_by_target.get(current_node_id, []),
+                completed_ids,
+                context.node_data,
+            )
             try:
                 result = await handler.execute(node_spec, context)
             except Exception as exc:
@@ -108,7 +114,10 @@ class WorkflowDAGEngine:
                     node_id=current_node_id,
                     node_type=node_spec.type,
                     status=result.status,
-                    input_data={"inputs": context.inputs},
+                    input_data={
+                        "inputs": context.inputs,
+                        "ports": context.node_inputs[current_node_id],
+                    },
                     output_data=result.output,
                     latency_ms=round((time.perf_counter() - node_start_time) * 1000, 2),
                 )
@@ -160,6 +169,39 @@ class WorkflowDAGEngine:
             executed_nodes,
             f"Workflow vượt quá giới hạn {max_allowed_steps} bước thực thi.",
         )
+
+    @staticmethod
+    def _collect_node_inputs(
+        node_id: str,
+        incoming_edges: list[WorkflowEdgeSpec],
+        completed_node_ids: set[str],
+        node_data: dict[str, object],
+    ) -> dict[str, object]:
+        """Route completed source-port values into the target node's named inputs."""
+        routed: dict[str, object] = {}
+        for edge in incoming_edges:
+            if edge.source not in completed_node_ids:
+                continue
+            source_output = node_data.get(f"node:{edge.source}")
+            if not isinstance(source_output, dict):
+                continue
+
+            if edge.source_port:
+                if edge.source_port not in source_output:
+                    logger.warning(
+                        "Workflow edge %s -> %s references missing source port '%s'",
+                        edge.source,
+                        node_id,
+                        edge.source_port,
+                    )
+                    continue
+                value = source_output[edge.source_port]
+            else:
+                value = source_output
+
+            target_port = edge.target_port or "input"
+            routed[target_port] = value
+        return routed
 
     @staticmethod
     def _find_ready_nodes(
