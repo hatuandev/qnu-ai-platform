@@ -4,6 +4,7 @@ import {
   Bot,
   CheckCircle2,
   Clock,
+  Download,
   Layers,
   Lightbulb,
   Loader2,
@@ -13,12 +14,17 @@ import {
   Sparkles,
 } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 import { ChatMessage } from "@/components/ai/chat-message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { type ChatCitation, useRAGStream } from "@/hooks/use-rag-stream";
+import {
+  downloadMarkdownFile,
+  formatConversationToMarkdown,
+} from "@/lib/export-markdown";
 import type { AssistantItem } from "@/types/assistants";
 
 interface AssistantPlaygroundTabProps {
@@ -91,6 +97,19 @@ export function AssistantPlaygroundTab({
     }
   };
 
+  const handleExportMarkdown = () => {
+    if (messages.length === 0) return;
+    const md = formatConversationToMarkdown({
+      assistantName: assistant.name,
+      assistantCode,
+      assistantDescription: assistant.description,
+      messages,
+    });
+    const filename = `hoi_thoai_${assistantCode}_${new Date().toISOString().slice(0, 10)}.md`;
+    downloadMarkdownFile(filename, md);
+    toast.success(`Đã tải tệp ${filename} thành công!`);
+  };
+
   const handleSuggestedClick = (question: string) => {
     if (!isStreaming) {
       sendMessage(question);
@@ -123,16 +142,30 @@ export function AssistantPlaygroundTab({
             </div>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
-            onClick={clearMessages}
-            title="Xóa lịch sử cuộc trò chuyện"
-          >
-            <RotateCcw className="size-3" />
-            <span>Làm mới</span>
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              disabled={messages.length === 0}
+              onClick={handleExportMarkdown}
+              title="Tải cuộc trò chuyện dạng tệp Markdown (.md)"
+            >
+              <Download className="size-3" />
+              <span>Tải về (.md)</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={clearMessages}
+              title="Xóa lịch sử cuộc trò chuyện"
+            >
+              <RotateCcw className="size-3" />
+              <span>Làm mới</span>
+            </Button>
+          </div>
         </CardHeader>
 
         {/* Message Scroller */}

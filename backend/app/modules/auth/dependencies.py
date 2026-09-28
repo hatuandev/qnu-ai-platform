@@ -47,9 +47,9 @@ async def get_current_actor(request: Request) -> AuthActor:
         or request.headers.get("X-Enforce-Auth", "").lower() in ("true", "1")
     )
 
-    # In test mode without explicit auth enforcement, provide default dev actor
+    # In development or test mode without explicit auth enforcement, provide default dev actor
     if not current_settings.DEV_AUTH_ENABLED or (
-        current_settings.ENVIRONMENT == "test" and not enforce_auth
+        current_settings.ENVIRONMENT in ("development", "test") and not enforce_auth
     ):
         return AuthActor(
             actor_id="act_admin_qnu",
