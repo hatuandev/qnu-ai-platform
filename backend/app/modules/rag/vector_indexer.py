@@ -193,21 +193,71 @@ class VectorIndexer:
             "Content-Type": "application/json",
         }
 
+        # Partition texts dynamically based on item count and character budget.
+        # Cloudflare Workers AI limits total request context to 60,000 tokens.
+        # Keeping MAX_BATCH_CHARS <= 16,000 and MAX_BATCH_ITEMS <= 6 guarantees safe margins for multilingual/table text.
+        MAX_BATCH_CHARS = 16000
+        MAX_BATCH_ITEMS = 6
+
+        batches: list[list[str]] = []
+        current_batch: list[str] = []
+        current_chars = 0
+
+        for t in texts:
+            clean_t = t[:16000] if len(t) > 16000 else t
+            t_len = len(clean_t)
+            if current_batch and (len(current_batch) >= MAX_BATCH_ITEMS or (current_chars + t_len > MAX_BATCH_CHARS)):
+                batches.append(current_batch)
+                current_batch = [clean_t]
+                current_chars = t_len
+            else:
+                current_batch.append(clean_t)
+                current_chars += t_len
+        if current_batch:
+            batches.append(current_batch)
+
         all_vectors: list[list[float]] = []
-        batch_size = 16
+
         async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds)) as client:
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i : i + batch_size]
-                resp = await client.post(url, headers=headers, json={"text": batch})
-                if resp.status_code != 200:
-                    raise RuntimeError(
-                        f"Cloudflare embedding error (HTTP {resp.status_code}): {resp.text[:200]}"
+            async def _send_batch(batch_items: list[str]) -> list[list[float]]:
+                resp = await client.post(url, headers=headers, json={"text": batch_items})
+                if resp.status_code == 200:
+                    data = resp.json().get("result", {})
+                    vecs = data.get("data") if isinstance(data, dict) else data
+                    if not vecs:
+                        raise RuntimeError(f"No vector data returned from Cloudflare: {resp.text[:200]}")
+                    return [[float(x) for x in v] for v in vecs]
+
+                err_text = resp.text
+                # Adaptive recovery: if batch exceeded context window, recursively split into halves
+                if ("Max context reached" in err_text or "3030" in err_text) and len(batch_items) > 1:
+                    mid = len(batch_items) // 2
+                    logger.warning(
+                        "Cloudflare embedding context exceeded for batch (%d chunks). Splitting batch...",
+                        len(batch_items),
                     )
-                data = resp.json().get("result", {})
-                vecs = data.get("data") if isinstance(data, dict) else data
-                if not vecs:
-                    raise RuntimeError(f"No vector data returned from Cloudflare: {resp.text[:200]}")
-                all_vectors.extend([[float(x) for x in v] for v in vecs])
+                    left = await _send_batch(batch_items[:mid])
+                    right = await _send_batch(batch_items[mid:])
+                    return left + right
+
+                # If single oversized chunk exceeded context window, truncate and retry once
+                if ("Max context reached" in err_text or "3030" in err_text) and len(batch_items) == 1:
+                    logger.warning("Single chunk exceeded Cloudflare context window. Truncating to 6,000 chars...")
+                    truncated = [batch_items[0][:6000]]
+                    trunc_resp = await client.post(url, headers=headers, json={"text": truncated})
+                    if trunc_resp.status_code == 200:
+                        trunc_data = trunc_resp.json().get("result", {})
+                        trunc_vecs = trunc_data.get("data") if isinstance(trunc_data, dict) else trunc_data
+                        if trunc_vecs:
+                            return [[float(x) for x in v] for v in trunc_vecs]
+
+                raise RuntimeError(
+                    f"Cloudflare embedding error (HTTP {resp.status_code}): {err_text[:250]}"
+                )
+
+            for batch in batches:
+                batch_vecs = await _send_batch(batch)
+                all_vectors.extend(batch_vecs)
 
         return all_vectors
 

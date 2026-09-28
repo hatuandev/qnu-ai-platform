@@ -1,37 +1,66 @@
 # QNU AI Platform - Task Runner
 param (
     [Parameter(Position = 0)]
-    [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "dev", "dev1", "dev2", "be", "fe", "fe2", "test", "help")]
+    [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "seed", "dev", "dev1", "dev2", "be", "fe", "fe2", "test", "help")]
     [string]$Command = "dev"
 )
 
 switch ($Command) {
     "infra-up" {
         Write-Host "Dang khoi dong ha tang Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)..." -ForegroundColor Green
-        docker compose --profile infra up -d
+        docker compose -f "$PSScriptRoot\docker-compose.infra.yml" up -d
     }
     "infra-down" {
         Write-Host "Dang dung ha tang Docker..." -ForegroundColor Yellow
-        docker compose down
+        docker compose -f "$PSScriptRoot\docker-compose.infra.yml" down
     }
     "infra-status" {
         Write-Host "Trang thai cum ha tang Docker:" -ForegroundColor Cyan
-        docker compose ps
+        docker compose -f "$PSScriptRoot\docker-compose.infra.yml" ps
     }
     "infra-logs" {
-        docker compose logs -f
+        docker compose -f "$PSScriptRoot\docker-compose.infra.yml" logs -f
+    }
+    "seed" {
+        Write-Host "Dang khoi tao CSDL va seed toan bo du lieu mac dinh QNU AI Platform..." -ForegroundColor Green
+        Set-Location "$PSScriptRoot\backend"
+        .\.venv\Scripts\python.exe -m app.cli db bootstrap
+        Set-Location $PSScriptRoot
     }
     "dev" {
+        Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
+        Set-Location "$PSScriptRoot\backend"
+        & ".\.venv\Scripts\python.exe" -m app.cli db ensure-ready
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[CANH BAO] CSDL chua san sang hoac gap loi khi khoi tao." -ForegroundColor Red
+            Write-Host "Neu PostgreSQL chua chay, vui long chay: .\run.ps1 infra-up" -ForegroundColor Yellow
+        }
+        Set-Location $PSScriptRoot
+
         Write-Host "Dang khoi chay Backend (Port 8001) va Frontend cu (Port 3001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     { $_ -in "dev1", "dev2" } {
+        Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
+        Set-Location "$PSScriptRoot\backend"
+        & ".\.venv\Scripts\python.exe" -m app.cli db ensure-ready
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[CANH BAO] CSDL chua san sang hoac gap loi khi khoi tao." -ForegroundColor Red
+            Write-Host "Neu PostgreSQL chua chay, vui long chay: .\run.ps1 infra-up" -ForegroundColor Yellow
+        }
+        Set-Location $PSScriptRoot
+
         Write-Host "Dang khoi chay Backend (Port 8001) va Frontend 2 Moi (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
     }
     "be" {
+        Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
+        Set-Location "$PSScriptRoot\backend"
+        & ".\.venv\Scripts\python.exe" -m app.cli db ensure-ready
+        Set-Location $PSScriptRoot
+
         Write-Host "Dang khoi chay Backend API (Port 8001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
     }
@@ -59,6 +88,7 @@ switch ($Command) {
         Write-Host "  .\run.ps1 infra-down   : Dung cum ha tang Docker"
         Write-Host "  .\run.ps1 infra-status : Kiem tra trang thai cac container"
         Write-Host "  .\run.ps1 infra-logs   : Xem logs cua cum Docker"
+        Write-Host "  .\run.ps1 seed         : Khoi tao CSDL va seed toan bo du lieu mac dinh"
         Write-Host "  .\run.ps1 dev          : Khoi chay ca Backend 8001 va Frontend cu 3001"
         Write-Host "  .\run.ps1 dev1         : Khoi chay ca Backend 8001 va Frontend 2 Moi 3000"
         Write-Host "  .\run.ps1 be           : Khoi chay rieng Backend API 8001"

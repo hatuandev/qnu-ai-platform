@@ -471,6 +471,77 @@ async def verify_core_seed_data() -> bool:
     return True
 
 
+async def ensure_db_ready(*, auto_seed: bool = True) -> bool:
+    """Ensure PostgreSQL database exists, schema is migrated to HEAD, and default seed data exists.
+
+    If database does not exist: creates it.
+    If schema is missing/unmigrated: runs Alembic migrations.
+    If core seed data is missing: runs platform seed.
+    """
+    logger.info("Checking database and seed data readiness...")
+
+    # Step 1: Quick check if database exists and PostgreSQL is reachable
+    db_needs_creation = False
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        exc_str = str(exc).lower()
+        if "does not exist" in exc_str or "invalidcatalogname" in exc_str:
+            logger.info("Target database does not exist yet. Will auto-create...")
+            db_needs_creation = True
+        elif any(term in exc_str for term in ("connection refused", "connectcallfailed", "is the server running")):
+            logger.error(
+                "Khong the ket noi den PostgreSQL (127.0.0.1:5432). "
+                "Vui long kiem tra container Docker da khoi dong chua bang lenh: ./make infra-up"
+            )
+            return False
+        else:
+            db_needs_creation = True
+
+    if db_needs_creation:
+        await ensure_postgres_database_exists(settings.DATABASE_URL)
+        await engine.dispose()
+
+    # Step 2: Check schema readiness
+    schema_ok = False
+    try:
+        schema_ok = await check_db_schema()
+    except Exception as exc:
+        logger.warning("Schema check encountered exception: %s", exc)
+        schema_ok = False
+
+    if not schema_ok:
+        logger.info("Database schema chua san sang hoac thieu bang. Dang chay migration len HEAD...")
+        migrated = await migrate_database(ensure_database=False)
+        if not migrated:
+            logger.error("Migration database that bai.")
+            return False
+        logger.info("Migration database hoan tat thanh cong.")
+
+    # Step 3: Check seed data
+    if auto_seed:
+        seed_ok = False
+        try:
+            seed_ok = await verify_core_seed_data()
+        except Exception as exc:
+            logger.info("Seed data verification notice: %s. Seeding required.", exc)
+            seed_ok = False
+
+        if not seed_ok:
+            logger.info("CSDL chua co du lieu mau mac dinh. Dang tu dong seed platform data...")
+            seed_res = await run_db_seed(seed_all=True)
+            if seed_res != 0:
+                logger.error("Seed du lieu mau that bai.")
+                return False
+            logger.info("Du lieu mau da duoc seed thanh cong.")
+        else:
+            logger.info("Du lieu mau da san sang.")
+
+    logger.info("Database va du lieu nen tang QNU AI Platform: SAN SANG.")
+    return True
+
+
 async def run_knowledge_reconcile(collection_id: str | None = None, auto_fix: bool = False) -> int:
     """Run 4-layer reconciliation across DB, Qdrant, MinIO, and Redis."""
     from app.modules.knowledge.models import KnowledgeCollection
@@ -599,6 +670,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # `db check`
     db_subparsers.add_parser("check", help="Verify database schema and connection")
+    ensure_parser = db_subparsers.add_parser("ensure-ready", help="Ensure DB exists, migrated, and seeded if missing")
+    ensure_parser.add_argument("--no-seed", action="store_true", help="Only ensure database and schema, skip auto-seeding")
 
     # `db migrate`
     db_subparsers.add_parser("migrate", help="Upgrade schema to Alembic HEAD")
@@ -677,6 +750,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "db":
         if args.db_action == "check":
             passed = asyncio.run(check_db_schema())
+            return 0 if passed else 1
+        if args.db_action == "ensure-ready":
+            passed = asyncio.run(ensure_db_ready(auto_seed=not args.no_seed))
             return 0 if passed else 1
         if args.db_action == "migrate":
             return run_db_migrate()

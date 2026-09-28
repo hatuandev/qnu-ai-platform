@@ -7,9 +7,21 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-26 00:35 (UTC+7)
-- **Phiên số**: #227 (deploy Dokploy: chết câm sau alembic context, đều ~10s, không traceback; đã loại OOM lúc import. Chờ phép chia đôi: ExitCode/OOMKilled + `db check` trên server)
-- **Phiên số trước**: #222
+- **Thời gian cập nhật**: 2026-09-28 23:45 (UTC+7)
+- **Phiên số**: #228 (Tự động Migration & Seed khi chạy `make dev1`, Khắc phục triệt để lỗi tràn token Cloudflare Workers AI BGE-M3 Code 3030 trên tài liệu bảng biểu lớn)
+- **Phiên số trước**: #227
+- **Mục tiêu đã hoàn thành (phiên #228)**:
+  - 1. **Khắc phục lỗi index tràn token Cloudflare BGE-M3 (HTTP 400 Code 3030)**:
+       * Điều tra nguyên nhân tài liệu `Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)` bị "Lỗi index" (23 chunks bảng biểu lớn): `batch_size = 16` cũ làm request phình to tới 82.800 tokens, vượt ngưỡng 60.000 tokens của Cloudflare.
+       * Tái cấu trúc hàm `_embed_texts_cloudflare` trong `backend/app/modules/rag/vector_indexer.py`: áp dụng Dynamic Token/Character Budgeting (`MAX_BATCH_CHARS = 16000`, `MAX_BATCH_ITEMS = 6`) và Adaptive Recursive Sub-batching Fallback (tự động chia đôi batch khi gặp lỗi context limit).
+       * Tái lập chỉ mục `doc_18253b3d02d3`: nạp thành công 23/23 chunks vào Qdrant, chuyển trạng thái thành `ready` / `indexed`.
+  - 2. **Tự động hóa toàn diện CSDL khi chạy `make dev1`**:
+       * Thêm hàm `ensure_db_ready` và lệnh `python -m app.cli db ensure-ready`: tự động kiểm tra PostgreSQL, tạo database `qnu_ai_platform` nếu chưa có, chạy Alembic migration lên HEAD nếu thiếu bảng, và nạp seed data mặc định nếu CSDL trống.
+       * Tích hợp vào `lifespan` FastAPI Backend (`app/main.py`) ở môi trường dev để tự phục hồi (self-healing) khi CSDL mới.
+       * Cập nhật toàn bộ task runners (`make.ps1`, `make.bat`, `make`, `run.ps1`, `Makefile`): chạy `ensure-ready` trước khi mở cửa sổ Backend và Frontend 2.
+  - 3. **Cô lập hạ tầng Docker cục bộ (`docker-compose.infra.yml`)**:
+       * Tạo tệp compose độc lập cho 5 dịch vụ local (Postgres, Qdrant, Redis, MinIO, Gotenberg), tránh xung đột Dokploy production environment.
+       * Đồng bộ mật khẩu truy cập `DEV_ACCESS_PASSWORD=QNU@2026` và `PROVIDER_ENCRYPTION_KEY` thống nhất với giao diện `sign-in.tsx`.
 - **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
 - **Phiên số trước**: #215
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
