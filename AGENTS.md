@@ -467,3 +467,8 @@ Ba sự cố đã từng xảy ra thật trong dự án (commit ảnh nhị phâ
 - Giá trị mặc định trong `app/core/config.py` chỉ được là placeholder rỗng hoặc giá trị dev vô hại; `DEV_AUTH_ENABLED` bắt buộc là `False` ở môi trường production.
 - Trước mỗi commit, Agent phải rà soát diff để bảo đảm không lọt secret mới (API key, token, private key) vào lịch sử git.
 
+### 9.4. Quy Chuẩn Thứ Tự Push Git: Gitea Trước, GitHub Sau (Gitea-First Push Policy)
+- **Thứ tự bắt buộc**: Khi đẩy mã nguồn (`git push`), hệ thống và AI Agent bắt buộc phải đẩy lên **Gitea nội bộ trước** (`https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git`), sau khi Gitea chấp nhận thành công mới đẩy tiếp sang **GitHub** (`https://github.com/hatuandev/qnu-ai-platform.git`).
+- **Cấu hình đa Push URL**: Remote `origin` đã được thiết lập 2 `pushurl` tuần tự. Khi thực hiện `git push` hoặc `git push origin main`, Git sẽ tự động đẩy lần lượt theo thứ tự: Gitea ➔ GitHub. Nếu Gitea bị lỗi hoặc từ chối, Git sẽ dừng ngay lập tức và không đẩy lên GitHub.
+
+
