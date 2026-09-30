@@ -7,22 +7,34 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-29 20:35 (UTC+7)
-- **Phiên số**: #231 (Cấu hình Kỹ Năng / Tools Universal trực tiếp trên Web UI & Triệt tiêu hoàn toàn admission_score_tool.py)
-- **Phiên số trước**: #230
-- **Mục tiêu đã hoàn thành (phiên #231)**:
-  - 1. **Triệt tiêu 100% tệp công cụ cục bộ `admission_score_tool.py`**:
-       * Đã xóa vĩnh viễn tệp `backend/app/modules/tools/builtin/admission_score_tool.py`.
-       * Thay thế bằng 2 công cụ universal toàn nền tảng: `FactLayerLookupTool` (`lookup_fact_layer`) và `UniversalReportExportTool` (`export_universal_report`).
-       * Đăng ký vào `ToolRegistry` dùng chung cho cả 5 Trợ lý AI và toàn bộ luồng DAG.
-  - 2. **Cấu hình Kỹ Năng / Capabilities Trực quan trên Web UI**:
-       * Nâng cấp `frontend2/src/components/assistants/sections/assistant-tools-section.tsx`: Bổ sung khối "Kỹ Năng & Công Cụ Nền Tảng (Universal AI Capabilities)" với các Switch điều khiển từng công cụ (`export_universal_report`, `lookup_fact_layer`, `export_administrative_document`, `export_exam_matrix`).
-       * Cập nhật `frontend2/src/components/assistants/types.ts` và `assistant-detail-page.tsx`: Đồng bộ `enabled_tools` hai chiều giữa Form và API backend.
-  - 3. **Kiểm thử Toàn Diện (100% Pass)**:
-       * Backend Pytest: 36/36 tests passed in 7.58s (`test_universal_report.py`, `test_universal_tools.py`, `test_consulting_dispatcher.py`, `test_tools.py`, `test_assistants.py`, `test_admissions_agentic_flow.py`).
-       * Backend Linter: `ruff check app tests` -> 0 errors.
-       * Frontend Build: Biên dịch bundle thành công 100%.
+- **Thời gian cập nhật**: 2026-09-30 23:25 (UTC+7)
+- **Phiên số**: #234 (Tích hợp OpenRouter AI Gateway, NVIDIA NIM Provider, Xử lý lỗi 503 Overload & Nemotron Thinking Stream, Git Dual-Push)
+- **Phiên số trước**: #233, #232, #231
+- **Mục tiêu đã hoàn thành (các phiên #232 - #234)**:
+  - 1. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
+       * Bổ sung biến môi trường `OPENROUTER_API_KEY` và `OPENROUTER_BASE_URL` ("https://openrouter.ai/api/v1") trong `app.core.config`.
+       * Tự động gắn kèm headers `HTTP-Referer: https://qnu.edu.vn` và `X-Title: QNU AI Platform` theo chuẩn OpenRouter API trong `OpenAIAdapter`.
+       * Đăng ký `prov_openrouter` vào `STANDARD_QNU_PROVIDERS` với danh mục model gợi ý (`deepseek/deepseek-r1`, `anthropic/claude-3.7-sonnet`, `openai/gpt-4o-mini`, `google/gemini-2.0-flash-001`, `meta-llama/llama-3.3-70b-instruct`) và preset schemas.
+       * CSDL live PostgreSQL: Đạt đủ **11 Nhà Cung Cấp** tiêu chuẩn (OpenAI, Gemini, Mistral, Cloudflare, DeepSeek, Groq, Claude, Local vLLM, Ollama, NVIDIA NIM, OpenRouter).
+  - 2. **Phiên #233 — Tích hợp NVIDIA NIM (`prov_nvidia`), Xử lý lỗi 503 Overload & Nemotron Thinking Stream**:
+       * Đăng ký `prov_nvidia` vào `STANDARD_QNU_PROVIDERS` (Base URL: `https://integrate.api.nvidia.com/v1`).
+       * Hỗ trợ tham số `chat_template_kwargs={"enable_thinking": True}` qua `extra_body` cho mô hình suy luận `nvidia/nemotron-3-ultra-550b-a55b` và dòng DeepSeek R1 trong `OpenAIAdapter`.
+       * Bóc tách `reasoning_content` từ `chunk.choices[0].delta` và stream trực tiếp token suy luận về client.
+       * Cơ chế phục hồi 503/504/529: Auto-retry 1 lần sau 1s trong `_ping_single_model`, phân loại trạng thái `temporarily_overloaded` thay vì gán lỗi chết.
+       * UI `add-custom-model-dialog.tsx`: Cảnh báo màu hổ phách, icon đồng hồ `Clock`, giải thích tên mô hình chính xác và mở nút "Thêm model" cho phép người dùng lưu mô hình ngay.
+  - 3. **Phiên #232 — Nâng cấp Task Runner (`reseed`, `reset-db`) & Git Dual-Push (Gitea + GitHub)**:
+       * Sửa lỗi `ParameterBindingValidationException` trong `make.ps1` bằng việc bổ sung `"reseed"`, `"reset-db"` vào attribute `[ValidateSet(...)]` và triển khai nhánh switch tương ứng.
+       * Tối ưu hóa `Makefile` tương thích PowerShell.
+       * Cấu hình remote `origin`: Fetch trỏ về Gitea (`qnu-gitea.duckdns.org` - Gitea-first pull), Push trỏ đồng thời về Gitea và GitHub (`github.com/hatuandev`). 1 lệnh `git push` tự động đồng bộ cả 2 máy chủ.
+  - 4. **Phiên #231 — Cấu hình Kỹ Năng / Tools Universal Trên Web UI & Triệt tiêu hoàn toàn `admission_score_tool.py`**:
+       * Xóa bỏ 100% tệp gán cứng `admission_score_tool.py`.
+       * Thay thế bằng 2 công cụ nền tảng dùng chung `lookup_fact_layer` và `export_universal_report`.
+       * Nâng cấp UI `/assistants/:id` với khối "Kỹ Năng & Công Cụ Nền Tảng (Universal AI Capabilities)" cho phép bật/tắt từng công cụ qua Switch Radix UI.
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
+- **Trạng thái kiểm thử**:
+  - Backend: 11/11 Providers nạp live CSDL PostgreSQL 16 hợp lệ (`verify_core_seed_data()`).
+  - Frontend2: `npm run build` thành công 100% trong 4.79s, 0 lỗi TypeScript, 0 lỗi Biome.
+  - Git: Dual-Push thành công đồng thời cả Gitea và GitHub.
 - **Mục tiêu đã hoàn thành**:
 - 0. **Tối Ưu Hóa Toàn Diện Responsive Mobile & Triệt Tiêu Toàn Bộ Nút/Dropdown Dư Thừa Phân Hệ Loại Văn Bản (`/document-types`) (phiên #215)**:
   - *Hiện trạng & Yêu cầu*:
