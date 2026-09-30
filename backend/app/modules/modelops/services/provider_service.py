@@ -493,6 +493,97 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
             "api_keys": [],
         },
     },
+    {
+        "id": "prov_nvidia",
+        "name": "NVIDIA NIM",
+        "provider_type": "nvidia",
+        "model_name": "meta/llama-3.3-70b-instruct",
+        "models": [
+            "meta/llama-3.3-70b-instruct",
+            "deepseek-ai/deepseek-r1",
+            "deepseek-ai/deepseek-v3",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "meta/llama-3.1-8b-instruct",
+            "mistralai/mixtral-8x22b-instruct-v0.1",
+            "nvidia/neva-22b",
+        ],
+        "api_base_url": getattr(settings, "NVIDIA_BASE_URL", "") or "https://integrate.api.nvidia.com/v1",
+        "api_key": encrypt_secret(getattr(settings, "NVIDIA_API_KEY", "") or "") if getattr(settings, "NVIDIA_API_KEY", "") else "",
+        "priority": 6,
+        "is_active": bool(getattr(settings, "NVIDIA_API_KEY", None)),
+        "timeout_seconds": 60,
+        "extra_config": {
+            "models": [
+                "meta/llama-3.3-70b-instruct",
+                "deepseek-ai/deepseek-r1",
+                "deepseek-ai/deepseek-v3",
+                "nvidia/llama-3.1-nemotron-70b-instruct",
+                "meta/llama-3.1-8b-instruct",
+                "mistralai/mixtral-8x22b-instruct-v0.1",
+                "nvidia/neva-22b",
+            ],
+            "model_specs": {
+                "meta/llama-3.3-70b-instruct": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Meta Llama 3.3 70B Instruct tối ưu qua NVIDIA TensorRT-LLM, suy luận cực nhanh",
+                },
+                "deepseek-ai/deepseek-r1": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "DeepSeek R1 mô hình suy luận chuyên sâu (Reasoning) triển khai trên NVIDIA NIM",
+                },
+                "deepseek-ai/deepseek-v3": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "DeepSeek V3 671B MoE siêu mạnh mẽ, độ chính xác cao",
+                },
+                "nvidia/llama-3.1-nemotron-70b-instruct": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Mô hình Nemotron 70B độc quyền tinh chỉnh bởi NVIDIA cho độ chuẩn xác vượt trội",
+                },
+                "meta/llama-3.1-8b-instruct": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Llama 3.1 8B gọn nhẹ, phản hồi độ trễ thấp",
+                },
+                "mistralai/mixtral-8x22b-instruct-v0.1": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Mixtral 8x22B MoE thông minh, đa ngữ xuất sắc",
+                },
+                "nvidia/neva-22b": {
+                    "can_ocr": True,
+                    "can_vision": True,
+                    "type": "vision_ocr",
+                    "description": "NVIDIA NeVA 22B Vision-Language model phân tích ảnh và văn bản thị giác",
+                },
+            },
+            "api_keys": [
+                {
+                    "id": "key_nvidia_primary",
+                    "name": "Khóa Chính (Primary)",
+                    "api_key": encrypt_secret(getattr(settings, "NVIDIA_API_KEY", "") or ""),
+                    "api_key_masked": mask_api_key(getattr(settings, "NVIDIA_API_KEY", "") or ""),
+                    "priority": 1,
+                    "is_active": True,
+                    "status": "active",
+                    "quota_limit": 20_000_000,
+                    "usage_tokens": 0,
+                    "cooldown_until": None,
+                    "last_used_at": None,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            ] if getattr(settings, "NVIDIA_API_KEY", None) else [],
+        },
+    },
 ]
 
 
@@ -524,6 +615,8 @@ class ProviderService:
             settings.OPENAI_API_KEY = clean_key
         elif provider_type == "gemini":
             settings.GEMINI_API_KEY = clean_key
+        elif provider_type == "nvidia":
+            settings.NVIDIA_API_KEY = clean_key
 
     async def sync_active_providers_to_runtime(self, db: AsyncSession) -> int:
         """Query active providers from database and inject credentials into runtime settings at startup."""
@@ -1274,6 +1367,7 @@ class ProviderService:
                         else "https://api.deepseek.com/v1" if provider_type == "deepseek"
                         else "https://api.groq.com/openai/v1" if provider_type == "groq"
                         else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
+                        else "https://integrate.api.nvidia.com/v1" if provider_type == "nvidia"
                         else "http://localhost:11434/v1" if provider_type == "ollama"
                         else "http://localhost:8000/v1"
                     )

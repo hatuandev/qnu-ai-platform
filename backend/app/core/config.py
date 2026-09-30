@@ -51,6 +51,7 @@ class Settings(BaseSettings):
         "MISTRAL_API_KEY",
         "CLOUDFLARE_API_KEY",
         "CLOUDFLARE_API_TOKEN",
+        "NVIDIA_API_KEY",
         "GOTENBERG_USERNAME",
         "GOTENBERG_PASSWORD",
         mode="before",
@@ -217,6 +218,13 @@ class Settings(BaseSettings):
     CLOUDFLARE_API_KEY: str | None = None
     CLOUDFLARE_API_TOKEN: str | None = None
     CLOUDFLARE_ACCOUNT_ID: str | None = None
+
+    # --- NVIDIA NIM ---
+    NVIDIA_API_KEY: str | None = None
+    NVIDIA_BASE_URL: str = Field(
+        default="https://integrate.api.nvidia.com/v1",
+        validation_alias=AliasChoices("NVIDIA_BASE_URL", "NVIDIA_API_BASE", "NVIDIA_NIM_URL"),
+    )
 
     LOCAL_LLM_ENABLED: bool = False
     LOCAL_LLM_BASE_URL: str | None = None

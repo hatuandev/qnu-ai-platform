@@ -212,7 +212,15 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
     "@cf/baai/bge-reranker-base",
     "@cf/meta/llama-3.1-8b-instruct",
   ],
-  nvidia: ["meta/llama-3.3-70b-instruct", "deepseek-ai/deepseek-r1"],
+  nvidia: [
+    "meta/llama-3.3-70b-instruct",
+    "deepseek-ai/deepseek-r1",
+    "deepseek-ai/deepseek-v3",
+    "nvidia/llama-3.1-nemotron-70b-instruct",
+    "meta/llama-3.1-8b-instruct",
+    "mistralai/mixtral-8x22b-instruct-v0.1",
+    "nvidia/neva-22b",
+  ],
   ollama: ["qwen2.5:7b", "llama3.1:8b", "bge-m3:latest"],
   local_vllm: ["qwen2.5-7b-instruct"],
   openrouter: [
