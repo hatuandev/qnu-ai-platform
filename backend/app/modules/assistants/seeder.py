@@ -82,7 +82,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
     {
         "id": "ast_admissions",
         "code": "admissions",
-        "name": "Trợ lý ảo Tư vấn Tuyển sinh",
+        "name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
         "description": (
             "Giải đáp đề án tuyển sinh, điểm chuẩn, phương thức xét tuyển, học phí, học bổng "
             "và ký túc xá từ nguồn chính thức."
@@ -133,7 +133,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
     {
         "id": "ast_regulations",
         "code": "regulations",
-        "name": "Trợ lý ảo Tư vấn Quy chế, Quy định",
+        "name": "Mô-đun trợ lý ảo tư vấn quy chế, quy định",
         "description": (
             "Tra cứu quy chế tín chỉ, đăng ký học phần, xử lý học vụ, chuẩn đầu ra và xét tốt nghiệp."
         ),
@@ -172,7 +172,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
     {
         "id": "ast_library",
         "code": "library",
-        "name": "Trợ lý ảo Tra cứu & Khai thác Tài nguyên Thư viện",
+        "name": "Mô-đun trợ lý ảo tra cứu, tư vấn khai thác tài nguyên thư viện",
         "description": (
             "Hỗ trợ tìm tài liệu, giáo trình, luận văn, cơ sở dữ liệu số và quy định mượn trả sách."
         ),
@@ -209,7 +209,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
     {
         "id": "ast_drafting",
         "code": "drafting",
-        "name": "Trợ lý ảo Hỗ trợ Soạn thảo Văn bản",
+        "name": "Mô-đun trợ lý ảo hỗ trợ soạn thảo văn bản",
         "description": (
             "Hỗ trợ soạn thông báo, tờ trình, kế hoạch và giấy mời theo Nghị định 30/2020/NĐ-CP."
         ),
@@ -256,7 +256,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
     {
         "id": "ast_question_bank",
         "code": "question_bank",
-        "name": "Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi theo Chuẩn Đầu ra",
+        "name": "Mô-đun trợ lý ảo hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra",
         "description": (
             "Xây dựng ma trận đề, câu hỏi trắc nghiệm hoặc tự luận theo Bloom kèm đáp án và biểu điểm."
         ),
@@ -339,9 +339,8 @@ async def seed_standard_assistants(db: AsyncSession) -> AssistantSeedResponse:
 
         code = str(item["code"])
         if code in existing_by_code:
-            # Existing assistants may have been customized in the admin UI.
-            # The production bootstrap only repairs missing defaults and never
-            # overwrites user-owned prompts, guardrails, or sample questions.
+            existing_record = existing_by_code[code]
+            existing_record.name = str(item["name"])
             continue
         db.add(
             AssistantModel(

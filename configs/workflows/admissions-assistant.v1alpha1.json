@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "admissions-assistant",
-    "display_name": "Trợ lý ảo Tư vấn Tuyển sinh",
+    "display_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
     "description": "Trợ lý thông minh giải đáp thông tin đề án tuyển sinh, chỉ tiêu, mã ngành, học phí và điểm chuẩn các năm.",
     "scope": {
       "tenant_id": "tenant_qnu",

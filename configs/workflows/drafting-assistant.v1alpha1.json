@@ -3,7 +3,7 @@
   "kind": "WorkflowDefinition",
   "metadata": {
     "name": "drafting-assistant",
-    "display_name": "Trợ lý ảo Hỗ trợ Soạn thảo Văn bản",
+    "display_name": "Mô-đun trợ lý ảo hỗ trợ soạn thảo văn bản",
     "description": "Tạo dự thảo DOCX/PDF theo cấu trúc thích ứng, dữ kiện có nguồn gốc và kiểm định ngữ nghĩa.",
     "scope": {
       "tenant_id": "tenant_qnu",

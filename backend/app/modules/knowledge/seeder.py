@@ -294,11 +294,12 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == REGULATIONS_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
     if col:
+        col.name = "Kho tri thức tư vấn quy chế, quy định"
         _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=REGULATIONS_COLLECTION_ID,
-            name="Kho Tri Thức Quy Chế & Quy Định Đào Tạo",
+            name="Kho tri thức tư vấn quy chế, quy định",
             module_code="regulations",
             description="Quy chế đào tạo đại học chính quy theo hệ thống tín chỉ, thang điểm và chuẩn đầu ra QNU.",
             tenant_id=DEFAULT_SEED_TENANT_ID,
@@ -458,11 +459,12 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == DECREE_30_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
     if col:
+        col.name = "Kho tri thức hỗ trợ soạn thảo văn bản"
         _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=DECREE_30_COLLECTION_ID,
-            name="Kho Tri Thức Thể Thức & Biểu Mẫu Văn Bản",
+            name="Kho tri thức hỗ trợ soạn thảo văn bản",
             module_code="drafting",
             description="Mẫu văn bản hành chính, quyết định, tờ trình, quy cách căn lề theo NĐ 30/2020.",
             tenant_id=DEFAULT_SEED_TENANT_ID,
@@ -621,11 +623,12 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == ADMISSIONS_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
     if col:
+        col.name = "Kho tri thức tư vấn tuyển sinh"
         _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=ADMISSIONS_COLLECTION_ID,
-            name="Kho Tri Thức Đề Án Tuyển Sinh",
+            name="Kho tri thức tư vấn tuyển sinh",
             module_code="admissions",
             description="Đề án và thông báo tuyển sinh đại học chính quy, phương thức xét tuyển, chỉ tiêu, điểm chuẩn, học phí và ký túc xá QNU.",
             tenant_id=DEFAULT_SEED_TENANT_ID,
@@ -785,11 +788,12 @@ async def seed_library_knowledge(db: AsyncSession) -> dict[str, int]:
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == LIBRARY_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
     if col:
+        col.name = "Kho tri thức tra cứu, tư vấn khai thác tài nguyên thư viện"
         _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=LIBRARY_COLLECTION_ID,
-            name="Kho Tri Thức Tài Nguyên Thư Viện & Học Liệu Số",
+            name="Kho tri thức tra cứu, tư vấn khai thác tài nguyên thư viện",
             module_code="library",
             description="Quy chế mượn trả sách, tra cứu OPAC, cơ sở dữ liệu số (ScienceDirect, IEEE, Springer), phòng tự học 24/7 và dịch vụ kiểm tra đạo văn Turnitin QNU.",
             tenant_id=DEFAULT_SEED_TENANT_ID,
@@ -949,11 +953,12 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
     col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == QUESTION_BANK_COLLECTION_ID)
     col = (await db.execute(col_stmt)).scalar_one_or_none()
     if col:
+        col.name = "Kho tri thức hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra"
         _normalize_seed_collection_scope(col)
     if not col:
         col = KnowledgeCollection(
             id=QUESTION_BANK_COLLECTION_ID,
-            name="Kho Tri Thức Ngân Hàng Câu Hỏi & Chuẩn Đầu Ra",
+            name="Kho tri thức hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra",
             module_code="question_bank",
             description="Quy định xây dựng ngân hàng câu hỏi, ma trận đề thi theo thang đo Bloom, tiêu chuẩn MCQ và barem chấm điểm QNU.",
             tenant_id=DEFAULT_SEED_TENANT_ID,

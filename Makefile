@@ -1,8 +1,14 @@
-.PHONY: dev test infra-up infra-down infra-status infra-logs seed be fe fe2 dev1 dev2
+.PHONY: dev test infra-up infra-down infra-status infra-logs seed reset-db reseed be fe fe2 dev1 dev2
 
 # Khởi tạo CSDL migration và nạp toàn bộ seed data mặc định
 seed:
 	cd backend && .\.venv\Scripts\python.exe -m app.cli db bootstrap
+
+# Xóa sạch toàn bộ CSDL PostgreSQL & Qdrant, sau đó seed lại toàn bộ 5 mô-đun
+reset-db:
+	cd backend && .\.venv\Scripts\python.exe scripts/reset_and_reseed.py
+
+reseed: reset-db
 
 # Khởi chạy toàn bộ cụm hạ tầng Docker (PostgreSQL, Qdrant, Redis, MinIO, Gotenberg)
 infra-up:

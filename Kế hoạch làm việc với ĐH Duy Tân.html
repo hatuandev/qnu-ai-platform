@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kế Hoạch Làm Việc Với Đại Học Duy Tân - Bản In A4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap"
+    rel="stylesheet">
+
+  <style>
+    :root {
+      --mau-chu-chinh: #111827;
+      --mau-chu-phu: #374151;
+      --mau-chu-mo: #6B7280;
+      --mau-duong-vien: #D1D5DB;
+      --mau-duong-vien-nhe: #E5E7EB;
+      --mau-nen-phu: #F9FAFB;
+      --mau-nhan: #C2410C;
+      --mau-nhan-nhat: #FFF7ED;
+      --mau-nhan-vien: #FDBA74;
+      --mau-qnu: #0D9488;
+      --mau-qnu-nhat: #F0FDFA;
+      --phong-tieu-de: 'Space Grotesk', -apple-system, sans-serif;
+      --phong-noi-dung: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #E5E7EB;
+      color: var(--mau-chu-chinh);
+      font-family: var(--phong-noi-dung);
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 24px 0 40px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Thanh điều khiển trên màn hình máy tính */
+    .thanh-dieu-khien {
+      max-width: 210mm;
+      margin: 0 auto 16px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    .thong-tin-tai-lieu {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--mau-chu-phu);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nut-in-nhanh {
+      background-color: var(--mau-nhan);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 6px rgba(194, 65, 12, 0.25);
+      transition: background 0.15s ease;
+    }
+
+    .nut-in-nhanh:hover {
+      background-color: #9A3412;
+    }
+
+    /* Khung giả lập trang A4 */
+    .trang-a4 {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 14mm 16mm 14mm 16mm;
+      margin: 0 auto 20px auto;
+      background: #FFFFFF;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .noi-dung-chinh {
+      flex: 1;
+    }
+
+    /* Header tài liệu trang trọng */
+    .dau-trang-hanh-chinh {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid var(--mau-chu-chinh);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+
+    .ben-qnu {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--mau-qnu);
+      line-height: 1.35;
+    }
+
+    .ben-dtu {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-align: right;
+      color: var(--mau-nhan);
+      line-height: 1.35;
+    }
+
+    .tieu-de-chinh {
+      text-align: center;
+      margin: 10px 0 12px 0;
+    }
+
+    .tieu-de-chinh h1 {
+      font-family: var(--phong-tieu-de);
+      font-size: 18px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: var(--mau-chu-chinh);
+      margin-bottom: 4px;
+    }
+
+    .tieu-de-chinh p {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--mau-nhan);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Bảng thông số tóm tắt nhanh */
+    .bang-thong-so {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 11.5px;
+    }
+
+    .bang-thong-so td {
+      border: 1px solid var(--mau-duong-vien);
+      padding: 6px 10px;
+      background: var(--mau-nen-phu);
+    }
+
+    .bang-thong-so .nhan-ts {
+      font-weight: 700;
+      color: var(--mau-chu-phu);
+      width: 15%;
+      background: #F3F4F6;
+    }
+
+    .bang-thong-so .gia-tri-ts {
+      font-weight: 600;
+      color: var(--mau-chu-chinh);
+      width: 35%;
+    }
+
+    /* Khối section chung */
+    .khoi-muc {
+      margin-bottom: 12px;
+    }
+
+    .tieu-de-muc-lon {
+      font-family: var(--phong-tieu-de);
+      font-size: 13.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--mau-chu-chinh);
+      background: #F3F4F6;
+      border-left: 4px solid var(--mau-nhan);
+      padding: 5px 10px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tieu-de-muc-lon span {
+      font-family: var(--phong-noi-dung);
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--mau-chu-mo);
+      text-transform: none;
+    }
+
+    /* Sơ đồ 4 bước ngang */
+    .so-do-4-buoc {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .buoc-so-do {
+      border: 1px solid var(--mau-duong-vien);
+      border-radius: 4px;
+      padding: 7px 8px;
+      background: #FFFFFF;
+      position: relative;
+    }
+
+    .buoc-so-do.buoc-chinh {
+      border: 1.5px solid var(--mau-nhan);
+      background: var(--mau-nhan-nhat);
+    }
+
+    .buoc-so-do .ten-giai-doan {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--mau-nhan);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .buoc-so-do .tieu-de-buoc {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--mau-chu-chinh);
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--mau-duong-vien-nhe);
+      padding-bottom: 3px;
+    }
+
+    .buoc-so-do ul {
+      list-style: none;
+      font-size: 10.5px;
+      color: var(--mau-chu-phu);
+      line-height: 1.35;
+    }
+
+    .buoc-so-do li {
+      margin-bottom: 2px;
+      position: relative;
+      padding-left: 8px;
+    }
+
+    .buoc-so-do li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--mau-nhan);
+      font-weight: bold;
+    }
+
+    /* Phần II: Nội dung buổi họp khởi động */
+    .danh-sach-muc-hop {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .hang-muc-hop {
+      border: 1px solid var(--mau-duong-vien-nhe);
+      border-radius: 4px;
+      padding: 6px 10px;
+      background: #FFFFFF;
+    }
+
+    .hang-muc-hop h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--mau-chu-chinh);
+      margin-bottom: 3px;
+    }
+
+    .hang-muc-hop p,
+    .hang-muc-hop ul {
+      font-size: 11.5px;
+      color: var(--mau-chu-phu);
+      line-height: 1.4;
+    }
+
+    .hang-muc-hop ul {
+      margin-left: 18px;
+      margin-top: 3px;
+    }
+
+    .hang-muc-hop li {
+      margin-bottom: 2px;
+    }
+
+    .the-chip-ten {
+      display: inline-block;
+      background: #F3F4F6;
+      border: 1px solid var(--mau-duong-vien);
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 10.5px;
+      font-weight: 600;
+      margin: 2px 2px 2px 0;
+    }
+
+    .the-chip-ten.dtu {
+      background: var(--mau-nhan-nhat);
+      border-color: var(--mau-nhan-vien);
+      color: var(--mau-nhan);
+    }
+
+    /* 3 Mốc quan trọng */
+    .bang-3-moc {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+      font-size: 11.5px;
+    }
+
+    .bang-3-moc th {
+      background: #F3F4F6;
+      color: var(--mau-chu-chinh);
+      font-weight: 700;
+      padding: 5px 8px;
+      border: 1px solid var(--mau-duong-vien);
+      text-align: left;
+    }
+
+    .bang-3-moc td {
+      border: 1px solid var(--mau-duong-vien);
+      padding: 5px 8px;
+      line-height: 1.35;
+    }
+
+    /* Bảng tiến độ 8 tuần */
+    .bang-tien-do-8-tuan {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      font-size: 11px;
+    }
+
+    .bang-tien-do-8-tuan th {
+      background: #E5E7EB;
+      color: var(--mau-chu-chinh);
+      font-weight: 700;
+      padding: 5px 6px;
+      border: 1px solid var(--mau-duong-vien);
+      text-align: left;
+    }
+
+    .bang-tien-do-8-tuan td {
+      border: 1px solid var(--mau-duong-vien);
+      padding: 4px 6px;
+      vertical-align: top;
+      line-height: 1.35;
+    }
+
+    .bang-tien-do-8-tuan tr:nth-child(even) {
+      background: #F9FAFB;
+    }
+
+    .bang-tien-do-8-tuan .dong-thang {
+      background: #F3F4F6 !important;
+      font-weight: 700;
+      color: var(--mau-nhan);
+      padding: 4px 6px;
+    }
+
+    .cot-tuan {
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--mau-chu-chinh);
+      text-align: center;
+      width: 8%;
+    }
+
+    .cot-qnu {
+      width: 36%;
+    }
+
+    .cot-dtu {
+      width: 36%;
+    }
+
+    .cot-ketqua {
+      width: 20%;
+      font-weight: 600;
+      color: var(--mau-qnu);
+    }
+
+    .badge-moc {
+      display: inline-block;
+      background: var(--mau-nhan);
+      color: #FFFFFF;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 2px;
+      margin-top: 2px;
+    }
+
+    /* Khối Biểu mẫu & Sản phẩm bàn giao (2 cột) */
+    .luoi-hai-cot-a4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .cot-a4 {
+      border: 1px solid var(--mau-duong-vien);
+      border-radius: 4px;
+      padding: 8px 10px;
+      background: #FFFFFF;
+    }
+
+    .cot-a4 h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--mau-chu-chinh);
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--mau-duong-vien-nhe);
+      padding-bottom: 4px;
+    }
+
+    .cot-a4 ul {
+      margin-left: 16px;
+      font-size: 11px;
+      color: var(--mau-chu-phu);
+      line-height: 1.4;
+    }
+
+    .cot-a4 li {
+      margin-bottom: 4px;
+    }
+
+    /* Chữ ký xác nhận cuối trang 2 */
+    .khung-chu-ky {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      text-align: center;
+      margin-top: 10px;
+      padding-top: 8px;
+    }
+
+    .ben-ky h5 {
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .ben-ky p {
+      font-size: 10px;
+      color: var(--mau-chu-mo);
+      font-style: italic;
+      margin-bottom: 38px;
+    }
+
+    .ben-ky .ten-nguoi-ky {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--mau-chu-chinh);
+    }
+
+    /* Chân trang số trang */
+    .chan-trang-a4 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--mau-duong-vien-nhe);
+      padding-top: 6px;
+      font-size: 10px;
+      color: var(--mau-chu-mo);
+    }
+
+    /* ========================================================
+       CẤU HÌNH IN ẤN CHUẨN A4 (@media print)
+       ======================================================== */
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        font-size: 10.5pt !important;
+      }
+
+      .thanh-dieu-khien {
+        display: none !important;
+      }
+
+      .trang-a4 {
+        width: 100% !important;
+        min-height: auto !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .trang-a4:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* Đảm bảo bảng không bị vỡ dòng ngang */
+      .bang-thong-so,
+      .bang-3-moc,
+      .bang-tien-do-8-tuan {
+        page-break-inside: auto;
+      }
+
+      tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Thanh điều khiển trên màn hình máy tính -->
+  <div class="thanh-dieu-khien">
+    <div class="thong-tin-tai-lieu">
+      <span>Tài liệu: Kế hoạch phối hợp triển khai ĐH Quy Nhơn – ĐH Duy Tân (Khổ in: 2 Trang A4)</span>
+    </div>
+    <button class="nut-in-nhanh" onclick="window.print()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+        <rect x="6" y="14" width="12" height="8"></rect>
+      </svg>
+      <span>In / Xuất PDF (Chuẩn 2 Trang A4)</span>
+    </button>
+  </div>
+
+  <!-- ==================== TRANG 1 ==================== -->
+  <div class="trang-a4">
+    <div class="noi-dung-chinh">
+
+      <!-- Tiêu đề chính -->
+      <div class="tieu-de-chinh">
+        <h1>KẾ HOẠCH LÀM VIỆC & PHỐI HỢP TRIỂN KHAI</h1>
+      </div>
+
+      <!-- Bảng thông số tóm tắt -->
+      <table class="bang-thong-so">
+        <tr>
+          <td class="nhan-ts">Thời Lượng:</td>
+          <td class="gia-tri-ts">02 Tháng · 8 Tuần Triển Khai</td>
+          <td class="nhan-ts">Khởi Động:</td>
+          <td class="gia-tri-ts">Thứ Ba (Họp trực tuyến Google Meet)</td>
+        </tr>
+        <tr>
+          <td class="nhan-ts">Kênh Phối Hợp:</td>
+          <td class="gia-tri-ts">Nhóm Zalo Công Việc</td>
+          <td class="nhan-ts">Mục Tiêu:</td>
+          <td class="gia-tri-ts">Hoàn Thành & Bàn Giao 100% Sản Phẩm</td>
+        </tr>
+      </table>
+
+      <!-- I. Sơ đồ quy trình triển khai -->
+      <div class="khoi-muc">
+        <div class="tieu-de-muc-lon">
+          I. Sơ Đồ Quy Trình Triển Khai & Quyết Định
+          <span>(Quy trình phối hợp 4 giai đoạn)</span>
+        </div>
+
+        <div class="so-do-4-buoc">
+          <div class="buoc-so-do">
+            <div class="ten-giai-doan">Giai Đoạn 01</div>
+            <div class="tieu-de-buoc">Lập Nhóm Zalo</div>
+            <ul>
+              <li>Khởi tạo nhóm trao đổi</li>
+              <li>Mời đầy đủ thành viên</li>
+              <li>Gửi link Google Meet</li>
+            </ul>
+          </div>
+
+          <div class="buoc-so-do buoc-chinh">
+            <div class="ten-giai-doan">Giai Đoạn 02 (Tuần 1)</div>
+            <div class="tieu-de-buoc">Họp Khởi Động</div>
+            <ul>
+              <li>Lập 2 nhóm kỹ thuật</li>
+              <li>Chốt 2 người mỗi bên</li>
+              <li>Thống nhất kinh phí 2 tháng</li>
+              <li>Bàn giao tài liệu mẫu</li>
+            </ul>
+          </div>
+
+          <div class="buoc-so-do">
+            <div class="ten-giai-doan">Giai Đoạn 03 (Tuần 1-8)</div>
+            <div class="tieu-de-buoc">Triển Khai 02 Tháng</div>
+            <ul>
+              <li>Tuần 1-4: Khảo sát & Dùng thử</li>
+              <li>Tuần 5-7: Hoàn thiện & Test</li>
+              <li>Báo cáo tiến độ hàng tuần</li>
+            </ul>
+          </div>
+
+          <div class="buoc-so-do">
+            <div class="ten-giai-doan">Giai Đoạn 04 (Tuần 8)</div>
+            <div class="tieu-de-buoc">Bàn Giao & Hoàn Tất</div>
+            <ul>
+              <li>Bàn giao 100% sản phẩm</li>
+              <li>Bàn giao mã nguồn & tài liệu</li>
+              <li>Đưa vào sử dụng chính thức</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- II. Nội dung chi tiết buổi họp khởi động -->
+      <div class="khoi-muc">
+        <div class="tieu-de-muc-lon">
+          II. Nội Dung Chi Tiết Buổi Họp Khởi Động
+        </div>
+
+        <div class="danh-sach-muc-hop">
+          <!-- Mục 01 -->
+          <div class="hang-muc-hop">
+            <h4>MỤC 01: Thành Phần Tham Dự</h4>
+            <p>
+              <strong>Thành phần tham dự:</strong>
+              <span class="the-chip-ten">Anh Đạt</span>
+              <span class="the-chip-ten">Chị Hằng</span>
+              <span class="the-chip-ten">Thi</span>
+              <span class="the-chip-ten">Hồ Tuấn</span>
+              <span class="the-chip-ten dtu">Đại diện ĐH Duy Tân</span>
+            </p>
+          </div>
+
+          <!-- Mục 02 -->
+          <div class="hang-muc-hop">
+            <h4>MỤC 02: Lập Nhóm Kỹ Thuật & Thống Nhất Kinh Phí Cho Nhóm Làm Trong 2 Tháng</h4>
+            <ul>
+              <li><strong>Cơ cấu 02 nhóm kỹ thuật chuyên trách:</strong>
+                (1) Nhóm kỹ thuật Đại học Quy Nhơn: <strong>2 người</strong>;
+                (2) Nhóm kỹ thuật Đại học Duy Tân: <strong>2 người</strong>.
+              </li>
+              <li><strong>Thống nhất kinh phí thực hiện trong 2 tháng:</strong> Thống nhất kinh phí 2 tháng/nhóm kỹ
+                thuật Đại học Duy Tân.</li>
+            </ul>
+          </div>
+
+          <!-- Mục 03 -->
+          <div class="hang-muc-hop">
+            <h4>MỤC 03: Công Việc & Sản Phẩm Bàn Giao</h4>
+            <ul>
+              <li><strong>Nhóm kỹ thuật ĐH Quy Nhơn:</strong> Cung cấp tài liệu chuẩn (giáo trình, đề cương chi tiết,
+                chuẩn đầu ra...); phối hợp kiểm thử và xác nhận tính đúng đắn của dữ liệu.</li>
+              <li><strong>Nhóm kỹ thuật ĐH Duy Tân:</strong> Phụ trách phát triển phần mềm Chatbot Trợ lý ảo hỗ trợ tạo
+                câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra</li>
+              <li><strong>Thời gian & Sản phẩm bàn giao cuối cùng:</strong> Thực hiện trong 02 tháng (8 tuần). Bàn giao
+                Chatbot hoạt động ổn định và bộ mã nguồn hoàn chỉnh kèm tài liệu hướng dẫn.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== TRANG 2 ==================== -->
+  <div class="trang-a4">
+    <div class="noi-dung-chinh">
+
+      <!-- III. Kế hoạch & tiến độ 8 tuần -->
+      <div class="khoi-muc">
+        <div class="tieu-de-muc-lon">
+          III. Kế Hoạch & Tiến Độ Thực Hiện Trong 2 Tháng (8 Tuần)
+          <span>(3 Mốc quan trọng & Lộ trình phân bổ chi tiết)</span>
+        </div>
+
+        <!-- 3 Mốc quan trọng -->
+        <table class="bang-3-moc">
+          <tr>
+            <th style="width: 20%; text-align: center;">Mốc Thực Hiện</th>
+            <th style="width: 18%; text-align: center;">Thời Gian</th>
+            <th>Mục Tiêu & Nội Dung Trọng Tâm</th>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; text-align: center; color: var(--mau-nhan);">MỐC 1</td>
+            <td style="text-align: center; font-weight: 600;">Tuần 01</td>
+            <td>Họp khởi động, thống nhất công việc, lập 2 nhóm kỹ thuật và bàn giao gói tài liệu mẫu ban đầu.</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; text-align: center; color: var(--mau-nhan);">MỐC 2</td>
+            <td style="text-align: center; font-weight: 600;">Tuần 04</td>
+            <td>Đánh giá giữa kỳ, dùng thử và đóng góp ý kiến hoàn thiện cho bản chatbot đầu tiên (50–100 câu hỏi).</td>
+          </tr>
+          <tr>
+            <td style="font-weight: 700; text-align: center; color: var(--mau-nhan);">MỐC 3</td>
+            <td style="text-align: center; font-weight: 600;">Tuần 08</td>
+            <td>Hoàn thành toàn diện, ký biên bản bàn giao chatbot, toàn bộ mã nguồn và 2 bộ tài liệu hướng dẫn.</td>
+          </tr>
+        </table>
+
+        <!-- Bảng tiến độ chi tiết 8 tuần -->
+        <table class="bang-tien-do-8-tuan">
+          <thead>
+            <tr>
+              <th class="cot-tuan">Tuần</th>
+              <th class="cot-qnu">Phần Việc ĐH Quy Nhơn</th>
+              <th class="cot-dtu">Phần Việc ĐH Duy Tân</th>
+              <th class="cot-ketqua">Kết Quả Bàn Giao</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Tháng 1 -->
+            <tr>
+              <td colspan="4" class="dong-thang">THÁNG 1: KHỞI ĐỘNG, CHUẨN BỊ DỮ LIỆU & LÀM BẢN DÙNG THỬ (Tuần 1 – Tuần
+                4)</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 1<br><span class="badge-moc">Mốc 1</span></td>
+              <td>Bàn giao tài liệu 1–2 môn học (giáo trình, đề cương chi tiết, chuẩn đầu ra, câu hỏi mẫu); ký biên bản
+                cuộc họp.</td>
+              <td>Tiếp nhận tài liệu, đọc hiểu nội dung và chuẩn bị hệ thống làm việc.</td>
+              <td class="cot-ketqua">Biên bản cuộc họp & tài liệu mẫu đã bàn giao.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 2</td>
+              <td>Hướng dẫn cấu trúc đề thi, cách chia các mức độ câu hỏi (dễ, trung bình, khó) bám theo chuẩn đầu ra.
+              </td>
+              <td>Xử lý nội dung tài liệu, lập trình phần mềm tự động tạo câu hỏi trắc nghiệm và tự luận đúng nội dung.
+              </td>
+              <td class="cot-ketqua">Bản thử nghiệm tạo câu hỏi ban đầu.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 3</td>
+              <td>Chuẩn bị các tiêu chí để kiểm tra và đánh giá chất lượng câu hỏi sinh ra.</td>
+              <td>Làm giao diện web (chọn môn, bài, chuẩn đầu ra, độ khó, số lượng câu); cho phép xem lại và sửa trực
+                tiếp câu hỏi.</td>
+              <td class="cot-ketqua">Bản chatbot web chạy dùng thử nội bộ.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 4<br><span class="badge-moc">Mốc 2</span></td>
+              <td>Dùng thử chatbot tạo 50–100 câu hỏi; kiểm tra độ chính xác kiến thức và chuẩn đầu ra; gửi danh sách
+                cần sửa.</td>
+              <td>Trình diễn thử nghiệm chatbot tại buổi họp giữa kỳ; tiếp thu ý kiến góp ý để sửa trong tháng thứ 2.
+              </td>
+              <td class="cot-ketqua">Biên bản đánh giá giữa kỳ & danh sách góp ý.</td>
+            </tr>
+
+            <!-- Tháng 2 -->
+            <tr>
+              <td colspan="4" class="dong-thang">THÁNG 2: HOÀN THIỆN, XUẤT FILE, THỬ NGHIỆM & BÀN GIAO (Tuần 5 – Tuần 8)
+              </td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 5</td>
+              <td>Gửi mẫu file Word và file Excel đề thi đang dùng chuẩn tại trường.</td>
+              <td>Sửa lỗi phát hiện ở tuần 4; hoàn thiện tính năng xuất câu hỏi ra file Word và Excel theo đúng mẫu.
+              </td>
+              <td class="cot-ketqua">Chatbot xuất được file Word và Excel chuẩn.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 6</td>
+              <td>Mời 2–3 giảng viên dùng thử chatbot tạo câu hỏi cho môn học thật; lấy ý kiến về tính thuận tiện và hữu
+                ích.</td>
+              <td>Theo dõi vận hành hệ thống, hỗ trợ kỹ thuật và sửa các lỗi phát sinh khi giảng viên thao tác thực tế.
+              </td>
+              <td class="cot-ketqua">Báo cáo kết quả dùng thử & danh sách lỗi đã sửa.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 7</td>
+              <td>Rà soát lại toàn bộ câu hỏi đã tạo; chuẩn bị dự thảo hồ sơ bàn giao.</td>
+              <td>Hoàn thiện mã nguồn; viết tài liệu hướng dẫn cài đặt và tài liệu hướng dẫn sử dụng cho giảng viên.
+              </td>
+              <td class="cot-ketqua">Phần mềm hoàn chỉnh, 2 tài liệu & hồ sơ bàn giao.</td>
+            </tr>
+            <tr>
+              <td class="cot-tuan">Tuần 8<br><span class="badge-moc">Mốc 3</span></td>
+              <td>Đánh giá chất lượng chatbot, ký biên bản bàn giao sản phẩm với ĐH Duy Tân.</td>
+              <td>Báo cáo tổng kết, bàn giao mã nguồn, hướng dẫn phía QNU tiếp nhận quản trị và cam kết bảo hành hỗ trợ.
+              </td>
+              <td class="cot-ketqua">Biên bản bàn giao 2 bên & đưa chatbot vào sử dụng.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- IV. Biểu mẫu & Sản phẩm bàn giao -->
+      <div class="khoi-muc">
+        <div class="tieu-de-muc-lon">
+          IV. Biểu Mẫu Hồ Sơ & Sản Phẩm Bàn Giao
+          <span>(Quy chuẩn hồ sơ hành chính & nghiệm thu kỹ thuật)</span>
+        </div>
+
+        <div class="luoi-hai-cot-a4">
+          <div class="cot-a4">
+            <h4>1. Biểu Mẫu Áp Dụng</h4>
+            <ul>
+              <li><strong>Biên bản cuộc họp khởi động:</strong> Ghi nhận nội dung thống nhất, thành phần tham gia và
+                phân công trách nhiệm (Tuần 1).</li>
+              <li><strong>Bảng dự toán kinh phí:</strong> Ghi rõ số tiền chi trả cho nhóm kỹ thuật ĐH Duy Tân (Tuần 1).
+              </li>
+              <li><strong>Phiếu tiến độ tuần:</strong> Cập nhật công việc đã làm và việc cần xử lý định kỳ (Hàng tuần).
+              </li>
+              <li><strong>Biên bản bàn giao sản phẩm:</strong> Xác nhận hoàn thành các hạng mục theo thỏa thuận hai bên
+                (Tuần 8).</li>
+            </ul>
+          </div>
+
+          <div class="cot-a4">
+            <h4>2. Sản Phẩm Bàn Giao</h4>
+            <ul>
+              <li><strong>Phần mềm Chatbot hoàn chỉnh:</strong> Tạo câu hỏi trắc nghiệm/tự luận bám sát chuẩn đầu ra,
+                xuất được file Word & Excel.</li>
+              <li><strong>Toàn bộ mã nguồn:</strong> Bàn giao đầy đủ mã nguồn và tài liệu hướng dẫn cài đặt trên máy chủ
+                ĐH Quy Nhơn.</li>
+              <li><strong>02 Bộ tài liệu hướng dẫn:</strong> (1) Hướng dẫn cài đặt và quản trị; (2) Hướng dẫn sử dụng
+                cho giảng viên.</li>
+              <li><strong>Hồ sơ bàn giao:</strong> Đầy đủ biên bản bàn giao và tài liệu chuyển giao theo thỏa thuận hai
+                bên.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+
+</html>

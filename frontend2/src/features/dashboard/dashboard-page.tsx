@@ -90,7 +90,7 @@ export function DashboardPage() {
   const defaultAssistants = [
     {
       id: "ast_admissions",
-      name: "Trợ lý ảo Tư vấn Tuyển sinh",
+      name: "Mô-đun trợ lý ảo tư vấn tuyển sinh",
       code: "admissions",
       category: "Tư vấn & Hướng nghiệp",
       model: "GPT-4o-mini",
@@ -101,7 +101,7 @@ export function DashboardPage() {
     },
     {
       id: "ast_regulations",
-      name: "Trợ lý ảo Tư vấn Quy chế, Quy định",
+      name: "Mô-đun trợ lý ảo tư vấn quy chế, quy định",
       code: "regulations",
       category: "Công tác sinh viên",
       model: "Claude 3.5 Sonnet",
@@ -112,7 +112,7 @@ export function DashboardPage() {
     },
     {
       id: "ast_library",
-      name: "Trợ lý ảo Tra cứu & Khai thác Tài nguyên Thư viện",
+      name: "Mô-đun trợ lý ảo tra cứu, tư vấn khai thác tài nguyên thư viện",
       code: "library",
       category: "Học liệu & Nghiên cứu",
       model: "Gemini 1.5 Pro",
@@ -123,7 +123,7 @@ export function DashboardPage() {
     },
     {
       id: "ast_drafting",
-      name: "Trợ lý ảo Hỗ trợ Soạn thảo Văn bản",
+      name: "Mô-đun trợ lý ảo hỗ trợ soạn thảo văn bản",
       code: "drafting",
       category: "Văn thư & Hành chính",
       model: "GPT-4o",
@@ -134,7 +134,7 @@ export function DashboardPage() {
     },
     {
       id: "ast_question_bank",
-      name: "Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi theo Chuẩn Đầu ra",
+      name: "Mô-đun trợ lý ảo hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra",
       code: "question_bank",
       category: "Khảo thí & Đảm bảo CL",
       model: "GPT-4o",
