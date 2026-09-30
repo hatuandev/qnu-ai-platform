@@ -19,6 +19,10 @@ case "$CMD" in
     echo "[QNU AI Platform] Khoi tao CSDL va seed toan bo du lieu mac dinh..."
     (cd backend && ./.venv/Scripts/python.exe -m app.cli db bootstrap)
     ;;
+  reset-db|reseed)
+    echo "[QNU AI Platform] Dang xoa sach toan bo CSDL PostgreSQL va Qdrant, sau do seed lai toan bo 5 mo-dun..."
+    (cd backend && ./.venv/Scripts/python.exe scripts/reset_and_reseed.py)
+    ;;
   dev)
     echo "[QNU AI Platform] Kiem tra CSDL va du lieu mau..."
     (cd backend && ./.venv/Scripts/python.exe -m app.cli db ensure-ready)
@@ -55,6 +59,8 @@ case "$CMD" in
     echo "  ./make infra-status : Kiem tra trang thai cac container Docker"
     echo "  ./make infra-logs   : Theo doi logs cua cum Docker"
     echo "  ./make seed         : Khoi tao va seed du lieu CSDL mac dinh"
+    echo "  ./make reset-db     : Xoa sach toan bo CSDL PostgreSQL & Qdrant, sau do seed lai toan bo 5 mo-dun"
+    echo "  ./make reseed       : Alias cua reset-db"
     echo "  ./make dev          : Khoi chay ca Backend 8001 va Frontend cu (Port 3001)"
     echo "  ./make dev1         : Khoi chay ca Backend 8001 va Frontend 2 Moi (Port 3000)"
     echo "  ./make be           : Khoi chay rieng Backend API 8001"

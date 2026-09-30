@@ -1,7 +1,7 @@
 # QNU AI Platform - Task Runner
 param (
     [Parameter(Position = 0)]
-    [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "seed", "dev", "dev1", "dev2", "be", "fe", "fe2", "test", "help")]
+    [ValidateSet("infra-up", "infra-down", "infra-status", "infra-logs", "seed", "reset-db", "reseed", "dev", "dev1", "dev2", "be", "fe", "fe2", "test", "help")]
     [string]$Command = "dev"
 )
 
@@ -25,6 +25,12 @@ switch ($Command) {
         Write-Host "Dang khoi tao CSDL va seed toan bo du lieu mac dinh QNU AI Platform..." -ForegroundColor Green
         Set-Location "$PSScriptRoot\backend"
         .\.venv\Scripts\python.exe -m app.cli db bootstrap
+        Set-Location $PSScriptRoot
+    }
+    { $_ -in "reset-db", "reseed" } {
+        Write-Host "Dang xoa sach toan bo CSDL PostgreSQL va Qdrant, sau do seed lai toan bo 5 mo-dun..." -ForegroundColor Yellow
+        Set-Location "$PSScriptRoot\backend"
+        & ".\.venv\Scripts\python.exe" "scripts\reset_and_reseed.py"
         Set-Location $PSScriptRoot
     }
     "dev" {
@@ -89,6 +95,8 @@ switch ($Command) {
         Write-Host "  .\run.ps1 infra-status : Kiem tra trang thai cac container"
         Write-Host "  .\run.ps1 infra-logs   : Xem logs cua cum Docker"
         Write-Host "  .\run.ps1 seed         : Khoi tao CSDL va seed toan bo du lieu mac dinh"
+        Write-Host "  .\run.ps1 reset-db     : Xoa sach toan bo CSDL PostgreSQL & Qdrant, sau do seed lai toan bo 5 mo-dun"
+        Write-Host "  .\run.ps1 reseed       : Alias cua reset-db"
         Write-Host "  .\run.ps1 dev          : Khoi chay ca Backend 8001 va Frontend cu 3001"
         Write-Host "  .\run.ps1 dev1         : Khoi chay ca Backend 8001 va Frontend 2 Moi 3000"
         Write-Host "  .\run.ps1 be           : Khoi chay rieng Backend API 8001"
