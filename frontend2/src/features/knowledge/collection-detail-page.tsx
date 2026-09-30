@@ -67,8 +67,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
 
-  // Facts Filters
-  const [factsSearchQuery, setFactsSearchQuery] = useState("");
 
   // Dialog States
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -152,10 +150,10 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     queryFn: () => jobsApi.getIngestionTasks(collection.id),
   });
 
-  // 5. Fetch Facts
+  // 5. Fetch Facts (tải tới 500 facts phục vụ bộ lọc đa chiều & phân trang)
   const factsQuery = useQuery({
     queryKey: ["collection-facts", collection.id],
-    queryFn: () => knowledgeApi.getCollectionFacts(collection.id),
+    queryFn: () => knowledgeApi.getCollectionFacts(collection.id, 500),
     enabled: Boolean(collection.id),
   });
 
@@ -217,18 +215,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     });
   }, [allTasks, taskSearchQuery, taskStatusFilter]);
 
-  // Filtered Facts
-  const filteredFacts = useMemo(() => {
-    const list = factsQuery.data?.facts || [];
-    const q = factsSearchQuery.toLowerCase().trim();
-    if (!q) return list;
-    return list.filter(
-      (f) =>
-        f.entity_name.toLowerCase().includes(q) ||
-        f.attribute_name.toLowerCase().includes(q) ||
-        f.attribute_value.toLowerCase().includes(q),
-    );
-  }, [factsQuery.data?.facts, factsSearchQuery]);
 
   // Mutations
   const updateCollectionMutation = useMutation({
@@ -577,12 +563,10 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         {/* Tab 2: Facts Số */}
         <TabsContent value="facts" className="mt-0 focus-visible:ring-0">
           <CollectionFactsTab
-            facts={filteredFacts}
+            facts={factsQuery.data?.facts || []}
             totalCount={factsQuery.data?.total || 0}
             isLoading={factsQuery.isLoading}
             isFetching={factsQuery.isFetching}
-            searchQuery={factsSearchQuery}
-            onSearchChange={setFactsSearchQuery}
             onRefresh={() => factsQuery.refetch()}
             onOpenExcelImport={() => setIsExcelImportOpen(true)}
           />

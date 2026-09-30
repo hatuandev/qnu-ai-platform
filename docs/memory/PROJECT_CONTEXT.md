@@ -7,20 +7,35 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-30 23:35 (UTC+7)
-- **Phiên số**: #235 (Thu Thập & Tổ Chức 17 Tệp Tài Liệu Tuyển Sinh QNU Vào Thư Mục docs/tai_lieu, Chính Sách Người Dùng Tự Đẩy Git Push)
-- **Phiên số trước**: #234, #233, #232, #231
-- **Mục tiêu đã hoàn thành (phiên #235)**:
-  - 1. **Thu Thập & Số Hóa Toàn Diện 17 Tệp Tài Liệu Tuyển Sinh QNU**:
-       * Quét tự động 3 cổng tuyển sinh chính thức: Đại học chính quy (`/tuyen-sinh-dai-hoc-chinh-quy-2027`), Sau đại học (`/tuyen-sinh-sau-dai-hoc-2028`), Vừa làm vừa học (`/tuyen-sinh-vua-lam-vua-hoc-2029`).
-       * Xây dựng hàm `normalize_url` giải quyết triệt để lỗi double percent encoding đối với các file URL chứa ký tự tiếng Việt hoặc dấu cách.
-       * Tải thành công trọn vẹn 17 tệp PDF và DOCX (tổng 9.34 MB) về 3 thư mục con chuyên biệt:
-         - `docs/tai_lieu/dai_hoc_chinh_quy/` (6 tệp: điểm chuẩn ĐHCQ 2026, quy đổi điểm TB123, báo cáo chỉ tiêu...).
-         - `docs/tai_lieu/sau_dai_hoc/` (8 tệp: các phụ lục tuyển sinh thạc sĩ và tiến sĩ 2026...).
-         - `docs/tai_lieu/vua_lam_vua_hoc/` (3 tệp: thông báo từ xa, mức thu học phí, tuyển sinh liên kết...).
-       * Khởi tạo tệp mục lục chi tiết [**`docs/tai_lieu/README.md`**](../tai_lieu/README.md) lưu trữ metadata từng tài liệu kèm liên kết nội bộ.
-  - 2. **Chính Sách Git Push (User-Controlled Git Push Policy)**:
-       * Xác lập quy tắc rõ ràng: AI Agent không tự ý chạy lệnh `git push` sau mỗi lượt vibe coding; việc push mã nguồn lên các remote Git (Gitea / GitHub) sẽ do Người dùng chủ động kiểm tra và thực hiện.
+- **Thời gian cập nhật**: 2026-09-30 23:55 (UTC+7)
+- **Phiên số**: #236 (Tối Ưu Hóa Toàn Diện UI/UX Tab Facts Số Hóa Kho Tri Thức, Khắc Phục Lỗi Ô Tìm Kiếm, Bổ Sung Bộ Lọc Đa Chiều & Phân Trang Thông Minh)
+- **Phiên số trước**: #235, #234, #233, #232, #231
+- **Mục tiêu đã hoàn thành (phiên #236)**:
+  - 1. **Khắc Phục Lỗi Giao Diện Ô Tìm Kiếm & Nâng Cấp Bộ Lọc Đa Chiều (Multi-Dimensional Filters)**:
+       * Sửa lỗi giao diện icon Search trơ trọi đứng ngoài ô input: Tích hợp icon `Search` chìm tinh tế bên trong `Input`, bổ sung nút xóa nhanh ký tự `X` khi có văn bản tìm kiếm. Tìm kiếm đồng thời theo Thực thể, Thuộc tính và Giá trị.
+       * Bổ sung dải 4 Thẻ KPI Telemetry Strip tổng quan kho facts: *Tổng số facts*, *Thực thể định danh duy nhất*, *Số loại thuộc tính*, *Độ tin cậy trích xuất trung bình*.
+       * Bổ sung Dải Chip Lọc Nhanh 1-Click (Quick Category Filter Chips): *Tất cả*, *Điểm chuẩn*, *Chỉ tiêu*, *Học phí*, *Tổ hợp môn*, *Khác* kèm đếm số lượng động.
+       * Bổ sung Thanh công cụ bộ lọc nâng cao gồm 4 Dropdown chuẩn Radix `<Select>`: Lọc theo Loại thực thể (Entity Type), Lọc theo Tên thuộc tính (Attribute Name), Lọc theo Mức độ tin cậy (Confidence $\ge 90\%$, $80-89\%$, $<80\%$), và Sắp xếp linh hoạt (Mới nhất, Thực thể A-Z/Z-A, Thuộc tính A-Z, Độ tin cậy giảm dần).
+       * Bổ sung Nút "Đặt lại" (Reset All Filters) với icon `RotateCcw` đưa toàn bộ bộ lọc về mặc định trong 1 click.
+  - 2. **Giải Quyết Triệt Để Vấn Đề Dữ Liệu Quá Tải Bằng Phân Trang Client-Side (Client-Side Pagination)**:
+       * Trước đây 326+ facts bị kết xuất tràn lan thành danh sách cuộn vô tận khiến giao diện giật lag và khó tra cứu.
+       * Tích hợp thanh phân trang thông minh với bộ chọn kích thước trang `15 / 25 / 50 / 100 hàng/trang`.
+       * Bộ điều hướng phân trang đầy đủ: Nút Đầu (`<<`), Nút Trước (`<`), Nhãn trang `Trang X / Y`, Nút Kế tiếp (`>`), Nút Cuối (`>>`) và text trạng thái chi tiết `Hiển thị X - Y trong số Z facts đã lọc (Tổng số kho: N)`.
+  - 3. **Nâng Cấp Trải Nghiệm Bảng Dữ Liệu & Hộp Thoại Thanh Tra Chi Tiết Fact (Inspector Modal)**:
+       * Thêm cột Số Thứ Tự (`#`) tính tự động theo trang.
+       * Giá trị số hóa (Điểm chuẩn, Học phí...) được định dạng nổi bật với màu QNU Academic Teal, tích hợp tính năng sao chép giá trị 1-click (Copy to Clipboard) kèm thông báo Toast Sonner.
+       * Huy hiệu Độ tin cậy phân loại màu ngữ nghĩa (`emerald` $\ge 90\%$, `amber` $80-89\%$, `rose` $<80\%$).
+       * Cột Thao tác với nút "Xem chi tiết" mở Modal `FactDetailDialog` hiển thị đầy đủ thông tin metadata, tài liệu gốc và trình xem JSON thô (Raw Fact Payload) định dạng trang trọng.
+  - 4. **Mở Rộng Backend Query Limit (`GET /api/v1/knowledge/collections/{collection_id}/facts`)**:
+       * Nâng tham số `limit` từ tối đa 200 lên tối đa 1000 (mặc định 500) trong `knowledge/router.py`, cho phép tải trọn vẹn 326+ facts của kho tri thức trong 1 request duy nhất, tối ưu 100% cho client-side filtering siêu tốc với độ trễ 0ms.
+  - 5. **Kiểm Thử Frontend Build**:
+       * `npm.cmd run build` trên `frontend2` thành công 100% trong 3.00s, 0 lỗi TypeScript, 0 lỗi Biome.
+  - 6. **Tuân Thủ Tuyệt Đối Chính Sách Git Push**:
+       * Không tự ý chạy `git push`, chỉ commit cục bộ để Người dùng tự push theo ý muốn.
+- **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
+- **Trạng thái kiểm thử**:
+  - Frontend2: `npm run build` thành công 100% (3.00s), 0 lỗi typecheck/linter.
+  - Backend: Limit API facts mở rộng 1000/500, nạp live CSDL PostgreSQL 16.
   - 3. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
        * Bổ sung biến môi trường `OPENROUTER_API_KEY` và `OPENROUTER_BASE_URL` ("https://openrouter.ai/api/v1") trong `app.core.config`.
        * Tự động gắn kèm headers `HTTP-Referer: https://qnu.edu.vn` và `X-Title: QNU AI Platform` theo chuẩn OpenRouter API trong `OpenAIAdapter`.

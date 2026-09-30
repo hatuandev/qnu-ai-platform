@@ -402,7 +402,7 @@ async def import_collection_facts_excel(
 )
 async def get_collection_facts(
     collection_id: str,
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ) -> FactListResponse:
