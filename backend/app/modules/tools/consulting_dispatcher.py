@@ -519,7 +519,7 @@ class AgenticConsultingDispatcher:
             # Dynamically query candidate major names from database knowledge_facts
             candidate_majors: list[str] = []
             try:
-                async with AsyncSessionFactory() as db:
+                if db is not None:
                     stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
                     facts = (await db.execute(stmt)).scalars().all()
                     for f in facts:
@@ -528,6 +528,16 @@ class AgenticConsultingDispatcher:
                         elif "ngành " in f.entity_name.lower():
                             clean_name = f.entity_name.replace("Điểm chuẩn ngành ", "").replace(" ĐH Quy Nhơn", "").strip()
                             candidate_majors.append(clean_name)
+                else:
+                    async with AsyncSessionFactory() as session:
+                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                        facts = (await session.execute(stmt)).scalars().all()
+                        for f in facts:
+                            if f.raw_data and f.raw_data.get("major_name"):
+                                candidate_majors.append(f.raw_data["major_name"])
+                            elif "ngành " in f.entity_name.lower():
+                                clean_name = f.entity_name.replace("Điểm chuẩn ngành ", "").replace(" ĐH Quy Nhơn", "").strip()
+                                candidate_majors.append(clean_name)
             except Exception as exc:
                 logger.warning("Failed to load candidate majors: %s", exc)
 
@@ -549,9 +559,13 @@ class AgenticConsultingDispatcher:
                 # 2. Query Live Database Facts
                 live_facts: list[KnowledgeFact] = []
                 try:
-                    async with AsyncSessionFactory() as db:
+                    if db is not None:
                         stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
                         live_facts = list((await db.execute(stmt)).scalars().all())
+                    else:
+                        async with AsyncSessionFactory() as session:
+                            stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                            live_facts = list((await session.execute(stmt)).scalars().all())
                 except Exception as exc:
                     logger.warning("Failed to query live facts: %s", exc)
 
@@ -742,9 +756,13 @@ class AgenticConsultingDispatcher:
         elif module_code == "regulations" and is_export:
             # Query live regulations facts directly from database
             try:
-                async with AsyncSessionFactory() as db:
+                if db is not None:
                     stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
                     facts = (await db.execute(stmt)).scalars().all()
+                else:
+                    async with AsyncSessionFactory() as session:
+                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                        facts = (await session.execute(stmt)).scalars().all()
             except Exception:
                 facts = []
 
@@ -797,9 +815,13 @@ class AgenticConsultingDispatcher:
         elif module_code == "library" and is_export:
             # Query live library facts directly from database
             try:
-                async with AsyncSessionFactory() as db:
+                if db is not None:
                     stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
                     facts = (await db.execute(stmt)).scalars().all()
+                else:
+                    async with AsyncSessionFactory() as session:
+                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                        facts = (await session.execute(stmt)).scalars().all()
             except Exception:
                 facts = []
 
