@@ -21,6 +21,7 @@ export interface AssistantEditForm {
   require_grounded_answer: boolean;
   protect_system_prompt: boolean;
   human_approval_required: boolean;
+  enabled_tools: string[];
   require_citations: boolean;
   no_answer_message: string;
 }

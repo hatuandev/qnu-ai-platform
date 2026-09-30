@@ -62,7 +62,8 @@ def build_generic_system_instruction(module_code: str, custom_prompt: str | None
         "2. TRÍCH XUẤT THEO THỰC THỂ: Khi tài liệu chứa nhiều ngành hoặc đối tượng, CHỈ ĐƯỢC trích xuất duy nhất thông tin của ngành/đối tượng mà người dùng đang hỏi. Tuyệt đối không sao chép các ngành khác trong bảng.\n"
         "3. ĐỊNH DẠNG CHUẨN MỰC: Tuyệt đối không sao chép nguyên văn các ký tự phân cách thô dạng `||||||` hoặc ký hiệu bảng vỡ. Trình bày danh sách gạch đầu dòng (-) hoặc bảng Markdown hoàn chỉnh có dòng tiêu đề cột.\n"
         f"4. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức và hướng dẫn liên hệ {contact}\n"
-        "5. Giữ nguyên tính chính xác của các con số, văn phong sư phạm lịch thiệp, mạch lạc."
+        "5. Giữ nguyên tính chính xác của các con số, văn phong sư phạm lịch thiệp, mạch lạc.\n"
+        "6. Giao tiếp tự nhiên, đi thẳng vào nội dung. Tuyệt đối không lặp lại câu chào giới thiệu danh xưng rập khuôn (như 'Chào bạn! Mình là Trợ lý...') ở mỗi câu trả lời."
     )
 
 
@@ -427,7 +428,12 @@ class RagService:
         # Numeric grounding gate: multi-digit figures in the answer must exist in evidence.
         if status == "answered":
             numeric_ok, ungrounded_numbers = citation_guard.verify_numeric_grounding(
-                clean_answer, final_citations, facts_used_payload
+                clean_answer,
+                final_citations,
+                facts_used_payload,
+                query=req.question,
+                system_context=req.system_prompt,
+                candidate_texts=[c.content for c in candidates],
             )
             if not numeric_ok:
                 logger.warning(

@@ -183,17 +183,37 @@ class HybridRetriever:
             except Exception as e_uni:
                 logger.debug("Unaccent ILIKE fallback skipped: %s", e_uni)
 
+        # Batch-fetch document titles to provide human-friendly citation labels
+        doc_ids = {c.document_id for c in chunks if c.document_id}
+        doc_title_map: dict[str, str] = {}
+        if doc_ids:
+            try:
+                docs_res = await db.execute(
+                    select(KnowledgeDocument.id, KnowledgeDocument.title).where(
+                        KnowledgeDocument.id.in_(doc_ids)
+                    )
+                )
+                for d_id, d_title in docs_res.all():
+                    if d_title:
+                        doc_title_map[d_id] = d_title
+            except Exception as e_docs:
+                logger.debug("Document title lookup skipped: %s", e_docs)
+
         results: list[dict[str, Any]] = []
         for idx, c in enumerate(chunks, start=1):
+            meta = dict(c.chunk_metadata or {})
+            doc_title = doc_title_map.get(c.document_id)
+            if doc_title and not meta.get("document_title"):
+                meta["document_title"] = doc_title
             results.append(
                 {
                     "chunk_id": c.id,
                     "document_id": c.document_id,
                     "content": c.content,
-                    "section": c.section,
+                    "section": c.section or doc_title,
                     "page_number": c.page_number,
                     "score": 1.0 / idx,
-                    "metadata": c.chunk_metadata,
+                    "metadata": meta,
                 }
             )
         return results

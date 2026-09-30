@@ -84,10 +84,14 @@ def get_llm_adapter(
         )
 
     if pt in ("local_vllm", "local", "ollama", "vllm"):
+        default_url = "http://localhost:11434/v1" if pt == "ollama" else "http://localhost:8000/v1"
+        target_base = base_url or default_url
+        if target_base and not target_base.rstrip("/").endswith("/v1") and (pt == "ollama" or ":11434" in target_base):
+            target_base = f"{target_base.rstrip('/')}/v1"
         return LocalVLLMAdapter(
             model_name=model_name,
             api_key=api_key,
-            base_url=base_url or "http://localhost:8000/v1",
+            base_url=target_base,
             timeout_seconds=timeout_seconds,
         )
 

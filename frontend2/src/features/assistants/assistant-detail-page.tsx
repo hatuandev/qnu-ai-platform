@@ -75,6 +75,7 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     require_grounded_answer: cfg?.guardrails?.require_grounded_answer ?? true,
     protect_system_prompt: cfg?.guardrails?.protect_system_prompt ?? true,
     human_approval_required: cfg?.tools?.human_approval_required ?? true,
+    enabled_tools: cfg?.tools?.enabled_tools ?? ["export_universal_report", "lookup_fact_layer"],
     require_citations: cfg?.output_policy?.require_citations ?? true,
     no_answer_message:
       cfg?.guardrails?.no_answer_message ||
@@ -162,8 +163,8 @@ export function AssistantDetailPage({
     const providers = providersQuery.data ?? [];
     const list: { value: string; label: string; providerName: string }[] = [];
     const seen = new Set<string>();
+
     for (const prov of providers) {
-      if (!prov.is_active) continue;
       for (const m of prov.models ?? []) {
         if (!seen.has(m)) {
           seen.add(m);
@@ -175,8 +176,27 @@ export function AssistantDetailPage({
         }
       }
     }
+
+    // Always ensure current form models are present in options so dropdown is never blank
+    if (form?.primary_model && !seen.has(form.primary_model)) {
+      seen.add(form.primary_model);
+      list.unshift({
+        value: form.primary_model,
+        label: form.primary_model,
+        providerName: "Cấu hình hiện tại",
+      });
+    }
+    if (form?.fallback_model && !seen.has(form.fallback_model)) {
+      seen.add(form.fallback_model);
+      list.push({
+        value: form.fallback_model,
+        label: form.fallback_model,
+        providerName: "Cấu hình hiện tại",
+      });
+    }
+
     return list;
-  }, [providersQuery.data]);
+  }, [providersQuery.data, form?.primary_model, form?.fallback_model]);
 
   // Mutations
   const updateMutation = useMutation({
@@ -214,6 +234,7 @@ export function AssistantDetailPage({
           tools: {
             ...current.config?.tools,
             human_approval_required: value.human_approval_required,
+            enabled_tools: value.enabled_tools,
           },
           output_policy: {
             ...current.config?.output_policy,

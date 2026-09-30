@@ -221,6 +221,7 @@ class ToolService:
                     "tenant_id": request.tenant_id,
                     "assistant_code": request.assistant_code,
                     "conversation_id": request.conversation_id,
+                    "db_session": session,
                 },
             )
             # Atomic Consumption upon successful execution

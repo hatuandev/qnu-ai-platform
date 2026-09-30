@@ -18,19 +18,25 @@ from app.modules.tools.schemas import (
 )
 from app.modules.tools.service import ToolService
 
+public_router = APIRouter(prefix="/tools", tags=["Tool Gateway & Artifacts"])
 router = APIRouter(prefix="/tools", tags=["Tool Gateway & Function Calling"])
 service = ToolService()
 
 
 def _content_disposition(filename: str) -> str:
-    """Build an RFC 5987 download header that preserves Vietnamese filenames."""
+    """Build a robust RFC 6266 / RFC 5987 Content-Disposition header preserving file extension."""
     normalized = unicodedata.normalize("NFC", filename)
     ascii_name = unicodedata.normalize("NFKD", normalized).encode("ascii", "ignore").decode()
     ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", ascii_name).strip("._")
     if not ascii_name:
         ascii_name = "qnu-document"
+    # Ensure extension is always preserved in ascii_name
+    if "." in filename:
+        ext = filename.rsplit(".", 1)[-1]
+        if not ascii_name.lower().endswith(f".{ext.lower()}"):
+            ascii_name = f"{ascii_name}.{ext}"
     encoded_name = quote(normalized, safe="")
-    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded_name}"
+    return f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
 
 
 @router.get("", response_model=list[ToolDefinitionResponse])
@@ -64,7 +70,7 @@ async def execute_tool(
     return await service.execute_tool(session=session, request=request)
 
 
-@router.get("/artifacts/{filename}")
+@public_router.get("/artifacts/{filename}")
 async def download_artifact(filename: str) -> Response:
     """Download an exported document artifact (DOCX, PDF, XLSX, etc.)."""
     from app.core.storage import storage_service
@@ -87,9 +93,15 @@ async def download_artifact(filename: str) -> Response:
         media_type=media_type,
         headers={
             "Content-Disposition": _content_disposition(filename),
-            "Cache-Control": "private, no-store",
+            "Content-Type": media_type,
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "private, no-cache, no-store, must-revalidate",
         },
     )
+
+
+# Mount public artifact routes into main tools router as well
+router.include_router(public_router)
 
 
 @router.post("/export/document")

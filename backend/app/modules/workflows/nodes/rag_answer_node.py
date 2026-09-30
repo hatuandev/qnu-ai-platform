@@ -98,6 +98,29 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             history=context.inputs.get("conversation_history"),
         )
 
+        # Universal Agentic Consulting & Artifact Generation
+        from app.modules.tools.consulting_dispatcher import consulting_dispatcher
+
+        dispatch_res = await consulting_dispatcher.dispatch(
+            module_code=module_code,
+            user_message=query,
+            history=context.inputs.get("conversation_history"),
+            collection_id=collection_id,
+            db=context.db,
+            preferred_model_name=primary_model,
+            fallback_model=fallback_model,
+        )
+        if dispatch_res.get("has_agentic_guidance"):
+            guidance = dispatch_res.get("guidance_context", "")
+            if guidance:
+                base_prompt = ask_req.system_prompt or ""
+                ask_req.system_prompt = f"{base_prompt}\n\n[DỮ LIỆU ĐỐI SOÁT & TƯ VẤN CHUYÊN BIỆT TỪ FACT LAYER]:\n{guidance}"
+
+        artifacts = dispatch_res.get("artifacts", [])
+        if artifacts:
+            context.node_data["artifacts"] = artifacts
+            context.outputs["artifacts"] = artifacts
+
         if context.db:
             rag_res = await rag_service.ask(context.db, ask_req)
             answer_text = rag_res.answer
@@ -123,5 +146,6 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                 "citations": citations,
                 "status": status,
                 "suggested_questions": suggested_questions,
+                "artifacts": artifacts,
             },
         )

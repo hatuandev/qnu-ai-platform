@@ -4,17 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.modules.tools.builtin.admission_score_tool import AdmissionScoreLookupTool
 from app.modules.tools.builtin.base import BaseTool
 from app.modules.tools.builtin.document_exporter import DocumentExporterTool
 from app.modules.tools.builtin.exam_matrix_tool import ExamMatrixExporterTool
+from app.modules.tools.builtin.fact_lookup_tool import FactLayerLookupTool
+from app.modules.tools.builtin.universal_report_tool import UniversalReportExportTool
 
 
 class ToolRegistry:
     """Central registry of executable tools and OpenAPI function schemas."""
 
     ALIASES: dict[str, str] = {
-        "admissions.fact_lookup": "lookup_admission_score",
+        "admissions.fact_lookup": "lookup_fact_layer",
+        "lookup_admission_score": "lookup_fact_layer",
+        "export_report": "export_universal_report",
         "document.docx_export": "export_administrative_document",
         "assessment.xlsx_export": "export_exam_matrix",
     }
@@ -24,8 +27,9 @@ class ToolRegistry:
         self._register_defaults()
 
     def _register_defaults(self) -> None:
-        """Register the 3 essential QNU built-in tools."""
-        self.register(AdmissionScoreLookupTool())
+        """Register the 4 universal platform tools."""
+        self.register(UniversalReportExportTool())
+        self.register(FactLayerLookupTool())
         self.register(DocumentExporterTool())
         self.register(ExamMatrixExporterTool())
 

@@ -210,11 +210,13 @@ def create_app() -> FastAPI:
     from app.modules.ocr import ocr_router
     from app.modules.rag import rag_router
     from app.modules.tools import tools_router
+    from app.modules.tools.router import public_router as public_tools_router
     from app.modules.workflows import workflow_router
 
-    # Public Routes (Auth, Health, and Public Chat Widget)
+    # Public Routes (Auth, Health, Public Chat Widget, and Artifact Downloads)
     app.include_router(auth_router, prefix=settings.API_PREFIX)
     app.include_router(assistant_chat_router, prefix=settings.API_PREFIX)
+    app.include_router(public_tools_router, prefix=settings.API_PREFIX)
 
     # Secured Admin Routes (Protected by Dev Access Gate)
     auth_guard = [Depends(get_current_actor)]

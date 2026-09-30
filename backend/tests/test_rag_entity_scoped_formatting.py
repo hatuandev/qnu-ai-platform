@@ -158,3 +158,40 @@ def test_interrogative_pronoun_nganh_nao_has_no_target_entities():
     assert len(analysis.target_entities) == 0
     assert "Nào" not in analysis.target_entities
 
+
+def test_clean_robotic_intro_preserves_natural_dialogue():
+    """Canned repetitive greetings must be stripped, while natural answers and simple greetings are preserved."""
+    from app.modules.rag.composer import clean_robotic_intro, sanitize_rag_answer
+
+    # 1. Full canned intro with self-introduction
+    robotic_1 = (
+        "Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn. "
+        "Mình rất vui được hỗ trợ thông tin cho bạn! "
+        "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là 24.50 điểm."
+    )
+    assert clean_robotic_intro(robotic_1) == "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là 24.50 điểm."
+
+    # 2. Variant with (QNU.AI) acronym
+    robotic_2 = (
+        "Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn (QNU.AI). "
+        "Mình rất vui được hỗ trợ thông tin cho bạn.\n\n"
+        "Thông tin chi tiết như sau: Ngành Luật xét tuyển tổ hợp C00, D01."
+    )
+    assert clean_robotic_intro(robotic_2) == "Thông tin chi tiết như sau: Ngành Luật xét tuyển tổ hợp C00, D01."
+
+    # 3. Variant without Chào bạn
+    robotic_3 = (
+        "Mình là Trợ lý Tuyển sinh của Đại học Quy Nhơn. "
+        "Thông tin ngành Sư phạm Toán là: điểm chuẩn 26.0."
+    )
+    assert clean_robotic_intro(robotic_3) == "Thông tin ngành Sư phạm Toán là: điểm chuẩn 26.0."
+
+    # 4. Natural greeting without canned intro must be preserved
+    natural = "Chào bạn! Ngành Công nghệ thông tin có các phương thức xét tuyển sau:"
+    assert clean_robotic_intro(natural) == natural
+
+    # 5. sanitize_rag_answer cleans robotic intro automatically
+    sanitized = sanitize_rag_answer(robotic_1)
+    assert sanitized == "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là 24.50 điểm."
+
+

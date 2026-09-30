@@ -8,33 +8,55 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.core.exceptions import NotFoundException
-from app.modules.tools.builtin.admission_score_tool import AdmissionScoreLookupTool
 from app.modules.tools.builtin.document_exporter import DocumentExporterTool
 from app.modules.tools.builtin.exam_matrix_tool import ExamMatrixExporterTool
+from app.modules.tools.builtin.fact_lookup_tool import FactLayerLookupTool
+from app.modules.tools.builtin.universal_report_tool import UniversalReportExportTool
 from app.modules.tools.registry import ToolRegistry
 from app.modules.tools.schemas import ToolExecuteRequest
 from app.modules.tools.service import ToolService
 
 
 @pytest.mark.asyncio
-async def test_admission_score_tool_found():
-    tool = AdmissionScoreLookupTool()
-    assert tool.name == "lookup_admission_score"
-    assert tool.category == "admissions"
+async def test_fact_layer_lookup_tool_found():
+    from app.core.database import engine
+    await engine.dispose()
+    tool = FactLayerLookupTool()
+    assert tool.name == "lookup_fact_layer"
+    assert tool.category == "knowledge"
 
-    res = await tool.execute({"major_name": "Công nghệ thông tin", "year": 2024})
+    res = await tool.execute({"keyword": "Công nghệ thông tin", "collection_id": "col_admissions"})
+    assert res["status"] == "success"
     assert res["found"] is True
-    assert res["total"] >= 1
-    assert res["records"][0]["cutoff_score"] == 24.5
-    assert "0256.3846.156" in res["hotline"]
+    assert res["total_facts"] >= 1
 
 
 @pytest.mark.asyncio
-async def test_admission_score_tool_not_found():
-    tool = AdmissionScoreLookupTool()
-    res = await tool.execute({"major_name": "Ngành Không Tồn Tại", "year": 2024})
+async def test_fact_layer_lookup_tool_not_found():
+    from app.core.database import engine
+    await engine.dispose()
+    tool = FactLayerLookupTool()
+    res = await tool.execute({"keyword": "KhongTonTai12345XYZ", "collection_id": "col_admissions"})
+    assert res["status"] == "success"
     assert res["found"] is False
-    assert "0256.3846.156" in res["hotline"]
+    assert len(res["facts"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_universal_report_export_tool():
+    tool = UniversalReportExportTool()
+    assert tool.name == "export_universal_report"
+    assert tool.category == "export"
+
+    res = await tool.execute({
+        "title": "Báo cáo thử nghiệm",
+        "tables": [{"headers": ["A", "B"], "rows": [["1", "2"]]}],
+        "formats": ["xlsx", "docx"],
+    })
+    assert res["status"] == "success"
+    assert res["total_files"] >= 2
+    assert res["docx_url"] is not None
+    assert res["xlsx_url"] is not None
 
 
 @pytest.mark.asyncio
@@ -108,40 +130,58 @@ async def test_exam_matrix_exporter(tmp_path, monkeypatch):
 def test_tool_registry():
     registry = ToolRegistry()
     tools = registry.list_all()
-    assert len(tools) >= 3
+    assert len(tools) >= 4
+
+    tool_fact = registry.get("lookup_fact_layer")
+    assert tool_fact is not None
+    assert tool_fact.category == "knowledge"
 
     tool_admissions = registry.get("lookup_admission_score")
     assert tool_admissions is not None
-    assert tool_admissions.category == "admissions"
 
-    schemas = registry.list_schemas(category="admissions")
-    assert len(schemas) == 1
-    assert schemas[0]["name"] == "lookup_admission_score"
+    schemas = registry.list_schemas(category="knowledge")
+    assert len(schemas) >= 1
+    assert any(s["name"] == "lookup_fact_layer" for s in schemas)
 
 
 @pytest.mark.asyncio
 async def test_tool_service_execution():
     service = ToolService()
     tools = service.list_tools()
-    assert len(tools) >= 3
+    assert len(tools) >= 4
 
-    detail = service.get_tool("lookup_admission_score")
-    assert detail.name == "lookup_admission_score"
+    detail = service.get_tool("lookup_fact_layer")
+    assert detail.name == "lookup_fact_layer"
+    assert detail.category == "knowledge"
 
     mock_session = AsyncMock()
     mock_session.add = MagicMock()
     mock_session.commit = AsyncMock()
 
+    # Mock assistant record
+    from app.modules.assistants.models import AssistantModel
+    mock_assistant = AssistantModel(
+        code="admissions_assistant",
+        name="Trợ lý Tuyển sinh",
+        config={"tools": {"enabled_tools": ["export_universal_report", "lookup_fact_layer"]}},
+    )
+    mock_exec = MagicMock()
+    mock_exec.scalar_one_or_none.return_value = mock_assistant
+    mock_session.execute.return_value = mock_exec
+
     req = ToolExecuteRequest(
-        tool_name="lookup_admission_score",
-        parameters={"major_name": "Sư phạm Toán học", "year": 2024},
+        tool_name="export_universal_report",
+        parameters={
+            "title": "Báo cáo thử nghiệm",
+            "tables": [{"headers": ["A", "B"], "rows": [["1", "2"]]}],
+            "formats": ["xlsx"],
+        },
         tenant_id="tenant_qnu",
         assistant_code="admissions_assistant",
     )
     resp = await service.execute_tool(mock_session, req)
     assert resp.status == "success"
-    assert resp.result["found"] is True
-    assert resp.result["records"][0]["cutoff_score"] == 26.25
+    assert resp.result["status"] == "success"
     assert resp.latency_ms >= 0.0
 
 

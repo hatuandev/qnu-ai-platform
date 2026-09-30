@@ -221,6 +221,10 @@ class Settings(BaseSettings):
     LOCAL_LLM_ENABLED: bool = False
     LOCAL_LLM_BASE_URL: str | None = None
     LOCAL_LLM_MODEL: str = "qwen2.5:7b"
+    OLLAMA_BASE_URL: str = Field(
+        default="http://localhost:11434/v1",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "OLLAMA_HOST", "OLLAMA_URL"),
+    )
 
     DEFAULT_MONTHLY_TOKEN_QUOTA: int = 5_000_000
     DEFAULT_MONTHLY_COST_QUOTA_USD: float = 100.0

@@ -79,6 +79,41 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
+  const handleDownloadArtifact = async (
+    e: React.MouseEvent,
+    art: { name: string; url?: string },
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!art.url) return;
+
+    try {
+      const res = await fetch(art.url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = art.name;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 1000);
+    } catch (err) {
+      console.warn("Direct blob download failed, falling back to direct navigation:", err);
+      const fallbackLink = document.createElement("a");
+      fallbackLink.href = art.url;
+      fallbackLink.download = art.name;
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+    }
+  };
+
   if (isUser) {
     return (
       <div
@@ -159,21 +194,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
               <Download className="h-4 w-4" />
               <span>
-                {message.artifacts.some(
-                  (a) => a.name.endsWith(".xlsx") || a.type.includes("sheet"),
-                )
-                  ? `Ma trận đề thi kết xuất (${message.artifacts.length} tệp tải về):`
-                  : `Tài liệu kết xuất (${message.artifacts.length} tệp tải về):`}
+                Tài liệu kết xuất ({message.artifacts.length} tệp tải về):
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {message.artifacts.map((art) => (
-                <a
+                <button
                   key={art.id}
-                  href={art.url || "#"}
-                  download={art.name}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  type="button"
+                  onClick={(e) => handleDownloadArtifact(e, art)}
+                  title={`Tải về ${art.name}`}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-card hover:bg-muted border border-border shadow-xs hover:border-primary/40 text-xs transition-all cursor-pointer group/art"
                 >
                   {art.type.includes("pdf") || art.name.endsWith(".pdf") ? (
@@ -198,7 +228,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     </span>
                   </div>
                   <Download className="h-3.5 w-3.5 text-muted-foreground group-hover/art:text-primary ml-1 shrink-0" />
-                </a>
+                </button>
               ))}
             </div>
           </div>

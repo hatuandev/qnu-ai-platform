@@ -261,6 +261,66 @@ class VectorIndexer:
 
         return all_vectors
 
+    async def _embed_texts_ollama(
+        self,
+        texts: list[str],
+        runtime: ModelRuntimeConfig,
+    ) -> list[list[float]]:
+        """Batch encode texts using Ollama self-hosted embedding endpoint."""
+        import httpx
+
+        base = (runtime.api_base_url or "http://localhost:11434/v1").rstrip("/")
+        if not base.endswith("/v1") and ":11434" in base:
+            v1_url = f"{base}/v1/embeddings"
+        elif base.endswith("/v1"):
+            v1_url = f"{base}/embeddings"
+        else:
+            v1_url = f"{base}/v1/embeddings"
+
+        headers = {"Content-Type": "application/json"}
+        if runtime.api_key:
+            headers["Authorization"] = f"Bearer {runtime.api_key}"
+
+        batch_size = 16
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+        all_vectors: list[list[float]] = []
+
+        timeout = float(runtime.timeout_seconds or 60.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            for batch in batches:
+                payload = {
+                    "model": runtime.model_name,
+                    "input": batch,
+                }
+                resp = await client.post(v1_url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if "data" in data and isinstance(data["data"], list):
+                        batch_vecs = [item["embedding"] for item in data["data"]]
+                    elif "embeddings" in data and isinstance(data["embeddings"], list):
+                        batch_vecs = data["embeddings"]
+                    else:
+                        raise RuntimeError(f"Unexpected response format from Ollama: {resp.text[:200]}")
+                    all_vectors.extend([[float(x) for x in v] for v in batch_vecs])
+                else:
+                    # Fallback to Ollama native /api/embed if /v1/embeddings returns non-200
+                    native_url = f"{base.replace('/v1', '')}/api/embed"
+                    native_payload = {
+                        "model": runtime.model_name,
+                        "input": batch,
+                    }
+                    native_resp = await client.post(native_url, headers=headers, json=native_payload)
+                    if native_resp.status_code == 200:
+                        native_data = native_resp.json()
+                        raw_vecs = native_data.get("embeddings") or []
+                        all_vectors.extend([[float(x) for x in v] for v in raw_vecs])
+                    else:
+                        raise RuntimeError(
+                            f"Ollama embedding error (HTTP {resp.status_code}): {resp.text[:250]}"
+                        )
+
+        return all_vectors
+
     async def embed_texts(
         self,
         texts: list[str],
@@ -294,6 +354,23 @@ class VectorIndexer:
                 logger.error("Cloudflare embedding unavailable: %s", exc)
                 raise AppException(
                     f"Cloudflare Workers AI không khả dụng: {exc}",
+                    code="EMBEDDING_PROVIDER_UNAVAILABLE",
+                    status_code=503,
+                    details={"provider": provider},
+                ) from exc
+
+        elif provider == "ollama":
+            try:
+                vectors = await self._embed_texts_ollama(texts, runtime)
+                if len(vectors) != len(texts):
+                    raise RuntimeError(
+                        f"Ollama returned {len(vectors)} vectors for {len(texts)} texts."
+                    )
+                return [self._fit_dim(v) for v in vectors]
+            except Exception as exc:
+                logger.error("Ollama embedding unavailable: %s", exc)
+                raise AppException(
+                    f"Ollama Embedding không khả dụng: {exc}",
                     code="EMBEDDING_PROVIDER_UNAVAILABLE",
                     status_code=503,
                     details={"provider": provider},

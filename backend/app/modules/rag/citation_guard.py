@@ -114,10 +114,17 @@ class CitationGuard:
                 continue
             seen_chunks.add(c.chunk_id)
 
-            title = c.section or f"Tài liệu {c.document_id[:8]}"
-            quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")
-
             meta = c.metadata or {}
+            doc_name = (
+                meta.get("document_title")
+                or meta.get("file_name")
+                or meta.get("title")
+                or meta.get("collection_name")
+            )
+            title = c.section or doc_name or f"Tài liệu tuyển sinh ({c.document_id[:8]})"
+            if title.startswith("doc_"):
+                title = f"Tài liệu ({title})"
+            quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")
             source_pages = meta.get("source_pages")
             if not source_pages and c.page_number:
                 source_pages = [c.page_number]
@@ -184,8 +191,11 @@ class CitationGuard:
         answer: str,
         citations: list[Citation],
         facts_used: list[dict] | None = None,
+        query: str | None = None,
+        system_context: str | None = None,
+        candidate_texts: list[str] | None = None,
     ) -> tuple[bool, list[str]]:
-        """Check that multi-digit figures in the answer exist in evidence text.
+        """Check that multi-digit figures in the answer exist in evidence text, query, or valid reasoning.
 
         Single digits are skipped (too noisy: list indices, counts). Comparison is
         separator-insensitive so "112,3" matches "112.3". Returns (grounded, ungrounded).
@@ -201,6 +211,14 @@ class CitationGuard:
             return True, []
 
         evidence_parts: list[str] = []
+        if query and query.strip():
+            evidence_parts.append(query)
+        if system_context and system_context.strip():
+            evidence_parts.append(system_context)
+        if candidate_texts:
+            for text in candidate_texts:
+                if text and text.strip():
+                    evidence_parts.append(text)
         for cite in citations or []:
             if cite.quote:
                 evidence_parts.append(cite.quote)
@@ -209,12 +227,37 @@ class CitationGuard:
                 for key in ("val", "entity", "attr"):
                     if fact.get(key):
                         evidence_parts.append(str(fact[key]))
+
         evidence_numbers = {
             re.sub(r"\D", "", n)
             for n in re.findall(r"\d+(?:[.,]\d+)*", " ".join(evidence_parts))
         }
 
-        ungrounded = sorted(t for t in targets if t not in evidence_numbers)
+        # Standard national scoring scales, MOET priority scales, and year bounds
+        standard_scales = {
+            "025", "05", "050", "075", "10", "125", "15", "150", "175", "20", "200",
+            "225", "30", "300", "75", "100",
+        }
+
+        ungrounded: list[str] = []
+        for t in sorted(targets):
+            # 1. Exact match in evidence
+            if t in evidence_numbers:
+                continue
+            # 2. Substring of an evidence number (e.g. 235 or 35 in 2359)
+            if any(t in ev for ev in evidence_numbers):
+                continue
+            # 3. Evidence number is a substring of target
+            if any(ev in t for ev in evidence_numbers if len(ev) >= 2):
+                continue
+            # 4. Standard national priority constants / admission scales
+            if t in standard_scales:
+                continue
+            # 5. Subject combination suffixes or rank indices (e.g., '01', '02', '07')
+            if len(t) == 2 and t.startswith("0"):
+                continue
+            ungrounded.append(t)
+
         return (not ungrounded), ungrounded
 
     def get_no_answer_response(

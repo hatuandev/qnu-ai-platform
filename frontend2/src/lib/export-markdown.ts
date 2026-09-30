@@ -7,6 +7,35 @@ export interface ExportConversationOptions {
   messages: ChatMessageItem[];
 }
 
+function formatTimestamp(ts?: string): string {
+  if (!ts) return "";
+  const trimmed = ts.trim();
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    return trimmed;
+  }
+  const dateObj = new Date(trimmed);
+  if (!isNaN(dateObj.getTime())) {
+    return dateObj.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+  return "";
+}
+
+function cleanCitationTitle(rawTitle?: string, docName?: string): string {
+  const chosen = (rawTitle || docName || "").trim();
+  if (!chosen) return "Tài liệu minh chứng chính thức";
+  if (/^doc_[a-zA-Z0-9_-]+$/i.test(chosen)) {
+    return `Tài liệu tuyển sinh QNU (${chosen})`;
+  }
+  if (/^Tài liệu doc_[a-zA-Z0-9_-]+/i.test(chosen)) {
+    return chosen.replace(/^Tài liệu (doc_[a-zA-Z0-9_-]+)/i, "Tài liệu tuyển sinh QNU ($1)");
+  }
+  return chosen;
+}
+
 /**
  * Format a list of chat messages into a structured Markdown document.
  */
@@ -43,13 +72,7 @@ export function formatConversationToMarkdown(
   // 2. Chat Turns
   let turnNumber = 1;
   for (const msg of messages) {
-    const timeLabel = msg.timestamp
-      ? new Date(msg.timestamp).toLocaleTimeString("vi-VN", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      : "";
+    const timeLabel = formatTimestamp(msg.timestamp);
 
     if (msg.role === "user") {
       lines.push(
@@ -84,8 +107,9 @@ export function formatConversationToMarkdown(
           const excerptStr = c.excerpt
             ? `\n  > Trích dẫn: "${c.excerpt.trim()}"`
             : "";
+          const title = cleanCitationTitle(c.title, c.document_name);
           lines.push(
-            `- [${idx + 1}] **${c.title || c.document_name}**${pageStr}${excerptStr}`,
+            `- [${idx + 1}] **${title}**${pageStr}${excerptStr}`,
           );
         });
         lines.push("");

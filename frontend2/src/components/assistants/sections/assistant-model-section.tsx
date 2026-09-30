@@ -47,30 +47,23 @@ export function AssistantModelSection({
         )}
         <Field htmlFor="detail-primary-model" label="Mô hình chính (Primary)">
           <Select
-            value={form.primary_model}
-            onValueChange={(val) => onChange({ ...form, primary_model: val })}
+            value={form.primary_model || "__none__"}
+            onValueChange={(val) =>
+              onChange({ ...form, primary_model: val === "__none__" ? "" : val })
+            }
           >
             <SelectTrigger id="detail-primary-model">
-              <SelectValue
-                placeholder={
-                  availableModels.length > 0
-                    ? "Chọn mô hình chính"
-                    : "Không có mô hình"
-                }
-              />
+              <SelectValue placeholder="Chưa có mô hình" />
             </SelectTrigger>
             <SelectContent>
-              {availableModels.length > 0 ? (
-                availableModels.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="p-2 text-center text-xs text-muted-foreground">
-                  Chưa có mô hình nào khả dụng
-                </div>
-              )}
+              <SelectItem value="__none__">
+                Chưa có mô hình
+              </SelectItem>
+              {availableModels.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>
@@ -80,30 +73,23 @@ export function AssistantModelSection({
           label="Mô hình dự phòng (Fallback)"
         >
           <Select
-            value={form.fallback_model}
-            onValueChange={(val) => onChange({ ...form, fallback_model: val })}
+            value={form.fallback_model || "__none__"}
+            onValueChange={(val) =>
+              onChange({ ...form, fallback_model: val === "__none__" ? "" : val })
+            }
           >
             <SelectTrigger id="detail-fallback-model">
-              <SelectValue
-                placeholder={
-                  availableModels.length > 0
-                    ? "Chọn mô hình dự phòng"
-                    : "Không có mô hình"
-                }
-              />
+              <SelectValue placeholder="Chưa có mô hình" />
             </SelectTrigger>
             <SelectContent>
-              {availableModels.length > 0 ? (
-                availableModels.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))
-              ) : (
-                <div className="p-2 text-center text-xs text-muted-foreground">
-                  Chưa có mô hình nào khả dụng
-                </div>
-              )}
+              <SelectItem value="__none__">
+                Chưa có mô hình
+              </SelectItem>
+              {availableModels.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>

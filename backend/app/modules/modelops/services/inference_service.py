@@ -84,7 +84,7 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
         )
 
     # 3. Custom / OpenRouter / OpenAI compatible proxies allow arbitrary model names
-    return p_type in ("openai_compatible", "custom", "local", "vllm", "local_vllm", "openrouter", "groq")
+    return p_type in ("openai_compatible", "custom", "local", "vllm", "local_vllm", "ollama", "openrouter", "groq")
 
 
 class InferenceService:

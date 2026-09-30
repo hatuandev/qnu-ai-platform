@@ -7,23 +7,21 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-28 23:45 (UTC+7)
-- **Phiên số**: #228 (Tự động Migration & Seed khi chạy `make dev1`, Khắc phục triệt để lỗi tràn token Cloudflare Workers AI BGE-M3 Code 3030 trên tài liệu bảng biểu lớn)
-- **Phiên số trước**: #227
-- **Mục tiêu đã hoàn thành (phiên #228)**:
-  - 1. **Khắc phục lỗi index tràn token Cloudflare BGE-M3 (HTTP 400 Code 3030)**:
-       * Điều tra nguyên nhân tài liệu `Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)` bị "Lỗi index" (23 chunks bảng biểu lớn): `batch_size = 16` cũ làm request phình to tới 82.800 tokens, vượt ngưỡng 60.000 tokens của Cloudflare.
-       * Tái cấu trúc hàm `_embed_texts_cloudflare` trong `backend/app/modules/rag/vector_indexer.py`: áp dụng Dynamic Token/Character Budgeting (`MAX_BATCH_CHARS = 16000`, `MAX_BATCH_ITEMS = 6`) và Adaptive Recursive Sub-batching Fallback (tự động chia đôi batch khi gặp lỗi context limit).
-       * Tái lập chỉ mục `doc_18253b3d02d3`: nạp thành công 23/23 chunks vào Qdrant, chuyển trạng thái thành `ready` / `indexed`.
-  - 2. **Tự động hóa toàn diện CSDL khi chạy `make dev1`**:
-       * Thêm hàm `ensure_db_ready` và lệnh `python -m app.cli db ensure-ready`: tự động kiểm tra PostgreSQL, tạo database `qnu_ai_platform` nếu chưa có, chạy Alembic migration lên HEAD nếu thiếu bảng, và nạp seed data mặc định nếu CSDL trống.
-       * Tích hợp vào `lifespan` FastAPI Backend (`app/main.py`) ở môi trường dev để tự phục hồi (self-healing) khi CSDL mới.
-       * Cập nhật toàn bộ task runners (`make.ps1`, `make.bat`, `make`, `run.ps1`, `Makefile`): chạy `ensure-ready` trước khi mở cửa sổ Backend và Frontend 2.
-  - 3. **Cô lập hạ tầng Docker cục bộ (`docker-compose.infra.yml`)**:
-       * Tạo tệp compose độc lập cho 5 dịch vụ local (Postgres, Qdrant, Redis, MinIO, Gotenberg), tránh xung đột Dokploy production environment.
-       * Đồng bộ mật khẩu truy cập `DEV_ACCESS_PASSWORD=QNU@2026` và `PROVIDER_ENCRYPTION_KEY` thống nhất với giao diện `sign-in.tsx`.
-- **Ghi chú pull 25/09**: Công việc RAG #179–#187 đã commit (`a45af34`); pull thêm deploy Dokploy + `frontend2/`; phát hiện 1 test bảo mật rớt do config tự sinh key (chưa quyết định giữ hay revert).
-- **Phiên số trước**: #215
+- **Thời gian cập nhật**: 2026-09-29 20:35 (UTC+7)
+- **Phiên số**: #231 (Cấu hình Kỹ Năng / Tools Universal trực tiếp trên Web UI & Triệt tiêu hoàn toàn admission_score_tool.py)
+- **Phiên số trước**: #230
+- **Mục tiêu đã hoàn thành (phiên #231)**:
+  - 1. **Triệt tiêu 100% tệp công cụ cục bộ `admission_score_tool.py`**:
+       * Đã xóa vĩnh viễn tệp `backend/app/modules/tools/builtin/admission_score_tool.py`.
+       * Thay thế bằng 2 công cụ universal toàn nền tảng: `FactLayerLookupTool` (`lookup_fact_layer`) và `UniversalReportExportTool` (`export_universal_report`).
+       * Đăng ký vào `ToolRegistry` dùng chung cho cả 5 Trợ lý AI và toàn bộ luồng DAG.
+  - 2. **Cấu hình Kỹ Năng / Capabilities Trực quan trên Web UI**:
+       * Nâng cấp `frontend2/src/components/assistants/sections/assistant-tools-section.tsx`: Bổ sung khối "Kỹ Năng & Công Cụ Nền Tảng (Universal AI Capabilities)" với các Switch điều khiển từng công cụ (`export_universal_report`, `lookup_fact_layer`, `export_administrative_document`, `export_exam_matrix`).
+       * Cập nhật `frontend2/src/components/assistants/types.ts` và `assistant-detail-page.tsx`: Đồng bộ `enabled_tools` hai chiều giữa Form và API backend.
+  - 3. **Kiểm thử Toàn Diện (100% Pass)**:
+       * Backend Pytest: 36/36 tests passed in 7.58s (`test_universal_report.py`, `test_universal_tools.py`, `test_consulting_dispatcher.py`, `test_tools.py`, `test_assistants.py`, `test_admissions_agentic_flow.py`).
+       * Backend Linter: `ruff check app tests` -> 0 errors.
+       * Frontend Build: Biên dịch bundle thành công 100%.
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Mục tiêu đã hoàn thành**:
 - 0. **Tối Ưu Hóa Toàn Diện Responsive Mobile & Triệt Tiêu Toàn Bộ Nút/Dropdown Dư Thừa Phân Hệ Loại Văn Bản (`/document-types`) (phiên #215)**:

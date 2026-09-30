@@ -44,7 +44,8 @@ from app.modules.rag.composer import answer_format_planner
 from app.modules.rag.facts import fact_layer
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
-from app.modules.tools.builtin.admission_score_tool import AdmissionScoreLookupTool
+from app.modules.tools.builtin.fact_lookup_tool import FactLayerLookupTool
+from app.modules.tools.builtin.universal_report_tool import UniversalReportExportTool
 from app.modules.tools.builtin.document_exporter import DocumentExporterTool
 from app.modules.tools.builtin.exam_matrix_tool import ExamMatrixExporterTool
 from app.modules.workflows.engine import WorkflowDAGEngine
@@ -396,11 +397,21 @@ async def verify_module_6() -> None:
 # =========================================================================
 async def verify_module_7() -> None:
     print("\n--- [7/8] TESTING TOOLS, OCR & BACKGROUND WORKERS ---")
-    # 7.1 Admission Cutoff Tool
-    tool_score = AdmissionScoreLookupTool()
-    score_res = await tool_score.execute({"major_name": "Công nghệ thông tin", "year": 2024})
-    assert score_res["found"] is True and score_res["records"][0]["cutoff_score"] == 24.5
-    log_result("Module 7", "Tool: Admission Cutoffs", "PASS", "Tra cứu CNTT 2024 -> 24.5 điểm, tổ hợp A00, A01, D01, D07")
+    # 7.1 Universal Fact Layer Lookup Tool
+    tool_facts = FactLayerLookupTool()
+    score_res = await tool_facts.execute({"keyword": "Công nghệ thông tin", "collection_id": "col_admissions"})
+    assert score_res["found"] is True and score_res["total_facts"] >= 1
+    log_result("Module 7", "Tool: Fact Layer Lookup", "PASS", "Tra cứu CNTT trong Kho tri thức col_admissions thành công")
+
+    # 7.1b Universal Report Exporter Tool
+    tool_export = UniversalReportExportTool()
+    export_res = await tool_export.execute({
+        "title": "Báo cáo kiểm thử tự động",
+        "tables": [{"headers": ["Mã", "Tên"], "rows": [["01", "Kiểm thử"]]}],
+        "formats": ["xlsx", "docx"],
+    })
+    assert export_res["status"] == "success" and export_res["total_files"] >= 2
+    log_result("Module 7", "Tool: Universal Report Exporter", "PASS", "Kết xuất báo cáo đa định dạng (XLSX, DOCX) thành công")
 
     # 7.2 Decree 30 Word Document Exporter
     tool_doc = DocumentExporterTool()

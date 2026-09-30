@@ -433,6 +433,66 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
             "api_keys": [],
         },
     },
+    {
+        "id": "prov_ollama",
+        "name": "Ollama Self-Hosted (GPU/CPU)",
+        "provider_type": "ollama",
+        "model_name": "qwen2.5:7b",
+        "models": [
+            "qwen2.5:7b",
+            "llama3.1:8b",
+            "bge-m3:latest",
+            "bge-m3",
+            "nomic-embed-text:latest",
+        ],
+        "api_base_url": getattr(settings, "OLLAMA_BASE_URL", "") or "http://localhost:11434/v1",
+        "api_key": "",
+        "priority": 9,
+        "is_active": True,
+        "timeout_seconds": 60,
+        "extra_config": {
+            "models": [
+                "qwen2.5:7b",
+                "llama3.1:8b",
+                "bge-m3:latest",
+                "bge-m3",
+                "nomic-embed-text:latest",
+            ],
+            "model_specs": {
+                "qwen2.5:7b": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Mô hình ngôn ngữ tự host trên Ollama, suy luận nhanh, hỗ trợ tiếng Việt tốt",
+                },
+                "llama3.1:8b": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Meta Llama 3.1 8B Instruct chạy nội bộ trên máy chủ Ollama",
+                },
+                "bge-m3:latest": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "embedding",
+                    "description": "Mô hình Embedding đa ngữ BAAI BGE-M3 (1024 chiều, Dense/Multi-lingual)",
+                },
+                "bge-m3": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "embedding",
+                    "description": "Mô hình Embedding đa ngữ BAAI BGE-M3 (1024 chiều)",
+                },
+                "nomic-embed-text:latest": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "embedding",
+                    "description": "Mô hình Embedding Nomic đa dụng ngữ cảnh 8192 token",
+                },
+            },
+            "api_keys": [],
+        },
+    },
 ]
 
 
@@ -931,13 +991,21 @@ class ProviderService:
 
                 elif provider_type in ("ollama", "local_vllm"):
                     default_url = "http://localhost:11434/v1" if provider_type == "ollama" else "http://localhost:8000/v1"
-                    target_url = (base_url or default_url).rstrip("/") + "/models"
-                    resp = await client.get(target_url)
+                    clean_base = (base_url or default_url).rstrip("/")
+                    if provider_type == "ollama" and not clean_base.endswith("/v1"):
+                        clean_base = f"{clean_base}/v1"
+                    target_url = f"{clean_base}/models"
+                    headers = {}
+                    if clean_key:
+                        headers["Authorization"] = f"Bearer {clean_key}"
+                    resp = await client.get(target_url, headers=headers)
                     elapsed = (time.perf_counter() - start) * 1000
                     if resp.status_code == 200:
-                        return True, round(elapsed, 1), f"Máy chủ cục bộ {provider_type} phản hồi tốt tại {target_url}."
+                        return True, round(elapsed, 1), f"Máy chủ {provider_type} phản hồi tốt tại {target_url}."
+                    elif resp.status_code in (401, 403):
+                        return False, round(elapsed, 1), f"Khóa API không hợp lệ (HTTP {resp.status_code})."
                     else:
-                        return False, round(elapsed, 1), f"Máy chủ cục bộ phản hồi HTTP {resp.status_code}."
+                        return False, round(elapsed, 1), f"Máy chủ {provider_type} phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
 
                 return True, 50.0, "Đã kiểm tra thông số kết nối nhà cung cấp."
 
@@ -1209,6 +1277,10 @@ class ProviderService:
                         else "http://localhost:11434/v1" if provider_type == "ollama"
                         else "http://localhost:8000/v1"
                     )
+                    clean_base = base.rstrip("/")
+                    if provider_type == "ollama" and not clean_base.endswith("/v1"):
+                        clean_base = f"{clean_base}/v1"
+
                     headers = {"Content-Type": "application/json"}
                     if clean_key:
                         headers["Authorization"] = f"Bearer {clean_key}"
@@ -1216,11 +1288,11 @@ class ProviderService:
                         headers["HTTP-Referer"] = "https://qnu.edu.vn"
                         headers["X-Title"] = "QNU AI Platform"
 
-                    if "embed" in m_lower:
-                        target_url = f"{base.rstrip('/')}/embeddings"
+                    if "embed" in m_lower or "bge" in m_lower:
+                        target_url = f"{clean_base}/embeddings"
                         payload = {"model": clean_model, "input": "ping"}
                     else:
-                        target_url = f"{base.rstrip('/')}/chat/completions"
+                        target_url = f"{clean_base}/chat/completions"
                         payload = {"model": clean_model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1}
 
                     resp = await client.post(target_url, headers=headers, json=payload)
@@ -1916,7 +1988,7 @@ class ProviderService:
             conditions = [ModelProviderConfig.name == name]
             if p_id:
                 conditions.append(ModelProviderConfig.id == p_id)
-            if p_type not in ("custom", "local_vllm", "generic_openai", "other"):
+            if p_type not in ("custom", "local_vllm", "ollama", "generic_openai", "other"):
                 conditions.append(ModelProviderConfig.provider_type == p_type)
 
             stmt = select(ModelProviderConfig).where(or_(*conditions))

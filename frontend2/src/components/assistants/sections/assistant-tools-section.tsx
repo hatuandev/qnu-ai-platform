@@ -1,9 +1,13 @@
 import {
   CheckCircle2,
+  Database,
   ExternalLink,
+  FileSpreadsheet,
+  FileText,
   Layers,
   Network,
   ShieldAlert,
+  Sparkles,
   Wrench,
 } from "lucide-react";
 import type { AssistantEditForm } from "@/components/assistants/types";
@@ -28,6 +32,58 @@ interface AssistantToolsSectionProps {
   assistant?: AssistantItem;
 }
 
+interface UniversalToolDef {
+  id: string;
+  name: string;
+  categoryBadge: string;
+  description: string;
+  details: string;
+  icon: typeof Wrench;
+}
+
+const UNIVERSAL_TOOLS: UniversalToolDef[] = [
+  {
+    id: "export_universal_report",
+    name: "Kết Xuất Báo Cáo & File Đa Định Dạng (.xlsx, .docx, .pdf)",
+    categoryBadge: "Toàn Nền Tảng",
+    description:
+      "Tự động phân tích, tổng hợp dữ liệu tư vấn thành bảng biểu và xuất các tệp phiếu tư vấn, kế hoạch, ma trận sang Excel, Word, PDF để tải về.",
+    details:
+      "Áp dụng cho mọi trợ lý: Tuyển sinh, Quy chế học vụ, Thư viện, Soạn thảo văn bản, Ngân hàng đề thi.",
+    icon: FileSpreadsheet,
+  },
+  {
+    id: "lookup_fact_layer",
+    name: "Tra Cứu Dữ Kiện Số Hóa (Structured Fact Layer)",
+    categoryBadge: "Dữ Liệu Động",
+    description:
+      "Truy vấn trực tiếp số liệu chính xác (điểm chuẩn, chỉ tiêu, học phí, học phần, hạn ngạch) từ bảng facts động của kho tri thức thay vì chỉ phụ thuộc vào văn bản mộc.",
+    details:
+      "Bảo đảm tính chính xác 100% đối với các con số biến động theo năm học hoặc quy chế mới.",
+    icon: Database,
+  },
+  {
+    id: "export_administrative_document",
+    name: "Soạn Thảo Văn Bản Hành Chính Chuẩn NĐ 30/2020",
+    categoryBadge: "Hành Chính Số",
+    description:
+      "Tự động đóng gói nội dung đã tạo thành tệp Word (.docx) chuẩn thể thức và kỹ thuật trình bày văn bản hành chính theo Nghị định 30/2020/NĐ-CP.",
+    details:
+      "Bao gồm Quốc hiệu, Tiêu ngữ, Tên cơ quan ban hành, Thẩm quyền ký và Định dạng văn bản hành chính.",
+    icon: FileText,
+  },
+  {
+    id: "export_exam_matrix",
+    name: "Biên Soạn Ma Trận Đề Thi Chuẩn Bloom",
+    categoryBadge: "Khảo Thí",
+    description:
+      "Tạo và kết xuất bảng ma trận phân bổ số lượng câu hỏi, thời gian và điểm số theo 4 cấp độ tư duy (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao) chuẩn Excel.",
+    details:
+      "Phục vụ giảng viên xây dựng đề thi kết thúc học phần và ngân hàng câu hỏi.",
+    icon: Sparkles,
+  },
+];
+
 export function AssistantToolsSection({
   form,
   onChange,
@@ -35,6 +91,18 @@ export function AssistantToolsSection({
   assistant,
 }: AssistantToolsSectionProps) {
   const assistantCode = assistant?.code || assistant?.id || "";
+
+  const isToolEnabled = (toolId: string) => {
+    return (form.enabled_tools || []).includes(toolId);
+  };
+
+  const toggleTool = (toolId: string, enabled: boolean) => {
+    const currentTools = form.enabled_tools || [];
+    const nextTools = enabled
+      ? Array.from(new Set([...currentTools, toolId]))
+      : currentTools.filter((t) => t !== toolId);
+    onChange({ ...form, enabled_tools: nextTools });
+  };
 
   return (
     <Card>
@@ -148,6 +216,83 @@ export function AssistantToolsSection({
               Tuân thủ chuẩn Function Calling OpenAPI Schema & Ghi vết kiểm toán
               (Audit Trail).
             </span>
+          </div>
+        </div>
+
+        {/* 4. Universal AI Capabilities & Skills */}
+        <div className="space-y-3 pt-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              <h4 className="text-xs font-bold text-foreground">
+                Kỹ Năng & Công Cụ Nền Tảng (Universal AI Capabilities)
+              </h4>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Kích hoạt hoặc thu hồi các kỹ năng thực thi của Trợ lý AI. Hệ thống sử dụng hoàn toàn dữ liệu động từ Kho tri thức số hóa và cơ chế xuất file tự động mà không gán cứng mã nguồn.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            {UNIVERSAL_TOOLS.map((tool) => {
+              const enabled = isToolEnabled(tool.id);
+              const IconComp = tool.icon;
+              return (
+                <div
+                  key={tool.id}
+                  className={`rounded-lg border p-3.5 transition-colors ${
+                    enabled ? "bg-card border-primary/30" : "bg-muted/15 border-border/50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div
+                        className={`flex size-8 items-center justify-center rounded-md shrink-0 mt-0.5 ${
+                          enabled
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        <IconComp className="size-4" />
+                      </div>
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-xs font-semibold text-foreground">
+                            {tool.name}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] py-0 px-1.5 font-normal text-muted-foreground bg-muted/40"
+                          >
+                            {tool.categoryBadge}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          {tool.description}
+                        </p>
+                        <p className="text-[10px] text-primary/80 font-medium">
+                          {tool.details}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                      <Badge
+                        variant={enabled ? "default" : "outline"}
+                        className="text-[11px]"
+                      >
+                        {enabled ? "Kích hoạt" : "Tắt"}
+                      </Badge>
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={(checked) => toggleTool(tool.id, checked)}
+                        aria-label={`Bật/Tắt công cụ ${tool.name}`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </CardContent>

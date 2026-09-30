@@ -7,6 +7,9 @@ import re
 SYSTEM_PROMPT_TEMPLATE = """Bạn là Trợ lý AI Thông minh của Trường Đại học Quy Nhơn (QNU.AI).
 Phong cách giao tiếp:
 - Xưng hô 'mình' và gọi người dùng là 'bạn'. Giọng văn ấm áp, nhiệt tình, lịch sự, rõ ràng và đi thẳng vào trọng tâm.
+- GIAO TIẾP TỰ NHIÊN, KHÔNG LẶP LỜI CHÀO MẪU:
+  + TUYỆT ĐỐI KHÔNG lặp lại câu chào hỏi hoặc giới thiệu bản thân kiểu máy móc (như: "Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn. Mình rất vui được hỗ trợ...", "Chào bạn! Mình là Trợ lý AI...").
+  + Hãy đi thẳng vào câu trả lời một cách tự nhiên, mạch lạc như trong một cuộc đối thoại liên tục giữa người với người.
 - BÁM SÁT TRỌNG TÂM CÂU HỎI: Chỉ trả lời đúng và đủ khía cạnh người dùng hỏi. Tuyệt đối không tự ý mở rộng sang các chủ đề khác (như học phí, điểm chuẩn, lệ phí, ký túc xá) nếu câu hỏi không yêu cầu.
 - CÂU HỎI TỔNG QUAN VỀ TRƯỜNG: Khi người dùng hỏi chung về trường (như "phương thức tuyển sinh của trường", "phương thức tuyển sinh năm 2026"), BẮT BUỘC trả lời về toàn trường (các phương thức 1, 2, 3, 4, 5). TUYỆT ĐỐI KHÔNG tự ý thu hẹp vào một ngành cụ thể từ lịch sử trò chuyện nếu người dùng không yêu cầu.
 - TRA CỨU TỔ HỢP MÔN: Chỉ liệt kê những ngành/chuyên ngành có MỘT TỔ HỢP CỤ THỂ chứa ĐỦ TẤT CẢ các môn được hỏi. Tuyệt đối không ghép các môn từ nhiều tổ hợp khác nhau của cùng một ngành để trả lời (ví dụ: nếu một ngành có tổ hợp (Toán, Văn, Anh) và (Văn, Anh, Hóa), ngành đó KHÔNG có tổ hợp (Toán, Anh, Hóa), tuyệt đối không được liệt kê).
@@ -29,6 +32,31 @@ Phong cách giao tiếp:
 - "Câu hỏi gợi ý từ góc độ người dùng 1?"
 - "Câu hỏi gợi ý từ góc độ người dùng 2?"
 """
+
+_ROBOTIC_INTRO_PATTERN = re.compile(
+    r"^\s*(?:Chào\s+bạn[!,.]\s*)?"
+    r"(?:"
+        r"(?:Mình|Tôi)\s+là\s+Trợ\s+lý\s+(?:ảo\s+)?[^\n!?:]*?(?:Trường\s+Đại\s+học\s+Quy\s+Nhơn|Trường\s+ĐH\s+Quy\s+Nhơn|Đại\s+học\s+Quy\s+Nhơn|QNU(?:\.AI)?)[^\n!?:]*?(?:\([^)]*\))?[.!?:–—\n]\s*"
+        r"(?:(?:Mình|Tôi|Rất)\s+(?:rất\s+)?(?:vui|sẵn\s+lòng)\s+(?:được\s+)?hỗ\s+trợ[^\n!?:]*?(?:như\s+sau\s*)?[:!?.\n]\s*)?"
+    r"|"
+        r"(?:Chào\s+bạn[!,.]\s*)?(?:Mình|Tôi|Rất)\s+(?:rất\s+)?(?:vui|sẵn\s+lòng)\s+(?:được\s+)?hỗ\s+trợ[^\n!?:]*?(?:như\s+sau\s*)?[:!?.\n]\s*"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def clean_robotic_intro(text: str) -> str:
+    """Remove repetitive canned robotic self-introductions in multi-turn dialogues.
+
+    Preserves natural dialogue and only strips boilerplate intro lines if there is
+    substantial answer content remaining.
+    """
+    if not text:
+        return ""
+    cleaned = _ROBOTIC_INTRO_PATTERN.sub("", text).strip()
+    if len(cleaned) >= 10:
+        return cleaned
+    return text.strip()
 
 _REPETITIVE_TRAIL_PATTERNS = [
     re.compile(
@@ -230,6 +258,7 @@ def extract_suggested_questions(
             body_text = pattern.sub("", body_text).strip()
         # Clean any trailing leftover header markers e.g. [GIZ]:, [GỢI Ý]:
         body_text = _TRAILING_TAG_PATTERN.sub("", body_text).strip()
+        body_text = clean_robotic_intro(body_text)
 
         if suggestions:
             return body_text, suggestions[:3]
@@ -242,6 +271,7 @@ def extract_suggested_questions(
             trail_str = trail_match.group(0).strip()
             body_text = text[: trail_match.start()].strip()
             body_text = _TRAILING_TAG_PATTERN.sub("", body_text).strip()
+            body_text = clean_robotic_intro(body_text)
 
             lower_trail = trail_str.lower()
             converted: list[str] = []
@@ -265,15 +295,16 @@ def extract_suggested_questions(
             return body_text, []
 
     body_text = _TRAILING_TAG_PATTERN.sub("", text).strip()
+    body_text = clean_robotic_intro(body_text)
     return body_text, []
 
 
 def sanitize_rag_answer(raw_answer: str, target_entity: str | None = None) -> str:
-    """Clean raw OCR pipe artifacts, broken table syntax, and prevent multi-major verbatim table dumps."""
+    """Clean robotic intro, raw OCR pipe artifacts, broken table syntax, and prevent multi-major verbatim table dumps."""
     if not raw_answer:
         return ""
 
-    text = raw_answer.strip()
+    text = clean_robotic_intro(raw_answer)
 
     # 1. Handle verbatim multi-major dumps if target_entity is known
     # e.g. '|||||| (Toán, Anh, Sử) || 31 | 7380101 | Luật ... || 36 | 7480201 | Công nghệ thông tin ...'
@@ -310,7 +341,7 @@ def sanitize_rag_answer(raw_answer: str, target_entity: str | None = None) -> st
                     formatted_lines.append(intro)
                 else:
                     formatted_lines.append(
-                        "Chào bạn! Dựa trên Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn, "
+                        "Dựa trên Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn, "
                         "thông tin xét tuyển chi tiết như sau:"
                     )
 
@@ -322,7 +353,7 @@ def sanitize_rag_answer(raw_answer: str, target_entity: str | None = None) -> st
                     for c in combos:
                         formatted_lines.append(f"  * ({c.strip()})")
 
-                return "\n".join(formatted_lines).strip()
+                return clean_robotic_intro("\n".join(formatted_lines).strip())
 
     # 2. General cleanup for raw OCR pipes
     text = re.sub(r"\|{3,}", "", text)
@@ -344,7 +375,7 @@ def sanitize_rag_answer(raw_answer: str, target_entity: str | None = None) -> st
     # 3. Clean any trailing leftover header markers e.g. [GIZ]:, [GỢI Ý]:
     text = _TRAILING_TAG_PATTERN.sub("", text).strip()
 
-    return text.strip()
+    return clean_robotic_intro(text.strip())
 
 
 class AnswerFormatPlanner:
@@ -406,7 +437,7 @@ class AnswerFormatPlanner:
             )
         else:
             lines.append(
-                "- Trình bày thành danh sách gạch đầu dòng (-) mạch lạc, có câu mở đầu thân thiện và đi thẳng vào đối tượng được hỏi."
+                "- Trình bày thành danh sách gạch đầu dòng (-) mạch lạc, đi thẳng vào trọng tâm đối tượng được hỏi, tự nhiên và súc tích (không thêm câu chào rập khuôn)."
             )
 
         if target_entity:
