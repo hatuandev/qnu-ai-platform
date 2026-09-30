@@ -591,6 +591,98 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
             ] if getattr(settings, "NVIDIA_API_KEY", None) else [],
         },
     },
+    {
+        "id": "prov_openrouter",
+        "name": "OpenRouter AI Gateway",
+        "provider_type": "openrouter",
+        "model_name": "google/gemini-2.5-flash",
+        "models": [
+            "google/gemini-2.5-flash",
+            "anthropic/claude-3.5-sonnet",
+            "deepseek/deepseek-r1",
+            "meta-llama/llama-3.3-70b-instruct",
+            "openai/gpt-4o-mini",
+            "qwen/qwen-2.5-72b-instruct",
+            "google/gemini-2.0-flash-exp:free",
+        ],
+        "api_base_url": getattr(settings, "OPENROUTER_BASE_URL", "") or "https://openrouter.ai/api/v1",
+        "api_key": encrypt_secret(getattr(settings, "OPENROUTER_API_KEY", "") or "") if getattr(settings, "OPENROUTER_API_KEY", "") else "",
+        "priority": 7,
+        "is_active": bool(getattr(settings, "OPENROUTER_API_KEY", None)),
+        "timeout_seconds": 60,
+        "extra_config": {
+            "models": [
+                "google/gemini-2.5-flash",
+                "anthropic/claude-3.5-sonnet",
+                "deepseek/deepseek-r1",
+                "meta-llama/llama-3.3-70b-instruct",
+                "openai/gpt-4o-mini",
+                "qwen/qwen-2.5-72b-instruct",
+                "google/gemini-2.0-flash-exp:free",
+            ],
+            "model_specs": {
+                "google/gemini-2.5-flash": {
+                    "can_ocr": False,
+                    "can_vision": True,
+                    "type": "text",
+                    "description": "Google Gemini 2.5 Flash đa phương thức, siêu nhanh và chi phí tối ưu",
+                },
+                "anthropic/claude-3.5-sonnet": {
+                    "can_ocr": False,
+                    "can_vision": True,
+                    "type": "text",
+                    "description": "Claude 3.5 Sonnet đỉnh cao về viết mã và lý luận văn bản phức tạp",
+                },
+                "deepseek/deepseek-r1": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "can_reasoning": True,
+                    "type": "text",
+                    "description": "Mô hình suy luận chuyên sâu DeepSeek R1 phân tích từng bước",
+                },
+                "meta-llama/llama-3.3-70b-instruct": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Llama 3.3 70B mã nguồn mở hàng đầu của Meta",
+                },
+                "openai/gpt-4o-mini": {
+                    "can_ocr": False,
+                    "can_vision": True,
+                    "type": "text",
+                    "description": "GPT-4o mini thông minh, nhanh nhẹn và chi phí thấp từ OpenAI",
+                },
+                "qwen/qwen-2.5-72b-instruct": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "text",
+                    "description": "Qwen 2.5 72B mã nguồn mở đa ngữ và logic toán học mạnh mẽ",
+                },
+                "google/gemini-2.0-flash-exp:free": {
+                    "can_ocr": False,
+                    "can_vision": True,
+                    "type": "text",
+                    "description": "Gemini 2.0 Flash bản thử nghiệm miễn phí (:free) trên OpenRouter",
+                },
+            },
+            "api_keys": [
+                {
+                    "id": "key_openrouter_primary",
+                    "name": "Khóa Chính (Primary)",
+                    "api_key": encrypt_secret(getattr(settings, "OPENROUTER_API_KEY", "") or ""),
+                    "api_key_masked": mask_api_key(getattr(settings, "OPENROUTER_API_KEY", "") or ""),
+                    "priority": 1,
+                    "is_active": True,
+                    "status": "active",
+                    "quota_limit": 20_000_000,
+                    "usage_tokens": 0,
+                    "cooldown_until": None,
+                    "last_used_at": None,
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            ] if getattr(settings, "OPENROUTER_API_KEY", None) else [],
+        },
+    },
 ]
 
 
@@ -624,6 +716,8 @@ class ProviderService:
             settings.GEMINI_API_KEY = clean_key
         elif provider_type == "nvidia":
             settings.NVIDIA_API_KEY = clean_key
+        elif provider_type == "openrouter":
+            settings.OPENROUTER_API_KEY = clean_key
 
     async def sync_active_providers_to_runtime(self, db: AsyncSession) -> int:
         """Query active providers from database and inject credentials into runtime settings at startup."""

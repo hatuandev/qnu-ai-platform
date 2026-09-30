@@ -226,6 +226,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("NVIDIA_BASE_URL", "NVIDIA_API_BASE", "NVIDIA_NIM_URL"),
     )
 
+    # --- OpenRouter ---
+    OPENROUTER_API_KEY: str | None = None
+    OPENROUTER_BASE_URL: str = Field(
+        default="https://openrouter.ai/api/v1",
+        validation_alias=AliasChoices("OPENROUTER_BASE_URL", "OPENROUTER_API_BASE", "OPENROUTER_URL"),
+    )
+
     LOCAL_LLM_ENABLED: bool = False
     LOCAL_LLM_BASE_URL: str | None = None
     LOCAL_LLM_MODEL: str = "qwen2.5:7b"

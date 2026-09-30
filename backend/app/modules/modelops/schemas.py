@@ -261,6 +261,15 @@ PROVIDER_PRESETS: list[ProviderPresetItem] = [
         default_base_url="https://openrouter.ai/api/v1",
         placeholder_key="sk-or-v1-...",
         help_text="Lấy từ openrouter.ai/keys.",
+        suggested_models=[
+            "google/gemini-2.5-flash",
+            "anthropic/claude-3.5-sonnet",
+            "deepseek/deepseek-r1",
+            "meta-llama/llama-3.3-70b-instruct",
+            "openai/gpt-4o-mini",
+            "qwen/qwen-2.5-72b-instruct",
+            "google/gemini-2.0-flash-exp:free",
+        ],
     ),
     ProviderPresetItem(
         code="mistral",

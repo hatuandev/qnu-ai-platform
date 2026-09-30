@@ -115,6 +115,9 @@ class OpenAIAdapter(BaseLLMAdapter):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if "openrouter" in (self.base_url or "").lower():
+            headers["HTTP-Referer"] = "https://qnu.edu.vn"
+            headers["X-Title"] = "QNU AI Platform"
         payload = {
             "model": self.model_name,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
@@ -185,6 +188,9 @@ class OpenAIAdapter(BaseLLMAdapter):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if "openrouter" in (self.base_url or "").lower():
+            headers["HTTP-Referer"] = "https://qnu.edu.vn"
+            headers["X-Title"] = "QNU AI Platform"
         payload = {
             "model": self.model_name,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
