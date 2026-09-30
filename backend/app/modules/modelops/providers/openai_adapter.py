@@ -121,6 +121,16 @@ class OpenAIAdapter(BaseLLMAdapter):
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        lower_m = self.model_name.lower()
+        if (
+            "nemotron" in lower_m
+            or "r1" in lower_m
+            or "thinking" in lower_m
+            or "qwq" in lower_m
+            or kwargs.get("enable_thinking")
+            or kwargs.get("thinking_budget")
+        ):
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             resp = await client.post(endpoint, json=payload, headers=headers)
@@ -128,7 +138,12 @@ class OpenAIAdapter(BaseLLMAdapter):
             data = resp.json()
 
         choice = data.get("choices", [{}])[0]
-        content = choice.get("message", {}).get("content", "")
+        msg = choice.get("message", {})
+        content = msg.get("content") or ""
+        reasoning_content = msg.get("reasoning_content") or ""
+        if not content and reasoning_content:
+            content = reasoning_content
+
         usage = data.get("usage", {})
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
@@ -152,7 +167,73 @@ class OpenAIAdapter(BaseLLMAdapter):
         max_tokens: int = 2000,
         **kwargs,
     ) -> AsyncIterator[str]:
-        response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens)
-        words = response.content.split(" ")
-        for word in words:
-            yield word + " "
+        # Safe offline mock mode
+        if (
+            not self.api_key
+            or self.api_key in ("mock", "test", "demo", "placeholder")
+            or self.api_key.startswith(("mock", "test", "sk-proj-mock", "dummy"))
+        ):
+            response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
+            words = response.content.split(" ")
+            for word in words:
+                yield word + " "
+            return
+
+        base_url = self.base_url or "https://api.openai.com/v1"
+        endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        lower_m = self.model_name.lower()
+        if (
+            "nemotron" in lower_m
+            or "r1" in lower_m
+            or "thinking" in lower_m
+            or "qwq" in lower_m
+            or kwargs.get("enable_thinking")
+            or kwargs.get("thinking_budget")
+        ):
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
+
+        try:
+            import json
+            async with (
+                httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client,
+                client.stream("POST", endpoint, json=payload, headers=headers) as resp,
+            ):
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    chunk_str = line[5:].strip()
+                    if chunk_str == "[DONE]":
+                        break
+                    try:
+                        chunk_data = json.loads(chunk_str)
+                        choices = chunk_data.get("choices", [])
+                        if not choices:
+                            continue
+                        delta = choices[0].get("delta", {})
+                        token = delta.get("content")
+                        if token:
+                            yield token
+                        else:
+                            reasoning = delta.get("reasoning_content")
+                            if reasoning:
+                                yield reasoning
+                    except json.JSONDecodeError:
+                        continue
+        except Exception:
+            # Fallback to standard generate if streaming fails
+            response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
+            words = response.content.split(" ")
+            for word in words:
+                yield word + " "

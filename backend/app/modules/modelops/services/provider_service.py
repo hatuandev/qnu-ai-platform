@@ -500,10 +500,10 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "model_name": "meta/llama-3.3-70b-instruct",
         "models": [
             "meta/llama-3.3-70b-instruct",
+            "nvidia/nemotron-3-ultra-550b-a55b",
             "deepseek-ai/deepseek-r1",
             "deepseek-ai/deepseek-v3",
             "nvidia/llama-3.1-nemotron-70b-instruct",
-            "meta/llama-3.1-8b-instruct",
             "mistralai/mixtral-8x22b-instruct-v0.1",
             "nvidia/neva-22b",
         ],
@@ -515,10 +515,10 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "extra_config": {
             "models": [
                 "meta/llama-3.3-70b-instruct",
+                "nvidia/nemotron-3-ultra-550b-a55b",
                 "deepseek-ai/deepseek-r1",
                 "deepseek-ai/deepseek-v3",
                 "nvidia/llama-3.1-nemotron-70b-instruct",
-                "meta/llama-3.1-8b-instruct",
                 "mistralai/mixtral-8x22b-instruct-v0.1",
                 "nvidia/neva-22b",
             ],
@@ -528,6 +528,13 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "can_vision": False,
                     "type": "text",
                     "description": "Meta Llama 3.3 70B Instruct tối ưu qua NVIDIA TensorRT-LLM, suy luận cực nhanh",
+                },
+                "nvidia/nemotron-3-ultra-550b-a55b": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "can_reasoning": True,
+                    "type": "text",
+                    "description": "Siêu mô hình suy luận tư duy Nemotron 550B tối tân từ NVIDIA NIM",
                 },
                 "deepseek-ai/deepseek-r1": {
                     "can_ocr": False,
@@ -1382,14 +1389,32 @@ class ProviderService:
                         headers["HTTP-Referer"] = "https://qnu.edu.vn"
                         headers["X-Title"] = "QNU AI Platform"
 
+                    is_reasoning_or_thinking = any(
+                        kw in m_lower for kw in ("r1", "reason", "nemotron", "thinking", "o1", "o3", "qwq")
+                    )
+
                     if "embed" in m_lower or "bge" in m_lower:
                         target_url = f"{clean_base}/embeddings"
                         payload = {"model": clean_model, "input": "ping"}
                     else:
                         target_url = f"{clean_base}/chat/completions"
-                        payload = {"model": clean_model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1}
+                        payload = {
+                            "model": clean_model,
+                            "messages": [{"role": "user", "content": "hi"}],
+                            "max_tokens": 10 if is_reasoning_or_thinking else 1,
+                        }
+                        if provider_type == "nvidia" and is_reasoning_or_thinking:
+                            payload["chat_template_kwargs"] = {"enable_thinking": True}
 
                     resp = await client.post(target_url, headers=headers, json=payload)
+                    # Retry once if temporary upstream server overload (503/504/529)
+                    if resp.status_code in (503, 504, 529) or ("overloaded" in resp.text.lower() and resp.status_code != 200):
+                        await asyncio.sleep(1.0)
+                        try:
+                            resp = await client.post(target_url, headers=headers, json=payload)
+                        except Exception:
+                            pass
+
                     elapsed = round((time.perf_counter() - start) * 1000, 1)
                     if resp.status_code == 200:
                         return {
@@ -1398,6 +1423,24 @@ class ProviderService:
                             "status": "available",
                             "latency_ms": elapsed,
                             "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code in (503, 504, 529) or "overloaded" in resp.text.lower():
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "temporarily_overloaded",
+                            "latency_ms": elapsed,
+                            "message": f"Máy chủ {provider_type.upper()} đang quá tải tạm thời (HTTP {resp.status_code} - Service temporarily overloaded). Tên mô hình chính xác, bạn vẫn có thể thêm mô hình vào hệ thống.",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 410:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "deprecated",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' đã hết hạn / ngừng cung cấp bởi nhà cung cấp (HTTP 410 Gone).",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
                     elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not exist" in resp.text.lower() or "not found" in resp.text.lower()):

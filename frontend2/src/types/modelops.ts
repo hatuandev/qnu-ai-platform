@@ -18,7 +18,13 @@ export interface ProviderApiKey {
 export interface SingleModelTestResult {
   model_name: string;
   success: boolean;
-  status: "available" | "unavailable" | "rate_limited" | "error";
+  status:
+    | "available"
+    | "unavailable"
+    | "rate_limited"
+    | "temporarily_overloaded"
+    | "deprecated"
+    | "error";
   latency_ms: number;
   message: string;
   tested_at: string;

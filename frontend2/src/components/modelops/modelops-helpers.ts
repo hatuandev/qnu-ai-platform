@@ -214,10 +214,10 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
   ],
   nvidia: [
     "meta/llama-3.3-70b-instruct",
+    "nvidia/nemotron-3-ultra-550b-a55b",
     "deepseek-ai/deepseek-r1",
     "deepseek-ai/deepseek-v3",
     "nvidia/llama-3.1-nemotron-70b-instruct",
-    "meta/llama-3.1-8b-instruct",
     "mistralai/mixtral-8x22b-instruct-v0.1",
     "nvidia/neva-22b",
   ],

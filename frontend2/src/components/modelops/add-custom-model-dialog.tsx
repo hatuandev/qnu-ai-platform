@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Brain,
   CheckCircle2,
+  Clock,
   Eye,
   FlaskConical,
   RotateCw,
@@ -186,13 +187,21 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
               className={`p-2.5 rounded-md text-xs flex items-center gap-2 ${
                 newModelTestResult.status === "available"
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                  : newModelTestResult.status === "rate_limited"
-                    ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
+                  : newModelTestResult.status === "rate_limited" ||
+                    newModelTestResult.status === "temporarily_overloaded" ||
+                    newModelTestResult.message?.includes("503") ||
+                    newModelTestResult.message?.includes("quá tải")
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                     : "bg-destructive/10 text-destructive border border-destructive/30"
               }`}
             >
               {newModelTestResult.status === "available" ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+              ) : newModelTestResult.status === "rate_limited" ||
+                newModelTestResult.status === "temporarily_overloaded" ||
+                newModelTestResult.message?.includes("503") ||
+                newModelTestResult.message?.includes("quá tải") ? (
+                <Clock className="h-4 w-4 shrink-0 text-amber-500" />
               ) : (
                 <AlertTriangle className="h-4 w-4 shrink-0" />
               )}
@@ -207,9 +216,23 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                   <span>
                     Chạm Rate Limit (429): {newModelTestResult.message}
                   </span>
+                ) : newModelTestResult.status === "temporarily_overloaded" ||
+                  newModelTestResult.message?.includes("503") ||
+                  newModelTestResult.message?.includes("quá tải") ? (
+                  <div className="space-y-0.5">
+                    <span className="font-semibold block">
+                      Máy chủ quá tải tạm thời (HTTP 503):
+                    </span>
+                    <span className="text-[11px] opacity-90 block">
+                      {newModelTestResult.message}
+                    </span>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-300 block font-normal mt-0.5">
+                      Tên mô hình hợp lệ. Bạn vẫn có thể nhấn &ldquo;Thêm Mô Hình&rdquo; bên dưới để kích hoạt.
+                    </span>
+                  </div>
                 ) : (
                   <span>
-                    Không khả dụng (404/Error): {newModelTestResult.message}
+                    Không khả dụng ({newModelTestResult.status === "deprecated" ? "410 Hết hạn" : "404/Error"}): {newModelTestResult.message}
                   </span>
                 )}
               </div>
@@ -283,14 +306,16 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                           lower.includes("vision") ||
                           lower.includes("4o") ||
                           lower.includes("sonnet") ||
-                          lower.includes("ocr"),
+                          lower.includes("ocr") ||
+                          lower.includes("neva"),
                       );
                       setIsReasoningCapable(
                         lower.includes("o1") ||
                           lower.includes("o3") ||
                           lower.includes("reason") ||
                           lower.includes("r1") ||
-                          lower.includes("thinking"),
+                          lower.includes("thinking") ||
+                          lower.includes("nemotron"),
                       );
                       setNewModelTestResult(null);
                     }}

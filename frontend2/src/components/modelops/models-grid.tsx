@@ -349,10 +349,28 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                       <span>{testRes.latency_ms}ms</span>
                     </span>
+                  ) : testRes.status === "temporarily_overloaded" ||
+                    testRes.message?.includes("503") ||
+                    testRes.message?.includes("quá tải") ? (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
+                      title={`Máy chủ quá tải tạm thời: ${testRes.message}`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>503 Tạm bận</span>
+                    </span>
+                  ) : testRes.status === "deprecated" ? (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
+                      title={`Đã hết hạn (410 Gone): ${testRes.message}`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
+                      <span>410 Hết hạn</span>
+                    </span>
                   ) : testRes.status === "unavailable" ? (
                     <span
                       className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
-                      title={`Hết hiệu lực: ${testRes.message}`}
+                      title={`Không tìm thấy (404): ${testRes.message}`}
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
                       <span>404</span>
