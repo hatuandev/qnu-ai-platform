@@ -467,8 +467,14 @@ Ba sự cố đã từng xảy ra thật trong dự án (commit ảnh nhị phâ
 - Giá trị mặc định trong `app/core/config.py` chỉ được là placeholder rỗng hoặc giá trị dev vô hại; `DEV_AUTH_ENABLED` bắt buộc là `False` ở môi trường production.
 - Trước mỗi commit, Agent phải rà soát diff để bảo đảm không lọt secret mới (API key, token, private key) vào lịch sử git.
 
-### 9.4. Quy Chuẩn Thứ Tự Push Git: Gitea Trước, GitHub Sau (Gitea-First Push Policy)
-- **Thứ tự bắt buộc**: Khi đẩy mã nguồn (`git push`), hệ thống và AI Agent bắt buộc phải đẩy lên **Gitea nội bộ trước** (`https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git`), sau khi Gitea chấp nhận thành công mới đẩy tiếp sang **GitHub** (`https://github.com/hatuandev/qnu-ai-platform.git`).
-- **Cấu hình đa Push URL**: Remote `origin` đã được thiết lập 2 `pushurl` tuần tự. Khi thực hiện `git push` hoặc `git push origin main`, Git sẽ tự động đẩy lần lượt theo thứ tự: Gitea ➔ GitHub. Nếu Gitea bị lỗi hoặc từ chối, Git sẽ dừng ngay lập tức và không đẩy lên GitHub.
+### 9.4. Quy Chuẩn Đồng Bộ Git: Ưu Tiên Gitea Tuyệt Đối (Gitea-First Pull & Dual-Push Policy)
+- **Quy chuẩn Kéo Code (`git pull`)**: Mặc định mọi thao tác `git pull` hoặc `git fetch` lấy từ **Gitea nội bộ** (`https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git`) làm nguồn chính (Single Source of Truth).
+- **Quy chuẩn Đẩy Code (`git push`)**: Khi đẩy mã nguồn (`git push`), Git tự động đẩy tuần tự: **Gitea trước ➔ GitHub sau**. Nếu Gitea gặp sự cố hoặc từ chối, Git dừng lại ngay lập tức và không đẩy lên GitHub.
+- **Cấu hình Remote chuẩn**:
+  - `origin (fetch)`: `https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git` (Ưu tiên kéo từ Gitea).
+  - `origin (push 1)`: `https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git` (Đẩy lên Gitea).
+  - `origin (push 2)`: `https://github.com/hatuandev/qnu-ai-platform.git` (Đẩy lên GitHub).
+  - Remote phụ `github`: `https://github.com/hatuandev/qnu-ai-platform.git` (dành riêng khi cần đối soát hoặc fetch thủ công từ GitHub).
+  - Remote phụ `gitea`: `https://qnu-gitea.duckdns.org/admin/qnu-ai-platform.git`.
 
 
