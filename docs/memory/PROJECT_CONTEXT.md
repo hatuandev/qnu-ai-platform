@@ -7,22 +7,32 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-30 23:25 (UTC+7)
-- **Phiên số**: #234 (Tích hợp OpenRouter AI Gateway, NVIDIA NIM Provider, Xử lý lỗi 503 Overload & Nemotron Thinking Stream, Git Dual-Push)
-- **Phiên số trước**: #233, #232, #231
-- **Mục tiêu đã hoàn thành (các phiên #232 - #234)**:
-  - 1. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
+- **Thời gian cập nhật**: 2026-09-30 23:35 (UTC+7)
+- **Phiên số**: #235 (Thu Thập & Tổ Chức 17 Tệp Tài Liệu Tuyển Sinh QNU Vào Thư Mục docs/tai_lieu, Chính Sách Người Dùng Tự Đẩy Git Push)
+- **Phiên số trước**: #234, #233, #232, #231
+- **Mục tiêu đã hoàn thành (phiên #235)**:
+  - 1. **Thu Thập & Số Hóa Toàn Diện 17 Tệp Tài Liệu Tuyển Sinh QNU**:
+       * Quét tự động 3 cổng tuyển sinh chính thức: Đại học chính quy (`/tuyen-sinh-dai-hoc-chinh-quy-2027`), Sau đại học (`/tuyen-sinh-sau-dai-hoc-2028`), Vừa làm vừa học (`/tuyen-sinh-vua-lam-vua-hoc-2029`).
+       * Xây dựng hàm `normalize_url` giải quyết triệt để lỗi double percent encoding đối với các file URL chứa ký tự tiếng Việt hoặc dấu cách.
+       * Tải thành công trọn vẹn 17 tệp PDF và DOCX (tổng 9.34 MB) về 3 thư mục con chuyên biệt:
+         - `docs/tai_lieu/dai_hoc_chinh_quy/` (6 tệp: điểm chuẩn ĐHCQ 2026, quy đổi điểm TB123, báo cáo chỉ tiêu...).
+         - `docs/tai_lieu/sau_dai_hoc/` (8 tệp: các phụ lục tuyển sinh thạc sĩ và tiến sĩ 2026...).
+         - `docs/tai_lieu/vua_lam_vua_hoc/` (3 tệp: thông báo từ xa, mức thu học phí, tuyển sinh liên kết...).
+       * Khởi tạo tệp mục lục chi tiết [**`docs/tai_lieu/README.md`**](../tai_lieu/README.md) lưu trữ metadata từng tài liệu kèm liên kết nội bộ.
+  - 2. **Chính Sách Git Push (User-Controlled Git Push Policy)**:
+       * Xác lập quy tắc rõ ràng: AI Agent không tự ý chạy lệnh `git push` sau mỗi lượt vibe coding; việc push mã nguồn lên các remote Git (Gitea / GitHub) sẽ do Người dùng chủ động kiểm tra và thực hiện.
+  - 3. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
        * Bổ sung biến môi trường `OPENROUTER_API_KEY` và `OPENROUTER_BASE_URL` ("https://openrouter.ai/api/v1") trong `app.core.config`.
        * Tự động gắn kèm headers `HTTP-Referer: https://qnu.edu.vn` và `X-Title: QNU AI Platform` theo chuẩn OpenRouter API trong `OpenAIAdapter`.
        * Đăng ký `prov_openrouter` vào `STANDARD_QNU_PROVIDERS` với danh mục model gợi ý (`deepseek/deepseek-r1`, `anthropic/claude-3.7-sonnet`, `openai/gpt-4o-mini`, `google/gemini-2.0-flash-001`, `meta-llama/llama-3.3-70b-instruct`) và preset schemas.
        * CSDL live PostgreSQL: Đạt đủ **11 Nhà Cung Cấp** tiêu chuẩn (OpenAI, Gemini, Mistral, Cloudflare, DeepSeek, Groq, Claude, Local vLLM, Ollama, NVIDIA NIM, OpenRouter).
-  - 2. **Phiên #233 — Tích hợp NVIDIA NIM (`prov_nvidia`), Xử lý lỗi 503 Overload & Nemotron Thinking Stream**:
+  - 4. **Phiên #233 — Tích hợp NVIDIA NIM (`prov_nvidia`), Xử lý lỗi 503 Overload & Nemotron Thinking Stream**:
        * Đăng ký `prov_nvidia` vào `STANDARD_QNU_PROVIDERS` (Base URL: `https://integrate.api.nvidia.com/v1`).
        * Hỗ trợ tham số `chat_template_kwargs={"enable_thinking": True}` qua `extra_body` cho mô hình suy luận `nvidia/nemotron-3-ultra-550b-a55b` và dòng DeepSeek R1 trong `OpenAIAdapter`.
        * Bóc tách `reasoning_content` từ `chunk.choices[0].delta` và stream trực tiếp token suy luận về client.
        * Cơ chế phục hồi 503/504/529: Auto-retry 1 lần sau 1s trong `_ping_single_model`, phân loại trạng thái `temporarily_overloaded` thay vì gán lỗi chết.
        * UI `add-custom-model-dialog.tsx`: Cảnh báo màu hổ phách, icon đồng hồ `Clock`, giải thích tên mô hình chính xác và mở nút "Thêm model" cho phép người dùng lưu mô hình ngay.
-  - 3. **Phiên #232 — Nâng cấp Task Runner (`reseed`, `reset-db`) & Git Dual-Push (Gitea + GitHub)**:
+  - 5. **Phiên #232 — Nâng cấp Task Runner (`reseed`, `reset-db`) & Git Dual-Push (Gitea + GitHub)**:
        * Sửa lỗi `ParameterBindingValidationException` trong `make.ps1` bằng việc bổ sung `"reseed"`, `"reset-db"` vào attribute `[ValidateSet(...)]` và triển khai nhánh switch tương ứng.
        * Tối ưu hóa `Makefile` tương thích PowerShell.
        * Cấu hình remote `origin`: Fetch trỏ về Gitea (`qnu-gitea.duckdns.org` - Gitea-first pull), Push trỏ đồng thời về Gitea và GitHub (`github.com/hatuandev`). 1 lệnh `git push` tự động đồng bộ cả 2 máy chủ.
