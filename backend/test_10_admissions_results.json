@@ -1,0 +1,199 @@
+[
+  {
+    "id": 1,
+    "question": "Năm 2026, Trường Đại học Quy Nhơn tuyển sinh theo những phương thức nào và tổng chỉ tiêu dự kiến là bao nhiêu?",
+    "elapsed_sec": 34.92,
+    "status": "answered",
+    "answer": "Bảng thông tin tuyển sinh của Trường Đại học Quy Nhơn năm 2026:\n\n| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh dự kiến | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 |  | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |\n| 2 | 7140201 | Giáo dục Mầm non | 5 |  | (Văn, Toán, NK GDMN) |\n| 3 | 7140202 | Giáo dục Tiểu học | 1,4 |  | (Văn, Anh, Toán)<br>(Văn, Anh, Lý)<br>(Văn, Anh, Hóa)<br>(Văn, Anh, Sinh)<br>(Văn, Anh, Sử)<br>(Văn, Anh, Địa) |\n| 4 | 7140205 | Giáo dục Chính trị | 1,4 |  | (Văn, Toán, Giáo dục KT và PL)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Anh, Giáo dục KT và PL) |\n| 5 | 7140206 | Giáo dục Thể chất | 5 |  | (Toán, Sinh, NK TDTT) (Toán, Văn, NK TDTT)<br>(Văn, Sinh, NK TDTT)<br>(Văn, Địa, NK TDTT)<br>(Toán, Lý, NK TDTT)<br>(Văn, Giáo dục KT và PL, NK TDTT) |\n\nTổng chỉ tiêu dự kiến: 4800 chỉ tiêu.\n\nBên cạnh đó, Trường Đại học Quy Nhơn cũng tuyển sinh theo các phương thức khác nhau, bao gồm:\n\n- Xét tuyển dựa vào kết quả kỳ thi tốt nghiệp THPT năm 2026 theo tổ hợp môn xét tuyển (THPT).\n- Xét tuyển dựa vào kết quả học tập 3 năm THPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào tạo giáo viên không xét tuyển phương thức này.\n- Xét tuyển dựa vào kết quả kỳ thi đánh giá năng lực (ĐGNL) của Đại học Quốc gia Thành phố Hồ Chí Minh (ĐNL) và kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội (SPT).\n- Xét tuyển dựa vào kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội (SPT).\n- Xét tuyển dựa vào kết quả thi tốt nghiệp THPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy Nhơn.\n- Xét tuyển thẳng theo Quy chế tuyển sinh của Bộ Giáo dục và Đào tạo.\n\nLưu ý: Thông tin trên chỉ mang tính tham khảo và có thể thay đổi theo quy định của Bộ Giáo dục và Đào tạo và Trường Đại học Quy Nhơn.",
+    "citations_count": 8,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 2)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 1)",
+      "Tài liệu tuyển sinh (doc_5058) (Trang 1)",
+      "Tài liệu tuyển sinh (doc_b8ff) (Trang 1)",
+      "1897_BC03_Dieu_kien_xac_dinh_chi_tieu_tuyen_sinh_2026 (Trang 8)"
+    ],
+    "expected_topics": [
+      "5 phương thức (PT1..PT5) + xét tuyển thẳng",
+      "4800 chỉ tiêu dự kiến"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 2,
+    "question": "Em muốn xét tuyển vào các ngành Sư phạm (đào tạo giáo viên) bằng điểm học bạ THPT hoặc điểm Đánh giá năng lực ĐHQG TP.HCM có được không?",
+    "elapsed_sec": 13.13,
+    "status": "answered",
+    "answer": "Bạn muốn xét tuyển vào các ngành Sư phạm (đào tạo giáo viên) bằng điểm học bạ THPT hoặc điểm Đánh giá năng lực ĐHQG TP.HCM có được không?\n\nĐúng vậy, bạn có thể xét tuyển vào các ngành Sư phạm của Trường Đại học Quy Nhơn bằng điểm học bạ THPT hoặc điểm Đánh giá năng lực ĐHQG TP.HCM.\n\nDưới đây là thông tin về các ngành Sư phạm của Trường Đại học Quy Nhơn:\n\n- Quản lý giáo dục (7140114)\n- Giáo dục Mầm non (7140201)\n- Giáo dục Tiểu học (7140202)\n- Giáo dục Chính trị (7140205)\n- Giáo dục Thể chất (7140206)\n- Sư phạm Toán học (7140209)\n- Sư phạm Tin học (7140210)\n- Sư phạm Vật lý (7140211)\n- Sư phạm Hóa học (7140212)\n- Sư phạm Sinh học (7140213)\n- Sư phạm Ngữ văn (7140217)\n- Sư phạm Lịch sử (7140218)\n- Sư phạm Địa lý (7140219)\n- Sư phạm Tiếng Anh (7140231)\n- Sư phạm Khoa học tự nhiên (7140247)\n- Sư phạm Lịch sử - Địa lí (7140249)\n\nĐể xét tuyển vào các ngành Sư phạm này, bạn cần đáp ứng các điều kiện sau:\n\n- Điểm học bạ THPT: Tùy thuộc vào từng ngành và phương thức xét tuyển, bạn cần có điểm học bạ THPT đạt được một trong các mức điểm sau: 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0.\n- Điểm Đánh giá năng lực ĐHQG TP.HCM: Tương tự, bạn cần có điểm Đánh giá năng lực ĐHQG TP.HCM đạt được một trong các mức điểm sau: 600, 650, 700, 750, 800, 850, 900.\n\nBạn cần kiểm tra thông tin cụ thể về từng ngành và phương thức xét tuyển để có thông tin chính xác nhất.",
+    "citations_count": 8,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 2)",
+      "Tài liệu tuyển sinh (doc_e4fe) (Trang 10)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 11)",
+      "Tài liệu tuyển sinh (doc_e4fe) (Trang 3)",
+      "Tài liệu tuyển sinh (doc_b061) (Trang 7)"
+    ],
+    "expected_topics": [
+      "KHÔNG được xét tuyển",
+      "Các ngành đào tạo giáo viên không xét tuyển PT2 (học bạ) và PT3 (ĐGNL ĐHQG TP.HCM)"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 3,
+    "question": "Điểm chuẩn trúng tuyển theo phương thức Học bạ (PT2) của các ngành Quản trị kinh doanh, Kinh tế, và Kế toán năm 2026 là bao nhiêu?",
+    "elapsed_sec": 5.32,
+    "status": "answered",
+    "answer": "| Cột 1 | Cột 2 | Cột 3 |\n| --- | --- | --- |\n| Quản trị kinh doanh | 7340101 | 20 |\n\nĐiểm chuẩn trúng tuyển theo phương thức Học bạ (PT2) của ngành Quản trị kinh doanh năm 2024 là 20 điểm.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_d147) (Trang 8)",
+      "Tài liệu tuyển sinh (doc_b8ff) (Trang 10)",
+      "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026 (Trang 32)",
+      "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026 (Trang 36)",
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 5)"
+    ],
+    "expected_topics": [
+      "Điểm chuẩn học bạ 2026 của Quản trị kinh doanh, Kinh tế, Kế toán từ văn bản điểm chuẩn/quy đổi"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 4,
+    "question": "Điểm chuẩn theo kỳ thi Đánh giá năng lực của ĐH Sư phạm Hà Nội (PT4) của ngành Sư phạm Toán học và Giáo dục Tiểu học là bao nhiêu?",
+    "elapsed_sec": 8.68,
+    "status": "answered",
+    "answer": "Bên dưới là thông tin điểm chuẩn theo kỳ thi Đánh giá năng lực của ĐH Sư phạm Hà Nội (PT4) của ngành Sư phạm Toán học và Giáo dục Tiểu học:\n\n| Ngành học | Điểm chuẩn PT4 |\n| :--- | :--- |\n| Sư phạm Toán học (7140209) | 25,50 |\n| Sư phạm Toán học (7140209) - Điểm chuẩn theo từng tổ hợp | (Toán, Lý, Hóa): 22,88, (Toán, Lý, Anh): 23,04, (Toán, Hóa, Anh): 23,04, (Toán, Tin, Anh): 22,88 |\n| Giáo dục Tiểu học (7140202) | 20,55 |\n| Giáo dục Tiểu học (7140202) - Điểm chuẩn theo từng tổ hợp | (Toán, Văn, Anh): 20,00, (Toán, Văn, Lý): 20,00, (Toán, Văn, Hóa): 20,00, (Toán, Văn, Tin): 20,00, (Toán, Văn, Địa): 20,00 |\n\nBảng so sánh điểm chuẩn của Sư phạm Toán học và Giáo dục Tiểu học theo kỳ thi Đánh giá năng lực của ĐH Sư phạm Hà Nội (PT4):\n\n| Ngành học | Điểm chuẩn PT4 |\n| :--- | :--- |\n| Sư phạm Toán học (7140209) | 25,50 |\n| Giáo dục Tiểu học (7140202) | 20,55 |\n\nBảng trên cho thấy Sư phạm Toán học có điểm chuẩn cao hơn Giáo dục Tiểu học.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_d147) (Trang 6)",
+      "Tài liệu tuyển sinh (doc_82be) (Trang 1)",
+      "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026 (Trang 33)",
+      "1897_Bao_cao_thuc_hien_chi_tieu_tuyen_sinh_2025 (Trang 3)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 11)"
+    ],
+    "expected_topics": [
+      "Điểm chuẩn PT4 ĐGNL ĐH Sư phạm Hà Nội"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 5,
+    "question": "Em có chứng chỉ IELTS 5.5 (hoặc VSTEP Bậc 4) thì khi xét tuyển vào QNU bằng PT1 hoặc PT2, môn Tiếng Anh được quy đổi sang bao nhiêu điểm?",
+    "elapsed_sec": 15.09,
+    "status": "answered",
+    "answer": "Bạn đã có chứng chỉ IELTS 5.5 hoặc VSTEP Bậc 4. Khi xét tuyển vào Trường Đại học Quy Nhơn bằng Phương thức 1 (PT1) hoặc Phương thức 2 (PT2), môn Tiếng Anh sẽ được quy đổi sang 8.5 điểm.\n\nThông tin này được quy định tại phần c của đoạn trích [1] trong thông báo tuyển sinh của Trường Đại học Quy Nhơn.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 9)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 2)",
+      "Tài liệu tuyển sinh (doc_5058) (Trang 2)",
+      "Tài liệu tuyển sinh (doc_5058) (Trang 3)",
+      "Tài liệu tuyển sinh (doc_e4fe) (Trang 1)"
+    ],
+    "expected_topics": [
+      "IELTS 5.5 -> 8.5 điểm",
+      "VSTEP Bậc 4 (4.0) -> 8.0 điểm"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 6,
+    "question": "Tổ hợp môn X26 (Toán, Tin học, Tiếng Anh) và X78 (Ngữ văn, Giáo dục KT và PL, Tiếng Anh) được quy về tổ hợp gốc nào theo quy định của trường?",
+    "elapsed_sec": 6.84,
+    "status": "answered",
+    "answer": "Tổ hợp môn X26 (Toán, Tin học, Tiếng Anh) và X78 (Ngữ văn, Giáo dục KT và PL, Tiếng Anh) được quy về tổ hợp gốc nào theo quy định của trường?\n\nCăn cứ vào Bảng quy đổi tương đương các tổ hợp theo tổ hợp gốc trong Phụ lục 2, chúng ta có:\n\n- Tổ hợp X26: Toán, Tin học, Tiếng Anh\n- Tổ hợp X78: Ngữ văn, Giáo dục KT và PL, Tiếng Anh\n\nTheo Bảng quy đổi tương đương các tổ hợp theo tổ hợp gốc, chúng ta có:\n\n- Tổ hợp X26 tương đương với tổ hợp gốc D01: Ngữ văn, Toán, Tiếng Anh\n- Tổ hợp X78 tương đương với tổ hợp gốc D01: Ngữ văn, Toán, Tiếng Anh\n\nVậy, tổ hợp môn X26 (Toán, Tin học, Tiếng Anh) và X78 (Ngữ văn, Giáo dục KT và PL, Tiếng Anh) được quy về tổ hợp gốc D01 theo quy định của trường.",
+    "citations_count": 8,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_5058) (Trang 5)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 5)",
+      "Tài liệu tuyển sinh (doc_5058) (Trang 2)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 6)",
+      "Thong_bao_diem_chuan_DGNL_va_hoc_ba_DHCQ_2026 (Trang 2)"
+    ],
+    "expected_topics": [
+      "X26 -> A01",
+      "X78 -> D01"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 7,
+    "question": "Nếu em đạt giải Ba trong kỳ thi chọn Học sinh giỏi quốc gia thì được cộng bao nhiêu điểm ưu tiên xét tuyển?",
+    "elapsed_sec": 12.69,
+    "status": "answered",
+    "answer": "Bạn đoạt giải Ba trong kỳ thi chọn Học sinh giỏi quốc gia thì được cộng 1 điểm ưu tiên xét tuyển.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 9)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 10)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 13)",
+      "Tài liệu tuyển sinh (doc_5058) (Trang 3)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 2)"
+    ],
+    "expected_topics": [
+      "Giải Ba HSG quốc gia -> cộng 1.0 điểm",
+      "Thời hạn giải không quá 3 năm"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 8,
+    "question": "Ngành Giáo dục Mầm non (mã 7140201) tuyển sinh theo phương thức nào và tổ hợp môn thi gồm những gì?",
+    "elapsed_sec": 12.68,
+    "status": "answered",
+    "answer": "Bạn đang hỏi về ngành Giáo dục Mầm non (mã 7140201) của Trường Đại học Quy Nhơn. \n\nNgành Giáo dục Mầm non của Trường Đại học Quy Nhơn tuyển sinh theo Phương thức 5 (PT5 - mã 405), là xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy Nhơn.\n\nTổ hợp môn xét tuyển của ngành Giáo dục Mầm non là:\n\n- (Văn, Toán, NK GDMN)\n\nHãy lưu ý, bạn cần đáp ứng đủ các yêu cầu và điều kiện tuyển sinh của ngành Giáo dục Mầm non để được xét tuyển.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 2)",
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 5)",
+      "Tài liệu tuyển sinh (doc_b061) (Trang 4)",
+      "Tài liệu tuyển sinh (doc_1772) (Trang 3)",
+      "Tài liệu tuyển sinh (doc_d147) (Trang 3)"
+    ],
+    "expected_topics": [
+      "Phương thức 5 (PT5 - mã 405)",
+      "Tổ hợp: Văn, Toán, Năng khiếu GDMN"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 9,
+    "question": "Điểm thi tốt nghiệp THPT của em tổ hợp D01 được 21.0 điểm. Em muốn học các ngành khối Kinh tế hoặc Công nghệ tại QNU thì cơ hội trúng tuyển thế nào?",
+    "elapsed_sec": 9.52,
+    "status": "answered",
+    "answer": "Cảm ơn bạn đã đặt câu hỏi về cơ hội trúng tuyển vào các ngành khối Kinh tế hoặc Công nghệ tại Trường Đại học Quy Nhơn.\n\nĐiểm thi tốt nghiệp THPT của bạn tổ hợp D01 được 21.0 điểm. Để có thể trúng tuyển vào các ngành khối Kinh tế hoặc Công nghệ, bạn cần xem xét các thông tin sau:\n\n1. **Điểm chuẩn**: Điểm chuẩn của các ngành khối Kinh tế và Công nghệ tại Trường Đại học Quy Nhơn thường dao động từ 19.00 đến 24.00 điểm. Tuy nhiên, điểm chuẩn có thể thay đổi tùy thuộc vào từng ngành và phương thức xét tuyển.\n2. **Tổ hợp môn xét tuyển**: Các ngành khối Kinh tế và Công nghệ tại Trường Đại học Quy Nhơn thường xét tuyển theo tổ hợp môn D01 (Toán, Văn, Anh) hoặc D07 (Toán, Văn, Sử).\n3. **Phương thức xét tuyển**: Trường Đại học Quy Nhơn có nhiều phương thức xét tuyển, bao gồm xét tuyển dựa vào kết quả thi tốt nghiệp THPT, xét tuyển dựa vào kết quả đánh giá năng lực, và xét tuyển dựa vào kết quả học tập trung học phổ thông.\n\nDựa trên thông tin trên, tôi khuyên bạn nên xem xét các ngành sau:\n\n- **Kinh tế**: Điểm chuẩn: 19.90 điểm (Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 19.90 điểm).\n- **Quản lý nhà nước**: Điểm chuẩn: 21.90 điểm (Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 21.90 điểm).\n- **Kỹ thuật phần mềm**: Điểm chuẩn: 16.00 điểm (Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 16.00 điểm).\n- **Công nghệ thông tin**: Điểm chuẩn: 18.20 điểm (Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 18.20 điểm).\n\nTuy nhiên, bạn cần lưu ý rằng điểm chuẩn có thể thay đổi tùy thuộc vào từng ngành và phương thức xét tuyển. Vì vậy, bạn nên kiểm tra thông tin chính thức trên trang web của Trường Đại học Quy Nhơn để có thông tin chính xác nhất.",
+    "citations_count": 6,
+    "citations": [
+      "Tài liệu tuyển sinh (doc_1772) (Trang 9)",
+      "TB123_Quy_doi_tuong_duong_diem_xet_tuyen_2026 (Trang 2)",
+      "Tài liệu tuyển sinh (doc_82be) (Trang 3)",
+      "TB123_Quy_doi_tuong_duong_diem_xet_tuyen_2026 (Trang 1)",
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 6)"
+    ],
+    "expected_topics": [
+      "Tư vấn cơ hội trúng tuyển dựa trên phổ điểm 2024/2025 các ngành Kinh tế / Công nghệ"
+    ],
+    "artifacts_count": 0
+  },
+  {
+    "id": 10,
+    "question": "Điểm chuẩn trúng tuyển ngành Trí tuệ nhân tạo của Trường Đại học Quy Nhơn năm 2028 là bao nhiêu điểm?",
+    "elapsed_sec": 5.66,
+    "status": "answered",
+    "answer": "Tôi hiểu bạn đang hỏi về điểm chuẩn trúng tuyển ngành Trí tuệ nhân tạo của Trường Đại học Quy Nhơn. Tuy nhiên, trong các đoạn trích bạn cung cấp, không có thông tin về điểm chuẩn trúng tuyển của ngành Trí tuệ nhân tạo.\n\nNếu bạn muốn biết điểm chuẩn trúng tuyển của ngành Trí tuệ nhân tạo, tôi đề xuất bạn nên tham khảo thông tin chính thức từ Trường Đại học Quy Nhơn hoặc các nguồn tin cậy khác.",
+    "citations_count": 6,
+    "citations": [
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 12)",
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 6)",
+      "Thong_bao_diem_chuan_DGNL_va_hoc_ba_DHCQ_2026 (Trang 2)",
+      "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (Trang 13)",
+      "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026 (Trang 5)"
+    ],
+    "expected_topics": [
+      "Năm tương lai 2028: Chưa có dữ liệu / Chưa diễn ra",
+      "Cung cấp điểm chuẩn 2024/2025 hoặc hướng dẫn theo dõi"
+    ],
+    "artifacts_count": 0
+  }
+]

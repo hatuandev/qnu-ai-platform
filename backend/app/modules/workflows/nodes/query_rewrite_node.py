@@ -598,12 +598,18 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
             if (profile and hasattr(profile, "model_policy") and profile.model_policy)
             else None
         )
+        preferred_provider_id = (
+            getattr(profile.model_policy, "preferred_provider_id", None)
+            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            else None
+        )
 
         req = LLMGenerateRequest(
             messages=[ChatMessage(role="user", content=prompt)],
             temperature=0.0,
             max_tokens=200,
             thinking_budget=0,
+            preferred_provider_id=preferred_provider_id,
             preferred_model_name=primary_model,
             fallback_model_name=fallback_model,
         )

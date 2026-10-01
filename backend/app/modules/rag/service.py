@@ -374,6 +374,7 @@ class RagService:
                         max_tokens=req.max_tokens,
                         thinking_budget=req.thinking_budget,
                         conversation_id=req.conversation_id,
+                        preferred_provider_id=req.preferred_provider_id,
                         preferred_model_name=req.fallback_model,
                     )
                     llm_res = await modelops_service.generate(db, fallback_llm_req)
