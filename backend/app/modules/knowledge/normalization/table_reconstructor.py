@@ -401,21 +401,32 @@ def is_repeated_header(row_cells: list[CanonicalCell], expected_headers: list[st
 
 
 def is_sub_header_row(row_cells: list[CanonicalCell]) -> bool:
-    """Check if a row is a second-level header row (e.g. Chỉ tiêu / Điểm trúng tuyển) repeating on a new page."""
+    """Morphological check: determine whether a row is a second-level table header (sub-header) repeating across pages.
+
+    Invariants of a sub-header row:
+    1. Parent identifier columns (e.g. STT, Code, Entity Name) are empty.
+    2. Sub-columns contain multiple concise descriptive text labels (alpha ratio >= 70%, length <= 60 chars).
+    3. Cells do not contain numeric measurement values (numeric ratio <= 25%).
+    """
     if not row_cells or len(row_cells) < 4:
         return False
     values = [re.sub(r"\s+", " ", c.raw_value).strip() for c in row_cells]
     first_three_empty = not any(values[: min(3, len(values))])
     if not first_three_empty:
         return False
-    sub_header_kws = ["chỉ tiêu", "trúng tuyển", "điểm", "nhập học", "xét tuyển", "tuyển sinh"]
+
     non_empty = [v for v in values[3:] if v]
     if len(non_empty) < 2:
         return False
-    sub_count = sum(
-        1 for v in non_empty if any(kw in v.lower() for kw in sub_header_kws)
-    )
-    return (sub_count / len(non_empty)) >= 0.70
+
+    # Sub-header labels are concise titles (<= 60 chars) without terminal sentence punctuation
+    if not all(len(v) <= 60 and not v.endswith((".", ";")) for v in non_empty):
+        return False
+
+    alpha_count = sum(1 for v in non_empty if re.search(r"[a-zA-Z\u00C0-\u024F\u1EA0-\u1EF9]", v))
+    numeric_count = sum(1 for v in non_empty if re.match(r"^[-+]?\d+(?:[\.,]\d+)?%?$", v))
+
+    return (alpha_count / len(non_empty)) >= 0.70 and (numeric_count / len(non_empty)) <= 0.25
 
 
 def is_orphan_continuation_row(row: CanonicalRow, key_col_idx: int = 0) -> bool:

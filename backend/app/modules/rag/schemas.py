@@ -91,3 +91,6 @@ class AskResponse(BaseModel):
         default_factory=list, description="Danh sách câu hỏi gợi ý tiếp theo"
     )
     latency_ms: float = 0.0
+    contexts: list[str] = Field(
+        default_factory=list, description="Nội dung các chunk tri thức được truy xuất làm ngữ cảnh"
+    )

@@ -961,6 +961,8 @@ async def test_export_and_import_providers():
     assert export_single["provider"]["account_id"] == "acc_export_123"
     assert len(export_single["provider"]["api_keys"]) == 1
     assert export_single["provider"]["api_keys"][0]["account_id"] == "acc_export_123"
+    assert export_single["provider"]["api_key"] is None
+    assert export_single["provider"]["api_keys"][0]["api_key"] is None
 
     # 2. Test Bulk Export
     export_all = await modelops_service.export_all_providers(mock_db, include_secrets=True)
@@ -968,6 +970,7 @@ async def test_export_and_import_providers():
     assert export_all["export_type"] == "all_providers"
     assert export_all["total_providers"] == 1
     assert export_all["providers"][0]["name"] == "Cloudflare Workers AI"
+    assert export_all["providers"][0]["api_key"] is None
 
     # 3. Test Import Overwrite
     import_req_overwrite = ProviderImportRequest(

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, Index, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +37,64 @@ class ModelProviderConfig(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class ProviderApiKey(Base):
+    """A provider credential with durable quota, health, and lease state."""
+
+    __tablename__ = "provider_api_keys"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True, default=generate_uuid)
+    provider_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("model_provider_configs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    api_key_encrypted: Mapped[str] = mapped_column(String(1000), nullable=False)
+    api_key_masked: Mapped[str] = mapped_column(String(100), nullable=False)
+    account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    quota_limit: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    usage_tokens: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    cooldown_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    lease_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_provider_api_keys_selection",
+            "provider_id",
+            "is_active",
+            "status",
+            "priority",
+        ),
+        Index("ix_provider_api_keys_lease", "provider_id", "lease_until"),
     )
 
 

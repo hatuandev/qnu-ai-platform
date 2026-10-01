@@ -10,6 +10,9 @@ from app.modules.modelops.services.model_runtime_resolver import (
     ModelRuntimeConfig,
     model_runtime_resolver,
 )
+from app.modules.modelops.services.provider_key_rotation_service import (
+    provider_key_rotation_service,
+)
 from app.modules.rag.fusion import FusionCandidate
 
 logger = logging.getLogger(__name__)
@@ -91,17 +94,30 @@ class RerankerClient:
                 }
                 scored = _combine_rrf_and_ce_scores(candidates, score_map)
                 return scored[:top_k]
-            else:
-                logger.warning(
-                    "Cloudflare rerank returned HTTP %d: %s", resp.status_code, resp.text[:200]
-                )
+            resp.raise_for_status()
+            raise RuntimeError("Cloudflare reranker returned an empty response.")
 
-        return candidates[:top_k]
-
-    async def _resolve_reranker_runtime(self) -> ModelRuntimeConfig:
+    async def _resolve_reranker_runtime(
+        self, *, excluded_key_ids: set[str] | None = None
+    ) -> ModelRuntimeConfig:
         """Load the current reranker provider and model from ModelOps."""
         async with AsyncSessionFactory() as db:
-            return await model_runtime_resolver.resolve(db, "reranker")
+            return await model_runtime_resolver.resolve(
+                db, "reranker", excluded_key_ids=excluded_key_ids
+            )
+
+    @staticmethod
+    async def _finish_runtime_key(
+        runtime: ModelRuntimeConfig, error: Exception | None = None
+    ) -> None:
+        lease = runtime.key_lease()
+        if lease is None:
+            return
+        async with AsyncSessionFactory() as db:
+            if error is None:
+                await provider_key_rotation_service.complete_success(db, lease)
+            else:
+                await provider_key_rotation_service.complete_failure(db, lease, error)
 
     async def rerank(
         self,
@@ -121,23 +137,37 @@ class RerankerClient:
         provider = "rrf_fallback"
 
         # 1. Resolve Cloudflare Workers AI Cross-Encoder from ModelOps.
-        try:
-            runtime = await self._resolve_reranker_runtime()
-            if runtime.provider_type == "cloudflare" and runtime.api_key and runtime.account_id:
-                ranked = await self._rerank_cloudflare(query, candidates, runtime, top_k)
-                provider = "cloudflare"
-                logger.info(
-                    "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
-                    provider,
-                    (time.perf_counter() - start_time) * 1000,
-                    len(candidates),
-                    len(ranked),
+        excluded: set[str] = set()
+        while True:
+            runtime: ModelRuntimeConfig | None = None
+            try:
+                runtime = await self._resolve_reranker_runtime(
+                    excluded_key_ids=excluded
                 )
-                return ranked
-        except Exception as exc:
-            logger.warning(
-                "ModelOps reranker unavailable: %s. Falling back to RRF score.", exc
-            )
+                if runtime.provider_type == "cloudflare" and runtime.api_key and runtime.account_id:
+                    ranked = await self._rerank_cloudflare(query, candidates, runtime, top_k)
+                    await self._finish_runtime_key(runtime)
+                    provider = "cloudflare"
+                    logger.info(
+                        "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
+                        provider,
+                        (time.perf_counter() - start_time) * 1000,
+                        len(candidates),
+                        len(ranked),
+                    )
+                    return ranked
+                await self._finish_runtime_key(runtime)
+                break
+            except Exception as exc:
+                if runtime is not None:
+                    await self._finish_runtime_key(runtime, exc)
+                    if runtime.key_id:
+                        excluded.add(runtime.key_id)
+                        continue
+                logger.warning(
+                    "ModelOps reranker unavailable: %s. Falling back to RRF score.", exc
+                )
+                break
 
         # 2. Custom external HTTP reranker endpoint (if configured)
         if self.endpoint_url:

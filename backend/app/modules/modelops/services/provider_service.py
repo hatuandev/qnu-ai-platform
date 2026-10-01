@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 from sqlalchemy import or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -18,7 +19,7 @@ from app.core.config import settings
 from app.core.crypto import decrypt_secret, encrypt_secret, is_encrypted
 from app.core.exceptions import AppException
 from app.modules.modelops.circuit_breaker import circuit_breaker_registry
-from app.modules.modelops.models import ModelProviderConfig
+from app.modules.modelops.models import ModelProviderConfig, ProviderApiKey
 from app.modules.modelops.schemas import (
     ProviderConfigCreate,
     ProviderConfigUpdate,
@@ -938,6 +939,22 @@ class ProviderService:
             extra_config=extra,
         )
         db.add(config)
+        if keys_list:
+            initial_key = keys_list[0]
+            db.add(
+                ProviderApiKey(
+                    id=initial_key["id"],
+                    provider_id=provider_id,
+                    name=initial_key["name"],
+                    api_key_encrypted=encrypted_key or "",
+                    api_key_masked=initial_key["api_key_masked"],
+                    account_id=data.account_id,
+                    priority=1,
+                    is_active=True,
+                    status="active",
+                    usage_tokens=0,
+                )
+            )
         await db.commit()
         await db.refresh(config)
 
@@ -1037,6 +1054,34 @@ class ProviderService:
                     }
                 )
             extra["api_keys"] = keys_pool
+            primary_id = keys_pool[0]["id"]
+            relational_result = await db.execute(
+                select(ProviderApiKey).where(
+                    ProviderApiKey.id == primary_id,
+                    ProviderApiKey.provider_id == provider_id,
+                )
+            )
+            relational_key = relational_result.scalar_one_or_none()
+            if relational_key is None:
+                relational_key = ProviderApiKey(
+                    id=primary_id,
+                    provider_id=provider_id,
+                    name=keys_pool[0].get("name") or "Khóa Chính",
+                    api_key_encrypted=enc_k or "",
+                    api_key_masked=masked,
+                    account_id=data.account_id or extra.get("account_id"),
+                    priority=1,
+                    is_active=True,
+                    status="active",
+                    usage_tokens=0,
+                )
+                db.add(relational_key)
+            else:
+                relational_key.api_key_encrypted = enc_k or ""
+                relational_key.api_key_masked = masked
+                relational_key.status = "active"
+                relational_key.cooldown_until = None
+                relational_key.consecutive_failures = 0
 
         config.extra_config = extra
         flag_modified(config, "extra_config")
@@ -1691,6 +1736,51 @@ class ProviderService:
         config = res.scalar_one_or_none()
 
         if config:
+            try:
+                relational = await db.execute(
+                    select(ProviderApiKey)
+                    .where(ProviderApiKey.provider_id == provider_id)
+                    .order_by(ProviderApiKey.priority, ProviderApiKey.created_at)
+                )
+                relational_keys = list(relational.scalars().all())
+            except SQLAlchemyError:
+                await db.rollback()
+                relational_keys = []
+            if relational_keys:
+                now = datetime.now(UTC)
+                changed = False
+                for key in relational_keys:
+                    if (
+                        key.status == "rate_limited"
+                        and key.cooldown_until is not None
+                        and key.cooldown_until <= now
+                    ):
+                        key.status = "active"
+                        key.cooldown_until = None
+                        changed = True
+                if changed:
+                    await db.commit()
+                return [
+                    {
+                        "id": key.id,
+                        "name": key.name,
+                        "api_key_masked": key.api_key_masked,
+                        "account_id": key.account_id,
+                        "priority": key.priority,
+                        "is_active": key.is_active,
+                        "status": key.status,
+                        "quota_limit": key.quota_limit,
+                        "usage_tokens": key.usage_tokens,
+                        "cooldown_until": (
+                            key.cooldown_until.isoformat() if key.cooldown_until else None
+                        ),
+                        "last_used_at": (
+                            key.last_used_at.isoformat() if key.last_used_at else None
+                        ),
+                        "created_at": key.created_at.isoformat() if key.created_at else None,
+                    }
+                    for key in relational_keys
+                ]
             extra = dict(config.extra_config or {})
             keys = list(extra.get("api_keys", []))
 
@@ -1773,6 +1863,22 @@ class ProviderService:
             if not config.api_key_encrypted or data.priority == 1:
                 config.api_key_encrypted = enc_key
 
+            db.add(
+                ProviderApiKey(
+                    id=new_key["id"],
+                    provider_id=provider_id,
+                    name=data.name,
+                    api_key_encrypted=enc_key or "",
+                    api_key_masked=masked,
+                    account_id=new_key["account_id"],
+                    priority=data.priority,
+                    is_active=True,
+                    status="active",
+                    quota_limit=data.quota_limit,
+                    usage_tokens=0,
+                )
+            )
+
             flag_modified(config, "extra_config")
             await db.commit()
             await db.refresh(config)
@@ -1824,6 +1930,31 @@ class ProviderService:
                     config.api_key_encrypted = active_keys[0].get("api_key")
                 elif keys:
                     config.api_key_encrypted = None
+
+                relational_result = await db.execute(
+                    select(ProviderApiKey).where(
+                        ProviderApiKey.id == key_id,
+                        ProviderApiKey.provider_id == provider_id,
+                    )
+                )
+                relational_key = relational_result.scalar_one_or_none()
+                if relational_key is not None:
+                    if data.name is not None:
+                        relational_key.name = data.name
+                    if data.account_id is not None:
+                        relational_key.account_id = (
+                            data.account_id.strip() if data.account_id else None
+                        )
+                    if data.priority is not None:
+                        relational_key.priority = data.priority
+                    if data.is_active is not None:
+                        relational_key.is_active = data.is_active
+                    if data.status is not None:
+                        relational_key.status = data.status
+                        if data.status != "rate_limited":
+                            relational_key.cooldown_until = None
+                    if data.quota_limit is not None:
+                        relational_key.quota_limit = data.quota_limit
 
                 config.extra_config = extra
                 flag_modified(config, "extra_config")
@@ -1882,6 +2013,16 @@ class ProviderService:
             else:
                 config.api_key_encrypted = None
 
+            relational_result = await db.execute(
+                select(ProviderApiKey).where(
+                    ProviderApiKey.id == key_id,
+                    ProviderApiKey.provider_id == provider_id,
+                )
+            )
+            relational_key = relational_result.scalar_one_or_none()
+            if relational_key is not None:
+                await db.delete(relational_key)
+
             flag_modified(config, "extra_config")
             await db.commit()
             await db.refresh(config)
@@ -1902,41 +2043,14 @@ class ProviderService:
     async def reveal_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str
     ) -> dict[str, Any]:
-        """Decrypt and return the plaintext API key value for clipboard copy in Admin UI."""
-        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
-        res = await db.execute(stmt)
-        config = res.scalar_one_or_none()
-
-        target_key: dict[str, Any] | None = None
-        if config:
-            for k in (config.extra_config or {}).get("api_keys", []):
-                if k.get("id") == key_id:
-                    target_key = k
-                    break
-        elif provider_id in _DEFAULT_PROVIDER_KEYS:
-            for k in _DEFAULT_PROVIDER_KEYS[provider_id]:
-                if k.get("id") == key_id:
-                    target_key = k
-                    break
-
-        if not target_key:
-            raise AppException(
-                status_code=404,
-                title="Khóa không tồn tại",
-                detail=f"Không tìm thấy khóa API '{key_id}'.",
-                code="KEY_NOT_FOUND",
-            )
-
-        raw_key = target_key.get("api_key", "")
-        plain = decrypt_secret(raw_key) if raw_key else None
-        if not plain:
-            raise AppException(
-                status_code=422,
-                title="Không thể giải mã khóa",
-                detail="Khóa API không thể giải mã. Vui lòng cập nhật lại khóa.",
-                code="KEY_DECRYPT_FAILED",
-            )
-        return {"api_key": plain}
+        """Reject plaintext key disclosure; provider credentials are write-only."""
+        del db, provider_id, key_id
+        raise AppException(
+            status_code=403,
+            title="Không được phép hiển thị khóa API",
+            detail="Khóa API chỉ được phép ghi mới hoặc thay thế và không thể xuất lại dạng rõ.",
+            code="KEY_REVEAL_DISABLED",
+        )
 
     async def test_provider_key(
         self, db: AsyncSession, provider_id: str, key_id: str
@@ -2064,7 +2178,7 @@ class ProviderService:
         }
 
     async def export_provider(
-        self, db: AsyncSession, provider_id: str, include_secrets: bool = True
+        self, db: AsyncSession, provider_id: str, include_secrets: bool = False
     ) -> dict[str, Any]:
         """Export a single provider configuration as a standardized JSON structure."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
@@ -2093,29 +2207,18 @@ class ProviderService:
                 }
             ]
 
+        del include_secrets
         exported_keys = []
         for k in keys_raw:
-            raw_k = k.get("api_key")
-            secret_val = None
-            if include_secrets and raw_k:
-                secret_val = decrypt_secret(raw_k) if is_encrypted(raw_k) else raw_k
             exported_keys.append(
                 {
                     "name": k.get("name", "API Key"),
-                    "api_key": secret_val,
+                    "api_key": None,
                     "account_id": k.get("account_id"),
                     "priority": k.get("priority", 1),
                     "is_active": k.get("is_active", True),
                     "quota_limit": k.get("quota_limit"),
                 }
-            )
-
-        provider_secret = None
-        if include_secrets and config.api_key_encrypted:
-            provider_secret = (
-                decrypt_secret(config.api_key_encrypted)
-                if is_encrypted(config.api_key_encrypted)
-                else config.api_key_encrypted
             )
 
         provider_data = {
@@ -2127,7 +2230,7 @@ class ProviderService:
             "models": list(extra.get("models", []))
             or ([config.model_name] if config.model_name else []),
             "api_base_url": config.api_base_url,
-            "api_key": provider_secret,
+            "api_key": None,
             "account_id": extra.get("account_id"),
             "priority": config.priority,
             "timeout_seconds": config.timeout_seconds,
@@ -2146,7 +2249,7 @@ class ProviderService:
         }
 
     async def export_all_providers(
-        self, db: AsyncSession, include_secrets: bool = True
+        self, db: AsyncSession, include_secrets: bool = False
     ) -> dict[str, Any]:
         """Export all configured providers and their key pools into a unified JSON backup."""
         stmt = select(ModelProviderConfig).order_by(ModelProviderConfig.priority.asc())
@@ -2369,4 +2472,3 @@ class ProviderService:
 
 
 provider_service = ProviderService()
-

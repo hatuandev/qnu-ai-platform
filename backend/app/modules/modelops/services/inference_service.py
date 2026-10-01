@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.cost_tracker import cost_tracker
 from app.core.crypto import decrypt_secret
@@ -18,6 +19,14 @@ from app.modules.modelops.circuit_breaker import circuit_breaker_registry
 from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import get_llm_adapter
 from app.modules.modelops.schemas import LLMGenerateRequest, LLMGenerateResponse
+from app.modules.modelops.services.key_rotation import (
+    classify_key_failure,
+    describe_provider_failure,
+)
+from app.modules.modelops.services.provider_key_rotation_service import (
+    LeasedProviderKey,
+    provider_key_rotation_service,
+)
 from app.modules.modelops.services.provider_service import (
     _DEFAULT_PROVIDER_KEYS,
     _auto_recover_cooldown,
@@ -151,10 +160,128 @@ class InferenceService:
             return mod.get_llm_adapter
         return get_llm_adapter
 
+    @staticmethod
+    def _estimate_request_tokens(req: LLMGenerateRequest) -> int:
+        prompt_chars = sum(len(message.content) for message in req.messages)
+        return max(1, prompt_chars // 4) + max(1, req.max_tokens)
+
+    @staticmethod
+    def _lease_to_key_entry(lease: LeasedProviderKey) -> dict[str, Any]:
+        return {
+            "id": lease.id,
+            "name": lease.name,
+            "api_key": lease.api_key,
+            "account_id": lease.account_id,
+            "_lease": lease,
+        }
+
+    @staticmethod
+    def _prepare_available_keys(
+        keys_pool: list[dict[str, Any]], estimated_tokens: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Recover cooldowns, enforce configured quotas and order usable keys."""
+        before = [
+            (key.get("id"), key.get("status"), key.get("cooldown_until"))
+            for key in keys_pool
+        ]
+        _auto_recover_cooldown(keys_pool)
+
+        for key in keys_pool:
+            quota_limit = key.get("quota_limit")
+            try:
+                parsed_quota_limit = int(quota_limit) if quota_limit is not None else None
+                usage_tokens = max(0, int(key.get("usage_tokens") or 0))
+            except (TypeError, ValueError):
+                parsed_quota_limit = None
+                usage_tokens = 0
+            if (
+                key.get("is_active", True)
+                and parsed_quota_limit is not None
+                and usage_tokens + estimated_tokens > parsed_quota_limit
+            ):
+                key["status"] = "exhausted"
+                key["cooldown_until"] = None
+
+        available_keys = [
+            key
+            for key in keys_pool
+            if key.get("is_active", True) and key.get("status", "active") == "active"
+        ]
+        available_keys.sort(
+            key=lambda key: (
+                key.get("priority", 1),
+                key.get("usage_tokens", 0),
+                key.get("last_used_at") or "",
+            )
+        )
+        after = [
+            (key.get("id"), key.get("status"), key.get("cooldown_until"))
+            for key in keys_pool
+        ]
+        return available_keys, before != after
+
+    @staticmethod
+    async def _persist_key_pool(
+        db: AsyncSession,
+        config: ModelProviderConfig | None,
+        keys_pool: list[dict[str, Any]],
+    ) -> None:
+        if config is None:
+            return
+        extra = dict(config.extra_config or {})
+        extra["api_keys"] = keys_pool
+        config.extra_config = extra
+        flag_modified(config, "extra_config")
+        await db.commit()
+
+    async def _record_key_success(
+        self,
+        db: AsyncSession,
+        config: ModelProviderConfig | None,
+        keys_pool: list[dict[str, Any]],
+        key: dict[str, Any],
+        total_tokens: int,
+    ) -> None:
+        key["usage_tokens"] = max(0, int(key.get("usage_tokens") or 0)) + total_tokens
+        key["last_used_at"] = datetime.now(UTC).isoformat()
+        quota_limit = key.get("quota_limit")
+        if quota_limit is not None and key["usage_tokens"] >= int(quota_limit):
+            key["status"] = "exhausted"
+            key["cooldown_until"] = None
+        await self._persist_key_pool(db, config, keys_pool)
+
+    async def _record_key_failure(
+        self,
+        db: AsyncSession,
+        config: ModelProviderConfig | None,
+        keys_pool: list[dict[str, Any]],
+        key: dict[str, Any],
+        exc: Exception,
+    ) -> str | None:
+        failure = classify_key_failure(exc)
+        if failure.state is None:
+            return None
+
+        key["status"] = failure.state
+        if failure.state == "rate_limited":
+            cooldown_seconds = failure.retry_after_seconds or 60
+            key["cooldown_until"] = (
+                datetime.now(UTC) + timedelta(seconds=cooldown_seconds)
+            ).isoformat()
+        else:
+            key["cooldown_until"] = None
+        key["last_error_code"] = failure.reason
+        key["last_error_at"] = datetime.now(UTC).isoformat()
+        await self._persist_key_pool(db, config, keys_pool)
+        return failure.state
+
     async def generate(self, db: AsyncSession, req: LLMGenerateRequest) -> LLMGenerateResponse:
         """Execute chat completion with Key Pool rotation, Circuit Breaker, Dynamic Fallback and Quota logging."""
         # 1. Quota Pre-check
-        quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
+        estimated_tokens = self._estimate_request_tokens(req)
+        quota = await self._call_check_quota_available(
+            db, req.tenant_id, estimated_tokens=estimated_tokens
+        )
 
         # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
         all_providers = await self._call_get_active_providers(db, only_active=True)
@@ -194,12 +321,11 @@ class InferenceService:
 
             providers = sorted(providers, key=_match_score, reverse=True)
 
-        last_error: Exception | None = None
-
         # 3. Traverse Providers with Circuit Breaker and Key Pool Rotation
         for idx, p in enumerate(providers):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
+            provider_error: Exception | None = None
 
             if not cb.can_execute():
                 logger.warning("Circuit Breaker OPEN for [%s] — skipping to next fallback", p_name)
@@ -217,16 +343,30 @@ class InferenceService:
             elif p["id"] in _DEFAULT_PROVIDER_KEYS:
                 keys_pool = _DEFAULT_PROVIDER_KEYS[p["id"]]
 
-            _auto_recover_cooldown(keys_pool)
-            available_keys = [
-                k for k in keys_pool if k.get("is_active", True) and k.get("status") == "active"
-            ]
-            available_keys.sort(key=lambda x: (x.get("priority", 1), x.get("usage_tokens", 0)))
+            relational_managed = False
+            tried_relational_keys: set[str] = set()
+            available_keys: list[dict[str, Any]] = []
+            if not _is_local_provider(p.get("provider_type", "")):
+                acquired = await provider_key_rotation_service.acquire(
+                    db, p["id"], estimated_tokens=estimated_tokens
+                )
+                relational_managed = acquired.managed
+                if acquired.lease is not None:
+                    available_keys.append(self._lease_to_key_entry(acquired.lease))
 
-            # If no keys in pool, fallback to default p["api_key"]
-            if not available_keys and p.get("api_key"):
-                available_keys = [{"id": "default", "name": "Default", "api_key": p["api_key"]}]
-            elif not available_keys:
+            if not relational_managed:
+                available_keys, key_state_changed = self._prepare_available_keys(
+                    keys_pool, estimated_tokens
+                )
+                if key_state_changed:
+                    await self._persist_key_pool(db, cfg_obj, keys_pool)
+
+                # Compatibility path until every deployment has run the migration.
+                if not keys_pool and p.get("api_key"):
+                    available_keys = [
+                        {"id": "default", "name": "Default", "api_key": p["api_key"]}
+                    ]
+            if not available_keys:
                 if not _is_local_provider(p.get("provider_type", "")):
                     logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
                     continue
@@ -237,6 +377,9 @@ class InferenceService:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
                 if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.release(db, lease)
                     logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
                     continue
                 p_models = p.get("models") or []
@@ -268,6 +411,9 @@ class InferenceService:
                     if chat_candidates:
                         chosen_model = chat_candidates[0]
                     else:
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey):
+                            await provider_key_rotation_service.release(db, lease)
                         logger.warning(
                             "Provider '%s' has only non-chat model '%s', skipping provider",
                             p["name"],
@@ -306,11 +452,19 @@ class InferenceService:
                         else:
                             raise
 
-                    # Update token usage on active key
-                    active_key_entry["usage_tokens"] = active_key_entry.get("usage_tokens", 0) + resp.total_tokens
-                    active_key_entry["last_used_at"] = datetime.now(UTC).isoformat()
-                    if cfg_obj:
-                        await db.commit()
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.complete_success(
+                            db, lease, total_tokens=resp.total_tokens
+                        )
+                    else:
+                        await self._record_key_success(
+                            db,
+                            cfg_obj,
+                            keys_pool,
+                            active_key_entry,
+                            resp.total_tokens,
+                        )
 
                     # Record success for circuit breaker
                     cb.record_success()
@@ -358,38 +512,58 @@ class InferenceService:
                     )
 
                 except Exception as exc:
-                    err_msg = str(exc).lower()
-                    if "429" in err_msg or "rate limit" in err_msg or "quota" in err_msg:
-                        # Cooldown this specific key and rotate to next key in pool
-                        active_key_entry["status"] = "rate_limited"
-                        active_key_entry["cooldown_until"] = (
-                            datetime.now(UTC) + timedelta(seconds=60)
-                        ).isoformat()
+                    provider_error = exc
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        failure = await provider_key_rotation_service.complete_failure(
+                            db, lease, exc
+                        )
+                        key_state = failure.state
+                        tried_relational_keys.add(lease.id)
+                        acquired = await provider_key_rotation_service.acquire(
+                            db,
+                            p["id"],
+                            estimated_tokens=estimated_tokens,
+                            excluded_key_ids=tried_relational_keys,
+                        )
+                        if acquired.lease is not None:
+                            available_keys.append(
+                                self._lease_to_key_entry(acquired.lease)
+                            )
+                    else:
+                        key_state = await self._record_key_failure(
+                            db, cfg_obj, keys_pool, active_key_entry, exc
+                        )
+                    if key_state is not None:
                         logger.warning(
-                            "Key [%s] for provider [%s] hit Rate Limit 429. Rotating to next key...",
+                            "Key [%s] for provider [%s] changed to [%s]. Rotating to next key...",
                             active_key_entry.get("name"),
                             p_name,
+                            key_state,
                         )
-                        if cfg_obj:
-                            await db.commit()
                         continue
-                    else:
-                        cb.record_failure(exc)
-                        last_error = exc
-                        logger.warning(
-                            "Provider [%s] failed with %s: %s. Initiating fallback...",
-                            p_name,
-                            type(exc).__name__,
-                            exc,
-                        )
-                        break
+                    logger.warning(
+                        "Key [%s] for provider [%s] failed with %s. Rotating to next key in pool...",
+                        active_key_entry.get("name"),
+                        p_name,
+                        describe_provider_failure(exc),
+                    )
+                    continue
+
+            if provider_error:
+                cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
+                logger.warning(
+                    "All available keys for provider [%s] failed. Initiating fallback...",
+                    p_name,
+                )
 
         # 4. If all providers exhausted
         raise AppException(
             status_code=503,
             title="Dịch vụ AI đang gián đoạn",
             detail=(
-                f"Tất cả các nhà cung cấp mô hình (OpenAI, Gemini, Local vLLM) và các khóa API đều không phản hồi: {last_error}"
+                "Tất cả nhà cung cấp và khóa API khả dụng đều không phản hồi. "
+                "Vui lòng kiểm tra trạng thái ModelOps hoặc thử lại sau."
             ),
             code="ALL_PROVIDERS_UNAVAILABLE",
         )
@@ -399,7 +573,10 @@ class InferenceService:
     ) -> AsyncIterator[str]:
         """Stream chat tokens with Key Pool rotation, Preferred Model priority, Quota tracking and Dynamic Fallback."""
         # 1. Quota Pre-check
-        quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
+        estimated_tokens = self._estimate_request_tokens(req)
+        quota = await self._call_check_quota_available(
+            db, req.tenant_id, estimated_tokens=estimated_tokens
+        )
 
         # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
         all_providers = await self._call_get_active_providers(db, only_active=True)
@@ -442,6 +619,7 @@ class InferenceService:
         for idx, p in enumerate(providers):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
+            provider_error: Exception | None = None
             if not cb.can_execute():
                 continue
 
@@ -456,14 +634,28 @@ class InferenceService:
             elif p["id"] in _DEFAULT_PROVIDER_KEYS:
                 keys_pool = _DEFAULT_PROVIDER_KEYS[p["id"]]
 
-            _auto_recover_cooldown(keys_pool)
-            available_keys = [
-                k for k in keys_pool if k.get("is_active", True) and k.get("status") == "active"
-            ]
-            available_keys.sort(key=lambda x: (x.get("priority", 1), x.get("usage_tokens", 0)))
-            if not available_keys and p.get("api_key"):
-                available_keys = [{"id": "default", "name": "Default", "api_key": p["api_key"]}]
-            elif not available_keys:
+            relational_managed = False
+            tried_relational_keys: set[str] = set()
+            available_keys: list[dict[str, Any]] = []
+            if not _is_local_provider(p.get("provider_type", "")):
+                acquired = await provider_key_rotation_service.acquire(
+                    db, p["id"], estimated_tokens=estimated_tokens
+                )
+                relational_managed = acquired.managed
+                if acquired.lease is not None:
+                    available_keys.append(self._lease_to_key_entry(acquired.lease))
+
+            if not relational_managed:
+                available_keys, key_state_changed = self._prepare_available_keys(
+                    keys_pool, estimated_tokens
+                )
+                if key_state_changed:
+                    await self._persist_key_pool(db, cfg_obj, keys_pool)
+                if not keys_pool and p.get("api_key"):
+                    available_keys = [
+                        {"id": "default", "name": "Default", "api_key": p["api_key"]}
+                    ]
+            if not available_keys:
                 if not _is_local_provider(p.get("provider_type", "")):
                     logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
                     continue
@@ -473,6 +665,9 @@ class InferenceService:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
                 if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.release(db, lease)
                     logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
                     continue
                 p_models = p.get("models") or []
@@ -504,6 +699,9 @@ class InferenceService:
                     if chat_candidates:
                         chosen_model = chat_candidates[0]
                     else:
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey):
+                            await provider_key_rotation_service.release(db, lease)
                         logger.warning(
                             "Provider '%s' has only non-chat model '%s', skipping provider",
                             p["name"],
@@ -564,12 +762,19 @@ class InferenceService:
                         completion_tokens=completion_tokens,
                     )
 
-                    active_key_entry["usage_tokens"] = (
-                        active_key_entry.get("usage_tokens", 0) + total_tokens
-                    )
-                    active_key_entry["last_used_at"] = datetime.now(UTC).isoformat()
-                    if cfg_obj:
-                        await db.commit()
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.complete_success(
+                            db, lease, total_tokens=total_tokens
+                        )
+                    else:
+                        await self._record_key_success(
+                            db,
+                            cfg_obj,
+                            keys_pool,
+                            active_key_entry,
+                            total_tokens,
+                        )
 
                     cb.record_success()
 
@@ -595,11 +800,48 @@ class InferenceService:
 
                     return
                 except Exception as ex:
-                    cb.record_failure(ex)
-                    logger.warning("Stream failed for provider [%s]: %s", p_name, ex)
+                    provider_error = ex
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        failure = await provider_key_rotation_service.complete_failure(
+                            db, lease, ex
+                        )
+                        key_state = failure.state
+                        tried_relational_keys.add(lease.id)
+                        if not yielded_any:
+                            acquired = await provider_key_rotation_service.acquire(
+                                db,
+                                p["id"],
+                                estimated_tokens=estimated_tokens,
+                                excluded_key_ids=tried_relational_keys,
+                            )
+                            if acquired.lease is not None:
+                                available_keys.append(
+                                    self._lease_to_key_entry(acquired.lease)
+                                )
+                    else:
+                        key_state = await self._record_key_failure(
+                            db, cfg_obj, keys_pool, active_key_entry, ex
+                        )
+                    logger.warning(
+                        "Stream failed for key [%s] of provider [%s]: %s",
+                        active_key_entry.get("name"),
+                        p_name,
+                        describe_provider_failure(ex),
+                    )
                     if yielded_any:
                         raise
+                    if key_state is not None:
+                        logger.warning(
+                            "Key [%s] for provider [%s] changed to [%s]. Rotating before first token...",
+                            active_key_entry.get("name"),
+                            p_name,
+                            key_state,
+                        )
                     continue
+
+            if provider_error:
+                cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
 
         raise AppException(
             status_code=503,

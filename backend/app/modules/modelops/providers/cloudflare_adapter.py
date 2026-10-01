@@ -107,17 +107,21 @@ class CloudflareAdapter(BaseLLMAdapter):
         completion_tokens = 0
 
         if "result" in data and isinstance(data["result"], dict):
-            # Cloudflare REST format: {"result": {"response": "..."}}
-            content = data["result"].get("response", "")
+            # Cloudflare REST format: {"result": {"response": "..."}} or {"result": {"response": {"text": "..."}}}
+            raw_resp = data["result"].get("response", "")
+            if isinstance(raw_resp, dict):
+                content = str(raw_resp.get("text") or raw_resp.get("content") or "")
+            else:
+                content = str(raw_resp or "")
         elif "choices" in data and isinstance(data["choices"], list):
             # OpenAI compatible format: {"choices": [{"message": {"content": "..."}}]}
-            content = data["choices"][0].get("message", {}).get("content", "")
+            content = str(data["choices"][0].get("message", {}).get("content", ""))
             if "usage" in data:
                 prompt_tokens = data["usage"].get("prompt_tokens", prompt_tokens)
                 completion_tokens = data["usage"].get("completion_tokens", 0)
 
         if not completion_tokens:
-            completion_tokens = len(content.split()) * 2
+            completion_tokens = len(content.split()) * 2 if content else 0
 
         elapsed = (time.perf_counter() - start_time) * 1000
 

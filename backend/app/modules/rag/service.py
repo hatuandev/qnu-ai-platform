@@ -339,6 +339,7 @@ class RagService:
             facts_used=facts_used_payload,
             suggested_questions=suggested_questions,
             latency_ms=exec_ms,
+            contexts=[c.content for c in candidates],
         )
 
         # 9. Save to Semantic Cache (Only cache valid answered queries with citations)

@@ -7,36 +7,44 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-01 08:45 (UTC+7)
-- **Phiên số**: #237 (Chuyển Đổi 100% Sang ModelOps DB, Xóa Bỏ Hoàn Toàn API Key Trong .env, Triệt Tiêu Hardcode Adapter Mocks & Tra Cứu Fact Layer Hình Thái Học)
-- **Phiên số trước**: #236, #235, #234, #233, #232
-- **Mục tiêu đã hoàn thành (phiên #237)**:
-  - 1. **Xóa Bỏ Hoàn Toàn API Key LLM Khỏi `backend/.env` (Database-First ModelOps)**:
-       * Xóa sạch `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY` khỏi `.env`. Cập nhật `DEFAULT_LLM_MODEL=gemini-2.5-flash`.
-       * Toàn bộ credentials, key pool, và quota được quản lý 100% qua ModelOps DB (`/models`) lưu trữ trong PostgreSQL 16.
-  - 2. **Triệt Tiêu Mock Giả Trong Production Adapters & Khắc Phục Nuốt Lỗi (Fail-Loud Policy)**:
-       * Loại bỏ 100% pseudo-RAG mock, regex text slicing và tin nhắn từ chối hotline cứng trong `OpenAIAdapter`, `GeminiAdapter`, `MistralAdapter`.
-       * Khi thiếu API key ở môi trường thực tế, adapter ném ngay `AppException` để kích hoạt Circuit Breaker và chuyển Fallback sang provider kế tiếp có khóa.
-  - 3. **Nâng Cấp `InferenceService` (Cascading & Credential Prioritization)**:
-       * Áp dụng trên cả `generate()` và `generate_stream()`: Lọc `only_active=True`, thưởng `+200` điểm cho provider có khóa hợp lệ trong CSDL, trừ `-500` điểm cho cloud provider thiếu khóa.
-       * Tự động bỏ qua các cloud provider chưa cấu hình khóa, giúp hệ thống lập tức gọi Google Gemini đã được người dùng cấu hình trên UI mà không bị kẹt ở OpenAI.
-  - 4. **Bóc Tách & Tra Cứu Fact Layer Theo Bất Biến Hình Thái Học (Morphological Invariant)**:
-       * Xóa bỏ 100% mảng từ khóa gán cứng `common_attr_words` trong `facts.py` (tuân thủ Tôn chỉ 7 AGENTS.md).
-       * Từ đơn unigrams ("giải", "thi", "điểm", "ba") chỉ được phép khớp vào `attribute_name`, không bao giờ khớp vào `entity_name`.
-       * Chỉ các cụm từ ghép danh từ ($\ge 2$ từ) hoặc mã định danh chuyên biệt (`\d{4,}`) mới được phép khớp vào `entity_name`.
-       * Đối với câu hỏi chính sách chung (như xét tuyển HSG), loại trừ toàn bộ fact ngành lẻ (như "Toán giải tích"), nhường chỗ cho trích xuất RAG chính xác từ văn bản.
-  - 5. **Chuyển Tiếp `preferred_provider_id` Từ Trợ Lý Vào DAG Node**:
-       * Cập nhật `rag_answer_node.py` trích xuất `preferred_provider_id` từ `profile.model_policy` và chuyển vào `AskRequest`.
-  - 6. **Bổ Sung Quy Chuẩn Vào `AGENTS.md`**:
-       * Mục 1.9: *Database-First ModelOps & Zero-Env LLM Credentials*.
-       * Mục 3.6: *Provider Credential Cascading & Fail-Fast Resolution*.
-       * Mục 3.7: *Morphological Fact-Layer Retrieval*.
-  - 7. **Tuân Thủ Tuyệt Đối Ràng Buộc Không Tự Ý Push Code**:
-       * Không chạy `git push`, chỉ chuẩn bị commit cục bộ để Người dùng tự chủ động push.
+- **Thời gian cập nhật**: 2026-10-02 (UTC+7)
+- **Phiên số**: #240 (ModelOps Giai đoạn 2 — Relational Key Pool, Atomic Lease & Provider Rotation dùng chung)
+- **Mục tiêu đã hoàn thành (phiên #240)**:
+  - 1. **Tách Key Pool khỏi JSONB**: thêm model `ProviderApiKey` và migration `20261002_provider_api_keys`, backfill khóa hiện hữu từ `model_provider_configs.extra_config.api_keys`, đồng thời tạo khóa primary cho provider chỉ có `api_key_encrypted`.
+  - 2. **Lease nguyên tử đa worker**: thêm `ProviderKeyRotationService` dùng `FOR UPDATE SKIP LOCKED`, `lease_token`, `lease_until`, cooldown, quota, trạng thái `rate_limited/exhausted/invalid` và cập nhật usage sau khi gọi provider.
+  - 3. **Luồng dùng chung**: chat `generate/generate_stream`, embedding, reranker và OCR cloud đều dùng nguồn lease chung; khi key lỗi hoặc hết hạn ngạch sẽ xoay sang key tiếp theo, sau đó mới fallback provider.
+  - 4. **Tương thích chuyển tiếp**: nếu migration chưa chạy hoặc bảng mới chưa có dữ liệu, runtime và API Provider tiếp tục đọc JSONB cũ; CRUD khóa ghi đồng thời relational table và JSONB trong thời gian chuyển đổi.
+  - 5. **Bảo mật**: runtime chỉ giải mã khóa trong vùng gọi adapter; API quản trị chỉ trả masked key, không bổ sung đường reveal/export plaintext.
+- **Kiểm thử phiên #240**:
+  - Nhóm trọng điểm: **46/46 passed** (ModelOps rotation, relational lease, resolver, OCR, RAG).
+  - Toàn bộ backend: **492 passed, 5 failed** ở các test admissions/fact/artifact đã tồn tại trước phiên; test Docling native trên Windows còn cảnh báo access violation.
+  - Ruff trên toàn bộ file thay đổi: **0 lỗi**; `alembic heads` nhận `20261002_provider_api_keys`.
+- **Phiên số trước**: #238, #237, #236, #235, #234
+- **Mục tiêu đã hoàn thành (phiên #239)**:
+  - 1. **Triển Khai Thành Công Kế Hoạch Hybrid DAG Nodes (`ke_hoach_nang_cap_hybrid_nodes_dag_workflow.md`)**:
+       * Tiếp nhận phê duyệt của người dùng, thực thi 100% các giai đoạn đề ra.
+  - 2. **Nâng Cấp & Chuẩn Hóa `condition_route_node.py` (Hybrid Intent Router)**:
+       * Xóa bỏ hoàn toàn mảng từ khóa cứng 88 từ `_INQUIRY_KEYWORDS` vi phạm Tôn chỉ 7 `AGENTS.md`.
+       * Bổ sung bất biến cú pháp tiếng Việt 0ms: phát hiện dấu `?`, đại từ/hạt nhân nghi vấn ngữ pháp, bóc tách hình thái học hành chính `_ORGANIZATIONAL_ENTITY_PATTERN` nhận diện tự động mọi phòng ban.
+       * Tích hợp Micro-LLM Intent Classifier: Phân loại ý định vào Rule ID mục tiêu khi quy tắc tất định không khớp (timeout 1.5s, safe fallback).
+       * Sửa lỗi vỡ biểu thức Regex khi `pattern` chứa ký tự điều khiển (`\b`, `(?:...|...)`), chuẩn hóa việc trích xuất token lời chào.
+  - 3. **Nâng Cấp `citation_guard_node.py` & `rag_answer_node.py`**:
+       * Thuật toán toán học 0ms đối soát số liệu `_detect_number_hallucinations`: hỗ trợ cả số thập phân và tiền tệ có nhiều dấu phân cách hàng nghìn (`15.000.000 VNĐ` vs `15000000`).
+       * Lưu trữ `guidance_context` và `fact_markdown` từ `rag_answer_node.py` cho `CitationGuardNode` đối soát bảng sự thật.
+       * Xử lý an toàn `model_policy` NoneType trong `rag_answer_node.py` tránh `AttributeError`.
+  - 4. **Kiểm Thử Hồi Quy & Đóng Gói Bundle 100% Passed**:
+       * Backend: Pytest 76/76 tests passed (100%), Ruff check `app` và `tests` 0 lỗi.
+       * Frontend (`frontend`): `tsc -b && vite build` $\rightarrow$ 100% thành công (0 lỗi, 8.57s).
+       * Frontend2 (`frontend2`): `vite build && tsc --noEmit` $\rightarrow$ 100% thành công (0 lỗi, 9.66s).
+  - 5. **Tuân Thủ Tuyệt Đối Ràng Buộc Không Tự Ý Push Code**:
+       * Không chạy `git push`, giữ nguyên commit cục bộ để Người dùng tự chủ động push.
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
-- **Trạng thái kiểm thử**:
-  - Backend: Pytest ModelOps `test_modelops.py` 22/22 passed (100%), Pytest RAG `test_suggestion_perspective_and_multiturn.py` 17/17 passed (100%).
-  - Môi trường: `.env` sạch 100% không còn API key LLM.
+- **Trạng thái kiểm thử nền hiện tại**:
+  - Backend trọng điểm phiên #240: 46/46 passed; full suite 492 passed và 5 lỗi tồn tại ở admissions/fact/artifact.
+  - Ruff trên các module ModelOps/OCR/RAG và migration mới: 0 lỗi.
+  - Frontend & Frontend2: Build production bundle thành công 100% (0 lỗi).
+- **Tóm tắt phiên trước (#238)**:
+  - Chuẩn hóa thuật toán tổng quát sub-header invariant trong `table_reconstructor.py`, tập trung hóa từ điển đánh giá Ragas TM-08 sang `configs/stopwords_vi.txt`.
   - 3. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
        * Bổ sung biến môi trường `OPENROUTER_API_KEY` và `OPENROUTER_BASE_URL` ("https://openrouter.ai/api/v1") trong `app.core.config`.
        * Tự động gắn kèm headers `HTTP-Referer: https://qnu.edu.vn` và `X-Title: QNU AI Platform` theo chuẩn OpenRouter API trong `OpenAIAdapter`.

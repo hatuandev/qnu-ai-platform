@@ -137,7 +137,7 @@ async def create_provider(
     summary="Xuất toàn bộ cấu hình tất cả các nhà cung cấp và key pool ra tệp JSON",
 )
 async def export_all_providers_endpoint(
-    include_secrets: bool = True,
+    include_secrets: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await modelops_service.export_all_providers(db, include_secrets=include_secrets)
@@ -174,7 +174,7 @@ async def update_provider(
 )
 async def export_single_provider_endpoint(
     provider_id: str,
-    include_secrets: bool = True,
+    include_secrets: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     return await modelops_service.export_provider(db, provider_id, include_secrets=include_secrets)
@@ -321,14 +321,14 @@ async def simulate_provider_key_rotation(
 
 @router.post(
     "/providers/{provider_id}/keys/{key_id}/reveal",
-    summary="Lộ ra giá trị thật của một khóa API (sau khi giải mã) để sao chép vào clipboard",
+    summary="Từ chối xuất giá trị rõ của khóa API",
 )
 async def reveal_provider_key(
     provider_id: str,
     key_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Trả về giá trị plaintext của API key sau khi giải mã — chỉ dành cho Admin UI copy."""
+    """API keys are write-only and cannot be returned as plaintext."""
     return await modelops_service.reveal_provider_key(db, provider_id, key_id)
 
 

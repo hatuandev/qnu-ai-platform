@@ -7,7 +7,12 @@ export interface ProviderApiKey {
   account_id?: string | null;
   priority: number;
   is_active: boolean;
-  status: "active" | "rate_limited" | "exhausted" | "inactive";
+  status:
+    | "active"
+    | "rate_limited"
+    | "exhausted"
+    | "invalid"
+    | "inactive";
   quota_limit?: number | null;
   usage_tokens: number;
   cooldown_until?: string | null;

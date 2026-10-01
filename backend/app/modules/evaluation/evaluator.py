@@ -15,16 +15,18 @@ from typing import Any
 
 import structlog
 
+from app.core.stopwords import get_vietnamese_stopwords
+
 logger = structlog.get_logger(__name__)
 
-VIETNAMESE_QUESTION_STOPWORDS = {
-    "là", "gì", "như", "thế", "nào", "ở", "đâu", "bao", "nhiêu", "sao", "mấy",
-    "ai", "của", "và", "các", "những", "được", "cho", "với", "trong", "khi",
-    "thì", "có", "không", "đến", "từ", "theo", "về", "ra", "đối", "sang", "mỗi",
-    "tại", "trường", "đh", "đại", "học", "áp", "dụng", "hãy", "biết", "thông",
-    "thường", "chuẩn", "này", "đó", "hay", "cần", "phải", "thực", "hiện",
-    "quy", "định", "cụ", "thể", "gồm", "nêu", "rõ", "xin", "hỏi",
-}
+
+def get_evaluation_stopwords() -> frozenset[str]:
+    """Retrieve Vietnamese question stopwords dynamically from the centralized dictionary."""
+    return get_vietnamese_stopwords()
+
+
+# Dynamic accessor alias for backward compatibility
+VIETNAMESE_QUESTION_STOPWORDS: frozenset[str] = get_vietnamese_stopwords()
 
 REFUSAL_PHRASES = [
     "0256.3846.156",
@@ -143,8 +145,9 @@ class HeuristicTM08Evaluator(BaseTM08Evaluator):
             # The assistant declined an answerable benchmark question
             return 0.20
 
+        question_stopwords = get_evaluation_stopwords()
         all_query_tokens = set(re.findall(r"\b\w{2,}\b", query.lower()))
-        content_tokens = all_query_tokens - VIETNAMESE_QUESTION_STOPWORDS
+        content_tokens = all_query_tokens - question_stopwords
         query_tokens = content_tokens if content_tokens else all_query_tokens
         answer_tokens = set(re.findall(r"\b\w{2,}\b", answer.lower()))
 
@@ -160,11 +163,11 @@ class HeuristicTM08Evaluator(BaseTM08Evaluator):
             matched = sum(
                 1
                 for kw in keywords
-                if any(token in answer_lower for token in kw.lower().split() if token not in VIETNAMESE_QUESTION_STOPWORDS)
+                if any(token in answer_lower for token in kw.lower().split() if token not in question_stopwords)
             )
             gt_coverage = matched / max(len(keywords), 1)
         elif ground_truth:
-            gt_tokens = set(re.findall(r"\b\w{2,}\b", ground_truth.lower())) - VIETNAMESE_QUESTION_STOPWORDS
+            gt_tokens = set(re.findall(r"\b\w{2,}\b", ground_truth.lower())) - question_stopwords
             if gt_tokens:
                 gt_coverage = len(gt_tokens.intersection(answer_tokens)) / len(gt_tokens)
 

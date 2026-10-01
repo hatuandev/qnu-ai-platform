@@ -67,25 +67,25 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                 details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
             )
 
+        model_policy = getattr(profile, "model_policy", None) if profile else None
         primary_model = (
-            profile.model_policy.primary_model
-            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
-            else None
+            model_policy.primary_model
+            if model_policy
+            else (config.get("preferred_model_name") or config.get("model"))
         )
         fallback_model = (
-            profile.model_policy.fallback_model
-            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
-            else None
+            model_policy.fallback_model
+            if model_policy
+            else (config.get("fallback_model_name") or config.get("fallback_model"))
         )
         thinking_budget = (
-            getattr(profile.model_policy, "thinking_budget", 0)
-            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            getattr(model_policy, "thinking_budget", 0)
+            if model_policy
             else config.get("thinking_budget", 0)
         )
-
         preferred_provider_id = (
-            getattr(profile.model_policy, "preferred_provider_id", None)
-            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            getattr(model_policy, "preferred_provider_id", None)
+            if model_policy
             else config.get("preferred_provider_id")
         )
 
@@ -96,13 +96,13 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             conversation_id=context.conversation_id,
             tenant_id=context.tenant_id or "tenant_qnu",
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
-            temperature=profile.model_policy.temperature if profile else config.get("temperature", 0.2),
-            max_tokens=min(profile.model_policy.max_tokens, 8192) if profile else config.get("max_tokens", 2000),
+            temperature=model_policy.temperature if model_policy else config.get("temperature", 0.2),
+            max_tokens=min(model_policy.max_tokens, 8192) if model_policy else config.get("max_tokens", 2000),
             thinking_budget=thinking_budget,
             preferred_model_name=primary_model,
             preferred_provider_id=preferred_provider_id,
             fallback_model=fallback_model,
-            history=context.inputs.get("conversation_history"),
+            history=context.inputs.get("conversation_history") or context.inputs.get("history"),
         )
 
         # Universal Agentic Consulting & Artifact Generation
@@ -122,6 +122,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             if guidance:
                 base_prompt = ask_req.system_prompt or ""
                 ask_req.system_prompt = f"{base_prompt}\n\n[DỮ LIỆU ĐỐI SOÁT & TƯ VẤN CHUYÊN BIỆT TỪ FACT LAYER]:\n{guidance}"
+                context.node_data["guidance_context"] = guidance
 
         artifacts = dispatch_res.get("artifacts", [])
         if artifacts:
@@ -134,11 +135,33 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             citations = [c.model_dump() for c in rag_res.citations]
             status = rag_res.status
             suggested_questions = getattr(rag_res, "suggested_questions", [])
+            retrieved_contexts = getattr(rag_res, "contexts", [])
+            context.node_data["contexts"] = retrieved_contexts
+            context.outputs["contexts"] = retrieved_contexts
+            facts_used = getattr(rag_res, "facts_used", [])
+            if facts_used:
+                context.node_data["facts_used"] = facts_used
+                fact_lines: list[str] = [
+                    "| Thực thể / Ngành | Thuộc tính | Giá trị dữ liệu |",
+                    "| --- | --- | --- |",
+                ]
+                for item in facts_used:
+                    if isinstance(item, dict):
+                        ent = item.get("entity") or item.get("entity_name") or ""
+                        attr = item.get("attr") or item.get("attribute_name") or ""
+                        val = item.get("val") or item.get("attribute_value") or ""
+                    else:
+                        ent = getattr(item, "entity_name", "")
+                        attr = getattr(item, "attribute_name", "")
+                        val = getattr(item, "attribute_value", "")
+                    fact_lines.append(f"| {ent} | {attr} | **{val}** |")
+                context.node_data["fact_markdown"] = "\n".join(fact_lines)
         else:
             answer_text = f"Dựa trên tài liệu chính thức của ĐH Quy Nhơn cho câu hỏi: '{query}'."
             citations = []
             status = "answered"
             suggested_questions = []
+            retrieved_contexts = []
 
         context.node_data["rag_answer"] = answer_text
         context.node_data["citations"] = citations
@@ -150,9 +173,11 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             status="completed",
             output={
                 "answer": answer_text,
+                "response": answer_text,
                 "citations": citations,
                 "status": status,
                 "suggested_questions": suggested_questions,
                 "artifacts": artifacts,
+                "contexts": retrieved_contexts,
             },
         )

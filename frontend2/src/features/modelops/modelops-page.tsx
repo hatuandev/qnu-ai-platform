@@ -313,6 +313,14 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
   const selectedProvider =
     providers.find((p) => p.id === selectedProviderId) || null;
 
+  const effectiveKeys = useMemo(() => {
+    if (providerKeys && providerKeys.length > 0) return providerKeys;
+    if (selectedProvider?.api_keys && selectedProvider.api_keys.length > 0) {
+      return selectedProvider.api_keys;
+    }
+    return [];
+  }, [providerKeys, selectedProvider]);
+
   const unavailableModelsCount = useMemo(() => {
     if (!selectedProvider) return 0;
     return (selectedProvider.models || []).filter(
@@ -687,7 +695,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
   const handleExportAll = async () => {
     try {
       setIsExportingAll(true);
-      const data = await apiClient.exportAllProviders(true);
+      const data = await apiClient.exportAllProviders(false);
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       downloadJsonFile(data, `qnu-ai-providers-all-${dateStr}.json`);
     } catch (err: unknown) {
@@ -706,7 +714,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
   ) => {
     try {
       setIsExportingSingle(true);
-      const data = await apiClient.exportProvider(providerId, true);
+      const data = await apiClient.exportProvider(providerId, false);
       const safeName = providerName.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
       downloadJsonFile(data, `provider-${providerType}-${safeName}.json`);
     } catch (err: unknown) {
@@ -803,8 +811,8 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         {/* Key Pool & Specs Section */}
         <KeyPoolSection
           selectedProvider={selectedProvider}
-          providerKeys={providerKeys}
-          loadingKeys={loadingKeys}
+          providerKeys={effectiveKeys}
+          loadingKeys={loadingKeys && effectiveKeys.length === 0}
           simulatingRotation={simulatingRotation}
           rotationResult={rotationResult}
           testingKeyId={testingKeyId}

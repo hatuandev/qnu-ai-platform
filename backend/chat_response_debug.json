@@ -1,70 +1,104 @@
 {
   "assistant_code": "admissions",
-  "assistant_name": "Trợ lý ảo Tư vấn Tuyển sinh",
-  "answer": "Chào bạn! Trường Đại học Quy Nhơn (QNU.AI) dự kiến tổng chỉ tiêu tuyển sinh năm 2026 là **4.800 chỉ tiêu**. \n\nTrường áp dụng các phương thức xét tuyển sau đây:\n\n- **Phương thức 1 (PT1 - mã 100):** Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026.\n- **Phương thức 2 (PT2 - mã 200):** Xét tuyển theo kết quả học tập 3 năm THPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo (lưu ý: các ngành đào tạo giáo viên không xét tuyển phương thức này).\n- **Phương thức 3 (PT3 - mã 402A):** Xét kết quả kỳ thi đánh giá năng lực (ĐGNL) của ĐHQG TP.HCM (lưu ý: các ngành đào tạo giáo viên không xét tuyển phương thức này).\n- **Phương thức 4 (PT4 - mã 402B):** Xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.\n- **Phương thức 5 (PT5 - mã 405):** Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026 kết hợp với điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy Nhơn.\n- **Xét tuyển thẳng:** Theo Quy chế tuyển sinh của Bộ Giáo dục và Đào tạo.",
+  "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+  "answer": "Chào bạn, mình sẽ cung cấp thông tin chi tiết về chỉ tiêu và các phương thức xét tuyển dự kiến của Trường Đại học Quy Nhơn (QNU) năm 2026 nhé.\n\n**1. Tổng chỉ tiêu dự kiến năm 2026:**\n\nTrường Đại học Quy Nhơn dự kiến tuyển sinh **4800 chỉ tiêu** cho năm 2026.\n\n**2. Các phương thức xét tuyển dự kiến năm 2026:**\n\nTrường sẽ áp dụng 5 phương thức xét tuyển chính và xét tuyển thẳng theo quy chế của Bộ Giáo dục và Đào tạo, cụ thể như sau:\n\n| Mã phương thức | Tên phương thức xét tuyển | Ghi chú |\n| :---: | :--- | :--- |\n| 100 (PT1) | Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026 | |\n| 200 (PT2) | Xét tuyển theo kết quả học tập 3 năm THPT (học bạ) | Các ngành đào tạo giáo viên không xét tuyển phương thức này. |\n| 402A (PT3) | Xét kết quả kỳ thi đánh giá năng lực (ĐGNL) của ĐHQG TP.HCM | Các ngành đào tạo giáo viên không xét tuyển phương thức này. |\n| 402B (PT4) | Xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội | |\n| 405 (PT5) | Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026 kết hợp điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy Nhơn | Áp dụng cho ngành Giáo dục Mầm non và Giáo dục Thể chất. |\n| Xét tuyển thẳng | Theo Quy chế tuyển sinh của Bộ Giáo dục và Đào tạo | |\n\n**Lưu ý thêm:**\n\n*   Đối với các ngành Giáo dục Mầm non và Giáo dục Thể chất, thí sinh cần tham gia thi năng khiếu do Trường Đại học Quy Nhơn tổ chức vào các ngày 19, 20, 21/6/2026.\n*   Trường có quy định sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn Tiếng Anh trong tổ hợp môn xét tuyển theo Phương thức 1 và Phương thức 2, với bảng quy đổi cụ thể.",
   "status": "answered",
   "citations": [
     {
-      "source_id": "doc_724f5fa33e3b",
-      "title": "Tài liệu doc_724f",
+      "source_id": "doc_1772dd5bcbd8",
+      "title": "Tài liệu tuyển sinh (doc_1772)",
       "section": null,
-      "page_number": null,
-      "quote": "**2. Phương thức tuyển sinh:**\n\n+ Phương thức 1 (PT1 - mã 100): Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026.\n+ Phương thức 2 (PT2 - mã 200): Xét tuyển theo kết quả học tập 3 năm THPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào tạo giáo viên không xét tuyển phương thức 2.\n+ Phương thức 3 (PT3 - mã 402A): Xét kết quả kỳ thi đánh giá năng lực (ĐGNL) của ĐHQG TP.HCM. Các ngành đào tạo giáo viên không xét tuyển phương thức 3).\n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.\n+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp THPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy Nhơn.\nNgoài ra, thực hiện Xét tuyển thẳng theo Quy chế tuyển sinh của Bộ Giáo dục và Đào tạo.\n\n**3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa các tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp THPT năm 2026.**\n\n**4. Các ngành, tổ hợp môn xét tuyển:**\n\nTổng chỉ tiêu dự kiến: 4800 chỉ tiêu.",
-      "source_pages": null,
+      "page_number": 2,
+      "quote": "+ Phương thức 1 (PT1 - mã 100): Xét tuyển theo kết quả thi tốt nghiệp THPT\nnăm 2026.\n\n+ Phương thức 2 (PT2 - mã 200): Xét tuyển theo kết quả học tập 3 năm THPT\n(học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào tạo giáo\nviên không xét tuyển phương thức 2.\n\n+ Phương thức 3 (PT3 - mã 402A): Xét kết quả kỳ thi đánh giá năng lực\n(ĐGNL) của ĐHQG TP.HCM. Các ngành đào tạo giáo viên không xét tuyển\nphương thức 3).\n\n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.\n\n+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp THPT\nnăm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học Quy\nNhơn.\n\nNgoài ra, thực hiện Xét tuyển thẳng theo Quy chế tuyển sinh của Bộ Giáo\ndục và Đào tạo.\n\n3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa các\ntổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp THPT\nnăm 2026.\n\n4. Các ngành, tổ hợp môn xét tuyển:\n\nTổng chỉ tiêu dự kiến: 4800 chỉ tiêu.\n\n| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh dự kiến | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 |  | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |\n| 2 | 7140201 | Giáo dục Mầm non | 5 |  | (Văn, Toán, NK GDMN) |\n| 3 | 7140202 | Giáo dục Tiểu học | 1,4 |  | (Văn,...",
+      "source_pages": [
+        2
+      ],
       "entity_key": null
     },
     {
-      "source_id": "doc_724f5fa33e3b",
-      "title": "Tài liệu doc_724f",
+      "source_id": "doc_1772dd5bcbd8",
+      "title": "Tài liệu tuyển sinh (doc_1772)",
       "section": null,
-      "page_number": null,
-      "quote": "Tổng chỉ tiêu dự kiến: 4800 chỉ tiêu.\n\n| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh dự kiến | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 |  | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |\n| 2 | 7140201 | Giáo dục Mầm non | 5 |  | (Văn, Toán, NK GDMN) |\n| 3 | 7140202 | Giáo dục Tiểu học | 1,4 |  | (Văn, Anh, Toán)<br>(Văn, Anh, Lý)<br>(Văn, Anh, Hóa)<br>(Văn, Anh, Sinh)<br>(Văn, Anh, Sử)<br>(Văn, Anh, Địa) |\n| 4 | 7140205 | Giáo dục Chính trị | 1,4 |  | (Văn, Toán, Giáo dục KT và PL)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Anh, Giáo dục KT và PL) |\n| 5 | 7140206 | Giáo dục Thể chất | 5 |  | (Toán, Sinh, NK TDTT)<br>(Toán, Văn, NK TDTT)<br>(Văn, Sinh, NK TDTT)<br>(Văn, Địa, NK TDTT)<br>(Toán, Lý, NK TDTT)<br>(Văn, Giáo dục KT và PL, NK TDTT) |\n| 6 | 7140209 | Sư phạm Toán học | 1,4 |  | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |\n| 7 | 7140210 | Sư phạm Tin học | 1,4 |  | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Văn, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Văn, Tin)<br>(Toán, Lý, Tin)<br>(Toán, Hóa, Tin)<br>(Toán, Anh, Tin) |\n| 8 | 7140211 | Sư phạm Vật lý | 1,4 |  | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Lý, Văn)<br>(Toán, Lý, Tin) |\n| 9 | 7140212 | Sư phạm Hóa học | 1,4 |...",
-      "source_pages": null,
+      "page_number": 9,
+      "quote": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét ưu\ntiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có cùng\nđiểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên đối với\ncác thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;\n\nb. Điểm cộng: xem chi thiết tại Mục 7;\n\nc. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn Tiếng\nAnh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và phương\nthức 2, được quy đổi như sau:\n\n| Điểm IELTS | Điểm quy đổi IELTS | Điểm VSTEP | Điểm quy đổi VSTEP |\n| :---: | :--- | :--- | :--- |\n| 5.0 | 8.0 | 4.0 | 8.0 |\n| 5.5 | 8.5 | 5.0 | 8.5 |\n| 6.0 | 9.0 | 6.0 | 9.0 |\n| 6.5 | 9.5 | 7.0 | 9.5 |\n| 7.0 trở lên | 10.0 | 8.0 trở lên | 10 |\n\nc. Ngưỡng đầu vào các ngành, các phương thức thực hiện theo các quy định\ntại Quy chế tuyển sinh đại học của Bộ Giáo dục và Đào tạo. Riêng đối với ngành\nGiáo dục Thể chất, thí sinh xét tuyển phải không bị dị tật cột sống, tay chân,\nmắt, phát âm và các dị tật khác; chiều cao tối thiểu là 1,65m, ngặng 45 kg đối\nvới nam và 1,55m, nặng 40 kg đối với nữ.\n\n6. Tổ chức tuyển sinh\n\nĐợt 1:\n\na) Thí sinh nộp hồ sơ xét tuyển thẳng, ưu tiên xét tuyển từ ngày 20/5/2026\nđến ngày 20/6/2026.\n\nb) Thi năng khiếu Giáo dục mầm non, Giáo dục thể chất: thi vào các ngày\n19, 20, 21/6/2026. Thí sinh đăng ký thi năng khiếu tại https://tsd.qnu.edu.vn từ\nngày 20/5/2026 đến 15/6/2026.\n\nc) Xét tuyển đợt 1:\nTất cả thí sinh, tất cả các phương thức phải đăng ký xét tu...",
+      "source_pages": [
+        9
+      ],
       "entity_key": null
     },
     {
-      "source_id": "doc_724f5fa33e3b",
-      "title": "Tài liệu doc_724f",
+      "source_id": "doc_5058d84571cf",
+      "title": "Tài liệu tuyển sinh (doc_5058)",
       "section": null,
-      "page_number": null,
-      "quote": "**5. Các thông tin cần thiết khác để thí sinh dự tuyển**\n\na. Điều kiện phụ sử dụng trong xét tuyển:\n\nTrường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét ưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên đối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;\n\nb. Điểm cộng: xem chi thiết tại Mục 7;\n\nc. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn Tiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và phương thức 2, được quy đổi như sau:\n\n| Điểm IELTS | Điểm quy đổi | Điểm VSTEP | Điểm quy đổi |\n| :---: | :--- | :--- | :--- |\n| 5.0 | 8.0 | 4.0 | 8.0 |\n| 5.5 | 8.5 | 5.0 | 8.5 |\n| 6.0 | 9.0 | 6.0 | 9.0 |\n| 6.5 | 9.5 | 7.0 | 9.5 |\n| 7.0 trở lên | 10.0 | 8.0 trở lên | 10 |\n\n.Thí sinh nộp chứng chỉ tại các điểm tiếp nhận để nhập lên cơ sở dữ liệu tuyển sinh của Bộ GD&ĐT.\n\nc. Ngưỡng đầu vào các ngành, các phương thức thực hiện theo các quy định tại Quy chế tuyển sinh đại học của Bộ Giáo dục và Đào tạo. Riêng đối với ngành Giáo dục Thể chất, thí sinh xét tuyển phải không bị dị tật cột sống, tay chân, mắt, phát âm và các dị tật khác; chiều cao tối thiểu là 1,65m, ngặng 45 kg đối với nam và 1,55m, nặng 40 kg đối với nữ.\n\n**6. Tổ chức tuyển sinh**\n\nĐợt 1:\n\na) Thí sinh nộp hồ sơ xét tuyển thẳng, ưu tiên xét tuyển từ ngày 20/5/2026 đến ngày 20/6/2026.\n\nb) Thi năng khiếu Giáo dục mầm non, Giáo dục thể chất: thi vào các ngày...",
-      "source_pages": null,
+      "page_number": 1,
+      "quote": "TRƯỜNG ĐẠI HỌC QUY NHƠN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\n\nĐộc lập - Tự do - Hạnh phúc\n\nHỘI ĐỒNG TUYỂN SINH\n\nSố: /TB-HĐTS\nGia Lai, ngày tháng năm 2026\n\nTHÔNG BÁO\nVề việc quy đổi tương đương điểm giữa các phương thức\n\ntuyển sinh đại học chính quy năm 2026\n\nCăn cứ Thông tư số 06/2026/TT-BGDĐT ngày 15 tháng 02 năm 2026 của Bộ trưởng\nBộ Giáo dục và Đào tạo ban hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học\nvà ngành Giáo dục Mầm non trình độ cao đẳng;\n\nCăn cứ Công văn số 4228/BGDĐT-GDĐH ngày 06 tháng 7 năm 2026 của Bộ Giáo\ndục và Đào tạo về việc đối sánh phổ điểm một số tổ hợp điểm thi trung học phổ thông năm\n2026 điểm học tập bậc trung học phổ thông;\nCăn cứ Thông tin tuyển sinh trình độ đại học năm 2026 theo Thông báo số 1906/TB-\nĐHQN ngày 31 tháng 5 năm 2026 của Trường Đại học Quy Nhơn.\n\nTrường Đại học Quy Nhơn thông báo việc quy đổi tương đương điểm giữa các phương\nthức tuyển sinh đại học chính quy năm 2026 như sau:\n\n1. Các phương thức xét tuyển\n- Xét tuyển dựa vào kết quả kỳ thi tốt nghiệp trung học phổ thông năm 2026 theo tổ\nhợp môn xét tuyển (THPT).\n\n- Xét tuyển dựa vào kết quả kỳ thi đánh giá năng lực của Đại học Quốc gia Thành phố\nHồ Chí Minh (ĐNL) và kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà\nNội (SPT).\n\n- Xét tuyển dựa vào kết quả học tập trung học phổ thông (HB), tính theo điểm trung\nbình các môn trong tổ hợp xét tuyển của cả năm lớp 10, 11 và 12.\n\n2. Khung quy đổi điểm giữa các phương thức\nBảng bách phân vị là bảng đối sánh các mức điể...",
+      "source_pages": [
+        1
+      ],
       "entity_key": null
     },
     {
-      "source_id": "doc_724f5fa33e3b",
-      "title": "Tài liệu doc_724f",
+      "source_id": "doc_1772dd5bcbd8",
+      "title": "Tài liệu tuyển sinh (doc_1772)",
       "section": null,
-      "page_number": null,
-      "quote": "> **BỘ GIÁO DỤC VÀ ĐÀO TẠO TRƯỜNG ĐẠI HỌC QUY NHƠN**\n\n> *Số: /TB-ĐHQN*\n\n> **CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM — Độc lập - Tự do - Hạnh phúc**\n\n---\n\n### THÔNG BÁO\n\n### THÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số 06/2026/TT/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\n\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số /QĐ-ĐHQN ngày của Hiệu trưởng Trường Đại học Quy Nhơn;\n\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm 2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ Giáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn tuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm 2026 (cập nhật) như sau:\n\n## I. THÔNG TIN CHUNG\n\n**1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn**\n\n**2. Mã cơ sở đào tạo trong tuyển sinh: DQN**\n\n**3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai**\n\n**4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn**\n\n**5. Số điện thoại liên hệ tuyển sinh: 1800.55.88.49**\n\n**6. Địa chỉ công khai quy chế tuyển sinh: https://tuyensinh.qnu.edu.vn**\n\n**7. Địa chỉ công khai các thông tin về hoạt động của cơ sở đào tạo (chương trình đào tạo; ngành đào tạo; đội ngũ giảng viên, cán bộ quản lý; cơ sở vật chất; quy mô đào tạo; tỷ lệ s...",
-      "source_pages": null,
+      "page_number": 1,
+      "quote": "BỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào\ntạo;\n\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số /QĐ-\nĐHQN ngày của Hiệu trưởng Trường Đại học Quy Nhơn;\n\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:\n\nI. THÔNG TIN CHUNG\n\n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn\n\n2. Mã cơ sở đào tạo trong tuyển sinh: DQN\n\n3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai\n\n4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn\n\n5. Số điện thoại liên hệ tuyển sinh: 1800.55.88.49\n\n6. Địa chỉ công khai quy chế tuyển sinh: https://tuyensinh.qnu.edu.vn\n\n7. Địa chỉ công khai các thông tin về hoạt động của cơ sở đào tạo (chương\ntrình đào tạo; ngành đào tạo; đội ngũ giảng viên, cán bộ quản lý; cơ sở vật chất;\nquy mô đào tạo; tỷ lệ sinh viên có việc làm; kế hoạch...",
+      "source_pages": [
+        1
+      ],
       "entity_key": null
     },
     {
-      "source_id": "doc_1703275396e6",
-      "title": "Tài liệu doc_1703",
+      "source_id": "doc_5058d84571cf",
+      "title": "Tài liệu tuyển sinh (doc_5058)",
       "section": null,
-      "page_number": null,
-      "quote": "BỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\nSố: 2327/QĐ-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\nGia Lai, ngày 06 tháng 8 năm 2026\n\nQUYẾT ĐỊNH\nVề việc bổ nhiệm viên chức quản lý\n\nHIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC QUY NHƠN\n\nCăn cứ Quyết định số 1842/QĐ ngày 21 tháng 12 năm 1977 của Bộ trưởng Bộ Giáo dục về thành lập cơ sở Đại học Sư phạm Quy Nhơn; Quyết định 02/HĐBT ngày 13 tháng 7 năm 1981 về thành lập Trường Đại học Sư phạm Quy Nhơn; Quyết định số 221/2003/QĐ-TTg ngày 30 tháng 10 năm 2003 của Thủ tướng Chính phủ về đổi tên Trường Đại học Sư phạm Quy Nhơn thành Trường Đại học Quy Nhơn;\n\nCăn cứ Thông tư liên tịch số 07/2009/TTLT-BGDĐT-BNV ngày 15 tháng 4 năm 2009 của Bộ trưởng Bộ Giáo dục và Đào tạo và Bộ trưởng Bộ Nội vụ về việc hướng dẫn thực hiện quyền tự chủ, tự chịu trách nhiệm về thực hiện nhiệm vụ, tổ chức bộ máy, biên chế đối với đơn vị sự nghiệp công lập giáo dục và đào tạo;\n\nCăn cứ Nghị định số 259/2026/NĐ-CP ngày 30 tháng 6 năm 2026 của Chính phủ quy định về tuyển dụng, sử dụng và quản lý viên chức;\n\nCăn cứ Quy định số 01-QĐ/ĐU ngày 03 tháng 4 năm 2026 của Ban Thường vụ Đảng ủy Bộ Giáo dục và Đào tạo về việc bổ nhiệm, bổ nhiệm lại, kéo dài thời gian giữ chức vụ, từ chức, cho thôi giữ chức vụ, miễn nhiệm, tạm đình chỉ công tác, luân chuyển, điều động, biệt phái đối với công chức, viên chức các đơn vị thuộc và trực thuộc Bộ Giáo dục và Đào tạo;\n\nCăn cứ Thông báo số 90-TB/ĐU ngày 05 tháng 8 năm 2026 của Ban Thường vụ Đảng ủy Trường Đại học Quy N...",
-      "source_pages": null,
+      "page_number": 3,
+      "quote": "PHỤ LỤC 1\nKHUNG QUY ĐỔI ĐIỂM GIỮA CÁC PHƯƠNG THỨC XÉT TUYỂN NĂM 2026\n(Kèm theo Thông báo số /TB-HĐTS ngày tháng năm 2026 của Hội đồng tuyển sinh Trường Đại học Quy Nhơn)\n\n| Top % | ĐNL | A00 SPT | HB | THPT | A01 SPT | HB | THPT | B00 SPT | HB | THPT | C00 SPT | HB | THPT | C01 SPT | HB | THPT | D01 SPT | HB | THPT | D07 SPT | HB | THPT |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 0.5% | 1024 | 27 | 30 | 28.75 | 25.35 | 30 | 28.25 | 27.38 | 30 | 29.13 | 23.15 | 30 | 27.25 | 22.85 | 30 | 27.5 | 22.68 | 30 | 27.38 | 26.65 | 30 | 28 |\n| 1.0% | 1004 | 24.75 | 29.75 | 27.5 | 23.35 | 29.45 | 26.75 | 24.75 | 29.65 | 28.25 | 21.4 | 29.55 | 25.75 | 20.9 | 29.8 | 26 | 20.85 | 29.55 | 25.75 | 24.65 | 29.55 | 26.5 |\n| 5.0% | 933 | 23 | 29.55 | 25.75 | 22.85 | 28.55 | 24.75 | 23.75 | 29.25 | 26.5 | 20.6 | 27.8 | 24 | 20.1 | 28.55 | 24.75 | 20 | 28.05 | 24.25 | 22.3 | 28.55 | 24.75 |\n| 10.0% | 885 | 22.5 | 28.55 | 24.75 | 22.2 | 27.55 | 23.75 | 23 | 29.05 | 25.25 | 18.7 | 26.55 | 22.75 | 19.35 | 27.55 | 23.75 | 19.8 | 27.05 | 23.25 | 21.95 | 27.3 | 23.5 |\n| 15.0% | 849 | 22 | 27.8 | 24 | 21.55 | 26.55 | 22.75 | 22.75 | 28.3 | 24.5 | 18.15 | 25.55 | 21.75 | 18.95 | 26.8 | 23 | 19.35 | 26.3 | 22.5 | 21.85 | 26.55 | 22.75 |\n| 20.0% | 818 | 21.5 | 27.3 | 23.5 | 21.25 | 25.8 | 22 | 22.35 | 27.55 | 23.75 | 17.8 | 24.8 | 21 | 18.7 | 26.3 | 22.5 | 19.2 | 25.55 | 21.75 | 21.75...",
+      "source_pages": [
+        3
+      ],
       "entity_key": null
     },
     {
-      "source_id": "doc_724f5fa33e3b",
-      "title": "Tài liệu doc_724f",
+      "source_id": "doc_b8ff1635e69f",
+      "title": "Tài liệu tuyển sinh (doc_b8ff)",
       "section": null,
-      "page_number": null,
-      "quote": "**11. Thông tin về tuyển sinh của 2 năm gần nhất**\n\n| STT | Mã ngành | Tên ngành | Chỉ tiêu (2024) | Số trúng tuyển nhập học (2024) | Điểm trúng tuyển (2024) | Chỉ tiêu (2025) | Số trúng tuyển nhập học (2025) | Điểm trúng tuyển (2025) |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý Giáo dục | 47 | 50 | 22.5 | 50 | 41 | 25.1 |\n| 2 | 7140201 | Giáo dục mầm non | 126 | 118 | 23.1 | 177 | 177 | 21.75 |\n| 3 | 7140202 | Giáo dục Tiểu học | 244 | 234 | 26.95 | 240 | 239 | 26.9 |\n| 4 | 7140205 | Giáo dục chính trị | 20 | 23 | 26.65 | 22 | 21 | 26.65 |\n| 5 | 7140206 | Giáo dục thể chất | 24 | 23 | 26.5 | 99 | 98 | 19.8 |\n| 6 | 7140209 | Sư phạm Toán học | 20 | 20 | 26.5 | 101 | 101 | 25.85 |\n| 7 | 7140210 | Sư phạm Tin học | 100 | 106 | 22.85 | 112 | 112 | 20.35 |\n| 8 | 7140211 | Sư phạm Vật lý | 20 | 19 | 25.75 | 81 | 80 | 24.4 |\n| 9 | 7140212 | Sư phạm Hóa học | 0 | 0 |  | 25 | 25 | 25.3 |\n| 10 | 7140213 | Sư phạm Sinh học | 20 | 21 | 23.9 | 29 | 29 | 21.2 |\n| 11 | 7140217 | Sư phạm Ngữ văn | 30 | 32 | 27.35 | 119 | 119 | 26.85 |\n| 12 | 7140218 | Sư phạm Lịch sử | 20 | 23 | 27.45 | 47 | 47 | 27.21 |\n| 13 | 7140219 | Sư phạm Địa lý | 20 | 19 | 27.3 | 70 | 70 | 26.74 |\n| 14 | 7140231 | Sư phạm Tiếng Anh | 84 | 87 | 25.92 | 199 | 199 | 23.59 |\n| 15 | 7140247 | Sư phạm KH tự nhiên | 20 | 17 | 25.65 | 99 | 99 | 22.5 |\n| 16 | 7140249 | Sư phạm Lịch sử Địa lý | 27 | 32 | 27.15 | 112 | 112 | 26.4 |\n| 17 | 7220201 | Ngôn ngữ Anh | 290 | 288 | 22 |...",
-      "source_pages": null,
+      "page_number": 1,
+      "quote": "ĐĂNG KÝ CHỈ TIÊU TUYỂN SINH NĂM 2026\n(Kèm theo Thông báo số 1897/TB-ĐHQN ngày 29/5/2026 của Trường Đại học Quy Nhơn)\n\n| STT | Trình độ/Lĩnh vực/ Ngành đào tạo | Mã ngành | Lĩnh vực | Năng lực | Bị phạt | Chỉ tiêu đăng ký |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n| * | TỔNG CHỈ TIÊU CHÍNH<br>QUY SO SÁNH CƠ SỞ VẬT<br>CHẤT (3 + 6) |  |  | 13536 | 0 | 5169 |\n| A | SAU ĐẠI HỌC |  |  | 1331 | 0 | 631 |\n| 1 | Tiến sĩ |  |  | 206 | 0 | 23 |\n| 1.1 | Tiến sĩ chính quy |  |  | 206 | 0 | 23 |\n| 1.1.1 | Nhân văn | 922 |  | 25 | 0 | 6 |\n| 1.1.1.1 | Ngôn ngữ, văn học và văn hoá<br>nước ngoài | 92202 | Nhân văn | 25 | 0 | 6 |\n| 1.1.1.1.1 | Ngôn ngữ Anh | 9220201 | Ngôn ngữ, văn học<br>và văn hoá nước<br>ngoài | 25 |  | 6 |\n| 1.1.2 | Khoa học tự nhiên | 944 |  | 70 | 0 | 4 |\n| 1.1.2.1 | Khoa học vật chất | 94401 | Khoa học tự nhiên | 70 | 0 | 4 |\n| 1.1.2.1.1 | Hoá lí thuyết và hoá lí | 9440119 | Khoa học vật chất | 70 |  | 4 |\n| 1.1.3 | Toán và thống kê | 946 |  | 79 | 0 | 8 |\n| 1.1.3.1 | Toán học | 94601 | Toán và thống kê | 79 | 0 | 8 |\n| 1.1.3.1.1 | Toán giải tích | 9460102 | Toán học | 49 |  | 4 |\n| 1.1.3.1.2 | Đại số và lí thuyết số | 9460104 | Toán học | 30 |  | 4 |\n| 1.1.4 | Kỹ thuật | 952 |  | 32 | 0 | 5 |\n| 1.1.4.1 | Kỹ thuật điện, điện tử và viễn<br>thông | 95202 | Kỹ thuật | 32 | 0 | 5 |\n| 1.1.4.1.1 | Kỹ thuật điện | 9520201 | Kỹ thuật điện, điện<br>tử và viễn thông | 32 |  | 5 |\n| 1.2 | Tiến sĩ liên kết đào tạo với nước<br>ngoài |  |  |  | 0 | 0 |\n| 2 | Thạc sĩ |  |  |...",
+      "source_pages": [
+        1
+      ],
+      "entity_key": null
+    },
+    {
+      "source_id": "doc_b061445999de",
+      "title": "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026",
+      "section": "1897_BC02_Co_so_phap_ly_xac_dinh_chi_tieu_2026",
+      "page_number": 15,
+      "quote": "| 130 | Nguyễn Tiến Trung | 10/09/1979 | 052079028416 |  | Nam | 07/08/2012 | HĐLĐ không<br>xác định thời hạn | 07/08/2012 |  | Phó giáo sư | Tiến sĩ | Hoá hữu cơ |  |  | 0 |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 131 | Mai Thế Anh | 18/11/1976 | 052076008985 |  | Nam | 08/08/2012 | HĐLĐ không<br>xác định thời hạn | 08/08/2012 |  |  | Tiến sĩ | Giáo dục học |  |  | 0 |\n| 132 | Lê Thị Mỹ Kim | 10/01/1982 | 054182011421 |  | Nữ | 01/04/2011 | HĐLĐ không<br>xác định thời hạn | 01/04/2011 |  |  | Thạc sĩ | Kế toán | 7340301 | Kế toán | 48 |\n| 133 | Phan Gia Trí | 31/10/1997 | 052097006824 |  | Nam | 12/01/2026 | HĐLĐ xác định<br>thời hạn | 12/01/2026 | 11/01/2031 |  | Thạc sĩ | Kỹ thuật điều<br>khiển và tự<br>động hóa |  |  | 0 |\n| 134 | Đoàn Đức Tùng | 06/08/1975 | 052075003073 |  | Nam | 16/06/2012 | HĐLĐ không<br>xác định thời hạn | 16/06/2012 |  | Phó giáo sư | Tiến sĩ | Kỹ thuật điện |  |  | 0 |\n| 135 | Lê Thị Mai Trang | 05/06/1987 | 035187010604 |  | Nữ | 10/12/2015 | HĐLĐ không<br>xác định thời hạn | 10/12/2015 |  |  | Thạc sĩ | Quản lý xây<br>dựng |  |  | 0 |\n| 136 | Nguyễn Duy<br>Khiêm | 10/09/1977 | 052077022130 |  | Nam | 16/06/2012 | HĐLĐ không<br>xác định thời hạn | 16/06/2012 |  |  | Tiến sĩ | Kỹ thuật điện |  |  | 0 |\n| 137 | Phan Thị Như<br>Phượng | 25/07/1989 | 052189000188 |  | Nữ | 21/12/2023 | HĐLĐ xác định<br>thời hạn | 21/12/2023 | 20/12/2026 |  | Đại học | Đông phương<br>học |  |...",
+      "source_pages": [
+        15
+      ],
+      "entity_key": null
+    },
+    {
+      "source_id": "doc_e4feebe4f2fe",
+      "title": "1897_BC03_Dieu_kien_xac_dinh_chi_tieu_tuyen_sinh_2026",
+      "section": "1897_BC03_Dieu_kien_xac_dinh_chi_tieu_tuyen_sinh_2026",
+      "page_number": 8,
+      "quote": "2. Dự kiến người học tốt nghiệp năm 2026 (người học)\n\n| STT | Trình độ/Lĩnh vực/Ngành đào tạo | Mã ngành | Lĩnh vực | Thời gian đào tạo | Dự kiến tốt nghiệp |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| A | SAU ĐẠI HỌC |  |  | 0 | 522 |\n| 1 | Tiến sĩ |  |  | 0 | 2 |\n| 1.1 | Tiến sĩ chính quy |  |  | 0 | 2 |\n| 1.1.1 | Nhân văn | 922 |  | 0 | 1 |\n| 1.1.1.1 | Ngôn ngữ, văn học và văn hoá nước ngoài | 92202 | Nhân văn | 0 | 1 |\n| 1.1.1.1.1 | Ngôn ngữ Anh | 9220201 | Ngôn ngữ, văn học và văn hoá nước ngoài | 4 | 1 |\n| 1.1.2 | Khoa học tự nhiên | 944 |  | 0 | 0 |\n| 1.1.2.1 | Khoa học vật chất | 94401 | Khoa học tự nhiên | 0 | 0 |\n| 1.1.2.1.1 | Hoá lí thuyết và hoá lí | 9440119 | Khoa học vật chất | 4 | 0 |\n| 1.1.3 | Toán và thống kê | 946 |  | 0 | 1 |\n| 1.1.3.1 | Toán học | 94601 | Toán và thống kê | 0 | 1 |\n| 1.1.3.1.1 | Toán giải tích | 9460102 | Toán học | 4 | 1 |\n| 1.1.3.1.2 | Đại số và lí thuyết số | 9460104 | Toán học | 4 | 0 |\n| 1.1.4 | Kỹ thuật | 952 |  | 0 | 0 |\n| 1.1.4.1 | Kỹ thuật điện, điện tử và viễn thông | 95202 | Kỹ thuật | 0 | 0 |\n| 1.1.4.1.1 | Kỹ thuật điện | 9520201 | Kỹ thuật điện, điện tử và viễn thông | 4 | 0 |\n| 1.2 | Tiến sĩ liên kết đào tạo với nước ngoài |  |  | 0 |  |\n| 2 | Thạc sĩ |  |  | 0 | 520 |\n| 2.1 | Thạc sĩ chính quy |  |  | 0 | 520 |\n| 2.1.1 | Khoa học giáo dục và đào tạo giáo viên | 814 |  | 0 | 107 |\n| 2.1.1.1 | Khoa học giáo dục | 81401 | Khoa học giáo dục và đào tạo giáo viên | 0 | 107 |\n| 2.1.1.1.1 | Lý luận và phương pháp dạy học | 81401...",
+      "source_pages": [
+        8
+      ],
       "entity_key": null
     }
   ],
   "suggested_questions": [
-    "Tổ hợp môn xét tuyển ngành Công nghệ thông tin gồm những môn nào?",
-    "Điểm chuẩn ngành Sư phạm Toán học năm 2025 là bao nhiêu?"
+    "Trường có những ngành đào tạo nào theo phương thức xét học bạ?",
+    "Điểm quy đổi IELTS sang điểm môn Tiếng Anh là bao nhiêu?"
   ],
-  "latency_ms": 17443.2,
-  "execution_id": "80c8eba2-452d-45f5-80d0-e64cf6ef7276",
+  "latency_ms": 10978.92,
+  "execution_id": "d6da79cb-cf21-4fcb-9397-83dd952a6810",
   "artifacts": [],
-  "conversation_id": "conv_76038df8fdc6"
+  "conversation_id": "conv_622bde2ed4e6"
 }

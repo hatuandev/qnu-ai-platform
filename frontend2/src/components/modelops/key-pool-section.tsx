@@ -1,6 +1,4 @@
 import {
-  Check,
-  Copy,
   KeyRound,
   Layers,
   Play,
@@ -19,7 +17,6 @@ import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
 import type { ModelProvider, ProviderApiKey } from "../../services/api-client";
-import { apiClient } from "../../services/api-client";
 
 export interface KeyPoolSectionProps {
   selectedProvider: ModelProvider;
@@ -72,32 +69,6 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
   const [newKeyAccountId, setNewKeyAccountId] = useState("");
   const [newKeyPriority, setNewKeyPriority] = useState(1);
   const [newKeyQuota, setNewKeyQuota] = useState("");
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
-  const [revealingKeyId, setRevealingKeyId] = useState<string | null>(null);
-
-  const handleCopyKey = async (providerId: string, keyId: string) => {
-    if (revealingKeyId) return;
-    setRevealingKeyId(keyId);
-    try {
-      const { api_key } = await apiClient.revealProviderKey(providerId, keyId);
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(api_key);
-        setCopiedKeyId(keyId);
-        setTimeout(() => setCopiedKeyId(null), 2000);
-      }
-    } catch {
-      // Fallback: copy masked value
-      const item = providerKeys.find((k) => k.id === keyId);
-      if (item && typeof navigator !== "undefined" && navigator.clipboard) {
-        navigator.clipboard.writeText(item.api_key_masked);
-        setCopiedKeyId(keyId);
-        setTimeout(() => setCopiedKeyId(null), 2000);
-      }
-    } finally {
-      setRevealingKeyId(null);
-    }
-  };
-
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newKeyName.trim() || !newKeySecret.trim()) return;
@@ -372,23 +343,6 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                             <code className="text-xs font-mono font-medium text-foreground tracking-wide select-all">
                               {keyItem.api_key_masked}
                             </code>
-                            <button
-                              type="button"
-                              disabled={revealingKeyId === keyItem.id}
-                              onClick={() =>
-                                handleCopyKey(selectedProvider.id, keyItem.id)
-                              }
-                              className="p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors disabled:opacity-50 disabled:cursor-wait"
-                              title="Sao chép API key thật"
-                            >
-                              {revealingKeyId === keyItem.id ? (
-                                <RefreshCw className="h-3 w-3 animate-spin" />
-                              ) : copiedKeyId === keyItem.id ? (
-                                <Check className="h-3 w-3 text-success" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                            </button>
                           </div>
 
                           {keyItem.account_id && (
@@ -422,6 +376,10 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                               className="text-[10px]"
                             >
                               Hết Quota
+                            </Badge>
+                          ) : keyItem.status === "invalid" ? (
+                            <Badge variant="destructive" className="text-[10px]">
+                              Khóa lỗi
                             </Badge>
                           ) : keyItem.is_active ? (
                             <Badge variant="success" className="text-[10px]">

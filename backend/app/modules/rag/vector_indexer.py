@@ -20,6 +20,9 @@ from app.modules.modelops.services.model_runtime_resolver import (
     ModelRuntimeConfig,
     model_runtime_resolver,
 )
+from app.modules.modelops.services.provider_key_rotation_service import (
+    provider_key_rotation_service,
+)
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -162,10 +165,38 @@ class VectorIndexer:
             return [round(float(x), 6) for x in vec[: self.vector_size]]
         return [round(float(x), 6) for x in vec] + [0.0] * (self.vector_size - len(vec))
 
-    async def _resolve_embedding_runtime(self) -> ModelRuntimeConfig:
+    async def _resolve_embedding_runtime(
+        self,
+        *,
+        excluded_key_ids: set[str] | None = None,
+        estimated_tokens: int = 0,
+    ) -> ModelRuntimeConfig:
         """Load the current embedding provider and model from ModelOps."""
         async with AsyncSessionFactory() as db:
-            return await model_runtime_resolver.resolve(db, "embedding")
+            return await model_runtime_resolver.resolve(
+                db,
+                "embedding",
+                excluded_key_ids=excluded_key_ids,
+                estimated_tokens=estimated_tokens,
+            )
+
+    @staticmethod
+    async def _finish_runtime_key(
+        runtime: ModelRuntimeConfig,
+        *,
+        total_tokens: int = 0,
+        error: Exception | None = None,
+    ) -> None:
+        lease = runtime.key_lease()
+        if lease is None:
+            return
+        async with AsyncSessionFactory() as db:
+            if error is None:
+                await provider_key_rotation_service.complete_success(
+                    db, lease, total_tokens=total_tokens
+                )
+            else:
+                await provider_key_rotation_service.complete_failure(db, lease, error)
 
     async def _embed_texts_cloudflare(
         self,
@@ -330,34 +361,53 @@ class VectorIndexer:
         if not texts:
             return []
 
-        runtime = runtime or await self._resolve_embedding_runtime()
+        estimated_tokens = max(1, sum(len(text) for text in texts) // 4)
+        runtime = runtime or await self._resolve_embedding_runtime(
+            estimated_tokens=estimated_tokens
+        )
         provider = runtime.provider_type
         if provider == "cloudflare":
-            if not runtime.api_key or not runtime.account_id:
-                raise AppException(
-                    "Provider Cloudflare thiếu Account ID hoặc API token.",
-                    code="EMBEDDING_PROVIDER_NOT_CONFIGURED",
-                    status_code=503,
-                    details={
-                        "provider_id": runtime.provider_id,
-                        "required_fields": ["account_id", "api_key"],
-                    },
-                )
-            try:
-                vectors = await self._embed_texts_cloudflare(texts, runtime)
-                if len(vectors) != len(texts):
-                    raise RuntimeError(
-                        f"Cloudflare returned {len(vectors)} vectors for {len(texts)} texts."
+            excluded: set[str] = set()
+            while True:
+                if not runtime.api_key or not runtime.account_id:
+                    raise AppException(
+                        "Provider Cloudflare thiếu Account ID hoặc API token.",
+                        code="EMBEDDING_PROVIDER_NOT_CONFIGURED",
+                        status_code=503,
+                        details={
+                            "provider_id": runtime.provider_id,
+                            "required_fields": ["account_id", "api_key"],
+                        },
                     )
-                return [self._fit_dim(v) for v in vectors]
-            except Exception as exc:
-                logger.error("Cloudflare embedding unavailable: %s", exc)
-                raise AppException(
-                    f"Cloudflare Workers AI không khả dụng: {exc}",
-                    code="EMBEDDING_PROVIDER_UNAVAILABLE",
-                    status_code=503,
-                    details={"provider": provider},
-                ) from exc
+                try:
+                    vectors = await self._embed_texts_cloudflare(texts, runtime)
+                    if len(vectors) != len(texts):
+                        raise RuntimeError(
+                            f"Cloudflare returned {len(vectors)} vectors for {len(texts)} texts."
+                        )
+                    await self._finish_runtime_key(
+                        runtime, total_tokens=estimated_tokens
+                    )
+                    return [self._fit_dim(v) for v in vectors]
+                except Exception as exc:
+                    await self._finish_runtime_key(runtime, error=exc)
+                    if runtime.key_id:
+                        excluded.add(runtime.key_id)
+                        try:
+                            runtime = await self._resolve_embedding_runtime(
+                                excluded_key_ids=excluded,
+                                estimated_tokens=estimated_tokens,
+                            )
+                            continue
+                        except AppException:
+                            pass
+                    logger.error("Cloudflare embedding unavailable: %s", exc)
+                    raise AppException(
+                        f"Cloudflare Workers AI không khả dụng: {exc}",
+                        code="EMBEDDING_PROVIDER_UNAVAILABLE",
+                        status_code=503,
+                        details={"provider": provider},
+                    ) from exc
 
         elif provider == "ollama":
             try:

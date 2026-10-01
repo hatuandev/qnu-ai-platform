@@ -63,7 +63,9 @@ class ProviderKeyItem(BaseModel):
     account_id: str | None = None
     priority: int = 1
     is_active: bool = True
-    status: Literal["active", "rate_limited", "exhausted", "inactive"] = "active"
+    status: Literal[
+        "active", "rate_limited", "exhausted", "invalid", "inactive"
+    ] = "active"
     quota_limit: int | None = None
     usage_tokens: int = 0
     cooldown_until: str | None = None
@@ -84,7 +86,9 @@ class ProviderKeyUpdate(BaseModel):
     account_id: str | None = None
     priority: int | None = Field(None, ge=1, le=99)
     is_active: bool | None = None
-    status: Literal["active", "rate_limited", "exhausted", "inactive"] | None = None
+    status: Literal[
+        "active", "rate_limited", "exhausted", "invalid", "inactive"
+    ] | None = None
     quota_limit: int | None = None
 
 

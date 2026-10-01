@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import io
 import os
 import re
@@ -13,10 +14,15 @@ from typing import Any
 import openpyxl
 import structlog
 from PIL import Image, ImageDraw
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.core.storage import storage_service
+from app.modules.modelops.models import ModelProviderConfig
+from app.modules.modelops.services.provider_key_rotation_service import (
+    provider_key_rotation_service,
+)
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.docling_adapter import DoclingOCRAdapter
 from app.modules.ocr.adapters.easyocr_adapter import EasyOCRAdapter
@@ -129,6 +135,81 @@ class OCRService:
         # Default fallback adapter
         return self._adapters.get(norm) or self._adapters[self.default_engine]
 
+    async def _extract_step_with_rotation(
+        self,
+        session: AsyncSession,
+        step: dict[str, Any],
+        content: bytes,
+        filename: str,
+    ) -> dict[str, Any]:
+        """Run one OCR model through the shared transactional key pool."""
+        model_name = str(step.get("model_name") or "").strip()
+        provider_id = str(step.get("provider_id") or "").strip()
+        adapter = self._resolve_adapter(model_name)
+        if not provider_id:
+            return await adapter.extract(content, filename)
+
+        provider_result = await session.execute(
+            select(ModelProviderConfig).where(
+                ModelProviderConfig.id == provider_id,
+                ModelProviderConfig.is_active.is_(True),
+            )
+        )
+        provider = provider_result.scalar_one_or_none()
+        if inspect.isawaitable(provider):
+            return await adapter.extract(content, filename)
+        if provider is None:
+            return await adapter.extract(content, filename)
+
+        provider_type = provider.provider_type.strip().lower()
+        if provider_type not in {"gemini", "mistral"}:
+            return await adapter.extract(content, filename)
+        model_family = model_name.lower()
+        if (provider_type == "gemini" and "mistral" in model_family) or (
+            provider_type == "mistral" and "gemini" in model_family
+        ):
+            return await adapter.extract(content, filename)
+
+        excluded: set[str] = set()
+        last_error: Exception | None = None
+        while True:
+            acquired = await provider_key_rotation_service.acquire(
+                session, provider_id, excluded_key_ids=excluded
+            )
+            if acquired.lease is None:
+                if not acquired.managed:
+                    return await adapter.extract(content, filename)
+                if last_error is not None:
+                    raise last_error
+                raise AppException(
+                    "Provider OCR không còn khóa API khả dụng.",
+                    code="OCR_PROVIDER_KEYS_UNAVAILABLE",
+                    status_code=503,
+                    details={"provider_id": provider_id},
+                )
+
+            lease = acquired.lease
+            if provider_type == "gemini":
+                rotated_adapter: BaseOCRAdapter = GeminiOCRAdapter(
+                    api_key=lease.api_key,
+                    model_name=model_name,
+                    base_url=provider.api_base_url,
+                )
+            else:
+                rotated_adapter = MistralOCRAdapter(
+                    api_key=lease.api_key,
+                    model_name=model_name,
+                    base_url=provider.api_base_url,
+                )
+            try:
+                result = await rotated_adapter.extract(content, filename)
+                await provider_key_rotation_service.complete_success(session, lease)
+                return result
+            except Exception as exc:
+                last_error = exc
+                excluded.add(lease.id)
+                await provider_key_rotation_service.complete_failure(session, lease, exc)
+
     async def _get_system_defaults(self, session: AsyncSession | None) -> dict[str, Any]:
         """Retrieve system_model_defaults dictionary from database."""
         if session:
@@ -178,7 +259,13 @@ class OCRService:
             if default_ocr_mode == "combo":
                 return await self._extract_combo_chain(session, content, filename, tenant_id, start_time)
             return await self._extract_auto(
-                session, content, filename, tenant_id, start_time, default_ocr_model=default_ocr_model
+                session,
+                content,
+                filename,
+                tenant_id,
+                start_time,
+                default_ocr_model=default_ocr_model,
+                default_ocr_provider_id=defaults.get("default_ocr_provider_id"),
             )
 
         if requested == "combo":
@@ -192,8 +279,23 @@ class OCRService:
         fallback_triggered = False
         fallback_engine: str | None = None
         cascade_trace: list[str] = []
+        modelops_step = {
+            "provider_id": str(defaults.get("default_ocr_provider_id") or ""),
+            "model_name": getattr(adapter, "model_name", requested),
+        }
+        requested_cloud_ocr = requested in {
+            "gemini_ocr",
+            "gemini",
+            "gemini_vision",
+            "mistral_ocr",
+            "mistral",
+        } or any(
+            marker in str(modelops_step["model_name"]).lower()
+            for marker in ("gemini", "gemma", "mistral")
+        )
+        use_modelops_key_pool = bool(modelops_step["provider_id"]) and requested_cloud_ocr
 
-        if not adapter.is_available():
+        if not adapter.is_available() and not use_modelops_key_pool:
             if requested in ("gemini_ocr", "gemini", "gemini_vision", "mistral_ocr", "mistral"):
                 logger.warning("cloud_ocr_missing_key_fallback_to_local", requested=requested)
                 for local_cand in ("easyocr", "docling", self.default_engine):
@@ -217,7 +319,12 @@ class OCRService:
         error_msg = None
 
         try:
-            result_dict = await adapter.extract(content, filename)
+            if use_modelops_key_pool:
+                result_dict = await self._extract_step_with_rotation(
+                    session, modelops_step, content, filename
+                )
+            else:
+                result_dict = await adapter.extract(content, filename)
         except Exception as exc:
             logger.warning("primary_ocr_failed_triggering_fallback", engine=adapter.name, error=str(exc))
             fallback_triggered = True
@@ -230,11 +337,21 @@ class OCRService:
                     continue
 
                 fb_adapter = self._resolve_adapter(step_model)
-                if not fb_adapter.is_available():
+                has_fb_provider = isinstance(step, dict) and bool(step.get("provider_id"))
+                if not fb_adapter.is_available() and not has_fb_provider:
                     continue
 
                 try:
-                    fb_res = await fb_adapter.extract(content, filename)
+                    fb_res = (
+                        await self._extract_step_with_rotation(
+                            session,
+                            step if isinstance(step, dict) else {},
+                            content,
+                            filename,
+                        )
+                        if has_fb_provider
+                        else await fb_adapter.extract(content, filename)
+                    )
                     raw_text = (fb_res.get("raw_text") or "").strip()
                     if raw_text:
                         result_dict = fb_res
@@ -279,6 +396,7 @@ class OCRService:
         tenant_id: str,
         start_time: float,
         default_ocr_model: str | None = None,
+        default_ocr_provider_id: str | None = None,
     ) -> OCRExtractResponse:
         """Smart routing:
         1. For digital text PDFs: Fast PyMuPDF extraction first (10-30ms).
@@ -411,11 +529,28 @@ class OCRService:
             else:
                 upgrade = self._adapters.get(candidate)
 
-            if not upgrade or not upgrade.is_available():
+            candidate_family = "gemini" if candidate == "gemini_ocr" else "mistral"
+            configured_family = str(default_ocr_model or candidate_family).lower()
+            has_modelops_provider = bool(default_ocr_provider_id) and candidate in {
+                "gemini_ocr",
+                "mistral_ocr",
+            } and candidate_family in configured_family
+            if not upgrade or (not upgrade.is_available() and not has_modelops_provider):
                 logger.debug("auto_ocr_candidate_skipped_unavailable", candidate=candidate)
                 continue
             try:
-                upgraded = await upgrade.extract(content, filename)
+                if has_modelops_provider:
+                    upgraded = await self._extract_step_with_rotation(
+                        session,
+                        {
+                            "provider_id": default_ocr_provider_id,
+                            "model_name": getattr(upgrade, "model_name", candidate),
+                        },
+                        content,
+                        filename,
+                    )
+                else:
+                    upgraded = await upgrade.extract(content, filename)
             except Exception as exc:
                 logger.warning("auto_ocr_candidate_failed_will_try_next", candidate=candidate, error=str(exc))
                 continue
@@ -530,14 +665,18 @@ class OCRService:
                 continue
 
             adapter = self._resolve_adapter(step_model)
-            if not adapter.is_available():
+            has_modelops_provider = isinstance(step, dict) and bool(step.get("provider_id"))
+            if not adapter.is_available() and not has_modelops_provider:
                 msg = f"{step_model}: Bỏ qua (Chưa có API Key hoặc thiếu gói phụ thuộc)"
                 cascade_trace.append(msg)
                 continue
 
             try:
                 step_start = time.perf_counter()
-                res = await adapter.extract(content, filename)
+                step_data = step if isinstance(step, dict) else {}
+                res = await self._extract_step_with_rotation(
+                    session, step_data, content, filename
+                )
                 raw_text = (res.get("raw_text") or "").strip()
                 if raw_text:
                     step_ms = round((time.perf_counter() - step_start) * 1000, 1)

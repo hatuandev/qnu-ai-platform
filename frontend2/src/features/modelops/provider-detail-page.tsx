@@ -104,6 +104,14 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
     enabled: !!providerId,
   });
 
+  const effectiveKeys = useMemo(() => {
+    if (providerKeys && providerKeys.length > 0) return providerKeys;
+    if (selectedProvider?.api_keys && selectedProvider.api_keys.length > 0) {
+      return selectedProvider.api_keys;
+    }
+    return [];
+  }, [providerKeys, selectedProvider]);
+
   const unavailableModelsCount = useMemo(() => {
     if (!selectedProvider) return 0;
     return (selectedProvider.models || []).filter(
@@ -243,7 +251,7 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
   ) => {
     setIsExporting(true);
     try {
-      const data = await apiClient.exportProvider(id, true);
+      const data = await apiClient.exportProvider(id, false);
       const jsonStr = JSON.stringify(data, null, 2);
       const blob = new Blob([jsonStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -558,8 +566,8 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
       {activeTab === "keys" && (
         <KeyPoolSection
           selectedProvider={selectedProvider}
-          providerKeys={providerKeys}
-          loadingKeys={loadingKeys}
+          providerKeys={effectiveKeys}
+          loadingKeys={loadingKeys && effectiveKeys.length === 0}
           simulatingRotation={simulatingRotation}
           rotationResult={rotationResult}
           testingKeyId={testingKeyId}

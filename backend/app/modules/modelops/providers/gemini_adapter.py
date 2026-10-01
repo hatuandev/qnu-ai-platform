@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -12,6 +13,8 @@ from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiAdapter(BaseLLMAdapter):
@@ -83,8 +86,21 @@ class GeminiAdapter(BaseLLMAdapter):
             "generationConfig": gen_config,
         }
 
+        actual_model = self.model_name
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             resp = await client.post(endpoint, json=payload)
+            if resp.status_code == 404 and self.model_name != "gemini-flash-latest":
+                logger.warning(
+                    "Model [%s] returned 404 from Google Gemini API. Auto-retrying with 'gemini-flash-latest'...",
+                    self.model_name,
+                )
+                fallback_endpoint = (
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+                    f"?key={self.api_key}"
+                )
+                resp = await client.post(fallback_endpoint, json=payload)
+                if resp.status_code == 200:
+                    actual_model = "gemini-flash-latest"
             resp.raise_for_status()
             data = resp.json()
 
@@ -103,7 +119,7 @@ class GeminiAdapter(BaseLLMAdapter):
         return LLMResponse(
             content=content,
             provider=self.provider_type,
-            model=self.model_name,
+            model=actual_model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
