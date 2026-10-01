@@ -267,3 +267,45 @@ async def test_lookup_facts_keeps_major_facts_when_target_entities_present():
     assert len(rows) == 1
     assert rows[0].entity_name == "Công nghệ thông tin"
 
+
+@pytest.mark.asyncio
+async def test_lookup_facts_does_not_match_major_on_unigram_competition_award():
+    """Queries about competition awards (e.g. 'đạt giải Ba HSG') must not match major facts like 'Toán giải tích'."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    from app.modules.rag.facts import fact_layer
+
+    calculus_major_fact = SimpleNamespace(
+        entity_name="Toán giải tích (9460102)",
+        entity_type="admissions_major",
+        attribute_name="Chỉ tiêu",
+        attribute_value="3",
+        raw_data={"major_code": "9460102"},
+    )
+    general_policy_fact = SimpleNamespace(
+        entity_name="Trường Đại học Quy Nhơn",
+        entity_type="general",
+        attribute_name="Chính sách ưu tiên xét tuyển giải Ba HSG",
+        attribute_value="Cộng 1 điểm ưu tiên vào tổng điểm",
+        raw_data={},
+    )
+
+    mock_db = AsyncMock()
+    mock_res = MagicMock()
+    mock_res.scalars.return_value.all.return_value = [calculus_major_fact, general_policy_fact]
+    mock_db.execute.return_value = mock_res
+
+    # Query asking about competition prize "giải", "ba" without specific target major
+    rows = await fact_layer.lookup_facts(
+        mock_db,
+        "col_admissions",
+        keywords=["giải", "ba", "học sinh giỏi"],
+        limit=5,
+    )
+    # The major 'Toán giải tích' must NOT be returned for general award queries
+    assert len(rows) == 1
+    assert rows[0].entity_name == "Trường Đại học Quy Nhơn"
+    assert "Toán giải tích" not in [r.entity_name for r in rows]
+
+

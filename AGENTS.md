@@ -23,6 +23,10 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
      - **Chuẩn hóa Nút Chuyển Chế Độ Xem (ViewModeToggle)**: Mọi chức năng chuyển đổi giữa chế độ thẻ lưới (Grid) và danh sách / bảng (Table/List) **BẮT BUỘC PHẢI DÙNG** `<ViewModeToggle value={viewMode} onChange={setViewMode} />` từ `@/components/ui/view-mode-toggle`. Tuyệt đối cấm tự code nút switcher riêng rẽ hoặc tạo phong cách nút khác nhau giữa các trang khi Vibe Coding.
      - **Tuyệt đối CẤM dùng thẻ HTML thô sơ (Zero Raw Native Form Elements)**: Cấm dùng `<input type="checkbox">`, `<input type="radio">`, `<button>`, `<select>`, `<input type="text">` thuần của trình duyệt vì sẽ gây xung đột thẩm mỹ (ví dụ checkbox bị đổi thành màu xanh dương Windows/Chrome thay vì xanh Academic Green của hệ thống).
      - **Điều kiện Tạo Mới Component UI**: **Chỉ tạo component UI mới khi và chỉ khi trong `@/components/ui/` hoàn toàn chưa có thành phần tương đương**. Khi tạo mới, bắt buộc phải đặt trong `src/components/ui/`, xây dựng trên nền tảng Radix UI / headless primitives chuẩn, áp dụng design tokens OKLCH, hỗ trợ `forwardRef`, đầy đủ TypeScript types, và export dùng chung cho toàn bộ dự án.
+  9. **Database-First ModelOps & Zero-Env LLM Credentials (Quản Lý Mô Hình 100% Qua Database, Zero API Key Trong .env)**:
+     - **100% Qua ModelOps DB**: Toàn bộ thông tin cấu hình nhà cung cấp LLM, khóa API (`api_keys`, `api_key_encrypted`), model name, quota và timeout được lưu trữ và quản lý tập trung trong CSDL PostgreSQL qua giao diện Nhà Cung Cấp ModelOps (`/models`).
+     - **Tuyệt đối KHÔNG gán API Key LLM trong `.env`**: File `backend/.env` tuyệt đối không chứa bất kỳ API key nào của LLM (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`). Tránh triệt để tình trạng xung đột giữa cấu hình người dùng trên UI và biến môi trường tĩnh.
+     - **Cấm Tuyệt Đối Mock Giả Trong Production Adapters (Zero Production Adapter Mocks)**: Bất kỳ LLM Adapter nào (`OpenAIAdapter`, `GeminiAdapter`, `MistralAdapter`, v.v.) khi thiếu API key ở môi trường production bắt buộc phải báo lỗi nghiêm túc (`AppException`), tuyệt đối cấm trả về câu trả lời giả mạo, trích xuất regex thô hay nhồi nhét tin nhắn hotline giả tạo (`"Về câu hỏi..., vui lòng liên hệ Hotline 0256.3846.156"`) làm sai lệch cơ chế Circuit Breaker và ngăn chặn Failover tự động.
 
 ---
 
@@ -76,6 +80,14 @@ Bất kỳ khi nào tạo hoặc cấu hình một Trợ lý AI (ví dụ: Tuy�
    - Tất cả các lệnh gọi LLM (`generate`, `stream_generate`) trong `InferenceService`, `LLMGenerateNodeHandler`, `AssistantChatService`, `RAGService` bắt buộc phải đọc `preferred_model_name`, `fallback_model_name`, `preferred_provider_id` từ yêu cầu hoặc cấu hình (`AssistantModelPolicy`).
    - Tuyệt đối không được ép model về danh sách cứng nếu tên model tương thích với loại nhà cung cấp (Google Gemini, OpenAI, Mistral, Anthropic, Custom/Ollama/vLLM).
    - Module OCR bắt buộc hỗ trợ cấu hình động `default_ocr_model` và chuỗi `ocr_combo_chain` từ `system_model_defaults`, không được ghim cứng model Vision/OCR nào.
+6. **Provider Credential Cascading & Fail-Fast Resolution (Cơ chế Điều Phối Khóa & Tự Động Bỏ Qua Provider Thiếu Khóa)**:
+   - `InferenceService` bắt buộc ưu tiên nhà cung cấp có khóa hợp lệ trong CSDL (+200 điểm trọng số), tự động bỏ qua nhà cung cấp đám mây không có khóa và chuyển sang Fallback (ví dụ: người dùng cấu hình Gemini trên UI thì hệ thống lập tức gọi Gemini, không bị nuốt lỗi hay fallback giả).
+   - Mọi DAG node (`rag_answer_node.py`), workflow, và assistant chat bắt buộc chuyển tiếp `preferred_provider_id` từ chính sách mô hình của trợ lý vào `AskRequest` và `LLMGenerateRequest`.
+   - Khi tất cả nhà cung cấp đều hết khóa hoặc không phản hồi, bắt buộc trả lỗi RFC 7807 với mã `ALL_PROVIDERS_UNAVAILABLE` thay vì che giấu bằng dữ liệu giả.
+7. **Morphological Fact-Layer Retrieval (Quy Chuẩn Tra Cứu Bảng Số Liệu Theo Bất Biến Hình Thái Học)**:
+   - Tầng tra cứu sự thật (`FactLayer.lookup_facts`) tuyệt đối không dùng chuỗi ký tự đơn lẻ (unigram như "giải", "thi", "điểm") để truy vấn `KnowledgeFact.entity_name.ilike(...)`.
+   - Chỉ các cụm từ ghép danh từ hoàn chỉnh ($\ge 2$ từ) hoặc mã định danh chuyên biệt (mã ngành `\d{7}`, mã nhiệm vụ `\d+\.\d+`) mới được khớp vào `entity_name`.
+   - Tuyệt đối cấm hardcode danh sách từ vựng/thuộc tính trong code tra cứu (tuân thủ Tôn chỉ 7).
 
 ---
 

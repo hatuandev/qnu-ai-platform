@@ -7,6 +7,8 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from app.core.config import settings
+from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
 
@@ -29,14 +31,18 @@ class MistralAdapter(BaseLLMAdapter):
         base_url = self.base_url or "https://api.mistral.ai/v1"
         endpoint = f"{base_url.rstrip('/')}/chat/completions"
 
-        # Safe offline mock mode when API key is not configured or dummy
-        if not self.api_key or self.api_key in ("mock", "test", "demo", "placeholder"):
-            user_msg = messages[-1].content if messages else ""
-            mock_text = (
-                f"[Mistral AI {self.model_name}] Dựa trên cơ sở dữ liệu Trường Đại học Quy Nhơn:\n"
-                f"Yêu cầu của bạn đã được mô hình xử lý thành công: '{user_msg[:100]}'."
+        # Check API key configuration: Fail loud if not configured so Failover Cascade takes over
+        if not self.api_key:
+            raise AppException(
+                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
+                code="provider_key_missing",
+                status_code=401,
             )
+
+        # Isolated test mock mode strictly for unit test environments
+        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
             elapsed = (time.perf_counter() - start_time) * 1000
+            mock_text = f"[Mistral AI {self.model_name}] Phản hồi thử nghiệm."
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
             comp_toks = len(mock_text.split()) * 2
             return LLMResponse(

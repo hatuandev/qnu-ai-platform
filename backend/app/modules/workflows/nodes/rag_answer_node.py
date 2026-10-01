@@ -83,6 +83,12 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             else config.get("thinking_budget", 0)
         )
 
+        preferred_provider_id = (
+            getattr(profile.model_policy, "preferred_provider_id", None)
+            if (profile and hasattr(profile, "model_policy") and profile.model_policy)
+            else config.get("preferred_provider_id")
+        )
+
         ask_req = AskRequest(
             question=query,
             collection_id=collection_id,
@@ -94,6 +100,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             max_tokens=min(profile.model_policy.max_tokens, 8192) if profile else config.get("max_tokens", 2000),
             thinking_budget=thinking_budget,
             preferred_model_name=primary_model,
+            preferred_provider_id=preferred_provider_id,
             fallback_model=fallback_model,
             history=context.inputs.get("conversation_history"),
         )

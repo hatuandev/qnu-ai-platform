@@ -87,6 +87,26 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
     return p_type in ("openai_compatible", "custom", "local", "vllm", "local_vllm", "ollama", "openrouter", "groq")
 
 
+def _is_local_provider(provider_type: str) -> bool:
+    """Check if provider is a local zero-credential runner."""
+    return provider_type.lower().strip() in ("local_vllm", "local", "ollama", "vllm")
+
+
+def _provider_has_credentials(p: dict[str, Any]) -> bool:
+    """Check if provider has active API keys configured or is a zero-auth local service."""
+    if _is_local_provider(p.get("provider_type", "")):
+        return True
+    if p.get("api_key") or p.get("api_key_masked"):
+        return True
+    keys = p.get("api_keys") or []
+    return any(
+        k.get("is_active", True)
+        and k.get("status") == "active"
+        and (k.get("api_key") or k.get("key_ciphertext"))
+        for k in keys
+    )
+
+
 class InferenceService:
     """Executes LLM inference (generate & stream) with Key Pool rotation, Dynamic Fallback, and Quota accounting."""
 
@@ -111,7 +131,7 @@ class InferenceService:
         return await usage_accounting_service.check_quota_available(db, tenant_id, estimated_tokens)
 
     async def _call_get_active_providers(
-        self, db: AsyncSession, only_active: bool = False
+        self, db: AsyncSession, only_active: bool = True
     ) -> list[dict[str, Any]]:
         facade = self._get_facade()
         if facade and hasattr(facade, "get_active_providers"):
@@ -137,16 +157,26 @@ class InferenceService:
         quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
 
         # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
-        all_providers = await self._call_get_active_providers(db)
+        all_providers = await self._call_get_active_providers(db, only_active=True)
         providers = [
             p
             for p in all_providers
             if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
             and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
         ]
+
+        # Filter out cloud providers that have no active keys configured when configured providers exist
+        configured_providers = [p for p in providers if _provider_has_credentials(p)]
+        if configured_providers:
+            providers = configured_providers
+
         if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
             def _match_score(p: dict[str, Any]) -> int:
                 score = 0
+                if _provider_has_credentials(p):
+                    score += 200
+                else:
+                    score -= 500
                 if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
                     score += 100
                 p_models = p.get("models") or []
@@ -197,12 +227,18 @@ class InferenceService:
             if not available_keys and p.get("api_key"):
                 available_keys = [{"id": "default", "name": "Default", "api_key": p["api_key"]}]
             elif not available_keys:
-                available_keys = [{"id": "none", "name": "None", "api_key": None}]
+                if not _is_local_provider(p.get("provider_type", "")):
+                    logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                    continue
+                available_keys = [{"id": "local", "name": "Local", "api_key": None}]
 
             # Try available keys in rotation
             for active_key_entry in available_keys:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
+                if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                    logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
+                    continue
                 p_models = p.get("models") or []
                 chat_candidates = [
                     m
@@ -366,16 +402,26 @@ class InferenceService:
         quota = await self._call_check_quota_available(db, req.tenant_id, estimated_tokens=300)
 
         # 2. Retrieve Provider Cascade and filter for genuine Chat LLMs only
-        all_providers = await self._call_get_active_providers(db)
+        all_providers = await self._call_get_active_providers(db, only_active=True)
         providers = [
             p
             for p in all_providers
             if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
             and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
         ]
+
+        # Filter out cloud providers that have no active keys configured when configured providers exist
+        configured_providers = [p for p in providers if _provider_has_credentials(p)]
+        if configured_providers:
+            providers = configured_providers
+
         if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
             def _match_score(p: dict[str, Any]) -> int:
                 score = 0
+                if _provider_has_credentials(p):
+                    score += 200
+                else:
+                    score -= 500
                 if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
                     score += 100
                 p_models = p.get("models") or []
@@ -418,11 +464,17 @@ class InferenceService:
             if not available_keys and p.get("api_key"):
                 available_keys = [{"id": "default", "name": "Default", "api_key": p["api_key"]}]
             elif not available_keys:
-                available_keys = [{"id": "none", "name": "None", "api_key": None}]
+                if not _is_local_provider(p.get("provider_type", "")):
+                    logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                    continue
+                available_keys = [{"id": "local", "name": "Local", "api_key": None}]
 
             for active_key_entry in available_keys:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
+                if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                    logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
+                    continue
                 p_models = p.get("models") or []
                 chat_candidates = [
                     m

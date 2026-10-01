@@ -7,35 +7,36 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-09-30 23:55 (UTC+7)
-- **Phiên số**: #236 (Tối Ưu Hóa Toàn Diện UI/UX Tab Facts Số Hóa Kho Tri Thức, Khắc Phục Lỗi Ô Tìm Kiếm, Bổ Sung Bộ Lọc Đa Chiều & Phân Trang Thông Minh)
-- **Phiên số trước**: #235, #234, #233, #232, #231
-- **Mục tiêu đã hoàn thành (phiên #236)**:
-  - 1. **Khắc Phục Lỗi Giao Diện Ô Tìm Kiếm & Nâng Cấp Bộ Lọc Đa Chiều (Multi-Dimensional Filters)**:
-       * Sửa lỗi giao diện icon Search trơ trọi đứng ngoài ô input: Tích hợp icon `Search` chìm tinh tế bên trong `Input`, bổ sung nút xóa nhanh ký tự `X` khi có văn bản tìm kiếm. Tìm kiếm đồng thời theo Thực thể, Thuộc tính và Giá trị.
-       * Bổ sung dải 4 Thẻ KPI Telemetry Strip tổng quan kho facts: *Tổng số facts*, *Thực thể định danh duy nhất*, *Số loại thuộc tính*, *Độ tin cậy trích xuất trung bình*.
-       * Bổ sung Dải Chip Lọc Nhanh 1-Click (Quick Category Filter Chips): *Tất cả*, *Điểm chuẩn*, *Chỉ tiêu*, *Học phí*, *Tổ hợp môn*, *Khác* kèm đếm số lượng động.
-       * Bổ sung Thanh công cụ bộ lọc nâng cao gồm 4 Dropdown chuẩn Radix `<Select>`: Lọc theo Loại thực thể (Entity Type), Lọc theo Tên thuộc tính (Attribute Name), Lọc theo Mức độ tin cậy (Confidence $\ge 90\%$, $80-89\%$, $<80\%$), và Sắp xếp linh hoạt (Mới nhất, Thực thể A-Z/Z-A, Thuộc tính A-Z, Độ tin cậy giảm dần).
-       * Bổ sung Nút "Đặt lại" (Reset All Filters) với icon `RotateCcw` đưa toàn bộ bộ lọc về mặc định trong 1 click.
-  - 2. **Giải Quyết Triệt Để Vấn Đề Dữ Liệu Quá Tải Bằng Phân Trang Client-Side (Client-Side Pagination)**:
-       * Trước đây 326+ facts bị kết xuất tràn lan thành danh sách cuộn vô tận khiến giao diện giật lag và khó tra cứu.
-       * Tích hợp thanh phân trang thông minh với bộ chọn kích thước trang `15 / 25 / 50 / 100 hàng/trang`.
-       * Bộ điều hướng phân trang đầy đủ: Nút Đầu (`<<`), Nút Trước (`<`), Nhãn trang `Trang X / Y`, Nút Kế tiếp (`>`), Nút Cuối (`>>`) và text trạng thái chi tiết `Hiển thị X - Y trong số Z facts đã lọc (Tổng số kho: N)`.
-  - 3. **Nâng Cấp Trải Nghiệm Bảng Dữ Liệu & Hộp Thoại Thanh Tra Chi Tiết Fact (Inspector Modal)**:
-       * Thêm cột Số Thứ Tự (`#`) tính tự động theo trang.
-       * Giá trị số hóa (Điểm chuẩn, Học phí...) được định dạng nổi bật với màu QNU Academic Teal, tích hợp tính năng sao chép giá trị 1-click (Copy to Clipboard) kèm thông báo Toast Sonner.
-       * Huy hiệu Độ tin cậy phân loại màu ngữ nghĩa (`emerald` $\ge 90\%$, `amber` $80-89\%$, `rose` $<80\%$).
-       * Cột Thao tác với nút "Xem chi tiết" mở Modal `FactDetailDialog` hiển thị đầy đủ thông tin metadata, tài liệu gốc và trình xem JSON thô (Raw Fact Payload) định dạng trang trọng.
-  - 4. **Mở Rộng Backend Query Limit (`GET /api/v1/knowledge/collections/{collection_id}/facts`)**:
-       * Nâng tham số `limit` từ tối đa 200 lên tối đa 1000 (mặc định 500) trong `knowledge/router.py`, cho phép tải trọn vẹn 326+ facts của kho tri thức trong 1 request duy nhất, tối ưu 100% cho client-side filtering siêu tốc với độ trễ 0ms.
-  - 5. **Kiểm Thử Frontend Build**:
-       * `npm.cmd run build` trên `frontend2` thành công 100% trong 3.00s, 0 lỗi TypeScript, 0 lỗi Biome.
-  - 6. **Tuân Thủ Tuyệt Đối Chính Sách Git Push**:
-       * Không tự ý chạy `git push`, chỉ commit cục bộ để Người dùng tự push theo ý muốn.
+- **Thời gian cập nhật**: 2026-10-01 08:45 (UTC+7)
+- **Phiên số**: #237 (Chuyển Đổi 100% Sang ModelOps DB, Xóa Bỏ Hoàn Toàn API Key Trong .env, Triệt Tiêu Hardcode Adapter Mocks & Tra Cứu Fact Layer Hình Thái Học)
+- **Phiên số trước**: #236, #235, #234, #233, #232
+- **Mục tiêu đã hoàn thành (phiên #237)**:
+  - 1. **Xóa Bỏ Hoàn Toàn API Key LLM Khỏi `backend/.env` (Database-First ModelOps)**:
+       * Xóa sạch `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY` khỏi `.env`. Cập nhật `DEFAULT_LLM_MODEL=gemini-2.5-flash`.
+       * Toàn bộ credentials, key pool, và quota được quản lý 100% qua ModelOps DB (`/models`) lưu trữ trong PostgreSQL 16.
+  - 2. **Triệt Tiêu Mock Giả Trong Production Adapters & Khắc Phục Nuốt Lỗi (Fail-Loud Policy)**:
+       * Loại bỏ 100% pseudo-RAG mock, regex text slicing và tin nhắn từ chối hotline cứng trong `OpenAIAdapter`, `GeminiAdapter`, `MistralAdapter`.
+       * Khi thiếu API key ở môi trường thực tế, adapter ném ngay `AppException` để kích hoạt Circuit Breaker và chuyển Fallback sang provider kế tiếp có khóa.
+  - 3. **Nâng Cấp `InferenceService` (Cascading & Credential Prioritization)**:
+       * Áp dụng trên cả `generate()` và `generate_stream()`: Lọc `only_active=True`, thưởng `+200` điểm cho provider có khóa hợp lệ trong CSDL, trừ `-500` điểm cho cloud provider thiếu khóa.
+       * Tự động bỏ qua các cloud provider chưa cấu hình khóa, giúp hệ thống lập tức gọi Google Gemini đã được người dùng cấu hình trên UI mà không bị kẹt ở OpenAI.
+  - 4. **Bóc Tách & Tra Cứu Fact Layer Theo Bất Biến Hình Thái Học (Morphological Invariant)**:
+       * Xóa bỏ 100% mảng từ khóa gán cứng `common_attr_words` trong `facts.py` (tuân thủ Tôn chỉ 7 AGENTS.md).
+       * Từ đơn unigrams ("giải", "thi", "điểm", "ba") chỉ được phép khớp vào `attribute_name`, không bao giờ khớp vào `entity_name`.
+       * Chỉ các cụm từ ghép danh từ ($\ge 2$ từ) hoặc mã định danh chuyên biệt (`\d{4,}`) mới được phép khớp vào `entity_name`.
+       * Đối với câu hỏi chính sách chung (như xét tuyển HSG), loại trừ toàn bộ fact ngành lẻ (như "Toán giải tích"), nhường chỗ cho trích xuất RAG chính xác từ văn bản.
+  - 5. **Chuyển Tiếp `preferred_provider_id` Từ Trợ Lý Vào DAG Node**:
+       * Cập nhật `rag_answer_node.py` trích xuất `preferred_provider_id` từ `profile.model_policy` và chuyển vào `AskRequest`.
+  - 6. **Bổ Sung Quy Chuẩn Vào `AGENTS.md`**:
+       * Mục 1.9: *Database-First ModelOps & Zero-Env LLM Credentials*.
+       * Mục 3.6: *Provider Credential Cascading & Fail-Fast Resolution*.
+       * Mục 3.7: *Morphological Fact-Layer Retrieval*.
+  - 7. **Tuân Thủ Tuyệt Đối Ràng Buộc Không Tự Ý Push Code**:
+       * Không chạy `git push`, chỉ chuẩn bị commit cục bộ để Người dùng tự chủ động push.
 - **Agent**: AI Senior Full-Stack Architect & Enterprise AI Systems Specialist
 - **Trạng thái kiểm thử**:
-  - Frontend2: `npm run build` thành công 100% (3.00s), 0 lỗi typecheck/linter.
-  - Backend: Limit API facts mở rộng 1000/500, nạp live CSDL PostgreSQL 16.
+  - Backend: Pytest ModelOps `test_modelops.py` 22/22 passed (100%), Pytest RAG `test_suggestion_perspective_and_multiturn.py` 17/17 passed (100%).
+  - Môi trường: `.env` sạch 100% không còn API key LLM.
   - 3. **Phiên #234 — Tích hợp Cổng Kết Nối OpenRouter AI Gateway (`prov_openrouter`)**:
        * Bổ sung biến môi trường `OPENROUTER_API_KEY` và `OPENROUTER_BASE_URL` ("https://openrouter.ai/api/v1") trong `app.core.config`.
        * Tự động gắn kèm headers `HTTP-Referer: https://qnu.edu.vn` và `X-Title: QNU AI Platform` theo chuẩn OpenRouter API trong `OpenAIAdapter`.

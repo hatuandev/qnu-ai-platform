@@ -8,6 +8,8 @@ from collections.abc import AsyncIterator
 
 import httpx
 
+from app.core.config import settings
+from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
 
@@ -30,75 +32,18 @@ class OpenAIAdapter(BaseLLMAdapter):
         base_url = self.base_url or "https://api.openai.com/v1"
         endpoint = f"{base_url.rstrip('/')}/chat/completions"
 
-        # Safe offline mock mode when API key is not configured or dummy
-        if (
-            not self.api_key
-            or self.api_key in ("mock", "test", "demo", "placeholder")
-            or self.api_key.startswith(("mock", "test", "sk-proj-mock", "dummy"))
-        ):
-            user_msg = messages[-1].content if messages else ""
-            query_line = ""
-            if "Câu hỏi của người dùng:" in user_msg:
-                query_line = user_msg.split("Câu hỏi của người dùng:")[1].split("\n")[0].strip()
-            elif user_msg:
-                query_line = user_msg.split("\n")[0].strip()
-            query_words = set(re.findall(r"\b\w{2,}\b", query_line.lower()))
+        # Check API key configuration: Fail loud if not configured so Failover Cascade takes over
+        if not self.api_key:
+            raise AppException(
+                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
+                code="provider_key_missing",
+                status_code=401,
+            )
 
-            if "TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC:" in user_msg:
-                parts = user_msg.split("TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC:")
-                context_part = parts[1].strip()
-                if "--- Đoạn trích" in context_part:
-                    chunks = [c.split("---", 1)[-1].strip() for c in context_part.split("--- Đoạn trích") if c.strip()]
-                else:
-                    chunks = [context_part[:1200]]
-
-                stopwords = {
-                    "văn", "bản", "hành", "chính", "quy", "định", "các", "những", "của",
-                    "cho", "trong", "theo", "về", "được", "có", "không", "là", "gì",
-                    "như", "thế", "nào", "bao", "nhiêu", "trường", "đại", "học", "nhơn"
-                }
-                target_words = query_words - stopwords or query_words
-
-                # Select best matching chunk based on informative words
-                best_chunk = chunks[0] if chunks else context_part[:500]
-                best_overlap = -1
-                for chk in chunks:
-                    chk_words = set(re.findall(r"\b\w{2,}\b", chk.lower()))
-                    overlap = len(target_words.intersection(chk_words))
-                    if overlap > best_overlap:
-                        best_overlap = overlap
-                        best_chunk = chk
-
-                # Preserve full chunk if within reasonable length, else extract focused window
-                if len(best_chunk) <= 2500:
-                    selected_text = best_chunk
-                else:
-                    lines = [line.strip() for line in best_chunk.split("\n") if line.strip()]
-                    relevant_lines = [
-                        ln for ln in lines
-                        if len(target_words.intersection(set(re.findall(r"\b\w{2,}\b", ln.lower())))) >= 1
-                    ]
-                    if not relevant_lines:
-                        relevant_lines = lines[:15]
-                    selected_text = "\n".join(relevant_lines[:20])
-
-                mock_text = (
-                    f"Căn cứ quy định chính thức của Trường Đại học Quy Nhơn, xin giải đáp như sau:\n\n"
-                    f"{selected_text}"
-                )
-            elif "BẢNG SỐ LIỆU ĐÃ XÁC THỰC:" in user_msg:
-                facts_part = user_msg.split("BẢNG SỐ LIỆU ĐÃ XÁC THỰC:")[1].split("\n\n")[0].strip()
-                mock_text = (
-                    f"Căn cứ dữ liệu số liệu chính thức của Trường Đại học Quy Nhơn:\n\n"
-                    f"{facts_part}"
-                )
-            else:
-                query_text = query_line or user_msg[:100]
-                mock_text = (
-                    f"Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn:\n"
-                    f"Về câu hỏi '{query_text}', vui lòng tham khảo các quy định hiện hành hoặc liên hệ Hotline 0256.3846.156."
-                )
+        # Isolated test mock mode strictly for unit test environments
+        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
             elapsed = (time.perf_counter() - start_time) * 1000
+            mock_text = f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}."
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
             comp_toks = len(mock_text.split()) * 2
             return LLMResponse(
@@ -170,15 +115,18 @@ class OpenAIAdapter(BaseLLMAdapter):
         max_tokens: int = 2000,
         **kwargs,
     ) -> AsyncIterator[str]:
-        # Safe offline mock mode
-        if (
-            not self.api_key
-            or self.api_key in ("mock", "test", "demo", "placeholder")
-            or self.api_key.startswith(("mock", "test", "sk-proj-mock", "dummy"))
-        ):
+        # Check API key configuration: Fail loud if not configured
+        if not self.api_key:
+            raise AppException(
+                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
+                code="provider_key_missing",
+                status_code=401,
+            )
+
+        # Isolated test mock mode strictly for unit test environments
+        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
             response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
-            words = response.content.split(" ")
-            for word in words:
+            for word in response.content.split(" "):
                 yield word + " "
             return
 

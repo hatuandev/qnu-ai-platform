@@ -115,8 +115,14 @@ class FactLayer:
             for kw in keywords:
                 clean_kw = kw.strip().lower()
                 if len(clean_kw) >= 2:
-                    conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_kw}%"))
                     conditions.append(KnowledgeFact.attribute_name.ilike(f"%{clean_kw}%"))
+                    # Morphological & Compound Invariant: only multi-word compounds (>= 2 words)
+                    # or alphanumeric codes may match entity_name loosely. Single unigrams (e.g. 'giải',
+                    # 'thi', 'điểm') must not loosely match entity names, preventing cross-word substring collisions
+                    # (e.g., 'giải' matching 'Toán giải tích').
+                    words = clean_kw.split()
+                    if len(words) >= 2 and len(clean_kw) >= 4:
+                        conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_kw}%"))
 
         if not conditions:
             return []
@@ -176,13 +182,10 @@ class FactLayer:
             if target_entities:
                 query_entity_markers.extend([t.strip().lower() for t in target_entities if t and t.strip()])
             if keywords:
-                common_attr_words = {
-                    "phương thức", "tuyển sinh", "chỉ tiêu", "học phí", "điểm chuẩn",
-                    "tổ hợp", "xét tuyển", "năm 2024", "năm 2025", "năm 2026", "2024", "2025", "2026",
-                }
                 for kw in keywords:
                     clean_kw = kw.strip().lower()
-                    if len(clean_kw) >= 3 and clean_kw not in common_attr_words:
+                    # An explicit entity code passed in keywords (e.g. '7480201', '6.8')
+                    if re.search(r"^\d{4,}$", clean_kw) or re.search(r"^\d+\.\d+$", clean_kw):
                         query_entity_markers.append(clean_kw)
 
             if not query_entity_markers:
@@ -198,7 +201,7 @@ class FactLayer:
                     raw = getattr(f, "raw_data", {}) or {}
                     raw_str = str(raw).lower() if isinstance(raw, dict) else ""
                     return any(
-                        m in ent_name or m in attr_val or m in raw_str
+                        m in ent_name or m in raw_str
                         for m in query_entity_markers
                     )
                 rows = [f for f in rows if matches_entity(f)]

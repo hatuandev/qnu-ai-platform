@@ -8,6 +8,8 @@ from typing import Any
 
 import httpx
 
+from app.core.config import settings
+from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
 
@@ -28,14 +30,18 @@ class GeminiAdapter(BaseLLMAdapter):
     ) -> LLMResponse:
         start_time = time.perf_counter()
 
-        # Safe offline mock mode when API key is not configured or dummy
-        if not self.api_key or self.api_key in ("mock", "test", "demo"):
-            user_msg = messages[-1].content if messages else ""
-            mock_text = (
-                f"[Gemini {self.model_name}] Thông tin phản hồi từ ĐH Quy Nhơn (Dự phòng):\n"
-                f"Đã tiếp nhận yêu cầu: '{user_msg[:100]}'."
+        # Check API key configuration: Fail loud if not configured so Failover Cascade takes over
+        if not self.api_key:
+            raise AppException(
+                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
+                code="provider_key_missing",
+                status_code=401,
             )
+
+        # Isolated test mock mode strictly for unit test environments
+        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
             elapsed = (time.perf_counter() - start_time) * 1000
+            mock_text = f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}."
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
             comp_toks = len(mock_text.split()) * 2
             return LLMResponse(
