@@ -18,7 +18,7 @@ class FusionCandidate:
     sparse_rank: int = -1
     section: str | None = None
     page_number: int | None = None
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] | None = None
 
 
 def _merge_ranked_list(

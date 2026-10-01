@@ -37,6 +37,23 @@ def _count_cols(line: str) -> int:
     return len(inner.split("|"))
 
 
+def _is_likely_header_row(cells: list[str]) -> bool:
+    """Morphological check: determine whether table cells represent column headers rather than data rows."""
+    non_empty = [c for c in cells if c.strip()]
+    if not non_empty:
+        return False
+    first = non_empty[0].strip()
+    if re.match(r"^\d+(?:\.\d+)+$", first):
+        return False
+    if len(non_empty) >= 2 and re.match(r"^\d+$", non_empty[0]) and re.match(r"^\d+$", non_empty[1]):
+        return False
+    numeric_count = sum(1 for c in non_empty if re.match(r"^[-+]?\d+(?:[\.,]\d+)?%?$", c.strip()))
+    if numeric_count / len(non_empty) > 0.40:
+        return False
+    alpha_count = sum(1 for c in non_empty if re.search(r"[a-zA-Z\u00C0-\u024F\u1EA0-\u1EF9]", c))
+    return (alpha_count / len(non_empty)) >= 0.50
+
+
 def _normalize_markdown_table_block(table_lines: list[str]) -> list[str]:
     """Chuẩn hóa một khối bảng Markdown: căn chỉnh số cột, định dạng header và separator."""
     if not table_lines:
@@ -73,8 +90,12 @@ def _normalize_markdown_table_block(table_lines: list[str]) -> list[str]:
 
         result.append("| " + " | ".join(raw_cells) + " |")
 
-        # Tự động chèn dòng phân cách header sau dòng đầu tiên nếu thiếu
-        if idx == 0 and (len(cleaned_rows) == 1 or not _is_table_sep(cleaned_rows[1])):
+        # Tự động chèn dòng phân cách header sau dòng đầu tiên nếu thiếu VÀ dòng đầu tiên là header thực sự
+        if (
+            idx == 0
+            and (len(cleaned_rows) == 1 or not _is_table_sep(cleaned_rows[1]))
+            and _is_likely_header_row(raw_cells)
+        ):
             sep_cells = [":---:" if c_i == 0 and expected_cols > 3 else ":---" for c_i in range(expected_cols)]
             result.append("| " + " | ".join(sep_cells) + " |")
 

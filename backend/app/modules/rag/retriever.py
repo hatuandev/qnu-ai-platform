@@ -8,9 +8,13 @@ import re
 import unicodedata
 from typing import Any
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.stopwords import (
+    extract_collection_domain_stopwords,
+    get_vietnamese_stopwords,
+)
 from app.modules.knowledge.models import KnowledgeChunk, KnowledgeDocument
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
@@ -18,24 +22,78 @@ from app.modules.rag.vector_indexer import vector_indexer
 
 logger = logging.getLogger(__name__)
 
-# Generic Vietnamese syllables that dilute lexical search when used as ILIKE patterns.
+# Vietnamese NLP & search stopwords dynamically loaded from configs/stopwords_vi.txt.
 # Stripped so distinctive tokens (subjects, majors, codes) drive matching instead of
-# ultra-common words like "các / ngành / xét / tuyển" (phiên #184).
-ILIKE_STOP_SYLLABLES: frozenset[str] = frozenset(
-    {
-        "cách", "trong", "được", "những", "thực", "hiện", "theo", "nào", "như", "thế",
-        "các", "ngành", "xét", "tuyển", "hợp", "môn", "nhung", "một", "này",
-        "kia", "đó", "với", "của", "và", "cho", "là", "có", "không", "cần", "để",
-        "bạn", "tôi", "trường", "đại", "học", "quy", "nhơn", "biết", "bao", "nhiêu",
-    }
+# ultra-common functional words and administrative boilerplate (phiên #184).
+ILIKE_STOP_SYLLABLES: frozenset[str] = get_vietnamese_stopwords()
+
+RE_ALPHANUMERIC: re.Pattern[str] = re.compile(
+    r"^(?=.*[a-zà-ỹ])(?=.*\d)[a-zà-ỹ0-9]+$", re.IGNORECASE
 )
+RE_NUMERIC_CODE: re.Pattern[str] = re.compile(r"^\d{3,8}$")
+RE_ACRONYM: re.Pattern[str] = re.compile(r"^[A-ZĐ]{2,}$")
 
 
-def select_ilike_tokens(query: str, limit: int = 6) -> list[str]:
-    """Pick distinctive word tokens for the ILIKE fallback, stripping punctuation."""
+def extract_weighted_tokens(
+    query: str,
+    limit: int = 12,
+    extra_stopwords: set[str] | frozenset[str] | None = None,
+) -> list[tuple[str, float]]:
+    """Extract distinct search tokens scored by structural information density & morphology."""
+    if not query:
+        return []
+    raw_words = re.findall(r"[A-Za-zÀ-ỹ0-9]+", query)
+    scored: dict[str, float] = {}
+
+    stopwords = get_vietnamese_stopwords()
+    if extra_stopwords:
+        stopwords = stopwords | extra_stopwords
+
+    for raw_word in raw_words:
+        token = raw_word.lower()
+        if len(token) <= 1:
+            continue
+        if token in stopwords:
+            continue
+
+        if RE_ALPHANUMERIC.match(raw_word):
+            weight = 4.0
+        elif RE_NUMERIC_CODE.match(raw_word):
+            weight = 3.5
+        elif RE_ACRONYM.match(raw_word):
+            weight = 2.5
+        elif re.match(r"^\d{1,2}$", raw_word):
+            weight = 1.2
+        elif len(token) >= 7:
+            weight = 1.8
+        elif len(token) >= 5:
+            weight = 1.2
+        elif len(token) == 4:
+            weight = 0.6
+        else:
+            weight = 0.2
+
+        if token not in scored or weight > scored[token]:
+            scored[token] = weight
+
+    sorted_tokens = sorted(scored.items(), key=lambda item: (-item[1], -len(item[0])))
+    return sorted_tokens[:limit]
+
+
+def select_ilike_tokens(
+    query: str,
+    limit: int = 6,
+    extra_stopwords: set[str] | frozenset[str] | None = None,
+) -> list[str]:
+    """Pick distinctive word tokens for the ILIKE fallback, ordered by information density."""
+    weighted = extract_weighted_tokens(query, limit=limit, extra_stopwords=extra_stopwords)
+    if weighted:
+        return [t for t, _ in weighted]
     tokens = re.findall(r"\w+", (query or "").lower())
-    meaningful = [t for t in tokens if len(t) > 2 and t not in ILIKE_STOP_SYLLABLES]
-    return meaningful[:limit] or [t for t in tokens if len(t) > 2][:limit]
+    stopwords = get_vietnamese_stopwords()
+    if extra_stopwords:
+        stopwords = stopwords | extra_stopwords
+    return [t for t in tokens if len(t) > 2 and t not in stopwords][:limit]
 
 
 def strip_vietnamese_accents(text: str) -> str:
@@ -63,19 +121,68 @@ class HybridRetriever:
         top_k: int = 10,
         tenant_id: str | None = None,
         workspace_id: str | None = None,
+        collection_name: str | None = None,
+        extra_stopwords: set[str] | frozenset[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform lexical keyword search in PostgreSQL using full-text search with ts_rank and ILIKE fallback."""
+        """Perform lexical keyword search in PostgreSQL using weighted information density scoring & FTS."""
         from app.modules.knowledge.models import KnowledgeCollection
 
-        fts_chunks: list[KnowledgeChunk] = []
+        chunks: list[KnowledgeChunk] = []
+        seen_ids: set[str] = set()
 
-        # 1. Try PostgreSQL Full-Text Search with ts_rank ranking
-        try:
-            ts_query = func.plainto_tsquery("simple", query.strip())
-            ts_vector = func.to_tsvector("simple", KnowledgeChunk.content)
-            rank_expr = func.ts_rank_cd(ts_vector, ts_query)
+        # Dynamic collection-specific stopwords: words in collection title appear in ~100% of chunks
+        effective_extra = set(extra_stopwords or set())
+        if collection_name:
+            effective_extra |= extract_collection_domain_stopwords(collection_name)
 
-            stmt = (
+        weighted_tokens = extract_weighted_tokens(query, limit=12, extra_stopwords=effective_extra)
+
+        # 1. Primary: Weighted Information Density ILIKE Matching with Document Anchor Scoping
+        if weighted_tokens:
+            score_cases = []
+            conditions = []
+            for token, weight in weighted_tokens:
+                is_code = (
+                    bool(RE_ALPHANUMERIC.match(token))
+                    or bool(RE_NUMERIC_CODE.match(token))
+                    or bool(RE_ACRONYM.match(token.upper()))
+                )
+                content_match = KnowledgeChunk.content.ilike(f"%{token}%")
+                doc_match = or_(
+                    KnowledgeDocument.file_name.ilike(f"%{token}%"),
+                    KnowledgeDocument.title.ilike(f"%{token}%"),
+                )
+                term_match = or_(content_match, doc_match)
+                conditions.append(term_match)
+
+                # Document Anchor Scoping: when an exact code or document number (e.g. 123, 1897, BC03)
+                # matches document metadata, elevate chunks from that document.
+                if is_code:
+                    score_cases.append(
+                        case(
+                            (and_(content_match, doc_match), weight * 1.5),
+                            (doc_match, weight * 1.2),
+                            (content_match, weight),
+                            else_=0.0,
+                        )
+                    )
+                else:
+                    score_cases.append(
+                        case(
+                            (and_(content_match, doc_match), weight * 1.3),
+                            (term_match, weight),
+                            else_=0.0,
+                        )
+                    )
+
+            total_score = (
+                sum(score_cases[1:], score_cases[0])
+                if len(score_cases) > 1
+                else score_cases[0]
+            )
+            match_expr = or_(*conditions)
+
+            stmt_weighted = (
                 select(KnowledgeChunk)
                 .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
                 .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
@@ -83,41 +190,43 @@ class HybridRetriever:
                     KnowledgeChunk.collection_id == collection_id,
                     KnowledgeDocument.status.in_(["approved", "ready"]),
                     KnowledgeDocument.is_active.is_(True),
-                    ts_vector.op("@@")(ts_query),
+                    match_expr,
                 )
             )
             if tenant_id:
-                stmt = stmt.where(KnowledgeCollection.tenant_id == tenant_id)
+                stmt_weighted = stmt_weighted.where(KnowledgeCollection.tenant_id == tenant_id)
             if workspace_id:
-                stmt = stmt.where(KnowledgeCollection.workspace_id == workspace_id)
-            stmt = stmt.order_by(desc(rank_expr)).limit(top_k)
-            res = await db.execute(stmt)
-            scalars = res.scalars()
-            fts_chunks = list(scalars.all()) if hasattr(scalars, "all") else []
-        except Exception as e:
-            logger.debug("PostgreSQL FTS ts_rank skipped or unsupported: %s", e)
-            fts_chunks = []
+                stmt_weighted = stmt_weighted.where(KnowledgeCollection.workspace_id == workspace_id)
+            stmt_weighted = stmt_weighted.order_by(desc(total_score)).limit(top_k)
 
-        # 2. If FTS yielded candidates, use them; supplement with keyword ILIKE when needed
-        seen_ids = {c.id for c in fts_chunks}
-        chunks = list(fts_chunks)
+            try:
+                res_weighted = await db.execute(stmt_weighted)
+                scalars_weighted = res_weighted.scalars()
+                for c in list(scalars_weighted.all()) if hasattr(scalars_weighted, "all") else []:
+                    if c.id not in seen_ids:
+                        chunks.append(c)
+                        seen_ids.add(c.id)
+                        if len(chunks) >= top_k:
+                            break
+            except Exception as e_weighted:
+                logger.debug("Sparse weighted ILIKE search failed: %s", e_weighted)
 
+        # 2. Supplementary: Disjunctive OR-Weighted Full-Text Search with ts_rank_cd
         if len(chunks) < top_k:
-            meaningful_tokens = select_ilike_tokens(query)
-
-            if meaningful_tokens:
-                if not fts_chunks and len(meaningful_tokens) >= 2:
-                    from sqlalchemy import and_
-
-                    match_expr = and_(
-                        KnowledgeChunk.content.ilike(f"%{meaningful_tokens[0]}%"),
-                        KnowledgeChunk.content.ilike(f"%{meaningful_tokens[1]}%"),
-                    )
+            try:
+                # Sanitize high-entropy alphanumeric tokens for PostgreSQL tsquery
+                safe_ts_tokens = [re.sub(r"[^\w]+", "", t) for t, _ in weighted_tokens[:8]]
+                safe_ts_tokens = [t for t in safe_ts_tokens if len(t) >= 2]
+                if safe_ts_tokens:
+                    or_query_str = " | ".join(safe_ts_tokens)
+                    ts_query = func.to_tsquery("simple", or_query_str)
                 else:
-                    conditions = [KnowledgeChunk.content.ilike(f"%{token}%") for token in meaningful_tokens]
-                    match_expr = or_(*conditions)
+                    ts_query = func.websearch_to_tsquery("simple", query.strip())
 
-                stmt_ilike = (
+                ts_vector = func.to_tsvector("simple", KnowledgeChunk.content)
+                rank_expr = func.ts_rank_cd(ts_vector, ts_query)
+
+                stmt_fts = (
                     select(KnowledgeChunk)
                     .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
                     .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
@@ -125,37 +234,52 @@ class HybridRetriever:
                         KnowledgeChunk.collection_id == collection_id,
                         KnowledgeDocument.status.in_(["approved", "ready"]),
                         KnowledgeDocument.is_active.is_(True),
-                        match_expr,
+                        ts_vector.op("@@")(ts_query),
                     )
                 )
                 if tenant_id:
-                    stmt_ilike = stmt_ilike.where(KnowledgeCollection.tenant_id == tenant_id)
+                    stmt_fts = stmt_fts.where(KnowledgeCollection.tenant_id == tenant_id)
                 if workspace_id:
-                    stmt_ilike = stmt_ilike.where(KnowledgeCollection.workspace_id == workspace_id)
-                stmt_ilike = stmt_ilike.limit(top_k)
+                    stmt_fts = stmt_fts.where(KnowledgeCollection.workspace_id == workspace_id)
+                stmt_fts = stmt_fts.order_by(desc(rank_expr)).limit(top_k)
+                res_fts = await db.execute(stmt_fts)
+                scalars_fts = res_fts.scalars()
+                for c in list(scalars_fts.all()) if hasattr(scalars_fts, "all") else []:
+                    if c.id not in seen_ids:
+                        chunks.append(c)
+                        seen_ids.add(c.id)
+                        if len(chunks) >= top_k:
+                            break
+            except Exception as e_fts:
+                logger.debug("PostgreSQL FTS ts_rank skipped or unsupported: %s", e_fts)
 
-                try:
-                    res_ilike = await db.execute(stmt_ilike)
-                    scalars_ilike = res_ilike.scalars()
-                    for c in list(scalars_ilike.all()) if hasattr(scalars_ilike, "all") else []:
-                        if c.id not in seen_ids:
-                            chunks.append(c)
-                            seen_ids.add(c.id)
-                            if len(chunks) >= top_k:
-                                break
-                except Exception as e_ilike:
-                    logger.debug("Sparse ILIKE fallback query failed: %s", e_ilike)
-
-        # 3. Unaccented fallback for queries typed without diacritics.
-        # Requires the PostgreSQL unaccent extension; skipped gracefully when unavailable.
+        # 3. Unaccented fallback for queries typed without diacritics
         if len(chunks) < top_k and is_unaccented_query(query):
             try:
-                uni_tokens = select_ilike_tokens(strip_vietnamese_accents(query))[:3]
-                if uni_tokens:
-                    uni_conds = [
-                        func.unaccent(KnowledgeChunk.content).ilike(f"%{token}%")
-                        for token in uni_tokens
-                    ]
+                uni_weighted = extract_weighted_tokens(strip_vietnamese_accents(query), limit=8)
+                if uni_weighted:
+                    uni_cases = []
+                    uni_conds = []
+                    for token, weight in uni_weighted:
+                        u_content = func.unaccent(KnowledgeChunk.content).ilike(f"%{token}%")
+                        u_doc = or_(
+                            func.unaccent(KnowledgeDocument.file_name).ilike(f"%{token}%"),
+                            func.unaccent(KnowledgeDocument.title).ilike(f"%{token}%"),
+                        )
+                        u_match = or_(u_content, u_doc)
+                        uni_conds.append(u_match)
+                        uni_cases.append(
+                            case(
+                                (and_(u_content, u_doc), weight * 1.3),
+                                (u_match, weight),
+                                else_=0.0,
+                            )
+                        )
+                    uni_total_score = (
+                        sum(uni_cases[1:], uni_cases[0])
+                        if len(uni_cases) > 1
+                        else uni_cases[0]
+                    )
                     stmt_uni = (
                         select(KnowledgeChunk)
                         .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
@@ -171,7 +295,7 @@ class HybridRetriever:
                         stmt_uni = stmt_uni.where(KnowledgeCollection.tenant_id == tenant_id)
                     if workspace_id:
                         stmt_uni = stmt_uni.where(KnowledgeCollection.workspace_id == workspace_id)
-                    stmt_uni = stmt_uni.limit(top_k)
+                    stmt_uni = stmt_uni.order_by(desc(uni_total_score)).limit(top_k)
                     res_uni = await db.execute(stmt_uni)
                     scalars_uni = res_uni.scalars()
                     for c in list(scalars_uni.all()) if hasattr(scalars_uni, "all") else []:

@@ -15,11 +15,18 @@ from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
 from app.modules.rag.composer import (
     answer_format_planner,
+    build_generic_system_instruction,
     extract_suggested_questions,
     sanitize_rag_answer,
 )
 from app.modules.rag.facts import fact_layer
-from app.modules.rag.query_router import QueryIntent, query_classifier, scope_history_by_topic
+from app.modules.rag.fusion import FusionCandidate
+from app.modules.rag.query_router import (
+    QueryAnalysis,
+    QueryIntent,
+    query_classifier,
+    scope_history_by_topic,
+)
 from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.schemas import (
     AskRequest,
@@ -30,41 +37,6 @@ from app.modules.rag.schemas import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-MODULE_CONTACT_HINTS: dict[str, str] = {
-    "admissions": "Hotline tư vấn tuyển sinh: 0256.3846.156 / Email: tuyensinh@qnu.edu.vn.",
-    "regulations": "Phòng Đào tạo Trường ĐH Quy Nhơn.",
-    "library": "Thư viện Trường ĐH Quy Nhơn.",
-    "drafting": "Phòng Hành chính - Tổng hợp Trường ĐH Quy Nhơn.",
-    "question_bank": "Phòng Khảo thí & Đảm bảo chất lượng Trường ĐH Quy Nhơn.",
-    "general": "bộ phận phụ trách của Trường ĐH Quy Nhơn.",
-}
-
-
-def build_generic_system_instruction(module_code: str, custom_prompt: str | None) -> str:
-    """Build reusable system instruction for any assistant.
-
-    Custom prompt from assistant profile takes precedence. Otherwise a
-    universal Zero-Hallucination instruction is returned with a
-    module-specific contact hint.
-    """
-    if custom_prompt and custom_prompt.strip():
-        return custom_prompt.strip()
-    contact = MODULE_CONTACT_HINTS.get((module_code or "general").strip().lower())
-    if not contact:
-        contact = MODULE_CONTACT_HINTS["general"]
-    return (
-        "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU).\n"
-        "Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA HOÀN TOÀN VÀO tài liệu và số liệu chính thức được cung cấp bên dưới.\n"
-        "QUY TẮC BẮT BUỘC (Zero Hallucination & Clean Formatting):\n"
-        "1. Chỉ sử dụng thông tin có trong Bảng Số Liệu hoặc Tài Liệu Trích Xuất. Tuyệt đối không tự suy diễn hoặc bịa đặt.\n"
-        "2. TRÍCH XUẤT THEO THỰC THỂ: Khi tài liệu chứa nhiều ngành hoặc đối tượng, CHỈ ĐƯỢC trích xuất duy nhất thông tin của ngành/đối tượng mà người dùng đang hỏi. Tuyệt đối không sao chép các ngành khác trong bảng.\n"
-        "3. ĐỊNH DẠNG CHUẨN MỰC: Tuyệt đối không sao chép nguyên văn các ký tự phân cách thô dạng `||||||` hoặc ký hiệu bảng vỡ. Trình bày danh sách gạch đầu dòng (-) hoặc bảng Markdown hoàn chỉnh có dòng tiêu đề cột.\n"
-        f"4. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức và hướng dẫn liên hệ {contact}\n"
-        "5. Giữ nguyên tính chính xác của các con số, văn phong sư phạm lịch thiệp, mạch lạc.\n"
-        "6. Giao tiếp tự nhiên, đi thẳng vào nội dung. Tuyệt đối không lặp lại câu chào giới thiệu danh xưng rập khuôn (như 'Chào bạn! Mình là Trợ lý...') ở mỗi câu trả lời."
-    )
 
 
 REFUSAL_PHRASES = (
@@ -161,6 +133,7 @@ class RagService:
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
             cached["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
+            cached["answer"] = sanitize_rag_answer(cached.get("answer", ""))
             return AskResponse.model_validate(cached)
 
         # 3. Query Intent Analysis & Fact-First Routing (module-aware, reusable)
@@ -262,20 +235,14 @@ class RagService:
             ),
         )
 
-        # 7. Assemble Prompt & Generate Answer (Mock/LLM generation)
-        context_texts = [c.content for c in candidates]
-        full_prompt = answer_format_planner.assemble_prompt(
-            query=req.question,
-            context_chunks=context_texts,
-            fact_table=fact_markdown,
-            custom_system_prompt=req.system_prompt,
-        )
-        logger.debug("Assembled prompt for query '%s' (length: %d)", req.question, len(full_prompt))
-
         # 7. Assemble Prompt & Generate Answer via ModelOps LLM Runtime
         context_texts = [c.content for c in candidates]
-        citations = citation_guard.build_citations(candidates)
+        for neighbors in (neighbor_context or {}).values():
+            for n_text in neighbors:
+                if n_text and n_text not in context_texts:
+                    context_texts.append(n_text)
 
+        citations = citation_guard.build_citations(candidates)
         system_instruction = build_generic_system_instruction(req.module_code, req.system_prompt)
 
         # Tiered evidence: fact-first queries rank facts above chunks above history.
@@ -293,117 +260,33 @@ class RagService:
             analysis.subject_names or any(k in req.question.lower() for k in ("môn", "tổ hợp"))
         )
 
-        user_content = f"Câu hỏi của người dùng: {req.question}\n\n"
-        if target_entity_str:
-            user_content += (
-                f"RÀNG BUỘC TRÍCH XUẤT THEO THỰC THỂ (BẮT BUỘC):\n"
-                f"- Người dùng đang hỏi về thực thể/ngành: '{target_entity_str}'.\n"
-                f"- BẠN CHỈ ĐƯỢC PHÉP trích xuất và giải đáp thông tin liên quan đến thực thể này.\n"
-                f"- TUYỆT ĐỐI KHÔNG sao chép hoặc liệt kê thông tin của các ngành/đối tượng khác có trong bảng hoặc tài liệu.\n\n"
-            )
-
-        format_instructions = answer_format_planner.get_format_instructions(
-            chosen_format,
+        user_content = answer_format_planner.build_rag_user_prompt(
+            question=req.question,
+            chosen_format=chosen_format,
             target_entity=target_entity_str,
             is_combo_query=is_combo_query,
+            is_fact_query=is_fact_query,
+            fact_markdown=fact_markdown,
+            context_texts=context_texts,
+            neighbor_context=neighbor_context,
         )
-        if format_instructions:
-            user_content += f"{format_instructions}\n\n"
-
-        if is_fact_query:
-            user_content += (
-                "THỨ TỰ ƯU TIÊN BẰNG CHỨNG (khi mâu thuẫn, tầng trên thắng tầng dưới):\n"
-                "TẦNG 1 - BẢNG SỐ LIỆU, TẦNG 2 - ĐOẠN TRÍCH, TẦNG 3 - LỊCH SỬ TRAO ĐỔI.\n"
-                "Lịch sử chỉ dùng để hiểu đại từ, không phải bằng chứng.\n\n"
-            )
-        if fact_markdown:
-            tier_label = "TẦNG 1 - BẢNG SỐ LIỆU ĐÃ XÁC THỰC" if is_fact_query else "BẢNG SỐ LIỆU ĐÃ XÁC THỰC"
-            user_content += f"{tier_label}:\n{fact_markdown}\n\n"
-        if context_texts:
-            chunk_label = (
-                "TẦNG 2 - ĐOẠN TRÍCH TỪ KHO TRI THỨC" if is_fact_query else "TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC"
-            )
-            user_content += f"{chunk_label}:\n"
-            for i, text in enumerate(context_texts, 1):
-                user_content += f"--- Đoạn trích [{i}] ---\n{text}\n\n"
-        if neighbor_context:
-            user_content += (
-                "BỐI CẢNH MỞ RỘNG (chỉ để hiểu thêm, KHÔNG dùng làm trích dẫn):\n"
-            )
-            for cid, texts in neighbor_context.items():
-                for text in texts:
-                    user_content += f"--- Bối cảnh kề chunk {cid} ---\n{text[:1000]}\n\n"
 
         # Topic-scoped history: independent new questions must not inherit stale answers.
-        scoped_history = scope_history_by_topic(history_list, analysis)
-        llm_messages = [ChatMessage(role="system", content=system_instruction)]
-        for h_msg in scoped_history:
-            h_role = h_msg.get("role", "user")
-            h_text = h_msg.get("content", "")
-            if h_role in ("user", "assistant") and h_text:
-                if is_fact_query:
-                    h_text = f"[TẦNG 3 - Lịch sử trao đổi, chỉ tham khảo ngữ cảnh] {h_text}"
-                llm_messages.append(ChatMessage(role=h_role, content=h_text))
-        llm_messages.append(ChatMessage(role="user", content=user_content))
+        llm_messages = self._build_chat_messages(
+            system_instruction=system_instruction,
+            user_content=user_content,
+            history_list=history_list,
+            analysis=analysis,
+        )
 
-        try:
-            llm_req = LLMGenerateRequest(
-                messages=llm_messages,
-                temperature=fact_temperature,
-                max_tokens=req.max_tokens,
-                thinking_budget=req.thinking_budget,
-                conversation_id=req.conversation_id,
-                preferred_provider_id=req.preferred_provider_id,
-                preferred_model_name=req.preferred_model_name,
-                fallback_model_name=req.fallback_model,
-            )
-            llm_res = await modelops_service.generate(db, llm_req)
-            synthesized_answer = llm_res.content.strip()
-        except Exception as e:
-            logger.warning(
-                "ModelOps primary model '%s' generation failed (%s). Checking fallback model...",
-                req.preferred_model_name,
-                e,
-            )
-            fallback_success = False
-            if req.fallback_model and req.fallback_model != req.preferred_model_name:
-                try:
-                    fallback_llm_req = LLMGenerateRequest(
-                        messages=llm_messages,
-                        temperature=fact_temperature,
-                        max_tokens=req.max_tokens,
-                        thinking_budget=req.thinking_budget,
-                        conversation_id=req.conversation_id,
-                        preferred_provider_id=req.preferred_provider_id,
-                        preferred_model_name=req.fallback_model,
-                    )
-                    llm_res = await modelops_service.generate(db, fallback_llm_req)
-                    synthesized_answer = llm_res.content.strip()
-                    fallback_success = True
-                    logger.info("Successfully recovered using fallback model '%s'", req.fallback_model)
-                except Exception as fb_err:
-                    logger.warning(
-                        "ModelOps fallback model '%s' also failed (%s), using grounded context synthesis fallback",
-                        req.fallback_model,
-                        fb_err,
-                    )
-
-            if not fallback_success:
-                # Factual grounded synthesis fallback without hallucinating
-                if fact_markdown:
-                    synthesized_answer = (
-                        f"Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
-                        f"{fact_markdown}\n\n"
-                        f"**Thông tin bổ sung:**\n"
-                        f"{candidates[0].content[:400] if candidates else ''}"
-                    )
-                elif candidates:
-                    synthesized_answer = (
-                        f"Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
-                        f"{candidates[0].content}"
-                    )
-                else:
-                    synthesized_answer = citation_guard.get_no_answer_response(req.module_code)
+        synthesized_answer = await self._generate_answer_with_fallback(
+            db=db,
+            req=req,
+            llm_messages=llm_messages,
+            temperature=fact_temperature,
+            fact_markdown=fact_markdown,
+            candidates=candidates,
+        )
 
         # 8. Output Guardrail safety check
         safe_output = output_guardrail.check(synthesized_answer)
@@ -471,6 +354,92 @@ class RagService:
             )
 
         return resp
+
+    @staticmethod
+    def _build_chat_messages(
+        system_instruction: str,
+        user_content: str,
+        history_list: list[dict],
+        analysis: QueryAnalysis,
+    ) -> list[ChatMessage]:
+        """Format multi-turn conversation messages with topic scoping and tier labeling."""
+        scoped_history = scope_history_by_topic(history_list, analysis)
+        llm_messages = [ChatMessage(role="system", content=system_instruction)]
+        for h_msg in scoped_history:
+            h_role = h_msg.get("role", "user")
+            h_text = h_msg.get("content", "")
+            if h_role in ("user", "assistant") and h_text:
+                if analysis.is_fact_first:
+                    h_text = f"[TẦNG 3 - Lịch sử trao đổi, chỉ tham khảo ngữ cảnh] {h_text}"
+                llm_messages.append(ChatMessage(role=h_role, content=h_text))
+        llm_messages.append(ChatMessage(role="user", content=user_content))
+        return llm_messages
+
+    async def _generate_answer_with_fallback(
+        self,
+        db: AsyncSession,
+        req: AskRequest,
+        llm_messages: list[ChatMessage],
+        temperature: float,
+        fact_markdown: str | None,
+        candidates: list[FusionCandidate],
+    ) -> str:
+        """Call ModelOps LLM with primary model, fallback model, or grounded context synthesis."""
+        try:
+            llm_req = LLMGenerateRequest(
+                messages=llm_messages,
+                temperature=temperature,
+                max_tokens=req.max_tokens,
+                thinking_budget=req.thinking_budget,
+                conversation_id=req.conversation_id,
+                preferred_provider_id=req.preferred_provider_id,
+                preferred_model_name=req.preferred_model_name,
+                fallback_model_name=req.fallback_model,
+            )
+            llm_res = await modelops_service.generate(db, llm_req)
+            return llm_res.content.strip()
+        except Exception as e:
+            logger.warning(
+                "ModelOps primary model '%s' generation failed (%s). Checking fallback model...",
+                req.preferred_model_name,
+                e,
+            )
+
+        if req.fallback_model and req.fallback_model != req.preferred_model_name:
+            try:
+                fallback_llm_req = LLMGenerateRequest(
+                    messages=llm_messages,
+                    temperature=temperature,
+                    max_tokens=req.max_tokens,
+                    thinking_budget=req.thinking_budget,
+                    conversation_id=req.conversation_id,
+                    preferred_provider_id=req.preferred_provider_id,
+                    preferred_model_name=req.fallback_model,
+                )
+                llm_res = await modelops_service.generate(db, fallback_llm_req)
+                logger.info("Successfully recovered using fallback model '%s'", req.fallback_model)
+                return llm_res.content.strip()
+            except Exception as fb_err:
+                logger.warning(
+                    "ModelOps fallback model '%s' also failed (%s), using grounded context synthesis fallback",
+                    req.fallback_model,
+                    fb_err,
+                )
+
+        # Factual grounded synthesis fallback without hallucinating
+        if fact_markdown:
+            return (
+                "Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
+                f"{fact_markdown}\n\n"
+                f"**Thông tin bổ sung:**\n"
+                f"{candidates[0].content[:400] if candidates else ''}"
+            )
+        if candidates:
+            return (
+                "Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
+                f"{candidates[0].content}"
+            )
+        return citation_guard.get_no_answer_response(req.module_code)
 
 
 rag_service = RagService()

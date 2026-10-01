@@ -184,8 +184,12 @@ class FactLayer:
             if keywords:
                 for kw in keywords:
                     clean_kw = kw.strip().lower()
-                    # An explicit entity code passed in keywords (e.g. '7480201', '6.8')
-                    if re.search(r"^\d{4,}$", clean_kw) or re.search(r"^\d+\.\d+$", clean_kw):
+                    # An explicit entity code (e.g. '7480201', '6.8') or compound entity phrase (>= 2 words)
+                    if (
+                        re.search(r"^\d{4,}$", clean_kw)
+                        or re.search(r"^\d+\.\d+$", clean_kw)
+                        or len(clean_kw.split()) >= 2
+                    ):
                         query_entity_markers.append(clean_kw)
 
             if not query_entity_markers:
@@ -201,7 +205,7 @@ class FactLayer:
                     raw = getattr(f, "raw_data", {}) or {}
                     raw_str = str(raw).lower() if isinstance(raw, dict) else ""
                     return any(
-                        m in ent_name or m in raw_str
+                        m in ent_name or m in attr_val or m in raw_str
                         for m in query_entity_markers
                     )
                 rows = [f for f in rows if matches_entity(f)]

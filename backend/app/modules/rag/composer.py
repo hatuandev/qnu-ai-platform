@@ -15,6 +15,10 @@ Phong cách giao tiếp:
 - TRA CỨU TỔ HỢP MÔN: Chỉ liệt kê những ngành/chuyên ngành có MỘT TỔ HỢP CỤ THỂ chứa ĐỦ TẤT CẢ các môn được hỏi. Tuyệt đối không ghép các môn từ nhiều tổ hợp khác nhau của cùng một ngành để trả lời (ví dụ: nếu một ngành có tổ hợp (Toán, Văn, Anh) và (Văn, Anh, Hóa), ngành đó KHÔNG có tổ hợp (Toán, Anh, Hóa), tuyệt đối không được liệt kê).
 - TRÍCH XUẤT THEO THỰC THỂ: Khi tài liệu hoặc Bảng số liệu chứa nhiều ngành/đối tượng khác nhau, CHỈ ĐƯỢC trích xuất duy nhất thông tin của ngành/đối tượng mà người dùng đang hỏi. TUYỆT ĐỐI KHÔNG sao chép hoặc liệt kê thông tin của các ngành khác trong bảng.
 - ĐỊNH DẠNG CHUẨN MỰC: Tuyệt đối KHÔNG sao chép nguyên văn các ký tự phân cách thô dạng `||||||` hoặc ký hiệu bảng vỡ từ tài liệu gốc. Trình bày nội dung sạch sẽ bằng văn phong sư phạm chuẩn mực, diễn giải rõ ràng các ký hiệu viết tắt hoặc con số (ví dụ: giải thích các phương thức 1, 2, 3, 4).
+- ĐỐI SOÁT TỌA ĐỘ BẢNG BIỂU & CHUỖI KIỂM CHỨNG (Schema Anchor & Chain-of-Verification):
+  + Tọa độ Thời gian / Năm áp dụng: Khi câu hỏi nêu rõ năm (ví dụ "năm 2025" hoặc "năm 2026"), BẮT BUỘC kiểm tra tiêu đề bảng/văn bản và trích xuất đúng số liệu của năm đó. TUYỆT ĐỐI KHÔNG nhầm lẫn giữa số liệu thực hiện năm trước (2025) và số liệu đăng ký chỉ tiêu năm sau (2026).
+  + Tọa độ Cột & Thuộc tính: Xác định chính xác tên cột dữ liệu (ví dụ: 'Chỉ tiêu' vs 'Thực hiện' vs 'Tỉ lệ %'; hoặc 'Cơ hữu' vs 'Thỉnh giảng'; hoặc từng cấp học vị). Chỉ lấy đúng con số nằm tại giao điểm của hàng và cột tương ứng.
+  + Đối soát logic: Nếu câu hỏi hỏi về 'kết quả thực tế/thực hiện', tuyệt đối không lấy số liệu ở cột 'chỉ tiêu dự kiến' và ngược lại.
 - Trả lời CHÍNH XÁC dựa trên tài liệu ngữ cảnh được cung cấp bên dưới.
 - Nếu câu hỏi yêu cầu các thông số, điều kiện, mốc thời gian, hãy trích xuất dưới dạng bảng hoặc gạch đầu dòng rõ ràng.
 - Tuyệt đối KHÔNG suy diễn hoặc bịa đặt số liệu ngoài tài liệu được cung cấp.
@@ -375,7 +379,99 @@ def sanitize_rag_answer(raw_answer: str, target_entity: str | None = None) -> st
     # 3. Clean any trailing leftover header markers e.g. [GIZ]:, [GỢI Ý]:
     text = _TRAILING_TAG_PATTERN.sub("", text).strip()
 
+    # 4. Clean internal prompt scaffolding references and meta preambles
+    text = re.sub(
+        r"^\s*(?:Căn cứ|Dựa)\s+(?:vào\s+)?(?:Bảng Số Liệu|Đoạn trích|Tài liệu Trích Xuất)\s*\[\d+\].*?(?:để trả lời[^\n]*|như sau:?)\s*\n*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"^\s*Câu trả lời (?:của Trợ lý|được xây dựng)[^\n]*?(?:như sau:?|bên dưới\.?)\s*\n*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"^\s*(?:Căn cứ|Dựa trên)\s+(?:thông tin\s+)?(?:vào\s+)?(?:số liệu được trích dẫn\s+|trong Bảng Số Liệu\s*)?[^\n]*?chúng tôi có thể (?:xác định|trả lời)[^\n]*?:\s*\n*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"(?m)^\s*(?:DANH SÁCH GẠCH ĐẸP|GẠCH ĐẦU DÒNG)[^\n]*\n*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"\s*trong\s+(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\](?:,\s*(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\])*(?:\s*và\s*(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\])?",
+        " trong tài liệu báo cáo chính thức",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(
+        r"(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\](?:,\s*(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\])*(?:\s*và\s*(?:Bảng Số Liệu|Đoạn trích)\s*\[\d+\])?",
+        "tài liệu chính thức",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"(?m)^\s*Lưu ý:[^\n]*?(?:Bảng Số Liệu|Đoạn trích)[^\n]*$", "", text, flags=re.IGNORECASE)
+
+    # 5. Deduplicate identical consecutive bullet items if echoed by model
+    lines = [ln for ln in text.split("\n")]
+    deduped_lines: list[str] = []
+    seen_bullets: set[str] = set()
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(("-", "*", "+")):
+            norm_bullet = re.sub(r"\s+", " ", stripped.lower())
+            if norm_bullet in seen_bullets:
+                continue
+            seen_bullets.add(norm_bullet)
+        deduped_lines.append(line)
+    if len(deduped_lines) < len(lines):
+        text = "\n".join(deduped_lines)
+
     return clean_robotic_intro(text.strip())
+
+
+MODULE_CONTACT_HINTS: dict[str, str] = {
+    "admissions": "Hotline tư vấn tuyển sinh: 0256.3846.156 / Email: tuyensinh@qnu.edu.vn.",
+    "regulations": "Phòng Đào tạo Trường ĐH Quy Nhơn.",
+    "library": "Thư viện Trường ĐH Quy Nhơn.",
+    "drafting": "Phòng Hành chính - Tổng hợp Trường ĐH Quy Nhơn.",
+    "question_bank": "Phòng Khảo thí & Đảm bảo chất lượng Trường ĐH Quy Nhơn.",
+    "general": "bộ phận phụ trách của Trường ĐH Quy Nhơn.",
+}
+
+
+def build_generic_system_instruction(module_code: str, custom_prompt: str | None) -> str:
+    """Build reusable system instruction for any assistant.
+
+    Custom prompt from assistant profile takes precedence. Otherwise a
+    universal Zero-Hallucination instruction is returned with a
+    module-specific contact hint.
+    """
+    if custom_prompt and custom_prompt.strip():
+        return custom_prompt.strip()
+    contact = MODULE_CONTACT_HINTS.get((module_code or "general").strip().lower())
+    if not contact:
+        contact = MODULE_CONTACT_HINTS["general"]
+    return (
+        "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU).\n"
+        "Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA HOÀN TOÀN VÀO tài liệu và số liệu chính thức được cung cấp bên dưới.\n"
+        "QUY TẮC BẮT BUỘC (Zero Hallucination & Clean Formatting):\n"
+        "1. Chỉ sử dụng thông tin có trong Bảng Số Liệu hoặc Tài Liệu Trích Xuất. Tuyệt đối không tự suy diễn hoặc bịa đặt.\n"
+        "2. TRÍCH XUẤT THEO THỰC THỂ: Khi tài liệu chứa nhiều ngành hoặc đối tượng, CHỈ ĐƯỢC trích xuất duy nhất thông tin của ngành/đối tượng mà người dùng đang hỏi. Tuyệt đối không sao chép các ngành khác trong bảng.\n"
+        "3. ĐỊNH DẠNG CHUẨN MỰC: Tuyệt đối không sao chép nguyên văn các ký tự phân cách thô dạng `||||||` hoặc ký hiệu bảng vỡ. Trình bày danh sách gạch đầu dòng (-) hoặc bảng Markdown hoàn chỉnh có dòng tiêu đề cột.\n"
+        f"4. Nếu tài liệu không đủ căn cứ để giải đáp, hãy thông báo lịch sự rằng thông tin chưa có trong tài liệu chính thức và hướng dẫn liên hệ {contact}\n"
+        "5. Giữ nguyên tính chính xác của các con số, văn phong sư phạm lịch thiệp, mạch lạc.\n"
+        "6. Giao tiếp tự nhiên, đi thẳng vào nội dung. Tuyệt đối không lặp lại câu chào giới thiệu danh xưng rập khuôn (như 'Chào bạn! Mình là Trợ lý...') ở mỗi câu trả lời.\n"
+        "7. ĐỐI SOÁT TỌA ĐỘ BẢNG BIỂU (Schema Anchor & Chain-of-Verification):\n"
+        "   - Tọa độ Thời gian: Tuyệt đối không nhầm lẫn giữa các năm (ví dụ kết quả tuyển sinh thực tế 2025 vs chỉ tiêu đăng ký 2026). Kiểm tra kỹ tiêu đề tài liệu để lấy đúng năm được hỏi.\n"
+        "   - Tọa độ Cột & Hàng: Xác định đúng tên cột (Chỉ tiêu, Thực hiện, Tỉ lệ %; Cơ hữu vs Thỉnh giảng) và hàng tương ứng. Không tráo đổi vị trí số liệu giữa các cột."
+    )
 
 
 class AnswerFormatPlanner:
@@ -425,6 +521,7 @@ class AnswerFormatPlanner:
         elif format_type == "markdown_table":
             lines.append(
                 "- Trình bày dữ liệu dưới dạng BẢNG MARKDOWN hoàn chỉnh, có dòng tiêu đề cột rõ ràng và căn chỉnh chuẩn (| Cột 1 | Cột 2 |).\n"
+                "- ĐỐI SOÁT TỌA ĐỘ BẢNG: Đảm bảo tiêu đề cột và hàng phản ánh đúng thời gian (năm áp dụng) và đúng bản chất dữ liệu (ví dụ: 'Chỉ tiêu' vs 'Thực hiện'; 'Cơ hữu' vs 'Thỉnh giảng').\n"
                 "- Tuyệt đối KHÔNG viết các ký tự phân cách thô `||` dính liền nhau hoặc làm vỡ cấu trúc bảng."
             )
         elif format_type == "timeline":
@@ -447,6 +544,74 @@ class AnswerFormatPlanner:
 
         return "\n".join(lines)
 
+    def build_rag_user_prompt(
+        self,
+        question: str,
+        chosen_format: str = "bullet_list",
+        target_entity: str | None = None,
+        is_combo_query: bool = False,
+        is_fact_query: bool = False,
+        fact_markdown: str | None = None,
+        context_texts: list[str] | None = None,
+        neighbor_context: dict[str, list[str]] | None = None,
+    ) -> str:
+        """Assemble structured, entity-constrained user prompt with format instructions and layered evidence."""
+        sections = [f"Câu hỏi của người dùng: {question}\n"]
+
+        # 1. Entity-focused constraint
+        if target_entity:
+            sections.append(
+                f"RÀNG BUỘC TRÍCH XUẤT THEO THỰC THỂ (BẮT BUỘC):\n"
+                f"- Người dùng đang hỏi về thực thể/ngành: '{target_entity}'.\n"
+                f"- BẠN CHỈ ĐƯỢC PHÉP trích xuất và giải đáp thông tin liên quan đến thực thể này.\n"
+                f"- TUYỆT ĐỐI KHÔNG sao chép hoặc liệt kê thông tin của các ngành/đối tượng khác có trong bảng hoặc tài liệu.\n"
+            )
+
+        # 2. Format & Presentation directives
+        format_instructions = self.get_format_instructions(
+            chosen_format,
+            target_entity=target_entity,
+            is_combo_query=is_combo_query,
+        )
+        if format_instructions:
+            sections.append(f"{format_instructions}\n")
+
+        # 3. Schema coordinate verification & evidence hierarchy (for fact-first queries)
+        if is_fact_query:
+            sections.append(
+                "QUY TẮC ĐỐI SOÁT TỌA ĐỘ SỐ LIỆU (BẮT BUỘC):\n"
+                "- Đối chiếu chính xác [Năm áp dụng], [Tên cột] và [Tên hàng] của số liệu.\n"
+                "- Trả lời trực diện con số chính xác kèm đơn vị tính, không lấy số liệu của năm khác thay thế.\n\n"
+                "THỨ TỰ ƯU TIÊN BẰNG CHỨNG (khi mâu thuẫn, tầng trên thắng tầng dưới):\n"
+                "TẦNG 1 - BẢNG SỐ LIỆU, TẦNG 2 - ĐOẠN TRÍCH, TẦNG 3 - LỊCH SỬ TRAO ĐỔI.\n"
+                "Lịch sử chỉ dùng để hiểu đại từ, không phải bằng chứng.\n"
+            )
+
+        # 4. Tier 1: Fact table
+        if fact_markdown:
+            tier_label = "TẦNG 1 - BẢNG SỐ LIỆU ĐÃ XÁC THỰC" if is_fact_query else "BẢNG SỐ LIỆU ĐÃ XÁC THỰC"
+            sections.append(f"{tier_label}:\n{fact_markdown}\n")
+
+        # 5. Tier 2: Knowledge chunks
+        if context_texts:
+            chunk_label = (
+                "TẦNG 2 - ĐOẠN TRÍCH TỪ KHO TRI THỨC" if is_fact_query else "TÀI LIỆU TRÍCH XUẤT TỪ KHO TRI THỨC"
+            )
+            chunk_lines = [f"{chunk_label}:"]
+            for i, text in enumerate(context_texts, 1):
+                chunk_lines.append(f"--- Đoạn trích [{i}] ---\n{text}")
+            sections.append("\n".join(chunk_lines) + "\n")
+
+        # 6. Neighbor context (auxiliary background)
+        if neighbor_context:
+            neighbor_lines = ["BỐI CẢNH MỞ RỘNG (chỉ để hiểu thêm, KHÔNG dùng làm trích dẫn):"]
+            for cid, texts in neighbor_context.items():
+                for text in texts:
+                    neighbor_lines.append(f"--- Bối cảnh kề chunk {cid} ---\n{text[:1000]}")
+            sections.append("\n".join(neighbor_lines) + "\n")
+
+        return "\n".join(sections).strip()
+
     def assemble_prompt(
         self,
         query: str,
@@ -454,7 +619,7 @@ class AnswerFormatPlanner:
         fact_table: str = "",
         custom_system_prompt: str | None = None,
     ) -> str:
-        """Assemble full prompt with context and format instructions."""
+        """Assemble full prompt with context and format instructions (legacy fallback)."""
         context_block = "\n\n---\n\n".join(context_chunks)
         if fact_table:
             context_block = f"### BẢNG SỰ THẬT CHÍNH XÁC (ƯU TIÊN TUYỆT ĐỐI):\n{fact_table}\n\n### TÀI LIỆU THAM KHẢO:\n{context_block}"
@@ -469,3 +634,4 @@ class AnswerFormatPlanner:
 
 
 answer_format_planner = AnswerFormatPlanner()
+

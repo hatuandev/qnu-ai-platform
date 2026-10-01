@@ -6,6 +6,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import StrEnum
+ 
+from app.core.stopwords import get_vietnamese_stopwords
 
 logger = logging.getLogger(__name__)
 
@@ -222,13 +224,8 @@ class QueryClassifier:
         (re.compile(r"\banh\b", re.IGNORECASE), "anh"),
     ]
 
-    # Conversational Vietnamese stopwords that should not dilute search keywords
-    VI_CONVERSATIONAL_STOPWORDS: set[str] = {
-        "tôi", "mình", "bạn", "em", "anh", "chị", "muốn", "hỏi", "cho", "biết",
-        "xem", "với", "ạ", "nhé", "không", "nhỉ", "nào", "gì", "sao", "thế",
-        "được", "có", "là", "của", "và", "các", "những", "cần", "để", "ý",
-        "bao", "nhiêu", "như",
-    }
+    # Conversational Vietnamese stopwords loaded dynamically from configs/stopwords_vi.txt
+    VI_CONVERSATIONAL_STOPWORDS: frozenset[str] = get_vietnamese_stopwords()
 
     RE_DECISION_CODE = re.compile(
         r"\b(?:QĐ|NĐ|TT|CV|KH|TB|BC)[\s\-]*\d+[\/\-]\w+",

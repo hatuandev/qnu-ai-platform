@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
+from app.core.stopwords import get_vietnamese_stopwords
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import Citation
 
@@ -91,14 +92,8 @@ EVIDENCE_KEYWORDS = (
     "năm 199",
 )
 
-ACADEMIC_STOPWORDS = {
-    "sinh", "viên", "trường", "đại", "học", "quy", "nhơn", "được", "trong", "theo",
-    "những", "các", "cho", "với", "của", "và", "hoặc", "khi", "thì", "tại", "này",
-    "mỗi", "một", "hai", "ba", "bốn", "tối", "đa", "thiểu", "người", "thời",
-    "gian", "thực", "hiện", "định", "có", "không", "phải", "để", "biết", "thêm",
-    "chi", "tiết", "trực", "tiếp", "quý", "vị", "bạn", "chào", "xin", "cảm", "ơn",
-    "liên", "hệ", "qua", "số", "điện", "thoại", "vui", "lòng", "năm",
-}
+# Vietnamese academic & general stopwords loaded dynamically from configs/stopwords_vi.txt
+ACADEMIC_STOPWORDS: frozenset[str] = get_vietnamese_stopwords()
 
 
 class CitationGuard:

@@ -569,3 +569,38 @@ def test_extract_suggested_questions_cleans_passive_boilerplate_and_parses_block
     assert len(sugs_2) == 2
     assert sugs_2[0] == "Học phí ngành Sư phạm Toán năm 2026 là bao nhiêu?"
     assert sugs_2[1] == "Trường có chính sách học bổng nào cho ngành này không?"
+
+
+def test_extract_weighted_tokens_and_information_density():
+    """Verify that extract_weighted_tokens prioritizes high-entropy codes, numbers, and acronyms."""
+    from app.modules.rag.retriever import extract_weighted_tokens, select_ilike_tokens
+
+    # Case 1: Query with alphanumeric combinations X06, X07, X25 and document number 123
+    q1 = "Theo Thông báo số 123/TB-ĐHQN về việc quy đổi tương đương các môn xét tuyển, các tổ hợp xét tuyển X06, X07, X25 được quy đổi tương đương sang các tổ hợp gốc nào?"
+    tokens_w = extract_weighted_tokens(q1, limit=10)
+    token_dict = dict(tokens_w)
+
+    assert "x06" in token_dict and token_dict["x06"] >= 3.5
+    assert "x07" in token_dict and token_dict["x07"] >= 3.5
+    assert "x25" in token_dict and token_dict["x25"] >= 3.5
+    # Institutional acronym 'đhqn' is filtered into ILIKE_STOP_SYLLABLES to avoid matching every school document
+    assert "đhqn" not in token_dict
+
+    # Ensure top 3 tokens in select_ilike_tokens are the high-entropy alphanumeric codes
+    top_ilike = select_ilike_tokens(q1, limit=5)
+    assert "x06" in top_ilike
+    assert "x07" in top_ilike
+    assert "x25" in top_ilike
+
+    # Case 2: Query with field-specific acronym CNTT and year 2026
+    q_acr = "Học phí ngành CNTT năm 2026"
+    tokens_acr = dict(extract_weighted_tokens(q_acr))
+    assert "cntt" in tokens_acr and tokens_acr["cntt"] >= 2.5
+    assert "2026" in tokens_acr and tokens_acr["2026"] >= 3.0
+
+    # Case 3: Query with Year numbers 2025 vs 2026
+    q2 = "Báo cáo thực hiện chỉ tiêu tuyển sinh năm 2025 so với năm 2026"
+    tokens_q2 = dict(extract_weighted_tokens(q2))
+    assert "2025" in tokens_q2 and tokens_q2["2025"] >= 3.0
+    assert "2026" in tokens_q2 and tokens_q2["2026"] >= 3.0
+

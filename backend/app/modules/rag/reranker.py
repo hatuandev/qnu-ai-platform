@@ -15,6 +15,31 @@ from app.modules.rag.fusion import FusionCandidate
 logger = logging.getLogger(__name__)
 
 
+def _combine_rrf_and_ce_scores(
+    candidates: list[FusionCandidate],
+    ce_score_map: dict[int, float],
+    k: int = 60,
+    ce_multiplier: float = 1.2,
+) -> list[FusionCandidate]:
+    """Fuse initial RRF ordering with Cross-Encoder (CE) relevance scores."""
+    ce_ranked_indices = sorted(
+        range(len(candidates)),
+        key=lambda idx: ce_score_map.get(idx, -999.0),
+        reverse=True,
+    )
+    ce_rank_map = {orig_idx: rank for rank, orig_idx in enumerate(ce_ranked_indices, start=1)}
+
+    scored_candidates: list[FusionCandidate] = []
+    for orig_idx, cand in enumerate(candidates):
+        rrf_rank = orig_idx + 1
+        ce_rank = ce_rank_map.get(orig_idx, len(candidates))
+        cand.rrf_score = (1.0 / (k + rrf_rank)) + (ce_multiplier / (k + ce_rank))
+        scored_candidates.append(cand)
+
+    scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
+    return scored_candidates
+
+
 class RerankerClient:
     """Client for Cross-Encoder Reranking with automatic fallback to RRF order."""
 
@@ -64,13 +89,8 @@ class RerankerClient:
                     for item in response_items
                     if "id" in item and "score" in item
                 }
-                scored_candidates = []
-                for idx, cand in enumerate(candidates):
-                    if idx in score_map:
-                        cand.rrf_score = score_map[idx]
-                    scored_candidates.append(cand)
-                scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
-                return scored_candidates[:top_k]
+                scored = _combine_rrf_and_ce_scores(candidates, score_map)
+                return scored[:top_k]
             else:
                 logger.warning(
                     "Cloudflare rerank returned HTTP %d: %s", resp.status_code, resp.text[:200]
@@ -135,13 +155,8 @@ class RerankerClient:
                     )
                     if resp.status_code == 200:
                         scores = resp.json().get("scores", [])
-                        scored_candidates = []
-                        for idx, score in enumerate(scores):
-                            if idx < len(candidates):
-                                cand = candidates[idx]
-                                cand.rrf_score = float(score)
-                                scored_candidates.append(cand)
-                        scored_candidates.sort(key=lambda x: x.rrf_score, reverse=True)
+                        score_map = {idx: float(score) for idx, score in enumerate(scores)}
+                        scored_candidates = _combine_rrf_and_ce_scores(candidates, score_map)
                         provider = "custom"
                         logger.info(
                             "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
