@@ -13,7 +13,6 @@ from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, Tenant
 from app.modules.modelops.providers import (
     CloudflareAdapter,
     GeminiAdapter,
-    LocalVLLMAdapter,
     MistralAdapter,
     OpenAIAdapter,
     get_llm_adapter,
@@ -63,10 +62,6 @@ def test_llm_adapter_factory():
     adapter_gemini = get_llm_adapter("gemini", "gemini-1.5-flash", api_key="mock")
     assert isinstance(adapter_gemini, GeminiAdapter)
     assert adapter_gemini.provider_type == "gemini"
-
-    adapter_local = get_llm_adapter("local_vllm", "qwen2.5-7b-instruct")
-    assert isinstance(adapter_local, LocalVLLMAdapter)
-    assert adapter_local.provider_type == "local_vllm"
 
     adapter_mistral = get_llm_adapter("mistral", "mistral-large-latest", api_key="mock")
     assert isinstance(adapter_mistral, MistralAdapter)
@@ -129,6 +124,7 @@ async def test_cloudflare_adapter_mock_generation():
 async def test_dynamic_fallback_when_primary_fails():
     mock_db = AsyncMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalars.return_value.all.return_value = []
     mock_db.execute.return_value = mock_res
 
@@ -357,6 +353,7 @@ async def test_api_modelops_generate():
     """Verify POST /platform/v1alpha1/modelops/generate invokes LLM successfully."""
     mock_db = AsyncMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalars.return_value.all.return_value = []
     mock_db.execute.return_value = mock_res
 
@@ -411,7 +408,7 @@ async def test_api_modelops_generate():
 
     assert response.status_code == 200
     data = response.json()
-    assert data["provider"] in ("openai", "gemini", "local_vllm")
+    assert data["provider"] in ("openai", "gemini")
     assert len(data["content"]) > 0
     assert data["total_tokens"] > 0
 
@@ -439,6 +436,7 @@ async def test_api_key_pool_crud_and_rotation():
     """Verify Key Pool management: list, add, update, test, and simulate 429 rotation."""
     mock_db = AsyncMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
 
@@ -533,21 +531,17 @@ async def test_system_model_defaults_api():
     )
 
     mock_res_cfg = MagicMock()
+    mock_res_cfg.scalar_one.return_value = 0
     mock_res_cfg.scalar_one_or_none.return_value = cfg_record
 
     mock_res_providers = MagicMock()
+    mock_res_providers.scalar_one.return_value = 0
     mock_res_providers.scalars.return_value.all.return_value = [
         ModelProviderConfig(
             id="prov_cloudflare",
             name="Cloudflare Workers AI",
             provider_type="cloudflare",
             extra_config={"models": ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base"]},
-        ),
-        ModelProviderConfig(
-            id="prov_sentence_transformers",
-            name="Local SentenceTransformers",
-            provider_type="sentence_transformers",
-            extra_config={"models": ["BAAI/bge-m3"]},
         ),
     ]
 
@@ -575,7 +569,7 @@ async def test_system_model_defaults_api():
             assert data["defaults"]["default_embedding_model"] == "@cf/baai/bge-m3"
             assert data["defaults"]["default_ocr_mode"] == "combo"
             assert len(data["defaults"]["ocr_combo_chain"]) >= 2
-            assert len(data["available_embeddings"]) >= 2
+            assert len(data["available_embeddings"]) >= 1
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -593,6 +587,7 @@ async def test_provider_models_test_all_success():
         extra_config={"models": ["gemini-1.5-flash", "gemini-1.5-pro"]},
     )
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = cfg_record
     mock_db.execute.return_value = mock_res
 
@@ -629,6 +624,7 @@ async def test_provider_models_test_single_model_and_invalid():
         extra_config={"models": ["gemini-1.5-flash", "gemini-deprecated-404"]},
     )
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = cfg_record
     mock_db.execute.return_value = mock_res
 
@@ -702,6 +698,7 @@ async def test_generate_stream_records_usage_and_deducts_quota():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
 
@@ -772,6 +769,7 @@ async def test_generate_prioritizes_fallback_model_when_primary_unavailable():
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
 
@@ -881,6 +879,7 @@ async def test_cloudflare_multi_account_key_pool():
     )
 
     mock_scalar = MagicMock()
+    mock_scalar.scalar_one.return_value = 0
     mock_scalar.scalar_one_or_none.return_value = mock_config
     mock_db.execute.return_value = mock_scalar
 
@@ -946,10 +945,19 @@ async def test_export_and_import_providers():
     )
 
     mock_scalar = MagicMock()
+    mock_scalar.scalar_one.return_value = 0
     mock_scalar.scalar_one_or_none.return_value = mock_config
     mock_scalar.scalars.return_value.all.return_value = [mock_config]
     mock_scalar.scalars.return_value.first.return_value = mock_config
-    mock_db.execute.return_value = mock_scalar
+    from app.modules.modelops.models import ProviderApiKey
+    empty_keys = MagicMock()
+    empty_keys.scalar_one_or_none.return_value = None
+    empty_keys.scalars.return_value.all.return_value = []
+    def result_for_statement(statement):
+        if statement.column_descriptions[0].get("entity") is ProviderApiKey:
+            return empty_keys
+        return mock_scalar
+    mock_db.execute.side_effect = result_for_statement
 
     # 1. Test Single Export
     export_single = await modelops_service.export_provider(
@@ -996,6 +1004,7 @@ async def test_dynamic_model_resolution_respects_custom_and_future_models():
     """Verify runtime dynamically resolves and honors preferred_model_name (e.g. gemini-3.5-flash) without hardcoded fallback."""
     mock_db = AsyncMock()
     mock_res = MagicMock()
+    mock_res.scalar_one.return_value = 0
     mock_res.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_res
 

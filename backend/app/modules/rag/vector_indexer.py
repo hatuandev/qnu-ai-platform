@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import importlib.util
 import logging
 import math
 import uuid
@@ -26,89 +25,6 @@ from app.modules.modelops.services.provider_key_rotation_service import (
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-
-_embedding_model: Any = None
-_embedding_model_name: str | None = None
-_embedding_model_failed = False
-
-
-def is_embedding_model_installed() -> bool:
-    """Check sentence-transformers availability without importing torch."""
-    return importlib.util.find_spec("sentence_transformers") is not None
-
-
-def _resolve_local_model_name(model_name: str) -> str:
-    """Map Cloudflare-style model paths like @cf/baai/bge-m3 to Hugging Face repo IDs."""
-    if not model_name:
-        return "BAAI/bge-m3"
-    clean = model_name.strip()
-    if clean.startswith("@cf/baai/bge-m3"):
-        return "BAAI/bge-m3"
-    if clean.startswith("@cf/baai/bge-large"):
-        return "BAAI/bge-large-en-v1.5"
-    if clean.startswith("@cf/baai/bge-base"):
-        return "BAAI/bge-base-en-v1.5"
-    if clean.startswith("@cf/baai/bge-small"):
-        return "BAAI/bge-small-en-v1.5"
-    if clean.startswith("@cf/"):
-        return clean[4:]
-    return clean
-
-
-def reset_embedding_model_state() -> None:
-    """Reset cached embedding model state for recovery or re-initialization."""
-    global _embedding_model, _embedding_model_failed, _embedding_model_name
-    _embedding_model = None
-    _embedding_model_name = None
-    _embedding_model_failed = False
-
-
-def _load_model_sync(model_name: str | None = None) -> Any:
-    """Load SentenceTransformer with local_files_only preference to avoid remote delays."""
-    from sentence_transformers import SentenceTransformer
-
-    local_model = _resolve_local_model_name(model_name or settings.EMBEDDING_MODEL)
-    try:
-        return SentenceTransformer(local_model, local_files_only=True)
-    except Exception:
-        return SentenceTransformer(local_model)
-
-
-def _get_embedding_model(model_name: str | None = None) -> Any | None:
-    """Lazily load the shared BGE-M3 encoder (sync entrypoint for tests/callers)."""
-    global _embedding_model, _embedding_model_failed, _embedding_model_name
-    requested_model = model_name or settings.EMBEDDING_MODEL
-    if _embedding_model is not None and _embedding_model_name == requested_model:
-        return _embedding_model
-    if _embedding_model_failed or not is_embedding_model_installed():
-        return None
-    try:
-        _embedding_model = _load_model_sync(requested_model)
-        _embedding_model_name = requested_model
-        logger.info("Loaded embedding model: %s", requested_model)
-    except Exception as exc:
-        _embedding_model_failed = True
-        logger.warning("Embedding model unavailable, using mock vectors: %s", exc)
-    return _embedding_model
-
-
-async def _get_embedding_model_async(model_name: str | None = None) -> Any | None:
-    """Asynchronously load model offloaded to thread so event loop never freezes."""
-    global _embedding_model, _embedding_model_failed, _embedding_model_name
-    requested_model = model_name or settings.EMBEDDING_MODEL
-    if _embedding_model is not None and _embedding_model_name == requested_model:
-        return _embedding_model
-    if _embedding_model_failed or not is_embedding_model_installed():
-        return None
-    try:
-        _embedding_model = await asyncio.to_thread(_load_model_sync, requested_model)
-        _embedding_model_name = requested_model
-        logger.info("Loaded embedding model asynchronously: %s", requested_model)
-    except Exception as exc:
-        _embedding_model_failed = True
-        logger.warning("Embedding model async load failed, using mock vectors: %s", exc)
-    return _embedding_model
-
 
 class VectorIndexer:
     """Manages collection provisioning, vector indexing and dense vector retrieval."""
@@ -292,66 +208,6 @@ class VectorIndexer:
 
         return all_vectors
 
-    async def _embed_texts_ollama(
-        self,
-        texts: list[str],
-        runtime: ModelRuntimeConfig,
-    ) -> list[list[float]]:
-        """Batch encode texts using Ollama self-hosted embedding endpoint."""
-        import httpx
-
-        base = (runtime.api_base_url or "http://localhost:11434/v1").rstrip("/")
-        if not base.endswith("/v1") and ":11434" in base:
-            v1_url = f"{base}/v1/embeddings"
-        elif base.endswith("/v1"):
-            v1_url = f"{base}/embeddings"
-        else:
-            v1_url = f"{base}/v1/embeddings"
-
-        headers = {"Content-Type": "application/json"}
-        if runtime.api_key:
-            headers["Authorization"] = f"Bearer {runtime.api_key}"
-
-        batch_size = 16
-        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
-        all_vectors: list[list[float]] = []
-
-        timeout = float(runtime.timeout_seconds or 60.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            for batch in batches:
-                payload = {
-                    "model": runtime.model_name,
-                    "input": batch,
-                }
-                resp = await client.post(v1_url, headers=headers, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if "data" in data and isinstance(data["data"], list):
-                        batch_vecs = [item["embedding"] for item in data["data"]]
-                    elif "embeddings" in data and isinstance(data["embeddings"], list):
-                        batch_vecs = data["embeddings"]
-                    else:
-                        raise RuntimeError(f"Unexpected response format from Ollama: {resp.text[:200]}")
-                    all_vectors.extend([[float(x) for x in v] for v in batch_vecs])
-                else:
-                    # Fallback to Ollama native /api/embed if /v1/embeddings returns non-200
-                    native_url = f"{base.replace('/v1', '')}/api/embed"
-                    native_payload = {
-                        "model": runtime.model_name,
-                        "input": batch,
-                    }
-                    native_resp = await client.post(native_url, headers=headers, json=native_payload)
-                    if native_resp.status_code == 200:
-                        native_data = native_resp.json()
-                        raw_vecs = native_data.get("embeddings") or []
-                        all_vectors.extend([[float(x) for x in v] for v in raw_vecs])
-                    else:
-                        raise RuntimeError(
-                            f"Ollama embedding error (HTTP {resp.status_code}): {resp.text[:250]}"
-                        )
-
-        return all_vectors
-
     async def embed_texts(
         self,
         texts: list[str],
@@ -389,6 +245,11 @@ class VectorIndexer:
                         runtime, total_tokens=estimated_tokens
                     )
                     return [self._fit_dim(v) for v in vectors]
+                except asyncio.CancelledError:
+                    if runtime.key_lease() is not None:
+                        async with AsyncSessionFactory() as db:
+                            await provider_key_rotation_service.release(db, runtime.key_lease())
+                    raise
                 except Exception as exc:
                     await self._finish_runtime_key(runtime, error=exc)
                     if runtime.key_id:
@@ -409,68 +270,12 @@ class VectorIndexer:
                         details={"provider": provider},
                     ) from exc
 
-        elif provider == "ollama":
-            try:
-                vectors = await self._embed_texts_ollama(texts, runtime)
-                if len(vectors) != len(texts):
-                    raise RuntimeError(
-                        f"Ollama returned {len(vectors)} vectors for {len(texts)} texts."
-                    )
-                return [self._fit_dim(v) for v in vectors]
-            except Exception as exc:
-                logger.error("Ollama embedding unavailable: %s", exc)
-                raise AppException(
-                    f"Ollama Embedding không khả dụng: {exc}",
-                    code="EMBEDDING_PROVIDER_UNAVAILABLE",
-                    status_code=503,
-                    details={"provider": provider},
-                ) from exc
-
-        if provider not in {"local", "sentence_transformers"}:
-            raise AppException(
-                f"Nhà cung cấp embedding không được hỗ trợ: {runtime.provider_type}",
-                code="EMBEDDING_PROVIDER_UNSUPPORTED",
-                status_code=503,
-                details={"provider": runtime.provider_id},
-            )
-
-        # Local inference is only used when explicitly selected. Cloudflare
-        # failures never reach this branch or trigger a model download.
-        model = await _get_embedding_model_async(runtime.model_name)
-        if model is None:
-            if settings.ENVIRONMENT not in ("test", "testing"):
-                raise AppException(
-                    "Mô hình embedding local không khả dụng.",
-                    code="EMBEDDING_UNAVAILABLE",
-                    status_code=503,
-                    details={"provider": provider},
-                )
-            return [self.mock_embedding(t, self.vector_size) for t in texts]
-        try:
-            # Protect event loop with thread offload and adaptive timeout guard (60s - 300s for CPU)
-            inference_timeout = max(60.0, min(300.0, len(texts) * 3.0))
-            vectors = await asyncio.wait_for(
-                asyncio.to_thread(
-                    model.encode,
-                    texts,
-                    batch_size=8,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                ),
-                timeout=inference_timeout,
-            )
-            return [self._fit_dim([float(x) for x in row]) for row in vectors]
-        except Exception as exc:
-            if settings.ENVIRONMENT not in ("test", "testing"):
-                logger.error("Embedding inference failed or timed out: %s", exc)
-                raise AppException(
-                    f"Trích xuất vector embedding thất bại: {exc}",
-                    code="EMBEDDING_FAILED",
-                    status_code=500,
-                )
-            logger.warning("Embedding inference failed or timed out, using mock vectors: %s", exc)
-            return [self.mock_embedding(t, self.vector_size) for t in texts]
-
+        raise AppException(
+            f"Nhà cung cấp embedding API không được hỗ trợ: {runtime.provider_type}",
+            code="EMBEDDING_PROVIDER_UNSUPPORTED",
+            status_code=503,
+            details={"provider": runtime.provider_id},
+        )
     async def index_chunks(
         self,
         collection_id: str,

@@ -7,17 +7,26 @@ export interface ProviderApiKey {
   account_id?: string | null;
   priority: number;
   is_active: boolean;
-  status:
-    | "active"
-    | "rate_limited"
-    | "exhausted"
-    | "invalid"
-    | "inactive";
+  status: "active" | "rate_limited" | "exhausted" | "invalid" | "inactive";
   quota_limit?: number | null;
   usage_tokens: number;
   cooldown_until?: string | null;
   last_used_at?: string | null;
+  last_error_code?: string | null;
+  last_error_at?: string | null;
+  consecutive_failures?: number;
+  is_leased?: boolean;
+  lease_until?: string | null;
   created_at?: string | null;
+}
+
+export interface ProviderKeyEvent {
+  id: string;
+  key_id: string | null;
+  event_type: string;
+  reason: string | null;
+  tokens: number;
+  created_at: string;
 }
 
 export interface SingleModelTestResult {
@@ -46,7 +55,7 @@ export interface ProviderModelsTestResponse {
 export interface ProviderPreset {
   code: string;
   name: string;
-  category: "cloud" | "local" | "custom";
+  category: "cloud" | "custom";
   icon: string;
   description: string;
   default_base_url?: string | null;
@@ -64,17 +73,12 @@ export interface ModelProvider {
     | "openai"
     | "gemini"
     | "claude"
-    | "local"
-    | "local_vllm"
-    | "ollama"
     | "deepseek"
     | "groq"
     | "openrouter"
     | "mistral"
     | "cloudflare"
     | "nvidia"
-    | "sentence_transformers"
-    | "docling"
     | "custom";
   is_active: boolean;
   circuit_breaker_status: "CLOSED" | "OPEN" | "HALF_OPEN";
@@ -96,7 +100,7 @@ export interface ModelOption {
   provider_name: string;
   provider_type: string;
   model_name: string;
-  category: "cloud" | "local" | "custom";
+  category: "cloud" | "custom";
   description?: string;
 }
 

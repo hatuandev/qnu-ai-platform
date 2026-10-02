@@ -8,7 +8,7 @@ export interface KnowledgeCollection {
   document_count: number;
   chunk_count: number;
   chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
-  ocr_profile: "PyMuPDF" | "Docling" | "EasyOCR";
+  ocr_profile: "PyMuPDF" | "Gemini" | "Mistral";
   embedding_model?: string;
   status?: "ready" | "indexing" | "maintenance";
   updated_at: string;

@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyState } from "@/components/admin/empty-state";
 import { AddCustomModelDialog } from "@/components/modelops/add-custom-model-dialog";
 import { KeyPoolSection } from "@/components/modelops/key-pool-section";
+import { KeyRotationHistory } from "@/components/modelops/key-rotation-history";
 import { ModelsGrid } from "@/components/modelops/models-grid";
 import { ProviderDetailHeader } from "@/components/modelops/provider-detail-header";
 import { ProviderModal } from "@/components/modelops/provider-modal";
@@ -98,19 +99,15 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
     data: providerKeys = [],
     isLoading: loadingKeys,
     refetch: refetchKeys,
+    error: keysError,
   } = useQuery({
     queryKey: ["provider-keys", providerId],
     queryFn: () => apiClient.getProviderKeys(providerId),
     enabled: !!providerId,
+    refetchInterval: activeTab === "keys" ? 10000 : false,
   });
 
-  const effectiveKeys = useMemo(() => {
-    if (providerKeys && providerKeys.length > 0) return providerKeys;
-    if (selectedProvider?.api_keys && selectedProvider.api_keys.length > 0) {
-      return selectedProvider.api_keys;
-    }
-    return [];
-  }, [providerKeys, selectedProvider]);
+  const effectiveKeys = providerKeys;
 
   const unavailableModelsCount = useMemo(() => {
     if (!selectedProvider) return 0;
@@ -408,18 +405,13 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
     setSimulatingRotation(true);
     setRotationResult(null);
     try {
-      const res = await apiClient.simulateKeyRotation(pId, {
-        tokens_consumed: 3500,
-        trigger_rate_limit: true,
-        cooldown_seconds: 60,
-      });
+      const res = await apiClient.previewKeyFailover(pId);
+      const order = res.key_order.map((key) => key.name).join(" → ");
       setRotationResult({
-        success: res.success,
+        success: res.rotated,
         rotated: res.rotated,
-        message: res.message,
+        message: `${res.message}${order ? ` Thứ tự: ${order}.` : ""}`,
       });
-      refetchKeys();
-      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
     } catch (err: unknown) {
       const errorObj = err as Error;
       setRotationResult({
@@ -564,28 +556,41 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
       )}
 
       {activeTab === "keys" && (
-        <KeyPoolSection
-          selectedProvider={selectedProvider}
-          providerKeys={effectiveKeys}
-          loadingKeys={loadingKeys && effectiveKeys.length === 0}
-          simulatingRotation={simulatingRotation}
-          rotationResult={rotationResult}
-          testingKeyId={testingKeyId}
-          keyTestFeedback={keyTestFeedback}
-          isAddingKey={addKeyMutation.isPending}
-          onSimulateRotation={handleSimulateRotation}
-          onSaveNewKey={(payload) =>
-            addKeyMutation.mutate({
-              pId: selectedProvider.id,
-              payload,
-            })
-          }
-          onTestSingleKey={handleTestSingleKey}
-          onDeleteKey={(pId, keyId) => deleteKeyMutation.mutate({ pId, keyId })}
-          onToggleKeyActive={(pId, keyId, isActive) =>
-            toggleKeyMutation.mutate({ pId, keyId, isActive })
-          }
-        />
+        <>
+          {keysError && (
+            <div className="text-sm text-destructive" role="alert">
+              Không tải được trạng thái khóa.{" "}
+              <Button variant="outline" size="sm" onClick={() => refetchKeys()}>
+                Thử lại
+              </Button>
+            </div>
+          )}
+          <KeyPoolSection
+            selectedProvider={selectedProvider}
+            providerKeys={effectiveKeys}
+            loadingKeys={loadingKeys && effectiveKeys.length === 0}
+            simulatingRotation={simulatingRotation}
+            rotationResult={rotationResult}
+            testingKeyId={testingKeyId}
+            keyTestFeedback={keyTestFeedback}
+            isAddingKey={addKeyMutation.isPending}
+            onSimulateRotation={handleSimulateRotation}
+            onSaveNewKey={(payload) =>
+              addKeyMutation.mutate({
+                pId: selectedProvider.id,
+                payload,
+              })
+            }
+            onTestSingleKey={handleTestSingleKey}
+            onDeleteKey={(pId, keyId) =>
+              deleteKeyMutation.mutate({ pId, keyId })
+            }
+            onToggleKeyActive={(pId, keyId, isActive) =>
+              toggleKeyMutation.mutate({ pId, keyId, isActive })
+            }
+          />
+          <KeyRotationHistory providerId={providerId} keys={effectiveKeys} />
+        </>
       )}
 
       {/* 5. Add Custom Model Dialog */}

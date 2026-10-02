@@ -119,7 +119,7 @@ export const RegionsInspector: React.FC<RegionsInspectorProps> = ({
           </Badge>
         </div>
         <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-          Thị giác máy tính (Docling LayoutLM) tự động nhận diện vùng quan tâm
+          Mô hình thị giác từ provider API tự động nhận diện vùng quan tâm
           (ROI), sắp xếp thứ tự đọc và loại trừ ký tự rác từ con dấu scan.
         </p>
       </div>

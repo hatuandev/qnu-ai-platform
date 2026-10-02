@@ -39,9 +39,7 @@ const OCR_ENGINE_PARAM: Record<string, string | undefined> = {
   auto: undefined,
   gemini: "gemini_ocr",
   mistral: "mistral_ocr",
-  docling: "docling",
   pymupdf: "pymupdf_ocr",
-  easyocr: "easyocr",
 };
 
 export interface DocumentIngestPageProps {
@@ -97,8 +95,10 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
     setRecommendation(rec);
 
     // 3. Tự động chọn bộ máy OCR theo đề xuất
-    if (rec.targetOcrKeyword === "docling") {
-      setOcrEngine("docling");
+    if (rec.targetOcrKeyword === "mistral") {
+      setOcrEngine("mistral");
+    } else if (rec.targetOcrKeyword === "gemini") {
+      setOcrEngine("gemini");
     } else if (rec.targetOcrKeyword === "pymupdf") {
       setOcrEngine("pymupdf");
     } else {
@@ -245,7 +245,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 Kho đích: <strong className="text-foreground">{collection.name}</strong> • Mô hình
                 Vector:{" "}
                 <span className="font-mono text-primary font-medium">
-                  {collection.embedding_model || "BAAI/bge-m3 (1024-dim)"}
+                  {collection.embedding_model || "Cloudflare BGE-M3"}
                 </span>
               </p>
             </div>
@@ -359,14 +359,8 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   <SelectItem value="mistral">
                     Mistral OCR Cloud API (Chuyên văn bản scan tiếng Việt & con dấu, siêu tốc)
                   </SelectItem>
-                  <SelectItem value="docling">
-                    IBM Docling TableFormer (Bóc tách ma trận bảng biểu Word & Excel)
-                  </SelectItem>
                   <SelectItem value="pymupdf">
                     PyMuPDF Fast (Bóc tách văn bản số nhanh & nguyên vẹn)
-                  </SelectItem>
-                  <SelectItem value="easyocr">
-                    EasyOCR Local (Nhận diện tài liệu scan ảnh offline & con dấu)
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -426,8 +420,8 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                         ? "Combo OCR Mặc Định Hệ Thống (Tự động failover khi hết Quota)"
                         : ocrEngine === "gemini"
                           ? "Google Gemini Vision OCR (Đa phương thức thế hệ mới)"
-                          : ocrEngine === "docling"
-                            ? "IBM Docling TableFormer (Bảo toàn 100% bảng)"
+                          : ocrEngine === "mistral"
+                            ? "Mistral OCR API (Bảo toàn cấu trúc bảng)"
                             : ocrEngine === "pymupdf"
                               ? "PyMuPDF Fast (Bóc tách native siêu tốc)"
                               : "Tự động nhận diện tối ưu theo tệp"}
@@ -464,7 +458,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground/90 pt-1 border-t border-border/40 italic">
-                  💡 {recommendation.technicalDetails} Bạn có thể tùy chỉnh lại bất kỳ thông số nào
+                  {recommendation.technicalDetails} Bạn có thể tùy chỉnh lại bất kỳ thông số nào
                   bên dưới nếu muốn.
                 </p>
               </div>
@@ -525,7 +519,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                   : "Phân đoạn Tiêu chuẩn (Standard 512-Token)"}
               </span>
               <span className="font-mono text-[11px] text-primary">
-                Vector: {collection.embedding_model || "BAAI/bge-m3 (1024-dim)"}
+                Vector: {collection.embedding_model || "Cloudflare BGE-M3"}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -614,7 +608,7 @@ export const DocumentIngestPage: React.FC<DocumentIngestPageProps> = ({
                 variant="ghost"
                 onClick={() => onStartVerification("doc_ts_2026")}
                 className="h-9 text-xs px-3 text-muted-foreground hover:text-primary gap-1.5 border border-dashed border-border hover:border-primary/40"
-                title="Mở tài liệu mẫu Đề án Tuyển sinh 2026 với 14 trang scan Docling thực tế"
+                title="Mở tài liệu mẫu Đề án Tuyển sinh 2026"
               >
                 <Sparkles className="size-3.5 text-primary" />
                 <span>Xem tài liệu mẫu (Tuyển sinh 2026)</span>

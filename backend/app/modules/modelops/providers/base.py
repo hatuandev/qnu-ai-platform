@@ -21,7 +21,7 @@ class LLMResponse:
 
 
 class BaseLLMAdapter(ABC):
-    """Strategy interface for LLM providers (OpenAI, Gemini, Local vLLM/Ollama)."""
+    """Strategy interface for API-based LLM providers."""
 
     def __init__(
         self,
@@ -38,7 +38,7 @@ class BaseLLMAdapter(ABC):
     @property
     @abstractmethod
     def provider_type(self) -> str:
-        """Identifier for the provider: openai, gemini, local_vllm."""
+        """Identifier for the provider, such as openai, gemini, or cloudflare."""
         ...
 
     @abstractmethod

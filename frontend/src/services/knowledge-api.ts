@@ -39,7 +39,7 @@ export const knowledgeApi = {
             : "SemanticChunker"),
         ocr_profile:
           (d.ocr_profile as KnowledgeCollection["ocr_profile"]) ||
-          (code.includes("regulation") || code.includes("library") ? "PyMuPDF" : "Docling"),
+          (code.includes("regulation") || code.includes("library") ? "PyMuPDF" : "Mistral"),
         updated_at: typeof d.updated_at === "string" ? d.updated_at : new Date().toISOString(),
       };
     });
@@ -199,7 +199,7 @@ export const knowledgeApi = {
         index_status:
           (d.index_status as "pending" | "indexing" | "indexed" | "index_failed") || "pending",
         index_error: (d.index_error as string | null) || null,
-        ocr_method: (d.ocr_method as string) || "Docling Table Parser",
+        ocr_method: (d.ocr_method as string) || "ModelOps OCR API",
         document_type_code: (d.document_type_code as string) || undefined,
         document_type: (d.document_type_code as string) || undefined,
         created_at: typeof d.created_at === "string" ? d.created_at : new Date().toISOString(),

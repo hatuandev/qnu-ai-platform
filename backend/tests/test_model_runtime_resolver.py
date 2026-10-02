@@ -12,6 +12,7 @@ from app.modules.modelops.services.model_runtime_resolver import ModelRuntimeRes
 def _query_result(record: ModelProviderConfig | None) -> MagicMock:
     result = MagicMock()
     result.scalar_one_or_none.return_value = record
+    result.scalar_one.return_value = 0
     return result
 
 
@@ -55,7 +56,7 @@ async def test_resolve_embedding_runtime_from_persisted_modelops_config() -> Non
         },
     )
     db = AsyncMock()
-    db.execute.side_effect = [_query_result(defaults), _query_result(provider)]
+    db.execute.side_effect = [_query_result(defaults), _query_result(provider), _query_result(None)]
 
     runtime = await ModelRuntimeResolver().resolve(db, "embedding")
 

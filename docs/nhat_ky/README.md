@@ -8,7 +8,10 @@
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
 | Ngày | Tệp Nhật Ký Chi Tiết | Trọng Tâm Phiên Làm Việc | Kết Quả Đạt Được |
-| :---: | :--- | :--- | :--- |
+| **2026-10-02** | [`2026-10-02_phien_246_khoi_phuc_docling_office_parser.md`](./2026-10-02_phien_246_khoi_phuc_docling_office_parser.md) | Khôi phục Docling Office Parser (DOCX, XLSX, PPTX), giữ OCR cloud và native fallback | Sửa lỗi thứ tự check extension & table markdown, 5/5 test parser passed, compileall đạt |
+| **2026-10-02** | [`2026-10-02_phien_245_loai_bo_model_local.md`](./2026-10-02_phien_245_loai_bo_model_local.md) | Loại bỏ toàn bộ runtime AI local, chuyển ModelOps sang provider API key | Xóa adapter/dependency/cache local, migration DB thành công, build hai frontend và 69 test trọng điểm đạt |
+| **2026-10-02** | [`2026-10-02_phien_244_kiem_thu_chatbot_tuyen_sinh_20_cau.md`](./2026-10-02_phien_244_kiem_thu_chatbot_tuyen_sinh_20_cau.md) | Kiểm thử assistant `admissions` bằng 20 câu đối chiếu 7 PDF | 14 đạt, 3 một phần, 3 không đạt; phát hiện cache phản hồi suy giảm và sai routing số liệu |
+| **2026-10-02** | [`2026-10-02_phien_243_sua_trang_thai_khoa_api_disabled.md`](./2026-10-02_phien_243_sua_trang_thai_khoa_api_disabled.md) | Chuẩn hóa trạng thái khóa API legacy và sửa lỗi HTTP 500 | Endpoint Gemini keys HTTP 200, migration + DB constraint, 23 test trọng điểm đạt |
 | **2026-09-15** | [`2026-09-15_hoan_thanh_8_giai_doan_backend.md`](./2026-09-15_hoan_thanh_8_giai_doan_backend.md) | Xây dựng toàn diện 8 Giai đoạn Backend theo chuẩn Enterprise Modular Monolith | 8/8 Giai đoạn hoàn thành, 68/68 Pytest Passed |
 | **2026-09-15** | [`2026-09-15_kiem_thu_doc_lap_37_chuc_nang.md`](./2026-09-15_kiem_thu_doc_lap_37_chuc_nang.md) | Chạy kiểm thử chức năng độc lập 8 phân hệ qua `scripts/verify_all_modules.py` | 37/37 Chức năng Đạt chuẩn (100% Passed) |
 | **2026-09-15** | [`2026-09-15_chuan_hoa_docker_minio.md`](./2026-09-15_chuan_hoa_docker_minio.md) | Chuẩn hóa Docker Compose duy nhất, Dockerfile Backend & MinIO Object Storage | Docker compose valid 100%, MinIO-First |

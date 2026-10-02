@@ -1734,7 +1734,7 @@ class IngestionService:
                             "filename": doc.file_name,
                             "source_file": doc.file_name,
                             "file_size_mb": round((doc.file_size_bytes or 0) / (1024 * 1024), 2),
-                            "ocr_engine": (doc.doc_metadata or {}).get("ocr_method") or "IBM Docling TableFormer",
+                            "ocr_engine": (doc.doc_metadata or {}).get("ocr_method") or "ModelOps API",
                             "channel": "studio_upload",
                         },
                         result={

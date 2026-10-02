@@ -21,10 +21,6 @@ def test_pricing_calculation():
     cost_flash = calculate_cost_usd("gemini-1.5-flash", prompt_tokens=1_000_000, completion_tokens=1_000_000)
     assert cost_flash == 0.375
 
-    # Local BAAI BGE-M3: $0.0
-    cost_local = calculate_cost_usd("bge-m3", prompt_tokens=10_000, completion_tokens=0)
-    assert cost_local == 0.0
-
     # Mistral OCR: fixed 0.001
     cost_ocr = calculate_cost_usd("mistral-ocr-latest")
     assert cost_ocr == 0.001

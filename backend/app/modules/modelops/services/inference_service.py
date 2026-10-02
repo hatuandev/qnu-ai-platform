@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -23,6 +24,7 @@ from app.modules.modelops.services.key_rotation import (
     classify_key_failure,
     describe_provider_failure,
 )
+from app.modules.modelops.services.key_status import normalize_provider_key_status
 from app.modules.modelops.services.provider_key_rotation_service import (
     LeasedProviderKey,
     provider_key_rotation_service,
@@ -44,9 +46,6 @@ VALID_CHAT_PROVIDER_TYPES: set[str] = {
     "groq",
     "claude",
     "mistral",
-    "local_vllm",
-    "local",
-    "ollama",
     "openrouter",
     "nvidia",
     "custom",
@@ -81,10 +80,6 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
         return p_type in ("mistral",) or "mistral" in p_id
     if any(k in m_lower for k in ("qwen", "deepseek", "llama", "phi-", "mixtral")):
         return p_type in (
-            "local",
-            "vllm",
-            "local_vllm",
-            "ollama",
             "groq",
             "cloudflare",
             "custom",
@@ -93,18 +88,11 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
         )
 
     # 3. Custom / OpenRouter / OpenAI compatible proxies allow arbitrary model names
-    return p_type in ("openai_compatible", "custom", "local", "vllm", "local_vllm", "ollama", "openrouter", "groq")
-
-
-def _is_local_provider(provider_type: str) -> bool:
-    """Check if provider is a local zero-credential runner."""
-    return provider_type.lower().strip() in ("local_vllm", "local", "ollama", "vllm")
+    return p_type in ("openai_compatible", "custom", "openrouter", "groq")
 
 
 def _provider_has_credentials(p: dict[str, Any]) -> bool:
-    """Check if provider has active API keys configured or is a zero-auth local service."""
-    if _is_local_provider(p.get("provider_type", "")):
-        return True
+    """Check if a provider has at least one active API credential."""
     if p.get("api_key") or p.get("api_key_masked"):
         return True
     keys = p.get("api_keys") or []
@@ -197,7 +185,7 @@ class InferenceService:
             if (
                 key.get("is_active", True)
                 and parsed_quota_limit is not None
-                and usage_tokens + estimated_tokens > parsed_quota_limit
+                and usage_tokens >= parsed_quota_limit
             ):
                 key["status"] = "exhausted"
                 key["cooldown_until"] = None
@@ -205,7 +193,9 @@ class InferenceService:
         available_keys = [
             key
             for key in keys_pool
-            if key.get("is_active", True) and key.get("status", "active") == "active"
+            if key.get("is_active", True)
+            and normalize_provider_key_status(key.get("status")) == "active"
+            and (key.get("quota_limit") is None or int(key.get("usage_tokens") or 0) + max(0, estimated_tokens) <= int(key["quota_limit"]))
         ]
         available_keys.sort(
             key=lambda key: (
@@ -289,7 +279,7 @@ class InferenceService:
             p
             for p in all_providers
             if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
-            and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
+            and "routing" not in str(p.get("id", "")).lower()
         ]
 
         # Filter out cloud providers that have no active keys configured when configured providers exist
@@ -346,13 +336,13 @@ class InferenceService:
             relational_managed = False
             tried_relational_keys: set[str] = set()
             available_keys: list[dict[str, Any]] = []
-            if not _is_local_provider(p.get("provider_type", "")):
-                acquired = await provider_key_rotation_service.acquire(
-                    db, p["id"], estimated_tokens=estimated_tokens
-                )
-                relational_managed = acquired.managed
-                if acquired.lease is not None:
-                    available_keys.append(self._lease_to_key_entry(acquired.lease))
+            acquired = await provider_key_rotation_service.acquire(
+                db, p["id"], estimated_tokens=estimated_tokens,
+                lease_seconds=max(120, p["timeout_seconds"] + 30)
+            )
+            relational_managed = acquired.managed
+            if acquired.lease is not None:
+                available_keys.append(self._lease_to_key_entry(acquired.lease))
 
             if not relational_managed:
                 available_keys, key_state_changed = self._prepare_available_keys(
@@ -367,16 +357,14 @@ class InferenceService:
                         {"id": "default", "name": "Default", "api_key": p["api_key"]}
                     ]
             if not available_keys:
-                if not _is_local_provider(p.get("provider_type", "")):
-                    logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
-                    continue
-                available_keys = [{"id": "local", "name": "Local", "api_key": None}]
+                logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                continue
 
             # Try available keys in rotation
             for active_key_entry in available_keys:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
-                if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                if not used_api_key:
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
                         await provider_key_rotation_service.release(db, lease)
@@ -511,6 +499,11 @@ class InferenceService:
                         active_key_id=active_key_entry.get("id"),
                     )
 
+                except asyncio.CancelledError:
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.release(db, lease)
+                    raise
                 except Exception as exc:
                     provider_error = exc
                     lease = active_key_entry.get("_lease")
@@ -525,6 +518,7 @@ class InferenceService:
                             p["id"],
                             estimated_tokens=estimated_tokens,
                             excluded_key_ids=tried_relational_keys,
+                            lease_seconds=max(120, p["timeout_seconds"] + 30),
                         )
                         if acquired.lease is not None:
                             available_keys.append(
@@ -584,7 +578,7 @@ class InferenceService:
             p
             for p in all_providers
             if p.get("provider_type") in VALID_CHAT_PROVIDER_TYPES
-            and not any(x in str(p.get("id", "")).lower() for x in ("routing", "sentence_transformers", "docling"))
+            and "routing" not in str(p.get("id", "")).lower()
         ]
 
         # Filter out cloud providers that have no active keys configured when configured providers exist
@@ -637,13 +631,13 @@ class InferenceService:
             relational_managed = False
             tried_relational_keys: set[str] = set()
             available_keys: list[dict[str, Any]] = []
-            if not _is_local_provider(p.get("provider_type", "")):
-                acquired = await provider_key_rotation_service.acquire(
-                    db, p["id"], estimated_tokens=estimated_tokens
-                )
-                relational_managed = acquired.managed
-                if acquired.lease is not None:
-                    available_keys.append(self._lease_to_key_entry(acquired.lease))
+            acquired = await provider_key_rotation_service.acquire(
+                db, p["id"], estimated_tokens=estimated_tokens,
+                lease_seconds=max(120, p["timeout_seconds"] + 30)
+            )
+            relational_managed = acquired.managed
+            if acquired.lease is not None:
+                available_keys.append(self._lease_to_key_entry(acquired.lease))
 
             if not relational_managed:
                 available_keys, key_state_changed = self._prepare_available_keys(
@@ -656,15 +650,13 @@ class InferenceService:
                         {"id": "default", "name": "Default", "api_key": p["api_key"]}
                     ]
             if not available_keys:
-                if not _is_local_provider(p.get("provider_type", "")):
-                    logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
-                    continue
-                available_keys = [{"id": "local", "name": "Local", "api_key": None}]
+                logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                continue
 
             for active_key_entry in available_keys:
                 raw_key = active_key_entry.get("api_key")
                 used_api_key = decrypt_secret(raw_key) if raw_key else None
-                if not _is_local_provider(p.get("provider_type", "")) and not used_api_key:
+                if not used_api_key:
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
                         await provider_key_rotation_service.release(db, lease)
@@ -716,6 +708,7 @@ class InferenceService:
                 yielded_any = False
                 streamed_chunks: list[str] = []
                 start_time = time.perf_counter()
+                last_renewed = start_time
 
                 try:
                     adapter = self._get_adapter_factory()(
@@ -744,6 +737,12 @@ class InferenceService:
                             raise
 
                     async for token_chunk in token_stream:
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey) and time.perf_counter() - last_renewed >= 30:
+                            renewed = await provider_key_rotation_service.renew(db, lease, max(120, p["timeout_seconds"] + 30))
+                            if not renewed:
+                                raise AppException("Quyền sử dụng khóa đã hết hiệu lực.", code="PROVIDER_KEY_LEASE_LOST", status_code=503)
+                            last_renewed = time.perf_counter()
                         yielded_any = True
                         streamed_chunks.append(token_chunk)
                         yield token_chunk
@@ -799,6 +798,11 @@ class InferenceService:
                         logger.warning("Failed to record streaming usage in database: %s", db_err)
 
                     return
+                except (asyncio.CancelledError, GeneratorExit):
+                    lease = active_key_entry.get("_lease")
+                    if isinstance(lease, LeasedProviderKey):
+                        await provider_key_rotation_service.release(db, lease)
+                    raise
                 except Exception as ex:
                     provider_error = ex
                     lease = active_key_entry.get("_lease")
@@ -814,6 +818,7 @@ class InferenceService:
                                 p["id"],
                                 estimated_tokens=estimated_tokens,
                                 excluded_key_ids=tried_relational_keys,
+                            lease_seconds=max(120, p["timeout_seconds"] + 30),
                             )
                             if acquired.lease is not None:
                                 available_keys.append(

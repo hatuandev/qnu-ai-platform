@@ -24,7 +24,7 @@ class OCREngineModel(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    engine_type: Mapped[str] = mapped_column(String(50), nullable=False)  # paddleocr, docling, mock_ocr
+    engine_type: Mapped[str] = mapped_column(String(50), nullable=False)
     provider_category: Mapped[str] = mapped_column(String(30), default="local")  # local, cloud
     capabilities: Mapped[list[str]] = mapped_column(JSONB, default=list)
     avg_confidence: Mapped[float] = mapped_column(Float, default=0.95)

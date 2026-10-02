@@ -35,7 +35,7 @@ export interface ProviderModelsTestResponse {
 export interface ProviderPreset {
   code: string;
   name: string;
-  category: "cloud" | "local" | "custom";
+  category: "cloud" | "custom";
   icon: string;
   description: string;
   default_base_url?: string | null;
@@ -53,17 +53,12 @@ export interface ModelProvider {
     | "openai"
     | "gemini"
     | "claude"
-    | "local"
-    | "local_vllm"
-    | "ollama"
     | "deepseek"
     | "groq"
     | "openrouter"
     | "mistral"
     | "cloudflare"
     | "nvidia"
-    | "sentence_transformers"
-    | "docling"
     | "custom";
   is_active: boolean;
   circuit_breaker_status: "CLOSED" | "OPEN" | "HALF_OPEN";
@@ -85,7 +80,7 @@ export interface ModelOption {
   provider_name: string;
   provider_type: string;
   model_name: string;
-  category: "cloud" | "local" | "custom";
+  category: "cloud" | "custom";
   description?: string;
 }
 

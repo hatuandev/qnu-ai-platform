@@ -21,6 +21,33 @@ from app.modules.modelops.schemas import (
 
 logger = logging.getLogger(__name__)
 
+REMOVED_LOCAL_PROVIDER_TYPES = {
+    "local",
+    "local_vllm",
+    "ollama",
+    "sentence_transformers",
+    "docling",
+    "easyocr",
+    "vllm",
+}
+REMOVED_LOCAL_PROVIDER_IDS = {
+    "prov_local",
+    "prov_ollama",
+    "prov_sentence_transformers",
+    "prov_docling",
+    "prov_easyocr",
+}
+
+
+def _without_local_models(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Remove retired in-process and self-hosted model entries from a routing chain."""
+    return [
+        item
+        for item in (items or [])
+        if str(item.get("provider_type", "")).lower() not in REMOVED_LOCAL_PROVIDER_TYPES
+        and str(item.get("provider_id", "")) not in REMOVED_LOCAL_PROVIDER_IDS
+    ]
+
 
 DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     {
@@ -47,22 +74,6 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "is_active": True,
         "description": "Ưu tiên 3: Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
     },
-    {
-        "provider_id": "prov_docling",
-        "provider_name": "Docling Local",
-        "model_name": "docling",
-        "provider_type": "local",
-        "is_active": True,
-        "description": "Ưu tiên 4: IBM Docling TableFormer — Bóc tách cấu trúc bảng biểu offline nội bộ",
-    },
-    {
-        "provider_id": "prov_easyocr",
-        "provider_name": "EasyOCR Local",
-        "model_name": "easyocr",
-        "provider_type": "local",
-        "is_active": True,
-        "description": "Ưu tiên 5: EasyOCR Local Engine — Nhận diện hình ảnh và con dấu offline",
-    },
 ]
 
 DEFAULT_QNU_EMBEDDING_COMBO_CHAIN: list[dict[str, Any]] = [
@@ -82,14 +93,6 @@ DEFAULT_QNU_EMBEDDING_COMBO_CHAIN: list[dict[str, Any]] = [
         "is_active": True,
         "description": "Ưu tiên 2: Google text-embedding-004 — Chất lượng truy xuất ngữ nghĩa tiếng Việt chuẩn xác",
     },
-    {
-        "provider_id": "prov_sentence_transformers",
-        "provider_name": "Local SentenceTransformers",
-        "model_name": "BAAI/bge-m3",
-        "provider_type": "local",
-        "is_active": True,
-        "description": "Ưu tiên 3 (Cứu sinh): Local PyTorch BGE-M3 nội bộ trường ĐH Quy Nhơn — Hoạt động offline 100%",
-    },
 ]
 
 DEFAULT_QNU_RERANKER_COMBO_CHAIN: list[dict[str, Any]] = [
@@ -100,14 +103,6 @@ DEFAULT_QNU_RERANKER_COMBO_CHAIN: list[dict[str, Any]] = [
         "provider_type": "cloud",
         "is_active": True,
         "description": "Ưu tiên 1: Cloudflare BGE-Reranker-Base — Cross-Encoder Edge GPU tái chấm điểm Top-K",
-    },
-    {
-        "provider_id": "prov_sentence_transformers",
-        "provider_name": "Local SentenceTransformers",
-        "model_name": "bge-reranker-large",
-        "provider_type": "local",
-        "is_active": True,
-        "description": "Ưu tiên 2: Local Cross-Encoder BGE Large — Suy luận cục bộ bảo mật",
     },
 ]
 
@@ -128,14 +123,6 @@ DEFAULT_QNU_CHAT_COMBO_CHAIN: list[dict[str, Any]] = [
         "is_active": True,
         "description": "Ưu tiên 2: OpenAI GPT-4o-mini — Ổn định và chi phí tối ưu",
     },
-    {
-        "provider_id": "prov_ollama",
-        "provider_name": "Ollama Local GPU",
-        "model_name": "qwen2.5:7b",
-        "provider_type": "local",
-        "is_active": True,
-        "description": "Ưu tiên 3: Ollama Local Qwen 2.5 7B — Dự phòng nội bộ không phụ thuộc internet",
-    },
 ]
 
 DEFAULT_QNU_OCR_COMBO: dict[str, Any] = {
@@ -155,7 +142,7 @@ DEFAULT_QNU_EMBEDDING_COMBO: dict[str, Any] = {
     "strategy": "fallback",
     "models": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,
     "is_default": True,
-    "description": "Chuỗi nhúng vector dự phòng 3 tầng (Cloudflare Edge ➔ Gemini ➔ PyTorch Local)",
+    "description": "Chuỗi nhúng vector qua API (Cloudflare Edge ➔ Gemini)",
 }
 
 DEFAULT_QNU_RERANKER_COMBO: dict[str, Any] = {
@@ -165,7 +152,7 @@ DEFAULT_QNU_RERANKER_COMBO: dict[str, Any] = {
     "strategy": "fallback",
     "models": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
     "is_default": True,
-    "description": "Chuỗi tái xếp hạng RAG dự phòng (Cloudflare Edge Cross-Encoder ➔ Local RRF)",
+    "description": "Tái xếp hạng RAG qua Cloudflare Workers AI",
 }
 
 DEFAULT_QNU_CHAT_COMBO: dict[str, Any] = {
@@ -175,7 +162,7 @@ DEFAULT_QNU_CHAT_COMBO: dict[str, Any] = {
     "strategy": "fallback",
     "models": DEFAULT_QNU_CHAT_COMBO_CHAIN,
     "is_default": False,
-    "description": "Chuỗi LLM hội thoại và lý luận dự phòng đa nhà cung cấp (Gemini ➔ GPT-4o-mini ➔ Ollama Local)",
+    "description": "Chuỗi LLM hội thoại qua API (Gemini ➔ GPT-4o-mini)",
 }
 
 DEFAULT_INITIAL_COMBOS: list[dict[str, Any]] = [
@@ -281,6 +268,19 @@ class ModelCatalogService:
                 db.add(cfg_record)
                 await db.commit()
 
+        for chain_key in (
+            "embedding_combo_chain",
+            "reranker_combo_chain",
+            "ocr_combo_chain",
+            "chat_combo_chain",
+        ):
+            default_data[chain_key] = _without_local_models(default_data.get(chain_key))
+        for combo in default_data.get("model_combos") or []:
+            combo["models"] = _without_local_models(combo.get("models"))
+        vision_adapter = default_data.get("vision_adapter") or {}
+        vision_adapter["models"] = _without_local_models(vision_adapter.get("models"))
+        default_data["vision_adapter"] = vision_adapter
+
         # Enumerate available options from active providers
         providers_stmt = select(ModelProviderConfig).where(
             ModelProviderConfig.is_active.is_(True),
@@ -300,16 +300,12 @@ class ModelCatalogService:
                 models_list.append(p.model_name)
 
             p_type = (p.provider_type or "").lower()
-            category = "cloud"
-            if p_type in ("sentence_transformers", "docling", "ollama", "local_vllm", "local") or "local" in p.id:
-                category = "local"
-            elif p_type == "custom":
-                category = "custom"
+            category = "custom" if p_type == "custom" else "cloud"
 
             for m in models_list:
                 m_lower = m.lower()
                 if (
-                    "bge" in m_lower or "embed" in m_lower or p_type in ("sentence_transformers",)
+                    "bge" in m_lower or "embed" in m_lower
                 ) and "rerank" not in m_lower:
                     available_embeddings.append(
                         ModelOption(
@@ -341,7 +337,7 @@ class ModelCatalogService:
                 else:
                     is_ocr_candidate = (
                         "ocr" in m_lower
-                        or p_type in ("docling", "mistral")
+                        or p_type == "mistral"
                         or (
                             p_type in ("gemini", "google")
                             and any(kw in m_lower for kw in ("flash", "vision", "pro", "image"))
@@ -364,19 +360,6 @@ class ModelCatalogService:
                             description=desc,
                         )
                     )
-
-        # Add local fallback RRF option if not present
-        if not any(r.model_name == "rrf_fallback" for r in available_rerankers):
-            available_rerankers.append(
-                ModelOption(
-                    provider_id="prov_sentence_transformers",
-                    provider_name="Local Rank Fusion (RRF)",
-                    provider_type="local",
-                    model_name="rrf_fallback",
-                    category="local",
-                    description="Xếp hạng hợp nhất RRF k=60 cục bộ (không phụ thuộc mạng ngoài)",
-                )
-            )
 
         return SystemModelDefaultsResponse(
             defaults=SystemModelDefaults(**default_data),
@@ -409,10 +392,10 @@ class ModelCatalogService:
 
         if update_data.default_embedding_provider_id is not None:
             defaults["default_embedding_provider_id"] = update_data.default_embedding_provider_id
-            if "cloudflare" in update_data.default_embedding_provider_id.lower():
-                settings.EMBEDDING_PROVIDER = "cloudflare"
-            else:
-                settings.EMBEDDING_PROVIDER = "sentence_transformers"
+            provider_hint = update_data.default_embedding_provider_id.lower()
+            settings.EMBEDDING_PROVIDER = (
+                "cloudflare" if "cloudflare" in provider_hint else "gemini"
+            )
 
         if update_data.default_embedding_model is not None:
             defaults["default_embedding_model"] = update_data.default_embedding_model
@@ -420,10 +403,7 @@ class ModelCatalogService:
 
         if update_data.default_reranker_provider_id is not None:
             defaults["default_reranker_provider_id"] = update_data.default_reranker_provider_id
-            if "cloudflare" in update_data.default_reranker_provider_id.lower():
-                settings.RERANKER_PROVIDER = "cloudflare"
-            else:
-                settings.RERANKER_PROVIDER = "local"
+            settings.RERANKER_PROVIDER = "cloudflare"
 
         if update_data.default_reranker_model is not None:
             defaults["default_reranker_model"] = update_data.default_reranker_model

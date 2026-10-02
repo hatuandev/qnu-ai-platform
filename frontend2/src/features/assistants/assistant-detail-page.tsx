@@ -64,9 +64,8 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
       id: `sq-${idx}`,
       text: q,
     })),
-    primary_model: cfg?.model_policy?.primary_model || "gpt-4o-mini",
-    fallback_model:
-      cfg?.model_policy?.fallback_model || "gemini-2.5-flash-lite",
+    primary_model: cfg?.model_policy?.primary_model ?? "",
+    fallback_model: cfg?.model_policy?.fallback_model ?? "",
     temperature: cfg?.model_policy?.temperature ?? 0.2,
     max_tokens: cfg?.model_policy?.max_tokens ?? 1200,
     thinking_budget: cfg?.model_policy?.thinking_budget ?? 0,
@@ -217,8 +216,8 @@ export function AssistantDetailPage({
             .filter((t) => t.length > 0),
           model_policy: {
             ...current.config?.model_policy,
-            primary_model: value.primary_model,
-            fallback_model: value.fallback_model,
+            primary_model: value.primary_model ? value.primary_model : null,
+            fallback_model: value.fallback_model ? value.fallback_model : null,
             temperature: value.temperature,
             max_tokens: value.max_tokens,
             thinking_budget: value.thinking_budget ?? 0,

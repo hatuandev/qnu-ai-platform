@@ -212,16 +212,6 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
                   <SelectItem value="nvidia">
                     NVIDIA NIM (LLM & Vision)
                   </SelectItem>
-                  <SelectItem value="ollama">Ollama (Local Models)</SelectItem>
-                  <SelectItem value="local_vllm">
-                    Local vLLM / HuggingFace
-                  </SelectItem>
-                  <SelectItem value="sentence_transformers">
-                    SentenceTransformers (CPU Cục Bộ)
-                  </SelectItem>
-                  <SelectItem value="docling">
-                    Docling TableFormer (Bóc Tách Cục Bộ)
-                  </SelectItem>
                   <SelectItem value="custom">
                     Custom Provider (Tương thích OpenAI)
                   </SelectItem>

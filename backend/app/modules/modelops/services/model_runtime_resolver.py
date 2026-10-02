@@ -6,14 +6,13 @@ from dataclasses import dataclass
 from typing import Literal
 
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import decrypt_secret
 from app.core.exceptions import AppException
 from app.modules.modelops.models import ModelProviderConfig
+from app.modules.modelops.services.key_status import normalize_provider_key_status
 from app.modules.modelops.services.provider_key_rotation_service import (
-    KeyAcquireResult,
     LeasedProviderKey,
     provider_key_rotation_service,
 )
@@ -57,7 +56,8 @@ class ModelRuntimeResolver:
         keys = [
             item
             for item in key_pool
-            if item.get("is_active", True) and item.get("status", "active") == "active"
+            if item.get("is_active", True)
+            and normalize_provider_key_status(item.get("status")) == "active"
         ]
         keys.sort(key=lambda item: (item.get("priority", 1), item.get("usage_tokens", 0)))
         selected = keys[0] if keys else {}
@@ -111,37 +111,33 @@ class ModelRuntimeResolver:
         account_id: str | None = extra.get("account_id")
         key_id: str | None = None
         lease_token: str | None = None
-        if provider_type not in {"local", "ollama", "sentence_transformers", "local_vllm"}:
-            try:
-                acquired = await provider_key_rotation_service.acquire(
-                    db,
-                    provider.id,
-                    estimated_tokens=estimated_tokens,
-                    excluded_key_ids=excluded_key_ids,
-                )
-            except (SQLAlchemyError, StopAsyncIteration):
-                # Deployments/tests running before the migration continue on JSONB.
-                await db.rollback()
-                acquired = KeyAcquireResult(managed=False, lease=None)
-            if acquired.lease is not None:
-                api_key = acquired.lease.api_key
-                account_id = acquired.lease.account_id or account_id
-                key_id = acquired.lease.id
-                lease_token = acquired.lease.lease_token
-            elif acquired.managed:
-                raise AppException(
-                    f"Provider mặc định '{provider_id}' không còn khóa khả dụng.",
-                    code="MODEL_PROVIDER_KEYS_UNAVAILABLE",
-                    status_code=503,
-                    details={"role": role, "provider_id": provider_id},
-                )
-            else:
-                api_key, account_id = self._select_active_key(
-                    extra, provider.api_key_encrypted
-                )
+        acquired = await provider_key_rotation_service.acquire(
+            db, provider.id, estimated_tokens=estimated_tokens,
+            excluded_key_ids=excluded_key_ids,
+            lease_seconds=max(120, provider.timeout_seconds + 30),
+        )
+        if acquired.lease is not None:
+            api_key = acquired.lease.api_key
+            account_id = acquired.lease.account_id or account_id
+            key_id = acquired.lease.id
+            lease_token = acquired.lease.lease_token
+        elif acquired.managed:
+            raise AppException(
+                f"Provider mặc định '{provider_id}' không còn khóa khả dụng.",
+                code="MODEL_PROVIDER_KEYS_UNAVAILABLE",
+                status_code=503,
+                details={"role": role, "provider_id": provider_id},
+            )
         else:
             api_key, account_id = self._select_active_key(
                 extra, provider.api_key_encrypted
+            )
+        if not api_key:
+            raise AppException(
+                f"Provider mặc định '{provider_id}' chưa có khóa API khả dụng.",
+                code="MODEL_PROVIDER_CREDENTIALS_MISSING",
+                status_code=503,
+                details={"role": role, "provider_id": provider_id},
             )
         invalid_cloudflare_account = (
             not account_id

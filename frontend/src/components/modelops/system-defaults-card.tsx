@@ -51,20 +51,6 @@ export const DEFAULT_QNU_OCR_COMBO_CHAIN: OCRComboItem[] = [
     is_active: true,
     description: "Bước 3 (Dự phòng 2): Mistral OCR Cloud Vision xử lý scan phức tạp & con dấu đỏ",
   },
-  {
-    provider_id: "prov_docling",
-    provider_name: "Local Edge Engine",
-    model_name: "docling-tableformer",
-    is_active: true,
-    description: "Bước 4 (Dự phòng 3): IBM Docling TableFormer bóc tách ma trận bảng biểu cục bộ",
-  },
-  {
-    provider_id: "prov_easyocr",
-    provider_name: "Local Edge Engine",
-    model_name: "easyocr-vie",
-    is_active: true,
-    description: "Bước 5 (Cứu sinh cuối cùng): EasyOCR CPU/CUDA cục bộ bảo đảm 0 gián đoạn",
-  },
 ];
 
 export interface SystemDefaultsCardProps {

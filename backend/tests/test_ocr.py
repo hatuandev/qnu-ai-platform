@@ -8,8 +8,6 @@ import fitz
 import pytest
 
 from app.core.exceptions import AppException
-from app.modules.ocr.adapters.docling_adapter import DoclingOCRAdapter
-from app.modules.ocr.adapters.easyocr_adapter import EasyOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
 from app.modules.ocr.service import OCRService
@@ -80,29 +78,14 @@ async def test_ocr_service_successful_extraction():
 
 
 @pytest.mark.asyncio
-async def test_heavy_adapters_report_availability_honestly():
-    """Docling/EasyOCR adapters must mirror real package presence (never crash)."""
-    import importlib.util
-
-    docling = DoclingOCRAdapter()
-    easyocr = EasyOCRAdapter()
-    assert docling.name == "docling"
-    assert easyocr.name == "easyocr"
-    assert docling.is_available() is (importlib.util.find_spec("docling") is not None)
-    assert easyocr.is_available() is (importlib.util.find_spec("easyocr") is not None)
-
-
-@pytest.mark.asyncio
 async def test_list_engines_reflects_real_availability():
-    """Engine catalog must expose 6 engines with honest active flags."""
+    """Engine catalog must expose API OCR and native PDF extraction."""
     service = OCRService()
     engines = service.list_engines()
     by_name = {e.name: e for e in engines}
-    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "docling", "easyocr", "mock_ocr", "mistral_ocr"}
+    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr"}
     assert by_name["pymupdf_ocr"].is_active is True
     assert by_name["gemini_ocr"].is_active is service._adapters["gemini_ocr"].is_available()
-    assert by_name["docling"].is_active is service._adapters["docling"].is_available()
-    assert by_name["easyocr"].is_active is service._adapters["easyocr"].is_available()
     assert by_name["mistral_ocr"].is_active is service._adapters["mistral_ocr"].is_available()
 
 
@@ -127,8 +110,8 @@ async def test_gemini_adapter_properties_and_availability():
 
 
 @pytest.mark.asyncio
-async def test_mistral_adapter_without_key_falls_back_to_local():
-    """When Mistral API key is absent, extract_document should fall back to local OCR."""
+async def test_mistral_adapter_without_key_fails_closed():
+    """A missing Mistral key must fail clearly instead of invoking a local model."""
     from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 
     service = OCRService()
@@ -147,43 +130,18 @@ async def test_mistral_adapter_without_key_falls_back_to_local():
         adapter = MistralOCRAdapter()
         assert adapter.is_available() is False
 
-        # Mock local OCR so test is instantaneous and isolated
-        class FakeLocalOCR:
-            name = "easyocr"
-
-            def is_available(self) -> bool:
-                return True
-
-            async def extract(self, content: bytes, filename: str) -> dict:
-                return {
-                    "engine_used": "easyocr",
-                    "total_pages": 1,
-                    "overall_confidence": 0.95,
-                    "pages": [
-                        {
-                            "page_number": 1,
-                            "extracted_text": "Van ban mau giang day QNU",
-                            "confidence": 0.95,
-                            "word_count": 6,
-                            "line_count": 1,
-                            "has_tables": False,
-                        }
-                    ],
-                    "raw_text": "Van ban mau giang day QNU",
-                }
-
-        with patch.dict(service._adapters, {"mistral_ocr": adapter, "easyocr": FakeLocalOCR()}):
-            resp = await service.extract_document(
+        with (
+            patch.dict(service._adapters, {"mistral_ocr": adapter}),
+            pytest.raises(AppException) as exc_info,
+        ):
+            await service.extract_document(
                 session=mock_session,
                 content=pdf_bytes,
                 filename="test.pdf",
                 engine_name="mistral_ocr",
             )
-            # Should have gracefully fallen back to local engine
-            assert resp.success is True
-            assert resp.fallback_triggered is True
-            assert resp.engine_used == "easyocr"
-            assert "Van ban mau giang day" in resp.raw_text
+        assert exc_info.value.code == "OCR_PROVIDER_CREDENTIALS_MISSING"
+        assert exc_info.value.status_code == 503
 
 
 @pytest.mark.asyncio
@@ -233,34 +191,17 @@ async def test_auto_routing_uses_mistral_when_key_present():
 
 @pytest.mark.asyncio
 async def test_explicit_unavailable_engine_raises_clear_error():
-    """Requesting an uninstalled engine must fail loudly, never silently mock."""
+    """Retired local engines must be rejected explicitly."""
     service = OCRService()
     mock_session = AsyncMock()
-    target = next(
-        (name for name in ("docling", "easyocr") if not service._adapters[name].is_available()),
-        None,
-    )
-    if target is None:  # all heavy engines installed: simulate a missing one
-        target = "docling"
-        with (
-            patch.object(service._adapters[target], "is_available", return_value=False),
-            pytest.raises(AppException) as exc_info,
-        ):
-            await service.extract_document(
-                session=mock_session,
-                content=b"%PDF-1.4 dummy",
-                filename="scan.pdf",
-                engine_name=target,
-            )
-    else:
-        with pytest.raises(AppException) as exc_info:
-            await service.extract_document(
-                session=mock_session,
-                content=b"%PDF-1.4 dummy",
-                filename="scan.pdf",
-                engine_name=target,
-            )
-    assert exc_info.value.code == "ocr_engine_unavailable"
+    with pytest.raises(AppException) as exc_info:
+        await service.extract_document(
+            session=mock_session,
+            content=b"%PDF-1.4 dummy",
+            filename="scan.pdf",
+            engine_name="docling",
+        )
+    assert exc_info.value.code == "OCR_LOCAL_ENGINE_REMOVED"
     assert exc_info.value.status_code == 400
 
 
@@ -281,11 +222,11 @@ async def test_auto_routing_blank_scan_returns_honest_empty():
     mock_session.add = MagicMock()
     mock_session.commit = AsyncMock()
 
-    # When Mistral API key is absent and heavy engines are unavailable, return PyMuPDF empty
+    # When cloud OCR APIs are unavailable, return an honest empty result.
     with (
         patch("app.core.config.settings.MISTRAL_API_KEY", ""),
-        patch.object(service._adapters["easyocr"], "is_available", return_value=False),
-        patch.object(service._adapters["docling"], "is_available", return_value=False),
+        patch.object(service._adapters["mistral_ocr"], "is_available", return_value=False),
+        patch.object(service._adapters["gemini_ocr"], "is_available", return_value=False),
     ):
         resp = await service.extract_document(
             session=mock_session,
@@ -297,55 +238,6 @@ async def test_auto_routing_blank_scan_returns_honest_empty():
     assert resp.raw_text == ""
     assert resp.engine_used == "pymupdf_ocr"
     assert resp.fallback_triggered is False
-
-
-@pytest.mark.asyncio
-async def test_auto_routing_upgrades_to_docling_when_available():
-    """Auto mode must upgrade blank scans to Docling when Mistral key is missing but Docling is installed."""
-    service = OCRService()
-    mock_session = AsyncMock()
-    mock_session.add = MagicMock()
-    mock_session.commit = AsyncMock()
-
-    class FakeDocling:
-        name = "docling"
-
-        def is_available(self) -> bool:
-            return True
-
-        async def extract(self, content: bytes, filename: str) -> dict:
-            return {
-                "engine_used": "docling",
-                "total_pages": 1,
-                "overall_confidence": 0.97,
-                "pages": [
-                    {
-                        "page_number": 1,
-                        "extracted_text": "Noi dung quet tu ban scan",
-                        "confidence": 0.97,
-                        "word_count": 5,
-                        "line_count": 1,
-                        "has_tables": False,
-                    }
-                ],
-                "raw_text": "Noi dung quet tu ban scan",
-            }
-
-    with (
-        patch("app.core.config.settings.MISTRAL_API_KEY", ""),
-        patch.object(service._adapters["easyocr"], "is_available", return_value=False),
-        patch.dict(service._adapters, {"docling": FakeDocling()}),
-    ):
-        resp = await service.extract_document(
-            session=mock_session,
-            content=_blank_pdf_bytes(),
-            filename="blank_scan.pdf",
-            engine_name="auto",
-        )
-    assert resp.success is True
-    assert resp.engine_used == "docling"
-    assert resp.fallback_triggered is True
-    assert "ban scan" in resp.raw_text
 
 
 @pytest.mark.asyncio
@@ -426,7 +318,6 @@ async def test_ocr_combo_chain_sequential_failover_on_quota():
     custom_combo = [
         {"provider_id": "prov_gemini", "model_name": "gemini-2.5-flash", "is_active": True},
         {"provider_id": "prov_mistral", "model_name": "mistral-ocr-latest", "is_active": True},
-        {"provider_id": "prov_docling", "model_name": "docling", "is_active": True},
     ]
 
     class FailingQuotaAdapter:

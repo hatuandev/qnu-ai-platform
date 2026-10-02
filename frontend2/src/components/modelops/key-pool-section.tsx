@@ -116,13 +116,13 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                 disabled={simulatingRotation || providerKeys.length <= 1}
                 onClick={() => onSimulateRotation(selectedProvider.id)}
                 className="h-8 text-xs gap-1.5"
-                title="Mô phỏng sự cố 429 trên khóa hiện tại để kiểm tra cơ chế nhảy khóa tự động"
+                title="Dự đoán thứ tự chuyển khóa khi gặp 429; không gọi provider hoặc thay đổi quota"
               >
                 <Zap
                   className={`h-3.5 w-3.5 text-warning ${simulatingRotation ? "animate-spin" : ""}`}
                 />
                 <span>
-                  {simulatingRotation ? "Đang test..." : "Thử Failover"}
+                  {simulatingRotation ? "Đang mô phỏng..." : "Mô phỏng Failover"}
                 </span>
               </Button>
 
@@ -152,8 +152,8 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
               <div>
                 <strong className="block font-semibold">
                   {rotationResult.rotated
-                    ? "⚡ Tự Động Xoay Khóa Thành Công!"
-                    : "Thông Báo Xử Lý Token"}
+                    ? "Mô phỏng chuyển khóa"
+                    : "Kết quả mô phỏng"}
                 </strong>
                 <span className="leading-relaxed">
                   {rotationResult.message}
@@ -378,8 +378,15 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                               Hết Quota
                             </Badge>
                           ) : keyItem.status === "invalid" ? (
-                            <Badge variant="destructive" className="text-[10px]">
+                            <Badge
+                              variant="destructive"
+                              className="text-[10px]"
+                            >
                               Khóa lỗi
+                            </Badge>
+                          ) : keyItem.is_leased ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Đang dùng
                             </Badge>
                           ) : keyItem.is_active ? (
                             <Badge variant="success" className="text-[10px]">
@@ -405,6 +412,24 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                         </div>
                       </div>
 
+                      {(keyItem.cooldown_until || keyItem.last_error_code) && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          {keyItem.cooldown_until && (
+                            <span>
+                              Thử lại:{" "}
+                              {new Date(keyItem.cooldown_until).toLocaleString(
+                                "vi-VN",
+                              )}
+                            </span>
+                          )}
+                          {keyItem.last_error_code && (
+                            <span>
+                              Lỗi gần nhất: {keyItem.last_error_code} ·{" "}
+                              {keyItem.consecutive_failures || 0} lần liên tiếp
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {/* Usage & Quota Bar */}
                       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                         <span>
@@ -461,7 +486,7 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                         >
                           <Play className="h-3 w-3 text-primary" />
                           <span>
-                            {isKeyTesting ? "Đang test..." : "Kiểm tra"}
+                            {isKeyTesting ? "Đang thử..." : "Kiểm tra"}
                           </span>
                         </Button>
 

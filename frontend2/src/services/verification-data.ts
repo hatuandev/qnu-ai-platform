@@ -13,7 +13,7 @@ export const MOCK_VERIFICATION_DOCUMENT: DocumentVerificationData = {
   filename: "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1).docx",
   file_size_mb: 0.87,
   total_pages: 14,
-  engine: "docling-tableformer-local",
+  engine: "mistral-ocr-latest",
   total_chars: 21870,
   estimated_chunks: 37,
   pages: [

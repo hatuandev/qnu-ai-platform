@@ -77,7 +77,7 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         icon: Cpu,
         badge: "Providers",
         badgeVariant: "default",
-        description: "OpenAI, Gemini, Mistral, Cloudflare, Local vLLM/Ollama và Circuit Breaker",
+        description: "OpenAI, Gemini, Mistral, Cloudflare và Circuit Breaker",
       },
     ],
   },

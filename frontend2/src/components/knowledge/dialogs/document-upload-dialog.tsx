@@ -47,10 +47,6 @@ const OCR_ENGINES = [
   { value: "auto", label: "Tự động phát hiện (Auto Pipeline)" },
   { value: "pymupdf_ocr", label: "PyMuPDF (Nhanh, văn bản số & hành chính)" },
   {
-    value: "docling",
-    label: "Docling (Bóc tách bảng biểu & tài liệu học thuật)",
-  },
-  {
     value: "gemini_vision",
     label: "Google Gemini Vision (Ảnh scan mờ, bản chụp)",
   },

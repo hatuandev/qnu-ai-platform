@@ -1,26 +1,12 @@
 import type { ModelProvider } from "../../services/api-client";
 
-export type ProviderCategory = "all" | "cloud" | "local" | "custom";
+export type ProviderCategory = "all" | "cloud" | "custom";
 
 export const getProviderCategory = (
   prov: ModelProvider,
-): "cloud" | "local" | "custom" => {
+): "cloud" | "custom" => {
   const t = (prov.type || prov.code || "").toLowerCase();
   if (t === "custom") return "custom";
-  if (
-    t === "sentence_transformers" ||
-    t === "docling" ||
-    t === "ollama" ||
-    t === "local_vllm" ||
-    t === "local" ||
-    prov.id.includes("local") ||
-    prov.id.includes("sentence_transformers") ||
-    prov.id.includes("docling") ||
-    prov.name.toLowerCase().includes("local") ||
-    prov.name.toLowerCase().includes("cục bộ")
-  ) {
-    return "local";
-  }
   return "cloud";
 };
 
@@ -46,7 +32,6 @@ export const getModelCapabilities = (
     mLower.includes("bge-base") ||
     mLower.includes("bge-small") ||
     mLower.includes("bge-large") ||
-    mLower.includes("sentence-transformers") ||
     mLower.includes("text-embedding");
 
   const isReranker =
@@ -60,8 +45,6 @@ export const getModelCapabilities = (
     !isEmbedding &&
     !isReranker &&
     (mLower.includes("ocr") ||
-      mLower.includes("docling") ||
-      mLower.includes("easyocr") ||
       mLower.includes("flash-image") ||
       mLower.startsWith("gemini") ||
       mLower.includes("gemini") ||
@@ -221,8 +204,6 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
     "mistralai/mixtral-8x22b-instruct-v0.1",
     "nvidia/neva-22b",
   ],
-  ollama: ["qwen2.5:7b", "llama3.1:8b", "bge-m3:latest"],
-  local_vllm: ["qwen2.5-7b-instruct"],
   openrouter: [
     "google/gemini-2.5-flash",
     "anthropic/claude-3.5-sonnet",
@@ -232,6 +213,4 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
     "qwen/qwen-2.5-72b-instruct",
     "google/gemini-2.0-flash-exp:free",
   ],
-  sentence_transformers: ["BAAI/bge-m3"],
-  docling: ["docling-tableformer-local"],
 };

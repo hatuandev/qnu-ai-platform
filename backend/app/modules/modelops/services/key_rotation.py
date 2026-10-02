@@ -21,6 +21,9 @@ _HARD_QUOTA_CODES = {
     "credit_balance_exhausted",
     "insufficient_quota",
     "monthly_quota_exceeded",
+    "out_of_credits",
+    "payment_required",
+    "quota_exceeded",
     "quota_exhausted",
 }
 _INVALID_CREDENTIAL_CODES = {
@@ -132,20 +135,45 @@ def classify_key_failure(exc: Exception) -> KeyFailure:
                 if retry_after is not None:
                     break
 
-    message = str(exc).lower()
-    if status_code is None and "429" in message:
+    payload_texts = [
+        str(value).lower()
+        for key, value in flattened
+        if key in {"message", "detail", "error", "description"} and isinstance(value, str)
+    ]
+    message_corpus = " ".join([str(exc).lower(), *payload_texts])
+    if status_code is None and "429" in message_corpus:
         status_code = 429
-    hard_quota = bool(structured_codes & _HARD_QUOTA_CODES) or any(
-        marker in message
-        for marker in ("insufficient_quota", "billing hard limit", "credit balance")
+    hard_quota = (
+        status_code == 402
+        or bool(structured_codes & _HARD_QUOTA_CODES)
+        or any(
+            marker in message_corpus
+            for marker in (
+                "insufficient_quota",
+                "billing hard limit",
+                "credit balance",
+                "quota exceeded",
+                "quota_exhausted",
+                "out of credit",
+                "credit expired",
+            )
+        )
+        or (
+            status_code == 403
+            and any(
+                marker in message_corpus
+                for marker in ("quota", "credit", "balance", "billing", "exceeded")
+            )
+        )
     )
     invalid_credential = bool(structured_codes & _INVALID_CREDENTIAL_CODES)
+
+    if hard_quota:
+        return KeyFailure("exhausted", status_code, None, "provider_quota_exhausted")
 
     if status_code == 429 or (
         isinstance(exc, AppException) and exc.code == "rate_limit_exceeded"
     ):
-        if hard_quota:
-            return KeyFailure("exhausted", status_code, None, "provider_quota_exhausted")
         return KeyFailure(
             "rate_limited",
             status_code,

@@ -178,10 +178,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     () => providers.filter((p) => getProviderCategory(p) === "cloud"),
     [providers],
   );
-  const localProviders = useMemo(
-    () => providers.filter((p) => getProviderCategory(p) === "local"),
-    [providers],
-  );
   const customProviders = useMemo(
     () => providers.filter((p) => getProviderCategory(p) === "custom"),
     [providers],
@@ -247,7 +243,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
       provider_name: string;
       provider_type: string;
       model_name: string;
-      category: "cloud" | "local" | "custom";
+      category: "cloud" | "custom";
       description?: string;
     }> = [];
     for (const p of providers) {
@@ -1082,22 +1078,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
               </Button>
 
               <Button
-                variant={activeCategoryTab === "local" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveCategoryTab("local")}
-                className="h-8 text-xs gap-1.5 rounded-full"
-              >
-                <Cpu className="size-3.5" />
-                <span>Local Campus</span>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
-                >
-                  {localProviders.length}
-                </Badge>
-              </Button>
-
-              <Button
                 variant={activeCategoryTab === "custom" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setActiveCategoryTab("custom")}
@@ -1238,53 +1218,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
                       {cloudProviders.map((prov) => (
-                        <ProviderCard
-                          key={prov.id}
-                          provider={prov}
-                          onSelect={handleSelectProvider}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Nhóm Local */}
-              {(activeCategoryTab === "all" ||
-                activeCategoryTab === "local") && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        <Cpu className="size-3.5" />
-                      </div>
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Local Campus AI (Máy Chủ Nội Bộ QNU)
-                      </h2>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-mono"
-                      >
-                        {localProviders.length}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openCreateModal("ollama")}
-                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
-                    >
-                      <Plus className="size-3" />
-                      <span>Thêm Local</span>
-                    </Button>
-                  </div>
-                  {localProviders.length === 0 ? (
-                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
-                      Chưa có Provider cục bộ nào.
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
-                      {localProviders.map((prov) => (
                         <ProviderCard
                           key={prov.id}
                           provider={prov}

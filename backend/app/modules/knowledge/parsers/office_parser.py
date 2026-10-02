@@ -368,6 +368,57 @@ class XlsxParser(BaseDocumentParser):
         )
 
 
+class PptxParser(BaseDocumentParser):
+    """Small native fallback for PPTX when the optional Docling backend is unavailable."""
+
+    async def parse(self, file_bytes: bytes, file_name: str) -> ParsedContent:
+        from pptx import Presentation
+
+        presentation = Presentation(io.BytesIO(file_bytes))
+        sections: list[str] = []
+        tables: list[ExtractedTable] = []
+        for slide_number, slide in enumerate(presentation.slides, start=1):
+            slide_lines = [f"## Slide {slide_number}"]
+            for shape in slide.shapes:
+                if getattr(shape, "has_text_frame", False):
+                    text = "\n".join(
+                        paragraph.text.strip()
+                        for paragraph in shape.text_frame.paragraphs
+                        if paragraph.text.strip()
+                    )
+                    if text:
+                        slide_lines.append(text)
+                if getattr(shape, "has_table", False):
+                    rows = [
+                        [cell.text.strip().replace("\n", " ") for cell in row.cells]
+                        for row in shape.table.rows
+                    ]
+                    if rows and rows[0]:
+                        headers = rows[0]
+                        data_rows = rows[1:]
+                        markdown = "| " + " | ".join(headers) + " |\n"
+                        markdown += "| " + " | ".join(["---"] * len(headers)) + " |\n"
+                        markdown += "\n".join(
+                            "| " + " | ".join(row) + " |" for row in data_rows
+                        )
+                        slide_lines.append(markdown)
+                        tables.append(
+                            ExtractedTable(
+                                page_number=slide_number,
+                                headers=headers,
+                                rows=data_rows,
+                                markdown_repr=markdown,
+                            )
+                        )
+            sections.append("\n\n".join(slide_lines))
+        return ParsedContent(
+            raw_text="\n\n".join(sections).strip(),
+            page_count=len(presentation.slides),
+            tables=tables,
+            metadata={"slide_count": len(presentation.slides), "parser": "python-pptx"},
+        )
+
+
 class PlainTextParser(BaseDocumentParser):
     """Fallback parser for .txt, .md, and .csv text documents."""
 

@@ -163,7 +163,7 @@ async def upload_document(
         None, description="Mã loại văn bản chuẩn từ taxonomy qnu-ai-core"
     ),
     ocr_engine: str | None = Form(
-        None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
+        None, description="Bộ máy OCR: auto, pymupdf_ocr hoặc provider API"
     ),
     auto_approve: bool = Form(
         False, description="Tự động phê duyệt & nạp vector nếu dữ liệu sạch (Fast-Track)"
@@ -194,7 +194,7 @@ async def parse_preview(
     file: UploadFile = File(...),
     strategy: str = Query("semantic", description="Chiến lược chia đoạn: semantic hoặc clause"),
     ocr_engine: str | None = Query(
-        None, description="Bộ máy OCR khi bóc scan: auto, pymupdf_ocr, docling, easyocr"
+        None, description="Bộ máy OCR: auto, pymupdf_ocr hoặc provider API"
     ),
     db: AsyncSession = Depends(get_db),
 ) -> ParsePreviewResponse:

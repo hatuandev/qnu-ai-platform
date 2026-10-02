@@ -6,7 +6,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +28,7 @@ def generate_uuid() -> str:
 
 
 class ModelProviderConfig(Base):
-    """Configuration for LLM Providers (OpenAI, Gemini, Local vLLM/Ollama)."""
+    """Configuration for API-based AI providers."""
 
     __tablename__ = "model_provider_configs"
 
@@ -26,7 +36,7 @@ class ModelProviderConfig(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     provider_type: Mapped[str] = mapped_column(
         String(50), nullable=False, index=True
-    )  # openai, gemini, local_vllm
+    )  # openai, gemini, cloudflare, mistral, custom
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     api_base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     api_key_encrypted: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -87,6 +97,10 @@ class ProviderApiKey(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'rate_limited', 'exhausted', 'invalid', 'inactive')",
+            name="ck_provider_api_keys_status",
+        ),
         Index(
             "ix_provider_api_keys_selection",
             "provider_id",
@@ -96,6 +110,26 @@ class ProviderApiKey(Base):
         ),
         Index("ix_provider_api_keys_lease", "provider_id", "lease_until"),
     )
+
+
+class ProviderKeyEvent(Base):
+    """Credential-free audit trail for provider key routing."""
+
+    __tablename__ = "provider_key_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    provider_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("model_provider_configs.id", ondelete="CASCADE"), nullable=False
+    )
+    key_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    tokens: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    __table_args__ = (Index("ix_provider_key_events_history", "provider_id", "created_at", "id"),)
 
 
 class TenantQuota(Base):

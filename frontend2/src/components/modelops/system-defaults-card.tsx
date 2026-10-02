@@ -510,7 +510,7 @@ export const SystemDefaultsCard: React.FC<SystemDefaultsCardProps> = ({
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="truncate">
-                Chính sách: Failover qua Cloudflare Edge ➔ Local BGE-M3
+                Chính sách: Failover API Cloudflare ➔ Gemini
               </span>
             </span>
             {onNavigateToCombos && (
@@ -849,7 +849,7 @@ export const SystemDefaultsCard: React.FC<SystemDefaultsCardProps> = ({
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="truncate">
-                Chính sách: Gemini 2.5 Flash ➔ Mistral OCR ➔ Docling
+                Chính sách: Gemini 2.5 Flash ➔ Mistral OCR
               </span>
             </span>
             {onNavigateToCombos && (
@@ -1019,7 +1019,7 @@ export const SystemDefaultsCard: React.FC<SystemDefaultsCardProps> = ({
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="truncate">
-                Chính sách: Gemini 2.5 ➔ GPT-4o-mini ➔ Local Qwen 2.5
+                Chính sách: Gemini 2.5 ➔ GPT-4o-mini
               </span>
             </span>
             {onNavigateToCombos && (

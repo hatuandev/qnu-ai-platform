@@ -348,8 +348,8 @@ export const KnowledgePage: React.FC = () => {
             <SelectContent>
               <SelectItem value="all">Mọi bộ máy OCR</SelectItem>
               <SelectItem value="PyMuPDF">PyMuPDF</SelectItem>
-              <SelectItem value="Docling">Docling</SelectItem>
-              <SelectItem value="EasyOCR">EasyOCR</SelectItem>
+              <SelectItem value="Gemini">Gemini</SelectItem>
+              <SelectItem value="Mistral">Mistral</SelectItem>
             </SelectContent>
           </Select>
 
@@ -700,8 +700,8 @@ export const KnowledgePage: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PyMuPDF">PyMuPDF (Nhanh)</SelectItem>
-                    <SelectItem value="Docling">Docling (Bảng)</SelectItem>
-                    <SelectItem value="EasyOCR">EasyOCR (Đa ngữ)</SelectItem>
+                    <SelectItem value="Gemini">Gemini Vision</SelectItem>
+                    <SelectItem value="Mistral">Mistral OCR</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

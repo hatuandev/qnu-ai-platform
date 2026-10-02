@@ -29,11 +29,6 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "deepseek-reasoner": {"prompt": 0.55, "completion": 2.19},
     "qwen2.5-7b-instruct": {"prompt": 0.10, "completion": 0.20},
     "qwen2.5-72b-instruct": {"prompt": 0.35, "completion": 0.70},
-    # Local & On-Premise Models (0 USD)
-    "bge-m3": {"prompt": 0.0, "completion": 0.0},
-    "bge-reranker-v2-m3": {"prompt": 0.0, "completion": 0.0},
-    "local-vllm": {"prompt": 0.0, "completion": 0.0},
-    "ollama": {"prompt": 0.0, "completion": 0.0},
 }
 
 DEFAULT_FALLBACK_PRICING = {"prompt": 0.15, "completion": 0.60}

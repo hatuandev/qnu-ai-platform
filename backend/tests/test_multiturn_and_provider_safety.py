@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.exceptions import AppException
 from app.modules.modelops.providers import get_llm_adapter
-from app.modules.modelops.providers.local_vllm_adapter import LocalVLLMAdapter
-from app.modules.modelops.schemas import ChatMessage
 from app.modules.modelops.services.inference_service import (
     NON_CHAT_MODEL_KEYWORDS,
     VALID_CHAT_PROVIDER_TYPES,
@@ -123,17 +120,3 @@ def test_get_llm_adapter_rejects_unsupported_provider() -> None:
 
     with pytest.raises(ValueError, match="Unsupported LLM provider type"):
         get_llm_adapter("docling", "docling-tableformer-local")
-
-
-@pytest.mark.asyncio
-async def test_local_vllm_adapter_fails_loudly_when_offline() -> None:
-    """LocalVLLMAdapter must raise AppException when server is offline, not returning a mock string."""
-    adapter = LocalVLLMAdapter(
-        model_name="qwen2.5-7b-instruct",
-        base_url="http://127.0.0.1:59999/v1",  # Guaranteed closed port
-        timeout_seconds=1,
-    )
-    with pytest.raises(AppException) as exc_info:
-        await adapter.generate([ChatMessage(role="user", content="Xin chào")])
-    assert exc_info.value.code == "local_llm_unavailable"
-    assert exc_info.value.status_code == 502

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import inspect
 import io
@@ -24,8 +25,6 @@ from app.modules.modelops.services.provider_key_rotation_service import (
     provider_key_rotation_service,
 )
 from app.modules.ocr.adapters.base import BaseOCRAdapter
-from app.modules.ocr.adapters.docling_adapter import DoclingOCRAdapter
-from app.modules.ocr.adapters.easyocr_adapter import EasyOCRAdapter
 from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
@@ -43,13 +42,6 @@ from app.modules.ocr.schemas import (
 
 logger = structlog.get_logger(__name__)
 
-#: Install hints shown when an optional engine is requested but missing.
-_ENGINE_INSTALL_HINTS: dict[str, str] = {
-    "docling": "uv add docling",
-    "easyocr": "uv add easyocr",
-}
-
-
 class OCRService:
     """Service orchestrating OCR document recognition with automated fallback."""
 
@@ -58,8 +50,6 @@ class OCRService:
             "pymupdf_ocr": PyMuPDFOCRAdapter(),
             "gemini_ocr": GeminiOCRAdapter(),
             "mistral_ocr": MistralOCRAdapter(),
-            "docling": DoclingOCRAdapter(),
-            "easyocr": EasyOCRAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
         self._adapters["gemini"] = self._adapters["gemini_ocr"]
@@ -73,8 +63,6 @@ class OCRService:
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
             ("eng_gemini", "gemini_ocr", "gemini", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.99, False),
             ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
-            ("eng_docling", "docling", "docling", ["docx", "xlsx", "pdf", "tables", "layout", "markdown"], 0.97, False),
-            ("eng_easyocr", "easyocr", "easyocr", ["png", "jpg", "scan", "stamp"], 0.90, False),
             ("eng_mock", "mock_ocr", "mock", ["pdf", "text", "fallback"], 0.98, False),
         ]
         engines: list[OCREngineResponse] = []
@@ -100,6 +88,13 @@ class OCRService:
     ) -> BaseOCRAdapter:
         """Resolve or dynamically instantiate the appropriate OCR adapter for a model name or engine name."""
         norm = (name_or_model or "").strip().lower()
+        if norm in {"docling", "easyocr", "sentence_transformers", "ollama", "local_vllm"}:
+            raise AppException(
+                f"Engine local '{name_or_model}' đã bị loại khỏi hệ thống.",
+                code="OCR_LOCAL_ENGINE_REMOVED",
+                status_code=400,
+                details={"engine": name_or_model},
+            )
 
         # If gemini_ocr/gemini/gemini_vision is requested, use dynamic model if configured
         if norm in ("gemini_ocr", "gemini", "gemini_vision"):
@@ -123,14 +118,6 @@ class OCRService:
             if norm != "mistral_ocr":
                 return MistralOCRAdapter(model_name=name_or_model)
             return self._adapters["mistral_ocr"]
-
-        # Check for Docling
-        if "docling" in norm:
-            return self._adapters["docling"]
-
-        # Check for EasyOCR
-        if "easyocr" in norm:
-            return self._adapters["easyocr"]
 
         # Default fallback adapter
         return self._adapters.get(norm) or self._adapters[self.default_engine]
@@ -174,7 +161,7 @@ class OCRService:
         last_error: Exception | None = None
         while True:
             acquired = await provider_key_rotation_service.acquire(
-                session, provider_id, excluded_key_ids=excluded
+                session, provider_id, excluded_key_ids=excluded, lease_seconds=180
             )
             if acquired.lease is None:
                 if not acquired.managed:
@@ -205,6 +192,9 @@ class OCRService:
                 result = await rotated_adapter.extract(content, filename)
                 await provider_key_rotation_service.complete_success(session, lease)
                 return result
+            except asyncio.CancelledError:
+                await provider_key_rotation_service.release(session, lease)
+                raise
             except Exception as exc:
                 last_error = exc
                 excluded.add(lease.id)
@@ -296,24 +286,12 @@ class OCRService:
         use_modelops_key_pool = bool(modelops_step["provider_id"]) and requested_cloud_ocr
 
         if not adapter.is_available() and not use_modelops_key_pool:
-            if requested in ("gemini_ocr", "gemini", "gemini_vision", "mistral_ocr", "mistral"):
-                logger.warning("cloud_ocr_missing_key_fallback_to_local", requested=requested)
-                for local_cand in ("easyocr", "docling", self.default_engine):
-                    cand_adapter = self._adapters.get(local_cand)
-                    if cand_adapter and cand_adapter.is_available():
-                        adapter = cand_adapter
-                        fallback_triggered = True
-                        fallback_engine = local_cand
-                        cascade_trace.append(f"{requested}: Thiếu API Key -> Chuyển sang {local_cand}")
-                        break
-            else:
-                hint = _ENGINE_INSTALL_HINTS.get(requested, "lien he quan tri vien")
-                raise AppException(
-                    f"Engine OCR '{requested}' chua san sang (thieu dependency). Cai dat voi: {hint}",
-                    code="ocr_engine_unavailable",
-                    status_code=400,
-                    details={"engine": requested, "install_hint": hint},
-                )
+            raise AppException(
+                f"OCR provider '{requested}' chưa có API key khả dụng.",
+                code="OCR_PROVIDER_CREDENTIALS_MISSING",
+                status_code=503,
+                details={"provider": requested},
+            )
 
         result_dict = None
         error_msg = None
@@ -400,19 +378,11 @@ class OCRService:
     ) -> OCRExtractResponse:
         """Smart routing:
         1. For digital text PDFs: Fast PyMuPDF extraction first (10-30ms).
-        2. For scanned PDFs & Images: Prioritize Google Gemini Vision OCR / Mistral OCR (Cloud API, 1-2s).
-           If Cloud API keys are not configured, gracefully fall back to Local OCR (EasyOCR/Docling).
-        3. For Office files (.docx, .doc, .xlsx, .xls): Prioritize Docling TableFormer.
+        2. For scanned PDFs, images, and Office files: use configured cloud OCR APIs.
         """
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "pdf"
 
-        # Special priority order by file format
-        if ext in ("docx", "doc", "xlsx", "xls"):
-            candidate_order = ("docling", "easyocr", "pymupdf_ocr")
-        elif ext in ("png", "jpg", "jpeg", "webp", "bmp", "tiff"):
-            candidate_order = ("gemini_ocr", "mistral_ocr", "easyocr", "docling")
-        else:
-            candidate_order = ("gemini_ocr", "mistral_ocr", "easyocr", "docling")
+        candidate_order = ("gemini_ocr", "mistral_ocr")
 
         # For PDF and text files, run Firecrawl Rust-based PDF Inspector for fast classification
         default_adapter = self._adapters[self.default_engine]
@@ -500,7 +470,7 @@ class OCRService:
 
         # Scanned PDF or images or office files:
         # Loop through candidates in priority order:
-        # Dynamic cloud models (Gemini / Mistral) -> Local OCR (EasyOCR / Docling)
+        # Dynamic cloud models (Gemini / Mistral)
         gemini_adapter = (
             GeminiOCRAdapter(model_name=default_ocr_model)
             if default_ocr_model
@@ -703,24 +673,6 @@ class OCRService:
                     is_quota=is_quota,
                 )
                 continue
-
-        # If all items in combo_chain failed, try local fallback
-        if result_dict is None or not (result_dict.get("raw_text") or "").strip():
-            for local_cand in ("easyocr", "docling", self.default_engine):
-                cand_adapter = self._adapters[local_cand]
-                if cand_adapter.is_available():
-                    try:
-                        res = await cand_adapter.extract(content, filename)
-                        if (res.get("raw_text") or "").strip():
-                            cascade_trace.append(f"{local_cand}: Cứu nguy nội bộ thành công")
-                            result_dict = res
-                            result_dict["engine_used"] = local_cand
-                            fallback_triggered = True
-                            fallback_engine = local_cand
-                            break
-                    except Exception as rescue_exc:
-                        logger.debug("local_rescue_failed", candidate=local_cand, error=str(rescue_exc))
-                        continue
 
         if result_dict is None:
             result_dict = {

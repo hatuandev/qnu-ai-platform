@@ -29,11 +29,21 @@ class AssistantKnowledgePolicy(BaseModel):
 
 
 class AssistantModelPolicy(BaseModel):
-    primary_model: str = Field("gpt-4o-mini", min_length=2, max_length=100)
-    fallback_model: str = Field("gemini-2.5-flash-lite", min_length=2, max_length=100)
+    primary_model: str | None = Field(default=None, max_length=100)
+    fallback_model: str | None = Field(default=None, max_length=100)
     temperature: float = Field(0.2, ge=0, le=2)
     max_tokens: int = Field(1200, ge=128, le=32000)
     thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
+
+    @field_validator("primary_model", "fallback_model", mode="before")
+    @classmethod
+    def normalize_model_names(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped if stripped else None
+        return v
 
 
 class AssistantGuardrailPolicy(BaseModel):

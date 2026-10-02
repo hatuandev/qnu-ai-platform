@@ -416,7 +416,7 @@ export function DashboardPage() {
                     ModelOps Router
                   </h5>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Định tuyến thông minh OpenAI, Gemini và Local vLLM/Ollama
+                    Định tuyến thông minh qua OpenAI, Gemini và các provider API
                   </p>
                 </button>
               </div>

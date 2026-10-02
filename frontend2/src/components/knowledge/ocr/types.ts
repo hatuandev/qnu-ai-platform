@@ -83,14 +83,14 @@ export const OCR_ENGINE_OPTIONS: OcrEngineOption[] = [
     description: "Tối ưu hóa tài liệu scan tiếng Việt tiêu chuẩn và bảng biểu",
   },
   {
-    value: "docling",
-    label: "Docling Parser (Deep Document Analysis)",
-    description: "Phân tích cấu trúc phân cấp, nhận diện layout học thuật sâu",
+    value: "gemini_vision",
+    label: "Google Gemini Vision",
+    description: "OCR tài liệu qua Gemini API và kho khóa ModelOps",
   },
   {
-    value: "easyocr",
-    label: "EasyOCR (Deep Learning Vision)",
-    description: "Mô hình mạng nơ-ron nhận diện văn bản mờ, ảnh chụp nghiêng",
+    value: "mistral_ocr",
+    label: "Mistral OCR",
+    description: "OCR tài liệu nhiều trang qua Mistral API",
   },
 ];
 

@@ -5,7 +5,6 @@ import {
   Brain,
   Check,
   CheckCircle2,
-  Cpu,
   Eye,
   GitMerge,
   Info,
@@ -100,22 +99,6 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                   is_active: true,
                   description:
                     "Bước 3 (Dự phòng 2): Mistral OCR bóc tách scan tiếng Việt & con dấu",
-                },
-                {
-                  provider_id: "prov_docling",
-                  provider_name: "Local Edge Engine",
-                  model_name: "docling-tableformer",
-                  is_active: true,
-                  description:
-                    "Bước 4 (Dự phòng 3): IBM Docling TableFormer bóc tách ma trận bảng biểu",
-                },
-                {
-                  provider_id: "prov_easyocr",
-                  provider_name: "Local Edge Engine",
-                  model_name: "easyocr-vie",
-                  is_active: true,
-                  description:
-                    "Bước 5 (Cứu sinh cuối cùng): EasyOCR CPU/CUDA cục bộ bảo đảm 0 gián đoạn",
                 },
               ],
       },
@@ -963,11 +946,6 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                           {caps.capabilityLabel.includes("Fast") && (
                             <span title="Tốc độ cao">
                               <Zap className="size-3 text-amber-500" />
-                            </span>
-                          )}
-                          {opt.category === "local" && (
-                            <span title="Local Engine">
-                              <Cpu className="size-3 text-emerald-500" />
                             </span>
                           )}
                           {selected && <Check className="size-3 text-primary ml-0.5" />}

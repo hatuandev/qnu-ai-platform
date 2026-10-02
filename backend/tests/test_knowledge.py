@@ -10,7 +10,12 @@ from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.modules.knowledge.chunker import ClauseBasedChunker, SemanticChunker
 from app.modules.knowledge.cleaner import clean_markdown_text, extract_sections_metadata
-from app.modules.knowledge.parsers import DocxParser, PlainTextParser, PyMuPdfParser
+from app.modules.knowledge.parsers import (
+    DocxParser,
+    PlainTextParser,
+    PyMuPdfParser,
+    get_document_parser,
+)
 
 
 def test_clean_markdown_text():
@@ -98,6 +103,24 @@ async def test_docx_parser_in_memory():
     assert "Điều 1. Đăng ký học phần" in parsed.raw_text
     assert len(parsed.tables) == 1
     assert "Số tín chỉ tối đa" in parsed.tables[0].markdown_repr
+
+
+@pytest.mark.asyncio
+async def test_pptx_parser_in_memory():
+    """PPTX uses Docling when available and remains readable through the fallback."""
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    textbox = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1))
+    textbox.text = "QNU tuyển sinh 2026"
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+
+    parsed = await get_document_parser("pptx").parse(buffer.getvalue(), "gioi-thieu.pptx")
+    assert parsed.page_count == 1
+    assert "QNU" in parsed.raw_text
 
 
 @pytest.mark.asyncio

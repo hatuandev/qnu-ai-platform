@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -35,8 +35,21 @@ from app.modules.modelops.schemas import (
     UsageStatsResponse,
 )
 from app.modules.modelops.service import modelops_service
+from app.modules.modelops.services.key_monitoring_service import key_monitoring_service
 
 router = APIRouter(prefix="/modelops", tags=["ModelOps & Multi-LLM Routing"])
+
+
+@router.get("/providers/{provider_id}/key-history")
+async def key_history(
+    provider_id: str, limit: int = Query(30, ge=1, le=100), db: AsyncSession = Depends(get_db)
+) -> list[dict[str, Any]]:
+    return await key_monitoring_service.history(db, provider_id, limit)
+
+
+@router.post("/providers/{provider_id}/failover-preview")
+async def failover_preview(provider_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    return await key_monitoring_service.failover_preview(db, provider_id)
 
 
 @router.get(
@@ -77,7 +90,6 @@ async def set_provider_model_as_default(
     )
 
 
-
 @router.post(
     "/generate",
     response_model=LLMGenerateResponse,
@@ -93,7 +105,7 @@ async def generate_completion(
 @router.get(
     "/presets",
     response_model=list[ProviderPresetItem],
-    summary="Lấy danh mục các cấu hình mẫu sẵn của các nhà cung cấp đặc thù (OpenAI, Gemini, Groq, DeepSeek, Cloudflare, NVIDIA, Ollama...)",
+    summary="Lấy danh mục cấu hình mẫu cho các nhà cung cấp AI qua API",
 )
 async def list_provider_presets() -> list[ProviderPresetItem]:
     return PROVIDER_PRESETS
@@ -111,7 +123,7 @@ async def list_active_providers(
 
 @router.post(
     "/providers/seed-defaults",
-    summary="Khôi phục hoặc nạp lại danh sách cấu hình Provider chuẩn từ QNU AI Core (OpenAI, Gemini, Mistral, Cloudflare, DeepSeek, Groq, Claude, Local vLLM)",
+    summary="Khôi phục danh sách provider API chuẩn của QNU AI Platform",
 )
 async def seed_default_providers(
     overwrite: bool = False,
@@ -302,6 +314,7 @@ async def test_provider_single_key(
 @router.post(
     "/providers/{provider_id}/keys/simulate-rotation",
     response_model=SimulateKeyRotationResponse,
+    deprecated=True,
     summary="Mô phỏng tiêu thụ token và cơ chế tự động xoay vòng sang khóa kế tiếp khi chạm Rate Limit 429",
 )
 async def simulate_provider_key_rotation(
@@ -385,4 +398,3 @@ async def get_modelops_usage_stats(
     db: AsyncSession = Depends(get_db),
 ) -> UsageStatsResponse:
     return await modelops_service.get_usage_statistics(db, days=days, tenant_id=tenant_id)
-

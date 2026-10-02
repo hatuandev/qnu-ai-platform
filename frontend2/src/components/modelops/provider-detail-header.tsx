@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Cloud,
   Copy,
-  Cpu,
   Download,
   Globe,
   Pencil,
@@ -96,14 +95,6 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
                   >
                     <Cloud className="h-3 w-3 text-muted-foreground" />
                     Cloud
-                  </Badge>
-                ) : cat === "local" ? (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] sm:text-[11px] font-mono border-border/80 text-foreground gap-1"
-                  >
-                    <Cpu className="h-3 w-3 text-muted-foreground" />
-                    Local
                   </Badge>
                 ) : (
                   <Badge

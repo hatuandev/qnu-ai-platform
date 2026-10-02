@@ -40,7 +40,7 @@ class LLMGenerateRequest(BaseModel):
 
 class LLMGenerateResponse(BaseModel):
     content: str = Field(..., description="Văn bản sinh ra từ mô hình")
-    provider: str = Field(..., description="Nhà cung cấp đã phục vụ: openai, gemini, local_vllm")
+    provider: str = Field(..., description="Nhà cung cấp API đã phục vụ")
     model: str = Field(..., description="Tên mô hình cụ thể")
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -71,6 +71,11 @@ class ProviderKeyItem(BaseModel):
     cooldown_until: str | None = None
     last_used_at: str | None = None
     created_at: str | None = None
+    last_error_code: str | None = None
+    last_error_at: str | None = None
+    consecutive_failures: int = 0
+    is_leased: bool = False
+    lease_until: str | None = None
 
 
 class ProviderKeyCreate(BaseModel):
@@ -99,6 +104,7 @@ class SimulateKeyRotationRequest(BaseModel):
 
 
 class SimulateKeyRotationResponse(BaseModel):
+    dry_run: bool = True
     success: bool
     previous_key_id: str
     previous_key_name: str
@@ -122,7 +128,7 @@ class ProviderKeyTestResponse(BaseModel):
 class ProviderConfigCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     provider_type: str = Field(
-        ..., description="openai, gemini, claude, local_vllm, ollama, deepseek, groq, openrouter, mistral, cloudflare, nvidia, custom"
+        ..., description="openai, gemini, claude, deepseek, groq, openrouter, mistral, cloudflare, nvidia, custom"
     )
     model_name: str | None = Field(None, max_length=100)
     models: list[str] = Field(default_factory=list, description="Danh sách các mô hình khả dụng")
@@ -196,7 +202,7 @@ class TenantQuotaResponse(BaseModel):
 class ProviderPresetItem(BaseModel):
     code: str
     name: str
-    category: Literal["cloud", "local", "custom"]
+    category: Literal["cloud", "custom"]
     icon: str
     description: str
     default_base_url: str | None = None
@@ -307,51 +313,11 @@ PROVIDER_PRESETS: list[ProviderPresetItem] = [
         help_text="Lấy từ build.nvidia.com.",
     ),
     ProviderPresetItem(
-        code="ollama",
-        name="Ollama (Local / On-Premise)",
-        category="local",
-        icon="server",
-        description="Máy chủ GPU nội bộ phục vụ suy luận riêng tư, bảo mật dữ liệu tuyệt đối của Trường ĐH Quy Nhơn.",
-        default_base_url="http://localhost:11434/v1",
-        placeholder_key="Để trống nếu không bật auth",
-        help_text="Địa chỉ API tương thích OpenAI của server Ollama nội bộ.",
-    ),
-    ProviderPresetItem(
-        code="local_vllm",
-        name="Local vLLM Server",
-        category="local",
-        icon="server",
-        description="Engine suy luận GPU vLLM tối ưu throughput cao chạy trực tiếp trong hạ tầng mạng trường QNU.",
-        default_base_url="http://localhost:8000/v1",
-        placeholder_key="Để trống nếu không yêu cầu key",
-        help_text="Địa chỉ vLLM endpoint tương thích OpenAI.",
-    ),
-    ProviderPresetItem(
-        code="sentence_transformers",
-        name="Local SentenceTransformers (PyTorch)",
-        category="local",
-        icon="server",
-        description="Mô hình nhúng vector BAAI/bge-m3 1024D chạy cục bộ trên máy chủ QNU, không tốn chi phí và bảo mật tuyệt đối.",
-        default_base_url="",
-        placeholder_key="Không yêu cầu API Key",
-        help_text="Chạy in-process qua PyTorch và HuggingFace weights.",
-    ),
-    ProviderPresetItem(
-        code="docling",
-        name="Docling Local (IBM Research)",
-        category="local",
-        icon="server",
-        description="Bộ bóc tách bố cục tài liệu và bảng biểu chuyên sâu TableFormer chạy offline nội bộ của IBM Research.",
-        default_base_url="",
-        placeholder_key="Không yêu cầu API Key",
-        help_text="Bóc tách PDF/DOCX/XLSX đa cột thành Markdown có cấu trúc.",
-    ),
-    ProviderPresetItem(
         code="custom",
         name="Tùy Chỉnh (OpenAI Compatible)",
         category="custom",
         icon="cpu",
-        description="Kết nối tới bất kỳ máy chủ mô hình nào hỗ trợ chuẩn OpenAI API (FastChat, LocalAI, Private Proxy...).",
+        description="Kết nối tới API bên thứ ba hỗ trợ chuẩn OpenAI Compatible.",
         default_base_url="https://api.your-provider.com/v1",
         placeholder_key="sk-...",
         help_text="Địa chỉ endpoint và API Key của hệ thống riêng.",
@@ -367,7 +333,7 @@ class ModelOption(BaseModel):
     provider_name: str
     provider_type: str
     model_name: str
-    category: str = "cloud"  # "cloud" | "local" | "custom"
+    category: str = "cloud"  # "cloud" | "custom"
     description: str | None = None
 
 
@@ -375,7 +341,7 @@ class OCRComboItem(BaseModel):
     provider_id: str
     provider_name: str
     model_name: str
-    provider_type: str = "cloud"  # "cloud" | "local" | "custom"
+    provider_type: str = "cloud"  # "cloud" | "custom"
     is_active: bool = True
     description: str | None = None
 

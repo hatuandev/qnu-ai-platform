@@ -1,7 +1,8 @@
-"""Reranker Adapter & Resilience Client (Cloudflare BGE-Reranker & BGE-Reranker-v2-m3)."""
+"""Reranker adapter and resilience client for Cloudflare Workers AI."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -158,6 +159,11 @@ class RerankerClient:
                     return ranked
                 await self._finish_runtime_key(runtime)
                 break
+            except asyncio.CancelledError:
+                if runtime is not None and runtime.key_lease() is not None:
+                    async with AsyncSessionFactory() as db:
+                        await provider_key_rotation_service.release(db, runtime.key_lease())
+                raise
             except Exception as exc:
                 if runtime is not None:
                     await self._finish_runtime_key(runtime, exc)

@@ -4,6 +4,7 @@ import type {
   ProviderApiKey,
   ProviderBulkExportResponse,
   ProviderImportResponse,
+  ProviderKeyEvent,
   ProviderModelsTestResponse,
   ProviderPreset,
   ProviderSingleExportResponse,
@@ -15,6 +16,27 @@ import type {
 import { BASE_URL } from "./http-client";
 
 export const modelopsApi = {
+  async getProviderKeyHistory(providerId: string): Promise<ProviderKeyEvent[]> {
+    const res = await fetch(
+      `${BASE_URL}/modelops/providers/${providerId}/key-history`,
+    );
+    if (!res.ok) throw new Error("Không thể tải lịch sử khóa API");
+    return res.json();
+  },
+
+  async previewKeyFailover(providerId: string): Promise<{
+    dry_run: boolean;
+    rotated: boolean;
+    key_order: { id: string; name: string }[];
+    message: string;
+  }> {
+    const res = await fetch(
+      `${BASE_URL}/modelops/providers/${providerId}/failover-preview`,
+      { method: "POST" },
+    );
+    if (!res.ok) throw new Error("Không thể mô phỏng chuyển khóa");
+    return res.json();
+  },
   async getModelProviders(): Promise<ModelProvider[]> {
     const res = await fetch(`${BASE_URL}/modelops/providers`);
     if (!res.ok) {

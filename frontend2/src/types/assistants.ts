@@ -13,8 +13,8 @@ export interface AssistantLifecycleConfig {
     retrieval_limit: number;
   };
   model_policy: {
-    primary_model: string;
-    fallback_model: string;
+    primary_model?: string | null;
+    fallback_model?: string | null;
     temperature: number;
     max_tokens: number;
     thinking_budget?: number;

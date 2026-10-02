@@ -11,7 +11,6 @@ from typing import Any
 
 import httpx
 from sqlalchemy import or_, select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -27,6 +26,8 @@ from app.modules.modelops.schemas import (
     ProviderKeyCreate,
     ProviderKeyUpdate,
 )
+from app.modules.modelops.services.key_pool_persistence import key_pool_snapshot, sync_imported_keys
+from app.modules.modelops.services.key_status import normalize_provider_key_status
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,6 @@ def _init_default_keys() -> None:
             }
         )
 
-    _DEFAULT_PROVIDER_KEYS["prov_local"] = []
 
 
 _init_default_keys()
@@ -144,7 +144,7 @@ def _sanitize_key_for_output(k: dict[str, Any]) -> dict[str, Any]:
         "account_id": k.get("account_id"),
         "priority": k.get("priority", 1),
         "is_active": k.get("is_active", True),
-        "status": k.get("status", "active"),
+        "status": normalize_provider_key_status(k.get("status")),
         "quota_limit": k.get("quota_limit"),
         "usage_tokens": k.get("usage_tokens", 0),
         "cooldown_until": k.get("cooldown_until"),
@@ -157,6 +157,7 @@ def _auto_recover_cooldown(keys: list[dict[str, Any]]) -> None:
     """Auto-recover keys from rate_limited status if cooldown_until has passed."""
     now = datetime.now(UTC)
     for k in keys:
+        k["status"] = normalize_provider_key_status(k.get("status"))
         if k.get("status") == "rate_limited" and k.get("cooldown_until"):
             try:
                 cd = datetime.fromisoformat(k["cooldown_until"])
@@ -415,82 +416,6 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "timeout_seconds": 20,
         "extra_config": {
             "models": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
-            "api_keys": [],
-        },
-    },
-    {
-        "id": "prov_local",
-        "name": "Local Campus AI",
-        "provider_type": "local_vllm",
-        "model_name": "qwen2.5-7b-instruct",
-        "models": ["qwen2.5-7b-instruct"],
-        "api_base_url": "http://localhost:8000/v1",
-        "api_key": "",
-        "priority": 8,
-        "is_active": bool(getattr(settings, "LOCAL_LLM_ENABLED", False)),
-        "timeout_seconds": 20,
-        "extra_config": {
-            "models": ["qwen2.5-7b-instruct"],
-            "api_keys": [],
-        },
-    },
-    {
-        "id": "prov_ollama",
-        "name": "Ollama Self-Hosted (GPU/CPU)",
-        "provider_type": "ollama",
-        "model_name": "qwen2.5:7b",
-        "models": [
-            "qwen2.5:7b",
-            "llama3.1:8b",
-            "bge-m3:latest",
-            "bge-m3",
-            "nomic-embed-text:latest",
-        ],
-        "api_base_url": getattr(settings, "OLLAMA_BASE_URL", "") or "http://localhost:11434/v1",
-        "api_key": "",
-        "priority": 9,
-        "is_active": True,
-        "timeout_seconds": 60,
-        "extra_config": {
-            "models": [
-                "qwen2.5:7b",
-                "llama3.1:8b",
-                "bge-m3:latest",
-                "bge-m3",
-                "nomic-embed-text:latest",
-            ],
-            "model_specs": {
-                "qwen2.5:7b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "text",
-                    "description": "Mô hình ngôn ngữ tự host trên Ollama, suy luận nhanh, hỗ trợ tiếng Việt tốt",
-                },
-                "llama3.1:8b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "text",
-                    "description": "Meta Llama 3.1 8B Instruct chạy nội bộ trên máy chủ Ollama",
-                },
-                "bge-m3:latest": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "embedding",
-                    "description": "Mô hình Embedding đa ngữ BAAI BGE-M3 (1024 chiều, Dense/Multi-lingual)",
-                },
-                "bge-m3": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "embedding",
-                    "description": "Mô hình Embedding đa ngữ BAAI BGE-M3 (1024 chiều)",
-                },
-                "nomic-embed-text:latest": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "embedding",
-                    "description": "Mô hình Embedding Nomic đa dụng ngữ cảnh 8192 token",
-                },
-            },
             "api_keys": [],
         },
     },
@@ -1018,7 +943,7 @@ class ProviderService:
         if data.timeout_seconds is not None:
             config.timeout_seconds = data.timeout_seconds
 
-        extra = dict(config.extra_config or {})
+        extra = await key_pool_snapshot(db, config)
         if data.models is not None:
             extra["models"] = data.models
             if data.models and not config.model_name:
@@ -1082,6 +1007,11 @@ class ProviderService:
                 relational_key.status = "active"
                 relational_key.cooldown_until = None
                 relational_key.consecutive_failures = 0
+                relational_key.usage_tokens = 0
+                relational_key.last_error_code = None
+                relational_key.last_error_at = None
+                relational_key.lease_token = None
+                relational_key.lease_until = None
 
         config.extra_config = extra
         flag_modified(config, "extra_config")
@@ -1157,11 +1087,7 @@ class ProviderService:
         account_id: str | None = None,
     ) -> tuple[bool, float, str]:
         """Perform real HTTP verification to the provider's API endpoint."""
-        # Clean local or offline providers
-        if provider_type in ("sentence_transformers", "docling"):
-            return True, 5.0, f"Module '{provider_type}' chạy cục bộ trên hệ thống, sẵn sàng phục vụ."
-
-        if not api_key and provider_type not in ("ollama", "local_vllm"):
+        if not api_key:
             return False, 0.0, "Thiếu khóa API Secret Key."
 
         clean_key = decrypt_secret(api_key.strip()) if api_key else ""
@@ -1228,24 +1154,6 @@ class ProviderService:
                     else:
                         return False, round(elapsed, 1), f"API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
 
-                elif provider_type in ("ollama", "local_vllm"):
-                    default_url = "http://localhost:11434/v1" if provider_type == "ollama" else "http://localhost:8000/v1"
-                    clean_base = (base_url or default_url).rstrip("/")
-                    if provider_type == "ollama" and not clean_base.endswith("/v1"):
-                        clean_base = f"{clean_base}/v1"
-                    target_url = f"{clean_base}/models"
-                    headers = {}
-                    if clean_key:
-                        headers["Authorization"] = f"Bearer {clean_key}"
-                    resp = await client.get(target_url, headers=headers)
-                    elapsed = (time.perf_counter() - start) * 1000
-                    if resp.status_code == 200:
-                        return True, round(elapsed, 1), f"Máy chủ {provider_type} phản hồi tốt tại {target_url}."
-                    elif resp.status_code in (401, 403):
-                        return False, round(elapsed, 1), f"Khóa API không hợp lệ (HTTP {resp.status_code})."
-                    else:
-                        return False, round(elapsed, 1), f"Máy chủ {provider_type} phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
-
                 return True, 50.0, "Đã kiểm tra thông số kết nối nhà cung cấp."
 
         except httpx.ConnectError:
@@ -1311,7 +1219,7 @@ class ProviderService:
             or "mock" in clean_key.lower()
             or "test" in clean_key.lower()
             or clean_key in ("mock", "test", "demo", "placeholder", "sk-proj-mock-key-1")
-            or not clean_key and provider_type not in ("sentence_transformers", "docling", "ollama", "local_vllm")
+            or not clean_key
         ):
             if "invalid" in m_lower or "deprecated" in m_lower or "404" in m_lower:
                 return {
@@ -1507,19 +1415,16 @@ class ProviderService:
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
 
-                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom", "ollama", "local_vllm"):
+                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom"):
                     base = base_url or (
                         "https://api.openai.com/v1" if provider_type == "openai"
                         else "https://api.deepseek.com/v1" if provider_type == "deepseek"
                         else "https://api.groq.com/openai/v1" if provider_type == "groq"
                         else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
                         else "https://integrate.api.nvidia.com/v1" if provider_type == "nvidia"
-                        else "http://localhost:11434/v1" if provider_type == "ollama"
-                        else "http://localhost:8000/v1"
+                        else "https://api.openai.com/v1"
                     )
                     clean_base = base.rstrip("/")
-                    if provider_type == "ollama" and not clean_base.endswith("/v1"):
-                        clean_base = f"{clean_base}/v1"
 
                     headers = {"Content-Type": "application/json"}
                     if clean_key:
@@ -1609,17 +1514,6 @@ class ProviderService:
                             "message": f"API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
-
-                elif provider_type in ("sentence_transformers", "docling"):
-                    elapsed = round((time.perf_counter() - start) * 1000, 1)
-                    return {
-                        "model_name": clean_model,
-                        "success": True,
-                        "status": "available",
-                        "latency_ms": elapsed or 5.0,
-                        "message": f"Mô hình '{clean_model}' cục bộ sẵn sàng phục vụ.",
-                        "tested_at": datetime.now(UTC).isoformat(),
-                    }
 
                 return {
                     "model_name": clean_model,
@@ -1736,16 +1630,12 @@ class ProviderService:
         config = res.scalar_one_or_none()
 
         if config:
-            try:
-                relational = await db.execute(
-                    select(ProviderApiKey)
-                    .where(ProviderApiKey.provider_id == provider_id)
-                    .order_by(ProviderApiKey.priority, ProviderApiKey.created_at)
-                )
-                relational_keys = list(relational.scalars().all())
-            except SQLAlchemyError:
-                await db.rollback()
-                relational_keys = []
+            relational = await db.execute(
+                select(ProviderApiKey)
+                .where(ProviderApiKey.provider_id == provider_id)
+                .order_by(ProviderApiKey.priority, ProviderApiKey.created_at)
+            )
+            relational_keys = list(relational.scalars().all())
             if relational_keys:
                 now = datetime.now(UTC)
                 changed = False
@@ -1760,27 +1650,11 @@ class ProviderService:
                         changed = True
                 if changed:
                     await db.commit()
-                return [
-                    {
-                        "id": key.id,
-                        "name": key.name,
-                        "api_key_masked": key.api_key_masked,
-                        "account_id": key.account_id,
-                        "priority": key.priority,
-                        "is_active": key.is_active,
-                        "status": key.status,
-                        "quota_limit": key.quota_limit,
-                        "usage_tokens": key.usage_tokens,
-                        "cooldown_until": (
-                            key.cooldown_until.isoformat() if key.cooldown_until else None
-                        ),
-                        "last_used_at": (
-                            key.last_used_at.isoformat() if key.last_used_at else None
-                        ),
-                        "created_at": key.created_at.isoformat() if key.created_at else None,
-                    }
-                    for key in relational_keys
-                ]
+                from app.modules.modelops.services.provider_key_rotation_service import (
+                    provider_key_rotation_service,
+                )
+
+                return [provider_key_rotation_service.to_public_dict(key) for key in relational_keys]
             extra = dict(config.extra_config or {})
             keys = list(extra.get("api_keys", []))
 
@@ -1853,7 +1727,7 @@ class ProviderService:
         config = res.scalar_one_or_none()
 
         if config:
-            extra = dict(config.extra_config or {})
+            extra = await key_pool_snapshot(db, config)
             keys = list(extra.get("api_keys", []))
             keys.append(new_key)
             extra["api_keys"] = keys
@@ -1904,7 +1778,7 @@ class ProviderService:
 
         target_key: dict[str, Any] | None = None
         if config:
-            extra = dict(config.extra_config or {})
+            extra = await key_pool_snapshot(db, config)
             keys = list(extra.get("api_keys", []))
             for k in keys:
                 if k.get("id") == key_id:
@@ -1998,7 +1872,7 @@ class ProviderService:
         config = res.scalar_one_or_none()
 
         if config:
-            extra = dict(config.extra_config or {})
+            extra = await key_pool_snapshot(db, config)
             keys = list(extra.get("api_keys", []))
             remaining = [k for k in keys if k.get("id") != key_id]
             extra["api_keys"] = remaining
@@ -2063,7 +1937,7 @@ class ProviderService:
         target_key: dict[str, Any] | None = None
         extra: dict[str, Any] = {}
         if config:
-            extra = dict(config.extra_config or {})
+            extra = await key_pool_snapshot(db, config)
             for k in extra.get("api_keys", []):
                 if k.get("id") == key_id:
                     target_key = k
@@ -2107,7 +1981,9 @@ class ProviderService:
         cooldown_seconds: int,
     ) -> dict[str, Any]:
         """Simulates token consumption and JIT automatic rotation to the next key on 429/quota."""
-        # 1. Fetch raw keys
+        from copy import deepcopy
+
+        # Work on a detached snapshot; simulations never write runtime state.
         keys: list[dict[str, Any]] = []
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
         res = await db.execute(stmt)
@@ -2115,9 +1991,9 @@ class ProviderService:
 
         if config:
             extra = dict(config.extra_config or {})
-            keys = extra.get("api_keys", [])
+            keys = deepcopy(extra.get("api_keys", []))
         elif provider_id in _DEFAULT_PROVIDER_KEYS:
-            keys = _DEFAULT_PROVIDER_KEYS[provider_id]
+            keys = deepcopy(_DEFAULT_PROVIDER_KEYS[provider_id])
 
         _auto_recover_cooldown(keys)
         active_candidates = [
@@ -2146,11 +2022,6 @@ class ProviderService:
         elif current_key.get("quota_limit") and current_key["usage_tokens"] >= current_key["quota_limit"]:
             current_key["status"] = "exhausted"
 
-        if config:
-            config.extra_config = extra
-            flag_modified(config, "extra_config")
-            await db.commit()
-
         # Find next available key
         next_candidates = [
             k for k in keys if k.get("is_active", True) and k.get("status") == "active" and k.get("id") != current_key["id"]
@@ -2174,7 +2045,8 @@ class ProviderService:
             "tokens_consumed": tokens_consumed,
             "rate_limit_triggered": trigger_rate_limit,
             "rotated": rotated,
-            "message": msg,
+            "message": f"Mô phỏng: {msg} Quota và trạng thái thật không thay đổi.",
+            "dry_run": True,
         }
 
     async def export_provider(
@@ -2314,7 +2186,7 @@ class ProviderService:
             p_type = (p_data.get("provider_type") or p_data.get("type") or "").strip().lower()
 
             if not name or not p_type:
-                errors.append(f"Bản ghi thiếu 'name' hoặc 'provider_type': {p_data}")
+                errors.append("Bản ghi thiếu name hoặc provider_type.")
                 continue
 
             # Check existing provider by ID, name, or specific cloud provider type
@@ -2322,7 +2194,7 @@ class ProviderService:
             conditions = [ModelProviderConfig.name == name]
             if p_id:
                 conditions.append(ModelProviderConfig.id == p_id)
-            if p_type not in ("custom", "local_vllm", "ollama", "generic_openai", "other"):
+            if p_type not in ("custom", "generic_openai", "other"):
                 conditions.append(ModelProviderConfig.provider_type == p_type)
 
             stmt = select(ModelProviderConfig).where(or_(*conditions))
@@ -2356,7 +2228,7 @@ class ProviderService:
                 existing.timeout_seconds = timeout
                 existing.is_active = is_active
 
-                current_extra = dict(existing.extra_config or {})
+                current_extra = await key_pool_snapshot(db, existing)
                 current_keys = list(current_extra.get("api_keys", []))
 
                 for ink in incoming_keys:
@@ -2399,10 +2271,15 @@ class ProviderService:
 
                 if p_data.get("api_key"):
                     existing.api_key_encrypted = encrypt_secret(p_data["api_key"].strip())
+                    if current_keys:
+                        current_keys[0]["api_key"] = existing.api_key_encrypted
+                        current_keys[0]["api_key_masked"] = mask_api_key(p_data["api_key"].strip())
                 elif current_keys and not existing.api_key_encrypted:
                     existing.api_key_encrypted = current_keys[0].get("api_key")
 
                 flag_modified(existing, "extra_config")
+                await db.flush()
+                await sync_imported_keys(db, existing)
                 updated_count += 1
                 self._sync_runtime_credentials(
                     existing.provider_type, existing.api_key_encrypted, account_id
@@ -2451,6 +2328,8 @@ class ProviderService:
                     extra_config=extra_config,
                 )
                 db.add(new_config)
+                await db.flush()
+                await sync_imported_keys(db, new_config)
                 imported_count += 1
                 self._sync_runtime_credentials(p_type, enc_main_key, account_id)
 

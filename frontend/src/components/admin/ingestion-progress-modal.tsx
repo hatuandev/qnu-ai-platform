@@ -74,9 +74,9 @@ export const IngestionProgressModal: React.FC<IngestionProgressModalProps> = ({
     {
       id: 2,
       title: "Chặng 2: Phân Tích Cấu Trúc & Bóc Tách OCR",
-      subtitle: ocrEngine || "Docling TableFormer",
+      subtitle: ocrEngine || "ModelOps OCR API",
       description: "Nhận diện cấu trúc đoạn văn bản, tái tạo bảng số liệu và tiêu đề",
-      detail: `Engine: ${ocrEngine || "Docling Local"} — Bóc tách native text và phục hồi hình học bảng`,
+      detail: `Engine: ${ocrEngine || "ModelOps OCR API"} — Bóc tách văn bản và phục hồi cấu trúc bảng`,
     },
     {
       id: 3,

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Cloud,
-  Cpu,
   Download,
   FileJson,
   Layers,
@@ -145,10 +144,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
     () => providers.filter((p) => getProviderCategory(p) === "cloud"),
     [providers]
   );
-  const localProviders = useMemo(
-    () => providers.filter((p) => getProviderCategory(p) === "local"),
-    [providers]
-  );
   const customProviders = useMemo(
     () => providers.filter((p) => getProviderCategory(p) === "custom"),
     [providers]
@@ -169,7 +164,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
       provider_name: string;
       provider_type: string;
       model_name: string;
-      category: "cloud" | "local" | "custom";
+      category: "cloud" | "custom";
       description?: string;
     }> = [];
     for (const p of providers) {
@@ -905,22 +900,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
             </Button>
 
             <Button
-              variant={activeCategoryTab === "local" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActiveCategoryTab("local")}
-              className="h-8 text-xs gap-1.5 rounded-full"
-            >
-              <Cpu className="h-3.5 w-3.5" />
-              <span>Local (Cục Bộ)</span>
-              <Badge
-                variant="secondary"
-                className="ml-0.5 text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none"
-              >
-                {localProviders.length}
-              </Badge>
-            </Button>
-
-            <Button
               variant={activeCategoryTab === "custom" ? "default" : "outline"}
               size="sm"
               onClick={() => setActiveCategoryTab("custom")}
@@ -1011,64 +990,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({ currentPath, onNavig
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {cloudProviders.map((prov) => (
-                          <ProviderCard
-                            key={prov.id}
-                            provider={prov}
-                            onSelect={handleSelectProvider}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Nhóm Local */}
-                {(activeCategoryTab === "all" || activeCategoryTab === "local") && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-500">
-                          <Cpu className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h2 className="text-sm font-bold text-foreground">
-                              Nhóm Local (Cục Bộ / On-Premise)
-                            </h2>
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                            >
-                              {localProviders.length} Provider
-                              {localProviders.length !== 1 ? "s" : ""}
-                            </Badge>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Mô hình AI bóc tách và tính toán chạy trực tiếp trên máy chủ nội bộ ĐH
-                            Quy Nhơn (SentenceTransformers BGE-M3, Docling OCR, Ollama...)
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openCreateModal("ollama")}
-                        className="h-7 text-xs text-muted-foreground hover:text-primary gap-1"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Thêm Local</span>
-                      </Button>
-                    </div>
-
-                    {localProviders.length === 0 ? (
-                      <Card className="p-6 border-dashed border-border bg-card/40 text-center">
-                        <p className="text-xs text-muted-foreground">
-                          Chưa có Provider cục bộ nào.
-                        </p>
-                      </Card>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {localProviders.map((prov) => (
                           <ProviderCard
                             key={prov.id}
                             provider={prov}

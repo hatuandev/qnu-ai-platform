@@ -306,7 +306,7 @@ async def seed_regulations_knowledge(db: AsyncSession) -> dict[str, int]:
             workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
-                "ocr_profile": "Docling",
+                "ocr_profile": "ModelOps API",
                 "document_count": 1,
                 "chunk_count": len(REGULATIONS_CHUNKS),
             },
@@ -471,7 +471,7 @@ async def seed_drafting_knowledge(db: AsyncSession) -> dict[str, int]:
             workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
-                "ocr_profile": "Docling",
+                "ocr_profile": "ModelOps API",
                 "document_count": 1,
                 "chunk_count": len(DECREE_30_CHUNKS),
             },
@@ -635,7 +635,7 @@ async def seed_admissions_knowledge(db: AsyncSession) -> dict[str, int]:
             workspace_id=DEFAULT_SEED_WORKSPACE_ID,
             collection_metadata={
                 "chunking_strategy": "ClauseBasedChunker",
-                "ocr_profile": "Docling",
+                "ocr_profile": "ModelOps API",
                 "document_count": 1,
                 "chunk_count": len(ADMISSIONS_CHUNKS),
             },

@@ -888,7 +888,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
             <pre className="p-3 bg-muted rounded-md border border-border font-mono text-xs overflow-x-auto whitespace-pre-wrap">
               {`curl -X POST "http://localhost:8001/api/v1/ocr/studio/parse" \\
   -F "file=@/duong/dan/tai_lieu_scan.pdf" \\
-  -F "engine_id=docling"`}
+  -F "engine_id=mistral_ocr"`}
             </pre>
             <p className="font-semibold text-foreground mt-3">
               Gọi bằng Python (httpx / requests):
@@ -899,7 +899,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
 url = "http://localhost:8001/api/v1/ocr/studio/parse"
 with open("tai_lieu_scan.pdf", "rb") as f:
     files = {"file": ("tai_lieu_scan.pdf", f, "application/pdf")}
-    data = {"engine_id": "docling"}
+    data = {"engine_id": "mistral_ocr"}
     resp = httpx.post(url, files=files, data=data, timeout=60.0)
     result = resp.json()
     print(f"Tổng số trang: {result['totalPages']}")`}

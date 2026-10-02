@@ -1,7 +1,7 @@
 export interface FileRecommendation {
   fileType: "word" | "pdf" | "spreadsheet" | "text" | "unknown";
   fileTypeLabel: string;
-  targetOcrKeyword: "docling" | "mistral" | "pymupdf" | "easyocr" | "auto";
+  targetOcrKeyword: "gemini" | "mistral" | "pymupdf" | "auto";
   recommendedChunking: "ClauseBasedChunker" | "SemanticChunker";
   title: string;
   reason: string;
@@ -11,8 +11,8 @@ export interface FileRecommendation {
 
 /**
  * Phân tích tệp tin và đề xuất mô hình bóc tách tối ưu dựa trên quy chuẩn QNU AI Core:
- * 1. DOCX/DOC/XLSX: Tệp số hóa có sẵn lớp text & bảng biểu -> Docling TableFormer Local (Bảo toàn 100% bảng & đoạn, không tốn token Cloud OCR).
- * 2. PDF: Fast-path PDF Inspector (10-30ms) cho trang số hóa + Mistral OCR Cloud / Docling cho trang scan ảnh.
+ * 1. DOCX/DOC/XLSX/PPTX: dùng Docling Office Parser để bảo toàn cấu trúc và bảng biểu.
+ * 2. PDF: Fast-path PDF Inspector cho trang số hóa, Mistral OCR API cho trang scan ảnh.
  * 3. TXT/MD: Bóc tách native tức thì không qua OCR, SemanticChunker.
  */
 export function inspectFileAndRecommend(
@@ -29,14 +29,14 @@ export function inspectFileAndRecommend(
     return {
       fileType: "word",
       fileTypeLabel: "Microsoft Word (.docx)",
-      targetOcrKeyword: "docling",
+      targetOcrKeyword: "auto",
       recommendedChunking: "ClauseBasedChunker",
       title: "Đề Xuất Tối Ưu Cho Tệp Word (.docx)",
-      badgeText: "Tự Động Đề Xuất • Docling",
+      badgeText: "Đề xuất • Docling Office",
       reason:
         "Tệp Word có sẵn cấu trúc đoạn văn bản, tiêu đề và bảng biểu dạng XML nguyên bản.",
       technicalDetails:
-        "Sử dụng Docling TableFormer Local để bảo toàn 100% bảng điểm chuẩn, chỉ tiêu và tiêu đề Điều/Khoản mà không tiêu tốn token Cloud OCR.",
+        "Dùng Docling Office Parser để bảo toàn heading, bảng và thứ tự nội dung; không cần OCR hay model AI local.",
     };
   }
 
@@ -45,14 +45,14 @@ export function inspectFileAndRecommend(
     return {
       fileType: "spreadsheet",
       fileTypeLabel: "Bảng tính Excel (.xlsx, .csv)",
-      targetOcrKeyword: "docling",
+      targetOcrKeyword: "auto",
       recommendedChunking: "ClauseBasedChunker",
       title: "Đề Xuất Tối Ưu Cho Bảng Tính Số Liệu",
-      badgeText: "Bảo Toàn Bảng • Docling",
+      badgeText: "Bảo toàn bảng • Docling",
       reason:
         "Tệp bảng tính chứa ma trận ô số liệu phức tạp (điểm chuẩn, học phí, chỉ tiêu tuyển sinh).",
       technicalDetails:
-        "Tự động định tuyến sang Docling TableFormer để chuyển đổi ma trận bảng sang Markdown Table chuẩn, chống lỗi Vision API và giúp LLM tra cứu chính xác 100%.",
+        "Định tuyến sang Docling Office Parser để chuyển đổi ma trận bảng sang Markdown có cấu trúc.",
     };
   }
 
@@ -72,14 +72,14 @@ export function inspectFileAndRecommend(
       return {
         fileType: "pdf",
         fileTypeLabel: "Adobe PDF Chứa Bảng Biểu (.pdf)",
-        targetOcrKeyword: "docling",
+        targetOcrKeyword: "mistral",
         recommendedChunking: "ClauseBasedChunker",
         title: "Đề Xuất Cho PDF Bảng Biểu & Số Liệu",
-        badgeText: "TableFormer • Docling",
+        badgeText: "Vision OCR • Mistral",
         reason:
           "Phát hiện tệp PDF chứa từ khóa bảng biểu điểm thi/chỉ tiêu đào tạo.",
         technicalDetails:
-          "Kích hoạt cơ chế PDF Inspector native siêu tốc (10-30ms) và ưu tiên Docling TableFormer để tái tạo cấu trúc bảng điểm chuẩn đa cột.",
+          "Kết hợp PDF Inspector và Mistral OCR API để tái tạo bảng nhiều cột.",
       };
     }
 
@@ -93,7 +93,7 @@ export function inspectFileAndRecommend(
       reason:
         "Tệp PDF hành chính, quyết định, quy chế học vụ hoặc tài liệu scan con dấu đỏ.",
       technicalDetails:
-        "Fast-path trích xuất text kỹ thuật số siêu tốc (10-30ms). Tự động kích hoạt Mistral OCR Cloud (1-2s) nếu là bản scan ảnh, tự động chuyển Local OCR nếu không có key.",
+        "Fast-path trích xuất text kỹ thuật số; bản scan ảnh được gửi tới Mistral OCR bằng API key trong ModelOps.",
     };
   }
 
@@ -108,7 +108,7 @@ export function inspectFileAndRecommend(
       badgeText: "Vision OCR • Mistral",
       reason: "Tệp hình ảnh chứa văn bản scan, bảng biểu hoặc con dấu trường.",
       technicalDetails:
-        "Sử dụng Mistral OCR Cloud Vision API trích xuất ký tự và bảng biểu siêu tốc, tự động chuyển Local OCR nếu không có key.",
+        "Sử dụng Mistral OCR API trích xuất ký tự và bảng biểu bằng khóa được quản lý trong ModelOps.",
     };
   }
 

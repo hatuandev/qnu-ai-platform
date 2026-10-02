@@ -1,24 +1,10 @@
 import type { ModelProvider } from "../../services/api-client";
 
-export type ProviderCategory = "all" | "cloud" | "local" | "custom";
+export type ProviderCategory = "all" | "cloud" | "custom";
 
-export const getProviderCategory = (prov: ModelProvider): "cloud" | "local" | "custom" => {
+export const getProviderCategory = (prov: ModelProvider): "cloud" | "custom" => {
   const t = (prov.type || prov.code || "").toLowerCase();
   if (t === "custom") return "custom";
-  if (
-    t === "sentence_transformers" ||
-    t === "docling" ||
-    t === "ollama" ||
-    t === "local_vllm" ||
-    t === "local" ||
-    prov.id.includes("local") ||
-    prov.id.includes("sentence_transformers") ||
-    prov.id.includes("docling") ||
-    prov.name.toLowerCase().includes("local") ||
-    prov.name.toLowerCase().includes("cục bộ")
-  ) {
-    return "local";
-  }
   return "cloud";
 };
 
@@ -38,7 +24,6 @@ export const getModelCapabilities = (modelName: string): ModelCapabilityInfo => 
     !isGemma &&
     !isBge &&
     (mLower.includes("ocr") ||
-      mLower.includes("docling") ||
       mLower.includes("flash-image") ||
       mLower.startsWith("gemini") ||
       mLower.includes("gemini") ||
@@ -105,8 +90,6 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
   mistral: ["mistral-ocr-latest"],
   cloudflare: ["@cf/baai/bge-m3", "@cf/baai/bge-reranker-base", "@cf/meta/llama-3.1-8b-instruct"],
   nvidia: ["meta/llama-3.3-70b-instruct", "nvidia/nemotron-3-ultra-550b-a55b", "deepseek-ai/deepseek-r1"],
-  ollama: ["qwen2.5:7b", "llama3.1:8b", "bge-m3:latest"],
-  local_vllm: ["qwen2.5-7b-instruct"],
   openrouter: [
     "google/gemini-2.5-flash",
     "anthropic/claude-3.5-sonnet",
@@ -116,6 +99,4 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
     "qwen/qwen-2.5-72b-instruct",
     "google/gemini-2.0-flash-exp:free",
   ],
-  sentence_transformers: ["BAAI/bge-m3"],
-  docling: ["docling-tableformer-local"],
 };

@@ -196,9 +196,9 @@ class Settings(BaseSettings):
         return url
 
     # --- Embedding & Reranker ---
-    EMBEDDING_PROVIDER: str = "cloudflare"  # 'cloudflare' or 'sentence_transformers'
+    EMBEDDING_PROVIDER: str = "cloudflare"
     EMBEDDING_MODEL: str = "@cf/baai/bge-m3"
-    RERANKER_PROVIDER: str = "cloudflare"  # 'cloudflare' or 'local'
+    RERANKER_PROVIDER: str = "cloudflare"
     RERANKER_MODEL: str = "@cf/baai/bge-reranker-base"
     DEFAULT_TOP_K: int = 8
     DEFAULT_RERANK_TOP_K: int = 5
@@ -231,14 +231,6 @@ class Settings(BaseSettings):
     OPENROUTER_BASE_URL: str = Field(
         default="https://openrouter.ai/api/v1",
         validation_alias=AliasChoices("OPENROUTER_BASE_URL", "OPENROUTER_API_BASE", "OPENROUTER_URL"),
-    )
-
-    LOCAL_LLM_ENABLED: bool = False
-    LOCAL_LLM_BASE_URL: str | None = None
-    LOCAL_LLM_MODEL: str = "qwen2.5:7b"
-    OLLAMA_BASE_URL: str = Field(
-        default="http://localhost:11434/v1",
-        validation_alias=AliasChoices("OLLAMA_BASE_URL", "OLLAMA_HOST", "OLLAMA_URL"),
     )
 
     DEFAULT_MONTHLY_TOKEN_QUOTA: int = 5_000_000

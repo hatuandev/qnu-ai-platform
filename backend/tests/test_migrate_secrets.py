@@ -76,7 +76,7 @@ async def test_inspect_secrets_classification() -> None:
     prov_empty = ModelProviderConfig(
         id="prov_3",
         name="Empty Provider",
-        provider_type="local_vllm",
+        provider_type="custom",
         api_key_encrypted=None,
         extra_config={"api_keys": [{"id": "k3", "api_key": None}]},
     )

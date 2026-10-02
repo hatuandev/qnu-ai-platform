@@ -41,7 +41,7 @@ export function CollectionHeader({
   reindexJobId,
 }: CollectionHeaderProps) {
   const embeddingModelDisplay =
-    collection.embedding_model || systemDefaultEmbeddingModel || "BAAI/bge-m3 (1024-dim)";
+    collection.embedding_model || systemDefaultEmbeddingModel || "Cloudflare BGE-M3";
 
   const isCloudflareModel = embeddingModelDisplay.includes("@cf/");
 

@@ -50,7 +50,7 @@ export function CollectionHeader({
   const embeddingModelDisplay =
     collection.embedding_model ||
     systemDefaultEmbeddingModel ||
-    "BAAI/bge-m3 (1024-dim)";
+    "Cloudflare BGE-M3 (1024-dim)";
 
   const isCloudflareModel = embeddingModelDisplay.includes("@cf/");
 

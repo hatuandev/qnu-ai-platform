@@ -135,8 +135,8 @@ export function CollectionDetailPage({
       document_count: 1,
       chunk_count: 10,
       chunking_strategy: "SemanticChunker",
-      ocr_profile: "Docling",
-      embedding_model: "BAAI/bge-m3 (1024-dim)",
+      ocr_profile: "Mistral",
+      embedding_model: "Cloudflare BGE-M3",
       status: "ready",
       updated_at: "19:48 12/09/2026",
     };

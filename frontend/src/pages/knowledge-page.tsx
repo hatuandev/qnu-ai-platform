@@ -349,7 +349,7 @@ export const KnowledgePage: React.FC<KnowledgePageProps> = ({ currentPath, onNav
                       <span>
                         {col.embedding_model ||
                           systemDefaults?.default_embedding_model ||
-                          "BAAI/bge-m3 (1024-dim)"}
+                          "Cloudflare BGE-M3"}
                       </span>
                     </span>
                     {!col.embedding_model && systemDefaults?.default_embedding_model && (

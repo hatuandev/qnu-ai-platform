@@ -8,6 +8,71 @@
 ## 1. Thông Tin Phiên Gần Nhất
 
 - **Thời gian cập nhật**: 2026-10-02 (UTC+7)
+- **Phiên số**: #246 (Khôi phục Docling Office Parser cho tài liệu Office)
+- **Kết quả phiên #246**:
+  - Khôi phục khả năng bóc tách tài liệu Office (DOCX, XLSX, PPTX, DOC, XLS, PPT) dạng declarative qua `DoclingOfficeParser` kế thừa `BaseDocumentParser`.
+  - Sửa lỗi thứ tự kiểm tra `extension not in _BACKEND_CONFIG` trong `_parse_sync` để ném `ValueError` thay vì gặp `KeyError`.
+  - Sửa lỗi thuật toán trích xuất bảng Markdown `_extract_markdown_tables` (bổ sung separator vào khối block, bảo toàn đầy đủ các dòng dữ liệu thay vì bỏ sót dòng đầu).
+  - Tích hợp fallback native `PptxParser` cho slide PowerPoint bên cạnh `DocxParser` và `XlsxParser`.
+  - Giữ nguyên 100% chính sách Zero Local AI: không khôi phục EasyOCR, SentenceTransformers, Torch/Transformers, models-local hay Ollama/vLLM; OCR scan giữ nguyên qua Gemini/Mistral API trong ModelOps DB.
+  - Cơ chế tự động dùng Native Fallback khi môi trường chưa có `pypdfium2` (do hạn chế mạng).
+  - Xác minh kiểm thử: `python -m unittest tests/test_docling_office_parser.py` đạt 5/5 PASSED; `compileall` parsers đạt 100%; `git diff --check` đạt 0 lỗi.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-02_phien_246_khoi_phuc_docling_office_parser.md`.
+- **Phiên trước #245**:
+  - Loại bỏ toàn bộ runtime AI local (vLLM, Ollama, EasyOCR, SentenceTransformers), chuyển ModelOps hoàn toàn sang provider API key.
+- **Phiên trước #244**:
+- **Kết quả phiên #244**:
+  - Đối chiếu 7 PDF tuyển sinh chính quy, xác nhận `col_admissions` có 7 tài liệu `ready/indexed`, 132 chunks và 1.332 facts.
+  - Chạy sạch 20 câu qua API assistant `admissions`: 14 đạt, 3 đạt một phần, 3 không đạt; điểm quy đổi 77,5%; độ trễ trung bình 5,685 giây và P95 7,628 giây.
+  - Ba lỗi chính: trả sai phạm vi PT5, sai lịch đăng ký/thi năng khiếu và nhầm chỉ tiêu AI/KTPM/CNTT với dữ liệu điều kiện/năng lực.
+  - Phát hiện P0: phản hồi ghép context khi toàn bộ provider lỗi vẫn được ghi semantic cache, khiến provider phục hồi nhưng tiếp tục phát câu trả lời kém chất lượng. Đã xóa 25 cache của riêng `col_admissions` trước lần chạy chính thức.
+  - Quan sát khóa Gemini nhận 429, chuyển `rate_limited` và runtime đi tiếp qua fallback. Chưa kiểm chứng chuỗi ba khóa provider thật vì pool Gemini chỉ có một khóa khả dụng tại thời điểm thử.
+  - Báo cáo: `docs/bao_cao/2026-10-02_kiem_thu_chatbot_tuyen_sinh_20_cau.md`.
+- **Phiên trước #243**:
+- **Kết quả phiên #243**:
+  - Phân tích log backend xác định các stack trace đều cùng một lỗi `ResponseValidationError`: khóa Gemini cũ có `status=disabled`, trong khi DTO chỉ chấp nhận trạng thái chuẩn và endpoint danh sách khóa trả HTTP 500.
+  - Thêm hàm chuẩn hóa trạng thái dùng chung tại biên API/runtime: `disabled` được ánh xạ thành `inactive`; trạng thái lạ fail-closed thành `inactive` và không được đưa vào vòng xoay khóa.
+  - Thêm migration `20261002_normalize_provider_key_status`: chuẩn hóa bảng relational và JSONB legacy, sau đó tạo check constraint `ck_provider_api_keys_status` để ngăn trạng thái ngoài chuẩn.
+  - Đã áp dụng migration lên PostgreSQL local. Khóa `anhtuan1991dev@gmail.com` chuyển từ `disabled` sang `inactive`, giữ nguyên `is_active=false`; không thay đổi secret hay khóa đang hoạt động.
+- **Kiểm tra phiên #243**:
+  - Endpoint gây lỗi `/modelops/providers/prov_gemini/keys` đã trả HTTP 200, hai trạng thái là `active` và `inactive`.
+  - CSDL còn 0 trạng thái ngoài chuẩn và check constraint đã tồn tại; Alembic ở head `20261002_normalize_provider_key_status`.
+  - 23/23 kiểm thử trọng điểm passed; full backend 506 passed, còn đúng 5 lỗi tuyển sinh/facts/artifact đã ghi từ các phiên trước.
+  - Ruff trên toàn bộ file sửa của phiên không lỗi; full Ruff vẫn còn 32 lỗi trong script/scratch ngoài phạm vi.
+  - Hai dòng `Slow request` 10–12 giây trong log là cảnh báo thời gian của thao tác kiểm tra model thật, không phải exception.
+- **Phiên trước #242**:
+- **Phiên số**: #242 (Rà soát ModelOps từ giai đoạn 1 đến 3)
+- **Kết quả phiên #242**:
+  - Phân loại hard quota theo mã lỗi chuẩn hóa ngay cả khi HTTP là 402/403; tiếp tục tách biệt lỗi 429 tạm thời và khóa không hợp lệ.
+  - Lỗi CSDL ở acquire/resolver/list keys không còn được che bằng fallback JSONB hay rollback làm hết hiệu lực ORM; test fixtures được sửa để trả COUNT và dữ liệu relational đúng kiểu, bỏ điều kiện production phục vụ AsyncMock.
+  - Yêu cầu lớn chỉ bỏ qua khóa thiếu quota cho riêng yêu cầu đó. Khóa chỉ bị đánh dấu exhausted khi đã dùng hết quota thực tế; yêu cầu nhỏ hơn vẫn dùng được số dư.
+  - Thao tác sửa/xóa/kiểm tra khóa đọc snapshot từ bảng khóa. Khóa primary do migration tạo, không có trong JSONB ban đầu, vẫn sửa được.
+  - Import đồng bộ khóa xuống bảng relational, bảo toàn usage/cooldown của khóa không đổi; thay secret thì xóa lease cũ và reset trạng thái/usage của credential mới.
+  - Chat, embedding, reranker và OCR giải phóng lease khi bị hủy. Chat streaming gia hạn lease sau mỗi 30 giây có token; thời hạn lease chat/resolver tính thêm khoảng đệm so với timeout, OCR dùng 180 giây cho timeout HTTP 120 giây.
+  - UI bỏ emoji và nhãn khẳng định xoay khóa thật ở kết quả mô phỏng.
+- **Kiểm tra phiên #242**:
+  - 80/80 kiểm thử trọng điểm ModelOps/resolver/monitoring/OCR/RAG passed, gồm hủy yêu cầu và streaming trước/sau token đầu tiên.
+  - PostgreSQL thật: request lớn bỏ qua quota thiếu, request nhỏ vẫn dùng số dư; 3 session đồng thời nhận 3 khóa khác nhau, session thứ tư không chiếm khóa đang dùng; chuỗi 1 → 2 → 3 và lịch sử đúng; sửa khóa migration thiếu JSONB và import secret đều hoạt động. Provider thử và khóa/sự kiện đã được xóa sau kiểm tra.
+  - Build frontend + TypeScript thành công, Biome trên file UI sửa không lỗi. Ruff trên nhóm file thay đổi không lỗi.
+  - Full pytest cuối cùng: 504 passed, 5 failed (cùng 5 test tuyển sinh/facts/artifact đã ghi từ #240/#241). Lần đầu có thêm lỗi quyền thư mục pytest tạm; chạy lại với thư mục tạm riêng đã loại bỏ các lỗi môi trường đó. Full Ruff vẫn 32 lỗi script/scratch ngoài phạm vi.
+- **Giới hạn còn lại**:
+  - Mô phỏng 429 không gọi provider thật. Token streaming là ước lượng ký tự theo cơ chế hiện tại.
+  - Chưa có chính sách xóa lịch sử cũ. Lease embedding theo toàn bộ batch/OCR nhiều lượt gọi chưa có heartbeat độc lập; batch rất dài cần cơ chế gia hạn riêng trước khi chạy tải dài ở production.
+- **Phiên trước #241**:
+- **Phiên số**: #241 (ModelOps Giai đoạn 3 — Giám sát khóa, lịch sử và mô phỏng Failover)
+- **Hoàn thành phiên #241**:
+  - Thêm bảng `provider_key_events`, migration `20261002_provider_key_events` và lịch sử 30 sự kiện mới nhất theo provider. Sự kiện chọn/chuyển khóa, thành công, 429, hết quota, khóa lỗi chỉ chứa ID, loại sự kiện, mã lỗi chuẩn hóa và token; không lưu secret hay payload lỗi.
+  - Trang chi tiết `/models/:id`, mục Khóa API hiển thị khóa đang dùng, cooldown, lỗi gần nhất và số lỗi liên tiếp; trạng thái/lịch sử tự tải lại mỗi 10 giây, có trạng thái rỗng/lỗi/thử lại.
+  - Nút Thử Failover gọi endpoint `failover-preview` chỉ đọc bảng khóa, bỏ qua khóa bị tắt, hết quota, lỗi, đang lease hoặc còn cooldown; hiển thị thứ tự khóa dự kiến khi gặp 429.
+  - Endpoint mô phỏng cũ được đánh dấu deprecated, chuyển sang xử lý bản sao; không ghi token giả hay đổi trạng thái khóa thật. Phép thử trên UI là mô phỏng, không gọi provider ngoài.
+  - Đã áp dụng migration giai đoạn 2 và 3 lên PostgreSQL local; revision hiện tại `20261002_provider_key_events`. Môi trường triển khai khác vẫn cần chạy migration trước khi dùng tính năng.
+- **Kiểm tra phiên #241**:
+  - Frontend: `npm run build` thành công, TypeScript không lỗi; Biome trên 5 file frontend sửa đổi không lỗi.
+  - Backend: 34 kiểm thử trọng điểm passed sau các chỉnh sửa cuối; Ruff trên các file sửa đổi không lỗi.
+  - PostgreSQL thật với dữ liệu tạm: Key 1 gặp 429 → Key 2 gặp 429 → Key 3 thành công, ghi 6 sự kiện và hạch toán 42 token. Toàn bộ dữ liệu thử được rollback; không gọi API provider.
+  - API local: danh sách khóa, lịch sử, failover-preview trả HTTP 200; preview trả `dry_run=true`.
+  - Toàn bộ backend: 495 passed, 5 failed (cùng tên test đã thất bại ở phiên #240: admissions agentic flow, consulting dispatcher, hai fact lookup, universal tools). Full Ruff còn 32 lỗi trong các script/scratch có sẵn. Không khẳng định toàn bộ dự án đã sạch kiểm thử.
+- **Phiên trước #240**:
 - **Phiên số**: #240 (ModelOps Giai đoạn 2 — Relational Key Pool, Atomic Lease & Provider Rotation dùng chung)
 - **Mục tiêu đã hoàn thành (phiên #240)**:
   - 1. **Tách Key Pool khỏi JSONB**: thêm model `ProviderApiKey` và migration `20261002_provider_api_keys`, backfill khóa hiện hữu từ `model_provider_configs.extra_config.api_keys`, đồng thời tạo khóa primary cho provider chỉ có `api_key_encrypted`.
@@ -2116,3 +2181,10 @@
 - [x] Đồng bộ 5 trợ lý Core vào PostgreSQL thật; hoàn thiện API CRUD/seed/bundle và UI list/create/detail tại `/assistants`.
 - [ ] Phiên OCR/Provider hoàn thiện trường `fallback_engine` trong `OCRExtractResponse` để full backend suite trở lại 142/142.
 - [ ] Bổ sung Core manifest/HTTP endpoint versioned, parser confidence/evidence, E2E CRUD/sync và scheduler sync taxonomy.
+
+### Đã Hoàn Thành Chuyển Đổi Sang Provider API (Phiên #245)
+- [x] Loại bỏ runtime local cho `Ollama`, `vLLM`, `SentenceTransformers`, `Docling` và `EasyOCR`; xóa adapter, preset, seed, icon và dependency liên quan.
+- [x] ModelOps chỉ phân giải provider có API key hợp lệ trong PostgreSQL; thiếu khóa sẽ fail-fast theo RFC 7807 và tiếp tục xoay khóa/provider dự phòng.
+- [x] Embedding và reranker mặc định dùng Cloudflare Workers AI (`@cf/baai/bge-m3`, `@cf/baai/bge-reranker-base`); đây là API cloud, không tải model về máy.
+- [x] OCR dùng PyMuPDF cho lớp text số và Gemini/Mistral qua API cho tài liệu scan; chuỗi cấu hình cũ trong DB đã được migration loại bỏ.
+- [x] Đã xóa cache BGE-M3, EasyOCR và Docling khỏi máy phát triển, giải phóng khoảng 5,21 GB.

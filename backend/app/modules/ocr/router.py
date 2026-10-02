@@ -56,7 +56,7 @@ async def extract_document_text(
 )
 async def parse_studio_document(
     file: UploadFile | None = File(None, description="Tệp tài liệu scan hoặc văn bản (PDF, PNG, JPG, DOCX, XLSX)"),
-    engine_id: str = Form("pymupdf_ocr", description="Mã engine OCR (pymupdf_ocr, docling, easyocr)"),
+    engine_id: str = Form("pymupdf_ocr", description="Mã engine OCR hoặc provider API"),
     tenant_id: str = Form("tenant_qnu", description="Mã tổ chức / tenant"),
     workspace_id: str = Form("workspace_qnu", description="Mã workspace"),
 ) -> StudioOCRParseResponse:

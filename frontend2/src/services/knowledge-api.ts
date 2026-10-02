@@ -45,7 +45,7 @@ export const knowledgeApi = {
           (d.ocr_profile as KnowledgeCollection["ocr_profile"]) ||
           (code.includes("regulation") || code.includes("library")
             ? "PyMuPDF"
-            : "Docling"),
+            : "Mistral"),
         updated_at:
           typeof d.updated_at === "string"
             ? d.updated_at
@@ -246,7 +246,7 @@ export const knowledgeApi = {
             | "indexed"
             | "index_failed") || "pending",
         index_error: (d.index_error as string | null) || null,
-        ocr_method: (d.ocr_method as string) || "Docling Table Parser",
+        ocr_method: (d.ocr_method as string) || "ModelOps OCR API",
         document_type_code: (d.document_type_code as string) || undefined,
         document_type: (d.document_type_code as string) || undefined,
         created_at:

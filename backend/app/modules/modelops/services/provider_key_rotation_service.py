@@ -8,12 +8,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_, select, update
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.crypto import decrypt_secret
-from app.modules.modelops.models import ProviderApiKey
+from app.modules.modelops.models import ProviderApiKey, ProviderKeyEvent
 from app.modules.modelops.services.key_rotation import KeyFailure, classify_key_failure
+from app.modules.modelops.services.key_status import normalize_provider_key_status
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,19 +51,10 @@ class ProviderKeyRotationService:
         now = datetime.now(UTC)
         excluded = excluded_key_ids or set()
 
-        try:
-            total_result = await db.execute(
-                select(func.count(ProviderApiKey.id)).where(
-                    ProviderApiKey.provider_id == provider_id
-                )
-            )
-        except SQLAlchemyError:
-            await db.rollback()
-            return KeyAcquireResult(managed=False, lease=None)
-        total_value = total_result.scalar_one()
-        # AsyncMock/legacy adapters may return an object instead of the COUNT scalar.
-        # Treat that as an unavailable relational table and let callers use JSONB.
-        if not isinstance(total_value, int) or total_value <= 0:
+        total_result = await db.execute(
+            select(func.count(ProviderApiKey.id)).where(ProviderApiKey.provider_id == provider_id)
+        )
+        if total_result.scalar_one() <= 0:
             return KeyAcquireResult(managed=False, lease=None)
 
         await db.execute(
@@ -76,24 +67,27 @@ class ProviderKeyRotationService:
             )
             .values(status="active", cooldown_until=None, updated_at=now)
         )
-        if estimated_tokens > 0:
-            await db.execute(
-                update(ProviderApiKey)
-                .where(
-                    ProviderApiKey.provider_id == provider_id,
-                    ProviderApiKey.status == "active",
-                    ProviderApiKey.quota_limit.is_not(None),
-                    ProviderApiKey.usage_tokens + estimated_tokens
-                    > ProviderApiKey.quota_limit,
-                )
-                .values(status="exhausted", cooldown_until=None, updated_at=now)
+        await db.execute(
+            update(ProviderApiKey)
+            .where(
+                ProviderApiKey.provider_id == provider_id,
+                ProviderApiKey.status == "active",
+                ProviderApiKey.quota_limit.is_not(None),
+                ProviderApiKey.usage_tokens >= ProviderApiKey.quota_limit,
             )
+            .values(status="exhausted", cooldown_until=None, updated_at=now)
+        )
 
         while True:
             conditions = [
                 ProviderApiKey.provider_id == provider_id,
                 ProviderApiKey.is_active.is_(True),
                 ProviderApiKey.status == "active",
+                or_(
+                    ProviderApiKey.quota_limit.is_(None),
+                    (ProviderApiKey.usage_tokens < ProviderApiKey.quota_limit)
+                    & (ProviderApiKey.usage_tokens + max(0, estimated_tokens) <= ProviderApiKey.quota_limit),
+                ),
                 or_(
                     ProviderApiKey.lease_until.is_(None),
                     ProviderApiKey.lease_until <= now,
@@ -126,6 +120,12 @@ class ProviderKeyRotationService:
                 key.lease_token = None
                 key.lease_until = None
                 key.version = (key.version or 0) + 1
+                db.add(ProviderKeyEvent(
+                    provider_id=provider_id,
+                    key_id=key.id,
+                    event_type="invalid",
+                    reason="provider_key_decryption_failed",
+                ))
                 await db.commit()
                 excluded.add(key.id)
                 continue
@@ -135,6 +135,14 @@ class ProviderKeyRotationService:
             key.lease_until = now + timedelta(seconds=max(15, lease_seconds))
             key.last_used_at = now
             key.version = (key.version or 0) + 1
+            db.add(
+                ProviderKeyEvent(
+                    provider_id=provider_id,
+                    key_id=key.id,
+                    event_type="rotated" if excluded else "selected",
+                    reason="previous_key_failed" if excluded else None,
+                )
+            )
             await db.commit()
             return KeyAcquireResult(
                 managed=True,
@@ -173,6 +181,14 @@ class ProviderKeyRotationService:
         key.lease_token = None
         key.lease_until = None
         key.version = (key.version or 0) + 1
+        db.add(
+            ProviderKeyEvent(
+                provider_id=lease.provider_id,
+                key_id=lease.id,
+                event_type="success",
+                tokens=max(0, total_tokens),
+            )
+        )
         await db.commit()
         return True
 
@@ -191,9 +207,7 @@ class ProviderKeyRotationService:
         if failure.state is not None:
             key.status = failure.state
         if failure.state == "rate_limited":
-            key.cooldown_until = now + timedelta(
-                seconds=failure.retry_after_seconds or 60
-            )
+            key.cooldown_until = now + timedelta(seconds=failure.retry_after_seconds or 60)
         elif failure.state in {"exhausted", "invalid"}:
             key.cooldown_until = None
         key.last_error_at = now
@@ -202,6 +216,14 @@ class ProviderKeyRotationService:
         key.lease_token = None
         key.lease_until = None
         key.version = (key.version or 0) + 1
+        db.add(
+            ProviderKeyEvent(
+                provider_id=lease.provider_id,
+                key_id=lease.id,
+                event_type=failure.state or "failed",
+                reason=failure.reason,
+            )
+        )
         await db.commit()
         return failure
 
@@ -215,6 +237,17 @@ class ProviderKeyRotationService:
         key.version = (key.version or 0) + 1
         await db.commit()
         return True
+
+    async def renew(self, db: AsyncSession, lease: LeasedProviderKey, lease_seconds: int) -> bool:
+        """Extend ownership during long streams without changing the routing order."""
+        result = await db.execute(
+            update(ProviderApiKey)
+            .where(ProviderApiKey.id == lease.id, ProviderApiKey.provider_id == lease.provider_id,
+                   ProviderApiKey.lease_token == lease.lease_token)
+            .values(lease_until=datetime.now(UTC) + timedelta(seconds=max(15, lease_seconds)))
+        )
+        await db.commit()
+        return result.rowcount == 1
 
     async def list_keys(self, db: AsyncSession, provider_id: str) -> list[ProviderApiKey]:
         result = await db.execute(
@@ -233,20 +266,21 @@ class ProviderKeyRotationService:
             "account_id": key.account_id,
             "priority": key.priority,
             "is_active": key.is_active,
-            "status": key.status,
+            "status": normalize_provider_key_status(key.status),
             "quota_limit": key.quota_limit,
             "usage_tokens": key.usage_tokens,
             "cooldown_until": key.cooldown_until.isoformat() if key.cooldown_until else None,
             "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
             "last_error_at": key.last_error_at.isoformat() if key.last_error_at else None,
             "last_error_code": key.last_error_code,
+            "consecutive_failures": key.consecutive_failures,
+            "is_leased": bool(key.lease_until and key.lease_until > datetime.now(UTC)),
+            "lease_until": key.lease_until.isoformat() if key.lease_until else None,
             "created_at": key.created_at.isoformat() if key.created_at else None,
         }
 
     @staticmethod
-    async def _lock_lease(
-        db: AsyncSession, lease: LeasedProviderKey
-    ) -> ProviderApiKey | None:
+    async def _lock_lease(db: AsyncSession, lease: LeasedProviderKey) -> ProviderApiKey | None:
         result = await db.execute(
             select(ProviderApiKey)
             .where(
