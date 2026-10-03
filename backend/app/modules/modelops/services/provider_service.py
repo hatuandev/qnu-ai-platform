@@ -1139,8 +1139,15 @@ class ProviderService:
                     else:
                         return False, round(elapsed, 1), f"Gemini API phản hồi HTTP {resp.status_code}."
 
-                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom"):
-                    target_url = (base_url or "https://api.openai.com/v1").rstrip("/") + "/models"
+                elif provider_type in (
+                    "openai", "deepseek", "groq", "openrouter", "nvidia",
+                    "ollama_cloud", "ollama", "claude", "custom"
+                ):
+                    base = base_url or (
+                        "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
+                        else "https://api.openai.com/v1"
+                    )
+                    target_url = base.rstrip("/") + "/models"
                     headers = {"Authorization": f"Bearer {clean_key}"}
                     if provider_type == "openrouter":
                         headers["HTTP-Referer"] = "https://qnu.edu.vn"
@@ -1154,7 +1161,7 @@ class ProviderService:
                     else:
                         return False, round(elapsed, 1), f"API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
 
-                return True, 50.0, "Đã kiểm tra thông số kết nối nhà cung cấp."
+                return False, 0.0, f"Loại nhà cung cấp '{provider_type}' chưa được cấu hình kiểm tra kết nối."
 
         except httpx.ConnectError:
             return False, 0.0, "Không thể kết nối tới máy chủ (Connect Error). Vui lòng kiểm tra lại URL hoặc mạng."
@@ -1415,13 +1422,17 @@ class ProviderService:
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
 
-                elif provider_type in ("openai", "deepseek", "groq", "openrouter", "nvidia", "custom"):
+                elif provider_type in (
+                    "openai", "deepseek", "groq", "openrouter", "nvidia",
+                    "ollama_cloud", "ollama", "claude", "custom"
+                ):
                     base = base_url or (
                         "https://api.openai.com/v1" if provider_type == "openai"
                         else "https://api.deepseek.com/v1" if provider_type == "deepseek"
                         else "https://api.groq.com/openai/v1" if provider_type == "groq"
                         else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
                         else "https://integrate.api.nvidia.com/v1" if provider_type == "nvidia"
+                        else "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
                         else "https://api.openai.com/v1"
                     )
                     clean_base = base.rstrip("/")
@@ -1478,13 +1489,22 @@ class ProviderService:
                             "message": f"Máy chủ {provider_type.upper()} đang quá tải tạm thời (HTTP {resp.status_code} - Service temporarily overloaded). Tên mô hình chính xác, bạn vẫn có thể thêm mô hình vào hệ thống.",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
-                    elif resp.status_code == 410:
+                    elif resp.status_code == 410 or ("retired" in resp.text.lower() and resp.status_code != 200):
                         return {
                             "model_name": clean_model,
                             "success": False,
                             "status": "deprecated",
                             "latency_ms": elapsed,
                             "message": f"Mô hình '{clean_model}' đã hết hạn / ngừng cung cấp bởi nhà cung cấp (HTTP 410 Gone).",
+                            "tested_at": datetime.now(UTC).isoformat(),
+                        }
+                    elif resp.status_code == 402:
+                        return {
+                            "model_name": clean_model,
+                            "success": False,
+                            "status": "payment_required",
+                            "latency_ms": elapsed,
+                            "message": f"Mô hình '{clean_model}' yêu cầu trả phí / nạp thêm credits (HTTP 402 Payment Required).",
                             "tested_at": datetime.now(UTC).isoformat(),
                         }
                     elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not exist" in resp.text.lower() or "not found" in resp.text.lower()):
@@ -1517,10 +1537,10 @@ class ProviderService:
 
                 return {
                     "model_name": clean_model,
-                    "success": True,
-                    "status": "available",
-                    "latency_ms": 30.0,
-                    "message": f"Đã kiểm tra mô hình '{clean_model}'.",
+                    "success": False,
+                    "status": "error",
+                    "latency_ms": 0.0,
+                    "message": f"Loại nhà cung cấp '{provider_type}' chưa được hỗ trợ kiểm tra mô hình.",
                     "tested_at": datetime.now(UTC).isoformat(),
                 }
 

@@ -37,6 +37,7 @@ export interface SingleModelTestResult {
     | "unavailable"
     | "rate_limited"
     | "temporarily_overloaded"
+    | "payment_required"
     | "deprecated"
     | "error";
   latency_ms: number;

@@ -985,7 +985,10 @@ class IngestionService:
                         pdf_bytes = original
                         filetype = file_type if file_type != "bmp" else "png"
 
-                    import cv2
+                    try:
+                        import cv2
+                    except ImportError:
+                        cv2 = None
                     import numpy as np
                     import pymupdf as fitz
 
@@ -1009,20 +1012,25 @@ class IngestionService:
                         cv_regions: list[dict] = []
 
                         try:
-                            pix = page.get_pixmap(dpi=150)
-                            img_np = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
-                                (pix.height, pix.width, pix.n)
-                            )
-                            if pix.n == 4:
-                                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
-                            elif pix.n == 3:
-                                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                            else:
-                                img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+                            if cv2 is not None:
+                                pix = page.get_pixmap(dpi=150)
+                                img_np = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
+                                    (pix.height, pix.width, pix.n)
+                                )
+                                if pix.n == 4:
+                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
+                                elif pix.n == 3:
+                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+                                else:
+                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
 
-                            cv_regions = detector.detect_layout_regions(
-                                img_bgr, markdown_text=page_text, page_number=p_num, fitz_page=page
-                            )
+                                cv_regions = detector.detect_layout_regions(
+                                    img_bgr, markdown_text=page_text, page_number=p_num, fitz_page=page
+                                )
+                            else:
+                                cv_regions = detector.detect_layout_regions(
+                                    None, markdown_text=page_text, page_number=p_num, fitz_page=page
+                                )
                         except Exception as e:
                             logger.debug("SmartLayoutDetector error on page %s: %s", p_num, e)
 

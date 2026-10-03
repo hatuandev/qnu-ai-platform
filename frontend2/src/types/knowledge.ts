@@ -27,6 +27,7 @@ export interface KnowledgeDocument {
     | "completed"
     | "processing"
     | "pending"
+    | "review_pending"
     | "failed"
     | "approved"
     | "archived"

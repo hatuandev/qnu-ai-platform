@@ -21,6 +21,8 @@ const LOBE_PROVIDER_ICONS: Record<string, string> = {
   qwen: "/icons/providers/qwen.svg",
   mistral: "/icons/providers/mistral.svg",
   openrouter: "/icons/providers/openrouter.svg",
+  ollama: "/icons/providers/ollama.svg",
+  ollama_cloud: "/icons/providers/ollama.svg",
 };
 
 export const ProviderIcon: React.FC<ProviderIconProps> = ({

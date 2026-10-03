@@ -7,9 +7,17 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-02 (UTC+7)
-- **Phiên số**: #246 (Khôi phục Docling Office Parser cho tài liệu Office)
-- **Kết quả phiên #246**:
+- **Thời gian cập nhật**: 2026-10-03 (UTC+7)
+- **Phiên số**: #247 (Khử bảng giả Footnote Demotion, Gộp cột lệch lưới & Nâng cấp OCR Combo Gemini 3.x Flash-Lite)
+- **Kết quả phiên #247**:
+  - Hỗ trợ tải lên nhiều tệp đồng thời (Multi-file Drag & Drop) trong Hộp thoại nạp tài liệu `DocumentUploadDialog` với danh sách hàng đợi theo dõi tiến trình từng file và thanh progress tổng thể.
+  - Xây dựng thuật toán hình thái học tổng quát Khử Bảng Giả (Footnote Demotion) trong `table_reconstructor.py`, tự động nhận diện và hạ cấp các dòng chú thích cuối trang (`*`, `Ghi chú:`) ra khỏi ma trận bảng thành khối callout text.
+  - Xây dựng thuật toán Gộp Cột Lệch Lưới (Interleaved Column Collapse), tự động sáp nhập các cột rác/lệch lưới do sai số tọa độ PDF ($\ge 85\%$ rỗng) vào cột liền kề, giải quyết triệt để lỗi 409 Conflict `UNRESOLVED_TABLE_HEADER` trên tài liệu bảng biểu tuyển sinh phức tạp (`doc_cd9f40ee9165` - `table_p13_2`).
+  - Chuẩn hóa hàm `_is_hdr` nhận diện chính xác các mã alphanumeric (`NV-01`, `A00`, `D01`, `TH01`).
+  - Khắc phục lỗi bóc tách 3 tệp PDF scan thuần ảnh (pure image PDF: `TB2302`, `QD2139`, `TB2618`): Nâng cấp cấu hình mặc định và chuỗi OCR Combo Chain từ các model cũ đã bị Google khai tử (`gemini-2.5-flash`, `gemini-2.5-flash-lite` 404) sang `gemini-3.1-flash-lite` (ưu tiên 1) và `gemini-3.5-flash-lite` (fallback 2) kết hợp xoay vòng khóa API Relational Key Pool khi gặp 429; cả 3 tệp scan đã bóc tách thành công 100%, sinh đủ 2 chunks chất lượng cao và chuyển trạng thái `ready`.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-03_phien_247_khu_bang_gia_footnote_demotion_va_nang_cap_ocr_combo_gemini_3.md`.
+  - Snapshot: `docs/memory/snapshots/2026-10-03_session_247.md`.
+- **Phiên trước #246**:
   - Khôi phục khả năng bóc tách tài liệu Office (DOCX, XLSX, PPTX, DOC, XLS, PPT) dạng declarative qua `DoclingOfficeParser` kế thừa `BaseDocumentParser`.
   - Sửa lỗi thứ tự kiểm tra `extension not in _BACKEND_CONFIG` trong `_parse_sync` để ném `ValueError` thay vì gặp `KeyError`.
   - Sửa lỗi thuật toán trích xuất bảng Markdown `_extract_markdown_tables` (bổ sung separator vào khối block, bảo toàn đầy đủ các dòng dữ liệu thay vì bỏ sót dòng đầu).

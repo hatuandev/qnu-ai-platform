@@ -66,13 +66,15 @@ def get_llm_adapter(
             account_id=account_id,
         )
 
-    if pt in ("deepseek", "groq", "openrouter", "nvidia", "claude", "custom"):
+    if pt in ("deepseek", "groq", "openrouter", "nvidia", "claude", "ollama_cloud", "ollama", "custom"):
         # OpenAI compatible endpoints
         default_urls = {
             "deepseek": "https://api.deepseek.com/v1",
             "groq": "https://api.groq.com/openai/v1",
             "openrouter": "https://openrouter.ai/api/v1",
             "nvidia": "https://integrate.api.nvidia.com/v1",
+            "ollama_cloud": "https://ollama.com/v1",
+            "ollama": "https://ollama.com/v1",
         }
         return OpenAIAdapter(
             model_name=model_name,

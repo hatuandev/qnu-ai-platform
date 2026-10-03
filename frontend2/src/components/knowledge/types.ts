@@ -22,6 +22,10 @@ export const STATUS_BADGE: Record<
     label: "Chờ duyệt",
     className: "bg-warning/10 text-warning border-warning/30",
   },
+  review_pending: {
+    label: "Chờ hiệu đính",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+  },
   processing: {
     label: "Đang xử lý",
     className: "bg-info/10 text-info border-info/30",

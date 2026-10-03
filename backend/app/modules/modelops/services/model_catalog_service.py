@@ -51,17 +51,17 @@ def _without_local_models(items: list[dict[str, Any]] | None) -> list[dict[str, 
 
 DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     {
-        "provider_id": "prov_ace0d9fe",
+        "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
-        "model_name": "gemini-2.5-flash",
+        "model_name": "gemini-3.1-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
         "description": "Ưu tiên 1: Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM siêu tốc (~2s)",
     },
     {
-        "provider_id": "prov_ace0d9fe",
+        "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
-        "model_name": "gemini-2.5-flash-lite",
+        "model_name": "gemini-3.5-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
         "description": "Ưu tiên 2: Google Gemini 2.5 Flash-Lite — Phản hồi nhanh, tối ưu quota dự phòng",
@@ -108,9 +108,9 @@ DEFAULT_QNU_RERANKER_COMBO_CHAIN: list[dict[str, Any]] = [
 
 DEFAULT_QNU_CHAT_COMBO_CHAIN: list[dict[str, Any]] = [
     {
-        "provider_id": "prov_ace0d9fe",
+        "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
-        "model_name": "gemini-2.5-flash",
+        "model_name": "gemini-3.1-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
         "description": "Ưu tiên 1: Gemini 2.5 Flash — Tốc độ phản hồi cực nhanh, suy luận thông minh",
@@ -208,14 +208,14 @@ class ModelCatalogService:
             "default_reranker_combo_id": "combo_qnu_reranker_shield",
             "reranker_combo_chain": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
 
-            "default_ocr_provider_id": "prov_ace0d9fe",
-            "default_ocr_model": "gemini-2.5-flash",
+            "default_ocr_provider_id": "prov_gemini",
+            "default_ocr_model": "gemini-3.1-flash-lite",
             "default_ocr_mode": "combo",
             "default_ocr_combo_id": "combo_qnu_ocr_master",
             "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,
 
-            "default_chat_provider_id": "prov_ace0d9fe",
-            "default_chat_model": "gemini-2.5-flash",
+            "default_chat_provider_id": "prov_gemini",
+            "default_chat_model": "gemini-3.1-flash-lite",
             "default_chat_mode": "single",
             "default_chat_combo_id": "combo_qnu_chat_shield",
             "chat_combo_chain": DEFAULT_QNU_CHAT_COMBO_CHAIN,

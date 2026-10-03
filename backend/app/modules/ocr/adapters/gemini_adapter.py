@@ -16,7 +16,7 @@ from app.modules.ocr.adapters.base import BaseOCRAdapter
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_GEMINI_OCR_MODEL = "gemini-2.5-flash"
+_DEFAULT_GEMINI_OCR_MODEL = "gemini-3.1-flash-lite"
 
 
 class GeminiOCRAdapter(BaseOCRAdapter):

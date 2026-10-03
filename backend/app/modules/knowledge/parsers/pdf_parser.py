@@ -185,12 +185,13 @@ def _normalize_raw_table_rows(
             return False
 
         first = non_empty[0]
-        # Check 1: Primary data sequence keys (STT, task code, Roman numeral, or program code)
+        # Check 1: Primary data sequence keys (STT, task code, Roman numeral, program code, or alphanumeric key)
         if (
             re.fullmatch(r"^\d+$", first)
             or re.fullmatch(r"^\d+(?:\.\d+)+$", first)
             or re.fullmatch(r"^[IVXLCDM]+$", first)
             or re.fullmatch(r"^\d{7}[A-Za-z]*$", first)
+            or re.fullmatch(r"^[A-Za-z]{1,6}[-_.]?\d+[A-Za-z0-9]*$", first)
         ):
             return False
 
@@ -217,7 +218,9 @@ def _normalize_raw_table_rows(
 
         # Check 4: Check if any cell has a distinct program or task code
         if any(
-            re.fullmatch(r"^\d{7}[A-Za-z]*$", c) or re.fullmatch(r"^\d+\.\d+$", c)
+            re.fullmatch(r"^\d{7}[A-Za-z]*$", c)
+            or re.fullmatch(r"^\d+\.\d+$", c)
+            or re.fullmatch(r"^[A-Za-z]{1,6}[-_.]?\d+[A-Za-z0-9]*$", c)
             for c in non_empty
         ):
             return False
@@ -429,7 +432,11 @@ class PyMuPdfParser(BaseDocumentParser):
                 )
 
         # 3. P0.2: Reconstruct multi-page tables across the entire document
-        reconstructed_tables = reconstruct_multi_page_tables(raw_canonical_tables)
+        demoted_blocks: list[CanonicalBlock] = []
+        reconstructed_tables = reconstruct_multi_page_tables(
+            raw_canonical_tables, demoted_blocks=demoted_blocks
+        )
+        canonical_blocks.extend(demoted_blocks)
 
         # 4. Build the CanonicalDocument
         canonical_doc = CanonicalDocument(

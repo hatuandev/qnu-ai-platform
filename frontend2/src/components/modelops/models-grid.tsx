@@ -367,6 +367,14 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                       <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
                       <span>410 Hết hạn</span>
                     </span>
+                  ) : testRes.status === "payment_required" ? (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
+                      title={`Yêu cầu nạp credits (HTTP 402): ${testRes.message}`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>402 Credits</span>
+                    </span>
                   ) : testRes.status === "unavailable" ? (
                     <span
                       className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"

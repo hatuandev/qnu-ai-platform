@@ -378,15 +378,15 @@ class SystemModelDefaults(BaseModel):
     reranker_combo_chain: list[OCRComboItem] = Field(default_factory=list)
 
     # Vision & OCR
-    default_ocr_provider_id: str = "prov_ace0d9fe"
-    default_ocr_model: str = "gemini-2.5-flash"
+    default_ocr_provider_id: str = "prov_gemini"
+    default_ocr_model: str = "gemini-3.1-flash-lite"
     default_ocr_mode: Literal["combo", "single"] = "combo"
     default_ocr_combo_id: str | None = "combo_qnu_ocr_master"
     ocr_combo_chain: list[OCRComboItem] = Field(default_factory=list)
 
     # Chat & Reasoning
-    default_chat_provider_id: str = "prov_ace0d9fe"
-    default_chat_model: str = "gemini-2.5-flash"
+    default_chat_provider_id: str = "prov_gemini"
+    default_chat_model: str = "gemini-3.1-flash-lite"
     default_chat_mode: Literal["combo", "single"] = "single"
     default_chat_combo_id: str | None = None
     chat_combo_chain: list[OCRComboItem] = Field(default_factory=list)
@@ -445,7 +445,15 @@ class SetDefaultModelRequest(BaseModel):
 class SingleModelTestResult(BaseModel):
     model_name: str
     success: bool
-    status: Literal["available", "unavailable", "rate_limited", "error"]
+    status: Literal[
+        "available",
+        "unavailable",
+        "rate_limited",
+        "deprecated",
+        "temporarily_overloaded",
+        "payment_required",
+        "error",
+    ]
     latency_ms: float = 0.0
     message: str
     tested_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())

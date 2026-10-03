@@ -586,5 +586,105 @@ def test_normalize_program_code_cells():
     assert norm[0].cells[1].normalized_value == "7340301AC"
 
 
+def test_footnote_demotion_pseudo_table():
+    """Verify that boxed footnotes / narrative notes are demoted to paragraph blocks."""
+    from app.modules.knowledge.normalization.models import (
+        BlockType,
+        CanonicalBlock,
+        CanonicalCell,
+        CanonicalRow,
+        CanonicalTable,
+        SourceSpan,
+    )
+    from app.modules.knowledge.normalization.table_reconstructor import (
+        reconstruct_multi_page_tables,
+    )
+
+    span = SourceSpan(page_number=13)
+    pseudo_table = CanonicalTable(
+        table_id="table_p13_2",
+        schema_key="empty_schema",
+        headers=["", ""],
+        rows=[
+            CanonicalRow(
+                row_id="r1",
+                cells=[
+                    CanonicalCell(
+                        raw_value="(1) Thí sinh đã tốt nghiệp đại học ngành đúng hoặc phù hợp với ngành đăng ký dự tuyển.",
+                        source_span=span,
+                    ),
+                    CanonicalCell(raw_value="", source_span=span),
+                ],
+                source_pages=[13],
+            ),
+            CanonicalRow(
+                row_id="r2",
+                cells=[
+                    CanonicalCell(
+                        raw_value="(2) Đối với người dự tuyển chưa có văn bằng tiếng Anh theo quy định.",
+                        source_span=span,
+                    ),
+                    CanonicalCell(raw_value="", source_span=span),
+                ],
+                source_pages=[13],
+            ),
+        ],
+        source_pages=[13],
+    )
+
+    demoted_blocks: list[CanonicalBlock] = []
+    res = reconstruct_multi_page_tables([pseudo_table], demoted_blocks=demoted_blocks)
+
+    # Must be stripped from tables
+    assert len(res) == 0
+    # Must be converted to paragraph blocks
+    assert len(demoted_blocks) == 2
+    assert demoted_blocks[0].type == BlockType.PARAGRAPH
+    assert "(1) Thí sinh đã tốt nghiệp" in demoted_blocks[0].text
+    assert "(2) Đối với người dự tuyển" in demoted_blocks[1].text
+
+
+def test_merge_interleaved_split_columns():
+    """Verify that split empty spacer columns are merged into preceding headers."""
+    from app.modules.knowledge.normalization.models import (
+        CanonicalCell,
+        CanonicalRow,
+        SourceSpan,
+    )
+    from app.modules.knowledge.normalization.table_reconstructor import clean_table_columns
+
+    span = SourceSpan(page_number=1)
+    headers = ["TT", "", "Tên đơn vị", ""]
+    rows = [
+        CanonicalRow(
+            row_id="r1",
+            cells=[
+                CanonicalCell(raw_value="1", source_span=span),
+                CanonicalCell(raw_value="", source_span=span),
+                CanonicalCell(raw_value="Khoa CNTT", source_span=span),
+                CanonicalCell(raw_value="", source_span=span),
+            ],
+            source_pages=[1],
+        ),
+        CanonicalRow(
+            row_id="r2",
+            cells=[
+                CanonicalCell(raw_value="", source_span=span),
+                CanonicalCell(raw_value="2", source_span=span),
+                CanonicalCell(raw_value="", source_span=span),
+                CanonicalCell(raw_value="Khoa Toán", source_span=span),
+            ],
+            source_pages=[1],
+        ),
+    ]
+
+    clean_h, clean_r = clean_table_columns(headers, rows)
+    assert clean_h == ["TT", "Tên đơn vị"]
+    assert len(clean_r) == 2
+    assert [c.raw_value for c in clean_r[0].cells] == ["1", "Khoa CNTT"]
+    assert [c.raw_value for c in clean_r[1].cells] == ["2", "Khoa Toán"]
+
+
+
 
 

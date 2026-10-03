@@ -390,6 +390,7 @@ export function CollectionDocumentsTab({
             <SelectContent>
               <SelectItem value="all">Tất cả trạng thái</SelectItem>
               <SelectItem value="pending">Chờ duyệt</SelectItem>
+              <SelectItem value="review_pending">Chờ hiệu đính</SelectItem>
               <SelectItem value="approved">Hiệu lực</SelectItem>
               <SelectItem value="processing">Đang xử lý</SelectItem>
               <SelectItem value="archived">Lưu trữ</SelectItem>
@@ -892,6 +893,11 @@ export function CollectionDocumentsTab({
                             STATUS_BADGE[doc.status]?.className ||
                             STATUS_BADGE.pending.className
                           }`}
+                          title={
+                            doc.status === "review_pending"
+                              ? doc.index_error || "Tài liệu có cảnh báo chất lượng cấu trúc, cần hiệu đính trong Studio"
+                              : undefined
+                          }
                         >
                           {STATUS_BADGE[doc.status]?.label || doc.status}
                         </Badge>

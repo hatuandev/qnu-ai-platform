@@ -16,6 +16,8 @@ import re
 import unicodedata
 
 from app.modules.knowledge.normalization.models import (
+    BlockType,
+    CanonicalBlock,
     CanonicalCell,
     CanonicalRow,
     CanonicalTable,
@@ -74,6 +76,7 @@ def _has_semantic_headers(headers: list[str]) -> bool:
         or re.fullmatch(r"^\d+(?:\.\d+)+$", first_val)
         or re.fullmatch(r"^[IVXLCDM]+$", first_val)
         or re.fullmatch(r"^\d{7}[A-Za-z]*$", first_val)
+        or re.fullmatch(r"^[A-Za-z]{1,6}[-_.]?\d+[A-Za-z0-9]*$", first_val)
     ):
         return False
 
@@ -95,7 +98,12 @@ def _has_semantic_headers(headers: list[str]) -> bool:
         return False
 
     # Check 4: Check if any cell has a distinct program or task code
-    if any(_PROGRAM_CODE_RE.fullmatch(h) or _TASK_CODE_RE.fullmatch(h) for h in meaningful_headers):
+    if any(
+        _PROGRAM_CODE_RE.fullmatch(h)
+        or _TASK_CODE_RE.fullmatch(h)
+        or re.fullmatch(r"^[A-Za-z]{1,6}[-_.]?\d+[A-Za-z0-9]*$", h)
+        for h in meaningful_headers
+    ):
         return False
 
     # Check 5: Every meaningful header cell must contain alphabetic characters
@@ -499,6 +507,57 @@ def merge_continuation(previous: CanonicalRow, current: CanonicalRow) -> Canonic
     )
 
 
+def _merge_interleaved_split_columns(
+    headers: list[str], rows: list[CanonicalRow]
+) -> tuple[list[str], list[CanonicalRow]]:
+    """Merge complementary split-columns resulting from cell boundary alignment jitter."""
+    if len(headers) < 2 or not rows:
+        return headers, rows
+
+    col_count = len(headers)
+    to_drop: set[int] = set()
+    new_rows_data = [
+        [c.raw_value for c in r.cells] + [""] * max(0, col_count - len(r.cells))
+        for r in rows
+    ]
+
+    for c in range(1, col_count):
+        p = c - 1
+        # Check if column c has phantom/empty header while column p has a real header
+        if _is_phantom_header(headers[c]) and not _is_phantom_header(headers[p]) and p not in to_drop:
+            # Check if columns p and c are complementary (never both non-empty in the same row)
+            conflicts = sum(1 for r_data in new_rows_data if r_data[p].strip() and r_data[c].strip())
+            if conflicts == 0:
+                # Merge column c into p
+                for r_data in new_rows_data:
+                    if not r_data[p].strip() and r_data[c].strip():
+                        r_data[p] = r_data[c].strip()
+                to_drop.add(c)
+
+    if not to_drop:
+        return headers, rows
+
+    keep_indices = [i for i in range(col_count) if i not in to_drop]
+    clean_h = [headers[i] for i in keep_indices]
+    clean_r: list[CanonicalRow] = []
+    for r_idx, r in enumerate(rows):
+        cells = [
+            r.cells[i]
+            if i < len(r.cells) and r.cells[i].raw_value == new_rows_data[r_idx][i]
+            else CanonicalCell(
+                raw_value=new_rows_data[r_idx][i],
+                normalized_value=new_rows_data[r_idx][i] or None,
+                source_span=r.cells[0].source_span
+                if r.cells
+                else SourceSpan(page_number=1, bbox=(0.0, 0.0, 0.0, 0.0)),
+            )
+            for i in keep_indices
+        ]
+        clean_r.append(r.model_copy(update={"cells": cells}))
+
+    return clean_h, clean_r
+
+
 def clean_table_columns(headers: list[str], rows: list[CanonicalRow]) -> tuple[list[str], list[CanonicalRow]]:
     """Remove phantom placeholder columns (e.g. 'Cột 2' with >85% empty cells) and trim padding."""
     if not headers or not rows:
@@ -506,6 +565,7 @@ def clean_table_columns(headers: list[str], rows: list[CanonicalRow]) -> tuple[l
 
     headers, rows = _merge_second_header_row(headers, rows)
     headers, rows = _normalize_spacer_columns(headers, rows)
+    headers, rows = _merge_interleaved_split_columns(headers, rows)
 
     col_count = len(headers)
     # Check emptiness of each column across all rows
@@ -670,16 +730,94 @@ def _finalize_table(table: CanonicalTable) -> CanonicalTable:
     )
 
 
-def reconstruct_multi_page_tables(raw_tables: list[CanonicalTable]) -> list[CanonicalTable]:
-    """Stitch contiguous tables, including pages whose data row is misread as a header."""
+def _is_pseudo_table(tbl: CanonicalTable) -> bool:
+    """Detect if a table is actually a boxed footnote, note, caption, or narrative paragraph."""
+    if _has_semantic_headers(tbl.headers):
+        return False
+
+    all_cells = tbl.headers + [
+        c.raw_value for r in tbl.rows for c in r.cells
+    ]
+    non_empty = [c.strip() for c in all_cells if c.strip()]
+    if not non_empty:
+        return True
+
+    # If the table contains structured codes (task code, program code, sequence code), it is a real table
+    code_re = re.compile(r"^(?:[A-Za-z]{1,6}[-_.]?\d+[A-Za-z0-9]*|\d{7}[A-Za-z]*|\d+\.\d+)$")
+    if any(code_re.fullmatch(c) for c in non_empty):
+        return False
+
+    # Check 1: 1-column pseudo tables with long text (e.g. caption / title / note)
+    if len(tbl.headers) == 1 and any(len(c) > 35 for c in non_empty):
+        return True
+
+    # Check 2: Very short table (<= 3 rows) where cells contain full narrative sentences
+    if len(tbl.rows) <= 3:
+        has_sentence = any(
+            len(c) > 40
+            or c.endswith((".", "..."))
+            or re.match(r"^\s*(?:\d+[\.\)]|\*|-|\+|(?:Ghi\s+chú|Lưu\s+ý|Theo\s+thông\s+báo))\b", c, re.IGNORECASE)
+            for c in non_empty
+        )
+        if has_sentence:
+            return True
+
+    return False
+
+
+def _demote_table_to_blocks(tbl: CanonicalTable) -> list[CanonicalBlock]:
+    """Convert a pseudo-table (e.g. footnote box) into regular paragraph blocks."""
+    blocks: list[CanonicalBlock] = []
+    p_num = min(tbl.source_pages) if tbl.source_pages else 1
+
+    hdr_text = " ".join(h.strip() for h in tbl.headers if h.strip())
+    if hdr_text:
+        blocks.append(
+            CanonicalBlock(
+                block_id=f"demoted_{tbl.table_id}_hdr",
+                type=BlockType.PARAGRAPH,
+                text=hdr_text,
+                source_span=SourceSpan(page_number=p_num, bbox=tbl.bbox or (0.0, 0.0, 0.0, 0.0)),
+            )
+        )
+    for r_idx, r in enumerate(tbl.rows):
+        row_text = " ".join(c.raw_value.strip() for c in r.cells if c.raw_value.strip())
+        if row_text:
+            blocks.append(
+                CanonicalBlock(
+                    block_id=f"demoted_{tbl.table_id}_r{r_idx+1}",
+                    type=BlockType.PARAGRAPH,
+                    text=row_text,
+                    source_span=SourceSpan(page_number=p_num, bbox=tbl.bbox or (0.0, 0.0, 0.0, 0.0)),
+                )
+            )
+    return blocks
+
+
+def reconstruct_multi_page_tables(
+    raw_tables: list[CanonicalTable],
+    demoted_blocks: list[CanonicalBlock] | None = None,
+) -> list[CanonicalTable]:
+    """Stitch contiguous tables, filter pseudo-tables, and clean schemas."""
     if not raw_tables:
         return []
 
-    # Pre-clean tables with genuine headers so schemas and column widths match cleanly.
-    # Continuation pages without semantic headers preserve raw column positions to avoid dropping
-    # legitimate columns that are temporarily empty on a single page before stitching.
-    cleaned_tables: list[CanonicalTable] = []
+    # 1. Demote standalone pseudo-tables (e.g. footnote boxes, caption paragraphs)
+    valid_raw_tables: list[CanonicalTable] = []
     for tbl in raw_tables:
+        if _is_pseudo_table(tbl):
+            logger.info("Demoting pseudo-table '%s' (pages %s) to text blocks", tbl.table_id, tbl.source_pages)
+            if demoted_blocks is not None:
+                demoted_blocks.extend(_demote_table_to_blocks(tbl))
+        else:
+            valid_raw_tables.append(tbl)
+
+    if not valid_raw_tables:
+        return []
+
+    # 2. Pre-clean tables with genuine headers so schemas and column widths match cleanly.
+    cleaned_tables: list[CanonicalTable] = []
+    for tbl in valid_raw_tables:
         if _has_semantic_headers(tbl.headers):
             clean_h, clean_r = clean_table_columns(tbl.headers, tbl.rows)
             cleaned_tables.append(

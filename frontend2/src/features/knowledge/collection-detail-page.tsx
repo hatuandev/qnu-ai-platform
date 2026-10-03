@@ -181,6 +181,8 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       const matchStatus =
         selectedStatusFilter === "all" ||
         d.status === selectedStatusFilter ||
+        (selectedStatusFilter === "pending" &&
+          (d.status === "pending" || d.status === "review_pending")) ||
         (selectedStatusFilter === "approved" &&
           (d.status === "ready" || d.status === "completed"));
 

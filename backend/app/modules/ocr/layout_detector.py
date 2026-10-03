@@ -12,7 +12,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 import structlog
 
@@ -23,6 +26,8 @@ class SmartLayoutDetector:
     """Extracts high-precision bounding boxes for tables, text, stamps, and headers."""
 
     def deskew_image(self, img: np.ndarray) -> tuple[np.ndarray, float]:
+        if cv2 is None or not isinstance(img, np.ndarray):
+            return img, 0.0
         """Detect and correct document skew angle (0 to 5 degrees) using minAreaRect."""
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
         thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
@@ -50,6 +55,8 @@ class SmartLayoutDetector:
         return rotated, angle
 
     def enhance_contrast(self, img: np.ndarray) -> np.ndarray:
+        if cv2 is None or not isinstance(img, np.ndarray):
+            return img
         """Apply Contrast Limited Adaptive Histogram Equalization (CLAHE) to sharpen scan text."""
         if len(img.shape) == 3:
             lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
@@ -85,6 +92,30 @@ class SmartLayoutDetector:
             "height": float,  # Percentage (0-100)
         }]
         """
+        if cv2 is None:
+            if fitz_page is not None:
+                try:
+                    hybrid_regions = self._detect_hybrid_pdf_regions(
+                        fitz_page=fitz_page,
+                        stamps=[],
+                        page_number=page_number,
+                    )
+                    if hybrid_regions:
+                        return hybrid_regions
+                except Exception as exc:
+                    logger.warning("hybrid_layout_detection_fallback", error=str(exc))
+            if markdown_text:
+                return [{
+                    "type": "text",
+                    "label": "text",
+                    "text": markdown_text,
+                    "top": 5.0,
+                    "left": 5.0,
+                    "width": 90.0,
+                    "height": 90.0,
+                }]
+            return []
+
         if isinstance(image_input, str):
             img = cv2.imread(image_input)
         elif isinstance(image_input, bytes):
@@ -167,6 +198,8 @@ class SmartLayoutDetector:
 
     def _detect_red_stamps(self, img: np.ndarray, w: int, h: int) -> tuple[list[dict[str, Any]], np.ndarray]:
         """Detect circular/oval official red stamps with high precision and adaptive density."""
+        if cv2 is None:
+            return [], None
         stamps: list[dict[str, Any]] = []
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         mask1 = cv2.inRange(hsv, np.array([0, 50, 50]), np.array([12, 255, 255]))
@@ -209,6 +242,8 @@ class SmartLayoutDetector:
         self, gray: np.ndarray, w: int, h: int, red_mask: np.ndarray | None = None
     ) -> tuple[list[dict[str, Any]], np.ndarray]:
         """Detect tables by extracting perpendicular grid lines."""
+        if cv2 is None:
+            return [], None
         tables: list[dict[str, Any]] = []
         thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
@@ -911,6 +946,19 @@ class SmartLayoutDetector:
         page_number: int = 1,
     ) -> list[dict[str, Any]]:
         """Segment paragraphs, headers, titles, and lists."""
+        if cv2 is None or text_thresh is None:
+            if markdown_text:
+                return [{
+                    "type": "text",
+                    "label": "text",
+                    "text": markdown_text,
+                    "top": 5.0,
+                    "left": 5.0,
+                    "width": 90.0,
+                    "height": 90.0,
+                }]
+            return []
+
         margin_l = int(w * 0.04)
         margin_r = int(w * 0.96)
         cleaned = text_thresh.copy()
