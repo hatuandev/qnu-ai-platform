@@ -8,15 +8,37 @@
 ## 1. Thông Tin Phiên Gần Nhất
 
 - **Thời gian cập nhật**: 2026-10-03 (UTC+7)
-- **Phiên số**: #247 (Khử bảng giả Footnote Demotion, Gộp cột lệch lưới & Nâng cấp OCR Combo Gemini 3.x Flash-Lite)
-- **Kết quả phiên #247**:
+- **Phiên số**: #249 (Gán Cứng Loại Tác Vụ Combo Theo 4 Tab ModelOps & Khóa Chặt Ngữ Cảnh)
+- **Kết quả phiên #249**:
+  - Tái cấu trúc UX/UI Quản lý Chuỗi Combo Dự Phòng (Failover Combos) trong `frontend2/src/components/modelops/combos-vision-section.tsx`:
+    - Xóa bỏ 100% cụm 4 nút bấm chuyển đổi loại tác vụ trong Modal gây hiểu lầm là 1 combo làm 4 chức năng.
+    - Gán cứng cố định kênh tác vụ (Vision OCR, Vector Embedding, Reranker, LLM Chat) theo từng Tab chuyên trách kèm banner nhận diện trực quan và badge `[Gán Cứng Cố Định]`.
+    - Nút `+ Tạo Combo` ở Header tự động nhận diện Tab người dùng đang đứng để gán cứng loại tác vụ tương ứng (ví dụ đứng ở Tab `Vision & OCR` thì nút là `Tạo Combo (OCR)` và mở modal gán cứng `ocr`).
+    - Logic `handleOpenEditModal` tự động chuẩn hóa tác vụ dựa trên tên combo (ví dụ `qnu-ocr-master` luôn được bảo vệ mở với `ocr`).
+    - Cảnh báo mô hình không có mắt thị giác trong chuỗi OCR (`qwen/qwen3.8-27b`) và lọc nghiêm ngặt candidate picker.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-03_phien_249_gan_cung_loai_tac_vu_combo_theo_4_tab_modelops.md`.
+- **Phiên trước #248**:
+  - Đánh giá chất lượng bóc tách OCR tài liệu scan `QD2139` bằng `gemini-3.5-flash`: phát hiện 4 lỗi (mất hàng học phí đầu trang 2 - ngành Kế toán 3 năm 37.440.000 VNĐ, gãy vỡ cú pháp GFM, ô nhiễm thẻ HTML table, gộp ô lười bằng thẻ `<br>`).
+  - Nâng cấp `cleaner.py` với các thuật toán hậu xử lý chuyên sâu:
+    - `clean_html_layout_tables`: Tự động nhận diện và chuyển đổi 100% các khối HTML table quốc hiệu, chữ ký con dấu sang cú pháp Markdown thuần (`**...**`, `*...*`, `-`).
+    - `stitch_ocr_multipage_tables`: Thuật toán hàn gắn bảng biểu tiếp nối qua nhiều trang, tự động khử bỏ vạch kẻ phân trang `---` và hợp nhất / lặp lại header row hợp lệ.
+    - `merge_ocr_orphan_table_rows`: Tự động bảo toàn các hàng bảng mồ côi (ô STT bị rỗng do kế thừa trang trước).
+  - Chuẩn hóa kiến trúc Protocol-Based Adapter theo Phương án B:
+    - `GeminiOCRAdapter`: Google Multimodal Protocol trực tiếp cho dòng Gemini 3.x / 2.5 Flash.
+    - `OpenAIVisionOCRAdapter` (trong `openai_vision_adapter.py`): Tổng quát hóa cho tất cả các mô hình Vision theo chuẩn OpenAI (`/chat/completions` với `image_url` qua PyMuPDF) bao gồm Qwen-2.5-VL, GPT-4o, Claude 3.5, DeepSeek-VL, Pixtral, Ollama/vLLM.
+    - Dọn dẹp xóa bỏ tệp `qwen_adapter.py` thừa, chuyển re-export sang `openai_vision_adapter.py`.
+    - Kiểm thử test suite OCR: 24/24 tests passed (100%), 0 lỗi Ruff linter.
+  - Rà soát tính năng OCR Combo trên UI & Backend:
+    - Khắc phục sự cố `qnu-ocr-master` bị gán nhầm sang `LLM Chat` và chọn nhầm model text-only `qwen/qwen3.8-27b (Groq Cloud LPU)`.
+    - Cập nhật `modelops-helpers.ts` trên Frontend2 để nhận diện hậu tố `-vl`, `_vl`, `pixtral` vào nhóm `Vision OCR`, giúp hiển thị chính xác các mô hình Vision-Language trong bộ chọn Combo.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-03_phien_248_chuan_hoa_adapter_openai_vision_va_toi_uu_ocr_combo_multimodal.md`.
+- **Phiên trước #247**:
   - Hỗ trợ tải lên nhiều tệp đồng thời (Multi-file Drag & Drop) trong Hộp thoại nạp tài liệu `DocumentUploadDialog` với danh sách hàng đợi theo dõi tiến trình từng file và thanh progress tổng thể.
   - Xây dựng thuật toán hình thái học tổng quát Khử Bảng Giả (Footnote Demotion) trong `table_reconstructor.py`, tự động nhận diện và hạ cấp các dòng chú thích cuối trang (`*`, `Ghi chú:`) ra khỏi ma trận bảng thành khối callout text.
   - Xây dựng thuật toán Gộp Cột Lệch Lưới (Interleaved Column Collapse), tự động sáp nhập các cột rác/lệch lưới do sai số tọa độ PDF ($\ge 85\%$ rỗng) vào cột liền kề, giải quyết triệt để lỗi 409 Conflict `UNRESOLVED_TABLE_HEADER` trên tài liệu bảng biểu tuyển sinh phức tạp (`doc_cd9f40ee9165` - `table_p13_2`).
   - Chuẩn hóa hàm `_is_hdr` nhận diện chính xác các mã alphanumeric (`NV-01`, `A00`, `D01`, `TH01`).
   - Khắc phục lỗi bóc tách 3 tệp PDF scan thuần ảnh (pure image PDF: `TB2302`, `QD2139`, `TB2618`): Nâng cấp cấu hình mặc định và chuỗi OCR Combo Chain từ các model cũ đã bị Google khai tử (`gemini-2.5-flash`, `gemini-2.5-flash-lite` 404) sang `gemini-3.1-flash-lite` (ưu tiên 1) và `gemini-3.5-flash-lite` (fallback 2) kết hợp xoay vòng khóa API Relational Key Pool khi gặp 429; cả 3 tệp scan đã bóc tách thành công 100%, sinh đủ 2 chunks chất lượng cao và chuyển trạng thái `ready`.
   - Báo cáo chi tiết: `docs/nhat_ky/2026-10-03_phien_247_khu_bang_gia_footnote_demotion_va_nang_cap_ocr_combo_gemini_3.md`.
-  - Snapshot: `docs/memory/snapshots/2026-10-03_session_247.md`.
 - **Phiên trước #246**:
   - Khôi phục khả năng bóc tách tài liệu Office (DOCX, XLSX, PPTX, DOC, XLS, PPT) dạng declarative qua `DoclingOfficeParser` kế thừa `BaseDocumentParser`.
   - Sửa lỗi thứ tự kiểm tra `extension not in _BACKEND_CONFIG` trong `_parse_sync` để ném `ValueError` thay vì gặp `KeyError`.

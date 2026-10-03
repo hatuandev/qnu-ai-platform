@@ -28,6 +28,13 @@ Tài liệu này định hình vai trò, tư duy kỹ thuật và các quy tắc
      - **Tuyệt đối KHÔNG gán API Key LLM trong `.env`**: File `backend/.env` tuyệt đối không chứa bất kỳ API key nào của LLM (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`). Tránh triệt để tình trạng xung đột giữa cấu hình người dùng trên UI và biến môi trường tĩnh.
      - **Cấm Tuyệt Đối Mock Giả Trong Production Adapters (Zero Production Adapter Mocks)**: Bất kỳ LLM Adapter nào (`OpenAIAdapter`, `GeminiAdapter`, `MistralAdapter`, v.v.) khi thiếu API key ở môi trường production bắt buộc phải báo lỗi nghiêm túc (`AppException`), tuyệt đối cấm trả về câu trả lời giả mạo, trích xuất regex thô hay nhồi nhét tin nhắn hotline giả tạo (`"Về câu hỏi..., vui lòng liên hệ Hotline 0256.3846.156"`) làm sai lệch cơ chế Circuit Breaker và ngăn chặn Failover tự động.
 
+  10. **Tự Động Cập Nhật Memory & Nhật Ký Làm Việc Sau Mỗi Phiên Vibe Coding (Continuous Context Memory & Work Log Synchronization)**:
+      - **Tôn chỉ bắt buộc**: Bất kỳ khi nào kết thúc một phiên làm việc, hoàn thành một tính năng, giải quyết một bài toán, refactor kiến trúc, sửa lỗi (bugfix) hoặc tinh chỉnh codebase (Vibe Coding), AI Agent **BẮT BUỘC PHẢI tự động cập nhật đồng bộ cả 3 thành phần tài liệu dự án** trước khi hoàn tất phản hồi cho người dùng:
+        1. **Tạo tệp Nhật Ký Phiên Làm Việc Mới** tại `docs/nhat_ky/YYYY-MM-DD_phien_XXX_ten_noi_dung.md`: Ghi rõ mục tiêu phiên, các tệp thay đổi, thuật toán cốt lõi, kết quả kiểm thử (Ruff linter, Pytest, Vite build) và bài học rút ra. Đồng thời cập nhật thêm dòng liên kết phiên mới vào bảng tổng hợp [`docs/nhat_ky/README.md`](docs/nhat_ky/README.md).
+        2. **Cập nhật Bộ Nhớ Ngữ Cảnh Dự Án (`docs/memory/PROJECT_CONTEXT.md`)**: Cập nhật mục `1. Thông Tin Phiên Gần Nhất`, ghi nhận trạng thái mới nhất của hệ thống, các quyết định kiến trúc (ADRs) và các điểm lưu ý để chống trôi ngữ cảnh (Context Drift) giữa các lượt chat hoặc các Agent kế nhiệm.
+        3. **Cập nhật Bảng Tiến Trình Tổng Thể (`docs/WORK_LOG.md`)**: Thêm 1 hàng mới vào đầu bảng tiến trình tổng hợp mô tả ngắn gọn công việc và kết quả đạt được.
+      - **Nghiêm cấm trôi dạt ngữ cảnh (Zero Context Amnesia)**: Tuyệt đối cấm kết thúc phiên làm việc mà không ghi nhận lại vết thay đổi; bảo đảm 100% mọi AI Agent tham gia dự án sau đó đều có thể đọc `PROJECT_CONTEXT.md` và `docs/nhat_ky/` để nắm bắt hiện trạng và tiếp quản công việc liền mạch mà không cần người dùng giải thích lại từ đầu.
+
 ---
 
 ## 2. Quy Trình Bắt Buộc Khi Tạo Mới Chatbot AI (AI Assistant Lifecycle)

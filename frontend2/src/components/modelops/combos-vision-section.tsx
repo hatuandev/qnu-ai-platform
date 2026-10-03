@@ -157,9 +157,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
     }
     if (formTaskType === "ocr") {
       if (availableOcrs.length > 0) return availableOcrs;
-      return allAvailableModels.filter(
-        (m) => getModelCapabilities(m.model_name).isOcr,
-      );
+      return allAvailableModels.filter((m) => {
+        const caps = getModelCapabilities(m.model_name);
+        return caps.isOcr || caps.hasVision;
+      });
     }
     // chat
     return allAvailableModels.filter((m) => {
@@ -203,7 +204,21 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
   // Mở modal sửa
   const handleOpenEditModal = (combo: ModelComboItem) => {
     setEditingCombo(combo);
-    setFormTaskType(combo.task_type || "ocr");
+    let resolvedTask: ModelComboTaskType = combo.task_type || "ocr";
+    const nameLower = combo.name.toLowerCase();
+    if (nameLower.includes("ocr")) {
+      resolvedTask = "ocr";
+    } else if (nameLower.includes("embedding")) {
+      resolvedTask = "embedding";
+    } else if (nameLower.includes("reranker")) {
+      resolvedTask = "reranker";
+    } else if (nameLower.includes("chat")) {
+      resolvedTask = "chat";
+    } else if (selectedTaskFilter !== "all") {
+      resolvedTask = selectedTaskFilter as ModelComboTaskType;
+    }
+
+    setFormTaskType(resolvedTask);
     setFormName(combo.name);
     setFormStrategy(combo.strategy);
     setFormDescription(combo.description || "");
@@ -446,11 +461,22 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
 
           <Button
             size="sm"
-            onClick={() => handleOpenCreateModal("ocr")}
+            onClick={() =>
+              handleOpenCreateModal(
+                selectedTaskFilter === "all"
+                  ? "ocr"
+                  : (selectedTaskFilter as ModelComboTaskType),
+              )
+            }
             className="h-8 px-3 text-xs gap-1.5 w-full sm:w-auto justify-center shrink-0 shadow-xs"
           >
             <Plus className="size-3.5" />
-            <span>Tạo Combo</span>
+            <span>
+              Tạo Combo{" "}
+              {selectedTaskFilter !== "all"
+                ? `(${TASK_TYPE_META[selectedTaskFilter as ModelComboTaskType]?.shortLabel || selectedTaskFilter})`
+                : ""}
+            </span>
           </Button>
         </div>
       </Card>
@@ -768,60 +794,65 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
               </span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Định nghĩa danh sách các mô hình ưu tiên tuần tự khi gặp sự cố
-              chạm hạn ngạch (Quota 429) hoặc lỗi mạng.
+              Mỗi Chuỗi Combo chỉ phục vụ <strong>DUY NHẤT 1 kênh tác vụ</strong> (Vision OCR, LLM Chat, Embedding hoặc Reranker). Không sử dụng chung giữa các loại tác vụ khác nhau.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* 1. Chọn Task Type */}
+            {/* 1. Kênh Tác Vụ Cốt Lõi - GÁN CỨNG THEO TAB */}
             <div className="space-y-1.5">
               <span className="text-xs font-semibold text-foreground block">
-                Loại Tác Vụ Cốt Lõi (Task Type):
+                Kênh Tác Vụ Cốt Lõi (Gán Cứng Cố Định):
               </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(
-                  [
-                    {
-                      id: "ocr",
-                      label: "Vision OCR",
-                      icon: Eye,
-                    },
-                    {
-                      id: "embedding",
-                      label: "Embedding",
-                      icon: Cpu,
-                    },
-                    {
-                      id: "reranker",
-                      label: "Reranker",
-                      icon: Zap,
-                    },
-                    {
-                      id: "chat",
-                      label: "LLM Chat",
-                      icon: Brain,
-                    },
-                  ] as const
-                ).map((t) => {
-                  const Icon = t.icon;
-                  const isSel = formTaskType === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setFormTaskType(t.id)}
-                      className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-xs font-semibold transition-all ${
-                        isSel
-                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                          : "bg-card text-muted-foreground border-border hover:text-foreground"
-                      }`}
-                    >
-                      <Icon className="size-3.5" />
-                      <span>{t.label}</span>
-                    </button>
-                  );
-                })}
+              <div className="p-3 rounded-lg border border-border bg-muted/40 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`p-2 rounded-lg shrink-0 ${
+                      formTaskType === "ocr"
+                        ? "bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                        : formTaskType === "embedding"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : formTaskType === "reranker"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    }`}
+                  >
+                    {formTaskType === "ocr" && <Eye className="size-5" />}
+                    {formTaskType === "embedding" && <Cpu className="size-5" />}
+                    {formTaskType === "reranker" && <Zap className="size-5" />}
+                    {formTaskType === "chat" && <Brain className="size-5" />}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground">
+                        {formTaskType === "ocr" &&
+                          "Vision OCR — Bóc Tách Văn Bản Scan & Ảnh"}
+                        {formTaskType === "embedding" &&
+                          "Vector Embedding — Nhúng Tri Thức Qdrant"}
+                        {formTaskType === "reranker" &&
+                          "Reranker — Tái Xếp Hạng RAG (Cross-Encoder)"}
+                        {formTaskType === "chat" &&
+                          "LLM Chat — Hội Thoại & Lý Luận Trợ Lý Ảo"}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-mono px-1.5 py-0 h-4 border-primary/40 text-primary"
+                      >
+                        Gán Cứng Cố Định
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formTaskType === "ocr" &&
+                        "Chuyên trách bóc tách tài liệu scan / ảnh. Chỉ cho phép thêm mô hình Vision có mắt đọc ảnh."}
+                      {formTaskType === "embedding" &&
+                        "Chuyên trách biến đổi văn bản thành vector đặc trưng trong Qdrant. Chỉ cho phép thêm mô hình Embedding."}
+                      {formTaskType === "reranker" &&
+                        "Chuyên trách so khớp ngữ nghĩa sâu giữa câu hỏi và trích đoạn. Chỉ cho phép thêm mô hình Reranker."}
+                      {formTaskType === "chat" &&
+                        "Chuyên trách tư vấn và đàm thoại trực tiếp với người dùng. Chỉ cho phép thêm mô hình Chat LLM."}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -984,22 +1015,50 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                     const isFirst = idx === 0;
                     const isLast = idx === formModels.length - 1;
                     const isActive = item.is_active ?? true;
+                    const caps = getModelCapabilities(item.model_name);
+                    const isMismatch =
+                      formTaskType === "ocr" && !caps.isOcr && !caps.hasVision;
 
                     return (
                       <div
                         key={`form-step-${item.provider_id}-${item.model_name}`}
-                        className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-card text-xs"
+                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${
+                          isMismatch
+                            ? "border-destructive/40 bg-destructive/5"
+                            : "border-border bg-card"
+                        }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="size-5 rounded-full bg-primary/10 text-primary font-bold font-mono text-[10px] flex items-center justify-center shrink-0">
+                          <span
+                            className={`size-5 rounded-full font-bold font-mono text-[10px] flex items-center justify-center shrink-0 ${
+                              isMismatch
+                                ? "bg-destructive/15 text-destructive"
+                                : "bg-primary/10 text-primary"
+                            }`}
+                          >
                             {idx + 1}
                           </span>
                           <div className="truncate">
-                            <span className="font-semibold text-foreground truncate block">
-                              {item.model_name}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-semibold text-foreground truncate block">
+                                {item.model_name}
+                              </span>
+                              {isMismatch && (
+                                <Badge
+                                  variant="destructive"
+                                  className="text-[9px] h-4 px-1 shrink-0 font-normal"
+                                >
+                                  Không có Vision OCR
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-muted-foreground block">
                               {item.provider_name}
+                              {isMismatch && (
+                                <span className="text-destructive font-medium ml-1">
+                                  — Model text thuần, hãy xóa khỏi chuỗi OCR!
+                                </span>
+                              )}
                             </span>
                           </div>
                         </div>
@@ -1068,8 +1127,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
                 htmlFor="combo-default-checkbox"
                 className="text-xs font-semibold text-foreground cursor-pointer"
               >
-                Đặt làm Chuỗi Dự Phòng MẶC ĐỊNH cho kênh tác vụ{" "}
-                <span className="text-primary uppercase">{formTaskType}</span>
+                Đặt làm Chuỗi Dự Phòng MẶC ĐỊNH cho kênh:{" "}
+                <span className="text-primary font-bold">
+                  {TASK_TYPE_META[formTaskType]?.label || formTaskType.toUpperCase()}
+                </span>
               </label>
             </div>
           </div>
