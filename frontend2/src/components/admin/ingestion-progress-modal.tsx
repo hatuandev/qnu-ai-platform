@@ -245,7 +245,7 @@ export const IngestionProgressModal: React.FC<IngestionProgressModalProps> = ({
                         variant="success"
                         className="text-[9px] font-mono px-1.5 py-0 h-4"
                       >
-                        ✓{" "}
+                        <Check className="size-2.5 inline mr-0.5" />
                         {stageDurations[st.id]
                           ? `${stageDurations[st.id]}ms`
                           : "OK"}

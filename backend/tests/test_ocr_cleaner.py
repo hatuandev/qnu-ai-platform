@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.modules.ocr.cleaner import (
+    clean_html_layout_tables,
     clean_ocr_table_syntax,
     merge_ocr_orphan_table_rows,
     post_process_ocr_output,
@@ -135,3 +136,53 @@ def test_post_process_ocr_output_end_to_end():
     assert "\n---\n" not in cleaned_text
     assert not any(line.strip() == "---" for line in cleaned_text.splitlines())
     assert len(cleaned_pages) == 2
+
+
+def test_clean_html_layout_tables_administrative_header_and_signature():
+    raw_html = (
+        '<table width="100%">\n'
+        "<tr>\n"
+        '<td align="center">\n'
+        "<b>BỘ GIÁO DỤC VÀ ĐÀO TẠO<br>TRƯỜNG ĐẠI HỌC QUY NHƠN</b><br>\n"
+        '<hr width="30%">\n'
+        "Số: 2139/QĐ-ĐHQN\n"
+        "</td>\n"
+        '<td align="center">\n'
+        "<b>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM<br>Độc lập - Tự do - Hạnh phúc</b><br>\n"
+        '<hr width="40%">\n'
+        "<i>Gia Lai, ngày 30 tháng 7 năm 2025</i>\n"
+        "</td>\n"
+        "</tr>\n"
+        "</table>\n\n"
+        "### QUYẾT ĐỊNH\n\n"
+        '<table width="100%">\n'
+        "<tr>\n"
+        '<td valign="top" width="40%">\n'
+        "<b>Nơi nhận:</b><br>\n"
+        "- Ban Giám hiệu;<br>\n"
+        "- Lưu VT; KHTC.\n"
+        "</td>\n"
+        '<td align="center" valign="top" width="60%">\n'
+        "<b>HIỆU TRƯỞNG</b><br>\n"
+        "<i>(Đã ký và đóng dấu)</i><br>\n"
+        "<b>PGS.TS. Đoàn Đức Tùng</b>\n"
+        "</td>\n"
+        "</tr>\n"
+        "</table>"
+    )
+
+    cleaned = clean_html_layout_tables(raw_html)
+    assert "<table" not in cleaned.lower()
+    assert "<td" not in cleaned.lower()
+    assert "<hr" not in cleaned.lower()
+    assert "<br" not in cleaned.lower()
+    assert "**BỘ GIÁO DỤC VÀ ĐÀO TẠO**" in cleaned
+    assert "**TRƯỜNG ĐẠI HỌC QUY NHƠN**" in cleaned
+    assert "**CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM**" in cleaned
+    assert "*Gia Lai, ngày 30 tháng 7 năm 2025*" in cleaned
+    assert "**Nơi nhận:**" in cleaned
+    assert "- Ban Giám hiệu;" in cleaned
+    assert "**HIỆU TRƯỞNG**" in cleaned
+    assert "*(Đã ký và đóng dấu)*" in cleaned
+    assert "**PGS.TS. Đoàn Đức Tùng**" in cleaned
+

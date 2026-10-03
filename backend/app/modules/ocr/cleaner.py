@@ -390,6 +390,84 @@ def clean_ocr_table_syntax(markdown: str) -> str:
     return "\n".join(clean_lines)
 
 
+def clean_html_layout_tables(markdown: str) -> str:
+    """Convert raw HTML layout tables (used for headers or signatures) to clean GFM Markdown.
+
+    Transforms constructs like:
+      <table width="100%">
+        <tr>
+          <td><b>BỘ GIÁO DỤC...</b><br>Số: 2139...</td>
+          <td><b>CỘNG HÒA...</b><br><i>Gia Lai...</i></td>
+        </tr>
+      </table>
+    Into clean Markdown paragraphs, completely removing HTML <table>, <tr>, <td>, <hr>, <br>.
+    """
+    if not markdown or ("<table" not in markdown.lower() and "<td" not in markdown.lower()):
+        return markdown
+
+    def _clean_cell_content(cell_html: str) -> str:
+        c = cell_html
+        c = re.sub(r"<\s*hr[^>]*>", "", c, flags=re.IGNORECASE)
+        c = re.sub(
+            r"<\s*b\s*>(.*?)<\s*/\s*b\s*>",
+            lambda m: "\n".join(
+                f"**{ln.strip()}**"
+                for ln in re.split(r"<\s*br\s*/?\s*>", m.group(1), flags=re.IGNORECASE)
+                if ln.strip()
+            ),
+            c,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        c = re.sub(
+            r"<\s*strong\s*>(.*?)<\s*/\s*strong\s*>",
+            lambda m: "\n".join(
+                f"**{ln.strip()}**"
+                for ln in re.split(r"<\s*br\s*/?\s*>", m.group(1), flags=re.IGNORECASE)
+                if ln.strip()
+            ),
+            c,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        c = re.sub(
+            r"<\s*i\s*>(.*?)<\s*/\s*i\s*>",
+            lambda m: "\n".join(
+                f"*{ln.strip()}*"
+                for ln in re.split(r"<\s*br\s*/?\s*>", m.group(1), flags=re.IGNORECASE)
+                if ln.strip()
+            ),
+            c,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        c = re.sub(
+            r"<\s*em\s*>(.*?)<\s*/\s*em\s*>",
+            lambda m: "\n".join(
+                f"*{ln.strip()}*"
+                for ln in re.split(r"<\s*br\s*/?\s*>", m.group(1), flags=re.IGNORECASE)
+                if ln.strip()
+            ),
+            c,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        c = re.sub(r"<\s*br\s*/?\s*>", "\n", c, flags=re.IGNORECASE)
+        c = re.sub(r"<[^>]+>", "", c)
+        lines = [line.strip() for line in c.splitlines() if line.strip()]
+        return "\n".join(lines)
+
+    def _replace_table(m: re.Match) -> str:
+        table_html = m.group(0)
+        has_th = bool(re.search(r"<\s*th[^>]*>", table_html, re.IGNORECASE))
+        if has_th:
+            return table_html
+
+        cells = re.findall(r"<\s*td[^>]*>([\s\S]*?)<\s*/\s*td\s*>", table_html, flags=re.IGNORECASE)
+        if not cells:
+            return ""
+        cleaned_cells = [_clean_cell_content(c) for c in cells]
+        return "\n\n".join(c for c in cleaned_cells if c)
+
+    return re.sub(r"<\s*table[^>]*>[\s\S]*?<\s*/\s*table\s*>", _replace_table, markdown, flags=re.IGNORECASE)
+
+
 def post_process_ocr_output(
     raw_text: str, pages: list[dict[str, Any]] | None = None
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -400,28 +478,36 @@ def post_process_ocr_output(
     if not raw_text or not raw_text.strip():
         return raw_text, pages or []
 
-    # Step 1: Repair words split across page/table boundaries
-    cleaned = repair_ocr_split_words_across_pages(raw_text)
+    # Step 1: Convert raw HTML layout tables (headers/footers) to clean Markdown
+    cleaned = clean_html_layout_tables(raw_text)
 
-    # Step 2: Stitch multi-page tables across --- / page boundaries
+    # Step 2: Repair words split across page/table boundaries
+    cleaned = repair_ocr_split_words_across_pages(cleaned)
+
+    # Step 3: Stitch multi-page tables across --- / page boundaries
     cleaned = stitch_ocr_multipage_tables(cleaned)
 
-    # Step 3: Merge orphan continuation rows into parent rows
+    # Step 4: Merge orphan continuation rows into parent rows
     cleaned = merge_ocr_orphan_table_rows(cleaned)
 
-    # Step 4: Clean syntax & typos
+    # Step 5: Clean syntax & typos
     cleaned = clean_ocr_table_syntax(cleaned)
 
-    # Step 5: Update page chunks if pages were provided
+    # Step 6: Final check on any remaining HTML layout table artifacts
+    cleaned = clean_html_layout_tables(cleaned)
+
+    # Step 7: Update page chunks if pages were provided
     out_pages: list[dict[str, Any]] = []
     if pages:
         for p in pages:
             p_copy = dict(p)
             p_text = str(p_copy.get("extracted_text") or "")
             if p_text:
-                p_cleaned = repair_ocr_split_words_across_pages(p_text)
+                p_cleaned = clean_html_layout_tables(p_text)
+                p_cleaned = repair_ocr_split_words_across_pages(p_cleaned)
                 p_cleaned = merge_ocr_orphan_table_rows(p_cleaned)
                 p_cleaned = clean_ocr_table_syntax(p_cleaned)
+                p_cleaned = clean_html_layout_tables(p_cleaned)
                 p_copy["extracted_text"] = p_cleaned
                 p_copy["word_count"] = len(p_cleaned.split())
                 p_copy["line_count"] = len(p_cleaned.splitlines())

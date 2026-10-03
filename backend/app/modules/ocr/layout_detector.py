@@ -9,15 +9,18 @@ Precisely identifies:
 
 from __future__ import annotations
 
+import io
 import re
 from typing import Any
+
+import numpy as np
+import structlog
+from PIL import Image
 
 try:
     import cv2
 except ImportError:
     cv2 = None
-import numpy as np
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -92,18 +95,33 @@ class SmartLayoutDetector:
             "height": float,  # Percentage (0-100)
         }]
         """
+        # 1. Vector PDF layout analysis via PyMuPDF (digital vectors/text)
+        if fitz_page is not None:
+            try:
+                hybrid_regions = self._detect_hybrid_pdf_regions(
+                    fitz_page=fitz_page,
+                    stamps=[],
+                    page_number=page_number,
+                )
+                if hybrid_regions:
+                    return hybrid_regions
+            except Exception as exc:
+                logger.debug("hybrid_layout_detection_skipped", error=str(exc))
+
+        # 2. Pure NumPy/Pillow Morphological Layout Detection (scanned pages & raster images)
+        try:
+            morph_regions = self._detect_morphology_regions(
+                image_input=image_input,
+                fitz_page=fitz_page,
+                markdown_text=markdown_text,
+                page_number=page_number,
+            )
+            if morph_regions:
+                return morph_regions
+        except Exception as exc:
+            logger.warning("morphology_layout_detection_failed", error=str(exc))
+
         if cv2 is None:
-            if fitz_page is not None:
-                try:
-                    hybrid_regions = self._detect_hybrid_pdf_regions(
-                        fitz_page=fitz_page,
-                        stamps=[],
-                        page_number=page_number,
-                    )
-                    if hybrid_regions:
-                        return hybrid_regions
-                except Exception as exc:
-                    logger.warning("hybrid_layout_detection_fallback", error=str(exc))
             if markdown_text:
                 return [{
                     "type": "text",
@@ -1224,5 +1242,537 @@ class SmartLayoutDetector:
         clean_result.sort(key=lambda r: (r["top"], r["left"]))
         return clean_result
 
+    def _detect_morphology_regions(
+        self,
+        image_input: bytes | str | np.ndarray | Image.Image | None = None,
+        fitz_page: Any = None,
+        markdown_text: str = "",
+        page_number: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Pure NumPy/Pillow Morphological Layout Detector.
+
+        Does not require OpenCV C++. Robust against scanned documents and fax artifacts.
+        Identifies:
+        1. Ruled tables via run-length horizontal grid lines & vertical boundary projection.
+        2. Text regions via horizontal projection profile and adaptive inter-line clustering.
+        3. Document structure (header on page 1, title, lists, signatures/closing blocks).
+        4. Associates Markdown snippets if available.
+        """
+        pil_img = None
+        if fitz_page is not None:
+            try:
+                pix = fitz_page.get_pixmap(dpi=150)
+                pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            except Exception as exc:
+                logger.debug("fitz_pixmap_failed", error=str(exc))
+
+        if pil_img is None and image_input is not None:
+            try:
+                if isinstance(image_input, str):
+                    pil_img = Image.open(image_input)
+                elif isinstance(image_input, (bytes, bytearray)):
+                    pil_img = Image.open(io.BytesIO(image_input))
+                elif isinstance(image_input, np.ndarray):
+                    pil_img = Image.fromarray(image_input)
+                elif isinstance(image_input, Image.Image):
+                    pil_img = image_input
+            except Exception as exc:
+                logger.debug("image_input_load_failed", error=str(exc))
+
+        if pil_img is None:
+            return []
+
+        w, h = pil_img.size
+        arr_gray = np.array(pil_img.convert("L"))
+
+        margin_x1 = int(0.04 * w)
+        margin_x2 = int(0.96 * w)
+        margin_y1 = int(0.03 * h)
+        margin_y2 = int(0.97 * h)
+
+        # 1. Binarize using dynamic ink threshold
+        bg_level = float(np.percentile(arr_gray, 90))
+        ink_thresh = min(190, int(bg_level * 0.78))
+        cleaned = (arr_gray < ink_thresh).astype(np.int32)
+        cleaned[:margin_y1, :] = 0
+        cleaned[margin_y2:, :] = 0
+        cleaned[:, :margin_x1] = 0
+        cleaned[:, margin_x2:] = 0
+
+        # 2. Red Stamp / Seal Detection
+        arr_rgb = np.array(pil_img.convert("RGB"))
+        r_chan = arr_rgb[:, :, 0].astype(np.int32)
+        g_chan = arr_rgb[:, :, 1].astype(np.int32)
+        b_chan = arr_rgb[:, :, 2].astype(np.int32)
+        red_mask = (r_chan > 120) & ((r_chan - g_chan) > 35) & ((r_chan - b_chan) > 35)
+        red_mask[:margin_y1, :] = False
+        red_mask[margin_y2:, :] = False
+        red_mask[:, :margin_x1] = False
+        red_mask[:, margin_x2:] = False
+
+        red_bottom = red_mask.copy()
+        red_bottom[:int(0.40 * h), :] = False
+        has_seal = np.count_nonzero(red_bottom) > 400
+        seal_y1, seal_y2 = 0, 0
+        if has_seal:
+            red_rows = np.where(red_bottom.sum(axis=1) > 5)[0]
+            seal_y1 = max(0, red_rows[0] - 10)
+            seal_y2 = min(h, red_rows[-1] + 10)
+
+        # 3. Enhanced Table Detection (Vertical columns + Horizontal grid lines)
+        # Vertical column grid lines with gap bridging up to 6px
+        bridged_v = cleaned.copy()
+        for s in range(1, 7):
+            bridged_v[:-s, :] |= cleaned[s:, :]
+            bridged_v[s:, :] |= cleaned[:-s, :]
+
+        min_v_len = max(90, int(h * 0.06))
+        v_lines: list[tuple[int, int, int]] = []
+        for x in range(margin_x1, margin_x2):
+            col = bridged_v[:, x]
+            diffs = np.diff(np.pad(col, (1, 1), "constant"))
+            starts = np.where(diffs == 1)[0]
+            ends = np.where(diffs == -1)[0]
+            if len(starts) > 0 and len(ends) > 0:
+                lens = ends - starts
+                for st, en, l in zip(starts, ends, lens):
+                    if l >= min_v_len:
+                        v_lines.append((x, st, en))
+
+        v_clusters: list[tuple[int, int, int]] = []
+        if v_lines:
+            v_lines.sort(key=lambda item: item[0])
+            curr_v = [v_lines[0]]
+            for vl in v_lines[1:]:
+                if vl[0] - curr_v[-1][0] <= 5:
+                    curr_v.append(vl)
+                else:
+                    vx = int(np.mean([item[0] for item in curr_v]))
+                    v_st = min(item[1] for item in curr_v)
+                    v_en = max(item[2] for item in curr_v)
+                    v_clusters.append((vx, v_st, v_en))
+                    curr_v = [vl]
+            vx = int(np.mean([item[0] for item in curr_v]))
+            v_st = min(item[1] for item in curr_v)
+            v_en = max(item[2] for item in curr_v)
+            v_clusters.append((vx, v_st, v_en))
+
+        # Horizontal grid lines with gap bridging up to 8px
+        # 3b. True horizontal ruled lines: must be long, continuous, and thin (thickness <= 6px)
+        # Bridge at most 3px to avoid merging regular text words into lines
+        bridged_h = cleaned.copy()
+        for s in (1, 2, 3):
+            bridged_h[:, :-s] |= cleaned[:, s:]
+            bridged_h[:, s:] |= cleaned[:, :-s]
+
+        min_h_solid_len = max(180, int(w * 0.35))  # Real table lines span >= 35% of page width
+        h_line_rows: list[int] = []
+        for y in range(margin_y1, margin_y2):
+            row = bridged_h[y, :]
+            diffs = np.diff(np.pad(row, (1, 1), "constant"))
+            starts = np.where(diffs == 1)[0]
+            ends = np.where(diffs == -1)[0]
+            if len(starts) > 0 and len(ends) > 0:
+                lens = ends - starts
+                if np.any(lens >= min_h_solid_len):
+                    h_line_rows.append(y)
+
+        h_clusters: list[int] = []
+        if h_line_rows:
+            curr = [h_line_rows[0]]
+            for r in h_line_rows[1:]:
+                if r - curr[-1] <= 6:
+                    curr.append(r)
+                else:
+                    if len(curr) <= 6:  # Table rule line thickness must be small
+                        h_clusters.append(int(np.mean(curr)))
+                    curr = [r]
+            if len(curr) <= 6:
+                h_clusters.append(int(np.mean(curr)))
+
+        table_boxes: list[tuple[int, int, int, int]] = []
+        # Multi-column table detection from vertical columns (>= 3 columns)
+        if len(v_clusters) >= 3:
+            v_min_y = min(item[1] for item in v_clusters)
+            v_max_y = max(item[2] for item in v_clusters)
+            v_min_x = min(item[0] for item in v_clusters)
+            v_max_x = max(item[0] for item in v_clusters)
+            overlapping_v = [
+                item for item in v_clusters
+                if max(0, min(item[2], v_max_y) - max(item[1], v_min_y)) >= (v_max_y - v_min_y) * 0.40
+            ]
+            if len(overlapping_v) >= 3 and (v_max_x - v_min_x) >= int(w * 0.30):
+                tbl_y1 = v_min_y
+                tbl_y2 = v_max_y
+                nearby_h = [hy for hy in h_clusters if (v_min_y - 30) <= hy <= (v_max_y + 30)]
+                if nearby_h:
+                    tbl_y1 = min(tbl_y1, min(nearby_h))
+                    tbl_y2 = max(tbl_y2, max(nearby_h))
+                table_boxes.append((
+                    max(0, v_min_x - 6),
+                    max(0, tbl_y1 - 4),
+                    min(w, v_max_x + 6),
+                    min(h, tbl_y2 + 4),
+                ))
+
+        # Secondary: Open-sided table (only horizontal rules), requires at least 3 distinct horizontal lines
+        if not table_boxes and len(h_clusters) >= 3:
+            curr_tbl_lines = [h_clusters[0]]
+            for i in range(len(h_clusters) - 1):
+                gap = h_clusters[i + 1] - h_clusters[i]
+                if 20 <= gap <= 200:
+                    curr_tbl_lines.append(h_clusters[i + 1])
+                else:
+                    if len(curr_tbl_lines) >= 3:
+                        y1 = min(curr_tbl_lines) - 4
+                        y2 = max(curr_tbl_lines) + 4
+                        sub = cleaned[y1:y2, :]
+                        cols = np.where(sub.sum(axis=0) > 3)[0]
+                        if len(cols) >= 2 and (cols[-1] - cols[0]) >= int(w * 0.35):
+                            table_boxes.append((max(0, cols[0] - 6), y1, min(w, cols[-1] + 6), y2))
+                    curr_tbl_lines = [h_clusters[i + 1]]
+            if len(curr_tbl_lines) >= 3:
+                y1 = min(curr_tbl_lines) - 4
+                y2 = max(curr_tbl_lines) + 4
+                sub = cleaned[y1:y2, :]
+                cols = np.where(sub.sum(axis=0) > 3)[0]
+                if len(cols) >= 2 and (cols[-1] - cols[0]) >= int(w * 0.35):
+                    table_boxes.append((max(0, cols[0] - 6), y1, min(w, cols[-1] + 6), y2))
+
+        # 4. Horizontal projection profile for text lines
+        h_proj = cleaned.sum(axis=1)
+        line_thresh = max(12, int(w * 0.012))
+        in_line = False
+        lines: list[tuple[int, int]] = []
+        start_y = 0
+        for y in range(margin_y1, margin_y2):
+            if h_proj[y] > line_thresh:
+                if not in_line:
+                    in_line = True
+                    start_y = y
+            else:
+                if in_line:
+                    in_line = False
+                    if y - start_y >= 4:
+                        lines.append((start_y, y))
+
+        # 5. Filter text lines outside table boxes
+        outside_lines: list[tuple[int, int]] = []
+        for (ly1, ly2) in lines:
+            is_inside_tbl = False
+            for (tx1, ty1, tx2, ty2) in table_boxes:
+                if max(ly1, ty1) < min(ly2, ty2):
+                    is_inside_tbl = True
+                    break
+            if not is_inside_tbl:
+                outside_lines.append((ly1, ly2))
+
+        # 6. Cluster outside lines into paragraphs/sections
+        split_thresh = max(14.0, min(18.0, 0.0095 * h))
+        clusters_lines: list[tuple[int, int]] = []
+        if outside_lines:
+            curr_cl = [outside_lines[0]]
+            for i in range(len(outside_lines) - 1):
+                gap = outside_lines[i + 1][0] - outside_lines[i][1]
+                if gap >= split_thresh:
+                    clusters_lines.append((curr_cl[0][0], curr_cl[-1][1]))
+                    curr_cl = [outside_lines[i + 1]]
+                else:
+                    curr_cl.append(outside_lines[i + 1])
+            if curr_cl:
+                clusters_lines.append((curr_cl[0][0], curr_cl[-1][1]))
+
+        # 7. Combine all visual blocks
+        all_raw: list[dict[str, Any]] = []
+        for cy1, cy2 in clusters_lines:
+            sub = cleaned[cy1:cy2, :]
+            cols = np.where(sub.sum(axis=0) > 2)[0]
+            cx1 = max(0, cols[0] - 6) if len(cols) > 0 else margin_x1
+            cx2 = min(w, cols[-1] + 6) if len(cols) > 0 else margin_x2
+            all_raw.append({"type": "text", "bbox": (cx1, cy1, cx2, cy2)})
+
+        for (tx1, ty1, tx2, ty2) in table_boxes:
+            all_raw.append({"type": "table", "bbox": (tx1, ty1, tx2, ty2)})
+
+        all_raw.sort(key=lambda b: (b["bbox"][1], b["bbox"][0]))
+
+        # 8. Page 1 header consolidation
+        final_blocks: list[dict[str, Any]] = []
+        if page_number == 1:
+            hdr_group = [b for b in all_raw if (b["bbox"][1] / h) <= 0.14 and b["type"] != "table"]
+            other_group = [b for b in all_raw if (b["bbox"][1] / h) > 0.14 or b["type"] == "table"]
+            if hdr_group:
+                hx1 = min(b["bbox"][0] for b in hdr_group)
+                hy1 = min(b["bbox"][1] for b in hdr_group)
+                hx2 = max(b["bbox"][2] for b in hdr_group)
+                hy2 = max(b["bbox"][3] for b in hdr_group)
+                final_blocks.append({
+                    "type": "header",
+                    "label": "Phần đầu văn bản",
+                    "bbox": (hx1, hy1, hx2, hy2),
+                })
+            final_blocks.extend(other_group)
+        else:
+            final_blocks = all_raw
+
+        # 9. Check if closing page with dual columns (Nơi nhận & Chữ ký)
+        is_closing = False
+        if fitz_page is not None:
+            try:
+                is_closing = (page_number == len(fitz_page.parent))
+            except Exception:
+                is_closing = (page_number > 1)
+        elif page_number > 1:
+            is_closing = True
+
+        processed_blocks: list[dict[str, Any]] = []
+        for b in final_blocks:
+            bx1, by1, bx2, by2 = b["bbox"]
+            bh_pct = (by2 - by1) / h * 100.0
+
+            # Only genuine signing block is candidate for dual-column split:
+            # - Must be closing page
+            # - Must not be a table
+            # - Must have substantial height (>= 5.0% of page height)
+            # - Must be located in the true signing area (near red seal or bottom >= 75%)
+            is_signing_area = False
+            if is_closing and b["type"] != "table" and bh_pct >= 5.0:
+                if has_seal:
+                    if by1 <= seal_y2 and by2 >= (seal_y1 - int(0.04 * h)):
+                        is_signing_area = True
+                else:
+                    if (by1 / h) >= 0.75:
+                        is_signing_area = True
+
+            if is_signing_area:
+                sub = cleaned[by1:by2, :]
+                v_p = sub.sum(axis=0)
+                gutter_start = int(0.36 * w)
+                gutter_end = int(0.55 * w)
+                if v_p[gutter_start:gutter_end].min() <= 2:
+                    gutter_x = gutter_start + int(np.argmin(v_p[gutter_start:gutter_end]))
+                    left_cols = np.where(v_p[:gutter_x] > 2)[0]
+                    right_cols = np.where(v_p[gutter_x:] > 2)[0]
+                    if len(left_cols) > 0 and len(right_cols) > 0:
+                        processed_blocks.append({
+                            "type": "list",
+                            "label": "Nơi nhận",
+                            "bbox": (max(0, left_cols[0] - 6), by1, gutter_x - 4, by2),
+                        })
+                        processed_blocks.append({
+                            "type": "signature",
+                            "label": "Chữ ký / Con dấu",
+                            "bbox": (gutter_x + right_cols[0] - 4, by1, min(w, gutter_x + right_cols[-1] + 6), by2),
+                        })
+                        continue
+            processed_blocks.append(b)
+
+        # 9. Format output with percentage coordinates
+        regions: list[dict[str, Any]] = []
+        for idx, b in enumerate(processed_blocks, 1):
+            bx1, by1, bx2, by2 = b["bbox"]
+            top_pct = round(by1 / h * 100, 1)
+            left_pct = round(bx1 / w * 100, 1)
+            w_pct = round((bx2 - bx1) / w * 100, 1)
+            h_pct = round((by2 - by1) / h * 100, 1)
+            b_type = b.get("type", "text")
+
+            if b_type == "table":
+                r_type = "table"
+                r_label = "Bảng dữ liệu"
+            elif b_type == "signature":
+                r_type = "signature"
+                r_label = "Chữ ký / Con dấu"
+            elif page_number == 1 and top_pct <= 14.0:
+                r_type = "header"
+                r_label = "Phần đầu văn bản"
+            elif page_number == 1 and top_pct <= 22.0:
+                r_type = "title"
+                r_label = "Tiêu đề"
+            elif h_pct >= 6.0:
+                r_type = "list"
+                r_label = "Danh sách"
+            else:
+                r_type = "text"
+                r_label = "Khối văn bản"
+
+            regions.append({
+                "type": r_type,
+                "label": r_label,
+                "text": "",
+                "content_snippet": "",
+                "top": top_pct,
+                "left": left_pct,
+                "width": w_pct,
+                "height": h_pct,
+            })
+
+        # 10. Map text/snippets from markdown if provided
+        if markdown_text:
+            regions = self._associate_snippets_with_regions(
+                regions, markdown_text, page_number=page_number, is_closing_page=is_closing
+            )
+
+        return regions
+
+    @staticmethod
+    def _associate_snippets_with_regions(
+        regions: list[dict[str, Any]],
+        markdown_text: str,
+        page_number: int = 1,
+        is_closing_page: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Map extracted markdown text / tables to visual layout regions cleanly."""
+        if not markdown_text or not regions:
+            return regions
+
+        raw = markdown_text.strip()
+        header_text = ""
+        table_text = ""
+        table_snippet = ""
+        sig_left_text = ""
+        sig_right_text = ""
+
+        # 1. Page 1 header table / text extraction
+        if page_number == 1:
+            m_hdr = re.search(
+                r"<table[^>]*>[\s\S]*?(?:BỘ GIÁO DỤC|TRƯỜNG ĐẠI HỌC|CỘNG HÒA)[\s\S]*?</table>",
+                raw,
+                re.IGNORECASE,
+            )
+            if m_hdr:
+                h_html = m_hdr.group(0)
+                clean_hdr = re.sub(r"<[^>]+>", "\n", h_html)
+                clean_hdr = re.sub(r"\n\s*\n", "\n", clean_hdr).strip()
+                header_text = clean_hdr
+                raw = raw[:m_hdr.start()] + "\n" + raw[m_hdr.end():]
+
+        # 2. Closing page signing block table / text extraction
+        if is_closing_page:
+            m_sig = re.search(
+                r"<table[^>]*>[\s\S]*?(?:Nơi nhận|HIỆU TRƯỞNG)[\s\S]*?</table>",
+                raw,
+                re.IGNORECASE,
+            )
+            if m_sig:
+                sig_html = m_sig.group(0)
+                tds = re.findall(r"<td[^>]*>([\s\S]*?)</td>", sig_html, re.IGNORECASE)
+                if len(tds) >= 2:
+                    sig_left_text = re.sub(r"<[^>]+>", "\n", tds[0]).strip()
+                    sig_left_text = re.sub(r"\n\s*\n", "\n", sig_left_text)
+                    sig_right_text = re.sub(r"<[^>]+>", "\n", tds[1]).strip()
+                    sig_right_text = re.sub(r"\n\s*\n", "\n", sig_right_text)
+                else:
+                    sig_right_text = re.sub(r"<[^>]+>", "\n", sig_html).strip()
+                raw = raw[:m_sig.start()] + "\n" + raw[m_sig.end():]
+
+        # 3. GFM Table extraction
+        lines = raw.splitlines()
+        table_lines = []
+        non_tbl_lines = []
+        in_tbl = False
+        for line in lines:
+            s = line.strip()
+            if s.startswith("|") and s.endswith("|"):
+                in_tbl = True
+                table_lines.append(s)
+            else:
+                if in_tbl:
+                    in_tbl = False
+                non_tbl_lines.append(line)
+
+        if table_lines:
+            table_text = "\n".join(table_lines)
+            table_snippet = table_lines[0][:160]
+
+        remaining_raw = "\n".join(non_tbl_lines)
+        remaining_raw = re.sub(
+            r"</?(?:br|center|p|div|span|td|tr|table)[^>]*>", "\n", remaining_raw, flags=re.IGNORECASE
+        )
+
+        raw_paragraphs = [p.strip() for p in re.split(r"\n\s*\n", remaining_raw) if p.strip()]
+        body_paras: list[str] = []
+        title_para = ""
+
+        # Expand bullet items if clustered
+        expanded_paragraphs: list[str] = []
+        for p in raw_paragraphs:
+            if p.startswith("<!--"):
+                continue
+            p_lines = [ln.strip() for ln in p.splitlines() if ln.strip()]
+            if any(re.match(r"^[\*\-\+•]\s+", ln) for ln in p_lines):
+                curr_intro: list[str] = []
+                for ln in p_lines:
+                    if re.match(r"^[\*\-\+•]\s+", ln):
+                        if curr_intro:
+                            expanded_paragraphs.append("\n".join(curr_intro))
+                            curr_intro = []
+                        expanded_paragraphs.append(ln)
+                    else:
+                        curr_intro.append(ln)
+                if curr_intro:
+                    expanded_paragraphs.append("\n".join(curr_intro))
+            else:
+                expanded_paragraphs.append(p)
+
+        for p in expanded_paragraphs:
+            clean_p = re.sub(r"\n+", "\n", p).strip()
+            p_up = clean_p.upper()
+            if page_number == 1 and not title_para and any(
+                kw in p_up for kw in (
+                    "THÔNG BÁO", "THONG BAO",
+                    "QUYẾT ĐỊNH", "QUYET DINH",
+                    "QUY ĐỊNH", "QUY DINH",
+                    "KẾ HOẠCH", "KE HOACH",
+                )
+            ):
+                title_para = clean_p
+            elif not header_text and page_number == 1 and any(
+                kw in p_up for kw in ("BỘ GIÁO DỤC", "CỘNG HÒA XÃ HỘI")
+            ):
+                header_text = clean_p
+            elif not sig_right_text and is_closing_page and any(
+                kw in p_up for kw in ("HIỆU TRƯỞNG", "HIEU TRUONG", "PHÓ HIỆU TRƯỞNG")
+            ):
+                sig_right_text = clean_p
+            elif not sig_left_text and is_closing_page and "NƠI NHẬN:" in p_up:
+                sig_left_text = clean_p
+            else:
+                body_paras.append(clean_p)
+
+        body_idx = 0
+        for r in regions:
+            rtype = r.get("type", "text")
+            top_val = float(r.get("top", 0.0))
+            label_val = str(r.get("label", ""))
+
+            if rtype == "table":
+                r["text"] = table_text or "Bảng dữ liệu"
+                r["content_snippet"] = table_snippet or "Bảng dữ liệu"
+            elif rtype == "header" and header_text:
+                r["text"] = header_text
+                r["content_snippet"] = header_text.splitlines()[0][:160]
+            elif rtype == "title" and title_para:
+                r["text"] = title_para
+                r["content_snippet"] = title_para.splitlines()[0][:160]
+            elif rtype == "signature":
+                r["text"] = sig_right_text or label_val
+                r["content_snippet"] = (sig_right_text.splitlines()[0] if sig_right_text else label_val)[:160]
+            elif rtype == "list" and is_closing_page and top_val >= 70.0 and sig_left_text:
+                r["text"] = sig_left_text
+                r["content_snippet"] = (sig_left_text.splitlines()[0] if sig_left_text else label_val)[:160]
+            else:
+                if body_idx < len(body_paras):
+                    bp = body_paras[body_idx]
+                    r["text"] = bp
+                    r["content_snippet"] = bp.splitlines()[0][:160]
+                    body_idx += 1
+                else:
+                    r["text"] = label_val or "Khối văn bản"
+                    r["content_snippet"] = label_val or "Khối văn bản"
+
+        return regions
+
 
 smart_layout_detector = SmartLayoutDetector()
+

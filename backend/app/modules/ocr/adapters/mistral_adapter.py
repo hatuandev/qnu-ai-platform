@@ -113,8 +113,6 @@ class MistralOCRAdapter(BaseOCRAdapter):
             for p in raw_pages
         }
         try:
-            import cv2
-            import numpy as np
             import pymupdf as fitz
 
             from app.modules.ocr.layout_detector import SmartLayoutDetector
@@ -125,20 +123,9 @@ class MistralOCRAdapter(BaseOCRAdapter):
                 for p_idx, page in enumerate(pdf):
                     p_num = p_idx + 1
                     try:
-                        pix = page.get_pixmap(dpi=150)
-                        img_np = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
-                            (pix.height, pix.width, pix.n)
-                        )
-                        if pix.n == 4:
-                            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
-                        elif pix.n == 3:
-                            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                        else:
-                            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-
                         page_txt = raw_pages_text.get(p_num) or page.get_text() or ""
                         regs = detector.detect_layout_regions(
-                            img_bgr,
+                            None,
                             markdown_text=page_txt,
                             page_number=p_num,
                             fitz_page=page,
@@ -163,27 +150,24 @@ class MistralOCRAdapter(BaseOCRAdapter):
                         logger.debug("Failed layout extraction on PDF page %d: %s", p_num, p_err)
                 pdf.close()
             elif ext in [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"]:
-                nparr = np.frombuffer(content, np.uint8)
-                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                if img is not None:
-                    page_txt = raw_pages_text.get(1) or ""
-                    regs = detector.detect_layout_regions(img, markdown_text=page_txt, page_number=1)
-                    if regs:
-                        geometry_by_page[1] = [
-                            {
-                                "type": str(r.get("type", "text")),
-                                "label": str(r.get("label") or r.get("type", "text")),
-                                "content_snippet": str(r.get("text") or "")[:160],
-                                "coordinates": {
-                                    "x": float(r.get("left", 0.0)),
-                                    "y": float(r.get("top", 0.0)),
-                                    "width": float(r.get("width", 0.0)),
-                                    "height": float(r.get("height", 0.0)),
-                                },
-                                "confidence": 0.98 if r.get("type") in ("table", "signature") else 0.92,
-                            }
-                            for r in regs
-                        ]
+                page_txt = raw_pages_text.get(1) or ""
+                regs = detector.detect_layout_regions(content, markdown_text=page_txt, page_number=1)
+                if regs:
+                    geometry_by_page[1] = [
+                        {
+                            "type": str(r.get("type", "text")),
+                            "label": str(r.get("label") or r.get("type", "text")),
+                            "content_snippet": str(r.get("text") or "")[:160],
+                            "coordinates": {
+                                "x": float(r.get("left", 0.0)),
+                                "y": float(r.get("top", 0.0)),
+                                "width": float(r.get("width", 0.0)),
+                                "height": float(r.get("height", 0.0)),
+                            },
+                            "confidence": 0.98 if r.get("type") in ("table", "signature") else 0.92,
+                        }
+                        for r in regs
+                    ]
         except Exception as exc:
             logger.debug("SmartLayoutDetector skipped in Mistral adapter: %s", exc)
 

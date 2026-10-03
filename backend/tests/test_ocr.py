@@ -83,10 +83,11 @@ async def test_list_engines_reflects_real_availability():
     service = OCRService()
     engines = service.list_engines()
     by_name = {e.name: e for e in engines}
-    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr"}
+    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr", "qwen_ocr"}
     assert by_name["pymupdf_ocr"].is_active is True
     assert by_name["gemini_ocr"].is_active is service._adapters["gemini_ocr"].is_available()
     assert by_name["mistral_ocr"].is_active is service._adapters["mistral_ocr"].is_available()
+    assert by_name["qwen_ocr"].is_active is service._adapters["qwen_ocr"].is_available()
 
 
 @pytest.mark.asyncio
@@ -105,6 +106,36 @@ async def test_gemini_adapter_properties_and_availability():
 
     with patch("app.core.config.settings.GEMINI_API_KEY", "test_key_fake_123"):
         active_adapter = GeminiOCRAdapter()
+        assert active_adapter.is_available() is True
+
+
+@pytest.mark.asyncio
+async def test_openai_vision_adapter_properties_and_availability():
+    """OpenAI Vision OCR adapter exposes correct name, display_name, and availability check."""
+    from app.modules.ocr.adapters.openai_vision_adapter import (
+        OpenAIVisionOCRAdapter,
+        QwenOCRAdapter,
+    )
+
+    adapter = OpenAIVisionOCRAdapter(model_name="gpt-4o")
+    assert adapter.name == "openai_vision_ocr"
+    assert "OpenAI GPT Vision OCR" in adapter.display_name
+    assert adapter.model_name == "gpt-4o"
+
+    qwen = QwenOCRAdapter()
+    assert qwen.name == "qwen_ocr"
+    assert "Qwen Vision OCR" in qwen.display_name
+    assert "qwen" in qwen.model_name.lower()
+
+    with (
+        patch("app.core.config.settings.OPENROUTER_API_KEY", ""),
+        patch("app.core.config.settings.OPENAI_API_KEY", ""),
+    ):
+        empty_adapter = OpenAIVisionOCRAdapter()
+        assert empty_adapter.is_available() is False
+
+    with patch("app.core.config.settings.OPENROUTER_API_KEY", "test_router_key"):
+        active_adapter = OpenAIVisionOCRAdapter()
         assert active_adapter.is_available() is True
 
 
@@ -248,7 +279,10 @@ async def test_ocr_service_graceful_fallback():
     mock_session.commit = AsyncMock()
 
     # Intentionally corrupt or make primary adapter raise an exception
-    with patch.object(service._adapters["pymupdf_ocr"], "extract", side_effect=RuntimeError("Engine Out Of Memory")):
+    with (
+        patch.object(service._adapters["pymupdf_ocr"], "extract", side_effect=RuntimeError("Engine Out Of Memory")),
+        patch.object(service, "_get_active_combo_chain", return_value=[]),
+    ):
         resp = await service.extract_document(
             session=mock_session,
             content=b"corrupted_pdf_data",
@@ -451,7 +485,7 @@ async def test_resolve_adapter_dynamically_respects_default_ocr_model():
 
     # When no default model is provided, fallback to default static adapter
     adapter_default = service._resolve_adapter("gemini_ocr")
-    assert getattr(adapter_default, "model_name", None) == "gemini-2.5-flash"
+    assert getattr(adapter_default, "model_name", None) == "gemini-3.1-flash-lite"
 
 
 @pytest.mark.asyncio

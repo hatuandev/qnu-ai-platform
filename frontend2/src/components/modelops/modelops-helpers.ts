@@ -50,7 +50,10 @@ export const getModelCapabilities = (
       mLower.includes("gemini") ||
       mLower.includes("4o") ||
       mLower.includes("sonnet") ||
-      mLower.includes("vision"));
+      mLower.includes("vision") ||
+      mLower.includes("-vl") ||
+      mLower.includes("_vl") ||
+      mLower.includes("pixtral"));
 
   const hasVision =
     !isGemma &&
@@ -61,7 +64,10 @@ export const getModelCapabilities = (
       mLower.includes("flash") ||
       mLower.includes("4o") ||
       mLower.includes("sonnet") ||
-      mLower.includes("opus"));
+      mLower.includes("opus") ||
+      mLower.includes("-vl") ||
+      mLower.includes("_vl") ||
+      mLower.includes("pixtral"));
 
   const hasReasoning =
     !isEmbedding &&

@@ -7,6 +7,10 @@ import logging
 import re
 import uuid
 
+try:
+    from app.modules.document_types.service import document_types_service
+except Exception:
+    document_types_service = None
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,7 +18,6 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.core.storage import storage_service
-from app.modules.document_types.service import document_types_service
 from app.modules.jobs.models import JobRecord
 from app.modules.knowledge.chunker import get_chunker
 from app.modules.knowledge.cleaner import clean_markdown_text
@@ -432,8 +435,10 @@ class IngestionService:
         auto_approve: bool = False,
     ) -> KnowledgeDocument:
         col = await collection_service.get_collection(db, collection_id)
-        normalized_document_type_code = await document_types_service.validate_active_code(
-            db, document_type_code
+        normalized_document_type_code = (
+            await document_types_service.validate_active_code(db, document_type_code)
+            if document_types_service
+            else document_type_code
         )
         file_hash = self.compute_file_hash(file_bytes)
         file_size = len(file_bytes)
@@ -882,7 +887,7 @@ class IngestionService:
 
     @staticmethod
     def _is_stale_raw_blocks(page_blocks: dict) -> bool:
-        """Return True if stored page_blocks only contain raw unclassified text blocks or synthetic stripes."""
+        """Return True if stored page_blocks only contain raw unclassified text blocks, placeholders, or old mock data."""
         if not page_blocks or not isinstance(page_blocks, dict) or not any(page_blocks.values()):
             return True
         all_blocks = [
@@ -895,31 +900,32 @@ class IngestionService:
         if not all_blocks:
             return True
 
-        is_synthetic = any(
-            (
-                isinstance(b.get("coordinates"), dict)
-                and abs(float(b["coordinates"].get("x", 0.0)) - 8.0) < 0.05
-                and abs(float(b["coordinates"].get("width", 0.0)) - 84.0) < 0.05
-            )
-            or "**" in str(b.get("label", ""))
-            or str(b.get("label", "")).startswith("#")
-            for b in all_blocks
-        )
-        if is_synthetic:
-            return True
-
+        # Detect placeholder strings or old synthetic labels
         has_placeholder = any(
             "Bảng biểu dữ liệu số hóa" in str(b.get("content_snippet", ""))
             or "Bảng biểu dữ liệu số hóa" in str(b.get("text", ""))
+            or "Con dấu & Chữ ký xác thực" in str(b.get("content_snippet", ""))
             for b in all_blocks
         )
         if has_placeholder:
             return True
 
+        # Detect if administrative header was erroneously mislabeled as table (old hardcoded bug)
+        has_quoc_hieu_as_table = any(
+            str(b.get("type", "")).lower() == "table"
+            and any(
+                kw in str(b.get("content_snippet", "")).upper() or kw in str(b.get("text", "")).upper()
+                for kw in ("CỘNG HÒA XÃ HỘI", "BỘ GIÁO DỤC", "ĐẠI HỌC QUY NHƠN")
+            )
+            for b in all_blocks
+        )
+        if has_quoc_hieu_as_table:
+            return True
+
         has_misclassified_header = any(
             str(b.get("type", "")).lower() == "header"
             and any(
-                kw in str(b.get("text", "")).upper()
+                kw in str(b.get("text", "")).upper() or kw in str(b.get("content_snippet", "")).upper()
                 for kw in (
                     "KẾ HOẠCH", "KE HOACH",
                     "QUYẾT ĐỊNH", "QUYET DINH",
@@ -938,12 +944,51 @@ class IngestionService:
         if has_misclassified_header:
             return True
 
+        # Check for truncated or heavily crushed blocks (missing lower sections or oversized blocks)
+        for p_blks in page_blocks.values():
+            if not p_blks:
+                continue
+            max_bot = max(
+                (float(b.get("coordinates", {}).get("y", 0.0)) + float(b.get("coordinates", {}).get("height", 0.0)))
+                for b in p_blks
+            )
+            # If layout ends prematurely (< 78%) with few blocks, it dropped bottom sections
+            if max_bot < 78.0 and len(p_blks) <= 6:
+                return True
+            # If any block is an oversized merged list/text block (>= 30% height)
+            for b in p_blks:
+                b_h = float(b.get("coordinates", {}).get("height", 0.0))
+                b_t = str(b.get("type", "")).lower()
+                if b_h >= 30.0 and b_t in ("list", "text"):
+                    return True
+
+            # Detect spurious signature blocks (more than 2 signatures on a page or signature above 70% of page)
+            sig_blocks = [b for b in p_blks if str(b.get("type", "")).lower() == "signature"]
+            if len(sig_blocks) > 2:
+                return True
+            if any(float(b.get("coordinates", {}).get("y", 0.0)) < 70.0 for b in sig_blocks):
+                return True
+
+            # Detect truncated table with orphan numbered row immediately following table bottom (< 2.0% gap)
+            tbls = [b for b in p_blks if str(b.get("type", "")).lower() == "table"]
+            for tb in tbls:
+                t_bottom = float(tb.get("coordinates", {}).get("y", 0.0)) + float(tb.get("coordinates", {}).get("height", 0.0))
+                for ob in p_blks:
+                    if ob is tb:
+                        continue
+                    ob_y = float(ob.get("coordinates", {}).get("y", 0.0))
+                    if 0.0 <= (ob_y - t_bottom) <= 2.0:
+                        txt = str(ob.get("text") or ob.get("content_snippet", "")).strip()
+                        if re.match(r"^\d+\b", txt):
+                            return True
+
         has_semantic = any(
             str(b.get("type", "")).lower() in ("signature", "table", "title", "header", "list")
             for b in all_blocks
         )
         if has_semantic:
             return False
+
         return all(
             str(b.get("type", "text")).lower() == "text"
             and (
@@ -985,11 +1030,6 @@ class IngestionService:
                         pdf_bytes = original
                         filetype = file_type if file_type != "bmp" else "png"
 
-                    try:
-                        import cv2
-                    except ImportError:
-                        cv2 = None
-                    import numpy as np
                     import pymupdf as fitz
 
                     from app.modules.knowledge.parsers.blocks import extract_page_blocks
@@ -1008,29 +1048,19 @@ class IngestionService:
                             "height": round(page_h, 1),
                             "orientation": "landscape" if page_w > page_h else "portrait",
                         }
-                        page_text = page.get_text() or ""
+                        page_markdowns_meta = meta.get("page_markdowns") or {}
+                        page_text = (
+                            page.get_text()
+                            or page_markdowns_meta.get(p_num)
+                            or page_markdowns_meta.get(str(p_num))
+                            or ""
+                        )
                         cv_regions: list[dict] = []
 
                         try:
-                            if cv2 is not None:
-                                pix = page.get_pixmap(dpi=150)
-                                img_np = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
-                                    (pix.height, pix.width, pix.n)
-                                )
-                                if pix.n == 4:
-                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
-                                elif pix.n == 3:
-                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                                else:
-                                    img_bgr = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-
-                                cv_regions = detector.detect_layout_regions(
-                                    img_bgr, markdown_text=page_text, page_number=p_num, fitz_page=page
-                                )
-                            else:
-                                cv_regions = detector.detect_layout_regions(
-                                    None, markdown_text=page_text, page_number=p_num, fitz_page=page
-                                )
+                            cv_regions = detector.detect_layout_regions(
+                                None, markdown_text=page_text, page_number=p_num, fitz_page=page
+                            )
                         except Exception as e:
                             logger.debug("SmartLayoutDetector error on page %s: %s", p_num, e)
 
@@ -1063,112 +1093,41 @@ class IngestionService:
                 logger.debug("Dynamic PDF block extraction skipped: %s", exc)
 
         if not extracted_blocks:
-            chunks = list(doc.chunks or [])
-            by_page: dict[int, list] = {}
-            for c in chunks:
-                p_num = c.page_number or 1
-                by_page.setdefault(p_num, []).append(c)
+            # Check if doc_metadata already contains valid page_blocks from OCR ingestion
+            existing_blocks = meta.get("page_blocks")
+            if (
+                existing_blocks
+                and isinstance(existing_blocks, dict)
+                and any(existing_blocks.values())
+                and not self._is_stale_raw_blocks(existing_blocks)
+            ):
+                extracted_blocks = existing_blocks
+            else:
+                # Semantic Markdown Partitioning: analyze actual Markdown text per page dynamically
+                from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 
-            title_lower = (getattr(doc, "title", "") or getattr(doc, "file_name", "") or "").lower()
-            is_admin_doc = any(
-                kw in title_lower
-                for kw in ["quyết định", "phương án", "kế hoạch", "thông báo", "tuyển sinh", "format", "đề án"]
-            )
+                page_markdowns: dict[int, str] = meta.get("page_markdowns") or {}
+                if not page_markdowns:
+                    chunks = list(doc.chunks or [])
+                    by_page: dict[int, list[str]] = {}
+                    for c in chunks:
+                        p_num = c.page_number or 1
+                        by_page.setdefault(p_num, []).append(c.content or "")
+                    page_markdowns = {
+                        p_num: "\n\n".join(texts)
+                        for p_num, texts in by_page.items()
+                    }
 
-            for p_num, p_chunks in (by_page.items() if by_page else {1: []}.items()):
-                p_blks: list[dict] = []
-                current_y = 6.0
-                step_y = min(80.0 / max(len(p_chunks) or 1, 1), 18.0)
-
-                if p_num == 1 and is_admin_doc:
-                    p_blks.append(
-                        {
-                            "type": "table",
-                            "coordinates": {
-                                "x": 10.0,
-                                "y": 8.0,
-                                "width": 80.0,
-                                "height": 13.0,
-                            },
-                            "label": "table",
-                            "content_snippet": "BỘ GIÁO DỤC VÀ ĐÀO TẠO TRƯỜNG ĐẠI HỌC QUY NHƠN",
-                            "confidence": 0.96,
-                        }
-                    )
-                    doc_heading = (
-                        "KẾ HOẠCH"
-                        if "kế hoạch" in title_lower
-                        else ("QUYẾT ĐỊNH" if "quyết định" in title_lower else (getattr(doc, "title", "VĂN BẢN") or "VĂN BẢN"))
-                    )
-                    p_blks.append(
-                        {
-                            "type": "title",
-                            "coordinates": {
-                                "x": 38.0,
-                                "y": 23.5,
-                                "width": 24.0,
-                                "height": 3.5,
-                            },
-                            "label": "title",
-                            "content_snippet": doc_heading,
-                            "confidence": 0.95,
-                        }
-                    )
-                    current_y = 28.5
-                    step_y = min((72.0 - current_y) / max(len(p_chunks) or 1, 1), 16.0)
-
-                for c_idx, c in enumerate(p_chunks, start=1):
-                    content = (c.content or "").strip()
-                    is_table = content.startswith("|") or "\n|" in content
-                    is_heading = content.startswith("#")
-                    is_list = any(content.lstrip().startswith(m) for m in ("-", "*", "+", "1.", "2.", "•"))
-
-                    if is_table:
-                        b_type = "table"
-                        label = "table"
-                    elif is_heading:
-                        b_type = "title" if (p_num == 1 and c_idx == 1 and not is_admin_doc) else "header"
-                        label = b_type
-                    elif is_list:
-                        b_type = "list"
-                        label = "list"
-                    else:
-                        b_type = "text"
-                        label = "text"
-
-                    p_blks.append(
-                        {
-                            "type": b_type,
-                            "coordinates": {
-                                "x": 10.0,
-                                "y": round(current_y, 1),
-                                "width": 80.0,
-                                "height": round(min(step_y * 0.88, 30.0), 1),
-                            },
-                            "label": label,
-                            "content_snippet": content[:160],
-                            "confidence": 0.95 if is_table else 0.90,
-                        }
-                    )
-                    current_y += step_y
-
-                if is_admin_doc:
-                    p_blks.append(
-                        {
-                            "type": "signature",
-                            "coordinates": {
-                                "x": 56.0,
-                                "y": 78.0,
-                                "width": 32.0,
-                                "height": 14.0,
-                            },
-                            "label": "signature",
-                            "content_snippet": "Con dấu & Chữ ký xác thực",
-                            "confidence": 0.95,
-                        }
-                    )
-
-                extracted_blocks[str(p_num)] = p_blks
+                for p_num_raw, p_text in (page_markdowns.items() if page_markdowns else {1: ""}.items()):
+                    try:
+                        p_num = int(p_num_raw)
+                    except (ValueError, TypeError):
+                        p_num = 1
+                    clean_p_text = (p_text or "").strip()
+                    if clean_p_text:
+                        sem_blks = GeminiOCRAdapter._semantic_markdown_partition(clean_p_text, p_num)
+                        if sem_blks:
+                            extracted_blocks[str(p_num)] = sem_blks
 
         if extracted_blocks:
             meta = dict(doc.doc_metadata or {})

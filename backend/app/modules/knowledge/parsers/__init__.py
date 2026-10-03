@@ -39,6 +39,7 @@ def get_document_parser(file_extension: str) -> BaseDocumentParser:
 
 __all__ = [
     "BaseDocumentParser",
+    "DoclingOfficeParser",
     "DocxParser",
     "ExtractedTable",
     "MarkdownParser",
@@ -46,9 +47,8 @@ __all__ = [
     "PDFInspector",
     "ParsedContent",
     "PlainTextParser",
+    "PptxParser",
     "PyMuPdfParser",
     "XlsxParser",
-    "DoclingOfficeParser",
-    "PptxParser",
     "get_document_parser",
 ]

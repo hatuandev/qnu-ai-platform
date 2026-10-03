@@ -67,12 +67,20 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "description": "Ưu tiên 2: Google Gemini 2.5 Flash-Lite — Phản hồi nhanh, tối ưu quota dự phòng",
     },
     {
+        "provider_id": "prov_openrouter",
+        "provider_name": "OpenRouter / Qwen Vision",
+        "model_name": "qwen/qwen-2.5-vl-72b-instruct",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 3: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng khi Gemini cạn quota",
+    },
+    {
         "provider_id": "prov_mistral",
         "provider_name": "Mistral AI",
         "model_name": "mistral-ocr-latest",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 3: Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+        "description": "Ưu tiên 4: Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
     },
 ]
 

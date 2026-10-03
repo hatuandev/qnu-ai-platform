@@ -28,6 +28,10 @@ from app.modules.ocr.adapters.base import BaseOCRAdapter
 from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 from app.modules.ocr.adapters.mistral_adapter import MistralOCRAdapter
 from app.modules.ocr.adapters.mock_adapter import MockOCRAdapter
+from app.modules.ocr.adapters.openai_vision_adapter import (
+    OpenAIVisionOCRAdapter,
+    QwenOCRAdapter,
+)
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
 from app.modules.ocr.layout_detector import smart_layout_detector
 from app.modules.ocr.models import OCRJobLog
@@ -50,11 +54,17 @@ class OCRService:
             "pymupdf_ocr": PyMuPDFOCRAdapter(),
             "gemini_ocr": GeminiOCRAdapter(),
             "mistral_ocr": MistralOCRAdapter(),
+            "qwen_ocr": QwenOCRAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
         self._adapters["gemini"] = self._adapters["gemini_ocr"]
         self._adapters["gemini_vision"] = self._adapters["gemini_ocr"]
         self._adapters["mistral"] = self._adapters["mistral_ocr"]
+        self._adapters["qwen"] = self._adapters["qwen_ocr"]
+        self._adapters["qwen_vl"] = self._adapters["qwen_ocr"]
+        self._adapters["qwen-vl"] = self._adapters["qwen_ocr"]
+        self._adapters["openai_vision_ocr"] = OpenAIVisionOCRAdapter()
+        self._adapters["openai_vision"] = self._adapters["openai_vision_ocr"]
         self.default_engine = "pymupdf_ocr"
 
     def list_engines(self) -> list[OCREngineResponse]:
@@ -62,6 +72,7 @@ class OCRService:
         catalog = [
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
             ("eng_gemini", "gemini_ocr", "gemini", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.99, False),
+            ("eng_qwen", "qwen_ocr", "qwen", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.98, False),
             ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
             ("eng_mock", "mock_ocr", "mock", ["pdf", "text", "fallback"], 0.98, False),
         ]
@@ -74,7 +85,7 @@ class OCRService:
                     name=name,
                     display_name=adapter.display_name,
                     engine_type=engine_type,
-                    provider_category="cloud" if name in ("gemini_ocr", "mistral_ocr") else "local",
+                    provider_category="cloud" if name in ("gemini_ocr", "mistral_ocr", "qwen_ocr") else "local",
                     capabilities=capabilities,
                     avg_confidence=confidence,
                     is_active=adapter.is_available(),
@@ -113,6 +124,14 @@ class OCRService:
         if "gemini" in norm or norm.startswith("gemma"):
             return GeminiOCRAdapter(model_name=name_or_model)
 
+        # Check for Qwen-VL / OpenAI Vision / OpenRouter models
+        if any(kw in norm for kw in ("qwen", "gpt", "vision", "openrouter", "deepseek-vl", "pixtral")):
+            if norm in ("qwen_ocr", "qwen", "qwen_vl", "qwen-vl"):
+                return self._adapters["qwen_ocr"]
+            if norm in ("openai_vision_ocr", "openai_vision"):
+                return self._adapters["openai_vision_ocr"]
+            return OpenAIVisionOCRAdapter(model_name=name_or_model)
+
         # Check for Mistral OCR
         if "mistral" in norm:
             if norm != "mistral_ocr":
@@ -149,7 +168,7 @@ class OCRService:
             return await adapter.extract(content, filename)
 
         provider_type = provider.provider_type.strip().lower()
-        if provider_type not in {"gemini", "mistral"}:
+        if provider_type not in {"gemini", "mistral", "openrouter", "qwen", "openai", "siliconflow"}:
             return await adapter.extract(content, filename)
         model_family = model_name.lower()
         if (provider_type == "gemini" and "mistral" in model_family) or (
@@ -176,8 +195,14 @@ class OCRService:
                 )
 
             lease = acquired.lease
-            if provider_type == "gemini":
+            if provider_type == "gemini" or "gemini" in model_family:
                 rotated_adapter: BaseOCRAdapter = GeminiOCRAdapter(
+                    api_key=lease.api_key,
+                    model_name=model_name,
+                    base_url=provider.api_base_url,
+                )
+            elif "qwen" in model_family or provider_type in {"openrouter", "qwen", "openai", "siliconflow"}:
+                rotated_adapter = QwenOCRAdapter(
                     api_key=lease.api_key,
                     model_name=model_name,
                     base_url=provider.api_base_url,
@@ -277,11 +302,15 @@ class OCRService:
             "gemini_ocr",
             "gemini",
             "gemini_vision",
+            "qwen_ocr",
+            "qwen",
+            "qwen_vl",
+            "qwen-vl",
             "mistral_ocr",
             "mistral",
         } or any(
             marker in str(modelops_step["model_name"]).lower()
-            for marker in ("gemini", "gemma", "mistral")
+            for marker in ("gemini", "gemma", "mistral", "qwen")
         )
         use_modelops_key_pool = bool(modelops_step["provider_id"]) and requested_cloud_ocr
 
@@ -816,25 +845,39 @@ class OCRService:
                     lines = [ln.strip() for ln in page_md.splitlines() if ln.strip() and not ln.strip().startswith("|")]
                     title = lines[0] if lines else f"Trang {pnum}"
 
-                    cv_regions = smart_layout_detector.detect_layout_regions(
-                        img_bytes, page_md, page_number=pnum, fitz_page=page
-                    )
-                    filtered_regions = [r for r in cv_regions if r.get("type") != "image"]
-                    has_table = any(r["type"] == "table" for r in filtered_regions) or ("|" in page_md)
-                    is_signed = any(r["type"] == "signature" for r in filtered_regions)
-
-                    regions_models = [
-                        StudioOCRRegion(
-                            type=r["type"],
-                            label=r.get("label", r["type"]),
-                            text=r.get("text", ""),
-                            top=float(r["top"]),
-                            left=float(r["left"]),
-                            width=float(r["width"]),
-                            height=float(r["height"]),
+                    adapter_blocks = p_info.get("blocks", []) if p_info else []
+                    if adapter_blocks:
+                        regions_models = [
+                            StudioOCRRegion(
+                                type=str(r.get("type", "text")),
+                                label=str(r.get("label") or r.get("type", "text")),
+                                text=str(r.get("content_snippet") or r.get("text", "")),
+                                top=float(r.get("coordinates", {}).get("y", r.get("top", 0.0))),
+                                left=float(r.get("coordinates", {}).get("x", r.get("left", 0.0))),
+                                width=float(r.get("coordinates", {}).get("width", r.get("width", 0.0))),
+                                height=float(r.get("coordinates", {}).get("height", r.get("height", 0.0))),
+                            )
+                            for r in adapter_blocks
+                        ]
+                    else:
+                        cv_regions = smart_layout_detector.detect_layout_regions(
+                            img_bytes, page_md, page_number=pnum, fitz_page=page
                         )
-                        for r in filtered_regions
-                    ]
+                        filtered_regions = [r for r in cv_regions if r.get("type") != "image"]
+                        regions_models = [
+                            StudioOCRRegion(
+                                type=r["type"],
+                                label=r.get("label", r["type"]),
+                                text=r.get("text", ""),
+                                top=float(r["top"]),
+                                left=float(r["left"]),
+                                width=float(r["width"]),
+                                height=float(r["height"]),
+                            )
+                            for r in filtered_regions
+                        ]
+                    has_table = any(r.type == "table" for r in regions_models) or ("|" in page_md)
+                    is_signed = any(r.type == "signature" for r in regions_models)
 
                     img_url = f"/api/v1/ocr/studio/page-image/{file_hash}/{img_filename}"
                     rendered_pages.append(
