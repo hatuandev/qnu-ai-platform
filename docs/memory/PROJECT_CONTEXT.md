@@ -8,18 +8,32 @@
 ## 1. Thông Tin Phiên Gần Nhất
 
 - **Thời gian cập nhật**: 2026-10-04 (UTC+7)
-- **Phiên số**: #255 (Nâng Cấp Toàn Diện Giao Diện Chat Chuẩn ChatGPT/Gemini & Tích Hợp Lịch Sử Hội Thoại Chat History)
-- **Kết quả phiên #255**:
-  - Tái cấu trúc trải nghiệm Cổng Chat Trợ lý AI (`/chat/:slug`) theo tiêu chuẩn thẩm mỹ cao cấp hiện đại của ChatGPT & Google Gemini:
-    - **Lịch sử hội thoại (Chat History / Multi-Sessions)**: Xây dựng hook `useChatHistory` (`use-chat-history.ts`) quản lý các thread lưu trữ bền vững trong `localStorage`, hỗ trợ tự động đặt tiêu đề thông minh từ câu hỏi đầu tiên của người dùng, phân loại theo nhóm thời gian (*Hôm nay, Hôm qua, 7 ngày trước, Trước đó*), đổi tên inline và xóa thread an toàn.
-    - **Thanh bên Lịch sử (Collapsible Chat History Sidebar)**: Xây dựng component `ChatHistorySidebar` (`chat-history-sidebar.tsx`) hỗ trợ gập/mở bằng nút `PanelLeft`, nút "+ Đoạn chat mới" (`SquarePen`) bo góc nổi bật, ô tìm kiếm lịch sử, dropdown chuyển nhanh giữa các Trợ lý AI của QNU và nút xóa toàn bộ lịch sử.
-    - **Tối ưu thị giác tin nhắn**: Thay thế bong bóng xanh lá cây chói lọi của User bằng khối xám nhẹ `bg-muted/80 text-foreground border border-border/40` bo tròn lớn `rounded-3xl px-5 py-3`; loại bỏ viền hộp thẻ cứng ngắc của Assistant sang dạng văn bản Markdown tự nhiên (`variant="natural"`).
-    - **Floating Input Dock chuẩn Gemini**: Khung nhập liệu nổi lơ lửng ở giữa đáy trang bo cong lớn `rounded-3xl` có viền sáng mỏng tinh tế, textarea auto-resize tự co giãn chiều cao theo nội dung gõ, nút gửi tròn `rounded-full size-8 sm:size-9` và tự động đổi thành nút Dừng sinh câu trả lời khi đang streaming.
-    - **Header Liền Mạch (Seamless Borderless Header)**: Bỏ hoàn toàn đường kẻ ngang `border-b` ở cả Header chính và Header Sidebar, loại bỏ hoàn toàn hiện tượng lệch bậc thang 8px; đồng bộ chiều cao chuẩn `h-14` (56px) với nút "+ Đoạn chat mới" viên thuốc `rounded-full h-9`; khử trùng lặp nút toggle (chỉ hiển thị `PanelLeft` trên Header chính khi Sidebar đang đóng).
+- **Phiên số**: #261 (Triển Khai Phong Cách Linear Bento Grid & Asymmetric 2-Column Hero Cho Cổng Trợ Lý AI Hub /chat)
+- **Kết quả phiên #261**:
+  - Triển khai toàn diện phong cách **Linear Bento Grid kết hợp Academic Clean** ("Academic Tech Bento") theo mẫu hình tương tự `9router.com`, `Linear.app`, `Vercel.com`:
+    - **Lớp Nền Khí Quyển (Atmospheric Backdrop)**: Lưới tọa độ kỹ thuật 40px (`linear-gradient`) kết hợp lớp Radial Vignette mờ dần về 4 góc và vầng sáng Academic Teal (`oklch(0.46 0.13 160)`) tạo chiều sâu công nghệ cao.
+    - **Bố Cục Hero 2 Cột Bất Đối Xứng (Asymmetric 2-Column Hero)**:
+      - *Cột trái (7 cols)*: Glowing Pill Badge, Tiêu đề H1 lớn với gradient Academic Teal sang Emerald, Smart AI Prompt Dock kính mờ, 1-Click Trending Hot Queries và dải 4 chỉ số KPI uy tín (`45+ Ngành`, `05 Trợ lý`, `1.300+ Facts`, `24/7 Trực tuyến`).
+      - *Cột phải (5 cols)*: **Interactive Live Preview Card 3D** với ảnh thực cảnh khuôn viên trường biển Quy Nhơn (`qnu-campus-hero.jpg`), tag trạng thái "Trực tuyến · Tư vấn 2026", đoạn đối thoại mô phỏng thực tế kèm trích dẫn văn bản minh chứng chuẩn RAG `[QĐ số 2139/QĐ-ĐHQN]`.
+    - **Lưới Bento Grid Trợ Lý AI Chuyên Trách**:
+      - Ô Bento trọng điểm Tuyển sinh 2026.
+      - 4 Ô Bento tiêu chuẩn (Văn bản, Khảo thí, Thư viện, Học vụ) với hộp icon trắng tương phản cao (`bg-white dark:bg-muted/40 p-2 rounded-md shadow-xs border border-border/50`), hiệu ứng nhấc nhẹ `hover:-translate-y-1` và viền phát sáng.
   - Kết quả kiểm thử:
-    - Linter (Biome): 0 lỗi, 0 cảnh báo trên toàn bộ 5 tệp chat (`use-chat-history.ts`, `chat-history-sidebar.tsx`, `public-chat-view.tsx`, `chat-bubble.tsx`, `chat-message.tsx`).
-    - Vite build: Hoàn thành trong **3.98s** (0 lỗi TypeScript, 0 lỗi đóng gói bundle).
-  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_255_nang_cap_giao_dien_chat_chuan_chatgpt_gemini_va_lich_su_hoi_thoai.md`.
+    - Biome Native: 0 lỗi, 0 cảnh báo.
+    - TypeScript Typecheck (`tsc --noEmit`): Exit code 0, 100% passed.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_261_trien_khai_linear_bento_grid_va_asymmetric_hero_qnu_ai_hub.md`.
+- **Phiên trước #260**:
+  - Tích hợp hình ảnh khuôn viên Trường Đại học Quy Nhơn, Logo chính thức, Họa tiết lưới kiến trúc & Kính mờ Glassmorphism.
+- **Phiên trước #259**:
+  - Nâng cấp toàn diện giao diện Cổng Trợ Lý AI (Public Chat Portal) chuẩn "Academic Modernism", Spotlight Tuyển sinh & AI Prompt Dock.
+- **Phiên trước #258**:
+  - Chuẩn hóa toàn diện hệ thống UI Rules: Bán kính bo góc 6px/8px, Zero Raw Buttons, khử trùng lặp Citations & Sidebar 256px.
+- **Phiên trước #257**:
+  - Đồng bộ 100% giao diện Chatbot theo chuẩn Google Gemini Desktop (PanelLeft icon, PenLine Capsule, Mini-Rail, Motion Deceleration Animation).
+- **Phiên trước #256**:
+  - Rà soát & Khắc phục race condition Cổng Chat, bảo toàn dữ liệu tức thì, chuẩn hóa React 19 Hooks & Triệt tiêu điều khiển dư thừa (Zero-Redundancy).
+- **Phiên trước #255**:
+  - Tái cấu trúc trải nghiệm Cổng Chat Trợ lý AI (`/chat/:slug`) theo tiêu chuẩn thẩm mỹ cao cấp hiện đại của ChatGPT & Google Gemini (Collapsible Sidebar, Floating Input Dock, Seamless Borderless Header, Natural Markdown Stream).
 - **Phiên trước #254**:
   - Tối ưu Responsive Grid Cards cho Laptop 14" (3 cột) và Desktop 24"+ (4 cột) trên các trang quản trị: Trợ lý AI, Kho tri thức, ModelOps, Loại văn bản, DAG Nodes (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4`).
   - Vite build hoàn tất trong 5.84s (0 lỗi).

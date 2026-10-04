@@ -19,11 +19,12 @@ import {
   Zap,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChatCitation, ChatMessageItem } from "../../hooks/use-rag-stream";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Attachment } from "./attachment";
 import { ChatBubble } from "./chat-bubble";
 
@@ -70,6 +71,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+
+  const uniqueCitations = useMemo(() => {
+    if (!message.citations) return [];
+    const seen = new Set<string>();
+    return message.citations.filter((cite) => {
+      const key = `${cite.title}__${cite.document_name || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [message.citations]);
 
   const handleCopy = async () => {
     try {
@@ -206,22 +218,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             </div>
             <div className="flex flex-wrap gap-2">
               {message.artifacts.map((art) => (
-                <button
+                <Button
                   key={art.id}
-                  type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={(e) => handleDownloadArtifact(e, art)}
                   title={`Tải về ${art.name}`}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-card hover:bg-muted border border-border shadow-xs hover:border-primary/40 text-xs transition-all cursor-pointer group/art"
+                  className="h-auto py-1.5 px-3 rounded-md bg-card hover:bg-muted border border-border shadow-xs hover:border-primary/40 text-xs transition-all cursor-pointer group/art gap-2 text-left font-normal"
                 >
                   {art.type.includes("pdf") || art.name.endsWith(".pdf") ? (
-                    <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                    <FileText className="size-4 text-destructive shrink-0" />
                   ) : art.type.includes("sheet") ||
                     art.type.includes("excel") ||
                     art.name.endsWith(".xlsx") ||
                     art.name.endsWith(".xls") ? (
-                    <FileSpreadsheet className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <FileSpreadsheet className="size-4 text-emerald-600 shrink-0" />
                   ) : (
-                    <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                    <FileText className="size-4 text-blue-600 shrink-0" />
                   )}
                   <div className="flex flex-col text-left">
                     <span className="font-semibold text-foreground group-hover/art:text-primary transition-colors">
@@ -234,8 +247,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                       • Nhấp để tải về
                     </span>
                   </div>
-                  <Download className="h-3.5 w-3.5 text-muted-foreground group-hover/art:text-primary ml-1 shrink-0" />
-                </button>
+                  <Download className="size-3.5 text-muted-foreground group-hover/art:text-primary ml-1 shrink-0" />
+                </Button>
               ))}
             </div>
           </div>
@@ -281,35 +294,44 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
 
-        {/* Citation Badges */}
-        {message.citations && message.citations.length > 0 && (
+        {/* Citation Badges (Deduplicated, Clean Academic Style, Zero Raw IDs) */}
+        {uniqueCitations.length > 0 && (
           <div className="mt-1 space-y-1.5">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              Căn cứ minh chứng ({message.citations.length} nguồn văn bản):
+              <ShieldCheck className="size-3.5 text-primary" />
+              Căn cứ minh chứng ({uniqueCitations.length} nguồn văn bản):
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {message.citations.map((cite, index) => (
-                <button
-                  key={cite.id || `cite-${index}`}
-                  type="button"
-                  onClick={() => onCitationClick?.(cite)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-primary/5 hover:bg-primary/15 text-primary border border-primary/20 text-xs font-medium transition-colors cursor-pointer text-left"
-                  title="Nhấp để xem chi tiết minh chứng đối chiếu văn bản gốc"
-                >
-                  <span className="font-bold text-[10px] bg-primary text-primary-foreground rounded-micro px-1 py-0.2">
-                    [{index + 1}]
-                  </span>
-                  <span className="truncate max-w-[200px] sm:max-w-[260px]">
-                    {cite.title}
-                  </span>
-                  {cite.article && (
-                    <span className="text-[10px] text-primary/70">
-                      ({cite.article})
+              {uniqueCitations.map((cite, index) => {
+                const isRawId =
+                  cite.article &&
+                  (/^doc_[a-f0-9]+/i.test(cite.article) ||
+                    /^[a-f0-9]{8,}/i.test(cite.article));
+                const displayArticle =
+                  cite.article && !isRawId ? cite.article : null;
+                return (
+                  <Button
+                    key={cite.id || `cite-${index}`}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onCitationClick?.(cite)}
+                    className="h-7 px-2.5 rounded-md border-border/80 bg-background hover:bg-muted/80 text-xs text-foreground/85 font-normal gap-1.5 shadow-2xs cursor-pointer text-left transition-colors"
+                    title="Nhấp để xem chi tiết minh chứng đối chiếu văn bản gốc"
+                  >
+                    <span className="font-bold text-[10px] text-primary">
+                      [{index + 1}]
                     </span>
-                  )}
-                </button>
-              ))}
+                    <span className="truncate max-w-[200px] sm:max-w-[260px]">
+                      {cite.title}
+                    </span>
+                    {displayArticle && (
+                      <span className="text-[10px] text-muted-foreground">
+                        ({displayArticle})
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -325,90 +347,116 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {message.suggestedQuestions.map((q) => (
-                  <button
+                  <Button
                     key={q}
-                    type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => onSuggestedClick?.(q)}
                     title="Nhấp để hỏi ngay câu này"
-                    className="inline-flex items-center gap-1.5 text-left text-xs px-2.5 py-1.5 rounded-control bg-card hover:bg-primary/5 text-foreground/90 hover:text-primary border border-border/80 hover:border-primary/40 shadow-2xs transition-all cursor-pointer group/chip"
+                    className="h-8 px-3 rounded-md text-left text-xs bg-background hover:bg-muted/70 text-foreground/90 hover:text-foreground border-border/80 shadow-2xs transition-colors cursor-pointer group/chip font-normal"
                   >
                     <ArrowRight className="size-3 text-primary shrink-0 group-hover/chip:translate-x-0.5 transition-transform" />
-                    <span>{q}</span>
-                  </button>
+                    <span className="truncate max-w-[320px] sm:max-w-[420px]">
+                      {q}
+                    </span>
+                  </Button>
                 ))}
               </div>
             </div>
           )}
 
-        {/* Actions Toolbar */}
+        {/* Actions Toolbar (Symmetrical Icon-Only with Radix Tooltips) */}
         {message.status === "completed" && (
           <div className="flex items-center gap-1 pt-1 opacity-80 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopy}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-              title="Sao chép câu trả lời"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-success" />
-                  <span className="text-[11px] text-success">Đã chép</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  <span className="text-[11px]">Sao chép</span>
-                </>
-              )}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCopy}
+                  className="size-7 rounded-md text-muted-foreground hover:text-foreground"
+                  aria-label="Sao chép câu trả lời"
+                >
+                  {copied ? (
+                    <Check className="size-3.5 text-success" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {copied ? "Đã sao chép!" : "Sao chép câu trả lời"}
+              </TooltipContent>
+            </Tooltip>
 
             {onRegenerate && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRegenerate}
-                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
-                title="Tạo lại câu trả lời"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span className="text-[11px]">Tạo lại</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onRegenerate}
+                    className="size-7 rounded-md text-muted-foreground hover:text-foreground"
+                    aria-label="Tạo lại câu trả lời"
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Tạo lại câu trả lời
+                </TooltipContent>
+              </Tooltip>
             )}
 
             <div className="flex items-center gap-0.5 ml-auto">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const next = feedback === "up" ? null : "up";
-                  setFeedback(next);
-                  if (next) onFeedback?.(next);
-                }}
-                className={cn(
-                  "h-7 w-7 p-0 text-muted-foreground hover:text-foreground",
-                  feedback === "up" && "text-primary bg-primary/10",
-                )}
-                title="Hữu ích"
-              >
-                <ThumbsUp className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const next = feedback === "down" ? null : "down";
-                  setFeedback(next);
-                  if (next) onFeedback?.(next);
-                }}
-                className={cn(
-                  "h-7 w-7 p-0 text-muted-foreground hover:text-foreground",
-                  feedback === "down" && "text-destructive bg-destructive/10",
-                )}
-                title="Chưa chính xác"
-              >
-                <ThumbsDown className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const next = feedback === "up" ? null : "up";
+                      setFeedback(next);
+                      if (next) onFeedback?.(next);
+                    }}
+                    className={cn(
+                      "size-7 rounded-md text-muted-foreground hover:text-foreground",
+                      feedback === "up" && "text-primary bg-primary/10",
+                    )}
+                    aria-label="Hữu ích"
+                  >
+                    <ThumbsUp className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Hữu ích
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const next = feedback === "down" ? null : "down";
+                      setFeedback(next);
+                      if (next) onFeedback?.(next);
+                    }}
+                    className={cn(
+                      "size-7 rounded-md text-muted-foreground hover:text-foreground",
+                      feedback === "down" &&
+                        "text-destructive bg-destructive/10",
+                    )}
+                    aria-label="Chưa chính xác"
+                  >
+                    <ThumbsDown className="size-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Chưa chính xác
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         )}

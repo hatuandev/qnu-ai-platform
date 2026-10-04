@@ -17,10 +17,9 @@ import {
   Library,
   Moon,
   PanelLeft,
-  RotateCcw,
+  PenLine,
   Sparkles,
   Square,
-  SquarePen,
   Sun,
 } from "lucide-react";
 import * as React from "react";
@@ -28,7 +27,6 @@ import { toast } from "sonner";
 import { useTheme } from "@/app/theme-provider";
 import { ChatMessage } from "@/components/ai/chat-message";
 import { CitationSheet } from "@/components/ai/citation-sheet";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,7 +38,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useChatHistory } from "@/hooks/use-chat-history";
-import { type ChatCitation, useRAGStream } from "@/hooks/use-rag-stream";
+import {
+  type ChatCitation,
+  type ChatMessageItem,
+  useRAGStream,
+} from "@/hooks/use-rag-stream";
 import {
   downloadMarkdownFile,
   formatConversationToMarkdown,
@@ -276,38 +278,47 @@ export function PublicChatView({
     tenantId: "tenant_qnu",
   });
 
-  // Load active thread messages into canvas when thread changes
+  // Load active thread messages into canvas on mount and when thread selection changes
   const prevThreadIdRef = React.useRef<string | null>(null);
+  const isInitialMountRef = React.useRef(true);
+
   React.useEffect(() => {
-    if (currentThreadId !== prevThreadIdRef.current) {
+    // Initial mount: load current thread's messages if present
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
       prevThreadIdRef.current = currentThreadId;
       if (currentThread && currentThread.messages.length > 0) {
         setMessages(currentThread.messages);
-      } else {
+      }
+      return;
+    }
+
+    // Only switch messages if currentThreadId changed to another thread,
+    // and never wipe in-flight streaming
+    if (currentThreadId !== prevThreadIdRef.current) {
+      prevThreadIdRef.current = currentThreadId;
+      if (isStreaming) {
+        return; // Protect active stream from cancellation
+      }
+      if (currentThread && currentThread.messages.length > 0) {
+        setMessages(currentThread.messages);
+      } else if (!currentThreadId) {
         clearMessages();
       }
     }
-  }, [currentThreadId, currentThread, setMessages, clearMessages]);
+  }, [currentThreadId, currentThread, isStreaming, setMessages, clearMessages]);
 
-  // Persist messages to active thread when streaming completes or messages update
+  // Persist messages to active thread when streaming completes
   const wasStreamingRef = React.useRef(false);
   React.useEffect(() => {
     if (wasStreamingRef.current && !isStreaming && messages.length > 0) {
-      let targetId = currentThreadId;
-      if (!targetId) {
-        const newTh = createNewThread();
-        targetId = newTh.id;
+      const targetId = currentThreadId || prevThreadIdRef.current;
+      if (targetId) {
+        saveThreadMessages(targetId, messages);
       }
-      saveThreadMessages(targetId, messages);
     }
     wasStreamingRef.current = isStreaming;
-  }, [
-    isStreaming,
-    messages,
-    currentThreadId,
-    createNewThread,
-    saveThreadMessages,
-  ]);
+  }, [isStreaming, messages, currentThreadId, saveThreadMessages]);
 
   // Handle auto-send initial question if provided via query param
   const initialSentRef = React.useRef(false);
@@ -319,9 +330,22 @@ export function PublicChatView({
       !isStreaming
     ) {
       initialSentRef.current = true;
-      if (!currentThreadId) {
-        createNewThread();
+      let targetId = currentThreadId;
+      if (!targetId) {
+        const newTh = createNewThread(initialQuestion);
+        targetId = newTh.id;
+        prevThreadIdRef.current = targetId;
       }
+      const userMsgItem: ChatMessageItem = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: initialQuestion,
+        timestamp: new Date().toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      saveThreadMessages(targetId, [userMsgItem]);
       sendMessage(initialQuestion);
     }
   }, [
@@ -331,6 +355,7 @@ export function PublicChatView({
     sendMessage,
     currentThreadId,
     createNewThread,
+    saveThreadMessages,
   ]);
 
   // Auto-scroll on new message
@@ -372,6 +397,8 @@ export function PublicChatView({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      // Prevent premature submit during Vietnamese IME tone composition
+      if (e.nativeEvent.isComposing) return;
       e.preventDefault();
       handleSend();
     }
@@ -380,9 +407,26 @@ export function PublicChatView({
   const handleSend = (textToSend?: string) => {
     const text = (textToSend ?? input).trim();
     if (text && !isStreaming) {
-      if (!currentThreadId) {
-        createNewThread();
+      let targetId = currentThreadId;
+      if (!targetId) {
+        const newTh = createNewThread(text);
+        targetId = newTh.id;
+        prevThreadIdRef.current = targetId;
       }
+
+      // Immediately save user message to thread to prevent data loss on unexpected close
+      const userMsgItem: ChatMessageItem = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: text,
+        timestamp: new Date().toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+      const existingMsgs = currentThread?.messages || [];
+      saveThreadMessages(targetId, [...existingMsgs, userMsgItem]);
+
       sendMessage(text);
       if (!textToSend) setInput("");
       textareaRef.current?.focus();
@@ -393,7 +437,16 @@ export function PublicChatView({
     if (isStreaming) {
       stopStreaming();
     }
+    const targetThread = threads.find((t) => t.id === threadId);
     selectThread(threadId);
+    prevThreadIdRef.current = threadId;
+
+    if (targetThread && targetThread.messages.length > 0) {
+      setMessages(targetThread.messages);
+    } else {
+      clearMessages();
+    }
+
     if (window.innerWidth < 1024) {
       setSidebarOpen(false);
     }
@@ -403,7 +456,8 @@ export function PublicChatView({
     if (isStreaming) {
       stopStreaming();
     }
-    createNewThread();
+    const newTh = createNewThread();
+    prevThreadIdRef.current = newTh.id;
     clearMessages();
     setInput("");
     toast.info("Đã tạo cuộc trò chuyện mới.");
@@ -452,18 +506,8 @@ export function PublicChatView({
 
         {/* Action Strip Inside Input */}
         <div className="flex items-center justify-between px-1">
-          {/* Secondary tools */}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/75">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-background"
-              onClick={handleNewThread}
-              title="Tạo đoạn chat mới"
-            >
-              <RotateCcw className="size-3.5" />
-            </Button>
+          {/* Keyboard hint */}
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70 px-1 select-none">
             <span className="hidden sm:inline font-mono text-[10px]">
               Shift + Enter để xuống dòng
             </span>
@@ -550,25 +594,37 @@ export function PublicChatView({
         onClearAll={clearAllThreads}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        allAssistants={allAssistants}
-        onSwitchAssistant={handleSwitchAssistant}
+        onOpen={() => setSidebarOpen(true)}
       />
 
       {/* 2. Main Chat Canvas */}
       <div className="flex-1 flex flex-col h-full min-w-0 bg-background relative overflow-hidden">
         {/* Top Header Navbar - Seamless without border-b like Gemini & ChatGPT */}
-        <header className="h-14 shrink-0 bg-background/80 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between z-20">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {/* Toggle Sidebar Button (shown when sidebar is collapsed) */}
+        <header className="h-14 shrink-0 bg-background/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-20">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            {/* Mobile-only Toggle Sidebar Button (Desktop uses Mini-Rail) */}
             {!sidebarOpen && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-lg text-muted-foreground hover:text-foreground shrink-0"
+                className="size-8 rounded-md text-muted-foreground hover:text-foreground shrink-0 hover:bg-muted/70 transition-colors lg:hidden"
                 onClick={() => setSidebarOpen(true)}
-                title="Mở thanh lịch sử chat"
+                title="Mở rộng thanh lịch sử"
               >
                 <PanelLeft className="size-4" />
+              </Button>
+            )}
+
+            {/* Mobile-only New Chat Button (Desktop uses Mini-Rail) */}
+            {!sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-md text-muted-foreground hover:text-foreground shrink-0 hover:bg-muted/70 transition-colors lg:hidden"
+                onClick={handleNewThread}
+                title="Đoạn chat mới"
+              >
+                <PenLine className="size-4" />
               </Button>
             )}
 
@@ -576,7 +632,7 @@ export function PublicChatView({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 rounded-lg text-muted-foreground hover:text-foreground lg:hidden"
+              className="size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors shrink-0 lg:hidden"
               onClick={() => void navigate({ to: "/chat" })}
               title="Quay lại Cổng Trợ Lý"
             >
@@ -586,11 +642,11 @@ export function PublicChatView({
             {/* Assistant Identifier & Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted/70 text-left transition-colors cursor-pointer group"
+                <Button
+                  variant="ghost"
+                  className="h-9 px-2 gap-2 rounded-md hover:bg-muted/70 text-left font-normal group text-foreground cursor-pointer"
                 >
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                     {getCategoryIcon(assistant.category, assistant.code)}
                   </div>
                   <div className="min-w-0">
@@ -601,7 +657,7 @@ export function PublicChatView({
                       <ChevronDown className="size-3 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform" />
                     </div>
                   </div>
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64 text-xs">
                 <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -626,35 +682,16 @@ export function PublicChatView({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <Badge
-              variant="outline"
-              className="text-[10px] hidden sm:inline-flex items-center gap-1 text-primary border-primary/20 bg-primary/5 h-5 px-1.5"
-            >
-              <CheckCircle2 className="size-3" />
-              <span>Chính thức QNU</span>
-            </Badge>
           </div>
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* New Chat Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
-              onClick={handleNewThread}
-              title="Đoạn chat mới"
-            >
-              <SquarePen className="size-4" />
-            </Button>
-
             {/* Export Markdown */}
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                className="size-8 rounded-md text-muted-foreground hover:text-foreground"
                 onClick={handleExportMarkdown}
                 title="Tải đoạn chat (.md)"
               >
@@ -666,7 +703,7 @@ export function PublicChatView({
             <Button
               variant="ghost"
               size="icon"
-              className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+              className="size-8 rounded-md text-muted-foreground hover:text-foreground"
               onClick={() =>
                 setTheme(resolvedTheme === "dark" ? "light" : "dark")
               }
@@ -706,14 +743,14 @@ export function PublicChatView({
                 </p>
               </div>
 
-              {/* 2x2 Prompt Suggestions Grid (Gemini Style) */}
+              {/* 2x2 Prompt Suggestions Grid (Gemini Style, Surface rounded-lg per Rule 4.3) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {promptSuggestions.map((item) => (
                   <button
                     key={item.text}
                     type="button"
                     onClick={() => handleSend(item.text)}
-                    className="group text-left p-4 rounded-2xl bg-muted/40 hover:bg-muted/70 dark:bg-muted/20 dark:hover:bg-muted/40 border border-border/70 hover:border-primary/40 transition-all shadow-2xs flex flex-col justify-between gap-3 min-h-[96px] cursor-pointer"
+                    className="group text-left p-4 rounded-lg bg-card/60 hover:bg-card border border-border/80 hover:border-primary/40 transition-all shadow-2xs hover:shadow-xs flex flex-col justify-between gap-3 min-h-[96px] cursor-pointer"
                   >
                     <span className="text-xs sm:text-sm font-medium text-foreground/90 leading-relaxed group-hover:text-primary transition-colors">
                       {item.text}
@@ -723,7 +760,7 @@ export function PublicChatView({
                         {item.icon}
                         <span>{item.category}</span>
                       </span>
-                      <div className="size-6 rounded-full bg-background border border-border/70 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-primary shadow-2xs">
+                      <div className="size-6 rounded-md bg-muted/80 border border-border/70 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all text-primary shadow-2xs">
                         <ArrowUpRight className="size-3.5" />
                       </div>
                     </div>

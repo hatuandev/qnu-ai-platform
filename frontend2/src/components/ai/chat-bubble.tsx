@@ -46,7 +46,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
       <div
         className={cn(
           variant === "natural"
-            ? "bg-muted/80 dark:bg-muted/60 text-foreground px-4.5 py-3 rounded-2xl sm:rounded-3xl shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text border border-border/50"
+            ? "bg-muted/80 dark:bg-muted/60 text-foreground px-4 sm:px-5 py-3 rounded-2xl sm:rounded-3xl shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text border border-border/50"
             : "bg-primary text-primary-foreground px-4 py-2.5 rounded-surface rounded-br-micro shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text",
           className,
         )}

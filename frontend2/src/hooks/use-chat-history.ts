@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessageItem } from "./use-rag-stream";
 
 export interface ChatThread {
@@ -21,7 +21,7 @@ function getStorageKey(assistantCode: string): string {
   return `qnu_chat_threads_${assistantCode.toLowerCase()}`;
 }
 
-function generateThreadTitle(userPrompt: string): string {
+export function generateThreadTitle(userPrompt: string): string {
   const clean = userPrompt.replace(/\s+/g, " ").trim();
   if (!clean) return "Đoạn chat mới";
   if (clean.length <= 42) return clean;
@@ -32,13 +32,16 @@ function generateThreadTitle(userPrompt: string): string {
     : `${truncated}...`;
 }
 
-function createNewThreadObject(assistantCode: string): ChatThread {
+function createNewThreadObject(
+  assistantCode: string,
+  initialTitle?: string,
+): ChatThread {
   const now = Date.now();
   const id = `thr_${now}_${Math.random().toString(36).slice(2, 8)}`;
   return {
     id,
     assistantCode,
-    title: "Đoạn chat mới",
+    title: initialTitle ? generateThreadTitle(initialTitle) : "Đoạn chat mới",
     createdAt: now,
     updatedAt: now,
     messages: [],
@@ -51,7 +54,7 @@ export function useChatHistory(assistantCode: string) {
     [assistantCode],
   );
 
-  // Load threads from localStorage
+  // Load threads from localStorage lazily
   const [threads, setThreads] = useState<ChatThread[]>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -72,58 +75,56 @@ export function useChatHistory(assistantCode: string) {
     return threads.length > 0 ? threads[0].id : "";
   });
 
-  // Reload threads when assistantCode changes
+  const activeKeyRef = useRef(storageKey);
+
+  // Sync threads to localStorage and reload when storageKey changes
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const sorted = parsed.sort(
-            (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
-          );
-          setThreads(sorted);
-          if (sorted.length > 0) {
-            setCurrentThreadId(sorted[0].id);
+    if (activeKeyRef.current !== storageKey) {
+      activeKeyRef.current = storageKey;
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const sorted = parsed.sort(
+              (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+            );
+            setThreads(sorted);
+            setCurrentThreadId(sorted.length > 0 ? sorted[0].id : "");
             return;
           }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
+      setThreads([]);
+      setCurrentThreadId("");
+      return;
     }
-    setThreads([]);
-    setCurrentThreadId("");
-  }, [storageKey]);
 
-  // Persist threads to localStorage whenever they change
-  const persistThreads = useCallback(
-    (newThreads: ChatThread[]) => {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(newThreads));
-      } catch (e) {
-        console.warn("Failed to save chat history to localStorage", e);
-      }
-    },
-    [storageKey],
-  );
+    // Persist to localStorage whenever threads change for current storageKey
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(threads));
+    } catch (e) {
+      console.warn("Failed to save chat history to localStorage", e);
+    }
+  }, [threads, storageKey]);
 
   // Get current active thread
   const currentThread = useMemo(() => {
     return threads.find((t) => t.id === currentThreadId) || null;
   }, [threads, currentThreadId]);
 
-  // Create a brand new thread
-  const createNewThread = useCallback((): ChatThread => {
-    const freshThread = createNewThreadObject(assistantCode);
-    setThreads((prev) => {
-      const updated = [freshThread, ...prev];
-      persistThreads(updated);
-      return updated;
-    });
-    setCurrentThreadId(freshThread.id);
-    return freshThread;
-  }, [assistantCode, persistThreads]);
+  // Create a brand new thread (with optional initial title)
+  const createNewThread = useCallback(
+    (initialPrompt?: string): ChatThread => {
+      const freshThread = createNewThreadObject(assistantCode, initialPrompt);
+      setThreads((prev) => [freshThread, ...prev]);
+      setCurrentThreadId(freshThread.id);
+      return freshThread;
+    },
+    [assistantCode],
+  );
 
   // Select a thread by id
   const selectThread = useCallback(
@@ -136,100 +137,82 @@ export function useChatHistory(assistantCode: string) {
     [threads],
   );
 
-  // Update messages of a thread (and auto-name title if it's new)
+  // Update messages of a thread (and auto-name title if it's default)
   const saveThreadMessages = useCallback(
     (threadId: string, messages: ChatMessageItem[]) => {
+      if (!threadId) return;
+
       setThreads((prev) => {
         const targetIndex = prev.findIndex((t) => t.id === threadId);
-        let updatedThreads: ChatThread[];
+
+        let autoTitle: string | undefined;
+        const firstUserMsg = messages.find((m) => m.role === "user");
+        if (firstUserMsg?.content) {
+          autoTitle = generateThreadTitle(firstUserMsg.content);
+        }
 
         if (targetIndex >= 0) {
           const target = prev[targetIndex];
-          let title = target.title;
-
-          // Auto-generate title from first user message if title is default
-          if ((!title || title === "Đoạn chat mới") && messages.length > 0) {
-            const firstUserMsg = messages.find((m) => m.role === "user");
-            if (firstUserMsg?.content) {
-              title = generateThreadTitle(firstUserMsg.content);
-            }
-          }
+          const finalTitle =
+            target.title && target.title !== "Đoạn chat mới"
+              ? target.title
+              : autoTitle || target.title;
 
           const updatedTarget: ChatThread = {
             ...target,
-            title,
+            title: finalTitle,
             messages,
             updatedAt: Date.now(),
           };
 
-          updatedThreads = [
+          return [
             updatedTarget,
             ...prev.filter((_, idx) => idx !== targetIndex),
           ];
-        } else {
-          // If thread does not exist yet in list, create it
-          let title = "Đoạn chat mới";
-          const firstUserMsg = messages.find((m) => m.role === "user");
-          if (firstUserMsg?.content) {
-            title = generateThreadTitle(firstUserMsg.content);
-          }
-
-          const newThread: ChatThread = {
-            id: threadId,
-            assistantCode,
-            title,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            messages,
-          };
-          updatedThreads = [newThread, ...prev];
         }
 
-        persistThreads(updatedThreads);
-        return updatedThreads;
+        // Thread does not exist yet: create and insert at head
+        const newThread: ChatThread = {
+          id: threadId,
+          assistantCode,
+          title: autoTitle || "Đoạn chat mới",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages,
+        };
+        return [newThread, ...prev];
       });
     },
-    [assistantCode, persistThreads],
+    [assistantCode],
   );
 
   // Rename a thread
-  const renameThread = useCallback(
-    (threadId: string, newTitle: string) => {
-      const trimmed = newTitle.trim();
-      if (!trimmed) return;
+  const renameThread = useCallback((threadId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
 
-      setThreads((prev) => {
-        const updated = prev.map((t) =>
-          t.id === threadId
-            ? { ...t, title: trimmed, updatedAt: Date.now() }
-            : t,
-        );
-        persistThreads(updated);
-        return updated;
-      });
-    },
-    [persistThreads],
-  );
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === threadId ? { ...t, title: trimmed, updatedAt: Date.now() } : t,
+      ),
+    );
+  }, []);
 
   // Delete a thread
-  const deleteThread = useCallback(
-    (threadId: string) => {
-      setThreads((prev) => {
-        const remaining = prev.filter((t) => t.id !== threadId);
-        persistThreads(remaining);
+  const deleteThread = useCallback((threadId: string) => {
+    setThreads((prev) => {
+      const remaining = prev.filter((t) => t.id !== threadId);
+      return remaining;
+    });
 
-        if (currentThreadId === threadId) {
-          if (remaining.length > 0) {
-            setCurrentThreadId(remaining[0].id);
-          } else {
-            setCurrentThreadId("");
-          }
-        }
-        return remaining;
-      });
-    },
-    [currentThreadId, persistThreads],
-  );
+    setCurrentThreadId((prevId) => {
+      if (prevId === threadId) {
+        // Will be picked up or reset
+        return "";
+      }
+      return prevId;
+    });
+  }, []);
 
   // Clear all threads for this assistant
   const clearAllThreads = useCallback(() => {
