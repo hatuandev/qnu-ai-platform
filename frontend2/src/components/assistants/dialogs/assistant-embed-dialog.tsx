@@ -30,7 +30,7 @@ export function AssistantEmbedDialog({
   const embedSnippet = React.useMemo(() => {
     return `<!-- QNU AI Platform Chat Widget -->
 <script 
-  src="${originUrl}/widget/qnu-chat-widget.js" 
+  src="${originUrl}/embed/qnu-chat-widget.js" 
   data-assistant="${assistantCode}"
   data-api-base="${originUrl}"
   data-title="${assistantName}"

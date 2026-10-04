@@ -7,6 +7,7 @@ export interface ChatBubbleProps {
   content: string;
   senderRole?: "user" | "assistant" | "system";
   isStreaming?: boolean;
+  variant?: "card" | "natural";
   className?: string;
 }
 
@@ -14,6 +15,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   content,
   senderRole = "assistant",
   isStreaming = false,
+  variant = "natural",
   className,
 }) => {
   const isAssistant = senderRole === "assistant";
@@ -23,7 +25,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     return (
       <div
         className={cn(
-          "flex items-center gap-2 px-4 py-3 rounded-surface bg-muted/60 text-muted-foreground w-fit animate-pulse border border-border/60",
+          "flex items-center gap-2 px-4 py-3 rounded-2xl bg-muted/60 text-muted-foreground w-fit animate-pulse border border-border/60",
           className,
         )}
       >
@@ -43,7 +45,9 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     return (
       <div
         className={cn(
-          "bg-primary text-primary-foreground px-4 py-2.5 rounded-surface rounded-br-micro shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text",
+          variant === "natural"
+            ? "bg-muted/80 dark:bg-muted/60 text-foreground px-4.5 py-3 rounded-2xl sm:rounded-3xl shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text border border-border/50"
+            : "bg-primary text-primary-foreground px-4 py-2.5 rounded-surface rounded-br-micro shadow-xs max-w-2xl text-sm leading-relaxed whitespace-pre-wrap select-text",
           className,
         )}
       >
@@ -56,7 +60,9 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     <div
       className={cn(
         "prose prose-sm dark:prose-invert max-w-none text-foreground leading-relaxed text-sm",
-        "bg-card border border-border/80 rounded-surface p-4 shadow-xs",
+        variant === "card"
+          ? "bg-card border border-border/80 rounded-surface p-4 shadow-xs"
+          : "bg-transparent border-0 p-0 shadow-none",
         className,
       )}
     >

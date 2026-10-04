@@ -1169,7 +1169,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
                     Xóa tìm kiếm
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3.5">
                   {filteredProviders.map((prov) => (
                     <ProviderCard
                       key={prov.id}
@@ -1216,7 +1216,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
                       Chưa có Provider đám mây nào.
                     </Card>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3.5">
                       {cloudProviders.map((prov) => (
                         <ProviderCard
                           key={prov.id}
@@ -1263,7 +1263,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
                       Chưa có Provider tùy chỉnh nào.
                     </Card>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3.5">
                       {customProviders.map((prov) => (
                         <ProviderCard
                           key={prov.id}

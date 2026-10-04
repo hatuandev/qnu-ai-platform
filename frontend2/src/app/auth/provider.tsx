@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext } from "react";
+import { loginWithSso, logoutSso } from "@/app/auth/oidc";
 import { currentUserQueryKey, useCurrentUser } from "@/app/auth/queries";
 import type { CurrentUser } from "@/app/auth/types";
 import { loginWithPassword, logout as logoutApi } from "@/services/auth-api";
@@ -11,6 +12,7 @@ type AuthContextValue = {
   error: Error | null;
   refetch: () => void;
   login: (password: string) => Promise<void>;
+  loginSso: (returnUrl?: string) => Promise<void>;
   signIn: (returnUrl?: string) => void;
   signOut: (returnUrl?: string) => Promise<void>;
   isDemoMode: boolean;
@@ -41,10 +43,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: currentUserQueryKey });
   };
 
+  const loginSso = async (returnUrl?: string) => {
+    await loginWithSso(returnUrl);
+  };
+
   const signOut = async (_returnUrl?: string) => {
     try {
       await logoutApi();
-    } finally {
+    } catch {
+      // ignore
+    }
+    try {
+      await logoutSso();
+    } catch {
       queryClient.setQueryData(currentUserQueryKey, null);
       window.location.href = "/sign-in";
     }
@@ -63,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: !(query.error instanceof Error) ? null : query.error,
         refetch: () => void query.refetch(),
         login,
+        loginSso,
         signIn,
         signOut,
         isDemoMode: false,

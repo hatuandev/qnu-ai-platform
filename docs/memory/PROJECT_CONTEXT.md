@@ -7,9 +7,69 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-03 (UTC+7)
-- **Phiên số**: #249 (Gán Cứng Loại Tác Vụ Combo Theo 4 Tab ModelOps & Khóa Chặt Ngữ Cảnh)
-- **Kết quả phiên #249**:
+- **Thời gian cập nhật**: 2026-10-04 (UTC+7)
+- **Phiên số**: #255 (Nâng Cấp Toàn Diện Giao Diện Chat Chuẩn ChatGPT/Gemini & Tích Hợp Lịch Sử Hội Thoại Chat History)
+- **Kết quả phiên #255**:
+  - Tái cấu trúc trải nghiệm Cổng Chat Trợ lý AI (`/chat/:slug`) theo tiêu chuẩn thẩm mỹ cao cấp hiện đại của ChatGPT & Google Gemini:
+    - **Lịch sử hội thoại (Chat History / Multi-Sessions)**: Xây dựng hook `useChatHistory` (`use-chat-history.ts`) quản lý các thread lưu trữ bền vững trong `localStorage`, hỗ trợ tự động đặt tiêu đề thông minh từ câu hỏi đầu tiên của người dùng, phân loại theo nhóm thời gian (*Hôm nay, Hôm qua, 7 ngày trước, Trước đó*), đổi tên inline và xóa thread an toàn.
+    - **Thanh bên Lịch sử (Collapsible Chat History Sidebar)**: Xây dựng component `ChatHistorySidebar` (`chat-history-sidebar.tsx`) hỗ trợ gập/mở bằng nút `PanelLeft`, nút "+ Đoạn chat mới" (`SquarePen`) bo góc nổi bật, ô tìm kiếm lịch sử, dropdown chuyển nhanh giữa các Trợ lý AI của QNU và nút xóa toàn bộ lịch sử.
+    - **Tối ưu thị giác tin nhắn**: Thay thế bong bóng xanh lá cây chói lọi của User bằng khối xám nhẹ `bg-muted/80 text-foreground border border-border/40` bo tròn lớn `rounded-3xl px-5 py-3`; loại bỏ viền hộp thẻ cứng ngắc của Assistant sang dạng văn bản Markdown tự nhiên (`variant="natural"`).
+    - **Floating Input Dock chuẩn Gemini**: Khung nhập liệu nổi lơ lửng ở giữa đáy trang bo cong lớn `rounded-3xl` có viền sáng mỏng tinh tế, textarea auto-resize tự co giãn chiều cao theo nội dung gõ, nút gửi tròn `rounded-full size-8 sm:size-9` và tự động đổi thành nút Dừng sinh câu trả lời khi đang streaming.
+    - **Header Liền Mạch (Seamless Borderless Header)**: Bỏ hoàn toàn đường kẻ ngang `border-b` ở cả Header chính và Header Sidebar, loại bỏ hoàn toàn hiện tượng lệch bậc thang 8px; đồng bộ chiều cao chuẩn `h-14` (56px) với nút "+ Đoạn chat mới" viên thuốc `rounded-full h-9`; khử trùng lặp nút toggle (chỉ hiển thị `PanelLeft` trên Header chính khi Sidebar đang đóng).
+  - Kết quả kiểm thử:
+    - Linter (Biome): 0 lỗi, 0 cảnh báo trên toàn bộ 5 tệp chat (`use-chat-history.ts`, `chat-history-sidebar.tsx`, `public-chat-view.tsx`, `chat-bubble.tsx`, `chat-message.tsx`).
+    - Vite build: Hoàn thành trong **3.98s** (0 lỗi TypeScript, 0 lỗi đóng gói bundle).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_255_nang_cap_giao_dien_chat_chuan_chatgpt_gemini_va_lich_su_hoi_thoai.md`.
+- **Phiên trước #254**:
+  - Tối ưu Responsive Grid Cards cho Laptop 14" (3 cột) và Desktop 24"+ (4 cột) trên các trang quản trị: Trợ lý AI, Kho tri thức, ModelOps, Loại văn bản, DAG Nodes (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4`).
+  - Vite build hoàn tất trong 5.84s (0 lỗi).
+- **Phiên trước #253**:
+  - Khắc phục triệt để lỗ hổng thiếu Bearer Token trên Frontend:
+    - Xây dựng Global Fetch Interceptor `frontend2/src/app/auth/fetch-interceptor.ts` tự động gắn `Authorization: Bearer <accessToken>` và `credentials: "include"` cho toàn bộ 77+ API calls tới `/platform/*`.
+    - Tích hợp interceptor trong `frontend2/src/main.tsx` và cung cấp helper `getAuthHeaders()` trong `http-client.ts`.
+    - Bổ sung scope `offline_access` vào `OIDC_CONFIG.scope` trong `oidc.ts` để kích hoạt Refresh Token ngầm qua `signinSilent`.
+  - Thắt chặt an ninh AuthActor & Enforce RBAC trên Backend:
+    - Sửa lỗ hổng gán nhầm default `roles=["admin"]` và `permissions=["*"]` trong `AuthActor` Pydantic model (`schemas.py`), chuyển mặc định về `roles=["staff"]`, `permissions=[]` an toàn.
+    - Áp dụng `require_permission` vào các router trọng yếu: `assistants` (`create`, `edit`, `delete`, `publish`), `knowledge` (`upload`, `delete`, `reindex`, `facts.manage`), `modelops` (`manage`, `test`).
+  - Bổ sung tài liệu cấu hình QNU SSO (`SSO_ENABLED`, `SSO_AUTHORITY`, `SSO_CLIENT_ID`, `SSO_AUDIENCE`, v.v.) vào `.env.example` và `.env.dokploy.example`.
+  - Kết quả kiểm thử:
+    - Backend: 15/15 unit tests passed 100% (`tests/test_auth.py`, `tests/test_sso_auth.py`), 0 lỗi Ruff linter.
+    - Frontend: 0 lỗi Biome linter, Vite build production hoàn tất thành công trong 6.15s (0 lỗi TypeScript/bundler).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_253_hoan_thien_toan_dien_sso_bearer_injection_va_fine_grained_rbac.md`.
+- **Phiên trước #252**:
+  - Chuẩn hóa danh mục quyền hạn `qnu-ai-permissions.json` theo chuẩn `qnu-sso.permissions` v1 gồm 25 quyền (`ai.*`), đồng bộ sang cả dự án `qnu-sso` để nạp vào CSDL SSO.
+  - Xây dựng tầng OIDC Client (`oidc-client-ts`) trên `frontend2`:
+    - Quản lý phiên `UserManager` trong `frontend2/src/app/auth/oidc.ts`.
+    - Route callback `/signin-oidc` xử lý lưu trữ user, đồng bộ cache TanStack Query và điều hướng về URL yêu cầu.
+    - Cải tiến giao diện `sign-in.tsx`: Nút đăng nhập QNU SSO nổi bật (Academic Teal), badges Cán bộ/Giảng viên và Sinh viên UIS, kết hợp Accordion Dev Access Gate cho lập trình viên phát triển offline.
+    - Cập nhật RBAC context (`can(permission)`) hỗ trợ đầy đủ các claims phân quyền và tiền tố `ai.access.*`.
+  - Xây dựng Bộ xác thực Bearer Token trên Backend FastAPI:
+    - Bổ sung cấu hình `SSO_AUTHORITY`, `SSO_CLIENT_ID`, `SSO_AUDIENCE`, `SSO_JWKS_URL`, `SSO_USERINFO_URL` trong `app.core.config`.
+    - Tạo module `sso_validator.py` xác thực Bearer Token qua JWKS public keys (RSA/RS256) kèm TTL cache 1 giờ, fallback UserInfo RFC standard.
+    - Bổ sung `require_permission` dependency bảo vệ API.
+    - Mở rộng `AuthActor` trong `schemas.py` với `email`, `user_type`, `student_id`, `roles`, `permissions`, `has_permission`.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_252_tich_hop_xac_thuc_tap_trung_qnu_sso_openiddict_va_phan_quyen_rbac.md`.
+  - Xây dựng bản kế hoạch tổng thể triển khai Production: [`ke_hoach_phat_hanh_chatbot_va_quan_ly_user_rbac_prod.md`](../../ke_hoach_phat_hanh_chatbot_va_quan_ly_user_rbac_prod.md).
+  - Hoàn thành Sprint 1 — Cổng Chat Độc Lập cho Sinh Viên / Thí Sinh:
+    - Bổ sung `/chat` và `/chat/*` vào `isPublicRoute` trong `frontend2/src/routes/__root.tsx`.
+    - Xây dựng `PublicChatPortal` (`frontend2/src/features/chat/public-chat-portal.tsx`) hiển thị danh mục 5 trợ lý chính thức của ĐH Quy Nhơn, tìm kiếm, lọc theo danh mục, câu hỏi gợi ý.
+    - Xây dựng `PublicChatView` (`frontend2/src/features/chat/public-chat-view.tsx`) giao diện chat toàn màn hình, Mobile-First, SSE streaming mượt mà, hỗ trợ đối soát văn bản qua `CitationSheet`, xuất biên bản Markdown (.md) và làm mới hội thoại.
+    - Khởi tạo các Route TanStack: `chat.tsx`, `chat.index.tsx`, `chat.$assistantSlug.tsx`.
+  - Hoàn thành Sprint 2 — Quản Lý Kênh Phân Phối & Web Chat Widget:
+    - Xây dựng `ChannelsPage` (`frontend2/src/features/channels/channels-page.tsx`) với bộ cấu hình tham số widget (`data-assistant`, `data-title`, `data-welcome`, `data-position`, `data-api-base`).
+    - Bộ sinh mã nhúng HTML script CDN tự động 1-click copy.
+    - Cảnh báo an ninh Domain Whitelist CORS (`*.qnu.edu.vn`, `tuyensinh.qnu.edu.vn`, `daotao.qnu.edu.vn`).
+    - Khung Live Preview tương tác 1:1 mô phỏng Cổng thông tin trường với bong bóng widget nổi mở/đóng và chat thử nghiệm phản hồi thời gian thực.
+    - Bổ sung mục `Kênh & Web Widget` (`/channels`) vào Sidebar `frontend2/src/navigation/config.ts` dưới nhóm `Xây Dựng AI`.
+    - Sửa đường dẫn nhúng widget trong `assistant-embed-dialog.tsx` trỏ đúng `/embed/qnu-chat-widget.js`.
+  - Kiểm thử Frontend (`cmd /c "npm run build"`): Đạt exit code 0 (`✓ built in 4.14s`), 0 lỗi TypeScript, 0 lỗi Vite bundler.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_251_trien_khai_cong_chat_cong_khai_va_kenh_widget_prod.md`.
+- **Phiên trước #250**:
+  - Rà soát toàn bộ các phân hệ chức năng trên Sidebar (`frontend2/src/layouts/app-sidebar.tsx` và `frontend2/src/navigation/config.ts`).
+  - Dọn dẹp triệt để các mục liên kết chưa có Route để loại bỏ 100% nguy cơ lỗi 404 cho người dùng.
+  - Tinh gọn Sidebar còn 3 nhóm chức năng cốt lõi hoạt động trơn tru.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_250_don_dep_menu_sidebar_frontend_va_ra_soat_chuc_nang.md`.
+- **Phiên trước #249**:
   - Tái cấu trúc UX/UI Quản lý Chuỗi Combo Dự Phòng (Failover Combos) trong `frontend2/src/components/modelops/combos-vision-section.tsx`:
     - Xóa bỏ 100% cụm 4 nút bấm chuyển đổi loại tác vụ trong Modal gây hiểu lầm là 1 combo làm 4 chức năng.
     - Gán cứng cố định kênh tác vụ (Vision OCR, Vector Embedding, Reranker, LLM Chat) theo từng Tab chuyên trách kèm banner nhận diện trực quan và badge `[Gán Cứng Cố Định]`.

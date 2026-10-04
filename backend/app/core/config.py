@@ -247,6 +247,39 @@ class Settings(BaseSettings):
     DEV_ACCESS_PASSWORD: str = "QNU@2026"
     RATE_LIMIT_PER_MINUTE: int = 120
 
+    # --- QNU Single Sign-On (OIDC / OpenIddict) ---
+    SSO_ENABLED: bool = True
+    SSO_AUTHORITY: str = Field(
+        default="http://localhost:5000",
+        validation_alias=AliasChoices("SSO_AUTHORITY", "AUTH_AUTHORITY"),
+    )
+    SSO_CLIENT_ID: str = Field(
+        default="qnu-ai-platform",
+        validation_alias=AliasChoices("SSO_CLIENT_ID", "AUTH_CLIENT_ID"),
+    )
+    SSO_AUDIENCE: str = "ai.api"
+    SSO_JWKS_URL: str | None = None
+    SSO_USERINFO_URL: str | None = None
+
+    @property
+    def clean_sso_authority(self) -> str:
+        """Returns clean SSO Authority base URL without trailing slash."""
+        return self.SSO_AUTHORITY.rstrip("/")
+
+    @property
+    def sso_jwks_url(self) -> str:
+        """Endpoint to fetch public JSON Web Key Sets (JWKS) from QNU SSO."""
+        if self.SSO_JWKS_URL:
+            return self.SSO_JWKS_URL
+        return f"{self.clean_sso_authority}/.well-known/jwks"
+
+    @property
+    def sso_userinfo_url(self) -> str:
+        """OIDC UserInfo endpoint on QNU SSO."""
+        if self.SSO_USERINFO_URL:
+            return self.SSO_USERINFO_URL
+        return f"{self.clean_sso_authority}/connect/userinfo"
+
     # --- Observability ---
     LOG_LEVEL: str = "INFO"
     JSON_LOGGING: bool = True

@@ -381,8 +381,8 @@ export const KnowledgePage: React.FC = () => {
           }}
         />
       ) : viewMode === "grid" ? (
-        /* Cards Grid View: 1 col on mobile, 2 on tablet, 4 on desktop */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        /* Cards Grid View: 1 col on mobile, 2 on tablet, 3 on laptop (14"), 4 on large desktop (24"+) */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
           {filteredCollections.map((col) => (
             <Card
               key={col.id}
@@ -391,24 +391,24 @@ export const KnowledgePage: React.FC = () => {
               {/* Card Header */}
               <div className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                       <BookOpen className="size-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <h3>
                         <button
                           type="button"
                           onClick={() =>
                             navigate({ to: `/knowledge/${col.id}` })
                           }
-                          className="text-left font-bold text-foreground hover:text-primary cursor-pointer line-clamp-1 transition-colors text-sm"
+                          className="text-left font-bold text-foreground hover:text-primary cursor-pointer line-clamp-1 transition-colors text-sm w-full"
                           title={col.name}
                         >
                           {col.name}
                         </button>
                       </h3>
-                      <span className="font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
+                      <span className="font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded inline-block truncate max-w-full">
                         {col.code}
                       </span>
                     </div>

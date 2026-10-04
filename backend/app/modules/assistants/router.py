@@ -25,13 +25,16 @@ from app.modules.assistants.schemas import (
     AssistantVersionResponse,
 )
 from app.modules.assistants.service import assistant_service
+from app.modules.auth.dependencies import require_permission
 
 router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU"])
 chat_router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU - Chat Runtime"])
 
 
 @router.get("/templates", response_model=list[AssistantTemplateResponse])
-async def list_assistant_templates() -> list[AssistantTemplateResponse]:
+async def list_assistant_templates(
+    _auth: object = Depends(require_permission("ai.assistants.view")),
+) -> list[AssistantTemplateResponse]:
     """Return the five official Core-derived templates for the creation wizard."""
     return assistant_service.list_templates()
 
@@ -40,6 +43,7 @@ async def list_assistant_templates() -> list[AssistantTemplateResponse]:
 async def generate_assistant_spec(
     body: AssistantGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.create")),
 ) -> AssistantGenerateResponse:
     """Generate assistant metadata, system prompt, and sample questions from an idea."""
     return await assistant_service.generate_spec(db, body)
@@ -48,6 +52,7 @@ async def generate_assistant_spec(
 @router.post("/seed-defaults", response_model=AssistantSeedResponse)
 async def seed_default_assistants(
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.create")),
 ) -> AssistantSeedResponse:
     """Persist missing official assistants and workflows without overwriting existing rows."""
     return await assistant_service.seed_defaults(db)
@@ -61,6 +66,7 @@ async def seed_default_assistants(
 async def import_assistant_bundle(
     body: AssistantBundle,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.create")),
 ) -> AssistantResponse:
     return await assistant_service.import_bundle(db, body)
 
@@ -71,6 +77,7 @@ async def list_assistants(
     category: str | None = Query(None, max_length=50),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.view")),
 ) -> list[AssistantResponse]:
     return await assistant_service.list_assistants(
         db,
@@ -88,6 +95,7 @@ async def list_assistants(
 async def create_assistant(
     body: AssistantCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.create")),
 ) -> AssistantResponse:
     return await assistant_service.create_assistant(db, body)
 
@@ -96,6 +104,7 @@ async def create_assistant(
 async def export_assistant_bundle(
     reference: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.view")),
 ) -> AssistantBundle:
     return await assistant_service.export_bundle(db, reference)
 
@@ -136,6 +145,7 @@ async def chat_with_assistant(
 async def get_assistant(
     reference: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.view")),
 ) -> AssistantResponse:
     return await assistant_service.get_assistant(db, reference)
 
@@ -145,6 +155,7 @@ async def update_assistant(
     reference: str,
     body: AssistantUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.edit")),
 ) -> AssistantResponse:
     return await assistant_service.update_assistant(db, reference, body)
 
@@ -153,6 +164,7 @@ async def update_assistant(
 async def deactivate_assistant(
     reference: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.delete")),
 ) -> AssistantResponse:
     """Soft-delete an assistant so workflow history and audits remain intact."""
     return await assistant_service.deactivate_assistant(db, reference)
@@ -162,6 +174,7 @@ async def deactivate_assistant(
 async def get_assistant_readiness(
     reference: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.view")),
 ) -> AssistantReadinessResponse:
     """Kiểm tra 5 tiêu chí sẵn sàng xuất bản (Publish Gate) cho Trợ lý AI."""
     return await assistant_service.get_readiness(db, reference)
@@ -171,6 +184,7 @@ async def get_assistant_readiness(
 async def publish_assistant(
     reference: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.publish")),
 ) -> AssistantPublishResponse:
     """Cổng xuất bản chính thức (Publish Gate) - Chặn kích hoạt nếu có lỗi nghiêm trọng."""
     return await assistant_service.publish_assistant(db, reference)
@@ -181,6 +195,7 @@ async def clone_assistant(
     reference: str,
     body: AssistantCloneRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.assistants.create")),
 ) -> AssistantResponse:
     """Nhân bản 1-click Trợ lý AI để tùy biến cho khoa/phòng ban chuyên trách."""
     return await assistant_service.clone_assistant(db, reference, body)

@@ -1,0 +1,235 @@
+{
+  "format": "qnu-sso.permissions",
+  "version": 1,
+  "applicationId": 4,
+  "applicationCode": "qnu-ai",
+  "applicationName": "QNU AI Platform",
+  "exportedAt": "2026-10-04T07:00:00.0000000+00:00",
+  "permissions": [
+    {
+      "name": "ai.access.read",
+      "displayName": "Truy cập QNU AI Platform",
+      "description": "Cho phép người dùng đăng nhập và xem giao diện Nền tảng AI",
+      "resource": "application",
+      "action": "read",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.access.manage",
+      "displayName": "Quản lý Nghiệp vụ AI",
+      "description": "Cho phép quản lý Trợ lý, Kho tri thức và xem báo cáo vận hành",
+      "resource": "application",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.access.admin",
+      "displayName": "Quản trị toàn bộ AI Platform",
+      "description": "Toàn quyền quản trị hệ thống, ModelOps, bảo mật và phân bổ hạn ngạch",
+      "resource": "application",
+      "action": "admin",
+      "isEnabled": true,
+      "isSensitive": true
+    },
+    {
+      "name": "ai.dashboard.view",
+      "displayName": "Xem Dashboard & KPI",
+      "description": "Xem tổng quan chỉ số hoạt động, lưu lượng chat và tài nguyên AI",
+      "resource": "dashboard",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.chat.access",
+      "displayName": "Trò chuyện với Trợ lý AI",
+      "description": "Cho phép tương tác hỏi đáp với các Trợ lý AI nội bộ",
+      "resource": "chat",
+      "action": "access",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.chat.export",
+      "displayName": "Xuất biên bản cuộc trò chuyện",
+      "description": "Tải xuống lịch sử tư vấn định dạng Markdown/PDF",
+      "resource": "chat",
+      "action": "export",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.assistants.view",
+      "displayName": "Xem danh sách Trợ lý AI",
+      "description": "Xem danh mục và cấu hình cơ bản của các Trợ lý AI",
+      "resource": "assistants",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.assistants.create",
+      "displayName": "Tạo mới Trợ lý AI",
+      "description": "Khởi tạo Trợ lý AI chuyên trách theo quy trình 7 bước",
+      "resource": "assistants",
+      "action": "create",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.assistants.update",
+      "displayName": "Chỉnh sửa Trợ lý AI",
+      "description": "Cập nhật Persona, Prompt, ModelOps policy và ràng buộc RAG",
+      "resource": "assistants",
+      "action": "update",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.assistants.delete",
+      "displayName": "Xóa Trợ lý AI",
+      "description": "Gỡ bỏ Trợ lý AI khỏi hệ thống",
+      "resource": "assistants",
+      "action": "delete",
+      "isEnabled": true,
+      "isSensitive": true
+    },
+    {
+      "name": "ai.assistants.publish",
+      "displayName": "Phát hành Trợ lý AI",
+      "description": "Bật tính năng Cổng chat công khai hoặc Web Widget",
+      "resource": "assistants",
+      "action": "publish",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.knowledge.view",
+      "displayName": "Xem Kho Tri Thức",
+      "description": "Xem danh sách Bộ sưu tập, tài liệu và các Chunks số hóa",
+      "resource": "knowledge",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.knowledge.create",
+      "displayName": "Tạo Bộ sưu tập Tri thức",
+      "description": "Khởi tạo Kho tri thức chuyên môn mới",
+      "resource": "knowledge",
+      "action": "create",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.knowledge.upload",
+      "displayName": "Nạp tài liệu & Bóc tách OCR",
+      "description": "Tải lên PDF/Word/Excel và kích hoạt Ingestion Pipeline",
+      "resource": "knowledge",
+      "action": "upload",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.knowledge.sync",
+      "displayName": "Đồng bộ & Index Vector",
+      "description": "Chạy đồng bộ nhúng Vector Qdrant và Lexical Index PostgreSQL FTS",
+      "resource": "knowledge",
+      "action": "sync",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.knowledge.delete",
+      "displayName": "Xóa tài liệu Tri thức",
+      "description": "Xóa tài liệu và các Vector chunks trong CSDL",
+      "resource": "knowledge",
+      "action": "delete",
+      "isEnabled": true,
+      "isSensitive": true
+    },
+    {
+      "name": "ai.models.view",
+      "displayName": "Xem Nhà cung cấp Mô hình AI",
+      "description": "Xem trạng thái kết nối các LLM/Vision/Embedding Providers",
+      "resource": "models",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.models.manage",
+      "displayName": "Quản lý ModelOps & Khóa API",
+      "description": "Thêm, sửa, đổi Provider, Model Defaults, Circuit Breaker và Quota",
+      "resource": "models",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": true
+    },
+    {
+      "name": "ai.workflows.view",
+      "displayName": "Xem Quy trình DAG Workflows",
+      "description": "Xem sơ đồ luồng xử lý RAG và Agentic DAG",
+      "resource": "workflows",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.workflows.manage",
+      "displayName": "Quản lý DAG Workflows",
+      "description": "Thiết kế, chỉnh sửa các Node trong Canvas và kích hoạt luồng",
+      "resource": "workflows",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.channels.manage",
+      "displayName": "Quản lý Kênh & Web Widget",
+      "description": "Cấu hình nhúng Web Chatbot và kiểm soát Domain Whitelist",
+      "resource": "channels",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.evaluations.view",
+      "displayName": "Xem Đánh giá RAG Benchmark",
+      "description": "Xem bảng đối soát Faithfulness, Answer Relevance, Context Precision",
+      "resource": "evaluations",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.evaluations.run",
+      "displayName": "Chạy Đánh giá RAG Benchmark",
+      "description": "Kích hoạt kiểm thử tự động bộ câu hỏi chuẩn nghiệp vụ",
+      "resource": "evaluations",
+      "action": "run",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.audit.view",
+      "displayName": "Xem Nhật ký Hoạt động & Chi phí",
+      "description": "Giám sát lưu lượng gọi API, token đã tiêu thụ và chi phí USD",
+      "resource": "audit",
+      "action": "view",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
+      "name": "ai.users.manage",
+      "displayName": "Quản lý Người dùng & Hạn ngạch Token",
+      "description": "Phân bổ hạn ngạch Token cho Giảng viên/Sinh viên và phân quyền Kho",
+      "resource": "users",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": true
+    }
+  ]
+}

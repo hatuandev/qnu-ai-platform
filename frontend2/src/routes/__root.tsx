@@ -33,7 +33,11 @@ function RootLayout() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPublicRoute =
-    pathname === "/sign-in" || pathname === "/access-denied";
+    pathname === "/sign-in" ||
+    pathname === "/signin-oidc" ||
+    pathname === "/access-denied" ||
+    pathname === "/chat" ||
+    pathname.startsWith("/chat/");
   const homeRoute = backendHomeRoute(user?.userType);
   const shouldRedirectToHome = user !== null && pathname === "/";
 

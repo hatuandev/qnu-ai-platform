@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.exceptions import AppException
 from app.core.security import create_access_token, decode_access_token
 from app.modules.auth.schemas import AuthActor, AuthStatusResponse, DevLoginRequest
+from app.modules.auth.sso_validator import validate_sso_token
 
 settings = get_settings()
 
@@ -41,6 +42,8 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
         tenant_id="tenant_qnu",
         workspace_id="workspace_qnu",
         role="admin",
+        roles=["admin"],
+        permissions=["*"],
         authenticated=True,
         session_version="v1",
     )
@@ -81,23 +84,36 @@ async def logout(response: Response) -> dict[str, str]:
 
 @router.get("/me", response_model=AuthStatusResponse, summary="Kiểm tra trạng thái phiên làm việc hiện tại")
 async def get_current_user(request: Request) -> AuthStatusResponse:
-    """Check current authentication status from session cookie or Authorization header."""
-    token = request.cookies.get("qnu_session")
+    """Check current authentication status from QNU SSO Bearer token or Dev session cookie."""
+    token: str | None = None
+
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+
     if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[7:].strip()
+        token = request.cookies.get("qnu_session")
 
     if token:
+        # 1. Thử xác thực với QNU SSO
+        sso_actor = await validate_sso_token(token)
+        if sso_actor:
+            return AuthStatusResponse(authenticated=True, actor=sso_actor)
+
+        # 2. Fallback Dev Access Gate token
         try:
             payload = decode_access_token(token)
             actor = AuthActor(
                 actor_id=str(payload.get("actor_id", "act_admin_qnu")),
                 username=str(payload.get("sub", "admin")),
                 display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
+                email=str(payload.get("email", "admin@qnu.edu.vn")),
+                user_type=str(payload.get("user_type", "admin")),
                 tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
                 workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
                 role=str(payload.get("role", "admin")),
+                roles=["admin"],
+                permissions=["*"],
                 authenticated=True,
                 session_version=str(payload.get("session_version", "v1")),
             )

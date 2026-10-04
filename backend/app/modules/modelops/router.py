@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import require_permission
 from app.modules.modelops.schemas import (
     PROVIDER_PRESETS,
     LLMGenerateRequest,
@@ -139,6 +140,7 @@ async def seed_default_providers(
 async def create_provider(
     body: ProviderConfigCreate,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.models.manage")),
 ) -> dict:
     return await modelops_service.create_provider(db, body)
 
@@ -175,6 +177,7 @@ async def update_provider(
     provider_id: str,
     body: ProviderConfigUpdate,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.models.manage")),
 ) -> dict:
     return await modelops_service.update_provider(db, provider_id, body)
 
@@ -199,6 +202,7 @@ async def export_single_provider_endpoint(
 async def delete_provider(
     provider_id: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.models.manage")),
 ) -> dict:
     return await modelops_service.delete_provider(db, provider_id)
 

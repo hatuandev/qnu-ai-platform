@@ -3,15 +3,11 @@ import {
   Bot,
   Cpu,
   FileText,
-  History,
   LayoutDashboard,
-  MessagesSquare,
   Network,
   Palette,
   Share2,
-  ShieldCheck,
   UserRoundCog,
-  Wrench,
 } from "lucide-react";
 import type { NavGroup } from "@/navigation/types";
 
@@ -53,50 +49,16 @@ export const navigationGroups: NavGroup[] = [
         to: "/models",
         icon: Cpu,
       },
-    ],
-  },
-
-  // 3. Vận hành
-  {
-    id: "operations",
-    label: "Vận Hành",
-    items: [
       {
-        id: "conversations",
-        title: "Hội Thoại & Handoff",
-        to: "/conversations",
-        icon: MessagesSquare,
-      },
-      {
-        id: "quality",
-        title: "Chất Lượng & Lỗ Hổng",
-        to: "/quality",
-        icon: ShieldCheck,
-      },
-      {
-        id: "runs",
-        title: "Giám Sát Thực Thi",
-        to: "/runs",
-        icon: History,
-      },
-    ],
-  },
-
-  // 4. Hệ thống
-  {
-    id: "system",
-    label: "Hệ Thống",
-    items: [
-      {
-        id: "integrations",
-        title: "Tích Hợp & Kênh",
-        to: "/settings/integrations",
+        id: "channels",
+        title: "Kênh & Web Widget",
+        to: "/channels",
         icon: Share2,
       },
     ],
   },
 
-  // 5. Nâng cao
+  // 3. Nâng cao
   {
     id: "advanced",
     label: "Nâng Cao",
@@ -106,12 +68,6 @@ export const navigationGroups: NavGroup[] = [
         title: "Thư Viện Nodes",
         to: "/capabilities/nodes",
         icon: Network,
-      },
-      {
-        id: "tools",
-        title: "Cổng Công Cụ",
-        to: "/capabilities/tools",
-        icon: Wrench,
       },
       {
         id: "document-types",

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, Upl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import require_permission
 from app.modules.knowledge.schemas import (
     ApproveDocumentRequest,
     ApproveDocumentResponse,
@@ -38,6 +39,7 @@ router = APIRouter(prefix="/knowledge", tags=["Knowledge Bases"])
 async def create_collection(
     body: CollectionCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.upload")),
 ) -> CollectionResponse:
     col = await knowledge_service.create_collection(db, body)
     return CollectionResponse.model_validate(col)
@@ -94,6 +96,7 @@ async def update_collection(
 async def delete_collection(
     collection_id: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.delete")),
 ) -> None:
     await knowledge_service.delete_collection(db, collection_id)
 
@@ -169,6 +172,7 @@ async def upload_document(
         False, description="Tự động phê duyệt & nạp vector nếu dữ liệu sạch (Fast-Track)"
     ),
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.upload")),
 ) -> DocumentResponse:
     content = await file.read()
     doc = await knowledge_service.ingest_document(
@@ -371,6 +375,7 @@ async def archive_document(
 async def delete_document(
     document_id: str,
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.delete")),
 ) -> None:
     await knowledge_service.delete_document(db, document_id)
 
@@ -385,6 +390,7 @@ async def import_collection_facts_excel(
     collection_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.facts.manage")),
 ) -> FactExcelImportResponse:
     content = await file.read()
     return await knowledge_service.import_facts_from_excel(

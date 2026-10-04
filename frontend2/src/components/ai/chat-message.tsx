@@ -31,6 +31,7 @@ export interface ChatMessageProps {
   message: ChatMessageItem;
   assistantCode?: string;
   assistantName?: string;
+  variant?: "card" | "natural";
   onCitationClick?: (citation: ChatCitation) => void;
   onRegenerate?: () => void;
   onSuggestedClick?: (question: string) => void;
@@ -59,6 +60,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   assistantCode = "admissions",
   assistantName = "Trợ lý Tuyển sinh QNU",
+  variant = "natural",
   onCitationClick,
   onRegenerate,
   onSuggestedClick,
@@ -104,7 +106,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         window.URL.revokeObjectURL(blobUrl);
       }, 1000);
     } catch (err) {
-      console.warn("Direct blob download failed, falling back to direct navigation:", err);
+      console.warn(
+        "Direct blob download failed, falling back to direct navigation:",
+        err,
+      );
       const fallbackLink = document.createElement("a");
       fallbackLink.href = art.url;
       fallbackLink.download = art.name;
@@ -132,7 +137,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <ChatBubble
             content={message.content}
             senderRole="user"
-            className="rounded-br-micro"
+            variant={variant}
+            className={variant === "card" ? "rounded-br-micro" : undefined}
           />
 
           {message.attachments && message.attachments.length > 0 && (
@@ -185,6 +191,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         <ChatBubble
           content={message.content}
           senderRole="assistant"
+          variant={variant}
           isStreaming={message.status === "streaming"}
         />
 

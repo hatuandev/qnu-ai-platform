@@ -4,6 +4,8 @@ export type AppPath =
   | "/dashboard"
   | "/"
   | "/assistants"
+  | "/channels"
+  | "/chat"
   | "/knowledge"
   | "/models"
   | "/conversations"

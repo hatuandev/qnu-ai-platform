@@ -143,22 +143,39 @@ export function RbacProvider({ children }: { children: React.ReactNode }) {
       can: (permission) => {
         if (!permission) return true;
         const p = permission.trim().toLowerCase();
-        if (permissions.has(p)) return true;
+        if (permissions.has("*") || permissions.has(p)) return true;
 
         const isAdmin =
-          auth.user?.roles?.some(
-            (r) => r.trim().toLowerCase() === "administrator",
-          ) || permissions.has("ktx.access.admin");
+          auth.user?.roles?.some((r) => {
+            const low = r.trim().toLowerCase();
+            return (
+              low === "administrator" ||
+              low === "admin" ||
+              low === "super_admin"
+            );
+          }) ||
+          permissions.has("ai.access.admin") ||
+          permissions.has("ktx.access.admin");
         if (isAdmin) return true;
 
-        const isManager = permissions.has("ktx.access.manage");
+        const isManager =
+          permissions.has("ai.access.manage") ||
+          permissions.has("ktx.access.manage");
         if (isManager) {
-          if (p.startsWith("ktx.")) return true;
+          if (p.startsWith("ai.") || p.startsWith("ktx.")) return true;
         }
 
-        const isReader = permissions.has("ktx.access.read");
+        const isReader =
+          permissions.has("ai.access.read") ||
+          permissions.has("ktx.access.read");
         if (isReader) {
-          if (p.endsWith(".view") || p.endsWith(".read")) return true;
+          if (
+            p.endsWith(".view") ||
+            p.endsWith(".read") ||
+            p.endsWith(".access") ||
+            p === "ai.chat.access"
+          )
+            return true;
         }
 
         return false;

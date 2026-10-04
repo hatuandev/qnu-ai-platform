@@ -12,7 +12,9 @@ export type CurrentUser = {
   email: string;
   name: string;
   userType: string;
+  studentId?: string;
   roles: string[];
   permissions: string[];
   roleMetadata: BackendRoleMetadata[];
+  accessToken?: string;
 };
