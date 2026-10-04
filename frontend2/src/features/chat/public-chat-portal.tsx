@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   BookOpen,
   Bot,
-  CheckCircle2,
   Clock,
   Compass,
   FileText,
@@ -41,47 +40,47 @@ const CATEGORY_MAP: Record<string, CategoryMeta> = {
   all: {
     label: "Tất cả Trợ lý",
     icon: Sparkles,
-    accentColor: "text-primary bg-primary/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   admissions: {
     label: "Tuyển sinh Đại học",
     icon: GraduationCap,
-    accentColor: "text-primary bg-primary/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   academic: {
     label: "Quy chế & Học vụ",
     icon: BookOpen,
-    accentColor: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   regulations: {
     label: "Quy chế & Đào tạo",
     icon: BookOpen,
-    accentColor: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   resources: {
     label: "Thư viện & Học liệu",
     icon: Library,
-    accentColor: "text-sky-600 dark:text-sky-400 bg-sky-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   library: {
     label: "Thư viện Số",
     icon: Library,
-    accentColor: "text-sky-600 dark:text-sky-400 bg-sky-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   administration: {
     label: "Soạn thảo Văn bản",
     icon: FileText,
-    accentColor: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   drafting: {
     label: "Soạn thảo Hành chính",
     icon: FileText,
-    accentColor: "text-amber-600 dark:text-amber-400 bg-amber-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
   examination: {
     label: "Khảo thí & Đề thi",
     icon: HelpCircle,
-    accentColor: "text-rose-600 dark:text-rose-400 bg-rose-500/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   },
 };
 
@@ -95,37 +94,58 @@ function resolveCategoryMeta(categorySlug: string): CategoryMeta {
   return {
     label: categorySlug,
     icon: Bot,
-    accentColor: "text-primary bg-primary/10",
+    accentColor: "text-primary bg-primary/10 border-primary/20",
   };
 }
 
 function formatAssistantDisplayName(name: string, code?: string): string {
   const c = (code || "").toLowerCase();
-  if (c.includes("admission") || c.includes("tuyen_sinh")) {
+  const n = (name || "").toLowerCase();
+  if (
+    c.includes("admission") ||
+    c.includes("tuyen_sinh") ||
+    n.includes("tuyển sinh")
+  ) {
     return "Trợ lý Tư vấn Tuyển sinh 2026";
   }
   if (
     c.includes("regulation") ||
     c.includes("quy_che") ||
-    c.includes("academic")
+    c.includes("academic") ||
+    n.includes("quy chế") ||
+    n.includes("học vụ")
   ) {
     return "Trợ lý Quy chế & Học vụ";
   }
   if (
     c.includes("library") ||
     c.includes("thu_vien") ||
-    c.includes("resources")
+    c.includes("resources") ||
+    n.includes("thư viện") ||
+    n.includes("học liệu")
   ) {
     return "Trợ lý Thư viện & Học liệu Số";
   }
   if (
     c.includes("draft") ||
     c.includes("soan_thao") ||
-    c.includes("administration")
+    c.includes("administration") ||
+    n.includes("soạn thảo")
   ) {
     return "Trợ lý Soạn thảo Văn bản";
   }
-  if (c.includes("exam") || c.includes("khao_thi") || c.includes("ngan_hang")) {
+  if (
+    c.includes("exam") ||
+    c.includes("khao_thi") ||
+    c.includes("ngan_hang") ||
+    c.includes("question") ||
+    c.includes("cau_hoi") ||
+    c.includes("de_thi") ||
+    n.includes("câu hỏi") ||
+    n.includes("ngân hàng") ||
+    n.includes("khảo thí") ||
+    n.includes("đề thi")
+  ) {
     return "Trợ lý Ngân hàng Đề & Khảo thí";
   }
   return name.replace(
@@ -246,27 +266,31 @@ export function PublicChatPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-primary/20 relative overflow-x-hidden">
-      {/* 1. Atmospheric Engineering Grid Pattern (Linear-Style 40px) */}
+    <div className="min-h-screen bg-[#faf9f6] dark:bg-background text-foreground flex flex-col selection:bg-primary/20 relative overflow-x-hidden">
+      {/* 1. Subtle Architectural Grid with Radial Mask (Fade out towards bottom) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(to_right,oklch(0.46_0.13_160/0.06)_1px,transparent_1px),linear-gradient(to_bottom,oklch(0.46_0.13_160/0.06)_1px,transparent_1px)] bg-[size:40px_40px]"
-      />
+        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      >
+        {/* Soft Linear Grid - Visible at Top Hero, smoothly fading down before cards */}
+        <div
+          className="absolute inset-0 bg-repeat [background-size:40px_40px]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(26, 115, 101, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(26, 115, 101, 0.08) 1px, transparent 1px)",
+            maskImage:
+              "linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 320px, rgba(0, 0, 0, 0) 580px)",
+            WebkitMaskImage:
+              "linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 320px, rgba(0, 0, 0, 0) 580px)",
+          }}
+        />
 
-      {/* 2. Radial Vignette to focus center (like 9Router landing-vignette) */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.03)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.45)_100%)]"
-      />
-
-      {/* 3. Ambient Radial Academic Teal Glow */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 -z-10 w-[72rem] h-[28rem] bg-gradient-to-b from-primary/15 via-teal-500/8 to-transparent blur-3xl opacity-75"
-      />
+        {/* Ambient Radial Academic Teal Glow behind Hero */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[64rem] h-[24rem] bg-gradient-to-b from-primary/15 via-teal-500/8 to-transparent blur-3xl opacity-60" />
+      </div>
 
       {/* Top Header with Ultra-Glass Navbar */}
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl transition-colors">
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-[#faf9f6]/85 dark:bg-background/80 backdrop-blur-xl transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link
             to="/chat"
@@ -328,7 +352,7 @@ export function PublicChatPortal() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full space-y-12">
+      <main className="relative z-10 flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full space-y-12">
         {/* ASYMMETRIC 2-COLUMN HERO (Linear Bento Style) */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Left Column: Value Prop & Interactive Smart Dock */}
@@ -339,13 +363,13 @@ export function PublicChatPortal() {
               <span>Hệ sinh thái Trợ lý AI · ĐH Quy Nhơn</span>
             </div>
 
-            {/* Bold H1 Headline with Academic Teal Gradient */}
+            {/* Bold H1 Headline with Academic Teal Gradient (No Orphan Words) */}
             <div className="space-y-2">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.15]">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.2]">
                 <span className="text-foreground">Một Điểm Chạm.</span>
                 <br />
                 <span className="bg-gradient-to-r from-primary via-teal-500 to-emerald-600 bg-clip-text text-transparent">
-                  Mọi Thông Tin Đại Học Quy Nhơn.
+                  Mọi Thông Tin ĐH Quy Nhơn.
                 </span>
               </h1>
               <p className="text-muted-foreground text-sm sm:text-base leading-relaxed max-w-xl pt-1">
@@ -479,20 +503,20 @@ export function PublicChatPortal() {
                   <span className="text-xs font-semibold text-foreground/95 drop-shadow-xs">
                     Trường Đại học Quy Nhơn · 170 An Dương Vương
                   </span>
-                  <Badge className="bg-primary text-primary-foreground text-[10px] rounded-micro shadow-xs">
+                  <Badge className="bg-primary text-primary-foreground text-xs rounded-micro shadow-xs">
                     Chính thức
                   </Badge>
                 </div>
               </div>
 
               {/* Lower Simulated Conversational Showcase */}
-              <div className="p-4 sm:p-5 space-y-3 bg-card border-t border-border/50">
+              <div className="p-5 sm:p-6 space-y-3.5 bg-card border-t border-border/50">
                 {/* Simulated User Question */}
                 <div className="flex items-start gap-2.5">
                   <div className="size-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0 text-muted-foreground">
                     TS
                   </div>
-                  <div className="rounded-xl rounded-tl-xs bg-muted/80 px-3 py-2 text-xs leading-relaxed text-foreground max-w-[85%]">
+                  <div className="rounded-xl rounded-tl-xs bg-muted/80 px-3.5 py-2 text-xs leading-relaxed text-foreground max-w-[85%]">
                     Năm 2026 trường có những phương thức xét tuyển nào và chỉ
                     tiêu ngành Sư phạm Toán?
                   </div>
@@ -503,20 +527,20 @@ export function PublicChatPortal() {
                   <div className="size-7 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
                     <Bot className="size-4 text-primary" />
                   </div>
-                  <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <div className="rounded-xl rounded-tl-xs bg-primary/5 border border-primary/15 px-3.5 py-2.5 text-xs leading-relaxed text-foreground">
                       <p className="font-semibold text-primary mb-1">
                         Trường Đại học Quy Nhơn áp dụng 05 phương thức xét
                         tuyển:
                       </p>
-                      <p className="text-muted-foreground text-[11px] leading-relaxed">
-                        1. Kết quả thi TN THPT · 2. Học bạ THPT · 3. Điểm ĐGNL
-                        ĐHQG · 4. Tuyển thẳng · 5. Kết hợp thi năng khiếu.
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        1. Điểm thi TN THPT · 2. Học bạ THPT · 3. ĐGNL ĐHQG · 4.
+                        Tuyển thẳng · 5. Năng khiếu kết hợp.
                       </p>
-                      <div className="mt-2 pt-1.5 border-t border-primary/10 flex items-center gap-1.5 text-[10px] text-primary/90 font-mono">
-                        <ShieldCheck className="size-3 text-emerald-500 shrink-0" />
+                      <div className="mt-2 pt-1.5 border-t border-primary/10 flex items-center gap-1.5 text-xs text-primary/90 font-mono">
+                        <ShieldCheck className="size-3.5 text-emerald-500 shrink-0" />
                         <span className="truncate">
-                          Căn cứ: [Đề án Tuyển sinh 2026 - QĐ số 2139/QĐ-ĐHQN]
+                          Căn cứ: [Đề án Tuyển sinh 2026 - QĐ số 2139]
                         </span>
                       </div>
                     </div>
@@ -525,7 +549,7 @@ export function PublicChatPortal() {
 
                 {/* Direct Action Link Button */}
                 <Button
-                  className="w-full h-9 rounded-md gap-2 font-medium text-xs shadow-xs bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                  className="w-full h-10 rounded-md gap-2 font-medium text-xs shadow-xs bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
                   onClick={() =>
                     void navigate({
                       to: "/chat/$assistantSlug",
@@ -544,20 +568,21 @@ export function PublicChatPortal() {
 
         {/* BENTO GRID: CÁC TRỢ LÝ AI CHUYÊN TRÁCH */}
         <section className="space-y-6 pt-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/70">
+          {/* Header & Category Filter (Separated lines, no scrollbar, full visible) */}
+          <div className="space-y-4 pb-3 border-b border-border/70">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                 <Sparkles className="size-5 text-primary" />
                 <span>Khám Phá Các Trợ Lý AI Chuyên Trách</span>
               </h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Mỗi trợ lý được huấn luyện chuyên biệt theo kho dữ liệu văn bản
                 chính thức của Nhà trường
               </p>
             </div>
 
-            {/* Category Filter Pills (100% Pure Vietnamese) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+            {/* Category Filter Pills (Full width, wrapping naturally, 100% visible) */}
+            <div className="flex flex-wrap items-center gap-2">
               {categories.map((cat) => {
                 const meta = resolveCategoryMeta(cat);
                 const Icon = meta.icon;
@@ -568,10 +593,10 @@ export function PublicChatPortal() {
                     variant={isSelected ? "default" : "outline"}
                     size="sm"
                     className={cn(
-                      "h-8 px-3 rounded-md text-xs font-medium gap-1.5 transition-all shrink-0 cursor-pointer",
+                      "h-8 px-3 rounded-md text-xs font-medium gap-1.5 transition-all cursor-pointer",
                       isSelected
                         ? "bg-primary text-primary-foreground shadow-xs"
-                        : "border-border/70 bg-card hover:bg-muted text-muted-foreground hover:text-foreground",
+                        : "border-border/70 bg-card/80 hover:bg-muted text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setSelectedCategory(cat)}
                   >
@@ -627,18 +652,12 @@ export function PublicChatPortal() {
 
           {/* BENTO CARD 1: ADMISSIONS SPOTLIGHT (Featured Hero Bento Box) */}
           {spotlightAssistant && (
-            <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-card via-card to-primary/5 p-6 sm:p-7 shadow-sm transition-all hover:border-primary/60 hover:shadow-md">
+            <div className="rounded-xl border border-primary/40 bg-white dark:bg-card p-6 sm:p-7 shadow-xs transition-all hover:border-primary/60 hover:shadow-md">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                 <div className="lg:col-span-7 space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-0.5 rounded-micro">
                       Trọng Điểm Tuyển Sinh 2026
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs rounded-micro flex items-center gap-1"
-                    >
-                      <CheckCircle2 className="size-3" /> Chính thức
                     </Badge>
                   </div>
 
@@ -662,28 +681,28 @@ export function PublicChatPortal() {
 
                   {/* Feature assurance chips */}
                   <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 dark:bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
                       <Sparkles className="size-3 text-primary" /> 45 Ngành đào
                       tạo
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-md bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 dark:bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
                       <ShieldCheck className="size-3 text-emerald-500" /> 05
                       Phương thức xét tuyển
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-md bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 dark:bg-background px-2.5 py-1 text-muted-foreground border border-border/70 font-medium">
                       <Zap className="size-3 text-amber-500" /> Đối soát 100%
                       văn bản gốc
                     </span>
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-4 bg-background/70 dark:bg-card/70 p-5 rounded-lg border border-border/60">
+                <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-4 bg-slate-50/80 dark:bg-muted/30 p-5 rounded-lg border border-border/60">
                   <div className="space-y-2">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <MessageSquare className="size-3.5 text-primary" /> Câu
                       hỏi thường gặp:
                     </span>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <Link
                         to="/chat/$assistantSlug"
                         params={{
@@ -693,10 +712,12 @@ export function PublicChatPortal() {
                         search={{
                           q: "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin năm 2025 là bao nhiêu?",
                         }}
-                        className="block text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted p-2 rounded-md transition-colors truncate border border-transparent hover:border-border/60"
+                        className="flex items-center justify-between text-xs text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 p-2.5 rounded-md transition-colors border border-border/50 hover:border-primary/40 group/p"
                       >
-                        → "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông
-                        tin..."
+                        <span className="truncate">
+                          "Điểm chuẩn ngành Sư phạm Toán và CNTT năm gần nhất?"
+                        </span>
+                        <ArrowUpRight className="size-3.5 text-primary opacity-60 group-hover/p:opacity-100 shrink-0 ml-1.5" />
                       </Link>
                       <Link
                         to="/chat/$assistantSlug"
@@ -707,10 +728,12 @@ export function PublicChatPortal() {
                         search={{
                           q: "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào năm 2026?",
                         }}
-                        className="block text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted p-2 rounded-md transition-colors truncate border border-transparent hover:border-border/60"
+                        className="flex items-center justify-between text-xs text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 p-2.5 rounded-md transition-colors border border-border/50 hover:border-primary/40 group/p"
                       >
-                        → "Trường Đại học Quy Nhơn áp dụng những phương thức xét
-                        tuyển..."
+                        <span className="truncate">
+                          "Các phương thức xét tuyển năm 2026?"
+                        </span>
+                        <ArrowUpRight className="size-3.5 text-primary opacity-60 group-hover/p:opacity-100 shrink-0 ml-1.5" />
                       </Link>
                     </div>
                   </div>
@@ -751,67 +774,79 @@ export function PublicChatPortal() {
                 {otherAssistants.map((assistant) => {
                   const meta = resolveCategoryMeta(assistant.category || "");
                   const Icon = meta.icon;
-                  const slug = assistant.code || assistant.id;
+                  const slug = (
+                    assistant.code ||
+                    assistant.id ||
+                    ""
+                  ).toLowerCase();
+                  const name = (assistant.name || "").toLowerCase();
+
+                  const isExam =
+                    slug.includes("exam") ||
+                    slug.includes("khao_thi") ||
+                    slug.includes("de_thi") ||
+                    slug.includes("question") ||
+                    slug.includes("cau_hoi") ||
+                    slug.includes("ngan_hang") ||
+                    name.includes("câu hỏi") ||
+                    name.includes("ngân hàng") ||
+                    name.includes("khảo thí") ||
+                    name.includes("đề thi");
+
+                  const isDraft =
+                    slug.includes("draft") ||
+                    slug.includes("soan_thao") ||
+                    name.includes("soạn thảo");
+
+                  const isLib =
+                    slug.includes("lib") ||
+                    slug.includes("thu_vien") ||
+                    slug.includes("hoc_lieu") ||
+                    name.includes("thư viện");
+
+                  const isReg =
+                    slug.includes("regulation") ||
+                    slug.includes("quy_che") ||
+                    slug.includes("academic") ||
+                    name.includes("quy chế") ||
+                    name.includes("học vụ");
+
+                  let sampleQuestion =
+                    "Cách tính điểm trung bình tích lũy thang điểm 4?";
+                  if (isDraft) {
+                    sampleQuestion =
+                      "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên cấp Trường.";
+                  } else if (isExam) {
+                    sampleQuestion =
+                      "Ma trận đề thi tự luận theo thang nhận thức Bloom 4 mức độ như thế nào?";
+                  } else if (isLib) {
+                    sampleQuestion =
+                      "Cách truy cập cơ sở dữ liệu quốc tế ScienceDirect từ xa?";
+                  } else if (isReg) {
+                    sampleQuestion =
+                      "Quy định cảnh báo học tập và thôi học tại Điều 16 như thế nào?";
+                  }
+
                   const displayName = formatAssistantDisplayName(
                     assistant.name,
                     assistant.code,
                   );
 
-                  let sampleQuestions: string[] = [];
-                  if (slug.includes("draft") || slug.includes("soan_thao")) {
-                    sampleQuestions = [
-                      "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên cấp Trường.",
-                      "Lập tờ trình xin phê duyệt kinh phí mua sắm trang thiết bị phòng thực hành.",
-                    ];
-                  } else if (
-                    slug.includes("exam") ||
-                    slug.includes("khao_thi") ||
-                    slug.includes("de_thi")
-                  ) {
-                    sampleQuestions = [
-                      "Tỷ lệ trọng số phân bổ 4 mức độ nhận thức Bloom trong ma trận đề thi kết thúc học phần là bao nhiêu?",
-                      "Quy tắc thiết kế câu hỏi trắc nghiệm khách quan MCQ chuẩn khảo thí là gì?",
-                    ];
-                  } else if (
-                    slug.includes("lib") ||
-                    slug.includes("thu_vien") ||
-                    slug.includes("hoc_lieu")
-                  ) {
-                    sampleQuestions = [
-                      "Quy định kiểm tra trùng lặp Turnitin đối với khóa luận tốt nghiệp như thế nào?",
-                      "Cách truy cập các cơ sở dữ liệu số quốc tế như ScienceDirect, IEEE Xplore từ xa bằng tài khoản QNU?",
-                    ];
-                  } else {
-                    sampleQuestions = [
-                      "Điều kiện cảnh báo học tập và buộc thôi học được quy định tại Điều 16 như thế nào?",
-                      "Cách tính điểm trung bình tích lũy thang điểm 4 và quy đổi điểm chữ ra sao?",
-                    ];
-                  }
-
                   return (
                     <Card
                       key={assistant.id}
-                      className="rounded-xl border border-border/80 bg-card hover:border-primary/50 shadow-xs hover:shadow-md transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between overflow-hidden group"
+                      className="rounded-xl border border-border/80 bg-white dark:bg-card hover:border-primary/50 shadow-xs hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 flex flex-col justify-between overflow-hidden group"
                     >
                       <CardHeader className="p-5 pb-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={cn(
-                              "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-micro",
-                              meta.accentColor,
-                            )}
-                          >
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-micro border border-primary/25 bg-primary/10 text-primary">
                             {meta.label}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono">
-                            <CheckCircle2 className="size-3 text-emerald-500" />
-                            Chính thức
                           </span>
                         </div>
 
                         <div className="flex items-start gap-3">
-                          {/* Crisp white logo box like 9Router */}
-                          <div className="size-10 rounded-md bg-white dark:bg-muted/40 p-2 shadow-xs border border-border/50 flex items-center justify-center shrink-0">
+                          {/* Crisp white logo container */}
+                          <div className="size-10 rounded-md bg-white dark:bg-card p-2 shadow-xs border border-border/60 flex items-center justify-center shrink-0">
                             <Icon className="size-5 text-primary" />
                           </div>
                           <div>
@@ -827,28 +862,18 @@ export function PublicChatPortal() {
                       </CardHeader>
 
                       <CardContent className="p-5 pt-0 space-y-3 mt-auto">
-                        {/* Sample questions */}
-                        {sampleQuestions.length > 0 && (
-                          <div className="space-y-1.5 pt-2 border-t border-border/50">
-                            <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                              <MessageSquare className="size-3" /> Câu hỏi gợi
-                              ý:
-                            </span>
-                            <div className="space-y-1">
-                              {sampleQuestions.slice(0, 2).map((q) => (
-                                <Link
-                                  key={q}
-                                  to="/chat/$assistantSlug"
-                                  params={{ assistantSlug: slug }}
-                                  search={{ q }}
-                                  className="block text-[11px] text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 px-2.5 py-1.5 rounded-md transition-colors truncate border border-transparent hover:border-border/60"
-                                >
-                                  "{q}"
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        {/* 1 Single prominent prompt chip */}
+                        <div className="pt-2 border-t border-border/50">
+                          <Link
+                            to="/chat/$assistantSlug"
+                            params={{ assistantSlug: slug }}
+                            search={{ q: sampleQuestion }}
+                            className="flex items-center justify-between text-xs text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted/70 p-2.5 rounded-md transition-colors border border-border/50 hover:border-primary/40 group/q"
+                          >
+                            <span className="truncate">"{sampleQuestion}"</span>
+                            <ArrowUpRight className="size-3.5 text-primary opacity-60 group-hover/q:opacity-100 shrink-0 ml-1.5" />
+                          </Link>
+                        </div>
 
                         <Button
                           className="w-full text-xs h-9 rounded-md gap-1.5 shadow-none font-medium border border-border/80 bg-background hover:bg-primary hover:text-primary-foreground hover:border-primary text-foreground transition-all cursor-pointer group/btn"
@@ -872,7 +897,7 @@ export function PublicChatPortal() {
         </section>
 
         {/* TRUST & GUARANTEE BAR */}
-        <section className="rounded-xl border border-border/70 bg-card/80 backdrop-blur-xs p-6 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-xs">
+        <section className="rounded-xl border border-border/70 bg-white/90 dark:bg-card/80 backdrop-blur-xs p-6 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-xs">
           <div className="flex items-start gap-3.5">
             <div className="size-10 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <ShieldCheck className="size-5" />
@@ -881,7 +906,7 @@ export function PublicChatPortal() {
               <p className="text-xs font-bold text-foreground">
                 100% Căn cứ chính thức
               </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Dữ liệu được đối soát trực tiếp từ văn bản, đề án tuyển sinh và
                 quy chế chuẩn của ĐH Quy Nhơn.
               </p>
@@ -889,14 +914,14 @@ export function PublicChatPortal() {
           </div>
 
           <div className="flex items-start gap-3.5">
-            <div className="size-10 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+            <div className="size-10 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <Zap className="size-5" />
             </div>
             <div className="space-y-1">
               <p className="text-xs font-bold text-foreground">
                 Hybrid RAG & Fact Layer
               </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Tra cứu sự thật dạng bảng số hóa, kèm trích dẫn văn bản minh
                 chứng chống ảo giác tuyệt đối.
               </p>
@@ -904,14 +929,14 @@ export function PublicChatPortal() {
           </div>
 
           <div className="flex items-start gap-3.5">
-            <div className="size-10 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+            <div className="size-10 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <Clock className="size-5" />
             </div>
             <div className="space-y-1">
               <p className="text-xs font-bold text-foreground">
                 Phản hồi trực tuyến 24/7
               </p>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Hỗ trợ sinh viên, giảng viên và thí sinh mọi lúc, mọi nơi với
                 thời gian phản hồi dưới 2 giây.
               </p>
@@ -921,7 +946,7 @@ export function PublicChatPortal() {
       </main>
 
       {/* FOOTER ACADEMIC & UNIVERSITY BRANDING */}
-      <footer className="border-t border-border/70 bg-card/60 py-8 mt-12">
+      <footer className="relative z-10 border-t border-border/70 bg-card/60 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             <img
@@ -933,10 +958,10 @@ export function PublicChatPortal() {
               <p className="font-bold text-foreground text-sm">
                 Trường Đại học Quy Nhơn
               </p>
-              <p className="text-[11px]">
+              <p className="text-xs">
                 Nền Tảng Trợ Lý Trí Tuệ Nhân Tạo (QNU AI Platform)
               </p>
-              <p className="text-[11px] text-muted-foreground/80">
+              <p className="text-xs text-muted-foreground/80">
                 170 An Dương Vương, TP. Quy Nhơn, Tỉnh Bình Định • Hotline:
                 0256.3846.156
               </p>
@@ -944,11 +969,11 @@ export function PublicChatPortal() {
           </div>
 
           <div className="text-center sm:text-right space-y-1">
-            <p className="text-[11px] text-muted-foreground/80 max-w-sm">
+            <p className="text-xs text-muted-foreground/80 max-w-sm">
               Dữ liệu câu trả lời được kiểm soát bằng công nghệ Hybrid RAG kết
               hợp Fact Layer số hóa và Groundedness Guardrails chống ảo giác.
             </p>
-            <p className="text-[10px] font-mono text-muted-foreground/60">
+            <p className="text-xs font-mono text-muted-foreground/60">
               © 2026 QNU AI Platform. All rights reserved.
             </p>
           </div>

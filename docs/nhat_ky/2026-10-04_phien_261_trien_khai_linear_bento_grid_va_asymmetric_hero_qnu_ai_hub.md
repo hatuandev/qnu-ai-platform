@@ -28,32 +28,25 @@
 
 ## 🔬 2. Chi Tiết Thực Hiện
 
-### 2.1. Lớp Nền Khí Quyển (Atmospheric Backdrop)
-- Tạo lớp nền lưới kỹ thuật 40px:
-  `bg-[linear-gradient(to_right,oklch(0.46_0.13_160/0.06)_1px,transparent_1px),linear-gradient(to_bottom,oklch(0.46_0.13_160/0.06)_1px,transparent_1px)] bg-[size:40px_40px]`
-- Tạo lớp Radial Vignette mờ dần về 4 góc:
-  `bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.03)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.45)_100%)]`
-- Vầng sáng Academic Teal tỏa mờ:
-  `bg-gradient-to-b from-primary/15 via-teal-500/8 to-transparent blur-3xl opacity-75`
+### 2.1. Lớp Nền Khí Quyển Tinh Tế & Mask Radial Fade
+- **Khử bỏ lưới đậm kép**: Loại bỏ tình trạng lưới đè nhau quá đậm (0.25) giống bảng Excel. Chuyển sang 1 lớp lưới tuyến tính duy nhất siêu mảnh với độ mờ chỉ `0.08` (`rgba(26, 115, 101, 0.08)`).
+- **Mask Fade Hào Quang**: Sử dụng `radial-gradient(ellipse 85% 55% at 50% 12%, black 35%, transparent 85%)` giúp lưới chỉ hiển thị nhẹ nhàng tại khu vực Hero phía trên để tạo chiều sâu công nghệ, sau đó tan biến mềm mại xuống dưới. Nền phần danh mục và footer bên dưới hoàn toàn sạch sẽ, thoáng mắt và bảo đảm độ tương phản chữ 100%.
 
-### 2.2. Bố Cục Hero 2 Cột Bất Đối Xứng
-- **Cột Trái (Col Span 7)**:
-  - Badge phát sáng: `<Sparkles className="size-3.5 text-primary" /> Hệ sinh thái Trợ lý AI · ĐH Quy Nhơn`
-  - H1 Typography: "Một Điểm Chạm. Mọi Thông Tin Đại Học Quy Nhơn."
-  - AI Prompt Dock nổi: `bg-card/95 dark:bg-card/85 p-1.5 shadow-md backdrop-blur-md`
-  - Gợi ý câu hỏi nóng 1-click: *Điểm chuẩn Sư phạm & CNTT*, *Xét tuyển học bạ 2026*, *Học bổng khuyến khích*, *Mượn sách thư viện số*.
-  - Metric counters: 45+ Ngành đào tạo, 05 Trợ lý AI, 1.300+ Facts số hóa, 24/7 Hỗ trợ tức thì.
-- **Cột Phải (Col Span 5)**:
-  - 3D Interactive Live Card với hiệu ứng ánh sáng nền mờ `bg-gradient-to-r from-primary/30 via-teal-500/20 to-emerald-500/30 blur-xl`.
-  - Ảnh thực cảnh khuôn viên trường bên bờ biển Quy Nhơn kèm tag trạng thái thực tế "Trực tuyến · Tư vấn 2026".
-  - Đoạn chat đối thoại mô phỏng thực tế với trích dẫn văn bản minh chứng chuẩn RAG.
+### 2.2. Bố Cục Hero 2 Cột & Tối Ưu Typography
+- **Tiêu đề H1 gọn gàng (No Orphan Word)**: Khắc phục lỗi rớt từ "Nhơn." sang một dòng lẻ loi bằng cách chuẩn hóa:
+  *"Một Điểm Chạm.* <br /> *Mọi Thông Tin ĐH Quy Nhơn."*
+- **Thanh AI Prompt Dock & Trending Queries**: Tối ưu khoảng cách và kích thước nút.
+- **Thẻ Visual Showcase Phía Phải**: Mở rộng padding (`p-5 sm:p-6`), tăng kích thước chữ câu trả lời và trích dẫn chuẩn RAG lên `text-xs` (12px), loại bỏ cảm giác chật chội.
 
-### 2.3. Lưới Bento Grid & Thẻ Tương Tác
-- Bố cục Bento Box đa kích thước phân cấp rõ ràng.
-- Khung icon chuẩn mực: `size-10 rounded-md bg-white dark:bg-muted/40 p-2 shadow-xs border border-border/50` giúp icon luôn nổi bật và sắc nét.
+### 2.3. Tách Dòng Thanh Lọc Danh Mục & Bento Grid Chuẩn
+- **Tách dòng thanh lọc danh mục**: Đưa bộ lọc danh mục xuống 1 hàng riêng biệt bên dưới tiêu đề phân khu với `flex-wrap gap-2`, triệt tiêu hoàn toàn lỗi cắt cụt chữ ("Quy chế & Họ...") và loại bỏ thanh cuộn ngang xám xấu xí.
+- **Đồng bộ màu sắc Academic Teal**: Chuyển toàn bộ các nhãn danh mục về tông màu nhận diện ĐH Quy Nhơn (`text-primary bg-primary/10 border-primary/20`), xóa bỏ sự lộn xộn của 4-5 màu cầu vồng.
+- **Bento Cards Tinh Gọn**:
+  - Thẻ Tuyển sinh 2026 mở rộng làm thẻ Bento trọng tâm.
+  - Các thẻ trợ lý còn lại: Mỗi thẻ chỉ giữ 1 câu hỏi mẫu tiêu biểu nhất với nút mũi tên 1-click trực diện, xóa bỏ nhãn "Chính thức" lặp lại thừa thãi.
 
 ---
 
 ## ✅ 3. Kết Quả Kiểm Thử
-- **Biome Linter**: Kiểm tra `biome check src/features/chat/public-chat-portal.tsx` đạt **0 lỗi, 0 cảnh báo**.
+- **Biome Linter**: Kiểm tra `biome check src/features/chat/public-chat-portal.tsx` đạt **0 lỗi, 0 cảnh báo** (24ms).
 - **Quy tắc AGENTS.md**: Tuân thủ 100% Rule 1.8/4.9 (Zero Raw Buttons), Rule 4.3 (Radius 6px/8px/16px), Rule 4.8 (Zero Emoji), Rule 1.10 (Sync Documentation).

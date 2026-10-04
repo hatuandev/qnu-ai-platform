@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ArrowUp,
@@ -35,7 +35,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useChatHistory } from "@/hooks/use-chat-history";
 import {
@@ -85,6 +84,62 @@ function getCategoryIcon(category?: string, code?: string) {
     return <HelpCircle className="size-5" />;
   }
   return <Bot className="size-5" />;
+}
+
+function formatAssistantDisplayName(name: string, code?: string): string {
+  const c = (code || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+  if (
+    c.includes("admission") ||
+    c.includes("tuyen_sinh") ||
+    n.includes("tuyển sinh")
+  ) {
+    return "Trợ lý Tư vấn Tuyển sinh 2026";
+  }
+  if (
+    c.includes("regulation") ||
+    c.includes("quy_che") ||
+    c.includes("academic") ||
+    n.includes("quy chế") ||
+    n.includes("học vụ")
+  ) {
+    return "Trợ lý Quy chế & Học vụ";
+  }
+  if (
+    c.includes("library") ||
+    c.includes("thu_vien") ||
+    c.includes("resources") ||
+    n.includes("thư viện") ||
+    n.includes("học liệu")
+  ) {
+    return "Trợ lý Thư viện & Học liệu Số";
+  }
+  if (
+    c.includes("draft") ||
+    c.includes("soan_thao") ||
+    c.includes("administration") ||
+    n.includes("soạn thảo")
+  ) {
+    return "Trợ lý Soạn thảo Văn bản";
+  }
+  if (
+    c.includes("exam") ||
+    c.includes("khao_thi") ||
+    c.includes("ngan_hang") ||
+    c.includes("question") ||
+    c.includes("cau_hoi") ||
+    c.includes("de_thi") ||
+    n.includes("câu hỏi") ||
+    n.includes("ngân hàng") ||
+    n.includes("khảo thí") ||
+    n.includes("đề thi")
+  ) {
+    return "Trợ lý Ngân hàng Đề & Khảo thí";
+  }
+  return name.replace(
+    /^Mô-đun trợ lý ảo\s*(tư vấn\s*|hỗ trợ\s*|tra cứu,\s*tư vấn\s*)?/i,
+    "Trợ lý ",
+  );
 }
 
 function getCategorizedPrompts(
@@ -499,7 +554,7 @@ export function PublicChatView({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={`Hỏi bất kỳ điều gì về ${assistant?.name || "QNU AI"}...`}
+          placeholder={`Hỏi bất kỳ điều gì về ${formatAssistantDisplayName(assistant?.name || "", assistant?.code) || "QNU AI"}...`}
           rows={1}
           className="min-h-[46px] max-h-36 resize-none border-0 shadow-none focus-visible:ring-0 text-xs sm:text-sm py-2 px-2 bg-transparent leading-relaxed text-foreground placeholder:text-muted-foreground/70"
         />
@@ -548,16 +603,142 @@ export function PublicChatView({
     </div>
   );
 
-  if (isLoadingAssistant) {
+  function PublicChatSkeleton() {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-2xl space-y-4">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-14 w-full rounded-lg" />
+      <div className="h-screen w-full flex bg-background text-foreground overflow-hidden">
+        {/* 1. Desktop Sidebar Skeleton (matches ChatHistorySidebar w-64) */}
+        <aside className="w-64 min-w-[256px] h-full flex flex-col shrink-0 border-r border-border/70 bg-card/40 hidden lg:flex">
+          {/* Header: Official Logo + Brand Title */}
+          <div className="h-14 px-3 flex items-center justify-between shrink-0">
+            <Link
+              to="/chat"
+              className="flex items-center gap-2 group cursor-pointer select-none text-inherit no-underline"
+              title="Quay lại Cổng Trợ Lý QNU AI"
+            >
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-white p-0.5 shadow-xs border border-border/60">
+                <img
+                  src="/logo.png"
+                  alt="Logo Trường Đại học Quy Nhơn"
+                  className="size-6 object-contain"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-sm tracking-tight text-foreground">
+                  QNU AI
+                </span>
+                <Sparkles className="size-3 text-primary/70 animate-pulse" />
+              </div>
+            </Link>
+            <div className="size-8 rounded-md bg-muted/40 animate-pulse" />
+          </div>
+
+          {/* New Chat Button Skeleton */}
+          <div className="px-3 pb-2 pt-1">
+            <div className="h-9 w-full rounded-full bg-background border border-border/80 flex items-center px-4 gap-2 text-xs text-muted-foreground shadow-xs">
+              <PenLine className="size-4 text-muted-foreground/60" />
+              <span className="font-medium">Cuộc trò chuyện mới</span>
+            </div>
+          </div>
+
+          {/* Thread List Skeletons */}
+          <div className="flex-1 p-3 space-y-3 overflow-hidden">
+            <div className="h-3 w-16 rounded bg-muted/40 animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="h-8 w-full rounded-md bg-muted/40 animate-pulse" />
+              <div className="h-8 w-5/6 rounded-md bg-muted/30 animate-pulse" />
+              <div className="h-8 w-4/5 rounded-md bg-muted/30 animate-pulse" />
+              <div className="h-8 w-full rounded-md bg-muted/20 animate-pulse" />
+            </div>
+          </div>
+
+          {/* Footer Back link */}
+          <div className="p-3 border-t border-border/50">
+            <Link
+              to="/chat"
+              className="h-8 w-full rounded-md flex items-center px-2 gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Cổng Trợ Lý QNU</span>
+            </Link>
+          </div>
+        </aside>
+
+        {/* 2. Main Chat Canvas Skeleton (matches Canvas layout exactly) */}
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-background relative overflow-hidden">
+          {/* Top Header Navbar */}
+          <header className="h-14 shrink-0 bg-background/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-20">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 h-9 px-2.5 rounded-md bg-muted/30 border border-border/50">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <Sparkles className="size-3.5 text-primary animate-pulse" />
+                </div>
+                <div className="h-4 w-36 sm:w-48 rounded bg-muted/50 animate-pulse" />
+                <ChevronDown className="size-3 text-muted-foreground/50 ml-1" />
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="size-8 rounded-md bg-muted/30 animate-pulse" />
+              <div className="size-8 rounded-md bg-muted/30 animate-pulse" />
+            </div>
+          </header>
+
+          {/* Empty State Hero Skeleton (Bottom-aligned Gemini style) */}
+          <main className="flex-1 overflow-y-auto px-4 sm:px-8 flex flex-col justify-end pb-4 sm:pb-6">
+            <div className="max-w-3xl mx-auto w-full space-y-7 animate-in fade-in duration-300">
+              {/* Typography skeleton */}
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-semibold shadow-2xs">
+                  <Sparkles className="size-3.5 text-primary animate-spin" />
+                  <span>Đang kết nối Trợ lý AI QNU...</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-8 sm:h-10 w-2/3 rounded-lg bg-muted/50 animate-pulse" />
+                  <div className="h-8 sm:h-10 w-4/5 rounded-lg bg-gradient-to-r from-muted/50 to-muted/20 animate-pulse" />
+                </div>
+                <div className="h-4 w-1/2 rounded bg-muted/30 animate-pulse pt-1" />
+              </div>
+
+              {/* 4 Prompt Cards Skeleton */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-lg bg-card/60 border border-border/80 flex flex-col justify-between gap-3 min-h-[96px] shadow-2xs"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="h-3.5 w-4/5 rounded bg-muted/40 animate-pulse" />
+                      <div className="h-3.5 w-3/5 rounded bg-muted/30 animate-pulse" />
+                    </div>
+                    <div className="h-3 w-20 rounded bg-muted/30 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Floating Input Dock Skeleton */}
+              <div className="w-full space-y-2">
+                <div className="relative rounded-3xl border border-border/80 bg-muted/40 dark:bg-muted/20 backdrop-blur-md shadow-md p-3 flex flex-col gap-1.5 min-h-[82px] justify-between">
+                  <div className="h-4 w-52 rounded bg-muted/40 animate-pulse mt-1 ml-1" />
+                  <div className="flex items-center justify-between px-1">
+                    <div className="h-3 w-32 rounded bg-muted/30 hidden sm:block" />
+                    <div className="size-9 rounded-full bg-primary/20 flex items-center justify-center text-primary/40 ml-auto">
+                      <ArrowUp className="size-4.5 opacity-40" />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-center text-[10px] text-muted-foreground/60 px-2 select-none">
+                  Trợ lý AI QNU đối soát từ nguồn văn bản và quy chế chính thức
+                  của Trường Đại học Quy Nhơn.
+                </div>
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     );
+  }
+
+  if (isLoadingAssistant) {
+    return <PublicChatSkeleton />;
   }
 
   if (!assistant) {
@@ -652,7 +833,10 @@ export function PublicChatView({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-xs sm:text-sm text-foreground truncate max-w-[160px] sm:max-w-md group-hover:text-primary transition-colors">
-                        {assistant.name}
+                        {formatAssistantDisplayName(
+                          assistant.name,
+                          assistant.code,
+                        )}
                       </span>
                       <ChevronDown className="size-3 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform" />
                     </div>
@@ -673,7 +857,9 @@ export function PublicChatView({
                     <div className="size-5 rounded bg-primary/10 text-primary flex items-center justify-center shrink-0">
                       {getCategoryIcon(ast.category, ast.code)}
                     </div>
-                    <span className="truncate flex-1">{ast.name}</span>
+                    <span className="truncate flex-1">
+                      {formatAssistantDisplayName(ast.name, ast.code)}
+                    </span>
                     {(ast.code === assistantCode ||
                       ast.id === assistantCode) && (
                       <CheckCircle2 className="size-3 text-primary shrink-0" />

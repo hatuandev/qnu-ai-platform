@@ -387,8 +387,12 @@ export function ChatHistorySidebar({
                   className="flex items-center gap-2 group cursor-pointer select-none text-inherit no-underline"
                   title="Quay lại Cổng Trợ Lý QNU AI"
                 >
-                  <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-teal-600 text-primary-foreground font-bold text-xs shadow-xs tracking-wider group-hover:opacity-90 transition-opacity">
-                    QNU
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-white p-0.5 shadow-xs border border-border/60 group-hover:border-primary/50 transition-colors">
+                    <img
+                      src="/logo.png"
+                      alt="Logo Trường Đại học Quy Nhơn"
+                      className="size-6 object-contain"
+                    />
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">

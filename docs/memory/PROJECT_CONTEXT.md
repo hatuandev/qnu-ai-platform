@@ -8,19 +8,20 @@
 ## 1. Thông Tin Phiên Gần Nhất
 
 - **Thời gian cập nhật**: 2026-10-04 (UTC+7)
-- **Phiên số**: #261 (Triển Khai Phong Cách Linear Bento Grid & Asymmetric 2-Column Hero Cho Cổng Trợ Lý AI Hub /chat)
-- **Kết quả phiên #261**:
-  - Triển khai toàn diện phong cách **Linear Bento Grid kết hợp Academic Clean** ("Academic Tech Bento") theo mẫu hình tương tự `9router.com`, `Linear.app`, `Vercel.com`:
-    - **Lớp Nền Khí Quyển (Atmospheric Backdrop)**: Lưới tọa độ kỹ thuật 40px (`linear-gradient`) kết hợp lớp Radial Vignette mờ dần về 4 góc và vầng sáng Academic Teal (`oklch(0.46 0.13 160)`) tạo chiều sâu công nghệ cao.
-    - **Bố Cục Hero 2 Cột Bất Đối Xứng (Asymmetric 2-Column Hero)**:
-      - *Cột trái (7 cols)*: Glowing Pill Badge, Tiêu đề H1 lớn với gradient Academic Teal sang Emerald, Smart AI Prompt Dock kính mờ, 1-Click Trending Hot Queries và dải 4 chỉ số KPI uy tín (`45+ Ngành`, `05 Trợ lý`, `1.300+ Facts`, `24/7 Trực tuyến`).
-      - *Cột phải (5 cols)*: **Interactive Live Preview Card 3D** với ảnh thực cảnh khuôn viên trường biển Quy Nhơn (`qnu-campus-hero.jpg`), tag trạng thái "Trực tuyến · Tư vấn 2026", đoạn đối thoại mô phỏng thực tế kèm trích dẫn văn bản minh chứng chuẩn RAG `[QĐ số 2139/QĐ-ĐHQN]`.
-    - **Lưới Bento Grid Trợ Lý AI Chuyên Trách**:
-      - Ô Bento trọng điểm Tuyển sinh 2026.
-      - 4 Ô Bento tiêu chuẩn (Văn bản, Khảo thí, Thư viện, Học vụ) với hộp icon trắng tương phản cao (`bg-white dark:bg-muted/40 p-2 rounded-md shadow-xs border border-border/50`), hiệu ứng nhấc nhẹ `hover:-translate-y-1` và viền phát sáng.
-  - Kết quả kiểm thử:
-    - Biome Native: 0 lỗi, 0 cảnh báo.
-    - TypeScript Typecheck (`tsc --noEmit`): Exit code 0, 100% passed.
+- **Phiên số**: #264 (Nâng Cấp App Shell Skeleton Triệt Tiêu 100% Layout Shift Màn Hình Chat /chat/:slug)
+- **Kết quả phiên #264**:
+  - **Khắc phục triệt để lỗi giật bố cục khi tải (CLS)**: Thay thế 3 khối Skeleton xám nằm trơ trọi giữa màn hình trắng bằng **`PublicChatSkeleton` (App Shell Skeleton chuẩn Enterprise)** giữ nguyên bố cục 2 cột hoàn chỉnh trong suốt thời gian chờ API.
+  - **Bảo toàn nhận diện thương hiệu**: Sidebar hiển thị ngay Logo chính thức ĐH Quy Nhơn, nút Tạo chat mới viên thuốc và danh sách shimmer threads. Canvas chính hiển thị huy hiệu `Đang kết nối Trợ lý AI QNU...` xoay vòng, shimmer welcome hero, 4 thẻ câu hỏi mẫu và khung nhập liệu nổi ở đáy.
+  - **Kiểm thử**: Biome linter pass 100% (29ms), 0 lỗi, 0 cảnh báo.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_264_nang_cap_app_shell_skeleton_triet_tieu_layout_shift_man_hinh_chat.md`.
+- **Phiên trước #263**:
+  - Đồng bộ Logo chính thức ĐH Quy Nhơn (`/logo.png`) và chuẩn hóa tên trợ lý trên giao diện Chat (/chat/:slug).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_263_dong_bo_logo_chinh_thuc_va_chuan_hoa_ten_tro_ly_tren_chat_view.md`.
+- **Phiên trước #262**:
+  - Tinh chỉnh chiều sâu thị giác (Warm off-white `#faf9f6`), làm mềm lưới kỹ thuật, chuẩn hóa tên trợ lý & khử trùng lặp câu hỏi mẫu (/chat).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_262_tinh_chinh_chieu_sau_thi_giac_khu_trung_lap_cau_hoi_mau_va_chuan_hoa_ten_tro_ly_chat_hub.md`.
+- **Phiên trước #261**:
+  - Triển khai phong cách Linear Bento Grid & Asymmetric 2-Column Hero cho Cổng Trợ Lý AI Hub (/chat).
   - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_261_trien_khai_linear_bento_grid_va_asymmetric_hero_qnu_ai_hub.md`.
 - **Phiên trước #260**:
   - Tích hợp hình ảnh khuôn viên Trường Đại học Quy Nhơn, Logo chính thức, Họa tiết lưới kiến trúc & Kính mờ Glassmorphism.
