@@ -7,6 +7,7 @@ import {
   Network,
   Palette,
   Share2,
+  Sparkles,
   UserRoundCog,
 } from "lucide-react";
 import type { NavGroup } from "@/navigation/types";
@@ -22,6 +23,12 @@ export const navigationGroups: NavGroup[] = [
         title: "Bảng Điều Khiển",
         to: "/dashboard",
         icon: LayoutDashboard,
+      },
+      {
+        id: "public_portal",
+        title: "Cổng Trợ Lý AI",
+        to: "/",
+        icon: Sparkles,
       },
     ],
   },

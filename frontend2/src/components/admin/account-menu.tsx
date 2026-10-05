@@ -149,6 +149,17 @@ export function AccountMenuContent({
           </span>
         </DropdownMenuItem>
 
+        <DropdownMenuItem
+          className="gap-2 text-xs py-2 cursor-pointer"
+          onSelect={() => {
+            onNavigate?.();
+            void router.navigate({ to: "/" });
+          }}
+        >
+          <Sparkles className="size-4 text-primary" />
+          <span>Cổng Trợ Lý AI (Trang chủ)</span>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         {/* 3. Quick Theme Submenu */}

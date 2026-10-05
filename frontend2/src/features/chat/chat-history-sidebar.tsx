@@ -356,7 +356,7 @@ export function ChatHistorySidebar({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => void navigate({ to: "/chat" })}
+                        onClick={() => void navigate({ to: "/" })}
                         className="size-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
                       >
                         <ArrowLeft className="size-4" />
@@ -383,7 +383,7 @@ export function ChatHistorySidebar({
               <div className="h-14 px-3 flex items-center justify-between shrink-0">
                 {/* Brand Logo (Links to Portal) */}
                 <Link
-                  to="/chat"
+                  to="/"
                   className="flex items-center gap-2 group cursor-pointer select-none text-inherit no-underline"
                   title="Quay lại Cổng Trợ Lý QNU AI"
                 >
@@ -541,7 +541,7 @@ export function ChatHistorySidebar({
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5 text-muted-foreground hover:text-foreground text-[11px] px-2 flex-1 justify-start rounded-md hover:bg-background"
-                  onClick={() => void navigate({ to: "/chat" })}
+                  onClick={() => void navigate({ to: "/" })}
                   title="Quay lại Cổng Trợ Lý"
                 >
                   <ArrowLeft className="size-3.5" />

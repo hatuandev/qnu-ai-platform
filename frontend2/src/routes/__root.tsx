@@ -1,14 +1,6 @@
-import {
-  createRootRoute,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useAuth } from "@/app/auth";
+import { createRootRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { AuthGate } from "@/app/auth/auth-gate";
 import { AdminShell } from "@/layouts/admin-shell";
-import { backendHomeRoute } from "@/rbac/backend-role-map";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -30,25 +22,15 @@ export const Route = createRootRoute({
 
 function RootLayout() {
   const pathname = useLocation({ select: (location) => location.pathname });
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const isPublicRoute =
+    pathname === "/" ||
     pathname === "/sign-in" ||
     pathname === "/signin-oidc" ||
     pathname === "/access-denied" ||
     pathname === "/chat" ||
     pathname.startsWith("/chat/");
-  const homeRoute = backendHomeRoute(user?.userType);
-  const shouldRedirectToHome = user !== null && pathname === "/";
-
-  useEffect(() => {
-    if (shouldRedirectToHome) {
-      void navigate({ to: homeRoute, replace: true });
-    }
-  }, [homeRoute, navigate, shouldRedirectToHome]);
 
   if (isPublicRoute) return <Outlet />;
-  if (shouldRedirectToHome) return null;
 
   return (
     <AuthGate>

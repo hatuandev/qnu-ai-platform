@@ -611,7 +611,7 @@ export function PublicChatView({
           {/* Header: Official Logo + Brand Title */}
           <div className="h-14 px-3 flex items-center justify-between shrink-0">
             <Link
-              to="/chat"
+              to="/"
               className="flex items-center gap-2 group cursor-pointer select-none text-inherit no-underline"
               title="Quay lại Cổng Trợ Lý QNU AI"
             >
@@ -654,7 +654,7 @@ export function PublicChatView({
           {/* Footer Back link */}
           <div className="p-3 border-t border-border/50">
             <Link
-              to="/chat"
+              to="/"
               className="h-8 w-full rounded-md flex items-center px-2 gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="size-3.5" />
@@ -752,7 +752,7 @@ export function PublicChatView({
           Trợ lý với mã "{assistantSlug}" có thể đã bị thay đổi hoặc chưa kích
           hoạt.
         </p>
-        <Button size="sm" onClick={() => void navigate({ to: "/chat" })}>
+        <Button size="sm" onClick={() => void navigate({ to: "/" })}>
           Quay lại Cổng Trợ Lý
         </Button>
       </div>
@@ -814,7 +814,7 @@ export function PublicChatView({
               variant="ghost"
               size="icon"
               className="size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors shrink-0 lg:hidden"
-              onClick={() => void navigate({ to: "/chat" })}
+              onClick={() => void navigate({ to: "/" })}
               title="Quay lại Cổng Trợ Lý"
             >
               <ArrowLeft className="size-4" />

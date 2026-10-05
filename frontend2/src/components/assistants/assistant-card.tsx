@@ -81,6 +81,62 @@ function formatCategoryLabel(category: string): string {
   }
 }
 
+function formatAssistantDisplayName(name: string, code?: string): string {
+  const c = (code || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+  if (
+    c.includes("admission") ||
+    c.includes("tuyen_sinh") ||
+    n.includes("tuyển sinh")
+  ) {
+    return "Trợ lý Tư vấn Tuyển sinh 2026";
+  }
+  if (
+    c.includes("regulation") ||
+    c.includes("quy_che") ||
+    c.includes("academic") ||
+    n.includes("quy chế") ||
+    n.includes("học vụ")
+  ) {
+    return "Trợ lý Quy chế & Học vụ";
+  }
+  if (
+    c.includes("library") ||
+    c.includes("thu_vien") ||
+    c.includes("resources") ||
+    n.includes("thư viện") ||
+    n.includes("học liệu")
+  ) {
+    return "Trợ lý Thư viện & Học liệu Số";
+  }
+  if (
+    c.includes("draft") ||
+    c.includes("soan_thao") ||
+    c.includes("administration") ||
+    n.includes("soạn thảo")
+  ) {
+    return "Trợ lý Soạn thảo Văn bản";
+  }
+  if (
+    c.includes("exam") ||
+    c.includes("khao_thi") ||
+    c.includes("ngan_hang") ||
+    c.includes("question") ||
+    c.includes("cau_hoi") ||
+    c.includes("de_thi") ||
+    n.includes("câu hỏi") ||
+    n.includes("ngân hàng") ||
+    n.includes("khảo thí") ||
+    n.includes("đề thi")
+  ) {
+    return "Trợ lý Ngân hàng Đề & Khảo thí";
+  }
+  return name.replace(
+    /^Mô-đun trợ lý ảo\s*(tư vấn\s*|hỗ trợ\s*|tra cứu,\s*tư vấn\s*)?/i,
+    "Trợ lý ",
+  );
+}
+
 export function AssistantCard({
   assistant,
   onOpen,
@@ -109,8 +165,9 @@ export function AssistantCard({
               <CardTitle
                 className="text-sm font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors cursor-pointer"
                 onClick={onOpen}
+                title={assistant.name}
               >
-                {assistant.name}
+                {formatAssistantDisplayName(assistant.name, assistant.code)}
               </CardTitle>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="font-mono text-[10px] text-muted-foreground truncate">

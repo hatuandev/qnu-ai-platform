@@ -7,12 +7,24 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-04 (UTC+7)
-- **Phiên số**: #264 (Nâng Cấp App Shell Skeleton Triệt Tiêu 100% Layout Shift Màn Hình Chat /chat/:slug)
-- **Kết quả phiên #264**:
-  - **Khắc phục triệt để lỗi giật bố cục khi tải (CLS)**: Thay thế 3 khối Skeleton xám nằm trơ trọi giữa màn hình trắng bằng **`PublicChatSkeleton` (App Shell Skeleton chuẩn Enterprise)** giữ nguyên bố cục 2 cột hoàn chỉnh trong suốt thời gian chờ API.
-  - **Bảo toàn nhận diện thương hiệu**: Sidebar hiển thị ngay Logo chính thức ĐH Quy Nhơn, nút Tạo chat mới viên thuốc và danh sách shimmer threads. Canvas chính hiển thị huy hiệu `Đang kết nối Trợ lý AI QNU...` xoay vòng, shimmer welcome hero, 4 thẻ câu hỏi mẫu và khung nhập liệu nổi ở đáy.
-  - **Kiểm thử**: Biome linter pass 100% (29ms), 0 lỗi, 0 cảnh báo.
+- **Thời gian cập nhật**: 2026-10-05 (UTC+7)
+- **Phiên số**: #265 (Chuyển Cổng Chat AI Thành Trang Chủ Ứng Dụng (/) & Tái Cấu Trúc Điều Hướng Hai Không Gian)
+- **Kết quả phiên #265**:
+  - **Chuyển Cổng Trợ Lý AI Hub thành Trang chủ (`/`)**:
+    - `frontend2/src/routes/index.tsx`: Render trực tiếp `PublicChatPortal` thay vì đá về `/dashboard`.
+    - `frontend2/src/routes/chat.index.tsx`: Chuyển hướng `<Navigate to="/" replace />` bảo toàn 100% tương thích ngược.
+    - `frontend2/src/routes/__root.tsx`: Bổ sung `pathname === "/"` vào `isPublicRoute`, gỡ bỏ `shouldRedirectToHome` cho phép mọi người dùng (kể cả đã đăng nhập) truy cập tự do tại Trang chủ.
+  - **Tối ưu hóa UX Cầu nối Hai Không gian (Dual-Space)**:
+    - `PublicChatPortal`: Logo liên kết về `/`, nút trên Header thích ứng theo trạng thái đăng nhập (`Vào Bảng Điều Khiển` khi đã đăng nhập, `Dành cho Cán bộ` khi chưa đăng nhập).
+    - `PublicChatView` & `ChatHistorySidebar`: Đồng bộ 100% các nút và link quay lại Cổng Trợ Lý trỏ về `/`.
+    - `AdminShell` Navigation: Thêm mục `Cổng Trợ Lý AI` (`/`, icon `Sparkles`) vào nhóm `Tổng Quan` trên Sidebar và Dropdown `AccountMenu` cho cán bộ truy cập tức thì.
+  - **Tối Ưu Lưới 3 Cột Trên Laptop 14" & Chuẩn Hóa Tên Thẻ Trợ Lý**:
+    - Nâng ngưỡng 4 cột từ `2xl:grid-cols-4` (1536px) lên `min-[1800px]:grid-cols-4`, bảo đảm trên toàn bộ laptop 13"-15.6" luôn hiển thị 3 cột thông thoáng (`lg:grid-cols-3`), không bị ép chật thẻ; áp dụng đồng bộ cho `assistants`, `knowledge`, `modelops`, `document-types`, `node-catalog`.
+    - Tích hợp `formatAssistantDisplayName` trong `AssistantCard` chuẩn hóa tên trợ lý ngắn gọn đắt giá, triệt tiêu lỗi cắt cụt `"Mô-đun trợ lý ảo hỗ..."`.
+  - **Kiểm thử**: Biome linter pass 100% (63ms), 0 lỗi, 0 cảnh báo; Vite build production thành công 100% trong **2.99s**.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_265_chuyen_cong_chat_thanh_trang_chu_ung_dung_va_tai_cau_truc_dieu_huong.md`.
+- **Phiên trước #264**:
+  - Khắc phục triệt để lỗi giật bố cục khi tải (CLS): Thay thế 3 khối Skeleton xám bằng `PublicChatSkeleton` (App Shell Skeleton chuẩn Enterprise) giữ nguyên bố cục 2 cột.
   - Báo cáo chi tiết: `docs/nhat_ky/2026-10-04_phien_264_nang_cap_app_shell_skeleton_triet_tieu_layout_shift_man_hinh_chat.md`.
 - **Phiên trước #263**:
   - Đồng bộ Logo chính thức ĐH Quy Nhơn (`/logo.png`) và chuẩn hóa tên trợ lý trên giao diện Chat (/chat/:slug).

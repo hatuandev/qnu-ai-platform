@@ -386,7 +386,7 @@ export function NodeCatalogPage() {
         />
       ) : viewMode === "grid" ? (
         /* Cards Grid View: 1 col on mobile, 2 on tablet, 3 on laptop (14"), 4 on large desktop (24"+) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3 sm:gap-4">
           {filteredNodes.map((node) => (
             <NodeCatalogCard
               key={`${node.type}@${node.version}`}

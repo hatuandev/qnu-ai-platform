@@ -21,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import * as React from "react";
+import { useAuth } from "@/app/auth";
 import { useTheme } from "@/app/theme-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -179,6 +180,7 @@ const TRENDING_QUICK_QUESTIONS = [
 
 export function PublicChatPortal() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState<string>("all");
@@ -293,7 +295,7 @@ export function PublicChatPortal() {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-[#faf9f6]/85 dark:bg-background/80 backdrop-blur-xl transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link
-            to="/chat"
+            to="/"
             className="flex items-center gap-3 select-none text-inherit no-underline group"
           >
             {/* Real University Logo in crisp container */}
@@ -344,7 +346,9 @@ export function PublicChatPortal() {
               className="text-xs h-9 rounded-md gap-1.5 border-border/80 bg-background hover:bg-muted font-medium"
               onClick={() => void navigate({ to: "/dashboard" })}
             >
-              <span>Dành cho Cán bộ</span>
+              <span>
+                {isAuthenticated ? "Vào Bảng Điều Khiển" : "Dành cho Cán bộ"}
+              </span>
               <ArrowRight className="size-3.5" />
             </Button>
           </div>

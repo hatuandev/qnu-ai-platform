@@ -1,4 +1,6 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { PublicChatPortal } from "@/features/chat/public-chat-portal";
+
 export const Route = createFileRoute("/")({
-  component: () => <Navigate to="/dashboard" />,
+  component: PublicChatPortal,
 });
