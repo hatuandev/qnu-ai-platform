@@ -130,7 +130,7 @@ class CollectionService:
             merged = dict(col.collection_metadata or {})
             merged.update(updates.pop("metadata") or {})
             col.collection_metadata = merged
-        if "data_processing" in updates and updates["data_processing"]:
+        if updates.get("data_processing"):
             dp = updates.pop("data_processing")
             dp_dict = dp if isinstance(dp, dict) else (dp.model_dump() if hasattr(dp, "model_dump") else dict(dp))
             merged = dict(col.collection_metadata or {})

@@ -295,8 +295,17 @@ def merge_ocr_orphan_table_rows(markdown: str) -> str:
         cells = _split_table_cells(stripped)
         col0 = cells[0].strip() if len(cells) > 0 else ""
 
-        # A row is an orphan continuation row if Column 0 is empty but at least one other column has text
-        is_orphan = (not col0) and any(bool(c.strip()) for c in cells[1:]) and (last_parent_idx != -1)
+        # Check if row contains independent numerical data, monetary amounts, or distinct entities
+        has_currency_or_number = any(re.search(r"\b\d{1,3}(?:\.\d{3})+\b", c) for c in cells[1:])
+        has_installment = any(re.search(r"\b(?:đợt\s+\d+|văn\s+bằng|tốt\s+nghiệp|khóa|năm)\b", c, re.IGNORECASE) for c in cells[1:])
+
+        # An orphan continuation row is ONLY a text wrapping artifact where no independent numerical/data record exists
+        is_orphan = (
+            (not col0)
+            and any(bool(c.strip()) for c in cells[1:])
+            and (last_parent_idx != -1)
+            and not (has_currency_or_number or has_installment)
+        )
 
         if is_orphan:
             parent_line = out_lines[last_parent_idx]
@@ -314,11 +323,7 @@ def merge_ocr_orphan_table_rows(markdown: str) -> str:
                     if not parent_val:
                         parent_cells[k] = child_val
                     else:
-                        # If child is a lowercase sentence continuation, join with space
-                        if child_val and child_val[0].islower():
-                            parent_cells[k] = f"{parent_val} {child_val}"
-                        else:
-                            parent_cells[k] = f"{parent_val}<br>{child_val}"
+                        parent_cells[k] = f"{parent_val} {child_val}"
 
             out_lines[last_parent_idx] = "| " + " | ".join(parent_cells) + " |"
             i += 1
@@ -468,6 +473,103 @@ def clean_html_layout_tables(markdown: str) -> str:
     return re.sub(r"<\s*table[^>]*>[\s\S]*?<\s*/\s*table\s*>", _replace_table, markdown, flags=re.IGNORECASE)
 
 
+def inherit_table_headers_for_continuation_pages(
+    pages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Ensure multi-page continuation tables inherit standard headers from preceding pages.
+
+    Algorithmic-First & Structural Invariants:
+    When an administrative document table spans across multiple pages (e.g., fee schedules),
+    subsequent pages often start directly with data rows or stray separators without repeating
+    the column header row. This causes markdown renderers and human reviewers to misinterpret
+    the first data row as a header or break table formatting.
+    """
+    last_header: str | None = None
+    last_separator: str | None = None
+    last_col_count: int = 0
+
+    out_pages: list[dict[str, Any]] = []
+    for page in pages:
+        p_copy = dict(page)
+        p_text = str(p_copy.get("extracted_text") or "")
+        if not p_text:
+            out_pages.append(p_copy)
+            continue
+
+        lines = p_text.splitlines()
+
+        # 1. Scan page for any full table with valid header
+        found_header = None
+        found_sep = None
+        for i in range(len(lines) - 1):
+            if (
+                _is_table_row(lines[i])
+                and not _is_table_separator(lines[i])
+                and _is_table_separator(lines[i + 1])
+            ):
+                cells = _split_table_cells(lines[i])
+                # Ensure it is a genuine header row (has multiple columns)
+                if len(cells) >= 3 and any(len(c) > 1 for c in cells):
+                    found_header = lines[i]
+                    found_sep = lines[i + 1]
+                    break
+
+        # 2. Check if this page starts with a continuation table (missing header)
+        first_table_idx = -1
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("<!--"):
+                continue
+            if _is_table_row(stripped):
+                first_table_idx = idx
+                break
+            else:
+                break  # Starts with regular heading / paragraph, not a continuation table
+
+        if first_table_idx != -1 and last_header and last_separator:
+            # Check if this table has its own valid header
+            has_own_header = False
+            if (
+                first_table_idx + 1 < len(lines)
+                and _is_table_separator(lines[first_table_idx + 1])
+                and not _is_table_separator(lines[first_table_idx])
+            ):
+                c0 = _split_table_cells(lines[first_table_idx])[0]
+                # If col 0 is a numeric ordinal, this is a data row, not a header!
+                if not re.search(r"^\d+$", c0):
+                    has_own_header = True
+
+            if not has_own_header:
+                # Remove any stray leading separator rows
+                while first_table_idx < len(lines) and _is_table_separator(lines[first_table_idx]):
+                    lines.pop(first_table_idx)
+
+                # Pad rows to match last_col_count
+                for r_idx in range(first_table_idx, len(lines)):
+                    if not _is_table_row(lines[r_idx]):
+                        break
+                    row_cells = _split_table_cells(lines[r_idx])
+                    if len(row_cells) < last_col_count:
+                        while len(row_cells) < last_col_count:
+                            row_cells.append("")
+                        lines[r_idx] = "| " + " | ".join(row_cells) + " |"
+
+                # Insert inherited header and separator
+                lines.insert(first_table_idx, last_separator)
+                lines.insert(first_table_idx, last_header)
+                p_copy["extracted_text"] = "\n".join(lines)
+                p_copy["word_count"] = len(p_copy["extracted_text"].split())
+                p_copy["line_count"] = len(p_copy["extracted_text"].splitlines())
+
+        if found_header and found_sep:
+            last_header = found_header
+            last_separator = found_sep
+            last_col_count = len(_split_table_cells(found_header))
+
+        out_pages.append(p_copy)
+    return out_pages
+
+
 def post_process_ocr_output(
     raw_text: str, pages: list[dict[str, Any]] | None = None
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -512,6 +614,9 @@ def post_process_ocr_output(
                 p_copy["word_count"] = len(p_cleaned.split())
                 p_copy["line_count"] = len(p_cleaned.splitlines())
             out_pages.append(p_copy)
+
+        # Step 8: Inherit table headers across continuation pages
+        out_pages = inherit_table_headers_for_continuation_pages(out_pages)
     else:
         out_pages = []
 

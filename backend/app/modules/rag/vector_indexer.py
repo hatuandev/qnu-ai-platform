@@ -102,7 +102,7 @@ class VectorIndexer:
                 async with AsyncSessionFactory() as db:
                     stmt = select(KnowledgeCollection).where(
                         (KnowledgeCollection.id == collection_id)
-                        | (KnowledgeCollection.slug == collection_id)
+                        | (KnowledgeCollection.module_code == collection_id)
                     )
                     res = await db.execute(stmt)
                     col = res.scalar_one_or_none()

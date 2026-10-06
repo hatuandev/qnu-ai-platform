@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, FileText, Table2 } from "lucide-react";
+import { Activity, Cpu, FileText, Table2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CollectionHeader } from "@/components/knowledge/collection-header";
-import { CollectionConfigDialog } from "@/components/knowledge/dialogs/collection-config-dialog";
+import { CollectionModelsTab } from "@/components/knowledge/tabs/collection-models-tab";
 import { CollectionExcelImportDialog } from "@/components/knowledge/dialogs/collection-excel-import-dialog";
 import { CollectionReconcileDialog } from "@/components/knowledge/dialogs/collection-reconcile-dialog";
 import { DocumentPreviewDialog } from "@/components/knowledge/dialogs/document-preview-dialog";
@@ -35,11 +35,13 @@ import type {
 export interface CollectionDetailPageProps {
   collectionId: string;
   initialDocId?: string;
+  initialTab?: CollectionDetailTab;
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   collectionId,
   initialDocId,
+  initialTab,
 }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -56,7 +58,15 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   }, [initialDocId]);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<CollectionDetailTab>("documents");
+  const [activeTab, setActiveTab] = useState<CollectionDetailTab>(
+    initialTab || "documents",
+  );
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Document Filters
   const [docSearchQuery, setDocSearchQuery] = useState("");
@@ -71,7 +81,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
   // Dialog States
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configName, setConfigName] = useState("");
   const [configDescription, setConfigDescription] = useState("");
   const [configDataProcessing, setConfigDataProcessing] =
@@ -126,6 +135,28 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       updated_at: new Date().toISOString(),
     };
   }, [collections, collectionId]);
+
+  useEffect(() => {
+    if (collection) {
+      setConfigName(collection.name);
+      setConfigDescription(collection.description || "");
+      if (collection.data_processing) {
+        setConfigDataProcessing(collection.data_processing);
+      } else {
+        setConfigDataProcessing({
+          embedding_model: "bge-m3:latest",
+          embedding_provider_id: "prov_rtx5090_ollama",
+          embedding_dimension: 1024,
+          ocr_mode: "combo",
+          primary_ocr_model: "qwen3-vl:8b",
+          primary_ocr_provider_id: "prov_rtx5090_ollama",
+          fallback_ocr_model: "gemini-3.1-flash-lite",
+          fallback_ocr_provider_id: "prov_gemini",
+          enable_ocr_rescue: true,
+        });
+      }
+    }
+  }, [collection]);
 
   // 2. Fetch System Defaults for Embedding Model
   const { data: systemDefaultsResponse } = useQuery({
@@ -232,7 +263,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     onSuccess: () => {
       toast.success("Cập nhật thông tin kho thành công.");
       queryClient.invalidateQueries({ queryKey: ["collections"] });
-      setIsConfigOpen(false);
     },
     onError: (err: Error) => {
       toast.error(`Cập nhật thất bại: ${err.message}`);
@@ -397,24 +427,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   };
 
-  const handleOpenConfig = () => {
-    setConfigName(collection.name);
-    setConfigDescription(collection.description);
-    setConfigDataProcessing(
-      collection.data_processing || {
-        embedding_model: "bge-m3:latest",
-        embedding_provider_id: "prov_rtx5090_ollama",
-        embedding_dimension: 1024,
-        ocr_mode: "combo",
-        primary_ocr_model: "qwen3-vl:8b",
-        primary_ocr_provider_id: "prov_rtx5090_ollama",
-        fallback_ocr_model: "gemini-3.1-flash-lite",
-        fallback_ocr_provider_id: "prov_gemini",
-        enable_ocr_rescue: true,
-      },
-    );
-    setIsConfigOpen(true);
-  };
 
   const handleReindexSingleDoc = async (docId: string) => {
     try {
@@ -505,7 +517,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         onOpenReconcile={handleOpenReconcile}
         onReindex={handleReindexCollection}
         isReindexing={isReindexing}
-        onOpenConfig={handleOpenConfig}
         onStartIngest={() => setIsUploadOpen(true)}
         actionError={actionError}
         reindexJobId={reindexJobId}
@@ -541,6 +552,14 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             >
               <Activity className="size-3.5" />
               <span>Tiến trình</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="models"
+              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
+            >
+              <Cpu className="size-3.5" />
+              <span>Mô hình & Cấu hình</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -611,6 +630,21 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onDeleteTask={(task) => setDeleteTaskTarget(task)}
           />
         </TabsContent>
+
+        {/* Tab 4: Cấu Hình Kho & Mô Hình AI */}
+        <TabsContent value="models" className="mt-0 focus-visible:ring-0">
+          <CollectionModelsTab
+            collection={collection}
+            configName={configName}
+            setConfigName={setConfigName}
+            configDescription={configDescription}
+            setConfigDescription={setConfigDescription}
+            dataProcessingConfig={configDataProcessing}
+            setDataProcessingConfig={setConfigDataProcessing}
+            isSaving={updateCollectionMutation.isPending}
+            onSave={() => updateCollectionMutation.mutate()}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* 4. Dialogs */}
@@ -625,21 +659,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           refetchTasks();
         }}
         onOpenStudio={(docId) => setActiveStudioDocId(docId)}
-      />
-
-      {/* Cấu Hình Kho */}
-      <CollectionConfigDialog
-        open={isConfigOpen}
-        onOpenChange={setIsConfigOpen}
-        configName={configName}
-        setConfigName={setConfigName}
-        configDescription={configDescription}
-        setConfigDescription={setConfigDescription}
-        documentCount={collection.document_count}
-        dataProcessingConfig={configDataProcessing}
-        setDataProcessingConfig={setConfigDataProcessing}
-        isSaving={updateCollectionMutation.isPending}
-        onSave={() => updateCollectionMutation.mutate()}
       />
 
       {/* Đối Soát Dữ Liệu */}

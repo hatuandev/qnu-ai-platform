@@ -21,7 +21,6 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyState } from "@/components/admin/empty-state";
 import { KpiMetric } from "@/components/admin/kpi-metric";
 import { PageHeader } from "@/components/admin/page-header";
-import { CollectionConfigDialog } from "@/components/knowledge/dialogs/collection-config-dialog";
 import { CollectionReconcileDialog } from "@/components/knowledge/dialogs/collection-reconcile-dialog";
 import { DocumentUploadDialog } from "@/components/knowledge/dialogs/document-upload-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +59,6 @@ import {
 import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type {
-  CollectionDataProcessingConfig,
   KnowledgeCollection,
   KnowledgeReconciliationReport,
 } from "@/types/knowledge";
@@ -83,14 +81,6 @@ export const KnowledgePage: React.FC = () => {
   const [createStrategy, setCreateStrategy] = useState("SemanticChunker");
   const [createOcr, setCreateOcr] = useState("PyMuPDF");
 
-  // Edit Collection Dialog State
-  const [editTarget, setEditTarget] = useState<KnowledgeCollection | null>(
-    null,
-  );
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editDataProcessing, setEditDataProcessing] =
-    useState<CollectionDataProcessingConfig>({});
 
   // Upload Dialog State
   const [uploadTarget, setUploadTarget] = useState<KnowledgeCollection | null>(
@@ -175,25 +165,6 @@ export const KnowledgePage: React.FC = () => {
     },
   });
 
-  // Edit Collection Mutation
-  const editMutation = useMutation({
-    mutationFn: () => {
-      if (!editTarget) throw new Error("Chưa chọn kho cần sửa.");
-      return knowledgeApi.updateCollection(editTarget.id, {
-        name: editName.trim() || undefined,
-        description: editDescription.trim() || undefined,
-        data_processing: editDataProcessing,
-      });
-    },
-    onSuccess: () => {
-      toast.success("Cập nhật thông tin kho thành công.");
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
-      setEditTarget(null);
-    },
-    onError: (err: Error) => {
-      toast.error(`Cập nhật thất bại: ${err.message}`);
-    },
-  });
 
   // Delete Collection Mutation
   const deleteMutation = useMutation({
@@ -218,22 +189,11 @@ export const KnowledgePage: React.FC = () => {
   };
 
   const handleOpenEdit = (col: KnowledgeCollection) => {
-    setEditTarget(col);
-    setEditName(col.name);
-    setEditDescription(col.description);
-    setEditDataProcessing(
-      col.data_processing || {
-        embedding_model: "bge-m3:latest",
-        embedding_provider_id: "prov_rtx5090_ollama",
-        embedding_dimension: 1024,
-        ocr_mode: "combo",
-        primary_ocr_model: "qwen3-vl:8b",
-        primary_ocr_provider_id: "prov_rtx5090_ollama",
-        fallback_ocr_model: "gemini-3.1-flash-lite",
-        fallback_ocr_provider_id: "prov_gemini",
-        enable_ocr_rescue: true,
-      },
-    );
+    navigate({
+      to: "/knowledge/$collectionId",
+      params: { collectionId: col.id },
+      search: { tab: "models" },
+    });
   };
 
   const handleOpenReconcile = async (col: KnowledgeCollection) => {
@@ -750,24 +710,6 @@ export const KnowledgePage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* 6. Dialog: Sửa Kho Tri Thức */}
-      {editTarget && (
-        <CollectionConfigDialog
-          open={Boolean(editTarget)}
-          onOpenChange={(v) => {
-            if (!v) setEditTarget(null);
-          }}
-          configName={editName}
-          setConfigName={setEditName}
-          configDescription={editDescription}
-          setConfigDescription={setEditDescription}
-          documentCount={editTarget.document_count}
-          dataProcessingConfig={editDataProcessing}
-          setDataProcessingConfig={setEditDataProcessing}
-          isSaving={editMutation.isPending}
-          onSave={() => editMutation.mutate()}
-        />
-      )}
 
       {/* 7. Dialog: Nạp Tài Liệu */}
       {uploadTarget && (

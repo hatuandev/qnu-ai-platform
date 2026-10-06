@@ -364,8 +364,8 @@ class VisionAdapterConfig(BaseModel):
 
 class SystemModelDefaults(BaseModel):
     # Embedding
-    default_embedding_provider_id: str = "prov_cloudflare"
-    default_embedding_model: str = "@cf/baai/bge-m3"
+    default_embedding_provider_id: str = "prov_rtx5090_ollama"
+    default_embedding_model: str = "bge-m3:latest"
     default_embedding_mode: Literal["combo", "single"] = "single"
     default_embedding_combo_id: str | None = None
     embedding_combo_chain: list[OCRComboItem] = Field(default_factory=list)

@@ -15,7 +15,6 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import settings
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.core.storage import storage_service
 from app.modules.jobs.models import JobRecord
@@ -24,6 +23,7 @@ from app.modules.knowledge.cleaner import clean_markdown_text
 from app.modules.knowledge.facts import fact_extractor
 from app.modules.knowledge.models import (
     KnowledgeChunk,
+    KnowledgeCollection,
     KnowledgeDocument,
     KnowledgeFact,
 )
@@ -1164,7 +1164,9 @@ class IngestionService:
         """Assemble the verification studio view from stored chunks + geometry."""
         doc = await self._call_get_document(db, document_id)
 
-        needs_rescue = (not doc.chunks or len(doc.chunks) == 0 or refresh_layout)
+        meta = doc.doc_metadata or {}
+        has_run_ingestion = bool(meta.get("ocr_method") or meta.get("page_count"))
+        needs_rescue = refresh_layout or (not has_run_ingestion and (not doc.chunks or len(doc.chunks) == 0))
         if needs_rescue and doc.storage_path:
             file_bytes = await _get_storage_service().get(doc.storage_path)
             if file_bytes:
@@ -1538,6 +1540,9 @@ class IngestionService:
             .scalars()
             .all()
         )
+        col_dp = (col.collection_metadata.get("data_processing") or {}) if col and col.collection_metadata else {}
+        col_embedding_model = col_dp.get("embedding_model") or "bge-m3:latest"
+
         chunks_payload = [
             {
                 "id": c.id,
@@ -1552,7 +1557,7 @@ class IngestionService:
                 "document_status": "indexing",
                 "is_retrievable": False,
                 "content_hash": c.chunk_hash,
-                "embedding_model": settings.EMBEDDING_MODEL,
+                "embedding_model": col_embedding_model,
                 "payload_schema_version": "v1",
                 "section": c.section,
                 "page_number": c.page_number,

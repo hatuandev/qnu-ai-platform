@@ -204,8 +204,8 @@ class ModelCatalogService:
         cfg_record = res.scalar_one_or_none()
 
         default_data: dict[str, Any] = {
-            "default_embedding_provider_id": "prov_cloudflare",
-            "default_embedding_model": "@cf/baai/bge-m3",
+            "default_embedding_provider_id": "prov_rtx5090_ollama",
+            "default_embedding_model": "bge-m3:latest",
             "default_embedding_mode": "combo",
             "default_embedding_combo_id": "combo_qnu_embedding_shield",
             "embedding_combo_chain": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,

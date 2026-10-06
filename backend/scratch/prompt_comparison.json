@@ -1,0 +1,18 @@
+[
+  {
+    "name": "SysPrompt-NoThink",
+    "elapsed": 55.379154205322266,
+    "c_len": 1999,
+    "th_len": 20259,
+    "c": "BỘ GIÁO DỤC VÀ ĐÀO TẠO  \nTRƯỜNG ĐẠI HỌC QUY NHƠN  \nSố: 2139/Qy-ĐHQN  \n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM  \nĐộc lập - Tự do - Hạnh phúc  \nGia Lai, ngày 30 tháng 7 năm 2025  \n\n## QUY ĐỊNH  \nVề mức thu ",
+    "th": "Got it, I need to convert the given image into Markdown GFM (GitHub Flavored Markdown) for Vietnamese administrative text. Let's start by analyzing the structure.\n\nFirst, the document header: \"BỘ GIÁO"
+  },
+  {
+    "name": "Direct-Transcription",
+    "elapsed": 61.02070331573486,
+    "c_len": 2196,
+    "th_len": 24246,
+    "c": "BỘ GIÁO DỤC VÀ ĐÀO TẠO  \nTRƯỜNG ĐẠI HỌC QUY NHON  \nSố : 2139/Qy-ĐHQN  \n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM  \nĐộc lập - Tự do - Hạnh phúc  \nGia Lai, ngày 30 tháng 7 năm 2025  \n\nQUY ĐỊNH  \nVề mức thu họ",
+    "th": "Got it, I need to transcribe the document in the image into Vietnamese Markdown text exactly as shown. Let me go through each part step by step.\n\nFirst, the header part. The document starts with \"BỘ G"
+  }
+]

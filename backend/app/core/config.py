@@ -196,8 +196,8 @@ class Settings(BaseSettings):
         return url
 
     # --- Embedding & Reranker ---
-    EMBEDDING_PROVIDER: str = "cloudflare"
-    EMBEDDING_MODEL: str = "@cf/baai/bge-m3"
+    EMBEDDING_PROVIDER: str = "custom"
+    EMBEDDING_MODEL: str = "bge-m3:latest"
     RERANKER_PROVIDER: str = "cloudflare"
     RERANKER_MODEL: str = "@cf/baai/bge-reranker-base"
     DEFAULT_TOP_K: int = 8

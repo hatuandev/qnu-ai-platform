@@ -5,7 +5,6 @@ import {
   Cpu,
   MoreHorizontal,
   RefreshCw,
-  Settings,
   ShieldCheck,
   Upload,
   Zap,
@@ -28,7 +27,6 @@ interface CollectionHeaderProps {
   onOpenReconcile: () => void;
   onReindex: () => void;
   isReindexing: boolean;
-  onOpenConfig: () => void;
   onStartIngest: () => void;
   actionError: string | null;
   reindexJobId: string | null;
@@ -42,17 +40,26 @@ export function CollectionHeader({
   onOpenReconcile,
   onReindex,
   isReindexing,
-  onOpenConfig,
   onStartIngest,
   actionError,
   reindexJobId,
 }: CollectionHeaderProps) {
-  const embeddingModelDisplay =
+  // Mô hình Vector Embedding đang áp dụng của riêng kho tri thức này
+  const activeEmbeddingModel =
+    collection.data_processing?.embedding_model ||
     collection.embedding_model ||
     systemDefaultEmbeddingModel ||
-    "Cloudflare BGE-M3 (1024-dim)";
+    "bge-m3:latest";
 
-  const isCloudflareModel = embeddingModelDisplay.includes("@cf/");
+  const isCloudflareModel = activeEmbeddingModel.includes("@cf/");
+
+  const formatModelLabel = (model: string) => {
+    if (model === "bge-m3:latest" || model === "bge-m3") return "BGE-M3 (1024D)";
+    if (model === "@cf/baai/bge-m3") return "Cloudflare BGE-M3 (1024D)";
+    if (model === "text-embedding-3-small") return "OpenAI Small (1536D)";
+    if (model === "text-embedding-3-large") return "OpenAI Large (3072D)";
+    return model;
+  };
 
   return (
     <div className="bg-card border border-border rounded-lg p-3 sm:p-5 shadow-xs space-y-2.5">
@@ -154,13 +161,6 @@ export function CollectionHeader({
                     {isReindexing ? "Đang reindex..." : "Reindex vector"}
                   </span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={onOpenConfig}
-                  className="gap-2 text-xs cursor-pointer py-2"
-                >
-                  <Settings className="size-3.5" />
-                  <span>Cấu hình kho</span>
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -192,37 +192,28 @@ export function CollectionHeader({
               <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs gap-1.5 px-2.5"
-              onClick={onOpenConfig}
-              title="Chỉnh sửa tên và mô tả kho"
-            >
-              <Settings className="size-3.5" />
-              <span>Sửa</span>
-            </Button>
           </div>
         </div>
       </div>
 
       {/* Sub Meta Info Line */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground pt-2.5 border-t border-border/60">
-        <span className="inline-flex items-center gap-1.5 font-mono text-xs text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20">
+        <span
+          className="inline-flex items-center gap-1.5 font-mono text-xs text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20"
+          title={`Mô hình Vector Embedding chuyên trách kho tri thức: ${activeEmbeddingModel}`}
+        >
           {isCloudflareModel ? (
             <Zap className="size-3.5 text-amber-500 shrink-0" />
           ) : (
-            <Cpu className="size-3.5 shrink-0" />
+            <Cpu className="size-3.5 text-primary shrink-0" />
           )}
-          <span>{embeddingModelDisplay}</span>
-          {!collection.embedding_model && systemDefaultEmbeddingModel && (
-            <Badge
-              variant="outline"
-              className="text-[10px] px-1 py-0 border-primary/30 text-primary bg-primary/10 font-sans font-normal"
-            >
-              Mặc định
-            </Badge>
-          )}
+          <span className="font-semibold">{formatModelLabel(activeEmbeddingModel)}</span>
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1.5 py-0 border-success/30 text-success bg-success/10 font-sans font-medium"
+          >
+            Đang áp dụng
+          </Badge>
         </span>
 
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded font-medium text-foreground">

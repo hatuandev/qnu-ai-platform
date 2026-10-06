@@ -48,6 +48,10 @@ export const knowledgeApi = {
             ? "PyMuPDF"
             : "Mistral"),
         data_processing: ((d.collection_metadata as Record<string, unknown>)?.data_processing || (d.metadata as Record<string, unknown>)?.data_processing || d.data_processing) as KnowledgeCollection["data_processing"],
+        embedding_model:
+          (((d.collection_metadata as Record<string, unknown>)?.data_processing || (d.metadata as Record<string, unknown>)?.data_processing || d.data_processing) as Record<string, unknown>)?.embedding_model as string ||
+          (d.embedding_model as string) ||
+          "bge-m3:latest",
         updated_at:
           typeof d.updated_at === "string"
             ? d.updated_at
@@ -63,9 +67,11 @@ export const knowledgeApi = {
     if (res.ok) {
       const item = await res.json();
       const meta = item.metadata || item.collection_metadata || {};
+      const dp = (meta.data_processing || item.data_processing) as Record<string, unknown> | undefined;
       return {
         ...item,
-        data_processing: meta.data_processing || item.data_processing,
+        data_processing: dp as KnowledgeCollection["data_processing"],
+        embedding_model: (dp?.embedding_model as string) || item.embedding_model || "bge-m3:latest",
       };
     }
     const all = await this.getCollections();

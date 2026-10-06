@@ -1407,7 +1407,12 @@ class SmartLayoutDetector:
                 nearby_h = [hy for hy in h_clusters if (v_min_y - 30) <= hy <= (v_max_y + 30)]
                 if nearby_h:
                     tbl_y1 = min(tbl_y1, min(nearby_h))
-                    tbl_y2 = max(tbl_y2, max(nearby_h))
+                    if len(nearby_h) >= 2:
+                        tbl_y2 = max(nearby_h)
+                    else:
+                        tbl_y2 = max(tbl_y2, max(nearby_h))
+                if has_seal and seal_y1 > tbl_y1:
+                    tbl_y2 = min(tbl_y2, seal_y1 - 6)
                 table_boxes.append((
                     max(0, v_min_x - 6),
                     max(0, tbl_y1 - 4),
@@ -1758,7 +1763,7 @@ class SmartLayoutDetector:
             elif rtype == "signature":
                 r["text"] = sig_right_text or label_val
                 r["content_snippet"] = (sig_right_text.splitlines()[0] if sig_right_text else label_val)[:160]
-            elif rtype == "list" and is_closing_page and top_val >= 70.0 and sig_left_text:
+            elif rtype == "list" and is_closing_page and top_val >= 40.0 and sig_left_text:
                 r["text"] = sig_left_text
                 r["content_snippet"] = (sig_left_text.splitlines()[0] if sig_left_text else label_val)[:160]
             else:

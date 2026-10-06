@@ -4,6 +4,7 @@ import { CollectionDetailPage } from "@/features/knowledge/collection-detail-pag
 
 const searchSchema = z.object({
   docId: z.string().optional(),
+  tab: z.enum(["documents", "facts", "tasks", "models"]).optional(),
 });
 
 export const Route = createFileRoute("/knowledge/$collectionId")({
@@ -13,8 +14,12 @@ export const Route = createFileRoute("/knowledge/$collectionId")({
 
 function CollectionDetailRoute() {
   const { collectionId } = Route.useParams();
-  const { docId } = Route.useSearch();
+  const { docId, tab } = Route.useSearch();
   return (
-    <CollectionDetailPage collectionId={collectionId} initialDocId={docId} />
+    <CollectionDetailPage
+      collectionId={collectionId}
+      initialDocId={docId}
+      initialTab={tab}
+    />
   );
 }

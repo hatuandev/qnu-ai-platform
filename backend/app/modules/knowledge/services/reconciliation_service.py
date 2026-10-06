@@ -9,7 +9,6 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.jobs.models import JobRecord
@@ -95,6 +94,9 @@ class ReconciliationService:
         doc.index_error = None
         await db.commit()
 
+        col_dp = (col.collection_metadata.get("data_processing") or {}) if col and col.collection_metadata else {}
+        col_embedding_model = col_dp.get("embedding_model") or "bge-m3:latest"
+
         chunks_payload = [
             {
                 "id": c.id,
@@ -109,7 +111,7 @@ class ReconciliationService:
                 "document_status": "indexing",
                 "is_retrievable": False,
                 "content_hash": c.chunk_hash,
-                "embedding_model": settings.EMBEDDING_MODEL,
+                "embedding_model": col_embedding_model,
                 "payload_schema_version": "v1",
                 "section": c.section,
                 "page_number": c.page_number,

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "DPI-150-Basic",
+    "dpi": 150,
+    "image_size_kb": 436,
+    "elapsed_s": 25.22,
+    "content_len": 0,
+    "thinking_len": 11260,
+    "has_content": false,
+    "first_100_content": ""
+  },
+  {
+    "name": "DPI-110-Basic",
+    "dpi": 110,
+    "image_size_kb": 269,
+    "elapsed_s": 23.54,
+    "content_len": 0,
+    "thinking_len": 10838,
+    "has_content": false,
+    "first_100_content": ""
+  },
+  {
+    "name": "DPI-110-FastPrompt",
+    "dpi": 110,
+    "image_size_kb": 269,
+    "elapsed_s": 23.91,
+    "content_len": 0,
+    "thinking_len": 14055,
+    "has_content": false,
+    "first_100_content": ""
+  }
+]

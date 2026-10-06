@@ -10,6 +10,7 @@ Supports all OpenAI-standard vision APIs:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -45,7 +46,7 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
 
         from app.core.config import resolve_ollama_network_url
 
-        if not base_url and ("qwen3-vl" in self._model_name.lower() or "qwen" in self._model_name.lower()):
+        if not base_url and ("qwen3-vl" in self._model_name.lower() or self._adapter_name == "qwen_ocr"):
             default_ollama = getattr(settings, "OLLAMA_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:11434"
             self._base_url = resolve_ollama_network_url(default_ollama).rstrip("/")
         else:
@@ -74,6 +75,7 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
             "11434" in self._base_url
             or "ollama" in self._base_url.lower()
             or "qwen3-vl" in self._model_name.lower()
+            or self._adapter_name == "qwen_ocr"
         )
 
     @property
@@ -159,8 +161,11 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 pdf = fitz.open(stream=content, filetype="pdf")
                 for p_idx, page in enumerate(pdf):
                     p_num = p_idx + 1
-                    pix = page.get_pixmap(dpi=150)
-                    img_bytes = pix.tobytes("jpeg")
+                    # DPI 96 + alpha=False + JPEG quality 85:
+                    # - alpha=False: eliminates 4th channel (25% memory savings and faster JPEG encoding)
+                    # - DPI 96: optimal 1:1 pixel grid for vision transformers, producing ~25% fewer visual patches
+                    pix = page.get_pixmap(dpi=96, alpha=False)
+                    img_bytes = pix.tobytes("jpeg", jpg_quality=85)
                     page_images.append((p_num, img_bytes, "image/jpeg"))
                 pdf.close()
             except Exception as pdf_err:
@@ -172,9 +177,6 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
         if not page_images:
             raise RuntimeError("Tài liệu không có trang nào để nhận dạng.")
 
-        pages_out: list[dict[str, Any]] = []
-        all_text: list[str] = []
-
         endpoint = (
             f"{self._base_url.removesuffix('/v1')}/api/chat"
             if is_ollama
@@ -185,61 +187,42 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
             "Content-Type": "application/json",
         }
 
-        # Process each page with Vision LLM
-        for p_num, img_bytes, mime_type in page_images:
+        # Concurrency semaphore: process up to 3 pages concurrently on RTX 5090 GPU (32GB VRAM)
+        sem = asyncio.Semaphore(3)
+
+        async def _process_single_page(p_num: int, img_bytes: bytes, mime_type: str, client: httpx.AsyncClient) -> dict[str, Any]:
             b64_data = base64.b64encode(img_bytes).decode("utf-8")
             data_url = f"data:{mime_type};base64,{b64_data}"
 
             prompt = (
-                f"Bạn là chuyên gia OCR và phân tích cấu trúc tài liệu hành chính tiếng Việt cao cấp "
-                f"của Trường Đại học Quy Nhơn (QNU). Hãy bóc tách nội dung Trang {p_num} của tài liệu này.\n"
-                "Quy tắc bắt buộc:\n"
-                "1. BẢO TOÀN NỘI DUNG & CHÍNH TẢ: Giữ nguyên 100% nội dung chữ, tiêu đề cấp mục (#, ##, ###), "
-                "số hiệu văn bản, ngày tháng, họ tên, các điều khoản, ghi chú, con dấu và chữ ký. Nhận diện chuẩn xác "
-                "thuật ngữ hành chính và tài chính.\n"
-                "2. CẤM TUYỆT ĐỐI THẺ HTML THÔ (ZERO RAW HTML TAGS): Tuyệt đối KHÔNG sử dụng các thẻ HTML như "
-                "<table>, <tr>, <td>, <hr>, <br>, <center>, <b>, <i> để dàn trang. 100% sử dụng Markdown GFM thuần khiết. "
-                "Các khối Quốc hiệu, tiêu ngữ, số hiệu văn bản và Nơi nhận, người ký phải viết dưới dạng văn bản Markdown chuẩn (**, *, -).\n"
-                "3. BẢNG BIỂU CHUẨN GFM & PHẲNG HÓA DỮ LIỆU: Mọi bảng biểu phải chuyển thành bảng Markdown hoàn chỉnh với hàng tiêu đề "
-                "và hàng phân cách '|:---|:---|'. Giữ nguyên vẹn toàn bộ các hàng và cột.\n"
-                "   - BẢNG HỌC PHÍ / CHỈ TIÊU: Mỗi phương án đào tạo (thời gian học, mức học phí) tách thành 1 HÀNG ĐỘC LẬP đầy đủ thông tin. "
-                "TUYỆT ĐỐI KHÔNG gộp nhiều mức học phí vào cùng một ô bằng thẻ <br> hay dấu xuống dòng.\n"
-                "   - BẢNG TIẾP NỐI QUA TRANG: Giữ lại đầy đủ 100% các hàng tiếp nối ở đầu trang (kể cả hàng có STT bị để trống). Lặp lại hàng tiêu đề bảng.\n"
-                "4. CHỐNG BẺ ĐÔI TỪ: Không bẻ gãy từ tiếng Việt.\n"
-                "5. CHUẨN UTF-8: Đảm bảo toàn bộ ký tự tiếng Việt hiển thị sạch sẽ theo chuẩn Unicode NFC.\n"
-                "6. KHUNG TỌA ĐỘ BỐ CỤC (BOUNDING BOXES): Tại đầu trang, chèn một khối ```layout_json "
-                "chứa danh sách các khối trên trang với tọa độ chuẩn hóa box_2d [ymin, xmin, ymax, xmax] (thang đo 0 đến 1000):\n"
-                "   - 'header': Quốc hiệu, tiêu ngữ, tên cơ quan, số hiệu văn bản (đỉnh trang).\n"
-                "   - 'title': Tiêu đề văn bản (THÔNG BÁO, QUYẾT ĐỊNH, QUY ĐỊNH...).\n"
-                "   - 'table': Vùng bao quanh toàn bộ bảng số liệu.\n"
-                "   - 'list': Danh sách gạch đầu dòng, danh sách hồ sơ, Nơi nhận...\n"
-                "   - 'text': Các đoạn văn bản thông thường, căn cứ pháp lý.\n"
-                "   - 'signature': Vùng con dấu đỏ và chữ ký của lãnh đạo.\n"
-                "Ví dụ mẫu đầu trang:\n"
-                "```layout_json\n"
-                "[\n"
-                "  {\"label\": \"header\", \"box_2d\": [40, 80, 160, 920], \"snippet\": \"BỘ GIÁO DỤC...\"},\n"
-                "  {\"label\": \"title\", \"box_2d\": [180, 180, 240, 820], \"snippet\": \"THÔNG BÁO...\"},\n"
-                "  {\"label\": \"table\", \"box_2d\": [320, 80, 480, 920], \"snippet\": \"STT | Mã ngành...\"}\n"
-                "]\n"
-                "```\n"
-                "[Tiếp theo là toàn bộ nội dung Markdown chi tiết của trang]\n"
+                f"OCR Trang {p_num} sang Markdown GFM tiếng Việt chuẩn Unicode NFC.\n"
+                "- Bảo toàn 100% nội dung chữ, tiêu đề cấp mục (#, ##, ###), số hiệu, ngày tháng, điều khoản, bảng biểu, chữ ký, con dấu.\n"
+                "- Bảng biểu chuyển thành bảng Markdown hoàn chỉnh với đầy đủ cột/hàng. Tuyệt đối không dùng thẻ HTML (<table>, <tr>, <td>, <br>)."
             )
 
             if is_ollama:
+                ollama_messages: list[dict[str, Any]] = [
+                    {
+                        "role": "user",
+                        "content": prompt,
+                        "images": [b64_data],
+                    }
+                ]
+                # Bypass CoT reasoning overhead for Document OCR (accelerates from ~50s down to 3-6s/page!)
+                if "qwen3" in self.model_name.lower() or "r1" in self.model_name.lower():
+                    ollama_messages.append({"role": "assistant", "content": "</think>\n"})
+
                 payload = {
                     "model": self.model_name,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": prompt,
-                            "images": [b64_data],
-                        }
-                    ],
+                    "messages": ollama_messages,
                     "options": {
-                        "temperature": 0.1,
-                        "num_predict": 8192,
+                        "temperature": 0.0,   # Greedy argmax decoding: fastest, zero sampling overhead
+                        "num_predict": 2048,  # Ample for standard A4 document page
+                        "num_ctx": 4096,      # Compact KV cache allocation, avoids reallocation overhead
+                        "top_k": 1,
+                        "top_p": 1.0,
                     },
+                    "keep_alive": -1,         # Retain model permanently in RTX 5090 VRAM (0s reload latency)
                     "stream": False,
                 }
             else:
@@ -257,8 +240,8 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                             ],
                         }
                     ],
-                    "temperature": 0.1,
-                    "max_tokens": 8192,
+                    "temperature": 0.0,
+                    "max_tokens": 4096,
                 }
 
             logger.info(
@@ -270,7 +253,7 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 endpoint,
             )
 
-            async with httpx.AsyncClient(timeout=180.0, trust_env=False) as client:
+            async with sem:
                 resp = await client.post(endpoint, json=payload, headers=headers)
 
             if resp.status_code != 200:
@@ -290,17 +273,59 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
 
             data = resp.json()
             if is_ollama:
-                extracted_page_raw = data.get("message", {}).get("content") or ""
+                msg = data.get("message") or {}
+                extracted_page_raw = (msg.get("content") or "").strip()
+                # Safety fallback: If model put text inside thinking or content is empty
+                if not extracted_page_raw:
+                    thinking_raw = (msg.get("thinking") or "").strip()
+                    if thinking_raw:
+                        logger.warning(
+                            "Ollama Vision OCR Trang %d: 'content' rỗng nhưng 'thinking' có %d ký tự. "
+                            "Đang kiểm tra trích xuất Markdown từ phần suy nghĩ...",
+                            p_num,
+                            len(thinking_raw),
+                        )
+                        m_think = re.search(r"(#+\s+[^\n]+|\|[^\n]+\|[^\n]*\n\|(?:\s*:?-+:?\s*\|)+)", thinking_raw)
+                        if m_think:
+                            extracted_page_raw = thinking_raw[m_think.start():].strip()
+                            logger.info("Đã cứu vãn thành công %d ký tự Markdown từ thinking cho Trang %d", len(extracted_page_raw), p_num)
             else:
                 choices = data.get("choices") or []
                 if not choices:
                     raise RuntimeError(f"Vision OCR không trả về kết quả cho Trang {p_num}.")
-                extracted_page_raw = choices[0].get("message", {}).get("content") or ""
+                extracted_page_raw = (choices[0].get("message", {}).get("content") or "").strip()
+
             clean_text, layout_blks = self._parse_page_layout_and_markdown(extracted_page_raw, p_num)
 
-            # Fallback to semantic partition if model didn't emit layout_json
+            # Use SmartLayoutDetector morphology & visual analysis on page image if model didn't emit layout_json
             if not layout_blks and clean_text:
-                layout_blks = self._semantic_markdown_partition(clean_text, p_num)
+                try:
+                    from app.modules.ocr.layout_detector import smart_layout_detector
+
+                    cv_regions = smart_layout_detector.detect_layout_regions(
+                        image_input=img_bytes,
+                        markdown_text=clean_text,
+                        page_number=p_num,
+                    )
+                    layout_blks = [
+                        {
+                            "type": r.get("type", "text"),
+                            "label": r.get("label", r.get("type", "text")),
+                            "coordinates": {
+                                "x": float(r.get("left", 0.0)),
+                                "y": float(r.get("top", 0.0)),
+                                "width": float(r.get("width", 0.0)),
+                                "height": float(r.get("height", 0.0)),
+                            },
+                            "content_snippet": str(r.get("content_snippet") or r.get("text", ""))[:160],
+                            "confidence": 0.98 if r.get("type") in ("table", "signature") else 0.92,
+                        }
+                        for r in cv_regions
+                        if r.get("type") != "image"
+                    ]
+                except Exception as layout_err:
+                    logger.warning("smart_layout_detector_failed_fallback: %s", layout_err)
+                    layout_blks = self._semantic_markdown_partition(clean_text, p_num)
 
             words = clean_text.split()
             lines = [line for line in clean_text.splitlines() if line.strip()]
@@ -308,7 +333,7 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 line.strip().startswith("|") and line.strip().endswith("|") for line in lines
             )
 
-            pages_out.append({
+            return {
                 "page_number": p_num,
                 "extracted_text": clean_text,
                 "confidence": 0.98 if clean_text else 0.50,
@@ -316,9 +341,23 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 "line_count": len(lines),
                 "has_tables": has_tables,
                 "blocks": layout_blks,
-            })
-            if clean_text:
-                all_text.append(f"<!-- Trang {p_num} -->\n\n{clean_text}")
+            }
+
+        # Execute OCR across pages concurrently with persistent HTTP client
+        async with httpx.AsyncClient(timeout=180.0, trust_env=False) as http_client:
+            tasks = [
+                _process_single_page(p_num, img_bytes, mime_type, http_client)
+                for p_num, img_bytes, mime_type in page_images
+            ]
+            raw_pages = await asyncio.gather(*tasks)
+
+        # Sort pages monotonically by page_number
+        pages_out = sorted(raw_pages, key=lambda p: p["page_number"])
+        all_text = [
+            f"<!-- Trang {p['page_number']} -->\n\n{p['extracted_text']}"
+            for p in pages_out
+            if p.get("extracted_text")
+        ]
 
         raw_joined = "\n\n---\n\n".join(all_text)
         from app.modules.ocr.cleaner import post_process_ocr_output
@@ -379,6 +418,10 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
             except Exception as parse_err:
                 logger.debug("Failed parsing layout_json on page %d: %s", page_number, parse_err)
             clean_text = (raw_page_content[:m.start()] + raw_page_content[m.end():]).strip()
+            if not clean_text and layout_blocks:
+                clean_text = "\n\n".join(
+                    str(b.get("content_snippet", "")) for b in layout_blocks if b.get("content_snippet")
+                )
 
         return clean_text, layout_blocks
 

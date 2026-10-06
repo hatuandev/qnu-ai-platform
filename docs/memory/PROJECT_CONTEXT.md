@@ -7,16 +7,32 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-06 09:25 (UTC+7)
-- **Phiên số**: #271 (Đồng Bộ Triệt Để Loại Bỏ Mặc Định & Combos Trên Frontend2 Port 3000, Tinh Gọn ModelOps & Đẩy Cấu Hình Sang Kho Tri Thức / Trợ Lý)
-- **Kết quả phiên #271**:
-  - **Khắc phục nguyên nhân gốc rễ (Root Cause)**: Dự án vận hành 2 thư mục frontend (`frontend` port 3001 và `frontend2` port 3000). Trình duyệt người dùng đang mở `http://localhost:3000/models` thuộc về `frontend2`.
-  - **Đồng bộ hóa hoàn toàn `frontend2`**:
-    1. **ModelOps (`frontend2/src/features/modelops/modelops-page.tsx`)**: Đã xóa triệt để 100% hai tab buttons `[Mặc Định]` và `[Combos]`, dọn dẹp `SystemDefaultsCard`, `CombosVisionSection`, `defaultsQuery`, `updateDefaultsMutation`. Giao diện `/models` chỉ hiển thị trực tiếp danh sách Nhà cung cấp (Providers Grid), Key Pool và Circuit Breaker.
-    2. **Kho Tri Thức (`frontend2/src/components/knowledge/dialogs/collection-config-dialog.tsx` & `collection-detail-page.tsx`)**: Tích hợp Dialog 3 Tabs (Cơ bản, Vector Embedding với Vector Invariance Rule khóa khi có tài liệu, Vision OCR Primary Qwen3-VL 8B / Fallback Gemini Lite kèm switch OCR Rescue).
-    3. **Trợ Lý AI (`frontend2/src/components/assistants/sections/assistant-knowledge-section.tsx` & `assistant-detail-page.tsx`)**: Bổ sung Card cấu hình Cross-Encoder Reranker độc lập (Bật/tắt, chọn model `bge-reranker-base`, `top_k`, `score_threshold`).
-  - **Kiểm thử & Đóng gói**: `npm run build` trên `frontend2` (`vite build && tsc --noEmit`) đạt **Exit Code 0 trong 3.22s** (0 lỗi TypeScript, 0 lỗi cú pháp). Hot-reload cập nhật tức thì màn hình `localhost:3000/models`.
-  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_271_dong_bo_triet_de_loai_bo_mac_dinh_combos_va_tai_cau_truc_tren_frontend2.md`](./nhat_ky/2026-10-06_phien_271_dong_bo_triet_de_loai_bo_mac_dinh_combos_va_tai_cau_truc_tren_frontend2.md).
+- **Thời gian cập nhật**: 2026-10-06 15:20 (UTC+7)
+- **Phiên số**: #277 (Khắc Phục Triệt Để Bounding Boxes Scan Bị Loạn & Bảng Markdown Bị Dồn Thẻ <br> / Mất Header Trên Scan Studio)
+- **Kết quả phiên #277**:
+  - **Khắc phục 100% Bounding Boxes thị giác**: Đấu nối trực tiếp SmartLayoutDetector (dùng giải thuật hình thái học phát hiện đường lưới bảng và mask HSV con dấu tròn đỏ) vào OpenAIVisionOCRAdapter, thay thế hoàn toàn hàm đoán mò toạ độ _semantic_markdown_partition. Trang 1 nhận đúng 6 vùng chuẩn xác (header, title, text, list, text, table), Trang 2 nhận đúng 5 vùng (table, text, text, list, signature). Bảng Trang 2 không còn bị kéo dài đè lên con dấu đỏ.
+  - **Bảo tồn bản ghi hàng học phí độc lập**: Cập nhật merge_ocr_orphan_table_rows trong cleaner.py với điều kiện số tiền (has_currency_or_number) và phân kỳ (has_installment), chấm dứt triệt để việc nhồi nhét thẻ <br> vào ô lớn.
+  - **Tự động kế thừa Header cho bảng tiếp nối**: Xây dựng hàm inherit_table_headers_for_continuation_pages, tự động sao chép Header & Separator và đệm đủ cột chuẩn GFM cho bảng ở Trang 2 khi xem từng trang trên UI, loại bỏ separator rác.
+  - Ruff 0 lỗi, pytest OCR 19/19 passed (100%).
+  - Báo cáo chi tiết: [docs/nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md](./nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md).
+- **Phiên trước #276**:
+  - Tối Ưu Tốc Độ Tối Đa Cho Qwen3-VL OCR & Hạ Tầng GPU RTX 5090 (Tắt Alpha Channel, DPI 96, Tinh Gọn Prompt, num_ctx 4096, Batching Concurrency).
+  - Báo cáo chi tiết: [docs/nhat_ky/2026-10-06_phien_276_toi_uu_toc_do_toi_da_qwen3_vl_ocr_va_ha_tang_rtx5090.md](./nhat_ky/2026-10-06_phien_276_toi_uu_toc_do_toi_da_qwen3_vl_ocr_va_ha_tang_rtx5090.md).
+- **Phiên trước #275**:
+  - Khắc Phục Triệt Để Qwen3-VL:8B Xử Lý Chậm & Không Phân Đoạn chunks=0 Khi Bóc Tách PDF Sang Markdown (Kỹ thuật Prefill `</think>` Bypass CoT, Parallel Gather, Keep-Alive -1).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_275_khac_phuc_triet_de_qwen3_vl_ocr_cham_va_chunks_0.md`](./nhat_ky/2026-10-06_phien_275_khac_phuc_triet_de_qwen3_vl_ocr_cham_va_chunks_0.md).
+- **Phiên trước #274**:
+  - Chuẩn Hóa Mô Hình Embedding Từng Kho Tri Thức — Mặc Định Chạy & Hiển Thị "Đang Áp Dụng".
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_274_chuan_hoa_embedding_model_kho_tri_thuc_va_runtime.md`.
+- **Phiên trước #273**:
+  - Loại Bỏ Nút Cấu Hình Thừa Trên Header Kho Tri Thức (Tránh Trùng Lặp Với Tab "Mô hình & Cấu hình").
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_273_loai_bo_nut_cau_hinh_header_kho_tri_thuc.md`.
+- **Phiên trước #272**:
+  - Chuyển Cấu Hình Mô Hình Kho Tri Thức Từ Modal Sang Tab Chuyên Biệt Full-Width, Tận Dụng Toàn Diện Màn Hình Thoáng Đãng (Bento Grid 2 cột + Full-Width OCR).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_272_chuyen_cau_hinh_kho_sang_tab_chuyen_biet_khu_modal.md`.
+- **Phiên trước #271**:
+  - Đồng Bộ Triệt Để Loại Bỏ Mặc Định & Combos Trên Frontend2 Port 3000, Tinh Gọn ModelOps & Đẩy Cấu Hình Sang Kho Tri Thức / Trợ Lý.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_271_dong_bo_triet_de_loai_bo_mac_dinh_combos_va_tai_cau_truc_tren_frontend2.md`.
 - **Phiên trước #270**:
   - Tái Cấu Trúc Toàn Diện Quản Lý Mô Hình: Tách Bạch ModelOps Hạ Tầng, Gắn Embedding & OCR Vào Kho Tri Thức, Phân Bổ Cross-Encoder Reranker Sang Trợ Lý AI.
   - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_270_tai_cau_truc_model_management_knowledge_assistants_modelops.md`.
