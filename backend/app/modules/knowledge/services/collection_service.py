@@ -7,7 +7,7 @@ import logging
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import EntityNotFoundError
+from app.core.exceptions import AppException, EntityNotFoundError
 from app.core.storage import storage_service
 from app.modules.knowledge.models import (
     KnowledgeChunk,
@@ -29,13 +29,31 @@ class CollectionService:
     async def create_collection(
         self, db: AsyncSession, req: CollectionCreateRequest
     ) -> KnowledgeCollection:
+        meta = dict(req.metadata or {})
+        if req.data_processing:
+            meta["data_processing"] = (
+                req.data_processing.model_dump()
+                if hasattr(req.data_processing, "model_dump")
+                else dict(req.data_processing)
+            )
+        elif "data_processing" not in meta:
+            meta["data_processing"] = {
+                "embedding_provider_id": "prov_rtx5090_ollama",
+                "embedding_model": "bge-m3:latest",
+                "embedding_dimension": 1024,
+                "ocr_mode": "combo",
+                "primary_ocr_provider_id": "prov_rtx5090_ollama",
+                "primary_ocr_model": "qwen3-vl:8b",
+                "fallback_ocr_provider_id": "prov_gemini",
+                "fallback_ocr_model": "gemini-3.1-flash-lite",
+            }
         col = KnowledgeCollection(
             name=req.name,
             description=req.description,
             module_code=req.module_code,
             tenant_id=req.tenant_id,
             workspace_id=req.workspace_id,
-            collection_metadata=req.metadata,
+            collection_metadata=meta,
         )
         db.add(col)
         await db.commit()
@@ -111,6 +129,22 @@ class CollectionService:
         if "metadata" in updates:
             merged = dict(col.collection_metadata or {})
             merged.update(updates.pop("metadata") or {})
+            col.collection_metadata = merged
+        if "data_processing" in updates and updates["data_processing"]:
+            dp = updates.pop("data_processing")
+            dp_dict = dp if isinstance(dp, dict) else (dp.model_dump() if hasattr(dp, "model_dump") else dict(dp))
+            merged = dict(col.collection_metadata or {})
+            if getattr(col, "document_count", 0) and col.document_count > 0:
+                old_dp = merged.get("data_processing") or {}
+                old_emb = old_dp.get("embedding_model")
+                new_emb = dp_dict.get("embedding_model")
+                if old_emb and new_emb and old_emb != new_emb:
+                    raise AppException(
+                        f"Không thể thay đổi mô hình Embedding ('{old_emb}' -> '{new_emb}') khi Kho tri thức đã có dữ liệu. Vui lòng tạo kho mới hoặc chạy Re-index.",
+                        code="CANNOT_CHANGE_EMBEDDING_OF_POPULATED_COLLECTION",
+                        status_code=400,
+                    )
+            merged["data_processing"] = dp_dict
             col.collection_metadata = merged
         for field, value in updates.items():
             if hasattr(col, field):

@@ -22,10 +22,19 @@ class AssistantPersonaScope(BaseModel):
     )
 
 
+class AssistantRerankerPolicy(BaseModel):
+    enabled: bool = True
+    provider_id: str | None = Field("prov_cloudflare", description="Provider ID của mô hình reranker")
+    model_name: str | None = Field("@cf/baai/bge-reranker-base", description="Tên mô hình reranker")
+    top_k: int = Field(5, ge=1, le=20, description="Số lượng chunk sau khi tái xếp hạng")
+    score_threshold: float = Field(0.4, ge=0.0, le=1.0, description="Ngưỡng điểm tin cậy tối thiểu")
+
+
 class AssistantKnowledgePolicy(BaseModel):
     chunking_strategy: Literal["ClauseBasedChunker", "SemanticChunker"] = "SemanticChunker"
     require_structured_facts: bool = False
     retrieval_limit: int = Field(10, ge=1, le=50)
+    reranker_policy: AssistantRerankerPolicy = Field(default_factory=AssistantRerankerPolicy)
 
 
 class AssistantModelPolicy(BaseModel):

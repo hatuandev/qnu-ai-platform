@@ -11,6 +11,12 @@ export interface AssistantLifecycleConfig {
     chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
     require_structured_facts: boolean;
     retrieval_limit: number;
+    reranker_policy?: {
+      enabled: boolean;
+      model_name: string;
+      top_k: number;
+      score_threshold: number;
+    };
   };
   model_policy: {
     primary_model: string;

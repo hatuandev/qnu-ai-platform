@@ -25,6 +25,7 @@ import { apiClient } from "@/services/api-client";
 import { jobsApi } from "@/services/jobs-api";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type {
+  CollectionDataProcessingConfig,
   IngestionTask,
   KnowledgeCollection,
   KnowledgeDocument,
@@ -73,6 +74,8 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configName, setConfigName] = useState("");
   const [configDescription, setConfigDescription] = useState("");
+  const [configDataProcessing, setConfigDataProcessing] =
+    useState<CollectionDataProcessingConfig>({});
   const [previewDoc, setPreviewDoc] = useState<KnowledgeDocument | null>(null);
   const [selectedTaskLog, setSelectedTaskLog] = useState<IngestionTask | null>(
     null,
@@ -224,6 +227,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       knowledgeApi.updateCollection(collection.id, {
         name: configName.trim() || undefined,
         description: configDescription.trim() || undefined,
+        data_processing: configDataProcessing,
       }),
     onSuccess: () => {
       toast.success("Cập nhật thông tin kho thành công.");
@@ -396,6 +400,19 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const handleOpenConfig = () => {
     setConfigName(collection.name);
     setConfigDescription(collection.description);
+    setConfigDataProcessing(
+      collection.data_processing || {
+        embedding_model: "bge-m3:latest",
+        embedding_provider_id: "prov_rtx5090_ollama",
+        embedding_dimension: 1024,
+        ocr_mode: "combo",
+        primary_ocr_model: "qwen3-vl:8b",
+        primary_ocr_provider_id: "prov_rtx5090_ollama",
+        fallback_ocr_model: "gemini-3.1-flash-lite",
+        fallback_ocr_provider_id: "prov_gemini",
+        enable_ocr_rescue: true,
+      },
+    );
     setIsConfigOpen(true);
   };
 
@@ -618,6 +635,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         setConfigName={setConfigName}
         configDescription={configDescription}
         setConfigDescription={setConfigDescription}
+        documentCount={collection.document_count}
+        dataProcessingConfig={configDataProcessing}
+        setDataProcessingConfig={setConfigDataProcessing}
         isSaving={updateCollectionMutation.isPending}
         onSave={() => updateCollectionMutation.mutate()}
       />

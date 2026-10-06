@@ -8,9 +8,16 @@ export interface AssistantLifecycleConfig {
     out_of_scope_policy: string;
   };
   knowledge_policy: {
-    chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
-    require_structured_facts: boolean;
-    retrieval_limit: number;
+    chunking_strategy?: "ClauseBasedChunker" | "SemanticChunker";
+    require_structured_facts?: boolean;
+    retrieval_limit?: number;
+    collection_id?: string;
+    reranker_policy?: {
+      enabled?: boolean;
+      model_name?: string;
+      top_k?: number;
+      score_threshold?: number;
+    };
   };
   model_policy: {
     primary_model?: string | null;

@@ -216,8 +216,11 @@ class KnowledgeService:
         file_bytes: bytes,
         file_name: str,
         ocr_engine: str | None = None,
+        collection_id: str | None = None,
     ) -> dict:
-        return await self._ingestion.prepare_ingestion(db, module_code, file_bytes, file_name, ocr_engine)
+        return await self._ingestion.prepare_ingestion(
+            db, module_code, file_bytes, file_name, ocr_engine, collection_id=collection_id
+        )
 
     async def replace_document_content(
         self,

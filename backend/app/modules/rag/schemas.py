@@ -72,6 +72,7 @@ class AskRequest(BaseModel):
     history: list[dict[str, str]] | None = Field(
         default=None, description="Lịch sử các lượt hội thoại gần nhất [{'role': 'user'|'assistant', 'content': '...'}]"
     )
+    reranker_policy: dict[str, Any] | None = None
 
 
 class AskResponse(BaseModel):

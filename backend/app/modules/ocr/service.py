@@ -126,8 +126,8 @@ class OCRService:
 
         # Check for Qwen-VL / OpenAI Vision / OpenRouter models
         if any(kw in norm for kw in ("qwen", "gpt", "vision", "openrouter", "deepseek-vl", "pixtral")):
-            if norm in ("qwen_ocr", "qwen", "qwen_vl", "qwen-vl"):
-                return self._adapters["qwen_ocr"]
+            if norm in ("qwen_ocr", "qwen", "qwen_vl", "qwen-vl") or "qwen3-vl" in norm:
+                return QwenOCRAdapter(model_name=name_or_model or "qwen3-vl:8b")
             if norm in ("openai_vision_ocr", "openai_vision"):
                 return self._adapters["openai_vision_ocr"]
             return OpenAIVisionOCRAdapter(model_name=name_or_model)
@@ -168,6 +168,13 @@ class OCRService:
             return await adapter.extract(content, filename)
 
         provider_type = provider.provider_type.strip().lower()
+        if provider_type in {"ollama", "local", "on_premise"}:
+            on_premise_adapter = QwenOCRAdapter(
+                model_name=model_name or "qwen3-vl:8b",
+                base_url=provider.api_base_url,
+            )
+            return await on_premise_adapter.extract(content, filename)
+
         if provider_type not in {"gemini", "mistral", "openrouter", "qwen", "openai", "siliconflow"}:
             return await adapter.extract(content, filename)
         model_family = model_name.lower()

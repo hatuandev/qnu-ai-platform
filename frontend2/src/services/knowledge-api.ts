@@ -1,5 +1,6 @@
 import type {
   ApproveDocumentResult,
+  CollectionDataProcessingConfig,
   FactExcelImportResponse,
   FactListResponse,
   KnowledgeCollection,
@@ -46,6 +47,7 @@ export const knowledgeApi = {
           (code.includes("regulation") || code.includes("library")
             ? "PyMuPDF"
             : "Mistral"),
+        data_processing: ((d.collection_metadata as Record<string, unknown>)?.data_processing || (d.metadata as Record<string, unknown>)?.data_processing || d.data_processing) as KnowledgeCollection["data_processing"],
         updated_at:
           typeof d.updated_at === "string"
             ? d.updated_at
@@ -59,7 +61,12 @@ export const knowledgeApi = {
       `${BASE_URL}/knowledge/collections/${collectionId}`,
     );
     if (res.ok) {
-      return await res.json();
+      const item = await res.json();
+      const meta = item.metadata || item.collection_metadata || {};
+      return {
+        ...item,
+        data_processing: meta.data_processing || item.data_processing,
+      };
     }
     const all = await this.getCollections();
     const found = all.find(
@@ -77,6 +84,7 @@ export const knowledgeApi = {
     description?: string;
     ocr_profile?: string;
     chunking_strategy?: string;
+    data_processing?: CollectionDataProcessingConfig;
   }): Promise<KnowledgeCollection> {
     const res = await fetch(`${BASE_URL}/knowledge/collections`, {
       method: "POST",
@@ -91,7 +99,11 @@ export const knowledgeApi = {
 
   async updateCollection(
     collectionId: string,
-    payload: { name?: string; description?: string },
+    payload: {
+      name?: string;
+      description?: string;
+      data_processing?: CollectionDataProcessingConfig;
+    },
   ): Promise<void> {
     let res: Response;
     try {

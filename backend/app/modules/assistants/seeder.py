@@ -29,6 +29,8 @@ def _lifecycle_config(
     primary_model: str = "gpt-4o-mini",
     fallback_model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.2,
+    max_tokens: int = 1200,
+    preferred_provider_id: str | None = None,
     require_structured_facts: bool = False,
     enabled_tools: list[str] | None = None,
     human_approval_required: bool = True,
@@ -47,12 +49,20 @@ def _lifecycle_config(
             "chunking_strategy": chunking_strategy,
             "require_structured_facts": require_structured_facts,
             "retrieval_limit": 10,
+            "reranker_policy": {
+                "enabled": True,
+                "provider_id": "prov_cloudflare",
+                "model_name": "@cf/baai/bge-reranker-base",
+                "top_k": 5,
+                "score_threshold": 0.40,
+            },
         },
         "model_policy": {
             "primary_model": primary_model,
             "fallback_model": fallback_model,
+            "preferred_provider_id": preferred_provider_id,
             "temperature": temperature,
-            "max_tokens": 1200,
+            "max_tokens": max_tokens,
         },
         "guardrails": {
             "block_prompt_injection": True,
@@ -239,7 +249,11 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
                 "Soạn giấy mời dự Lễ Khai giảng năm học mới chuẩn thể thức Đại học Quy Nhơn.",
             ],
             chunking_strategy="ClauseBasedChunker",
+            primary_model="deepseek-r1:32b",
+            fallback_model="qwen3:8b",
+            preferred_provider_id="prov_rtx5090_ollama",
             temperature=0.3,
+            max_tokens=3200,
             require_structured_facts=True,
             enabled_tools=["export_administrative_document"],
             human_approval_required=False,
@@ -278,7 +292,11 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
                 "Xuất ma trận đề thi chuẩn cho học phần 3 tín chỉ theo định dạng Excel.",
             ],
             chunking_strategy="ClauseBasedChunker",
+            primary_model="deepseek-r1:32b",
+            fallback_model="qwen3:8b",
+            preferred_provider_id="prov_rtx5090_ollama",
             temperature=0.3,
+            max_tokens=3200,
             require_structured_facts=True,
             enabled_tools=["export_exam_matrix"],
             no_answer_message=(
@@ -341,6 +359,9 @@ async def seed_standard_assistants(db: AsyncSession) -> AssistantSeedResponse:
         if code in existing_by_code:
             existing_record = existing_by_code[code]
             existing_record.name = str(item["name"])
+            existing_record.description = str(item["description"])
+            existing_record.config = item["config"]
+            existing_record.system_prompt = str(item["system_prompt"])
             continue
         db.add(
             AssistantModel(

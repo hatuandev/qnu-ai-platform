@@ -40,9 +40,10 @@ class VectorIndexer:
             return clean_id
         return f"col_{clean_id}"
 
-    async def ensure_collection(self, collection_id: str) -> str:
+    async def ensure_collection(self, collection_id: str, vector_size: int | None = None) -> str:
         """Create collection on Qdrant if it does not already exist."""
         cname = self._get_collection_name(collection_id)
+        target_size = vector_size or self.vector_size
         try:
             collections = await self.client.get_collections()
             existing_names = [c.name for c in collections.collections]
@@ -50,12 +51,12 @@ class VectorIndexer:
                 await self.client.create_collection(
                     collection_name=cname,
                     vectors_config=qmodels.VectorParams(
-                        size=self.vector_size,
+                        size=target_size,
                         distance=qmodels.Distance.COSINE,
                     ),
                     hnsw_config=qmodels.HnswConfigDiff(m=16, ef_construct=100),
                 )
-                logger.info("Created Qdrant collection: %s", cname)
+                logger.info("Created Qdrant collection: %s (dim=%d)", cname, target_size)
         except Exception as exc:
             logger.warning("Could not ensure Qdrant collection %s: %s", cname, exc)
         return cname
@@ -73,28 +74,61 @@ class VectorIndexer:
         """Legacy sync entrypoint: deterministic mock vector (tests/offline)."""
         return VectorIndexer.mock_embedding(text, dim)
 
-    def _fit_dim(self, vec: list[float]) -> list[float]:
+    def _fit_dim(self, vec: list[float], target_dim: int | None = None) -> list[float]:
         """Pad/truncate a model vector to the configured Qdrant dimension."""
-        if len(vec) == self.vector_size:
+        dim = target_dim or self.vector_size
+        if len(vec) == dim:
             return [round(float(x), 6) for x in vec]
-        if len(vec) > self.vector_size:
-            return [round(float(x), 6) for x in vec[: self.vector_size]]
-        return [round(float(x), 6) for x in vec] + [0.0] * (self.vector_size - len(vec))
+        if len(vec) > dim:
+            return [round(float(x), 6) for x in vec[:dim]]
+        return [round(float(x), 6) for x in vec] + [0.0] * (dim - len(vec))
 
     async def _resolve_embedding_runtime(
         self,
         *,
+        collection_id: str | None = None,
+        preferred_provider_id: str | None = None,
+        preferred_model_name: str | None = None,
         excluded_key_ids: set[str] | None = None,
         estimated_tokens: int = 0,
     ) -> ModelRuntimeConfig:
-        """Load the current embedding provider and model from ModelOps."""
+        """Load embedding provider and model from Collection metadata or ModelOps."""
+        if collection_id and not preferred_model_name:
+            try:
+                from sqlalchemy import select
+
+                from app.modules.knowledge.models import KnowledgeCollection
+
+                async with AsyncSessionFactory() as db:
+                    stmt = select(KnowledgeCollection).where(
+                        (KnowledgeCollection.id == collection_id)
+                        | (KnowledgeCollection.slug == collection_id)
+                    )
+                    res = await db.execute(stmt)
+                    col = res.scalar_one_or_none()
+                    if col and col.collection_metadata:
+                        dp = col.collection_metadata.get("data_processing") or {}
+                        if dp.get("embedding_model"):
+                            preferred_model_name = dp.get("embedding_model")
+                        if dp.get("embedding_provider_id"):
+                            preferred_provider_id = dp.get("embedding_provider_id")
+            except Exception as exc:
+                logger.warning(
+                    "Could not load data_processing config for collection %s: %s",
+                    collection_id,
+                    exc,
+                )
+
         async with AsyncSessionFactory() as db:
             return await model_runtime_resolver.resolve(
                 db,
                 "embedding",
+                preferred_provider_id=preferred_provider_id,
+                preferred_model_name=preferred_model_name,
                 excluded_key_ids=excluded_key_ids,
                 estimated_tokens=estimated_tokens,
             )
+
 
     @staticmethod
     async def _finish_runtime_key(
@@ -208,6 +242,63 @@ class VectorIndexer:
 
         return all_vectors
 
+    async def _embed_texts_ollama(
+        self,
+        texts: list[str],
+        runtime: ModelRuntimeConfig,
+    ) -> list[list[float]]:
+        """Batch encode texts using Ollama API (/api/embed or /v1/embeddings)."""
+        import httpx
+
+        from app.core.config import resolve_ollama_network_url
+
+        raw_base = (
+            getattr(runtime, "api_base_url", None)
+            or getattr(runtime, "base_url", None)
+            or getattr(settings, "OLLAMA_BASE_URL", "")
+            or "http://tormemrtxproto.tail0924dd.ts.net:11434"
+        ).rstrip("/")
+        resolved_base = resolve_ollama_network_url(raw_base).rstrip("/")
+        clean_base = resolved_base.removesuffix("/v1")
+        model_name = (runtime.model_name or "bge-m3:latest").strip()
+
+        batch_size = 16
+        all_vectors: list[list[float]] = []
+
+        async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds or 60.0), trust_env=False) as client:
+            for i in range(0, len(texts), batch_size):
+                chunk_texts = texts[i : i + batch_size]
+                # 1. Try native Ollama /api/embed endpoint
+                try:
+                    resp = await client.post(
+                        f"{clean_base}/api/embed",
+                        json={"model": model_name, "input": chunk_texts},
+                    )
+                    if resp.status_code == 200:
+                        embeddings = resp.json().get("embeddings", [])
+                        if embeddings:
+                            all_vectors.extend([[float(x) for x in v] for v in embeddings])
+                            continue
+                except Exception as exc:
+                    logger.debug("Ollama /api/embed attempt failed: %s", exc)
+
+                # 2. Fallback to OpenAI-compatible /v1/embeddings
+                headers = {"Content-Type": "application/json"}
+                if runtime.api_key:
+                    headers["Authorization"] = f"Bearer {runtime.api_key}"
+                resp = await client.post(
+                    f"{clean_base}/v1/embeddings",
+                    headers=headers,
+                    json={"model": model_name, "input": chunk_texts},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                items = data.get("data", [])
+                items.sort(key=lambda x: x.get("index", 0))
+                all_vectors.extend([[float(x) for x in item["embedding"]] for item in items])
+
+        return all_vectors
+
     async def embed_texts(
         self,
         texts: list[str],
@@ -222,6 +313,27 @@ class VectorIndexer:
             estimated_tokens=estimated_tokens
         )
         provider = runtime.provider_type
+        if provider in ("ollama", "ollama_local", "local"):
+            try:
+                vectors = await self._embed_texts_ollama(texts, runtime)
+                if len(vectors) != len(texts):
+                    raise RuntimeError(
+                        f"Ollama returned {len(vectors)} vectors for {len(texts)} texts."
+                    )
+                await self._finish_runtime_key(
+                    runtime, total_tokens=estimated_tokens
+                )
+                return [self._fit_dim(v) for v in vectors]
+            except Exception as exc:
+                await self._finish_runtime_key(runtime, error=exc)
+                logger.error("Ollama embedding unavailable: %s", exc)
+                raise AppException(
+                    f"Ollama Embedding không khả dụng: {exc}",
+                    code="EMBEDDING_PROVIDER_UNAVAILABLE",
+                    status_code=503,
+                    details={"provider": provider},
+                ) from exc
+
         if provider == "cloudflare":
             excluded: set[str] = set()
             while True:
@@ -314,7 +426,11 @@ class VectorIndexer:
                 )
 
         missing = [str(c["content"]) for c in chunks if not c.get("vector")]
-        embedding_runtime = await self._resolve_embedding_runtime() if missing else None
+        embedding_runtime = (
+            await self._resolve_embedding_runtime(collection_id=collection_id)
+            if missing
+            else None
+        )
         encoded = await self.embed_texts(missing, embedding_runtime) if missing else []
         encoded_iter = iter(encoded)
 
@@ -634,7 +750,8 @@ class VectorIndexer:
             if query_vector is not None:
                 vec = query_vector
             else:
-                embedded = await self.embed_texts([query])
+                embedding_runtime = await self._resolve_embedding_runtime(collection_id=collection_id)
+                embedded = await self.embed_texts([query], runtime=embedding_runtime)
                 if not embedded:
                     return []
                 vec = embedded[0]

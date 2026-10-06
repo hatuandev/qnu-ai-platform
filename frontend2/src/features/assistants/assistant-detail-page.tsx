@@ -79,6 +79,14 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     no_answer_message:
       cfg?.guardrails?.no_answer_message ||
       "Thông tin này chưa có trong nguồn văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ đơn vị phụ trách.",
+    reranker_enabled:
+      (cfg as unknown as Record<string, unknown>)?.knowledge_policy ? ((cfg as unknown as Record<string, { reranker_policy?: { enabled?: boolean } }>).knowledge_policy?.reranker_policy?.enabled ?? true) : true,
+    reranker_model:
+      (cfg as unknown as Record<string, { reranker_policy?: { model_name?: string } }>)?.knowledge_policy?.reranker_policy?.model_name || "bge-reranker-base",
+    reranker_top_k:
+      (cfg as unknown as Record<string, { reranker_policy?: { top_k?: number } }>)?.knowledge_policy?.reranker_policy?.top_k ?? 5,
+    reranker_score_threshold:
+      (cfg as unknown as Record<string, { reranker_policy?: { score_threshold?: number } }>)?.knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
   };
 }
 
@@ -238,6 +246,16 @@ export function AssistantDetailPage({
           output_policy: {
             ...current.config?.output_policy,
             require_citations: value.require_citations,
+          },
+          knowledge_policy: {
+            ...((current.config as unknown as Record<string, unknown>)?.knowledge_policy as Record<string, unknown> || {}),
+            collection_id: value.collection_id,
+            reranker_policy: {
+              enabled: value.reranker_enabled ?? true,
+              model_name: value.reranker_model || "bge-reranker-base",
+              top_k: value.reranker_top_k ?? 5,
+              score_threshold: value.reranker_score_threshold ?? 0.4,
+            },
           },
         },
       });

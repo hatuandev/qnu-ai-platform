@@ -420,6 +420,7 @@ class HybridRetriever:
         dense_weight: float = 1.0,
         sparse_weight: float = 1.0,
         sparse_variants: list[str] | None = None,
+        reranker_policy: dict[str, Any] | None = None,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker."""
         async def _safe_dense_search() -> list[dict[str, Any]]:
@@ -476,11 +477,19 @@ class HybridRetriever:
         )
 
         # 3. Cross-Encoder Reranking
-        reranked = await reranker_client.rerank(
-            query=query,
-            candidates=fused,
-            top_k=rerank_top_k,
-        )
+        rp = reranker_policy or {}
+        reranker_enabled = rp.get("enabled", True)
+        if not reranker_enabled:
+            reranked = fused[:rerank_top_k]
+        else:
+            reranked = await reranker_client.rerank(
+                query=query,
+                candidates=fused,
+                top_k=int(rp.get("top_k", rerank_top_k)),
+                preferred_provider_id=rp.get("provider_id"),
+                preferred_model_name=rp.get("model_name"),
+                score_threshold=float(rp.get("score_threshold", 0.0)),
+            )
 
         logger.debug(
             "Hybrid retrieval completed: query='%s', dense=%d, sparse=%d, fused=%d, reranked=%d",

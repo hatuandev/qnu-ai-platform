@@ -51,28 +51,20 @@ def _without_local_models(items: list[dict[str, Any]] | None) -> list[dict[str, 
 
 DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     {
+        "provider_id": "prov_rtx5090_ollama",
+        "provider_name": "On-Premise GPU RTX 5090 (Tailscale)",
+        "model_name": "qwen3-vl:8b",
+        "provider_type": "on_premise",
+        "is_active": True,
+        "description": "Ưu tiên 1 (On-Premise): Qwen 3 Vision 8B trên GPU RTX 5090 — Bóc tách tài liệu scan, bảng biểu & bảo mật nội bộ 100%",
+    },
+    {
         "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
         "model_name": "gemini-3.1-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 1: Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM siêu tốc (~2s)",
-    },
-    {
-        "provider_id": "prov_gemini",
-        "provider_name": "Google Gemini",
-        "model_name": "gemini-3.5-flash-lite",
-        "provider_type": "cloud",
-        "is_active": True,
-        "description": "Ưu tiên 2: Google Gemini 2.5 Flash-Lite — Phản hồi nhanh, tối ưu quota dự phòng",
-    },
-    {
-        "provider_id": "prov_openrouter",
-        "provider_name": "OpenRouter / Qwen Vision",
-        "model_name": "qwen/qwen-2.5-vl-72b-instruct",
-        "provider_type": "cloud",
-        "is_active": True,
-        "description": "Ưu tiên 3: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng khi Gemini cạn quota",
+        "description": "Ưu tiên 2 (Cloud Fallback): Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM dự phòng (~2s)",
     },
     {
         "provider_id": "prov_mistral",
@@ -80,7 +72,15 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "mistral-ocr-latest",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 4: Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+        "description": "Ưu tiên 3 (Cloud Fallback): Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+    },
+    {
+        "provider_id": "prov_openrouter",
+        "provider_name": "OpenRouter / Qwen Vision",
+        "model_name": "qwen/qwen-2.5-vl-72b-instruct",
+        "provider_type": "cloud",
+        "is_active": True,
+        "description": "Ưu tiên 4: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng",
     },
 ]
 

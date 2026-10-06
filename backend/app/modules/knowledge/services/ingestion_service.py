@@ -126,16 +126,29 @@ class IngestionService:
         file_bytes: bytes,
         file_name: str,
         ocr_engine: str | None,
+        collection_id: str | None = None,
     ) -> tuple[str, str, int, bool, dict[int, list[dict]]]:
         """Rescue blank parses (scanned PDFs/images) via OCR auto-routing."""
         try:
             from app.modules.ocr.service import OCRService
 
+            target_engine = ocr_engine
+            if (not target_engine or target_engine in ("auto", "none")) and collection_id:
+                col_res = await db.execute(
+                    select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
+                )
+                col_obj = col_res.scalar_one_or_none()
+                if col_obj and col_obj.collection_metadata:
+                    dp = col_obj.collection_metadata.get("data_processing") or {}
+                    col_ocr = dp.get("primary_ocr_model")
+                    if col_ocr:
+                        target_engine = col_ocr
+
             ocr_result = await OCRService().extract_document(
                 session=db,
                 content=file_bytes,
                 filename=file_name,
-                engine_name=ocr_engine or "auto",
+                engine_name=target_engine or "auto",
             )
         except Exception as exc:
             logger.warning("OCR rescue failed for file='%s': %s", file_name, exc)
@@ -237,6 +250,7 @@ class IngestionService:
         file_bytes: bytes,
         file_name: str,
         ocr_engine: str | None = None,
+        collection_id: str | None = None,
     ) -> dict:
         """Parse (+OCR rescue), clean and chunk a file without persisting."""
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
@@ -246,7 +260,7 @@ class IngestionService:
 
         if is_image or user_wants_explicit_ocr:
             ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
-                db, file_bytes, file_name, ocr_engine
+                db, file_bytes, file_name, ocr_engine, collection_id=collection_id
             )
             if rescued:
                 parsed = ParsedContent(
@@ -287,7 +301,7 @@ class IngestionService:
 
             if pdf_needs_ocr:
                 ocr_text, ocr_engine_used, ocr_pages, rescued, ocr_blocks = await self._run_ocr_rescue(
-                    db, file_bytes, file_name, ocr_engine
+                    db, file_bytes, file_name, ocr_engine, collection_id=collection_id
                 )
                 if rescued:
                     parsed = ParsedContent(
@@ -464,6 +478,7 @@ class IngestionService:
             file_bytes=file_bytes,
             file_name=file_name,
             ocr_engine=ocr_engine,
+            collection_id=collection_id,
         )
         parsed = prepared["parsed"]
         chunk_drafts = prepared["chunk_drafts"]

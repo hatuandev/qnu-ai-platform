@@ -68,19 +68,33 @@ def get_llm_adapter(
 
     if pt in ("deepseek", "groq", "openrouter", "nvidia", "claude", "ollama_cloud", "ollama", "custom"):
         # OpenAI compatible endpoints
+        from app.core.config import resolve_ollama_network_url, settings
+
+        raw_ollama_url = getattr(settings, "OLLAMA_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:11434"
+        ollama_default = resolve_ollama_network_url(raw_ollama_url).rstrip("/")
+        if not ollama_default.endswith("/v1"):
+            ollama_default = f"{ollama_default}/v1"
+
         default_urls = {
             "deepseek": "https://api.deepseek.com/v1",
             "groq": "https://api.groq.com/openai/v1",
             "openrouter": "https://openrouter.ai/api/v1",
             "nvidia": "https://integrate.api.nvidia.com/v1",
             "ollama_cloud": "https://ollama.com/v1",
-            "ollama": "https://ollama.com/v1",
+            "ollama": ollama_default,
         }
+        effective_base = base_url or default_urls.get(pt)
+        if pt in ("ollama", "custom") and effective_base:
+            effective_base = resolve_ollama_network_url(effective_base)
+        if effective_base and not effective_base.endswith("/v1") and not effective_base.endswith("/v1/"):
+            effective_base = f"{effective_base.rstrip('/')}/v1"
+
         return OpenAIAdapter(
             model_name=model_name,
-            api_key=api_key,
-            base_url=base_url or default_urls.get(pt),
+            api_key=api_key or ("ollama" if pt in ("ollama", "custom") else None),
+            base_url=effective_base,
             timeout_seconds=timeout_seconds,
+            provider_type=pt,
         )
 
     raise ValueError(f"Unsupported LLM provider type: '{provider_type}'")

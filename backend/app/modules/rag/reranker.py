@@ -99,12 +99,20 @@ class RerankerClient:
             raise RuntimeError("Cloudflare reranker returned an empty response.")
 
     async def _resolve_reranker_runtime(
-        self, *, excluded_key_ids: set[str] | None = None
+        self,
+        *,
+        preferred_provider_id: str | None = None,
+        preferred_model_name: str | None = None,
+        excluded_key_ids: set[str] | None = None,
     ) -> ModelRuntimeConfig:
         """Load the current reranker provider and model from ModelOps."""
         async with AsyncSessionFactory() as db:
             return await model_runtime_resolver.resolve(
-                db, "reranker", excluded_key_ids=excluded_key_ids
+                db,
+                "reranker",
+                preferred_provider_id=preferred_provider_id,
+                preferred_model_name=preferred_model_name,
+                excluded_key_ids=excluded_key_ids,
             )
 
     @staticmethod
@@ -125,6 +133,9 @@ class RerankerClient:
         query: str,
         candidates: list[FusionCandidate],
         top_k: int = 5,
+        preferred_provider_id: str | None = None,
+        preferred_model_name: str | None = None,
+        score_threshold: float = 0.0,
     ) -> list[FusionCandidate]:
         """Rerank candidates using cross-encoder relevance scoring.
 
@@ -143,10 +154,14 @@ class RerankerClient:
             runtime: ModelRuntimeConfig | None = None
             try:
                 runtime = await self._resolve_reranker_runtime(
-                    excluded_key_ids=excluded
+                    preferred_provider_id=preferred_provider_id,
+                    preferred_model_name=preferred_model_name,
+                    excluded_key_ids=excluded,
                 )
                 if runtime.provider_type == "cloudflare" and runtime.api_key and runtime.account_id:
                     ranked = await self._rerank_cloudflare(query, candidates, runtime, top_k)
+                    if score_threshold > 0.0:
+                        ranked = [c for c in ranked if getattr(c, "score", 0.0) >= score_threshold]
                     await self._finish_runtime_key(runtime)
                     provider = "cloudflare"
                     logger.info(

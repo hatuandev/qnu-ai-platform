@@ -70,6 +70,8 @@ class ModelRuntimeResolver:
         db: AsyncSession,
         role: ModelRole,
         *,
+        preferred_provider_id: str | None = None,
+        preferred_model_name: str | None = None,
         excluded_key_ids: set[str] | None = None,
         estimated_tokens: int = 0,
     ) -> ModelRuntimeConfig:
@@ -80,8 +82,8 @@ class ModelRuntimeResolver:
         defaults_record = defaults_result.scalar_one_or_none()
         defaults = dict((defaults_record.extra_config or {}).get("defaults") or {}) if defaults_record else {}
 
-        provider_id = str(defaults.get(f"default_{role}_provider_id") or "").strip()
-        model_name = str(defaults.get(f"default_{role}_model") or "").strip()
+        provider_id = (preferred_provider_id or str(defaults.get(f"default_{role}_provider_id") or "")).strip()
+        model_name = (preferred_model_name or str(defaults.get(f"default_{role}_model") or "")).strip()
         if not provider_id or not model_name:
             raise AppException(
                 f"Chưa chọn provider và mô hình mặc định cho {role} trong ModelOps.",

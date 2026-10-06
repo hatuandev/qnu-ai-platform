@@ -103,6 +103,11 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             preferred_provider_id=preferred_provider_id,
             fallback_model=fallback_model,
             history=context.inputs.get("conversation_history") or context.inputs.get("history"),
+            reranker_policy=(
+                getattr(getattr(profile, "knowledge_policy", None), "reranker_policy", None)
+                if hasattr(getattr(profile, "knowledge_policy", None), "reranker_policy")
+                else (config.get("knowledge_policy", {}).get("reranker_policy") if isinstance(config.get("knowledge_policy"), dict) else None)
+            ),
         )
 
         # Universal Agentic Consulting & Artifact Generation

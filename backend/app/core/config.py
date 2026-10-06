@@ -210,6 +210,12 @@ class Settings(BaseSettings):
     OPENAI_MODEL_NAME: str = "gpt-4o-mini"
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
+    # --- Ollama / Local AI Server (Tailscale / On-Premise) ---
+    OLLAMA_BASE_URL: str = Field(
+        default="http://tormemrtxproto.tail0924dd.ts.net:11434",
+        validation_alias=AliasChoices("OLLAMA_BASE_URL", "OLLAMA_HOST"),
+    )
+
     GEMINI_API_KEY: str | None = None
     GEMINI_MODEL_NAME: str = "gemini-2.5-flash-lite"
 
@@ -323,3 +329,33 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+def resolve_ollama_network_url(url: str | None = None) -> str:
+    """Resolve Ollama endpoint URL with resilience for Tailscale MagicDNS fallback."""
+    import socket
+    from urllib.parse import urlparse, urlunparse
+
+    target_url = (url or getattr(settings, "OLLAMA_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:11434").strip()
+    if not target_url:
+        return ""
+
+    parsed = urlparse(target_url)
+    hostname = parsed.hostname or ""
+    if not hostname:
+        return target_url
+
+    try:
+        socket.gethostbyname(hostname)
+        return target_url
+    except socket.gaierror:
+        # Fallback mapping if Tailscale MagicDNS is not yet enabled on the local client
+        tailscale_map = {
+            "tormemrtxproto.tail0924dd.ts.net": "100.105.13.53",
+            "tormemrtxproto": "100.105.13.53",
+        }
+        if hostname in tailscale_map:
+            ip = tailscale_map[hostname]
+            netloc = f"{ip}:{parsed.port}" if parsed.port else ip
+            return urlunparse(parsed._replace(netloc=netloc))
+        return target_url

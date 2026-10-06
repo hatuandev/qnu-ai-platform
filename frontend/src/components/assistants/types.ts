@@ -23,6 +23,10 @@ export interface AssistantEditForm {
   human_approval_required: boolean;
   require_citations: boolean;
   no_answer_message: string;
+  reranker_enabled: boolean;
+  reranker_model: string;
+  reranker_top_k: number;
+  reranker_score_threshold: number;
 }
 
 export const CATEGORY_OPTIONS = [

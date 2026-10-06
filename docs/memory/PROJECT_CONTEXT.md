@@ -7,21 +7,34 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-05 (UTC+7)
-- **Phiên số**: #265 (Chuyển Cổng Chat AI Thành Trang Chủ Ứng Dụng (/) & Tái Cấu Trúc Điều Hướng Hai Không Gian)
-- **Kết quả phiên #265**:
-  - **Chuyển Cổng Trợ Lý AI Hub thành Trang chủ (`/`)**:
-    - `frontend2/src/routes/index.tsx`: Render trực tiếp `PublicChatPortal` thay vì đá về `/dashboard`.
-    - `frontend2/src/routes/chat.index.tsx`: Chuyển hướng `<Navigate to="/" replace />` bảo toàn 100% tương thích ngược.
-    - `frontend2/src/routes/__root.tsx`: Bổ sung `pathname === "/"` vào `isPublicRoute`, gỡ bỏ `shouldRedirectToHome` cho phép mọi người dùng (kể cả đã đăng nhập) truy cập tự do tại Trang chủ.
-  - **Tối ưu hóa UX Cầu nối Hai Không gian (Dual-Space)**:
-    - `PublicChatPortal`: Logo liên kết về `/`, nút trên Header thích ứng theo trạng thái đăng nhập (`Vào Bảng Điều Khiển` khi đã đăng nhập, `Dành cho Cán bộ` khi chưa đăng nhập).
-    - `PublicChatView` & `ChatHistorySidebar`: Đồng bộ 100% các nút và link quay lại Cổng Trợ Lý trỏ về `/`.
-    - `AdminShell` Navigation: Thêm mục `Cổng Trợ Lý AI` (`/`, icon `Sparkles`) vào nhóm `Tổng Quan` trên Sidebar và Dropdown `AccountMenu` cho cán bộ truy cập tức thì.
-  - **Tối Ưu Lưới 3 Cột Trên Laptop 14" & Chuẩn Hóa Tên Thẻ Trợ Lý**:
-    - Nâng ngưỡng 4 cột từ `2xl:grid-cols-4` (1536px) lên `min-[1800px]:grid-cols-4`, bảo đảm trên toàn bộ laptop 13"-15.6" luôn hiển thị 3 cột thông thoáng (`lg:grid-cols-3`), không bị ép chật thẻ; áp dụng đồng bộ cho `assistants`, `knowledge`, `modelops`, `document-types`, `node-catalog`.
-    - Tích hợp `formatAssistantDisplayName` trong `AssistantCard` chuẩn hóa tên trợ lý ngắn gọn đắt giá, triệt tiêu lỗi cắt cụt `"Mô-đun trợ lý ảo hỗ..."`.
-  - **Kiểm thử**: Biome linter pass 100% (63ms), 0 lỗi, 0 cảnh báo; Vite build production thành công 100% trong **2.99s**.
+- **Thời gian cập nhật**: 2026-10-06 09:25 (UTC+7)
+- **Phiên số**: #271 (Đồng Bộ Triệt Để Loại Bỏ Mặc Định & Combos Trên Frontend2 Port 3000, Tinh Gọn ModelOps & Đẩy Cấu Hình Sang Kho Tri Thức / Trợ Lý)
+- **Kết quả phiên #271**:
+  - **Khắc phục nguyên nhân gốc rễ (Root Cause)**: Dự án vận hành 2 thư mục frontend (`frontend` port 3001 và `frontend2` port 3000). Trình duyệt người dùng đang mở `http://localhost:3000/models` thuộc về `frontend2`.
+  - **Đồng bộ hóa hoàn toàn `frontend2`**:
+    1. **ModelOps (`frontend2/src/features/modelops/modelops-page.tsx`)**: Đã xóa triệt để 100% hai tab buttons `[Mặc Định]` và `[Combos]`, dọn dẹp `SystemDefaultsCard`, `CombosVisionSection`, `defaultsQuery`, `updateDefaultsMutation`. Giao diện `/models` chỉ hiển thị trực tiếp danh sách Nhà cung cấp (Providers Grid), Key Pool và Circuit Breaker.
+    2. **Kho Tri Thức (`frontend2/src/components/knowledge/dialogs/collection-config-dialog.tsx` & `collection-detail-page.tsx`)**: Tích hợp Dialog 3 Tabs (Cơ bản, Vector Embedding với Vector Invariance Rule khóa khi có tài liệu, Vision OCR Primary Qwen3-VL 8B / Fallback Gemini Lite kèm switch OCR Rescue).
+    3. **Trợ Lý AI (`frontend2/src/components/assistants/sections/assistant-knowledge-section.tsx` & `assistant-detail-page.tsx`)**: Bổ sung Card cấu hình Cross-Encoder Reranker độc lập (Bật/tắt, chọn model `bge-reranker-base`, `top_k`, `score_threshold`).
+  - **Kiểm thử & Đóng gói**: `npm run build` trên `frontend2` (`vite build && tsc --noEmit`) đạt **Exit Code 0 trong 3.22s** (0 lỗi TypeScript, 0 lỗi cú pháp). Hot-reload cập nhật tức thì màn hình `localhost:3000/models`.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_271_dong_bo_triet_de_loai_bo_mac_dinh_combos_va_tai_cau_truc_tren_frontend2.md`](./nhat_ky/2026-10-06_phien_271_dong_bo_triet_de_loai_bo_mac_dinh_combos_va_tai_cau_truc_tren_frontend2.md).
+- **Phiên trước #270**:
+  - Tái Cấu Trúc Toàn Diện Quản Lý Mô Hình: Tách Bạch ModelOps Hạ Tầng, Gắn Embedding & OCR Vào Kho Tri Thức, Phân Bổ Cross-Encoder Reranker Sang Trợ Lý AI.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-06_phien_270_tai_cau_truc_model_management_knowledge_assistants_modelops.md`.
+- **Phiên trước #269**:
+  - Đồng Bộ Toàn Diện Dữ Liệu Seed CSDL PostgreSQL: Provider RTX 5090, Trợ Lý Soạn Thảo / Khảo Thí & Chuỗi OCR Combo Defaults.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_269_dong_bo_toan_dien_seed_data_provider_rtx5090_assistants_va_ocr_defaults.md`.
+- **Phiên trước #268**:
+  - Chốt Qwen3-VL:8B Làm Vision OCR On-Premise Chính Thức Cho QNU AI Platform (RTX 5090).
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_268_chot_qwen3_vl_8b_lam_vision_ocr_on_premise_chinh_thuc_qnu.md`.
+- **Phiên trước #267**:
+  - Chuẩn Hóa Tên Miền Tailscale MagicDNS Cho Máy Chủ AI GPU RTX 5090 & Cơ Chế Kháng Lỗi Phân Giải DNS.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_267_chuan_hoa_ten_mien_tailscale_magicdns_cho_may_chu_ai_gpu_rtx5090.md`.
+- **Phiên trước #266**:
+  - Tích hợp Server GPU On-Premise RTX 5090 qua Tailscale, cấu hình DeepSeek-R1 (32B) & Qwen3 (8B) cho Soạn thảo văn bản và Khảo thí, kết nối BGE-M3 & Qwen3-Embedding.
+  - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_266_tich_hop_server_gpu_rtx5090_tailscale_qwen3_deepseek_r1_cho_soan_thao_va_khao_thi.md`.
+- **Phiên trước #265**:
+  - Chuyển Cổng Trợ Lý AI Hub thành Trang chủ (`/`) & Tái Cấu Trúc Điều Hướng Hai Không Gian (Dual-Space).
+  - Tối ưu Responsive Grid Cards cho Laptop 14" (3 cột) và chuẩn hóa tên thẻ trợ lý.
   - Báo cáo chi tiết: `docs/nhat_ky/2026-10-05_phien_265_chuyen_cong_chat_thanh_trang_chu_ung_dung_va_tai_cau_truc_dieu_huong.md`.
 - **Phiên trước #264**:
   - Khắc phục triệt để lỗi giật bố cục khi tải (CLS): Thay thế 3 khối Skeleton xám bằng `PublicChatSkeleton` (App Shell Skeleton chuẩn Enterprise) giữ nguyên bố cục 2 cột.

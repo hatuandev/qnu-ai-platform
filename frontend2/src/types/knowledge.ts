@@ -1,6 +1,19 @@
 /** Types for Knowledge Collections, Documents, Chunks and Ingestion */
 
+export interface CollectionDataProcessingConfig {
+  embedding_provider_id?: string;
+  embedding_model?: string;
+  embedding_dimension?: number;
+  ocr_mode?: "single" | "combo";
+  primary_ocr_provider_id?: string;
+  primary_ocr_model?: string;
+  fallback_ocr_provider_id?: string | null;
+  fallback_ocr_model?: string | null;
+  enable_ocr_rescue?: boolean;
+}
+
 export interface KnowledgeCollection {
+  data_processing?: CollectionDataProcessingConfig;
   id: string;
   name: string;
   code: string;

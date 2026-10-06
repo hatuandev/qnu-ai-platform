@@ -27,6 +27,7 @@ import {
   apiClient,
 } from "../services/api-client";
 import { knowledgeApi } from "../services/knowledge-api";
+import type { CollectionDataProcessingConfig } from "@/types/knowledge";
 import { DocumentIngestPage } from "./document-ingest-page";
 import { ScanStudioPage } from "./scan-studio-page";
 
@@ -98,6 +99,7 @@ export function CollectionDetailPage({
   const [configName, setConfigName] = useState<string>("");
   const [configDescription, setConfigDescription] = useState<string>("");
   const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+  const [configDataProcessing, setConfigDataProcessing] = useState<CollectionDataProcessingConfig>({});
 
   // Playground state
   const [sandboxQuery, setSandboxQuery] = useState<string>("");
@@ -367,6 +369,19 @@ export function CollectionDetailPage({
   const openConfigDialog = () => {
     setConfigName(currentCollection.name);
     setConfigDescription(currentCollection.description || "");
+    setConfigDataProcessing(
+      currentCollection.data_processing || {
+        embedding_model: "bge-m3:latest",
+        embedding_provider_id: "prov_rtx5090_ollama",
+        embedding_dimension: 1024,
+        ocr_mode: "combo",
+        primary_ocr_model: "qwen3-vl:8b",
+        primary_ocr_provider_id: "prov_rtx5090_ollama",
+        fallback_ocr_model: "gemini-3.1-flash-lite",
+        fallback_ocr_provider_id: "prov_gemini",
+        enable_ocr_rescue: true,
+      }
+    );
     setIsConfigOpen(true);
   };
 
@@ -380,6 +395,7 @@ export function CollectionDetailPage({
       await apiClient.updateCollection(currentCollection.id, {
         name: configName.trim(),
         description: configDescription.trim(),
+        data_processing: configDataProcessing,
       });
       toast.success("Cập nhật cấu hình kho thành công.");
       setIsConfigOpen(false);
@@ -662,6 +678,9 @@ export function CollectionDetailPage({
         setConfigName={setConfigName}
         configDescription={configDescription}
         setConfigDescription={setConfigDescription}
+        documentCount={currentCollection.document_count}
+        dataProcessingConfig={configDataProcessing}
+        setDataProcessingConfig={setConfigDataProcessing}
         isSaving={isSavingConfig}
         onSave={handleSaveConfig}
       />

@@ -42,9 +42,15 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
         self._api_key = api_key
         self._model_name = model_name or _DEFAULT_VISION_OCR_MODEL
         self._adapter_name = adapter_name
-        self._base_url = (
-            base_url or getattr(settings, "OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
-        ).rstrip("/")
+
+        from app.core.config import resolve_ollama_network_url
+
+        if not base_url and ("qwen3-vl" in self._model_name.lower() or "qwen" in self._model_name.lower()):
+            default_ollama = getattr(settings, "OLLAMA_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:11434"
+            self._base_url = resolve_ollama_network_url(default_ollama).rstrip("/")
+        else:
+            raw_base = base_url or getattr(settings, "OPENROUTER_BASE_URL", _DEFAULT_OPENROUTER_BASE_URL)
+            self._base_url = resolve_ollama_network_url(raw_base).rstrip("/")
 
     @property
     def name(self) -> str:
@@ -63,7 +69,17 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
         return self._model_name
 
     @property
+    def _is_ollama(self) -> bool:
+        return (
+            "11434" in self._base_url
+            or "ollama" in self._base_url.lower()
+            or "qwen3-vl" in self._model_name.lower()
+        )
+
+    @property
     def api_key(self) -> str | None:
+        if self._is_ollama:
+            return "ollama"
         if self._api_key and self._api_key.strip():
             return self._api_key.strip()
         return (
@@ -73,12 +89,16 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
         )
 
     def is_available(self) -> bool:
+        if self._is_ollama:
+            return True
         key = self.api_key
         return bool(key and key.strip())
 
     async def extract(self, content: bytes, filename: str) -> dict[str, Any]:
-        """Call OpenAI-compatible Vision API to extract structured Markdown and detect page layouts."""
-        key = self.api_key
+        """Call OpenAI-compatible Vision API or native Ollama to extract structured Markdown and detect page layouts."""
+        is_ollama = self._is_ollama
+        key = self.api_key or ("ollama" if is_ollama else None)
+
         if not key or not key.strip():
             # Attempt to retrieve from database if runtime settings not yet populated
             from sqlalchemy import select
@@ -95,12 +115,20 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                             "qwen",
                             "openai",
                             "siliconflow",
+                            "ollama",
                         ]),
                         ModelProviderConfig.is_active.is_(True),
                     )
                     res = await db.execute(stmt)
                     providers = res.scalars().all()
                     for p in providers:
+                        if p.provider_type == "ollama":
+                            key = "ollama"
+                            if p.api_base_url and not self._base_url:
+                                from app.core.config import resolve_ollama_network_url
+
+                                self._base_url = resolve_ollama_network_url(p.api_base_url).rstrip("/")
+                            break
                         if p and p.api_key_encrypted:
                             raw_key = p.api_key_encrypted
                             key = decrypt_secret(raw_key) if is_encrypted(raw_key) else raw_key
@@ -110,7 +138,7 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
             except Exception as db_exc:
                 logger.debug("Failed fetching Vision-compatible API key from database: %s", db_exc)
 
-        if not key or not key.strip():
+        if not is_ollama and (not key or not key.strip()):
             raise RuntimeError(
                 f"Khóa API cho {self.display_name} chưa được cấu hình. "
                 "Vui lòng thiết lập API Key trong phần Quản lý Nhà cung cấp (ModelOps)."
@@ -147,7 +175,11 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
         pages_out: list[dict[str, Any]] = []
         all_text: list[str] = []
 
-        endpoint = f"{self._base_url}/chat/completions"
+        endpoint = (
+            f"{self._base_url.removesuffix('/v1')}/api/chat"
+            if is_ollama
+            else f"{self._base_url}/chat/completions"
+        )
         headers = {
             "Authorization": f"Bearer {key.strip()}",
             "Content-Type": "application/json",
@@ -194,33 +226,51 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 "[Tiếp theo là toàn bộ nội dung Markdown chi tiết của trang]\n"
             )
 
-            payload = {
-                "model": self.model_name,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": data_url},
-                            },
-                        ],
-                    }
-                ],
-                "temperature": 0.1,
-                "max_tokens": 8192,
-            }
+            if is_ollama:
+                payload = {
+                    "model": self.model_name,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt,
+                            "images": [b64_data],
+                        }
+                    ],
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": 8192,
+                    },
+                    "stream": False,
+                }
+            else:
+                payload = {
+                    "model": self.model_name,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": data_url},
+                                },
+                            ],
+                        }
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 8192,
+                }
 
             logger.info(
-                "Gửi Trang %d/%d (%s) tới Vision OCR (%s)",
+                "Gửi Trang %d/%d (%s) tới Vision OCR (%s @ %s)",
                 p_num,
                 len(page_images),
                 filename,
                 self.model_name,
+                endpoint,
             )
 
-            async with httpx.AsyncClient(timeout=120.0, trust_env=False) as client:
+            async with httpx.AsyncClient(timeout=180.0, trust_env=False) as client:
                 resp = await client.post(endpoint, json=payload, headers=headers)
 
             if resp.status_code != 200:
@@ -239,11 +289,13 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 )
 
             data = resp.json()
-            choices = data.get("choices") or []
-            if not choices:
-                raise RuntimeError(f"Vision OCR không trả về kết quả cho Trang {p_num}.")
-
-            extracted_page_raw = choices[0].get("message", {}).get("content") or ""
+            if is_ollama:
+                extracted_page_raw = data.get("message", {}).get("content") or ""
+            else:
+                choices = data.get("choices") or []
+                if not choices:
+                    raise RuntimeError(f"Vision OCR không trả về kết quả cho Trang {p_num}.")
+                extracted_page_raw = choices[0].get("message", {}).get("content") or ""
             clean_text, layout_blks = self._parse_page_layout_and_markdown(extracted_page_raw, p_num)
 
             # Fallback to semantic partition if model didn't emit layout_json
@@ -455,7 +507,8 @@ class QwenOCRAdapter(OpenAIVisionOCRAdapter):
     ) -> None:
         super().__init__(
             api_key=api_key,
-            model_name=model_name or _DEFAULT_VISION_OCR_MODEL,
+            model_name=model_name or "qwen3-vl:8b",
             base_url=base_url,
             adapter_name="qwen_ocr",
         )
+

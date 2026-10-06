@@ -51,6 +51,12 @@ const DEFAULT_CONFIG: AssistantLifecycleConfig = {
     chunking_strategy: "SemanticChunker",
     require_structured_facts: false,
     retrieval_limit: 10,
+    reranker_policy: {
+      enabled: true,
+      model_name: "bge-reranker-base",
+      top_k: 5,
+      score_threshold: 0.4,
+    },
   },
   model_policy: {
     primary_model: "gpt-4o-mini",

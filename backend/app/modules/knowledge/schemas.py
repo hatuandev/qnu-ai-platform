@@ -11,6 +11,18 @@ from pydantic import BaseModel, Field
 # ==============================================================================
 # 1. Collection Schemas
 # ==============================================================================
+class CollectionDataProcessingConfig(BaseModel):
+    """Cấu hình xử lý dữ liệu đặc thù cho từng Kho Tri Thức (Embedding & Vision OCR)."""
+    embedding_provider_id: str = Field("prov_rtx5090_ollama", description="ID nhà cung cấp embedding")
+    embedding_model: str = Field("bge-m3:latest", description="Mô hình vector embedding")
+    embedding_dimension: int = Field(1024, description="Số chiều vector (1024, 2560, 768, 1536)")
+    ocr_mode: str = Field("combo", description="single hoặc combo")
+    primary_ocr_provider_id: str = Field("prov_rtx5090_ollama", description="ID nhà cung cấp OCR chính")
+    primary_ocr_model: str = Field("qwen3-vl:8b", description="Mô hình OCR chính")
+    fallback_ocr_provider_id: str | None = Field("prov_gemini", description="ID nhà cung cấp OCR dự phòng")
+    fallback_ocr_model: str | None = Field("gemini-3.1-flash-lite", description="Mô hình OCR dự phòng")
+
+
 class CollectionCreateRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, description="Tên bộ sưu tập tri thức")
     description: str | None = Field(None, max_length=2000, description="Mô tả chi tiết")
@@ -20,6 +32,7 @@ class CollectionCreateRequest(BaseModel):
     tenant_id: str = Field("tenant_qnu", max_length=64)
     workspace_id: str = Field("workspace_qnu", max_length=64)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    data_processing: CollectionDataProcessingConfig | None = None
 
 
 class CollectionUpdateRequest(BaseModel):
@@ -27,6 +40,7 @@ class CollectionUpdateRequest(BaseModel):
     description: str | None = None
     is_active: bool | None = None
     metadata: dict[str, Any] | None = None
+    data_processing: CollectionDataProcessingConfig | None = None
 
 
 class CollectionResponse(BaseModel):

@@ -91,6 +91,10 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     no_answer_message:
       cfg.guardrails.no_answer_message ||
       "Thông tin này chưa có trong nguồn chính thức. Vui lòng liên hệ đơn vị phụ trách để được hỗ trợ.",
+    reranker_enabled: (cfg as any).knowledge_policy?.reranker_policy?.enabled ?? true,
+    reranker_model: (cfg as any).knowledge_policy?.reranker_policy?.model_name || "bge-reranker-base",
+    reranker_top_k: (cfg as any).knowledge_policy?.reranker_policy?.top_k ?? 5,
+    reranker_score_threshold: (cfg as any).knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
   };
 }
 
@@ -205,6 +209,16 @@ export function AssistantDetailPage({
           output_policy: {
             ...current.config.output_policy,
             require_citations: value.require_citations,
+          },
+          knowledge_policy: {
+            ...((current.config as any).knowledge_policy || {}),
+            collection_id: value.collection_id,
+            reranker_policy: {
+              enabled: value.reranker_enabled,
+              model_name: value.reranker_model,
+              top_k: value.reranker_top_k,
+              score_threshold: value.reranker_score_threshold,
+            },
           },
         },
       });

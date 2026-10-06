@@ -7,21 +7,18 @@ import {
   Download,
   FileJson,
   KeyRound,
-  Layers,
   Plus,
   RefreshCw,
   Search,
   Server,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { AddCustomModelDialog } from "@/components/modelops/add-custom-model-dialog";
-import { CombosVisionSection } from "@/components/modelops/combos-vision-section";
 import { ImportProvidersDialog } from "@/components/modelops/import-providers-dialog";
 import { KeyPoolSection } from "@/components/modelops/key-pool-section";
 import {
@@ -32,7 +29,6 @@ import { ModelsGrid } from "@/components/modelops/models-grid";
 import { ProviderCard } from "@/components/modelops/provider-card";
 import { ProviderDetailHeader } from "@/components/modelops/provider-detail-header";
 import { ProviderModal } from "@/components/modelops/provider-modal";
-import { SystemDefaultsCard } from "@/components/modelops/system-defaults-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -42,7 +38,6 @@ import {
   type ModelProvider,
   type ProviderModelsTestResponse,
   type SingleModelTestResult,
-  type SystemModelDefaults,
 } from "@/services/api-client";
 
 export {
@@ -93,18 +88,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     }
   }, [currentPath]);
 
-  // Master View Main Tab (Providers as DEFAULT!)
-  const [mainViewMode, setMainViewMode] = useState<
-    "providers" | "defaults" | "combos"
-  >("providers");
-  const [combosTaskFilter, setCombosTaskFilter] = useState<string>("all");
-
-  const handleNavigateToCombos = (taskFilter?: string) => {
-    if (taskFilter) {
-      setCombosTaskFilter(taskFilter);
-    }
-    setMainViewMode("combos");
-  };
 
   // Master View Category Filter Tab
   const [activeCategoryTab, setActiveCategoryTab] =
@@ -228,65 +211,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     return list;
   }, [providers, activeCategoryTab, searchQuery]);
 
-  const defaultsQuery = useQuery({
-    queryKey: ["system-model-defaults"],
-    queryFn: () => apiClient.getSystemModelDefaults(),
-  });
-  const systemDefaults = defaultsQuery.data?.defaults;
-  const availableEmbeddings = defaultsQuery.data?.available_embeddings || [];
-  const availableRerankers = defaultsQuery.data?.available_rerankers || [];
-  const availableOcrs = defaultsQuery.data?.available_ocrs || [];
-
-  const allAvailableModels = useMemo(() => {
-    const list: Array<{
-      provider_id: string;
-      provider_name: string;
-      provider_type: string;
-      model_name: string;
-      category: "cloud" | "custom";
-      description?: string;
-    }> = [];
-    for (const p of providers) {
-      if (!p.is_active) continue;
-      const cat = getProviderCategory(p);
-      for (const m of p.models || []) {
-        list.push({
-          provider_id: p.id,
-          provider_name: p.name,
-          provider_type: p.type || p.code || "cloud",
-          model_name: m,
-          category: cat,
-          description: `${m} (${p.name})`,
-        });
-      }
-    }
-    return list;
-  }, [providers]);
-
-  const updateDefaultsMutation = useMutation({
-    mutationFn: (payload: Partial<SystemModelDefaults>) =>
-      apiClient.updateSystemModelDefaults(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
-      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
-    },
-  });
-
-  const setDefaultMutation = useMutation({
-    mutationFn: ({
-      providerId,
-      role,
-      modelName,
-    }: {
-      providerId: string;
-      role: "embedding" | "reranker" | "ocr";
-      modelName: string;
-    }) => apiClient.setProviderModelAsDefault(providerId, role, modelName),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["system-model-defaults"] });
-      queryClient.invalidateQueries({ queryKey: ["knowledge-collections"] });
-    },
-  });
 
   const { data: presets = [] } = useQuery({
     queryKey: ["provider-presets"],
@@ -592,7 +516,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     modelId: string,
     _isVision: boolean,
     _isReasoning: boolean,
-    defaultRole: "none" | "embedding" | "reranker" | "ocr",
+    _defaultRole: "none" | "embedding" | "reranker" | "ocr",
     testResult: SingleModelTestResult | null,
   ) => {
     if (!selectedProvider) return;
@@ -608,13 +532,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
           ...prev,
           [modelId]: testResult,
         }));
-      }
-      if (defaultRole !== "none") {
-        setDefaultMutation.mutate({
-          providerId: selectedProvider.id,
-          role: defaultRole,
-          modelName: modelId,
-        });
       }
     }
   };
@@ -790,7 +707,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         <ModelsGrid
           selectedProvider={selectedProvider}
           presets={presets}
-          systemDefaults={systemDefaults}
           modelTestResults={modelTestResults}
           modelTestSummary={modelTestSummary}
           unavailableModelsCount={unavailableModelsCount}
@@ -1007,41 +923,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         </Card>
       </div>
 
-      {/* Main Navigation Tabs */}
-      <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 border-b border-border pb-2.5">
-        <Button
-          variant={mainViewMode === "providers" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setMainViewMode("providers")}
-          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
-        >
-          <Server className="size-3.5 shrink-0" />
-          <span className="truncate">Nhà Cung Cấp</span>
-        </Button>
-
-        <Button
-          variant={mainViewMode === "defaults" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setMainViewMode("defaults")}
-          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
-        >
-          <Sparkles className="size-3.5 shrink-0" />
-          <span className="truncate">Mặc Định</span>
-        </Button>
-
-        <Button
-          variant={mainViewMode === "combos" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setMainViewMode("combos")}
-          className="h-8.5 sm:h-8 px-1.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-1.5 rounded-md justify-center w-full sm:w-auto"
-        >
-          <Layers className="size-3.5 shrink-0" />
-          <span className="truncate">Combos</span>
-        </Button>
-      </div>
-
-      {/* Main View Content */}
-      {mainViewMode === "providers" && (
+{/* Provider Grid & Content */}
         <div className="space-y-4">
           {/* Category Tabs & Realtime Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
@@ -1278,32 +1160,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
             </div>
           )}
         </div>
-      )}
-
-      {mainViewMode === "defaults" && (
-        <SystemDefaultsCard
-          systemDefaults={systemDefaults}
-          availableEmbeddings={availableEmbeddings}
-          availableRerankers={availableRerankers}
-          availableOcrs={availableOcrs}
-          allAvailableModels={allAvailableModels}
-          isLoading={defaultsQuery.isLoading}
-          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
-          onNavigateToCombos={handleNavigateToCombos}
-        />
-      )}
-
-      {mainViewMode === "combos" && (
-        <CombosVisionSection
-          systemDefaults={systemDefaults}
-          availableOcrs={availableOcrs}
-          availableEmbeddings={availableEmbeddings}
-          availableRerankers={availableRerankers}
-          allAvailableModels={allAvailableModels}
-          initialTaskFilter={combosTaskFilter}
-          onUpdateDefaults={(payload) => updateDefaultsMutation.mutate(payload)}
-        />
-      )}
 
       {/* Provider Modal (Create / Edit with Presets) */}
       <ProviderModal

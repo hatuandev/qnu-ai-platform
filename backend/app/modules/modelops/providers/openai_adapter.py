@@ -14,11 +14,23 @@ from app.modules.modelops.schemas import ChatMessage
 
 
 class OpenAIAdapter(BaseLLMAdapter):
-    """Adapter for OpenAI API."""
+    """Adapter for OpenAI API and OpenAI-compatible providers (Ollama, OpenRouter, vLLM)."""
+
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: int = 15,
+        provider_type: str = "openai",
+        **kwargs,
+    ):
+        super().__init__(model_name, api_key, base_url, timeout_seconds, **kwargs)
+        self._provider_type_override = provider_type
 
     @property
     def provider_type(self) -> str:
-        return "openai"
+        return self._provider_type_override or "openai"
 
     async def generate(
         self,
@@ -31,8 +43,18 @@ class OpenAIAdapter(BaseLLMAdapter):
         base_url = self.base_url or "https://api.openai.com/v1"
         endpoint = f"{base_url.rstrip('/')}/chat/completions"
 
-        # Check API key configuration: Fail loud if not configured so Failover Cascade takes over
-        if not self.api_key:
+        # Check API key configuration: local/on-premise providers like Ollama do not require an API key
+        effective_key = self.api_key
+        is_local_or_ollama = (
+            self.provider_type in ("ollama", "local", "custom")
+            or "11434" in (self.base_url or "")
+            or "localhost" in (self.base_url or "")
+            or "100." in (self.base_url or "")
+        )
+        if not effective_key and is_local_or_ollama:
+            effective_key = "ollama"
+
+        if not effective_key:
             raise AppException(
                 f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
                 code="provider_key_missing",
@@ -56,7 +78,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             )
 
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {effective_key}",
             "Content-Type": "application/json",
         }
         if "openrouter" in (self.base_url or "").lower():
@@ -114,8 +136,18 @@ class OpenAIAdapter(BaseLLMAdapter):
         max_tokens: int = 2000,
         **kwargs,
     ) -> AsyncIterator[str]:
-        # Check API key configuration: Fail loud if not configured
-        if not self.api_key:
+        # Check API key configuration: local/on-premise providers like Ollama do not require an API key
+        effective_key = self.api_key
+        is_local_or_ollama = (
+            self.provider_type in ("ollama", "local", "custom")
+            or "11434" in (self.base_url or "")
+            or "localhost" in (self.base_url or "")
+            or "100." in (self.base_url or "")
+        )
+        if not effective_key and is_local_or_ollama:
+            effective_key = "ollama"
+
+        if not effective_key:
             raise AppException(
                 f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
                 code="provider_key_missing",
@@ -132,7 +164,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         base_url = self.base_url or "https://api.openai.com/v1"
         endpoint = f"{base_url.rstrip('/')}/chat/completions"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {effective_key}",
             "Content-Type": "application/json",
         }
         if "openrouter" in (self.base_url or "").lower():

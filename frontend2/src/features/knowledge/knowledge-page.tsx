@@ -60,6 +60,7 @@ import {
 import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type {
+  CollectionDataProcessingConfig,
   KnowledgeCollection,
   KnowledgeReconciliationReport,
 } from "@/types/knowledge";
@@ -88,6 +89,8 @@ export const KnowledgePage: React.FC = () => {
   );
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editDataProcessing, setEditDataProcessing] =
+    useState<CollectionDataProcessingConfig>({});
 
   // Upload Dialog State
   const [uploadTarget, setUploadTarget] = useState<KnowledgeCollection | null>(
@@ -179,6 +182,7 @@ export const KnowledgePage: React.FC = () => {
       return knowledgeApi.updateCollection(editTarget.id, {
         name: editName.trim() || undefined,
         description: editDescription.trim() || undefined,
+        data_processing: editDataProcessing,
       });
     },
     onSuccess: () => {
@@ -217,6 +221,19 @@ export const KnowledgePage: React.FC = () => {
     setEditTarget(col);
     setEditName(col.name);
     setEditDescription(col.description);
+    setEditDataProcessing(
+      col.data_processing || {
+        embedding_model: "bge-m3:latest",
+        embedding_provider_id: "prov_rtx5090_ollama",
+        embedding_dimension: 1024,
+        ocr_mode: "combo",
+        primary_ocr_model: "qwen3-vl:8b",
+        primary_ocr_provider_id: "prov_rtx5090_ollama",
+        fallback_ocr_model: "gemini-3.1-flash-lite",
+        fallback_ocr_provider_id: "prov_gemini",
+        enable_ocr_rescue: true,
+      },
+    );
   };
 
   const handleOpenReconcile = async (col: KnowledgeCollection) => {
@@ -744,6 +761,9 @@ export const KnowledgePage: React.FC = () => {
           setConfigName={setEditName}
           configDescription={editDescription}
           setConfigDescription={setEditDescription}
+          documentCount={editTarget.document_count}
+          dataProcessingConfig={editDataProcessing}
+          setDataProcessingConfig={setEditDataProcessing}
           isSaving={editMutation.isPending}
           onSave={() => editMutation.mutate()}
         />

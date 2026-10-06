@@ -205,6 +205,7 @@ class RagService:
             dense_weight=dense_weight,
             sparse_weight=sparse_weight,
             sparse_variants=sparse_variants,
+            reranker_policy=req.reranker_policy,
         )
 
         # 5. No-Answer Policy if context is empty
