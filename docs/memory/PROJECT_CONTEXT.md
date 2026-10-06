@@ -7,14 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-06 15:20 (UTC+7)
-- **Phiên số**: #277 (Khắc Phục Triệt Để Bounding Boxes Scan Bị Loạn & Bảng Markdown Bị Dồn Thẻ <br> / Mất Header Trên Scan Studio)
-- **Kết quả phiên #277**:
-  - **Khắc phục 100% Bounding Boxes thị giác**: Đấu nối trực tiếp SmartLayoutDetector (dùng giải thuật hình thái học phát hiện đường lưới bảng và mask HSV con dấu tròn đỏ) vào OpenAIVisionOCRAdapter, thay thế hoàn toàn hàm đoán mò toạ độ _semantic_markdown_partition. Trang 1 nhận đúng 6 vùng chuẩn xác (header, title, text, list, text, table), Trang 2 nhận đúng 5 vùng (table, text, text, list, signature). Bảng Trang 2 không còn bị kéo dài đè lên con dấu đỏ.
-  - **Bảo tồn bản ghi hàng học phí độc lập**: Cập nhật merge_ocr_orphan_table_rows trong cleaner.py với điều kiện số tiền (has_currency_or_number) và phân kỳ (has_installment), chấm dứt triệt để việc nhồi nhét thẻ <br> vào ô lớn.
-  - **Tự động kế thừa Header cho bảng tiếp nối**: Xây dựng hàm inherit_table_headers_for_continuation_pages, tự động sao chép Header & Separator và đệm đủ cột chuẩn GFM cho bảng ở Trang 2 khi xem từng trang trên UI, loại bỏ separator rác.
-  - Ruff 0 lỗi, pytest OCR 19/19 passed (100%).
-  - Báo cáo chi tiết: [docs/nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md](./nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md).
+- **Thời gian cập nhật**: 2026-10-06 15:55 (UTC+7)
+- **Phiên số**: #278 (Tinh Gọn Toàn Diện Root Workspace & Chuẩn Hóa Frontend2 Port 3000)
+- **Kết quả phiên #278**:
+  - **Root Workspace tinh gọn 54%**: Giảm từ 39 tệp/thư mục xuống còn 18 tệp. Gom 13 script `scratch_*.py` vào `scratch/archive/`, gom 8 tài liệu mẫu (.docx, .html, .md) vào `docs/tai_lieu/samples/`.
+  - **Chuẩn hóa Frontend2 độc tôn**: Xóa `node_modules` cũ giải phóng ~500MB đĩa, lưu trữ bản cũ vào `legacy/frontend_v1_backup/`, cập nhật `run.ps1` trỏ thẳng `frontend2` (Port 3000).
+  - **Xác định nguyên nhân quyền `document_types`**: Quyền sở hữu bị gán cho SYSTEM/root từ Docker trước đây. Đã hướng dẫn lệnh PowerShell Admin để cấp quyền.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_278_tinh_gon_toan_dien_root_workspace_va_chuan_hoa_frontend2.md`](./nhat_ky/2026-10-06_phien_278_tinh_gon_toan_dien_root_workspace_va_chuan_hoa_frontend2.md).
+- **Phiên trước #277**:
+  - Khắc Phục Triệt Để Bounding Boxes Scan Bị Loạn & Bảng Markdown Bị Dồn Thẻ `<br>` / Mất Header Trên Scan Studio (QD2139).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md`](./nhat_ky/2026-10-06_phien_277_khac_phuc_triet_de_vung_scan_loan_va_bang_markdown_bi_don_br.md).
 - **Phiên trước #276**:
   - Tối Ưu Tốc Độ Tối Đa Cho Qwen3-VL OCR & Hạ Tầng GPU RTX 5090 (Tắt Alpha Channel, DPI 96, Tinh Gọn Prompt, num_ctx 4096, Batching Concurrency).
   - Báo cáo chi tiết: [docs/nhat_ky/2026-10-06_phien_276_toi_uu_toc_do_toi_da_qwen3_vl_ocr_va_ha_tang_rtx5090.md](./nhat_ky/2026-10-06_phien_276_toi_uu_toc_do_toi_da_qwen3_vl_ocr_va_ha_tang_rtx5090.md).

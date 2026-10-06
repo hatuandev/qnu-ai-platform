@@ -43,21 +43,12 @@ switch ($Command) {
         }
         Set-Location $PSScriptRoot
 
-        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend cu (Port 3001)..." -ForegroundColor Green
+        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend QNU AI (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
     }
     { $_ -in "dev1", "dev2" } {
-        Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
-        Set-Location "$PSScriptRoot\backend"
-        & ".\.venv\Scripts\python.exe" -m app.cli db ensure-ready
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[CANH BAO] CSDL chua san sang hoac gap loi khi khoi tao." -ForegroundColor Red
-            Write-Host "Neu PostgreSQL chua chay, vui long chay: .\run.ps1 infra-up" -ForegroundColor Yellow
-        }
-        Set-Location $PSScriptRoot
-
-        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend 2 Moi (Port 3000)..." -ForegroundColor Green
+        Write-Host "Dang khoi chay Backend (Port 8001) va Frontend QNU AI (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
     }
@@ -70,12 +61,8 @@ switch ($Command) {
         Write-Host "Dang khoi chay Backend API (Port 8001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
     }
-    "fe" {
-        Write-Host "Dang khoi chay Frontend Studio cu (Port 3001)..." -ForegroundColor Green
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
-    }
-    "fe2" {
-        Write-Host "Dang khoi chay Frontend 2 Studio Moi (Port 3000)..." -ForegroundColor Green
+    { $_ -in "fe", "fe2" } {
+        Write-Host "Dang khoi chay Frontend QNU AI (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
     }
     "test" {
