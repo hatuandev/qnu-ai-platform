@@ -26,33 +26,27 @@ infra-status:
 infra-logs:
 	docker compose -f docker-compose.infra.yml logs -f
 
-# Khởi chạy đồng thời cả Backend (Port 8001) và Frontend cũ (Port 3001)
+# Khởi chạy đồng thời cả Backend (Port 8001) và Frontend Studio (Port 3000)
 dev:
 	cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
 	cmd /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-	cmd /c start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
+	cmd /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
 
-# Khởi chạy đồng thời cả Backend (Port 8001) và Frontend 2 Mới (Port 3000)
-dev1:
-	cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
-	cmd /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-	cmd /c start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
-
-# Alias dev2 -> dev1
-dev2: dev1
+# Alias dev1, dev2 -> dev
+dev1: dev
+dev2: dev
 
 # Khởi chạy riêng Backend API (Port 8001)
 be:
 	cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
 	cmd /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
 
-# Khởi chạy riêng Frontend Studio (Port 3001)
+# Khởi chạy riêng Frontend Studio (Port 3000)
 fe:
-	cmd /c start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
+	cmd /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
 
-# Khởi chạy riêng Frontend 2 Studio Mới (Port 3000)
-fe2:
-	cmd /c start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
+# Alias fe2 -> fe
+fe2: fe
 
 # Chạy toàn bộ kiểm thử tự động
 test:

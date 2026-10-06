@@ -64,20 +64,16 @@ switch ($Command) {
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Write-Host "Doi Backend khoi dong trong 2 giay de tranh proxy error..." -ForegroundColor Gray
         Start-Sleep -Seconds 2
-        Write-Host "Dang khoi chay Frontend 2 Studio Moi (Port 3000)..." -ForegroundColor Green
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
+        Write-Host "Dang khoi chay Frontend Studio (Port 3000)..." -ForegroundColor Green
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     "be" {
         Write-Host "Dang khoi chay Backend API (Port 8001)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
     }
-    "fe" {
-        Write-Host "Dang khoi chay Frontend Studio cu (Port 3001)..." -ForegroundColor Green
+    { $_ -in "fe", "fe2" } {
+        Write-Host "Dang khoi chay Frontend Studio (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
-    }
-    "fe2" {
-        Write-Host "Dang khoi chay Frontend 2 Studio Moi (Port 3000)..." -ForegroundColor Green
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
     }
     "test" {
         Write-Host "[1/2] Dang chay kiem thu Backend Pytest (68 tests)..." -ForegroundColor Cyan

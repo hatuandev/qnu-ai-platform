@@ -97,6 +97,9 @@ async def check_db_schema() -> bool:
                 "workflow_definitions",
                 "model_provider_configs",
                 "platform_document_types",
+                "provider_api_keys",
+                "provider_key_events",
+                "conversation_feedbacks",
             }
             missing = required_tables - tables
             if missing:

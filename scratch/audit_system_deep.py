@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 backend_dir = Path("backend/app")
-frontend_dir = Path("frontend2/src")
+frontend_dir = Path("frontend/src")
 
 def safe_read(p: Path) -> str:
     try:

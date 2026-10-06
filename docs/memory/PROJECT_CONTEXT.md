@@ -7,12 +7,23 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-06 15:55 (UTC+7)
-- **Phiên số**: #278 (Tinh Gọn Toàn Diện Root Workspace & Chuẩn Hóa Frontend2 Port 3000)
-- **Kết quả phiên #278**:
+- **Thời gian cập nhật**: 2026-10-06 16:30 (UTC+7)
+- **Phiên số**: #280 (Khắc Phục Triệt Để Lỗi UndefinedTableError "provider_api_keys", Nâng Cấp Alembic Head & Bảo Vệ Provider RTX 5090)
+- **Kết quả phiên #280**:
+  - **Khắc phục lỗi HTTP 500 khi gọi `/platform/v1alpha1/modelops/providers/{id}/keys`**: Phát hiện CSDL PostgreSQL đang dừng ở revision `20260922_conversation_feedback`, thiếu bảng quan hệ `provider_api_keys` và `provider_key_events`.
+  - **Bảo vệ an toàn 100% cho `prov_rtx5090_ollama`**: Hiệu chỉnh `20261002_remove_local_model_providers.py`, loại trừ tuyệt đối máy chủ GPU nội bộ RTX 5090 (`provider_type='ollama'`) và mô hình `qwen3-vl:8b` khỏi truy vấn dọn dẹp provider cũ; bảo tồn nguyên vẹn defaults toàn hệ thống.
+  - **Đồng bộ hóa Alembic lên HEAD (`20261002_remove_local_models`)**: Thực thi thành công toàn bộ chuỗi migration lên HEAD, tạo 2 bảng `provider_api_keys` và `provider_key_events`.
+  - **Nâng cấp `check_db_schema` trong `app/cli.py`**: Mở rộng `required_tables` gồm 9 bảng cốt lõi (thêm `provider_api_keys`, `provider_key_events`, `conversation_feedbacks`), giúp tự động kích hoạt `migrate_database()` lên HEAD nếu DB thiếu bảng.
+  - **Xác minh chất lượng**: Endpoint `/keys` trả về HTTP 200 OK với khóa on-premise; Pytest 14 tests (cli, rotation, status, provider safety) passed 100%; Ruff check 0 lỗi.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_280_khac_phuc_loi_relation_provider_api_keys_va_dong_bo_alembic_head.md`](./nhat_ky/2026-10-06_phien_280_khac_phuc_loi_relation_provider_api_keys_va_dong_bo_alembic_head.md).
+- **Phiên trước #279**:
+  - **Chuyển đổi hoàn tất `frontend2` $\rightarrow$ `frontend`**: Xóa sạch thư mục cache/untracked của frontend cũ, di chuyển toàn bộ mã nguồn `frontend2` thành thư mục `frontend` duy nhất của dự án.
+  - **Đồng bộ hóa toàn bộ Task Runners & Configs**: Cập nhật `frontend/package.json` (`qnu-ai-platform-frontend`), `frontend/bun.lock`, `docker-compose.yml` (`context: ./frontend`), `Makefile`, `run.ps1`, `make.ps1`, `make.bat`, `make`, `scratch/audit_system_deep.py`.
+  - **Xác minh chất lượng**: `npm run build` (`vite build && tsc --noEmit`) thành công 100% trong 2.04s, 0 lỗi TypeScript. Git staged 100% renames sạch.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_279_chuan_hoa_thong_nhat_frontend2_sang_frontend.md`](./nhat_ky/2026-10-06_phien_279_chuan_hoa_thong_nhat_frontend2_sang_frontend.md).
+- **Phiên trước #278**:
   - **Root Workspace tinh gọn 54%**: Giảm từ 39 tệp/thư mục xuống còn 18 tệp. Gom 13 script `scratch_*.py` vào `scratch/archive/`, gom 8 tài liệu mẫu (.docx, .html, .md) vào `docs/tai_lieu/samples/`.
   - **Chuẩn hóa Frontend2 độc tôn**: Xóa `node_modules` cũ giải phóng ~500MB đĩa, lưu trữ bản cũ vào `legacy/frontend_v1_backup/`, cập nhật `run.ps1` trỏ thẳng `frontend2` (Port 3000).
-  - **Xác định nguyên nhân quyền `document_types`**: Quyền sở hữu bị gán cho SYSTEM/root từ Docker trước đây. Đã hướng dẫn lệnh PowerShell Admin để cấp quyền.
   - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_278_tinh_gon_toan_dien_root_workspace_va_chuan_hoa_frontend2.md`](./nhat_ky/2026-10-06_phien_278_tinh_gon_toan_dien_root_workspace_va_chuan_hoa_frontend2.md).
 - **Phiên trước #277**:
   - Khắc Phục Triệt Để Bounding Boxes Scan Bị Loạn & Bảng Markdown Bị Dồn Thẻ `<br>` / Mất Header Trên Scan Studio (QD2139).

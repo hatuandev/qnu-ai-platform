@@ -27,32 +27,49 @@ _LOCAL_PROVIDER_IDS = (
 
 def upgrade() -> None:
     local_ids = ", ".join(f"'{provider_id}'" for provider_id in _LOCAL_PROVIDER_IDS)
+    # Only reset defaults if they were previously pointing to one of the retired local providers
     op.execute(
         sa.text(
-            """
+            f"""
             UPDATE model_provider_configs
             SET extra_config = jsonb_set(
-                COALESCE(extra_config, '{}'::jsonb),
-                '{defaults}',
+                COALESCE(extra_config, '{{}}'::jsonb),
+                '{{defaults}}',
                 jsonb_set(
                     jsonb_set(
                         jsonb_set(
                             jsonb_set(
-                                COALESCE(extra_config->'defaults', '{}'::jsonb),
-                                '{default_embedding_provider_id}',
-                                '"prov_cloudflare"'::jsonb,
+                                COALESCE(extra_config->'defaults', '{{}}'::jsonb),
+                                '{{default_embedding_provider_id}}',
+                                CASE
+                                    WHEN COALESCE(extra_config->'defaults'->>'default_embedding_provider_id', '') IN ({local_ids})
+                                        THEN '"prov_cloudflare"'::jsonb
+                                    ELSE extra_config->'defaults'->'default_embedding_provider_id'
+                                END,
                                 true
                             ),
-                            '{default_embedding_model}',
-                            '"@cf/baai/bge-m3"'::jsonb,
+                            '{{default_embedding_model}}',
+                            CASE
+                                WHEN COALESCE(extra_config->'defaults'->>'default_embedding_provider_id', '') IN ({local_ids})
+                                    THEN '"@cf/baai/bge-m3"'::jsonb
+                                ELSE extra_config->'defaults'->'default_embedding_model'
+                            END,
                             true
                         ),
-                        '{default_reranker_provider_id}',
-                        '"prov_cloudflare"'::jsonb,
+                        '{{default_reranker_provider_id}}',
+                        CASE
+                            WHEN COALESCE(extra_config->'defaults'->>'default_reranker_provider_id', '') IN ({local_ids})
+                                THEN '"prov_cloudflare"'::jsonb
+                            ELSE extra_config->'defaults'->'default_reranker_provider_id'
+                        END,
                         true
                     ),
-                    '{default_reranker_model}',
-                    '"@cf/baai/bge-reranker-base"'::jsonb,
+                    '{{default_reranker_model}}',
+                    CASE
+                        WHEN COALESCE(extra_config->'defaults'->>'default_reranker_provider_id', '') IN ({local_ids})
+                            THEN '"@cf/baai/bge-reranker-base"'::jsonb
+                        ELSE extra_config->'defaults'->'default_reranker_model'
+                    END,
                     true
                 ),
                 true
@@ -109,9 +126,11 @@ def upgrade() -> None:
                                             COALESCE(combo->'models', '[]'::jsonb)
                                         ) WITH ORDINALITY AS model_entries(model, model_ordinality)
                                         WHERE COALESCE(model->>'provider_id', '') NOT IN ({local_ids})
-                                          AND lower(COALESCE(model->>'provider_type', '')) NOT IN (
-                                            'local', 'local_vllm', 'ollama', 'vllm',
-                                            'sentence_transformers', 'docling', 'easyocr'
+                                          AND (
+                                            lower(COALESCE(model->>'provider_type', '')) NOT IN (
+                                                'local', 'local_vllm', 'sentence_transformers', 'docling', 'easyocr'
+                                            )
+                                            OR COALESCE(model->>'provider_id', '') = 'prov_rtx5090_ollama'
                                           )
                                     ),
                                     '[]'::jsonb
@@ -152,9 +171,11 @@ def upgrade() -> None:
                             COALESCE(extra_config->'defaults'->'vision_adapter'->'models', '[]'::jsonb)
                         ) WITH ORDINALITY AS entries(model, ordinality)
                         WHERE COALESCE(model->>'provider_id', '') NOT IN ({local_ids})
-                          AND lower(COALESCE(model->>'provider_type', '')) NOT IN (
-                            'local', 'local_vllm', 'ollama', 'vllm',
-                            'sentence_transformers', 'docling', 'easyocr'
+                          AND (
+                            lower(COALESCE(model->>'provider_type', '')) NOT IN (
+                                'local', 'local_vllm', 'sentence_transformers', 'docling', 'easyocr'
+                            )
+                            OR COALESCE(model->>'provider_id', '') = 'prov_rtx5090_ollama'
                           )
                     ),
                     '[]'::jsonb
@@ -169,11 +190,14 @@ def upgrade() -> None:
         sa.text(
             f"""
             DELETE FROM model_provider_configs
-            WHERE id IN ({local_ids})
-               OR lower(provider_type) IN (
-                    'local', 'local_vllm', 'ollama', 'vllm',
-                    'sentence_transformers', 'docling', 'easyocr'
-               )
+            WHERE (
+                id IN ({local_ids})
+                OR lower(provider_type) IN (
+                    'local', 'local_vllm', 'sentence_transformers', 'docling', 'easyocr'
+                )
+            )
+            AND id != 'prov_rtx5090_ollama'
+            AND id NOT LIKE 'prov_rtx%'
             """
         )
     )

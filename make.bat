@@ -46,24 +46,15 @@ docker compose -f docker-compose.infra.yml logs -f
 goto end
 
 :do_dev
-echo [QNU AI Platform] Kiem tra CSDL va du lieu mau...
-cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
-cd ..
-echo [QNU AI Platform] Dang khoi chay Backend va Frontend (Port 3001)...
-start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-timeout /t 2 /nobreak >nul
-start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
-goto end
-
 :do_dev1
 :do_dev2
 echo [QNU AI Platform] Kiem tra CSDL va du lieu mau...
 cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
 cd ..
-echo [QNU AI Platform] Dang khoi chay Backend va Frontend 2 (Port 3000)...
+echo [QNU AI Platform] Dang khoi chay Backend va Frontend Studio (Port 3000)...
 start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
 timeout /t 2 /nobreak >nul
-start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
+start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
 goto end
 
 :do_be
@@ -72,13 +63,9 @@ start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python
 goto end
 
 :do_fe
-echo [QNU AI Platform] Dang khoi chay Frontend Studio (Port 3001)...
-start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
-goto end
-
 :do_fe2
-echo [QNU AI Platform] Dang khoi chay Frontend 2 Studio (Port 3000)...
-start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
+echo [QNU AI Platform] Dang khoi chay Frontend Studio (Port 3000)...
+start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
 goto end
 
 :do_test

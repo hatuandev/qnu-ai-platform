@@ -23,30 +23,20 @@ case "$CMD" in
     echo "[QNU AI Platform] Dang xoa sach toan bo CSDL PostgreSQL va Qdrant, sau do seed lai toan bo 5 mo-dun..."
     (cd backend && ./.venv/Scripts/python.exe scripts/reset_and_reseed.py)
     ;;
-  dev)
+  dev|dev1|dev2)
     echo "[QNU AI Platform] Kiem tra CSDL va du lieu mau..."
     (cd backend && ./.venv/Scripts/python.exe -m app.cli db ensure-ready)
-    echo "[QNU AI Platform] Khoi chay Backend (Port 8001) va Frontend cu (Port 3001)..."
+    echo "[QNU AI Platform] Khoi chay Backend (Port 8001) va Frontend Studio (Port 3000)..."
     cmd.exe /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-    cmd.exe /c start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
-    ;;
-  dev1|dev2)
-    echo "[QNU AI Platform] Kiem tra CSDL va du lieu mau..."
-    (cd backend && ./.venv/Scripts/python.exe -m app.cli db ensure-ready)
-    echo "[QNU AI Platform] Khoi chay Backend (Port 8001) va Frontend 2 Moi (Port 3000)..."
-    cmd.exe /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-    cmd.exe /c start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
+    cmd.exe /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
     ;;
   be)
     echo "[QNU AI Platform] Kiem tra CSDL va du lieu mau..."
     (cd backend && ./.venv/Scripts/python.exe -m app.cli db ensure-ready)
     cmd.exe /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
     ;;
-  fe)
-    cmd.exe /c start "QNU Frontend Studio (Port 3001)" cmd /k "cd frontend && npm run dev"
-    ;;
-  fe2)
-    cmd.exe /c start "QNU Frontend 2 Studio (Port 3000)" cmd /k "cd frontend2 && npm run dev"
+  fe|fe2)
+    cmd.exe /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
     ;;
   test)
     (cd backend && uv run --extra dev pytest)

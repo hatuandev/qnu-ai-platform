@@ -45,12 +45,12 @@ switch ($Command) {
 
         Write-Host "Dang khoi chay Backend (Port 8001) va Frontend QNU AI (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     { $_ -in "dev1", "dev2" } {
         Write-Host "Dang khoi chay Backend (Port 8001) va Frontend QNU AI (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     "be" {
         Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
@@ -63,7 +63,7 @@ switch ($Command) {
     }
     { $_ -in "fe", "fe2" } {
         Write-Host "Dang khoi chay Frontend QNU AI (Port 3000)..." -ForegroundColor Green
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend2; npm run dev"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     "test" {
         Write-Host "[1/2] Dang chay kiem thu Backend Pytest (68 tests)..." -ForegroundColor Cyan
