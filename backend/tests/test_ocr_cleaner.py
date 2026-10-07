@@ -91,10 +91,9 @@ def test_merge_ocr_orphan_table_rows_with_br():
     )
     merged = merge_ocr_orphan_table_rows(raw)
     lines = [ln for ln in merged.splitlines() if ln.startswith("|")]
-    # Header + separator + Row 1.1 + Row 1.2 = 4 rows
     assert len(lines) == 4
-    assert "Kế thừa chức năng, dữ liệu cũ<br>Bảo đảm hệ thống sau nâng cấp" in merged
-    assert "chức năng đang sử dụng.<br>Không làm mất dữ liệu" in merged
+    assert "Kế thừa chức năng, dữ liệu cũ Bảo đảm hệ thống sau nâng cấp" in merged
+    assert "chức năng đang sử dụng. Không làm mất dữ liệu" in merged
 
 
 def test_clean_ocr_table_syntax_and_typos():

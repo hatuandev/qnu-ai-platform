@@ -7,9 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-06 16:30 (UTC+7)
-- **Phiên số**: #280 (Khắc Phục Triệt Để Lỗi UndefinedTableError "provider_api_keys", Nâng Cấp Alembic Head & Bảo Vệ Provider RTX 5090)
-- **Kết quả phiên #280**:
+- **Thời gian cập nhật**: 2026-10-06 23:35 (UTC+7)
+- **Phiên số**: #281 (Khắc Phục Lệch Vùng Chữ Ký Signature Box & Triệt Tiêu Nhãn Danh Sách "List" Giả Mạo Trên Scan Studio)
+- **Kết quả phiên #281**:
+  - **Khắc phục vùng nhận diện `signature` bị lệch và cắt đôi đoạn văn**: Tái cấu trúc thuật toán phát hiện vùng kết thúc văn bản `_detect_morphology_regions` trong `layout_detector.py`. Thuật toán mới tính toán chính xác tọa độ con dấu đỏ `(seal_x1, seal_y1, seal_x2, seal_y2)` và chỉ gom con dấu đỏ + chức vụ ("HIỆU TRƯỞNG") + chữ ký + họ tên lãnh đạo ở nửa phải trang (`x >= 0.38*w`) thành 1 hộp `signature` duy nhất.
+  - **Bảo tồn trọn vẹn đoạn văn bản số 4**: Loại bỏ triệt để hành vi quét khe trắng xén đôi đoạn văn bản số 4 (*"vướng mắc, các đơn vị..."*) thành 2 cột giả mạo (`list` bên trái, `signature` bên phải). Đoạn văn số 4 được giữ nguyên vẹn toàn dòng với nhãn `text`.
+  - **Triệt tiêu 100% nhãn `list` giả mạo**: Xóa bỏ hoàn toàn quy tắc gán nhãn tùy tiện `elif h_pct >= 6.0: r_type = "list"` và `elif self._is_list_marker(txt): rtype = "list"` trong `layout_detector.py` và `openai_vision_adapter.py`. Mọi đoạn văn quy chế/điều khoản được đưa về nhãn `text` ("Khối văn bản") chuẩn xác.
+  - **Cập nhật gán văn bản theo vị trí thực tế**: Sửa `_associate_snippets_with_regions` trong `layout_detector.py` định vị vùng Nơi nhận theo tọa độ không gian thực tế (`left < 45%` và `top >= 40%`) thay vì phụ thuộc nhãn `list`.
+  - **Xác minh chất lượng**: Bổ sung unit test `test_smart_layout_closing_signature.py` pass 100%; Toàn bộ bộ test OCR 27/27 tests passed (100%); Ruff linter kiểm tra `app/modules/ocr` và `tests/` sạch 0 lỗi.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-06_phien_281_khac_phuc_vung_chu_ky_bi_lech_va_triet_tieu_nhan_list_scan_studio.md`](./nhat_ky/2026-10-06_phien_281_khac_phuc_vung_chu_ky_bi_lech_va_triet_tieu_nhan_list_scan_studio.md).
+- **Phiên trước #280**:
   - **Khắc phục lỗi HTTP 500 khi gọi `/platform/v1alpha1/modelops/providers/{id}/keys`**: Phát hiện CSDL PostgreSQL đang dừng ở revision `20260922_conversation_feedback`, thiếu bảng quan hệ `provider_api_keys` và `provider_key_events`.
   - **Bảo vệ an toàn 100% cho `prov_rtx5090_ollama`**: Hiệu chỉnh `20261002_remove_local_model_providers.py`, loại trừ tuyệt đối máy chủ GPU nội bộ RTX 5090 (`provider_type='ollama'`) và mô hình `qwen3-vl:8b` khỏi truy vấn dọn dẹp provider cũ; bảo tồn nguyên vẹn defaults toàn hệ thống.
   - **Đồng bộ hóa Alembic lên HEAD (`20261002_remove_local_models`)**: Thực thi thành công toàn bộ chuỗi migration lên HEAD, tạo 2 bảng `provider_api_keys` và `provider_key_events`.

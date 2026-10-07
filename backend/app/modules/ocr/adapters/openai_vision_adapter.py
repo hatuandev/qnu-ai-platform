@@ -452,21 +452,27 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 )
             )
             is_title = (
-                any(
-                    kw in first_line_upper
-                    for kw in [
-                        "THÔNG BÁO",
-                        "QUYẾT ĐỊNH",
-                        "QUY ĐỊNH",
-                        "KẾ HOẠCH",
-                        "PHƯƠNG ÁN",
-                        "ĐỀ ÁN",
-                    ]
+                (first_line.startswith("#") and idx < 3)
+                or (
+                    len(first_line) < 120
+                    and any(
+                        first_line_upper.startswith(kw)
+                        for kw in [
+                            "THÔNG BÁO",
+                            "QUYẾT ĐỊNH",
+                            "QUY ĐỊNH",
+                            "KẾ HOẠCH",
+                            "PHƯƠNG ÁN",
+                            "ĐỀ ÁN",
+                            "CHƯƠNG ",
+                            "ĐIỀU ",
+                        ]
+                    )
                 )
-                or (first_line.startswith("#") and idx < 3)
             )
             is_sig = (
                 idx >= total_p - 2
+                and len(lines) <= 5
                 and any(
                     kw in p.upper()
                     for kw in [
@@ -477,15 +483,6 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                         "CHỮ KÝ",
                         "CON DẤU",
                     ]
-                )
-            )
-            is_list = (
-                not is_table
-                and not is_header
-                and not is_title
-                and any(
-                    first_line.lstrip().startswith(m)
-                    for m in ("-", "*", "+", "•", "1.", "2.", "a)", "b)")
                 )
             )
 
@@ -509,11 +506,6 @@ class OpenAIVisionOCRAdapter(BaseOCRAdapter):
                 bx = 52.0
                 bw = 38.0
                 bh = min(22.0, max(10.0, len(lines) * 3.0))
-            elif is_list:
-                lbl = "list"
-                bx = 10.0
-                bw = 80.0
-                bh = min(35.0, max(5.0, len(lines) * 2.5))
             else:
                 lbl = "text"
                 bx = 10.0

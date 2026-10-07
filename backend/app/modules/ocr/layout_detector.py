@@ -729,9 +729,6 @@ class SmartLayoutDetector:
             elif page_number == 1 and t < 15.0:
                 rtype = "header"
                 lbl = "header"
-            elif self._is_list_marker(txt):
-                rtype = "list"
-                lbl = "list"
             else:
                 rtype = "text"
                 lbl = "text"
@@ -1314,10 +1311,15 @@ class SmartLayoutDetector:
         red_bottom[:int(0.40 * h), :] = False
         has_seal = np.count_nonzero(red_bottom) > 400
         seal_y1, seal_y2 = 0, 0
+        seal_x1, seal_x2 = 0, 0
         if has_seal:
             red_rows = np.where(red_bottom.sum(axis=1) > 5)[0]
             seal_y1 = max(0, red_rows[0] - 10)
             seal_y2 = min(h, red_rows[-1] + 10)
+            red_cols = np.where(red_bottom.sum(axis=0) > 5)[0]
+            if len(red_cols) > 0:
+                seal_x1 = max(0, red_cols[0] - 10)
+                seal_x2 = min(w, red_cols[-1] + 10)
 
         # 3. Enhanced Table Detection (Vertical columns + Horizontal grid lines)
         # Vertical column grid lines with gap bridging up to 6px
@@ -1520,7 +1522,7 @@ class SmartLayoutDetector:
         else:
             final_blocks = all_raw
 
-        # 9. Check if closing page with dual columns (Nơi nhận & Chữ ký)
+        # 9. Detect Closing Page Signature & Official Seal Block
         is_closing = False
         if fitz_page is not None:
             try:
@@ -1531,46 +1533,51 @@ class SmartLayoutDetector:
             is_closing = True
 
         processed_blocks: list[dict[str, Any]] = []
-        for b in final_blocks:
-            bx1, by1, bx2, by2 = b["bbox"]
-            bh_pct = (by2 - by1) / h * 100.0
 
-            # Only genuine signing block is candidate for dual-column split:
-            # - Must be closing page
-            # - Must not be a table
-            # - Must have substantial height (>= 5.0% of page height)
-            # - Must be located in the true signing area (near red seal or bottom >= 75%)
-            is_signing_area = False
-            if is_closing and b["type"] != "table" and bh_pct >= 5.0:
-                if has_seal:
-                    if by1 <= seal_y2 and by2 >= (seal_y1 - int(0.04 * h)):
-                        is_signing_area = True
+        if is_closing and has_seal and (seal_y2 > seal_y1) and (seal_x2 > seal_x1):
+            # Vùng chữ ký thực sự nằm quanh con dấu đỏ ở nửa phải trang giấy
+            # Mở rộng lên trên để bao quanh chức vụ ("HIỆU TRƯỞNG"), mở rộng xuống dưới để bao quanh họ tên
+            sig_top = max(0, seal_y1 - int(0.08 * h))
+            sig_bottom = min(h, seal_y2 + int(0.08 * h))
+            sig_left = max(int(0.38 * w), seal_x1 - int(0.06 * w))
+            sig_right = min(w, max(seal_x2 + int(0.12 * w), int(0.92 * w)))
+
+            sig_merged_blocks: set[int] = set()
+            for idx, b in enumerate(final_blocks):
+                if b["type"] == "table":
+                    continue
+                bx1, by1, bx2, by2 = b["bbox"]
+                # Nếu khối text nằm ở nửa phải và chạm vào dải con dấu (chức vụ hoặc họ tên người ký)
+                if bx1 >= int(0.36 * w) and by1 >= (sig_top - 15) and by2 <= (sig_bottom + 15):
+                    sig_top = min(sig_top, by1)
+                    sig_bottom = max(sig_bottom, by2)
+                    sig_left = min(sig_left, bx1)
+                    sig_right = max(sig_right, bx2)
+                    sig_merged_blocks.add(idx)
+
+            # Thêm khối signature chính xác bao trọn con dấu và chữ ký
+            processed_blocks.append({
+                "type": "signature",
+                "label": "Chữ ký / Con dấu",
+                "bbox": (sig_left, sig_top, sig_right, sig_bottom),
+            })
+
+            # Giữ lại toàn bộ các khối text khác không thuộc vùng ký (đoạn văn bản toàn dòng ở trên như Đoạn 4, hoặc Nơi nhận bên trái)
+            for idx, b in enumerate(final_blocks):
+                if idx not in sig_merged_blocks:
+                    processed_blocks.append(b)
+        else:
+            for b in final_blocks:
+                bx1, by1, bx2, by2 = b["bbox"]
+                # Fallback unstamped: nếu trang cuối và khối nằm góc dưới phải (>= 72% h, >= 48% w)
+                if is_closing and b["type"] != "table" and (by1 / h) >= 0.72 and (bx1 / w) >= 0.48:
+                    processed_blocks.append({
+                        "type": "signature",
+                        "label": "Chữ ký / Con dấu",
+                        "bbox": (bx1, by1, bx2, by2),
+                    })
                 else:
-                    if (by1 / h) >= 0.75:
-                        is_signing_area = True
-
-            if is_signing_area:
-                sub = cleaned[by1:by2, :]
-                v_p = sub.sum(axis=0)
-                gutter_start = int(0.36 * w)
-                gutter_end = int(0.55 * w)
-                if v_p[gutter_start:gutter_end].min() <= 2:
-                    gutter_x = gutter_start + int(np.argmin(v_p[gutter_start:gutter_end]))
-                    left_cols = np.where(v_p[:gutter_x] > 2)[0]
-                    right_cols = np.where(v_p[gutter_x:] > 2)[0]
-                    if len(left_cols) > 0 and len(right_cols) > 0:
-                        processed_blocks.append({
-                            "type": "list",
-                            "label": "Nơi nhận",
-                            "bbox": (max(0, left_cols[0] - 6), by1, gutter_x - 4, by2),
-                        })
-                        processed_blocks.append({
-                            "type": "signature",
-                            "label": "Chữ ký / Con dấu",
-                            "bbox": (gutter_x + right_cols[0] - 4, by1, min(w, gutter_x + right_cols[-1] + 6), by2),
-                        })
-                        continue
-            processed_blocks.append(b)
+                    processed_blocks.append(b)
 
         # 9. Format output with percentage coordinates
         regions: list[dict[str, Any]] = []
@@ -1594,9 +1601,6 @@ class SmartLayoutDetector:
             elif page_number == 1 and top_pct <= 22.0:
                 r_type = "title"
                 r_label = "Tiêu đề"
-            elif h_pct >= 6.0:
-                r_type = "list"
-                r_label = "Danh sách"
             else:
                 r_type = "text"
                 r_label = "Khối văn bản"
@@ -1763,9 +1767,10 @@ class SmartLayoutDetector:
             elif rtype == "signature":
                 r["text"] = sig_right_text or label_val
                 r["content_snippet"] = (sig_right_text.splitlines()[0] if sig_right_text else label_val)[:160]
-            elif rtype == "list" and is_closing_page and top_val >= 40.0 and sig_left_text:
+            elif is_closing_page and float(r.get("left", 0.0)) < 45.0 and top_val >= 40.0 and sig_left_text:
                 r["text"] = sig_left_text
                 r["content_snippet"] = (sig_left_text.splitlines()[0] if sig_left_text else label_val)[:160]
+                sig_left_text = ""
             else:
                 if body_idx < len(body_paras):
                     bp = body_paras[body_idx]
