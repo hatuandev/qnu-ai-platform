@@ -558,7 +558,133 @@ class IngestionService:
 
         return doc
 
+    async def attach_repository_documents(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        document_ids: list[str],
+        chunk_strategy: str | None = None,
+        auto_approve: bool = True,
+    ) -> list[KnowledgeDocument]:
+        """Attach one or more documents from the Central Repository into a Knowledge Collection."""
+        col = await collection_service.get_collection(db, collection_id)
+        from app.modules.documents.models import RepositoryDocument
+
+        stmt = select(RepositoryDocument).where(
+            RepositoryDocument.id.in_(document_ids),
+            RepositoryDocument.is_active.is_(True),
+        )
+        rep_docs = (await db.execute(stmt)).scalars().all()
+        if not rep_docs:
+            raise EntityNotFoundError("Không tìm thấy tài liệu nào hợp lệ từ Kho Tài Liệu để gắn.")
+
+        created_docs: list[KnowledgeDocument] = []
+        for rep_doc in rep_docs:
+            # Check if this repository document is already attached to this collection
+            dup_check = select(KnowledgeDocument).where(
+                KnowledgeDocument.collection_id == collection_id,
+                KnowledgeDocument.repository_document_id == rep_doc.id,
+                KnowledgeDocument.is_active.is_(True),
+            )
+            existing = (await db.execute(dup_check)).scalar_one_or_none()
+            if existing:
+                logger.info(
+                    "Repository doc '%s' already attached to collection '%s' as doc '%s'.",
+                    rep_doc.id,
+                    collection_id,
+                    existing.id,
+                )
+                created_docs.append(existing)
+                continue
+
+            # Ensure pre-parsed markdown is available
+            parsed_md = rep_doc.parsed_markdown
+            if not parsed_md:
+                from app.modules.documents.service import document_repository_service
+
+                await document_repository_service.parse_and_cache_document(db, rep_doc)
+                parsed_md = rep_doc.parsed_markdown or ""
+
+            cleaned_text = clean_markdown_text(parsed_md)
+            strategy = chunk_strategy or self.chunk_strategy_for(col.module_code)
+            chunker = get_chunker(strategy)
+            chunk_drafts = chunker.chunk(cleaned_text)
+
+            meta = dict(rep_doc.doc_metadata or {})
+            meta.update(
+                {
+                    "source": "repository_vault",
+                    "repository_document_id": rep_doc.id,
+                    "chunk_count": len(chunk_drafts),
+                    "chunk_strategy": strategy,
+                }
+            )
+
+            doc_id = f"doc_{uuid.uuid4().hex[:12]}"
+            doc = KnowledgeDocument(
+                id=doc_id,
+                collection_id=collection_id,
+                repository_document_id=rep_doc.id,
+                document_type_code=rep_doc.document_type_code,
+                title=rep_doc.title,
+                file_name=rep_doc.file_name,
+                file_type=rep_doc.file_type,
+                file_size_bytes=rep_doc.file_size_bytes,
+                file_hash=rep_doc.file_hash,
+                storage_path=rep_doc.storage_path,
+                doc_metadata=meta,
+                status="pending",
+                index_status="pending",
+                is_active=True,
+            )
+            db.add(doc)
+            await db.flush()
+
+            for draft in chunk_drafts:
+                c_idx = getattr(draft, "chunk_index", 0) if not isinstance(draft, dict) else draft.get("chunk_index", 0)
+                c_content = getattr(draft, "content", "") if not isinstance(draft, dict) else draft.get("content", "")
+                c_hash = getattr(draft, "chunk_hash", "") if not isinstance(draft, dict) else draft.get("chunk_hash", "")
+                c_tokens = getattr(draft, "token_count", 0) if not isinstance(draft, dict) else draft.get("token_count", 0)
+                c_sec = getattr(draft, "section", None) if not isinstance(draft, dict) else draft.get("section")
+                c_page = getattr(draft, "page_number", None) if not isinstance(draft, dict) else draft.get("page_number")
+                c_meta = getattr(draft, "metadata", {}) if not isinstance(draft, dict) else draft.get("metadata", {})
+
+                db.add(
+                    KnowledgeChunk(
+                        document_id=doc.id,
+                        collection_id=collection_id,
+                        chunk_index=c_idx,
+                        content=c_content,
+                        chunk_hash=c_hash,
+                        token_count=c_tokens,
+                        section=c_sec,
+                        page_number=c_page,
+                        chunk_metadata=c_meta or {},
+                    )
+                )
+
+            created_docs.append(doc)
+
+        await db.commit()
+
+        if auto_approve:
+            approve_fn = (
+                self._facade.approve_document
+                if self._facade and hasattr(self._facade, "approve_document")
+                else self.approve_document
+            )
+            for d in created_docs:
+                if d.status == "pending":
+                    try:
+                        await approve_fn(db, d.id, pages=None)
+                        await db.refresh(d)
+                    except Exception as exc:
+                        logger.warning("Failed to auto-approve attached doc %s: %s", d.id, exc)
+
+        return created_docs
+
     async def parse_preview(
+
         self,
         file_bytes: bytes,
         file_name: str,

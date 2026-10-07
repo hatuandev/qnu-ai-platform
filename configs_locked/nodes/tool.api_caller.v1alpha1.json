@@ -1,0 +1,127 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "tool.api_caller",
+    "version": "1.0.0",
+    "display_name": "Gọi API & Dữ liệu Ngoài",
+    "description": "Kết nối và truy vấn dữ liệu thực tế từ các REST API ngoài (điểm học tập, học phí, dữ liệu UIS...) qua Tool Gateway an toàn để cung cấp dữ liệu cho câu trả lời.",
+    "category": "tool",
+    "labels": {
+      "provider": "tool_gateway"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "connector",
+      "operation": "tool.invoke"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_id"],
+      "properties": {
+        "tool_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "endpoint_override": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "http_method": {
+          "enum": ["GET", "POST", "PUT"],
+          "default": "GET"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 10
+        },
+        "on_error_behavior": {
+          "enum": ["return_empty", "fail_workflow", "use_fallback_message"],
+          "default": "return_empty"
+        },
+        "idempotent": {
+          "type": "boolean",
+          "default": false
+        },
+        "allowed_params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "response_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cache_ttl_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "parameters": {
+          "type": "object"
+        },
+        "query": {
+          "type": "string"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["data", "success"],
+      "properties": {
+        "data": {
+          "type": "object"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "status_code": {
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        },
+        "latency_ms": {
+          "type": "number"
+        }
+      }
+    },
+    "capabilities": ["network.outgoing", "tool.execute"],
+    "required_permissions": ["tools.read", "tools.execute"],
+    "connection_types": ["rest_api", "tool_gateway"],
+    "execution": {
+      "default_timeout_seconds": 15,
+      "max_timeout_seconds": 60,
+      "default_max_attempts": 3,
+      "side_effects": "read",
+      "idempotency": "connector_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["tool_id", "status_code", "latency_ms", "success"],
+      "redacted_fields": ["parameters.secret", "headers.authorization"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "active"
+    }
+  }
+}
+
+

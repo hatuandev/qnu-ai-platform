@@ -1,0 +1,121 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "condition.route",
+    "version": "1.0.0",
+    "display_name": "Rẽ Nhánh Điều Kiện (Condition Router)",
+    "description": "Định tuyến luồng thực thi DAG dựa trên ý định người dùng (intent), sự hiện diện của trường dữ liệu (fields/slots), hoặc điều kiện logic.",
+    "category": "routing",
+    "labels": {
+      "provider": "qnu_ai_core"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "control",
+      "operation": "condition.route"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "description": "Danh sách các quy tắc rẽ nhánh xét tuần tự. Nhánh đầu tiên khớp điều kiện sẽ được chọn.",
+          "items": {
+            "type": "object",
+            "required": ["match", "to"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Mã nhận diện quy tắc (phục vụ metrics)"
+              },
+              "match": {
+                "type": "object",
+                "description": "Điều kiện so khớp (intent, field, operator, value, missing)"
+              },
+              "to": {
+                "type": "string",
+                "description": "Node ID mục tiêu rẽ nhánh khi khớp"
+              }
+            }
+          }
+        },
+        "default_node": {
+          "type": "string",
+          "description": "Node ID mục tiêu mặc định khi không khớp quy tắc nào trong rules"
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "intent": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "object"
+        },
+        "missing_fields": {
+          "type": "array"
+        },
+        "message": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["route", "selected_node"],
+      "properties": {
+        "route": {
+          "type": "string"
+        },
+        "selected_node": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        },
+        "fields": {
+          "type": "object"
+        },
+        "message": {
+          "type": "string"
+        },
+        "response": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": [],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 5,
+      "max_timeout_seconds": 30,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "runtime_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["route", "selected_node", "selected_rule"],
+      "redacted_fields": []
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "active"
+    }
+  }
+}
+
+

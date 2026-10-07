@@ -59,8 +59,8 @@ ignore = ["BLE001", "S110", "LOG014", "RUF012", "B008"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "--basetemp=.pytest_temp"
 filterwarnings = [
+
     "ignore::DeprecationWarning:pydantic.*",
     "ignore::UserWarning:app.modules.rag.vector_indexer.*",
     "ignore:coroutine 'Connection._cancel' was never awaited:RuntimeWarning",

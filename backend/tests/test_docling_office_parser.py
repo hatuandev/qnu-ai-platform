@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import io
 import unittest
+
 import docx
 
 from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.docling_office_parser import DoclingOfficeParser
-from app.modules.knowledge.parsers.office_parser import DocxParser, PptxParser, XlsxParser
+from app.modules.knowledge.parsers.office_parser import DocxParser
 
 
 def _sample_docx_bytes() -> bytes:

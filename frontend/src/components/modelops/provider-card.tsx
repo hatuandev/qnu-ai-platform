@@ -1,9 +1,10 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Cpu, ScanText } from "lucide-react";
 import type React from "react";
 import { ProviderIcon } from "../../components/icons/provider-icon";
 import { Badge } from "../../components/ui/badge";
 import { Card } from "../../components/ui/card";
 import type { ModelProvider } from "../../services/api-client";
+import { getModelCapabilities } from "./modelops-helpers";
 
 export interface ProviderCardProps {
   provider: ModelProvider;
@@ -14,6 +15,12 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   provider,
   onSelect,
 }) => {
+  const models = provider.models || [];
+  const embeddingCount = models.filter(
+    (m) => getModelCapabilities(m).isEmbedding,
+  ).length;
+  const ocrCount = models.filter((m) => getModelCapabilities(m).isOcr).length;
+
   return (
     <Card
       onClick={() => onSelect(provider.id)}
@@ -37,14 +44,32 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <span className="text-[11px] font-mono text-muted-foreground uppercase">
               {provider.type}
             </span>
-            {provider.models && provider.models.length > 0 && (
+            {models.length > 0 && (
               <span className="text-[10px] text-muted-foreground/70 font-mono truncate">
-                • {provider.models.length} model
-                {provider.models.length > 1 ? "s" : ""}
+                • {models.length} model
+                {models.length > 1 ? "s" : ""}
+              </span>
+            )}
+            {embeddingCount > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono font-medium"
+                title={`${embeddingCount} mô hình Vector Embedding`}
+              >
+                <Cpu className="h-2.5 w-2.5" />
+                {embeddingCount} embed
+              </span>
+            )}
+            {ocrCount > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono font-medium"
+                title={`${ocrCount} mô hình Vision OCR`}
+              >
+                <ScanText className="h-2.5 w-2.5" />
+                {ocrCount} ocr
               </span>
             )}
           </div>

@@ -1,0 +1,76 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "extract.fields",
+    "version": "1.0.0",
+    "display_name": "Trích xuất Thực thể & Dữ liệu",
+    "description": "Tự động nhận diện và trích xuất các trường thông tin có cấu trúc (họ tên, MSSV, mã ngành, học kỳ...) từ văn bản câu hỏi tự nhiên.",
+    "category": "ai",
+    "labels": {
+      "provider": "qnu_ai_core"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "core_api",
+      "operation": "drafting.extract_fields"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "preserve_user_text": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bảo tồn chuỗi văn bản tự nhiên ban đầu của người dùng song song với các thực thể đã bóc tách."
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50000
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "fields": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["drafting.plan"],
+    "required_permissions": ["drafting.plan"],
+    "connection_types": ["qnu_ai_core"],
+    "execution": {
+      "default_timeout_seconds": 20,
+      "max_timeout_seconds": 60,
+      "default_max_attempts": 2,
+      "side_effects": "none",
+      "idempotency": "runtime_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["extracted_field_names", "status"],
+      "redacted_fields": ["text", "fields"]
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

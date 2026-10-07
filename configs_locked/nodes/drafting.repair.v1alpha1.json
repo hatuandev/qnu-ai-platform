@@ -1,0 +1,48 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "drafting.repair",
+    "version": "1.0.0",
+    "display_name": "Sửa Bản nháp Có Mục tiêu",
+    "description": "Dùng LLM sửa đúng các nghĩa còn thiếu và giữ nguyên dữ kiện có nguồn.",
+    "category": "ai",
+    "labels": {"provider": "qnu_ai_core"}
+  },
+  "spec": {
+    "handler": {"kind": "core_api", "operation": "drafting.repair"},
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.2},
+        "max_tokens": {"type": "integer", "minimum": 128, "maximum": 8192, "default": 3200}
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "required": ["repair_bundle"],
+      "properties": {"repair_bundle": {"type": "object"}}
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["draft", "quality_report"],
+      "properties": {"draft": {"type": "object"}, "quality_report": {"type": "object"}}
+    },
+    "capabilities": ["drafting.compose"],
+    "required_permissions": ["drafting.compose"],
+    "connection_types": ["qnu_ai_core"],
+    "execution": {
+      "default_timeout_seconds": 45,
+      "max_timeout_seconds": 120,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "runtime_key",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {"safe_trace_fields": ["quality_report"], "redacted_fields": ["repair_bundle", "draft"]},
+    "compatibility": {"min_runtime_version": "0.1.0", "status": "stable"}
+  }
+}

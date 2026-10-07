@@ -47,7 +47,7 @@ switch ($Command) {
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend; .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Write-Host "Doi Backend khoi dong trong 2 giay de tranh proxy error..." -ForegroundColor Gray
         Start-Sleep -Seconds 2
-        Write-Host "Dang khoi chay Frontend Studio cu (Port 3001)..." -ForegroundColor Green
+        Write-Host "Dang khoi chay Frontend Studio (Port 3000)..." -ForegroundColor Green
         Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     { $_ -in "dev1", "dev2" } {
@@ -94,11 +94,9 @@ switch ($Command) {
         Write-Host "  .\make seed         : Khoi tao CSDL va seed toan bo du lieu mac dinh"
         Write-Host "  .\make reset-db     : Xoa sach toan bo CSDL PostgreSQL & Qdrant, sau do seed lai toan bo 5 mo-dun"
         Write-Host "  .\make reseed       : Alias cua reset-db"
-        Write-Host "  .\make dev          : Khoi chay ca Backend 8001 va Frontend cu (Port 3001)"
-        Write-Host "  .\make dev1         : Khoi chay ca Backend 8001 va Frontend 2 Moi (Port 3000)"
+        Write-Host "  .\make dev          : Khoi chay ca Backend 8001 va Frontend Studio (Port 3000)"
         Write-Host "  .\make be           : Khoi chay rieng Backend API 8001"
-        Write-Host "  .\make fe           : Khoi chay rieng Frontend Studio cu 3001"
-        Write-Host "  .\make fe2          : Khoi chay rieng Frontend 2 Studio Moi 3000"
+        Write-Host "  .\make fe           : Khoi chay rieng Frontend Studio (Port 3000)"
         Write-Host "  .\make test         : Chay toan bo test Pytest va Playwright"
     }
 }

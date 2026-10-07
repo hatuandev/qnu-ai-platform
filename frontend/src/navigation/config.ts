@@ -2,6 +2,7 @@ import {
   BookOpen,
   Bot,
   Cpu,
+  FileStack,
   FileText,
   LayoutDashboard,
   Network,
@@ -43,6 +44,12 @@ export const navigationGroups: NavGroup[] = [
         title: "Trợ Lý AI",
         to: "/assistants",
         icon: Bot,
+      },
+      {
+        id: "documents",
+        title: "Kho Tài Liệu",
+        to: "/documents",
+        icon: FileStack,
       },
       {
         id: "knowledge",

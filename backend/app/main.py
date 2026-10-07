@@ -202,6 +202,7 @@ def create_app() -> FastAPI:
     from app.modules.auth.dependencies import get_current_actor
     from app.modules.conversations.router import router as conversations_router
     from app.modules.document_types.router import router as document_types_router
+    from app.modules.documents import documents_router
     from app.modules.evaluation import evaluation_router
     from app.modules.jobs import jobs_router
     from app.modules.knowledge import knowledge_router
@@ -222,7 +223,9 @@ def create_app() -> FastAPI:
     auth_guard = [Depends(get_current_actor)]
     app.include_router(jobs_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(document_types_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+    app.include_router(documents_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(knowledge_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
+
     app.include_router(rag_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(modelops_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(node_catalog_router, prefix=settings.API_PREFIX, dependencies=auth_guard)

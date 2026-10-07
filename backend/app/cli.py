@@ -100,7 +100,9 @@ async def check_db_schema() -> bool:
                 "provider_api_keys",
                 "provider_key_events",
                 "conversation_feedbacks",
+                "repository_documents",
             }
+
             missing = required_tables - tables
             if missing:
                 logger.error("Missing required core tables: %s", missing)

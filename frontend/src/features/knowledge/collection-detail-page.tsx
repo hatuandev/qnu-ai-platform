@@ -16,6 +16,7 @@ import {
   DocumentStudioWorkspace,
   StudioErrorBoundary,
 } from "@/components/knowledge/ocr";
+import { AttachFromRepositoryDialog } from "@/components/knowledge/dialogs/attach-from-repository-dialog";
 import { CollectionDocumentsTab } from "@/components/knowledge/tabs/collection-documents-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
@@ -81,6 +82,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
   // Dialog States
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAttachRepoOpen, setIsAttachRepoOpen] = useState(false);
   const [configName, setConfigName] = useState("");
   const [configDescription, setConfigDescription] = useState("");
   const [configDataProcessing, setConfigDataProcessing] =
@@ -518,6 +520,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         onReindex={handleReindexCollection}
         isReindexing={isReindexing}
         onStartIngest={() => setIsUploadOpen(true)}
+        onAttachFromRepo={() => setIsAttachRepoOpen(true)}
         actionError={actionError}
         reindexJobId={reindexJobId}
       />
@@ -659,6 +662,25 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           refetchTasks();
         }}
         onOpenStudio={(docId) => setActiveStudioDocId(docId)}
+      />
+
+      {/* Gắn Tài Liệu Từ Kho Tập Trung */}
+      <AttachFromRepositoryDialog
+        open={isAttachRepoOpen}
+        onOpenChange={setIsAttachRepoOpen}
+        collectionId={collection.id}
+        collectionName={collection.name}
+        existingDocumentRepoIds={allDocuments
+          .map(
+            (d) =>
+              (d as unknown as Record<string, unknown>)
+                .repository_document_id as string,
+          )
+          .filter(Boolean)}
+        onSuccess={() => {
+          refetchDocs();
+          refetchTasks();
+        }}
       />
 
       {/* Đối Soát Dữ Liệu */}

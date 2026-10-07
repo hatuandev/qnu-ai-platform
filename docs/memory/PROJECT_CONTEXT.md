@@ -7,9 +7,57 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-06 23:35 (UTC+7)
-- **Phiên số**: #281 (Khắc Phục Lệch Vùng Chữ Ký Signature Box & Triệt Tiêu Nhãn Danh Sách "List" Giả Mạo Trên Scan Studio)
-- **Kết quả phiên #281**:
+- **Thời gian cập nhật**: 2026-10-07 15:30 (UTC+7)
+- **Phiên số**: #283 (Triển Khai Phân Hệ Kho Tài Liệu Tập Trung Lưu Trữ MinIO S3, Tiền Bóc Tách Markdown & Tích Hợp Kho Tri Thức Vector DB)
+- **Kết quả phiên #283**:
+  - **Kiến trúc Cơ sở dữ liệu & Migration**:
+    * Thiết kế bảng `repository_documents`: Khóa chính UUID (`rdoc_...`), khóa băm SHA-256 (`file_hash`) khử trùng lặp dữ liệu, đường dẫn MinIO (`storage_path`, `preview_image_path`), chuỗi Markdown sạch (`parsed_markdown`), trạng thái bóc tách (`parse_status`), metadata hành chính Nghị định 30/2020/NĐ-CP (`legal_number`, `issuing_date`, `signer_title`, `signer_name`, v.v.).
+    * Mở rộng bảng `knowledge_documents` bổ sung cột `repository_document_id` (nullable, foreign key ON DELETE SET NULL), đảm bảo 100% tương thích ngược.
+    * Tạo migration Alembic `backend/alembic/versions/20261007_document_repository.py` và cập nhật `required_tables` trong `backend/app/cli.py`.
+  - **Module Backend `documents` (Chuẩn 4 file Clean Architecture)**:
+    * `models.py`: Khai báo model `RepositoryDocument`.
+    * `schemas.py`: Pydantic DTOs cho upload, list, detail, update, stats, và attach.
+    * `service.py` (`DocumentRepositoryService`): Upload S3 MinIO với SHA-256 deduplication, tự động pre-parse Markdown bảo tồn cấu trúc bảng và chuẩn hóa Unicode NFC qua Strategy pattern, render ảnh trang đầu PDF qua PyMuPDF (`fitz`), quản lý CRUD, cập nhật metadata NĐ 30, tải file gốc/Markdown, tính toán KPI tổng hợp.
+    * `router.py`: REST API chuẩn RFC 7807 mounted tại `/platform/v1alpha1/documents` trong `backend/app/main.py`.
+  - **Đấu nối tích hợp vào phân hệ Kho Tri Thức (`/knowledge`)**:
+    * Mở rộng `ingestion_service.py` với phương thức `ingest_from_repository_documents`: đọc trực tiếp Markdown sạch đã bóc tách sẵn trong kho, nạp thẳng vào chunking và vector embedding (Qdrant), bỏ qua 100% chi phí chạy lại OCR/Docling.
+    * Bổ sung endpoint `POST /platform/v1alpha1/knowledge/collections/{collection_id}/attach-repository-documents`.
+  - **Frontend Master-Detail & 3-Tier Components**:
+    * Bổ sung điều hướng "Kho Tài Liệu" (`/documents`, icon `FileStack`) trong nhóm "Xây Dựng AI".
+    * Trang danh sách Master View (`/documents`): 4 thẻ KPI (`KpiMetric`), bộ lọc tìm kiếm & loại VB & định dạng & trạng thái parse, nút chuyển đổi `<ViewModeToggle />` giữa Thẻ lưới (`DocumentCard`) và Bảng danh sách (`DocumentsTable`).
+    * Modal tải lên (`DocumentUploadModal`): Kéo thả tệp, điền metadata NĐ 30, switch tự động parse.
+    * Trang chi tiết độc lập (`/documents/:documentId`): Bố cục 2 cột chuyên sâu (xem trước Markdown GFM sạch, xem ảnh trang đầu PDF từ MinIO, chỉnh sửa metadata NĐ 30, hiển thị danh sách Kho Tri Thức đang liên kết).
+    * Hộp thoại "Gắn Từ Kho" (`AttachFromRepositoryDialog`): Tích hợp trực tiếp trên Header Kho Tri Thức (`/knowledge/:id`), cho phép nạp tài liệu từ kho vào vector collection với 1 click.
+    * Đăng ký route TanStack Router: `/documents`, `/documents/`, `/documents/$documentId`.
+  - **Kiểm thử chất lượng**:
+    * Backend Pytest: `test_document_repository.py` 5/5 PASSED 100% trong 3.99s.
+    * Backend Ruff: `ruff check app/modules/documents/ tests/test_document_repository.py` sạch 0 lỗi.
+    * Frontend Vite Build: `npm run build` hoàn tất trong 3.23s với **0 lỗi TypeScript, 0 lỗi cú pháp Vite**, exit code 0.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_283_trien_khai_kho_tai_lieu_tap_trung_minio_s3_va_tich_hop_kho_tri_thuc.md`](./nhat_ky/2026-10-07_phien_283_trien_khai_kho_tai_lieu_tap_trung_minio_s3_va_tich_hop_kho_tri_thuc.md).
+
+- **Phiên trước #282**:
+  - **Mở rộng thuật toán nhận diện họ Embedding tổng quát (`modelops-helpers.ts`)**: Bổ sung các pattern nhận diện họ embedding (`embed`, `bge-`, `bge_`, `gte-`, `gte_`, `e5-`, `minilm`, `instructor`, `text-embedding`, `voyage`, `cohere.embed`); Enforce kiểm tra `isReranker` trước `isEmbedding` tránh nhận diện sai `bge-reranker`; Bổ sung preset gợi ý cho `ollama`, `custom` và `openai`.
+  - **Chuẩn hóa hệ thống Badges trên Thẻ mô hình (`models-grid.tsx`)**:
+    * Bổ sung Badge `[Embedding]` (icon `<Cpu />`, màu Indigo) cho tất cả các mô hình embedding.
+    * Bổ sung Badge `[Reranker]` (icon `<Zap />`, màu Amber) cho mô hình tái xếp hạng.
+    * Triệt tiêu 100% nhãn `[Text]` trên các mô hình embedding (`qwen3-embedding`, `bge-m3`); Chỉ hiển thị `[Text]` khi mô hình là LLM Chat thực thụ.
+    * Icon bên trái thẻ model thay đổi động trực quan theo vai trò (`<Cpu />` Indigo cho Embedding, `<Zap />` Amber cho Reranker, `<ScanText />` Teal cho OCR, `<Eye />` Sky cho Vision, `<Brain />` Purple cho Reasoning, `<Bot />` cho LLM Chat).
+    * Chuẩn hóa Badge vai trò mặc định: `[★ Default Embed]` (Indigo), `[★ Default Rerank]` (Amber), `[★ Default OCR]` (Teal).
+  - **Bổ sung bộ lọc chuyên biệt**: Thêm tùy chọn `Embedding (Vector nhúng)` và `Reranker (Tái xếp hạng)` trong Select Filter của `ModelsGrid`.
+  - **Nâng cấp Modal Thêm Mô Hình Tùy Chỉnh (`add-custom-model-dialog.tsx`)**: Bổ sung Switch `Embedding` (icon `<Cpu />`, màu Indigo) vào lưới Khả Năng Hỗ Trợ (Capabilities) 3 cột (`Vision`, `Reasoning`, `Embedding`); Tích hợp tự động phát hiện họ mô hình embedding khi nhập ID hoặc bấm gợi ý nhanh.
+  - **Nâng cấp `ProviderCard` (`provider-card.tsx`)**: Bổ sung chip đếm số lượng `[Cpu X embed]` và `[ScanText Y ocr]` ngay tại trang danh sách `/models`.
+  - **Đồng bộ `SystemDefaults`**: Bổ sung query `systemDefaults` vào `modelops-page.tsx`.
+  - **Khắc phục xung đột phân quyền Windows NTFS trên Backend**:
+    * Sửa triệt để lỗi `Permission denied` / `Access is denied` thừa kế từ sandbox cũ trên các thư mục `node_catalog`, `alembic/versions`, `configs/nodes`, `assistants`, `workflows/nodes`.
+    * Toàn bộ 599+ tệp tin mã nguồn backend thuộc sở hữu sạch của user hiện tại, 0 file bị lỗi phân quyền.
+    * Sửa `pyproject.toml` và `test_node_catalog.py` loại bỏ `tmp_path` symlink conflict trên Windows.
+  - **Kiểm thử chất lượng toàn diện Full-Stack**:
+    * **Frontend (`npm run build`)**: Đóng gói bundle thành công trong 3.30s với **0 lỗi TypeScript, 0 lỗi biên dịch**, exit code 0.
+    * **Backend Ruff**: `ruff check app/ tests/` đạt chuẩn **All checks passed (0 lỗi)**.
+    * **Backend Pytest**: **180+ tests toàn diện PASSED 100%** (ModelOps 45/45, OCR 27/27, Chat Safety 5/5, Workflows/Assistants 36/36, Knowledge/RAG/Docling/Catalog 67/67).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_282_bo_sung_nhan_biet_mo_hinh_embedding_va_reranker_tren_modelops.md`](./nhat_ky/2026-10-07_phien_282_bo_sung_nhan_biet_mo_hinh_embedding_va_reranker_tren_modelops.md).
+
+- **Phiên trước #281**:
   - **Khắc phục vùng nhận diện `signature` bị lệch và cắt đôi đoạn văn**: Tái cấu trúc thuật toán phát hiện vùng kết thúc văn bản `_detect_morphology_regions` trong `layout_detector.py`. Thuật toán mới tính toán chính xác tọa độ con dấu đỏ `(seal_x1, seal_y1, seal_x2, seal_y2)` và chỉ gom con dấu đỏ + chức vụ ("HIỆU TRƯỞNG") + chữ ký + họ tên lãnh đạo ở nửa phải trang (`x >= 0.38*w`) thành 1 hộp `signature` duy nhất.
   - **Bảo tồn trọn vẹn đoạn văn bản số 4**: Loại bỏ triệt để hành vi quét khe trắng xén đôi đoạn văn bản số 4 (*"vướng mắc, các đơn vị..."*) thành 2 cột giả mạo (`list` bên trái, `signature` bên phải). Đoạn văn số 4 được giữ nguyên vẹn toàn dòng với nhãn `text`.
   - **Triệt tiêu 100% nhãn `list` giả mạo**: Xóa bỏ hoàn toàn quy tắc gán nhãn tùy tiện `elif h_pct >= 6.0: r_type = "list"` và `elif self._is_list_marker(txt): rtype = "list"` trong `layout_detector.py` và `openai_vision_adapter.py`. Mọi đoạn văn quy chế/điều khoản được đưa về nhãn `text` ("Khối văn bản") chuẩn xác.

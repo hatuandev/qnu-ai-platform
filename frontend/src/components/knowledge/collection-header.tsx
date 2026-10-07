@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CircleAlert,
   Cpu,
+  FileStack,
   MoreHorizontal,
   RefreshCw,
   ShieldCheck,
@@ -28,6 +29,7 @@ interface CollectionHeaderProps {
   onReindex: () => void;
   isReindexing: boolean;
   onStartIngest: () => void;
+  onAttachFromRepo?: () => void;
   actionError: string | null;
   reindexJobId: string | null;
 }
@@ -41,6 +43,7 @@ export function CollectionHeader({
   onReindex,
   isReindexing,
   onStartIngest,
+  onAttachFromRepo,
   actionError,
   reindexJobId,
 }: CollectionHeaderProps) {
@@ -116,8 +119,21 @@ export function CollectionHeader({
           </div>
         </div>
 
-        {/* Action Buttons: Primary Ingest + Dropdown on Mobile; Inline on desktop */}
+        {/* Action Buttons: Primary Ingest + Attach from Repo + Dropdown on Mobile */}
         <div className="flex items-center gap-2 w-full lg:w-auto shrink-0">
+          {onAttachFromRepo && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAttachFromRepo}
+              className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 font-medium shadow-xs border-border/80 hover:bg-primary/5 hover:text-primary transition-colors"
+              title="Gắn tài liệu từ Kho tập trung MinIO S3 mà không cần OCR lại"
+            >
+              <FileStack className="size-3.5 text-primary" />
+              <span>Gắn Từ Kho</span>
+            </Button>
+          )}
+
           <Button
             size="sm"
             onClick={onStartIngest}
@@ -142,6 +158,15 @@ export function CollectionHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52 text-xs">
+                {onAttachFromRepo && (
+                  <DropdownMenuItem
+                    onClick={onAttachFromRepo}
+                    className="gap-2 text-xs cursor-pointer py-2"
+                  >
+                    <FileStack className="size-3.5 text-primary" />
+                    <span>Gắn từ Kho tài liệu</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={onOpenReconcile}
                   className="gap-2 text-xs cursor-pointer py-2"

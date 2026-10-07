@@ -189,6 +189,36 @@ async def upload_document(
 
 
 @router.post(
+    "/collections/{collection_id}/attach-repository-documents",
+    response_model=dict,
+    status_code=status.HTTP_201_CREATED,
+    summary="Gắn tài liệu từ Kho Tài Liệu vào Kho Tri Thức và lập chỉ mục Vector",
+)
+async def attach_repository_documents(
+    collection_id: str,
+    document_ids: list[str] = Query(..., description="Danh sách ID tài liệu từ Kho Tài Liệu"),
+    chunk_strategy: str | None = Query(None, description="Chiến lược cắt đoạn: clause, semantic hoặc auto"),
+    auto_approve: bool = Query(True, description="Tự động duyệt và lập chỉ mục Vector tức thì"),
+    db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.upload")),
+) -> dict:
+    docs = await knowledge_service.attach_repository_documents(
+        db=db,
+        collection_id=collection_id,
+        document_ids=document_ids,
+        chunk_strategy=chunk_strategy,
+        auto_approve=auto_approve,
+    )
+    return {
+        "collection_id": collection_id,
+        "attached_count": len(docs),
+        "created_document_ids": [d.id for d in docs],
+        "message": f"Đã gắn và lập chỉ mục thành công {len(docs)} tài liệu vào kho tri thức.",
+    }
+
+
+
+@router.post(
     "/collections/{collection_id}/parse-preview",
     response_model=ParsePreviewResponse,
     summary="Xem trước Bóc tách & Chia đoạn Tài liệu (Không lưu DB)",

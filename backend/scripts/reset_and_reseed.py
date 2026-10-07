@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -38,11 +37,11 @@ except ImportError:
 
 from sqlalchemy import inspect, select, text
 
-from app.cli import run_db_seed, verify_core_seed_data
+from app.cli import migrate_database, run_db_seed, verify_core_seed_data
 from app.core.config import get_settings
 from app.core.database import AsyncSessionFactory, engine
 from app.modules.assistants.models import AssistantModel
-from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument, KnowledgeChunk
+from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection, KnowledgeDocument
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("reset_and_reseed")
@@ -141,6 +140,11 @@ async def verify_results() -> None:
 
 async def main() -> None:
     await reset_sql_tables()
+    logger.info("=== STEP 1.5: ENSURING SCHEMA IS MIGRATED TO HEAD ===")
+    migrated = await migrate_database(ensure_database=False)
+    if not migrated:
+        logger.error("Alembic schema migration to HEAD failed!")
+        raise RuntimeError("Migration failed")
     await reset_qdrant()
     await reseed_all()
     await verify_results()

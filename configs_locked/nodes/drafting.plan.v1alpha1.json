@@ -1,0 +1,57 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "drafting.plan",
+    "version": "1.0.0",
+    "display_name": "Lập Kế hoạch Văn bản",
+    "description": "Hợp nhất dữ kiện, nguồn gốc, hình thái và nghĩa bắt buộc của văn bản.",
+    "category": "drafting",
+    "labels": {"provider": "qnu_ai_core"}
+  },
+  "spec": {
+    "handler": {"kind": "core_api", "operation": "drafting.plan"},
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_document_type": {"type": "string", "default": "to_trinh"},
+        "knowledge_required": {"type": "boolean", "default": false},
+        "blocking_fields": {"type": "array", "items": {"type": "string"}, "default": []},
+        "organization_profile": {
+          "type": "object",
+          "description": "Hồ sơ tổ chức mặc định dùng khi người dùng không cung cấp trường tương ứng."
+        }
+      }
+    },
+    "input_schema": {"type": "object", "additionalProperties": true},
+    "output_schema": {
+      "type": "object",
+      "required": ["plan", "ready", "needs_input"],
+      "properties": {
+        "plan": {"type": "object"},
+        "ready": {"type": "object"},
+        "needs_input": {"type": "array"},
+        "missing_fields": {"type": "array"}
+      }
+    },
+    "capabilities": ["drafting.plan"],
+    "required_permissions": ["drafting.plan"],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 3,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "input_hash",
+      "checkpoint": "none",
+      "can_wait_for_input": true,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["document_type", "structure_profile", "semantic_obligations"],
+      "redacted_fields": ["explicit_fields", "source_text", "reference_profile"]
+    },
+    "compatibility": {"min_runtime_version": "0.1.0", "status": "stable"}
+  }
+}

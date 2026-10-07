@@ -1,0 +1,76 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "output.no_answer",
+    "version": "1.0.0",
+    "display_name": "Phản hồi Từ chối An toàn",
+    "description": "Phản hồi thông báo lịch sự, an toàn khi câu hỏi nằm ngoài phạm vi tri thức hoặc hệ thống không đủ ngữ cảnh để trả lời.",
+    "category": "output",
+    "labels": {
+      "guardrail": "abstention"
+    }
+  },
+  "spec": {
+    "handler": {
+      "kind": "builtin",
+      "operation": "output.no_answer"
+    },
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "message"],
+      "properties": {
+        "status": {
+          "enum": ["insufficient_context", "clarify_needed", "escalated", "refused"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": {
+          "type": "object"
+        }
+      }
+    },
+    "output_schema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "object"
+        }
+      }
+    },
+    "capabilities": ["chat.write"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 2,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "not_required",
+      "checkpoint": "never",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["status", "fallback_reason"],
+      "redacted_fields": []
+    },
+    "compatibility": {
+      "min_runtime_version": "0.1.0",
+      "status": "experimental"
+    }
+  }
+}
+
+

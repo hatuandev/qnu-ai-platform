@@ -78,6 +78,12 @@ class KnowledgeDocument(Base):
         nullable=False,
         index=True,
     )
+    repository_document_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("repository_documents.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     document_type_code: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("platform_document_types.code", ondelete="SET NULL"),
@@ -121,6 +127,7 @@ class KnowledgeDocument(Base):
     facts: Mapped[list[KnowledgeFact]] = relationship(
         "KnowledgeFact", back_populates="document", cascade="all, delete-orphan"
     )
+
 
     @property
     def ocr_method(self) -> str | None:

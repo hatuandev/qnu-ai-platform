@@ -3,6 +3,7 @@ import {
   Brain,
   CheckCircle2,
   Clock,
+  Cpu,
   Eye,
   FlaskConical,
   RotateCw,
@@ -52,6 +53,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
   const [newCustomModelId, setNewCustomModelId] = useState("");
   const [isVisionCapable, setIsVisionCapable] = useState(false);
   const [isReasoningCapable, setIsReasoningCapable] = useState(false);
+  const [isEmbeddingCapable, setIsEmbeddingCapable] = useState(false);
   const [testingNewModel, setTestingNewModel] = useState(false);
   const [newModelTestResult, setNewModelTestResult] =
     useState<SingleModelTestResult | null>(null);
@@ -59,10 +61,46 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
     "none" | "embedding" | "reranker" | "ocr"
   >("none");
 
+  const detectCapabilities = (modelName: string) => {
+    const lower = modelName.toLowerCase();
+    const isEmbed =
+      lower.includes("embed") ||
+      lower.includes("bge") ||
+      lower.includes("gte") ||
+      lower.includes("e5") ||
+      lower.includes("minilm") ||
+      lower.includes("instructor") ||
+      lower.includes("text-embedding");
+
+    const isVis =
+      !isEmbed &&
+      (lower.includes("flash") ||
+        lower.includes("vision") ||
+        lower.includes("4o") ||
+        lower.includes("sonnet") ||
+        lower.includes("ocr") ||
+        lower.includes("neva") ||
+        lower.includes("-vl") ||
+        lower.includes("_vl") ||
+        lower.includes("pixtral"));
+
+    const isReas =
+      !isEmbed &&
+      (lower.includes("o1") ||
+        lower.includes("o3") ||
+        lower.includes("reason") ||
+        lower.includes("r1") ||
+        lower.includes("thinking") ||
+        lower.includes("nemotron"));
+
+    return { isEmbed, isVis, isReas };
+  };
+
   const handleClose = () => {
     setNewCustomModelId("");
     setIsVisionCapable(false);
     setIsReasoningCapable(false);
+    setIsEmbeddingCapable(false);
     setNewModelTestResult(null);
     setTestingNewModel(false);
     setModelRoleDefault("none");
@@ -145,11 +183,22 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
           <div className="flex gap-2">
             <Input
               required
-              placeholder="VD: gpt-4o, gemini-2.0-flash, mistral-ocr-latest..."
+              placeholder="VD: gpt-4o, bge-m3, qwen3-embedding, mistral-ocr..."
               value={newCustomModelId}
               onChange={(e) => {
-                setNewCustomModelId(e.target.value);
+                const val = e.target.value;
+                setNewCustomModelId(val);
                 setNewModelTestResult(null);
+                if (val.trim()) {
+                  const { isEmbed, isVis, isReas } = detectCapabilities(val);
+                  setIsEmbeddingCapable(isEmbed);
+                  if (isEmbed) {
+                    setIsVisionCapable(false);
+                  } else {
+                    if (isVis) setIsVisionCapable(true);
+                    if (isReas) setIsReasoningCapable(true);
+                  }
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -245,7 +294,7 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
           <span className="text-xs font-semibold text-foreground block">
             Khả Năng Hỗ Trợ (Capabilities)
           </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
               <div className="space-y-0.5">
                 <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
@@ -279,6 +328,28 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                 aria-label="Bật tính năng Reasoning"
               />
             </div>
+
+            <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
+              <div className="space-y-0.5">
+                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Cpu className="h-3.5 w-3.5 text-indigo-500" />
+                  Embedding
+                </span>
+                <p className="text-[10px] text-muted-foreground">
+                  Nhúng vector ngữ nghĩa
+                </p>
+              </div>
+              <Switch
+                checked={isEmbeddingCapable}
+                onCheckedChange={(checked) => {
+                  setIsEmbeddingCapable(checked);
+                  if (checked) {
+                    setIsVisionCapable(false);
+                  }
+                }}
+                aria-label="Bật tính năng Embedding"
+              />
+            </div>
           </div>
         </div>
 
@@ -300,23 +371,10 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                     disabled={isAlreadyAdded}
                     onClick={() => {
                       setNewCustomModelId(sm);
-                      const lower = sm.toLowerCase();
-                      setIsVisionCapable(
-                        lower.includes("flash") ||
-                          lower.includes("vision") ||
-                          lower.includes("4o") ||
-                          lower.includes("sonnet") ||
-                          lower.includes("ocr") ||
-                          lower.includes("neva"),
-                      );
-                      setIsReasoningCapable(
-                        lower.includes("o1") ||
-                          lower.includes("o3") ||
-                          lower.includes("reason") ||
-                          lower.includes("r1") ||
-                          lower.includes("thinking") ||
-                          lower.includes("nemotron"),
-                      );
+                      const { isEmbed, isVis, isReas } = detectCapabilities(sm);
+                      setIsEmbeddingCapable(isEmbed);
+                      setIsVisionCapable(isVis);
+                      setIsReasoningCapable(isReas);
                       setNewModelTestResult(null);
                     }}
                     className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${

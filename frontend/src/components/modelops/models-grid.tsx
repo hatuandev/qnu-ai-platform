@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Cpu,
   Eye,
   FlaskConical,
   Loader2,
@@ -76,13 +77,16 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
   onQuickAddPresetModel,
 }) => {
   const [modelFilter, setModelFilter] = useState<
-    "all" | "ocr" | "vision" | "reasoning" | "default"
+    "all" | "embedding" | "ocr" | "vision" | "reasoning" | "reranker" | "default"
   >("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
 
   const filteredModels = useMemo(() => {
     const allM = selectedProvider.models || [];
     if (modelFilter === "all") return allM;
+    if (modelFilter === "embedding") {
+      return allM.filter((m) => getModelCapabilities(m).isEmbedding);
+    }
     if (modelFilter === "ocr") {
       return allM.filter((m) => getModelCapabilities(m).isOcr);
     }
@@ -91,6 +95,9 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
     }
     if (modelFilter === "reasoning") {
       return allM.filter((m) => getModelCapabilities(m).hasReasoning);
+    }
+    if (modelFilter === "reranker") {
+      return allM.filter((m) => getModelCapabilities(m).isReranker);
     }
     if (modelFilter === "default") {
       return allM.filter(
@@ -150,7 +157,14 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
               value={modelFilter}
               onValueChange={(val) =>
                 setModelFilter(
-                  val as "all" | "ocr" | "vision" | "reasoning" | "default",
+                  val as
+                    | "all"
+                    | "embedding"
+                    | "ocr"
+                    | "vision"
+                    | "reasoning"
+                    | "reranker"
+                    | "default",
                 )
               }
             >
@@ -159,9 +173,11 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả mô hình</SelectItem>
+                <SelectItem value="embedding">Embedding (Vector nhúng)</SelectItem>
                 <SelectItem value="ocr">OCR & Bóc tách (Vision OCR)</SelectItem>
                 <SelectItem value="vision">Vision (Thị giác)</SelectItem>
                 <SelectItem value="reasoning">Reasoning (Suy luận)</SelectItem>
+                <SelectItem value="reranker">Reranker (Tái xếp hạng)</SelectItem>
                 <SelectItem value="default">Mặc định hệ thống</SelectItem>
               </SelectContent>
             </Select>
@@ -238,9 +254,36 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                     : "border-border/80"
               }`}
             >
-              {/* Left Robot Icon */}
-              <div className="p-2 rounded-md bg-muted/60 border border-border/50 text-primary shrink-0 flex items-center justify-center">
-                <Bot className="h-4 w-4" />
+              {/* Left Model Type Icon */}
+              <div
+                className={`p-2 rounded-md border shrink-0 flex items-center justify-center transition-colors ${
+                  capabilities.isEmbedding
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-600 dark:text-indigo-400"
+                    : capabilities.isReranker
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                      : capabilities.isOcr
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : capabilities.hasVision
+                          ? "bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-400"
+                          : capabilities.hasReasoning
+                            ? "bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400"
+                            : "bg-muted/60 border-border/50 text-foreground/80"
+                }`}
+                title={capabilities.capabilityLabel}
+              >
+                {capabilities.isEmbedding ? (
+                  <Cpu className="h-4 w-4" />
+                ) : capabilities.isReranker ? (
+                  <Zap className="h-4 w-4" />
+                ) : capabilities.isOcr ? (
+                  <ScanText className="h-4 w-4" />
+                ) : capabilities.hasVision ? (
+                  <Eye className="h-4 w-4" />
+                ) : capabilities.hasReasoning ? (
+                  <Brain className="h-4 w-4" />
+                ) : (
+                  <Bot className="h-4 w-4" />
+                )}
               </div>
 
               {/* Center Info */}
@@ -253,51 +296,112 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                     {m}
                   </span>
 
+                  {/* Embedding Badge */}
+                  {capabilities.isEmbedding && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25 gap-0.5 font-semibold"
+                      title="Mô hình Vector Embedding (Kho Tri Thức & Semantic Search)"
+                    >
+                      <Cpu className="h-2.5 w-2.5" />
+                      Embedding
+                    </Badge>
+                  )}
+
+                  {/* Reranker Badge */}
+                  {capabilities.isReranker && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25 gap-0.5 font-semibold"
+                      title="Mô hình Cross-Encoder Reranker (Tái xếp hạng ngữ nghĩa cho RAG)"
+                    >
+                      <Zap className="h-2.5 w-2.5" />
+                      Reranker
+                    </Badge>
+                  )}
+
+                  {/* OCR Badge */}
                   {capabilities.isOcr && (
                     <Badge
                       variant="outline"
-                      className="text-[9px] px-1 py-0 h-3.5 bg-primary/10 text-primary border-primary/20 gap-0.5 font-medium"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-primary/10 text-primary border-primary/25 gap-0.5 font-semibold"
                       title="Mô hình hỗ trợ bóc tách tài liệu và nhận diện OCR"
                     >
                       <ScanText className="h-2.5 w-2.5" />
                       OCR
                     </Badge>
                   )}
-                  {!capabilities.hasVision && !capabilities.isOcr && (
+
+                  {/* Vision Badge (Non-OCR) */}
+                  {capabilities.hasVision && !capabilities.isOcr && (
                     <Badge
                       variant="outline"
-                      className="text-[9px] px-1 py-0 h-3.5 bg-muted/60 text-muted-foreground border-border/60 gap-0.5 font-normal"
-                      title="Mô hình thuần văn bản (Text-only, không hỗ trợ OCR/Thị giác)"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25 gap-0.5 font-medium"
+                      title="Mô hình đa phương thức (Vision / Thị giác)"
                     >
-                      <Type className="h-2.5 w-2.5" />
-                      Text
+                      <Eye className="h-2.5 w-2.5" />
+                      Vision
                     </Badge>
                   )}
 
+                  {/* Reasoning Badge */}
+                  {capabilities.hasReasoning &&
+                    !capabilities.isEmbedding &&
+                    !capabilities.isReranker && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] px-1.5 py-0 h-3.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25 gap-0.5 font-medium"
+                        title="Mô hình suy luận có tư duy CoT (Reasoning / Deep Thinking)"
+                      >
+                        <Brain className="h-2.5 w-2.5" />
+                        Reasoning
+                      </Badge>
+                    )}
+
+                  {/* Text Badge (Pure LLM only) */}
+                  {!capabilities.hasVision &&
+                    !capabilities.isOcr &&
+                    !capabilities.isEmbedding &&
+                    !capabilities.isReranker &&
+                    !capabilities.hasReasoning && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] px-1 py-0 h-3.5 bg-muted/60 text-muted-foreground border-border/60 gap-0.5 font-normal"
+                        title="Mô hình thuần văn bản (Text-only, không hỗ trợ OCR/Thị giác/Embedding)"
+                      >
+                        <Type className="h-2.5 w-2.5" />
+                        Text
+                      </Badge>
+                    )}
+
+                  {/* Default Roles Badges */}
                   {isDefEmbedding && (
                     <Badge
                       variant="secondary"
-                      className="text-[9px] px-1 py-0 h-3.5 bg-primary/10 text-primary border border-primary/20 gap-0.5"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 gap-0.5 font-medium"
+                      title="Mô hình Embedding mặc định toàn hệ thống"
                     >
-                      <Star className="h-2.5 w-2.5 fill-primary" />
-                      Embed
+                      <Star className="h-2.5 w-2.5 fill-current" />
+                      Default Embed
                     </Badge>
                   )}
                   {isDefReranker && (
                     <Badge
                       variant="secondary"
-                      className="text-[9px] px-1 py-0 h-3.5 bg-primary/10 text-primary border border-primary/20 gap-0.5"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 gap-0.5 font-medium"
+                      title="Mô hình Reranker mặc định toàn hệ thống"
                     >
-                      <Star className="h-2.5 w-2.5 fill-primary" />
-                      Rerank
+                      <Star className="h-2.5 w-2.5 fill-current" />
+                      Default Rerank
                     </Badge>
                   )}
                   {isDefOcr && (
                     <Badge
                       variant="secondary"
-                      className="text-[9px] px-1 py-0 h-3.5 bg-primary/10 text-primary border border-primary/20 gap-0.5"
+                      className="text-[9px] px-1.5 py-0 h-3.5 bg-primary/15 text-primary border border-primary/30 gap-0.5 font-medium"
+                      title="Mô hình OCR mặc định toàn hệ thống"
                     >
-                      <Star className="h-2.5 w-2.5 fill-primary" />
+                      <Star className="h-2.5 w-2.5 fill-current" />
                       Default OCR
                     </Badge>
                   )}
@@ -311,6 +415,16 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                     {displayName}
                   </span>
                   <div className="flex items-center gap-1 text-muted-foreground/70 shrink-0">
+                    {capabilities.isEmbedding && (
+                      <span title="Chuyên gia Nhúng Vector Ngữ Nghĩa (Vector Embedding)">
+                        <Cpu className="h-3 w-3 text-indigo-500" />
+                      </span>
+                    )}
+                    {capabilities.isReranker && (
+                      <span title="Chuyên gia Tái xếp hạng RAG (Cross-Encoder)">
+                        <Zap className="h-3 w-3 text-amber-500" />
+                      </span>
+                    )}
                     {capabilities.isOcr && (
                       <span title="Chuyên gia OCR / Bóc tách tài liệu">
                         <ScanText className="h-3 w-3 text-primary" />

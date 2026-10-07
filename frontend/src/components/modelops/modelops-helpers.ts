@@ -26,19 +26,26 @@ export const getModelCapabilities = (
   const mLower = modelName.toLowerCase();
   const isGemma = mLower.startsWith("gemma");
 
-  const isEmbedding =
-    mLower.includes("embed") ||
-    mLower.includes("bge-m3") ||
-    mLower.includes("bge-base") ||
-    mLower.includes("bge-small") ||
-    mLower.includes("bge-large") ||
-    mLower.includes("text-embedding");
-
   const isReranker =
     mLower.includes("rerank") ||
     mLower.includes("cross-encoder") ||
     mLower.includes("rrf") ||
     mLower.includes("bge-reranker");
+
+  const isEmbedding =
+    !isReranker &&
+    (mLower.includes("embed") ||
+      mLower.includes("bge-") ||
+      mLower.includes("bge_") ||
+      mLower.includes("gte-") ||
+      mLower.includes("gte_") ||
+      mLower.includes("e5-") ||
+      mLower.includes("e5_") ||
+      mLower.includes("minilm") ||
+      mLower.includes("instructor") ||
+      mLower.includes("text-embedding") ||
+      mLower.includes("voyage") ||
+      mLower.includes("cohere.embed"));
 
   const isOcr =
     !isGemma &&
@@ -177,7 +184,27 @@ export const getModelDisplayName = (modelName: string): string => {
 };
 
 export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
-  openai: ["gpt-4o", "gpt-4o-mini", "o1-mini"],
+  openai: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o1-mini",
+    "text-embedding-3-small",
+    "text-embedding-3-large",
+  ],
+  ollama: [
+    "qwen3:8b",
+    "deepseek-r1:32b",
+    "qwen3-vl:8b",
+    "bge-m3:latest",
+    "qwen3-embedding:4b-q8_0",
+  ],
+  custom: [
+    "qwen3:8b",
+    "deepseek-r1:32b",
+    "qwen3-vl:8b",
+    "bge-m3:latest",
+    "qwen3-embedding:4b-q8_0",
+  ],
   gemini: [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",

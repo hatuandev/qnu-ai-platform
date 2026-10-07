@@ -1,0 +1,46 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "drafting.reference",
+    "version": "1.0.0",
+    "display_name": "Phân tích Mẫu Văn bản",
+    "description": "Nhận diện bất biến cấu trúc từ tài liệu tham chiếu mà không sao chép dữ kiện.",
+    "category": "drafting",
+    "labels": {"provider": "qnu_ai_core"}
+  },
+  "spec": {
+    "handler": {"kind": "core_api", "operation": "drafting.reference"},
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_reference_characters": {"type": "integer", "minimum": 1000, "maximum": 32000, "default": 16000}
+      }
+    },
+    "input_schema": {"type": "object", "additionalProperties": true},
+    "output_schema": {
+      "type": "object",
+      "required": ["reference_profile"],
+      "properties": {"reference_profile": {"type": "object"}}
+    },
+    "capabilities": ["drafting.reference"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 3,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "input_hash",
+      "checkpoint": "none",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {
+      "safe_trace_fields": ["recommended_profile", "signals"],
+      "redacted_fields": ["reference_text"]
+    },
+    "compatibility": {"min_runtime_version": "0.1.0", "status": "stable"}
+  }
+}

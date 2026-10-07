@@ -217,6 +217,12 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     queryFn: () => apiClient.getProviderPresets(),
   });
 
+  const defaultsQuery = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+  });
+  const systemDefaults = defaultsQuery.data?.defaults;
+
   const {
     data: providerKeys = [],
     isLoading: loadingKeys,
@@ -707,6 +713,7 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         <ModelsGrid
           selectedProvider={selectedProvider}
           presets={presets}
+          systemDefaults={systemDefaults}
           modelTestResults={modelTestResults}
           modelTestSummary={modelTestSummary}
           unavailableModelsCount={unavailableModelsCount}

@@ -1,0 +1,48 @@
+{
+  "api_version": "qnu.ai/v1alpha1",
+  "kind": "NodeManifest",
+  "metadata": {
+    "type": "drafting.validate",
+    "version": "1.0.0",
+    "display_name": "Hoàn thiện Bản nháp",
+    "description": "Kiểm chứng căn cứ, ánh xạ document_ast.v1 sang hợp đồng mẫu DOCX và giữ placeholder an toàn.",
+    "category": "control",
+    "labels": {"provider": "qnu_ai_core"}
+  },
+  "spec": {
+    "handler": {"kind": "core_api", "operation": "drafting.validate"},
+    "config_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reject_unprovided_legal_citations": {"type": "boolean", "default": true},
+        "mark_as_draft": {"type": "boolean", "default": true}
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "required": ["draft"],
+      "properties": {"draft": {"type": "object"}}
+    },
+    "output_schema": {
+      "type": "object",
+      "required": ["draft", "missing_fields"],
+      "properties": {"draft": {"type": "object"}, "missing_fields": {"type": "array"}}
+    },
+    "capabilities": ["drafting.validate"],
+    "required_permissions": [],
+    "connection_types": [],
+    "execution": {
+      "default_timeout_seconds": 3,
+      "max_timeout_seconds": 10,
+      "default_max_attempts": 1,
+      "side_effects": "none",
+      "idempotency": "input_hash",
+      "checkpoint": "after_success",
+      "can_wait_for_input": false,
+      "can_wait_for_approval": false
+    },
+    "observability": {"safe_trace_fields": ["quality_report"], "redacted_fields": ["draft"]},
+    "compatibility": {"min_runtime_version": "0.1.0", "status": "stable"}
+  }
+}

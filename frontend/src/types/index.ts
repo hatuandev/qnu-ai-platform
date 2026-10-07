@@ -2,6 +2,7 @@
 
 export * from "./assistants";
 export * from "./common";
+export * from "./documents";
 export * from "./domain-templates";
 export * from "./evaluation";
 export * from "./knowledge";

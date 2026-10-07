@@ -125,7 +125,24 @@ class KnowledgeService:
             auto_approve=auto_approve,
         )
 
+    async def attach_repository_documents(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        document_ids: list[str],
+        chunk_strategy: str | None = None,
+        auto_approve: bool = True,
+    ) -> list[KnowledgeDocument]:
+        return await self._ingestion.attach_repository_documents(
+            db=db,
+            collection_id=collection_id,
+            document_ids=document_ids,
+            chunk_strategy=chunk_strategy,
+            auto_approve=auto_approve,
+        )
+
     async def parse_preview(
+
         self,
         file_bytes: bytes,
         file_name: str,

@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 import app.modules.assistants.models
 import app.modules.conversations.models
 import app.modules.document_types.models
+import app.modules.documents.models
 import app.modules.evaluation.models
 import app.modules.knowledge.models
 import app.modules.modelops.models

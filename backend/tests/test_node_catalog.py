@@ -36,7 +36,8 @@ async def test_node_catalog_supports_search_and_category_filters() -> None:
 
 
 @pytest.mark.asyncio
-async def test_node_catalog_returns_empty_when_catalog_directory_is_missing(tmp_path: Path) -> None:
-    service = NodeCatalogService(tmp_path / "missing-nodes")
+async def test_node_catalog_returns_empty_when_catalog_directory_is_missing() -> None:
+    service = NodeCatalogService(Path("tmp/missing-test-nodes-dir"))
 
     assert await service.list_nodes() == []
+
