@@ -8,7 +8,6 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.modelops.models import ModelProviderConfig
 from app.modules.modelops.schemas import (
@@ -23,12 +22,9 @@ logger = logging.getLogger(__name__)
 
 REMOVED_LOCAL_PROVIDER_TYPES = {
     "local",
-    "local_vllm",
-    "ollama",
     "sentence_transformers",
     "docling",
     "easyocr",
-    "vllm",
 }
 REMOVED_LOCAL_PROVIDER_IDS = {
     "prov_local",
@@ -51,20 +47,12 @@ def _without_local_models(items: list[dict[str, Any]] | None) -> list[dict[str, 
 
 DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     {
-        "provider_id": "prov_rtx5090_ollama",
-        "provider_name": "On-Premise GPU RTX 5090 (Tailscale)",
-        "model_name": "qwen3-vl:8b",
-        "provider_type": "on_premise",
-        "is_active": True,
-        "description": "Ưu tiên 1 (On-Premise): Qwen 3 Vision 8B trên GPU RTX 5090 — Bóc tách tài liệu scan, bảng biểu & bảo mật nội bộ 100%",
-    },
-    {
         "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
         "model_name": "gemini-3.1-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 2 (Cloud Fallback): Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM dự phòng (~2s)",
+        "description": "Ưu tiên 1 (Cloud Primary): Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM (~1.5s)",
     },
     {
         "provider_id": "prov_mistral",
@@ -72,7 +60,7 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "mistral-ocr-latest",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 3 (Cloud Fallback): Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+        "description": "Ưu tiên 2 (Cloud Fallback): Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
     },
     {
         "provider_id": "prov_openrouter",
@@ -80,18 +68,26 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "qwen/qwen-2.5-vl-72b-instruct",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 4: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng",
+        "description": "Ưu tiên 3: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng",
     },
 ]
 
 DEFAULT_QNU_EMBEDDING_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_rtx5090_vllm",
+        "provider_name": "On-Premise GPU RTX 5090 (vLLM)",
+        "model_name": "bge-m3",
+        "provider_type": "on_premise",
+        "is_active": True,
+        "description": "Ưu tiên 1 (On-Premise vLLM): BGE-M3 (1,024 dims) pooling/embeddings chạy trực tiếp trên GPU RTX 5090",
+    },
     {
         "provider_id": "prov_cloudflare",
         "provider_name": "Cloudflare Workers AI",
         "model_name": "@cf/baai/bge-m3",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 1: Cloudflare BGE-M3 (1024D) — Máy chủ Edge toàn cầu, tốc độ cao không tốn quota API",
+        "description": "Ưu tiên 2: Cloudflare BGE-M3 (1024D) — Máy chủ Edge toàn cầu dự phòng",
     },
     {
         "provider_id": "prov_gemini",
@@ -99,18 +95,26 @@ DEFAULT_QNU_EMBEDDING_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "text-embedding-004",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 2: Google text-embedding-004 — Chất lượng truy xuất ngữ nghĩa tiếng Việt chuẩn xác",
+        "description": "Ưu tiên 3: Google text-embedding-004 — Truy xuất ngữ nghĩa tiếng Việt chuẩn xác",
     },
 ]
 
 DEFAULT_QNU_RERANKER_COMBO_CHAIN: list[dict[str, Any]] = [
+    {
+        "provider_id": "prov_rtx5090_vllm",
+        "provider_name": "On-Premise GPU RTX 5090 (vLLM)",
+        "model_name": "bge-reranker-v2-m3",
+        "provider_type": "on_premise",
+        "is_active": True,
+        "description": "Ưu tiên 1 (On-Premise vLLM): BGE-Reranker-v2-M3 Cross-Encoder rerank/score trên GPU RTX 5090",
+    },
     {
         "provider_id": "prov_cloudflare",
         "provider_name": "Cloudflare Workers AI",
         "model_name": "@cf/baai/bge-reranker-base",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 1: Cloudflare BGE-Reranker-Base — Cross-Encoder Edge GPU tái chấm điểm Top-K",
+        "description": "Ưu tiên 2: Cloudflare BGE-Reranker-Base — Cross-Encoder Edge GPU tái chấm điểm Top-K",
     },
 ]
 
@@ -193,88 +197,101 @@ class ModelCatalogService:
     def __init__(self, facade: Any = None) -> None:
         self.facade = facade
 
+    async def resolve_embedding_dimension(
+        self,
+        db: AsyncSession,
+        provider_id: str,
+        model_name: str,
+        *,
+        metadata_dimension: int | None = None,
+    ) -> int:
+        """Resolve and validate one embedding vector space from the ModelOps database."""
+        provider_result = await db.execute(
+            select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        )
+        provider = provider_result.scalar_one_or_none()
+        if provider is None or provider.is_active is False:
+            raise AppException(
+                f"Embedding provider '{provider_id}' không tồn tại hoặc chưa hoạt động.",
+                code="EMBEDDING_PROVIDER_UNAVAILABLE",
+                status_code=409,
+                details={"provider_id": provider_id, "model_name": model_name},
+            )
+
+        extra_config = provider.extra_config or {}
+        model_specs = extra_config.get("model_specs") or {}
+        legacy_dimensions = extra_config.get("model_dimensions") or {}
+        configured_models = set(extra_config.get("models") or [])
+        if provider.model_name:
+            configured_models.add(provider.model_name)
+        configured_models.update(model_specs)
+        configured_models.update(legacy_dimensions)
+        if configured_models and model_name not in configured_models:
+            raise AppException(
+                f"Mô hình embedding '{model_name}' không thuộc provider '{provider_id}'.",
+                code="EMBEDDING_MODEL_NOT_AVAILABLE",
+                status_code=409,
+                details={"provider_id": provider_id, "model_name": model_name},
+            )
+
+        model_spec = model_specs.get(model_name) or {}
+        raw_dimension = model_spec.get("dimension") or model_spec.get("dims")
+        if raw_dimension is None:
+            raw_dimension = legacy_dimensions.get(model_name)
+        if raw_dimension is None:
+            raw_dimension = extra_config.get("embedding_dimension")
+
+        try:
+            dimension = int(raw_dimension)
+        except (TypeError, ValueError):
+            dimension = 0
+        if dimension <= 0:
+            raise AppException(
+                f"Mô hình embedding '{model_name}' thiếu cấu hình số chiều trong ModelOps.",
+                code="EMBEDDING_DIMENSION_NOT_CONFIGURED",
+                status_code=400,
+                details={"provider_id": provider_id, "model_name": model_name},
+            )
+
+        if metadata_dimension is not None and metadata_dimension != dimension:
+            raise AppException(
+                "Kích thước vector đã lưu không còn khớp cấu hình ModelOps; cần tạo thế hệ chỉ mục mới.",
+                code="EMBEDDING_DIMENSION_MISMATCH",
+                status_code=409,
+                details={
+                    "provider_id": provider_id,
+                    "model_name": model_name,
+                    "metadata_dimension": metadata_dimension,
+                    "modelops_dimension": dimension,
+                },
+            )
+
+        return dimension
+
     async def get_system_model_defaults(self, db: AsyncSession) -> SystemModelDefaultsResponse:
         """Retrieve current system-wide default models for Embedding, Reranker, and OCR.
 
-        If not yet stored in PostgreSQL, seeds default values matching Cloudflare Edge GPU & Mistral.
+        Fails fast with MODEL_DEFAULT_NOT_CONFIGURED if defaults are not yet stored in PostgreSQL.
         Dynamically enumerates available options across all registered active providers.
         """
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults")
         res = await db.execute(stmt)
         cfg_record = res.scalar_one_or_none()
 
-        default_data: dict[str, Any] = {
-            "default_embedding_provider_id": "prov_rtx5090_ollama",
-            "default_embedding_model": "bge-m3:latest",
-            "default_embedding_mode": "combo",
-            "default_embedding_combo_id": "combo_qnu_embedding_shield",
-            "embedding_combo_chain": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,
+        if not cfg_record or not cfg_record.extra_config or "defaults" not in cfg_record.extra_config:
+            raise AppException(
+                "Cấu hình mặc định mô hình hệ thống chưa được khởi tạo trong CSDL.",
+                code="MODEL_DEFAULT_NOT_CONFIGURED",
+                status_code=400,
+            )
 
-            "default_reranker_provider_id": "prov_cloudflare",
-            "default_reranker_model": "@cf/baai/bge-reranker-base",
-            "default_reranker_mode": "combo",
-            "default_reranker_combo_id": "combo_qnu_reranker_shield",
-            "reranker_combo_chain": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
-
-            "default_ocr_provider_id": "prov_gemini",
-            "default_ocr_model": "gemini-3.1-flash-lite",
-            "default_ocr_mode": "combo",
-            "default_ocr_combo_id": "combo_qnu_ocr_master",
-            "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,
-
-            "default_chat_provider_id": "prov_gemini",
-            "default_chat_model": "gemini-3.1-flash-lite",
-            "default_chat_mode": "single",
-            "default_chat_combo_id": "combo_qnu_chat_shield",
-            "chat_combo_chain": DEFAULT_QNU_CHAT_COMBO_CHAIN,
-
-            "model_combos": DEFAULT_INITIAL_COMBOS,
-            "vision_adapter": DEFAULT_VISION_ADAPTER,
-        }
-
-        if cfg_record and cfg_record.extra_config and "defaults" in cfg_record.extra_config:
-            default_data.update(cfg_record.extra_config["defaults"])
-            # Upgrade existing stored combos if task_type is missing
-            combos_list = default_data.get("model_combos") or []
-            existing_ids = {c.get("id") for c in combos_list}
-            for c in combos_list:
-                if not c.get("task_type"):
-                    c["task_type"] = "ocr"
-            # Add missing default combos for embedding/reranker/chat
-            for initial_c in DEFAULT_INITIAL_COMBOS:
-                if initial_c["id"] not in existing_ids:
-                    combos_list.append(initial_c)
-            default_data["model_combos"] = combos_list
-
-            if not default_data.get("embedding_combo_chain"):
-                default_data["embedding_combo_chain"] = DEFAULT_QNU_EMBEDDING_COMBO_CHAIN
-            if not default_data.get("reranker_combo_chain"):
-                default_data["reranker_combo_chain"] = DEFAULT_QNU_RERANKER_COMBO_CHAIN
-            if not default_data.get("ocr_combo_chain"):
-                default_data["ocr_combo_chain"] = DEFAULT_QNU_OCR_COMBO_CHAIN
-            if not default_data.get("chat_combo_chain"):
-                default_data["chat_combo_chain"] = DEFAULT_QNU_CHAT_COMBO_CHAIN
-            if not default_data.get("default_ocr_mode"):
-                default_data["default_ocr_mode"] = "combo"
-            if not default_data.get("default_embedding_mode"):
-                default_data["default_embedding_mode"] = "combo"
-            if not default_data.get("default_reranker_mode"):
-                default_data["default_reranker_mode"] = "combo"
-            if not default_data.get("vision_adapter"):
-                default_data["vision_adapter"] = DEFAULT_VISION_ADAPTER
-        else:
-            if not cfg_record:
-                cfg_record = ModelProviderConfig(
-                    id="system_model_defaults",
-                    name="Cấu Hình Mặc Định Hệ Thống",
-                    provider_type="system_routing",
-                    model_name=default_data["default_embedding_model"],
-                    is_active=True,
-                    priority=0,
-                    extra_config={"defaults": default_data},
-                )
-                db.add(cfg_record)
-                await db.commit()
+        default_data = dict(cfg_record.extra_config["defaults"])
+        if not default_data.get("default_embedding_model") or not default_data.get("default_embedding_provider_id"):
+            raise AppException(
+                "Thiếu cấu hình default embedding model hoặc provider trong CSDL.",
+                code="MODEL_DEFAULT_NOT_CONFIGURED",
+                status_code=400,
+            )
 
         for chain_key in (
             "embedding_combo_chain",
@@ -310,11 +327,22 @@ class ModelCatalogService:
             p_type = (p.provider_type or "").lower()
             category = "custom" if p_type == "custom" else "cloud"
 
+            p_specs = p_extra.get("model_specs") or {}
+
             for m in models_list:
                 m_lower = m.lower()
+                m_spec = p_specs.get(m) or {}
+                m_dim_raw = m_spec.get("dimension") or m_spec.get("dims")
+                m_dim = int(m_dim_raw) if m_dim_raw is not None else None
+
                 if (
                     "bge" in m_lower or "embed" in m_lower
                 ) and "rerank" not in m_lower:
+                    desc = (
+                        f"Nhúng vector {m_dim} chiều qua {p.name}"
+                        if m_dim
+                        else f"Nhúng vector qua {p.name}"
+                    )
                     available_embeddings.append(
                         ModelOption(
                             provider_id=p.id,
@@ -322,7 +350,8 @@ class ModelCatalogService:
                             provider_type=p.provider_type,
                             model_name=m,
                             category=category,
-                            description=f"Nhúng vector 1024 chiều qua {p.name}",
+                            description=desc,
+                            dimension=m_dim,
                         )
                     )
                 if "rerank" in m_lower:
@@ -336,8 +365,6 @@ class ModelCatalogService:
                             description=f"Xếp hạng lại tương quan ngữ nghĩa qua {p.name}",
                         )
                     )
-                p_specs = p_extra.get("model_specs") or {}
-                m_spec = p_specs.get(m) or {}
 
                 is_ocr_candidate = False
                 if "can_ocr" in m_spec:
@@ -400,22 +427,15 @@ class ModelCatalogService:
 
         if update_data.default_embedding_provider_id is not None:
             defaults["default_embedding_provider_id"] = update_data.default_embedding_provider_id
-            provider_hint = update_data.default_embedding_provider_id.lower()
-            settings.EMBEDDING_PROVIDER = (
-                "cloudflare" if "cloudflare" in provider_hint else "gemini"
-            )
 
         if update_data.default_embedding_model is not None:
             defaults["default_embedding_model"] = update_data.default_embedding_model
-            settings.EMBEDDING_MODEL = update_data.default_embedding_model
 
         if update_data.default_reranker_provider_id is not None:
             defaults["default_reranker_provider_id"] = update_data.default_reranker_provider_id
-            settings.RERANKER_PROVIDER = "cloudflare"
 
         if update_data.default_reranker_model is not None:
             defaults["default_reranker_model"] = update_data.default_reranker_model
-            settings.RERANKER_MODEL = update_data.default_reranker_model
 
         # Embedding Mode & Chain
         if update_data.default_embedding_mode is not None:

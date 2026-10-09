@@ -12,8 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.jobs.models import JobRecord
-from app.modules.knowledge.models import KnowledgeChunk, KnowledgeDocument
-from app.modules.knowledge.services.collection_service import collection_service
+from app.modules.knowledge.models import (
+    KnowledgeChunk,
+    KnowledgeCollection,
+    KnowledgeDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,15 +47,21 @@ class ReconciliationService:
         from app.modules.knowledge.services.ingestion_service import ingestion_service
         return await ingestion_service.get_document(db, document_id)
 
-    async def _get_collection(self, db: AsyncSession, collection_id: str):
+    async def _get_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> KnowledgeCollection:
         if self._facade and hasattr(self._facade, "get_collection"):
-            return await self._facade.get_collection(db, collection_id)
-        return await collection_service.get_collection(db, collection_id)
+            try:
+                return await self._facade.get_collection(db, collection_id, actor=actor)
+            except TypeError:
+                return await self._facade.get_collection(db, collection_id)
+        from app.modules.knowledge.services.scope_helper import get_scoped_collection
+        return await get_scoped_collection(db, collection_id, actor=actor)
 
-    async def reindex_document(self, db: AsyncSession, document_id: str) -> dict[str, Any]:
+    async def reindex_document(self, db: AsyncSession, document_id: str, actor: Any | None = None) -> dict[str, Any]:
         """Re-index chunks of a single document into Qdrant vector database."""
         doc = await self._get_document(db, document_id)
-        col = await self._get_collection(db, doc.collection_id)
+        col = await self._get_collection(db, doc.collection_id, actor=actor)
         metadata = doc.doc_metadata or {}
         quality_report = metadata.get("quality_report") or {}
         is_human_verified = bool(metadata.get("human_verified"))
@@ -95,7 +104,22 @@ class ReconciliationService:
         await db.commit()
 
         col_dp = (col.collection_metadata.get("data_processing") or {}) if col and col.collection_metadata else {}
-        col_embedding_model = col_dp.get("embedding_model") or "bge-m3:latest"
+        col_embedding_model = col_dp.get("embedding_model")
+        if not col_embedding_model:
+            from app.modules.modelops.services.model_catalog_service import model_catalog_service
+
+            try:
+                catalog = await model_catalog_service.get_system_model_defaults(db)
+                col_embedding_model = catalog.defaults.default_embedding_model
+            except AppException:
+                col_embedding_model = None
+
+        if not col_embedding_model:
+            raise AppException(
+                "Chưa cấu hình embedding model cho collection này và hệ thống chưa có default.",
+                code="EMBEDDING_MODEL_NOT_CONFIGURED",
+                status_code=400,
+            )
 
         chunks_payload = [
             {
@@ -197,9 +221,11 @@ class ReconciliationService:
             "message": doc.index_error or "Đã lập chỉ mục lại thành công.",
         }
 
-    async def reconcile_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
+    async def reconcile_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> dict[str, Any]:
         """Audit parity across 4 layers: PostgreSQL DB, Qdrant Vector, Storage Driver, Redis Cache."""
-        col = await self._get_collection(db, collection_id)
+        col = await self._get_collection(db, collection_id, actor=actor)
         docs = list(
             (
                 await db.execute(
@@ -352,9 +378,13 @@ class ReconciliationService:
             "discrepancies": discrepancies,
         }
 
-    async def reconcile_fix_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
+    async def reconcile_fix_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> dict[str, Any]:
         """Automatically recover and re-index all missing vectors for approved/ready documents in a collection."""
-        await collection_service.get_collection(db, collection_id)
+        from app.modules.knowledge.services.scope_helper import get_scoped_collection
+
+        await get_scoped_collection(db, collection_id, actor=actor)
         docs = list(
             (
                 await db.execute(

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import AuthActor, require_permission
 from app.modules.jobs.schemas import JobEnqueueRequest, JobResponse, JobStatsResponse
 from app.modules.jobs.service import jobs_service
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/jobs", tags=["Background Jobs"])
 async def enqueue_job(
     body: JobEnqueueRequest,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
 ) -> JobResponse:
     job = await jobs_service.enqueue_job(
         db,
@@ -25,6 +27,7 @@ async def enqueue_job(
         collection_id=body.collection_id,
         document_id=body.document_id,
         params=body.params,
+        actor=actor,
     )
     return JobResponse.model_validate(job)
 
@@ -34,22 +37,27 @@ async def list_jobs(
     status: str | None = Query(None, description="Lọc theo trạng thái"),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> list[JobResponse]:
-    jobs = await jobs_service.list_jobs(db, status=status, limit=limit)
+    jobs = await jobs_service.list_jobs(db, status=status, limit=limit, actor=actor)
     return [JobResponse.model_validate(j) for j in jobs]
 
 
 @router.get("/stats", response_model=JobStatsResponse, summary="Thống kê Jobs theo trạng thái")
-async def job_stats(db: AsyncSession = Depends(get_db)) -> JobStatsResponse:
-    return JobStatsResponse.model_validate(await jobs_service.get_stats(db))
+async def job_stats(
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> JobStatsResponse:
+    return JobStatsResponse.model_validate(await jobs_service.get_stats(db, actor=actor))
 
 
 @router.get("/{job_id}", response_model=JobResponse, summary="Chi tiết Job")
 async def get_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> JobResponse:
-    job = await jobs_service.get_job(db, job_id)
+    job = await jobs_service.get_job(db, job_id, actor=actor)
     return JobResponse.model_validate(job)
 
 
@@ -57,8 +65,9 @@ async def get_job(
 async def cancel_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
 ) -> JobResponse:
-    job = await jobs_service.cancel_job(db, job_id)
+    job = await jobs_service.cancel_job(db, job_id, actor=actor)
     return JobResponse.model_validate(job)
 
 
@@ -66,8 +75,9 @@ async def cancel_job(
 async def retry_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
 ) -> JobResponse:
-    job = await jobs_service.retry_job(db, job_id)
+    job = await jobs_service.retry_job(db, job_id, actor=actor)
     return JobResponse.model_validate(job)
 
 
@@ -79,9 +89,12 @@ async def cleanup_jobs(
         description="Danh sách trạng thái cần dọn dẹp, phân tách bằng dấu phẩy",
     ),
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.delete")),
 ) -> dict[str, Any]:
     status_list = [s.strip() for s in statuses.split(",") if s.strip()]
-    count = await jobs_service.cleanup_jobs(db, collection_id=collection_id, statuses=status_list)
+    count = await jobs_service.cleanup_jobs(
+        db, collection_id=collection_id, statuses=status_list, actor=actor
+    )
     return {"success": True, "deleted_count": count}
 
 
@@ -89,7 +102,8 @@ async def cleanup_jobs(
 async def delete_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.delete")),
 ) -> dict[str, Any]:
-    await jobs_service.delete_job(db, job_id)
+    await jobs_service.delete_job(db, job_id, actor=actor)
     return {"success": True, "deleted_id": job_id}
 

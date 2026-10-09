@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from app.modules.rag.composer import (
@@ -9,6 +11,27 @@ from app.modules.rag.composer import (
     sanitize_rag_answer,
 )
 from app.modules.rag.query_router import query_classifier
+from app.modules.rag.schemas import RetrievalSnapshot
+
+
+@pytest.fixture(autouse=True)
+def _pin_rag_snapshot_for_unit_tests():
+    async def resolve(*args, **kwargs):
+        collection_id = args[1] if len(args) > 1 else kwargs["collection_id"]
+        return RetrievalSnapshot(
+            snapshot_id=f"snap_{collection_id}_test",
+            collection_id=collection_id,
+            collection_epoch=1,
+            binding_revisions={"bnd_test": "idx_test"},
+            tenant_id=kwargs.get("tenant_id"),
+            workspace_id=kwargs.get("workspace_id"),
+        )
+
+    with patch(
+        "app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
+        new=AsyncMock(side_effect=resolve),
+    ):
+        yield
 
 
 def test_sanitize_rag_answer_removes_pipe_clusters():
@@ -193,5 +216,4 @@ def test_clean_robotic_intro_preserves_natural_dialogue():
     # 5. sanitize_rag_answer cleans robotic intro automatically
     sanitized = sanitize_rag_answer(robotic_1)
     assert sanitized == "Điểm chuẩn ngành Công nghệ thông tin năm 2024 là 24.50 điểm."
-
 

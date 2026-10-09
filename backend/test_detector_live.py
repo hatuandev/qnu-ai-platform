@@ -1,9 +1,10 @@
 import asyncio
 import sys
-from PIL import Image
+
 import pymupdf as fitz
-from app.core.database import AsyncSessionFactory
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
 from app.modules.ocr.layout_detector import SmartLayoutDetector
 
@@ -37,7 +38,7 @@ async def main():
         print(f"Detected {len(regions)} regions:")
         for r in regions:
             coords = f"top={r.get('top')}, left={r.get('left')}, w={r.get('width')}, h={r.get('height')}"
-            print(f"  [{r['type']}] {coords} | {r.get('label')} | {repr(r.get('text', '')[:40])}")
+            print(f"  [{r['type']}] {coords} | {r.get('label')} | {r.get('text', '')[:40]!r}")
 
 if __name__ == "__main__":
     asyncio.run(main())

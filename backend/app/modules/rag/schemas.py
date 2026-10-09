@@ -2,9 +2,45 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class RetrievalSnapshot(BaseModel):
+    """Immutable snapshot pinning collection epochs and binding index revisions for session consistency."""
+
+    snapshot_id: str = Field(..., description="Mã định danh duy nhất của snapshot")
+    collection_id: str = Field(..., description="Mã bộ sưu tập tri thức")
+    collection_epoch: int = Field(1, description="Epoch hiện hành của bộ sưu tập")
+    binding_revisions: dict[str, str] = Field(
+        default_factory=dict,
+        description="Bản đồ khóa phiên bản {binding_id: active_index_revision_id}",
+    )
+    vector_generations: dict[str, str] = Field(default_factory=dict)
+    tenant_id: str | None = None
+    workspace_id: str | None = None
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+        description="Thời điểm tạo snapshot ISO-8601",
+    )
+
+    def cache_fingerprint(self) -> str:
+        """Stable fingerprint for cache isolation across immutable retrieval snapshots."""
+        payload = {
+            "collection_id": self.collection_id,
+            "collection_epoch": self.collection_epoch,
+            "binding_revisions": sorted(self.binding_revisions.items()),
+            "vector_generations": sorted(self.vector_generations.items()),
+            "tenant_id": self.tenant_id,
+            "workspace_id": self.workspace_id,
+        }
+        return hashlib.sha256(
+            json.dumps(payload, ensure_ascii=True, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:20]
 
 
 class SearchRequest(BaseModel):
@@ -22,6 +58,14 @@ class SearchRequest(BaseModel):
     )
     tenant_id: str | None = Field(default=None, description="Mã tenant cô lập dữ liệu")
     workspace_id: str | None = Field(default=None, description="Mã workspace cô lập dữ liệu")
+    snapshot_id: str | None = Field(default=None, description="ID snapshot cố định phiên tra cứu")
+    retrieval_snapshot: RetrievalSnapshot | None = Field(
+        default=None, description="Chi tiết snapshot được pin cho phiên"
+    )
+
+    @property
+    def snapshot(self) -> RetrievalSnapshot | None:
+        return self.retrieval_snapshot
 
 
 class SearchResultItem(BaseModel):
@@ -32,6 +76,10 @@ class SearchResultItem(BaseModel):
     rank: int
     section: str | None = None
     page_number: int | None = None
+    binding_id: str | None = None
+    index_revision_id: str | None = None
+    revision_no: int | None = None
+    document_revision: int | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -41,6 +89,8 @@ class SearchResponse(BaseModel):
     total_found: int
     items: list[SearchResultItem]
     execution_time_ms: float
+    retrieval_snapshot: RetrievalSnapshot | None = None
+    snapshot: RetrievalSnapshot | None = None
 
 
 class Citation(BaseModel):
@@ -51,6 +101,10 @@ class Citation(BaseModel):
     quote: str | None = None
     source_pages: list[int] | None = None
     entity_key: str | None = None
+    binding_id: str | None = None
+    index_revision_id: str | None = None
+    source_revision_id: str | None = None
+    revision_no: int | None = None
 
 
 class AskRequest(BaseModel):
@@ -73,6 +127,14 @@ class AskRequest(BaseModel):
         default=None, description="Lịch sử các lượt hội thoại gần nhất [{'role': 'user'|'assistant', 'content': '...'}]"
     )
     reranker_policy: dict[str, Any] | None = None
+    snapshot_id: str | None = Field(default=None, description="ID snapshot cố định phiên tra cứu")
+    retrieval_snapshot: RetrievalSnapshot | None = Field(
+        default=None, description="Chi tiết snapshot được pin cho phiên"
+    )
+
+    @property
+    def snapshot(self) -> RetrievalSnapshot | None:
+        return self.retrieval_snapshot
 
 
 class AskResponse(BaseModel):
@@ -95,3 +157,5 @@ class AskResponse(BaseModel):
     contexts: list[str] = Field(
         default_factory=list, description="Nội dung các chunk tri thức được truy xuất làm ngữ cảnh"
     )
+    retrieval_snapshot: RetrievalSnapshot | None = None
+    snapshot: RetrievalSnapshot | None = None

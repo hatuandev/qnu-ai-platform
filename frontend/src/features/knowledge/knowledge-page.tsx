@@ -81,7 +81,6 @@ export const KnowledgePage: React.FC = () => {
   const [createStrategy, setCreateStrategy] = useState("SemanticChunker");
   const [createOcr, setCreateOcr] = useState("PyMuPDF");
 
-
   // Upload Dialog State
   const [uploadTarget, setUploadTarget] = useState<KnowledgeCollection | null>(
     null,
@@ -164,7 +163,6 @@ export const KnowledgePage: React.FC = () => {
       toast.error(`Tạo kho thất bại: ${err.message}`);
     },
   });
-
 
   // Delete Collection Mutation
   const deleteMutation = useMutation({
@@ -709,7 +707,6 @@ export const KnowledgePage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* 7. Dialog: Nạp Tài Liệu */}
       {uploadTarget && (

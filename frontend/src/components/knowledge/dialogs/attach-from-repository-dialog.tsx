@@ -95,7 +95,8 @@ export function AttachFromRepositoryDialog({
       }),
     onSuccess: (res) => {
       toast.success(
-        res.message || `Đã gắn thành công ${res.attached_count} tài liệu vào kho tri thức!`,
+        res.message ||
+          `Đã gắn thành công ${res.attached_count} tài liệu vào kho tri thức!`,
       );
       queryClient.invalidateQueries({
         queryKey: ["collection-documents", collectionId],
@@ -195,7 +196,9 @@ export function AttachFromRepositoryDialog({
                   </TableHead>
                   <TableHead>Tài Liệu</TableHead>
                   <TableHead className="w-32">Số Hiệu / Loại</TableHead>
-                  <TableHead className="w-28 text-center">Trạng Thái MD</TableHead>
+                  <TableHead className="w-28 text-center">
+                    Trạng Thái MD
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

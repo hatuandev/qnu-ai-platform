@@ -183,7 +183,7 @@ function FileUpload({
         </div>
       ) : null}
       {files.length > 0 ? (
-        <div className="divide-y rounded-lg border">
+        <div className="max-h-48 overflow-y-auto divide-y rounded-lg border">
           {files.map((file) => (
             <div
               key={`${file.name}-${file.lastModified}`}

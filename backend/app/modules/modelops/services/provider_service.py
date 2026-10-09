@@ -171,91 +171,51 @@ def _auto_recover_cooldown(keys: list[dict[str, Any]]) -> None:
 
 STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
     {
-        "id": "prov_rtx5090_ollama",
-        "name": "QNU AI Server (RTX 5090 - Ollama)",
-        "provider_type": "ollama",
-        "model_name": "deepseek-r1:32b",
+        "id": "prov_rtx5090_vllm",
+        "name": "QNU AI Server (RTX 5090 - vLLM)",
+        "provider_type": "vllm",
+        "model_name": "bge-m3",
         "models": [
-            "deepseek-r1:32b",
-            "qwen3:8b",
-            "deepseek-r1:70b",
-            "qwen3-vl:32b",
-            "qwen3-vl:8b",
-            "qwen3-embedding:4b-q8_0",
-            "qwen3-embedding:8b",
-            "bge-m3:latest",
+            "bge-m3",
+            "bge-reranker-v2-m3",
+            "qwen3-embedding-4b",
         ],
-        "api_base_url": getattr(settings, "OLLAMA_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:11434/v1",
+        "api_base_url": getattr(settings, "VLLM_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:8000/v1",
         "api_key": "",
         "priority": 1,
         "is_active": True,
         "timeout_seconds": 60,
         "extra_config": {
             "models": [
-                "deepseek-r1:32b",
-                "qwen3:8b",
-                "deepseek-r1:70b",
-                "qwen3-vl:32b",
-                "qwen3-vl:8b",
-                "qwen3-embedding:4b-q8_0",
-                "qwen3-embedding:8b",
-                "bge-m3:latest",
+                "bge-m3",
+                "bge-reranker-v2-m3",
+                "qwen3-embedding-4b",
             ],
             "model_specs": {
-                "deepseek-r1:32b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "can_reasoning": True,
-                    "type": "text",
-                    "description": "DeepSeek R1 32B chạy trực tiếp trên VRAM RTX 5090 — Tư duy logic sâu cho Soạn thảo văn bản & Ngân hàng đề thi",
-                },
-                "qwen3:8b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "text",
-                    "description": "Qwen 3 8B siêu tốc (< 1s) — Phù hợp hội thoại trực tuyến và soạn thảo nhanh",
-                },
-                "deepseek-r1:70b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "can_reasoning": True,
-                    "type": "text",
-                    "description": "DeepSeek R1 70B cỡ lớn — Offload một phần RAM CPU",
-                },
-                "qwen3-vl:32b": {
-                    "can_ocr": True,
-                    "can_vision": True,
-                    "type": "vision_ocr",
-                    "description": "Qwen 3 Vision 32B — Bóc tách tài liệu scan, bảng biểu phức tạp và văn bản hành chính",
-                },
-                "qwen3-vl:8b": {
-                    "can_ocr": True,
-                    "can_vision": True,
-                    "type": "vision_ocr",
-                    "description": "Qwen 3 Vision 8B siêu nhanh — Phân tích ảnh và tài liệu scan tiêu chuẩn",
-                },
-                "qwen3-embedding:4b-q8_0": {
+                "bge-m3": {
                     "can_ocr": False,
                     "can_vision": False,
                     "type": "embedding",
-                    "description": "Qwen 3 Embedding 4B (2,560 dims) — Vector hóa văn bản học thuật và thể thức hành chính",
+                    "dimension": 1024,
+                    "description": "BGE-M3 Đa ngữ (1,024 dims) — vLLM pooling / embeddings cho indexing & retrieval",
                 },
-                "qwen3-embedding:8b": {
+                "bge-reranker-v2-m3": {
+                    "can_ocr": False,
+                    "can_vision": False,
+                    "type": "reranker",
+                    "description": "BGE-Reranker-v2-M3 — vLLM rerank / score Cross-Encoder tái xếp hạng Top-K",
+                },
+                "qwen3-embedding-4b": {
                     "can_ocr": False,
                     "can_vision": False,
                     "type": "embedding",
-                    "description": "Qwen 3 Embedding 8B — Không gian vector siêu lớn",
-                },
-                "bge-m3:latest": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "embedding",
-                    "description": "BGE-M3 Đa ngữ (1,024 dims) — Chuẩn vector indexing cho Cổng Chatbot hỏi đáp",
+                    "dimension": 2560,
+                    "description": "Qwen3-Embedding-4B (2,560 dims) — vLLM pooling / embeddings đã tải local",
                 },
             },
             "api_keys": [
                 {
-                    "id": "key_rtx5090_primary",
+                    "id": "key_rtx5090_vllm_primary",
                     "name": "Tailscale WireGuard On-Premise",
                     "api_key": "",
                     "api_key_masked": "ON-PREMISE (NO KEY REQUIRED)",
@@ -771,6 +731,12 @@ class ProviderService:
         existing = {c.id: c for c in res.scalars().all()}
 
         seeded_configs = []
+        # Tự động dọn dẹp nhà cung cấp Ollama cũ đã bị thay thế bởi vLLM
+        if "prov_rtx5090_ollama" in existing:
+            await db.delete(existing["prov_rtx5090_ollama"])
+            del existing["prov_rtx5090_ollama"]
+            logger.info("Đã xóa bỏ nhà cung cấp Ollama cũ (prov_rtx5090_ollama) khỏi CSDL.")
+
         for p in STANDARD_QNU_PROVIDERS:
             p_id = p["id"]
             if p_id in existing and not overwrite:
@@ -1242,14 +1208,19 @@ class ProviderService:
 
                 elif provider_type in (
                     "openai", "deepseek", "groq", "openrouter", "nvidia",
-                    "ollama_cloud", "ollama", "claude", "custom"
+                    "ollama_cloud", "ollama", "claude", "custom", "vllm", "tei"
                 ):
                     base = base_url or (
                         "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
+                        else "http://tormemrtxproto.tail0924dd.ts.net:8000/v1" if provider_type in ("vllm", "tei")
                         else "https://api.openai.com/v1"
                     )
                     target_url = base.rstrip("/") + "/models"
-                    headers = {"Authorization": f"Bearer {clean_key}"}
+                    headers = {}
+                    if clean_key and clean_key.lower() not in ("none", "null", "vllm", "ollama"):
+                        headers["Authorization"] = f"Bearer {clean_key}"
+                    elif provider_type in ("vllm", "tei"):
+                        headers["Authorization"] = "Bearer vllm"
                     if provider_type == "openrouter":
                         headers["HTTP-Referer"] = "https://qnu.edu.vn"
                         headers["X-Title"] = "QNU AI Platform"
@@ -1525,7 +1496,7 @@ class ProviderService:
 
                 elif provider_type in (
                     "openai", "deepseek", "groq", "openrouter", "nvidia",
-                    "ollama_cloud", "ollama", "claude", "custom"
+                    "ollama_cloud", "ollama", "claude", "custom", "vllm", "tei"
                 ):
                     base = base_url or (
                         "https://api.openai.com/v1" if provider_type == "openai"
@@ -1534,13 +1505,16 @@ class ProviderService:
                         else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
                         else "https://integrate.api.nvidia.com/v1" if provider_type == "nvidia"
                         else "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
+                        else "http://tormemrtxproto.tail0924dd.ts.net:8000/v1" if provider_type in ("vllm", "tei")
                         else "https://api.openai.com/v1"
                     )
                     clean_base = base.rstrip("/")
 
                     headers = {"Content-Type": "application/json"}
-                    if clean_key:
+                    if clean_key and clean_key.lower() not in ("none", "null", "vllm", "ollama"):
                         headers["Authorization"] = f"Bearer {clean_key}"
+                    elif provider_type in ("vllm", "tei"):
+                        headers["Authorization"] = "Bearer vllm"
                     if provider_type == "openrouter":
                         headers["HTTP-Referer"] = "https://qnu.edu.vn"
                         headers["X-Title"] = "QNU AI Platform"
@@ -1549,7 +1523,15 @@ class ProviderService:
                         kw in m_lower for kw in ("r1", "reason", "nemotron", "thinking", "o1", "o3", "qwq")
                     )
 
-                    if "embed" in m_lower or "bge" in m_lower:
+                    if "rerank" in m_lower:
+                        target_url = f"{clean_base}/rerank"
+                        payload = {
+                            "model": clean_model,
+                            "query": "ping",
+                            "documents": ["ping"],
+                            "top_n": 1,
+                        }
+                    elif "embed" in m_lower or "bge" in m_lower:
                         target_url = f"{clean_base}/embeddings"
                         payload = {"model": clean_model, "input": "ping"}
                     else:

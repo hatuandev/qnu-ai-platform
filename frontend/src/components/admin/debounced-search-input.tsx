@@ -31,8 +31,9 @@ export function DebouncedSearchInput({
   // Sync external value to local state when external value changes
   // and user is not currently in an active IME composition
   useEffect(() => {
-    if (!isComposingRef.current && (externalValue ?? "") !== localValue) {
-      setLocalValue(externalValue ?? "");
+    if (!isComposingRef.current) {
+      const nextVal = externalValue ?? "";
+      setLocalValue((prev) => (nextVal !== prev ? nextVal : prev));
     }
   }, [externalValue]);
 

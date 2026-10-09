@@ -24,7 +24,8 @@ export const STATUS_BADGE: Record<
   },
   review_pending: {
     label: "Chờ hiệu đính",
-    className: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+    className:
+      "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
   },
   processing: {
     label: "Đang xử lý",
@@ -77,4 +78,10 @@ export function formatFileSize(bytes: number): string {
 
 export type CollectionSubView = "list" | "ingest" | "verify";
 
-export type CollectionDetailTab = "documents" | "facts" | "tasks" | "models";
+export type CollectionDetailTab =
+  | "documents"
+  | "bindings"
+  | "facts"
+  | "tasks"
+  | "models"
+  | "audit";

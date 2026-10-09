@@ -325,67 +325,81 @@ export const ExcelSpreadsheetViewer: React.FC<ExcelSpreadsheetViewerProps> = ({
             </tr>
           </thead>
           <tbody>
-            {currentSheet.rows.map((row, rIdx) => {
-              const isMatchSearch =
-                searchQuery &&
-                row.some((cell) =>
-                  cell.toLowerCase().includes(searchQuery.toLowerCase()),
+            {currentSheet.rows
+              .map((row, rIdx) => ({
+                id: `${currentSheet.name}-r${rIdx + 1}`,
+                rowNumber: rIdx + 1,
+                rIdx,
+                row,
+              }))
+              .map(({ id: rowId, rowNumber, rIdx, row }) => {
+                const isMatchSearch =
+                  searchQuery &&
+                  row.some((cell) =>
+                    cell.toLowerCase().includes(searchQuery.toLowerCase()),
+                  );
+
+                return (
+                  <tr
+                    key={rowId}
+                    className={`border-b border-border/60 hover:bg-muted/30 transition-colors ${
+                      isMatchSearch
+                        ? "bg-muted/50"
+                        : rIdx % 2 === 1
+                          ? "bg-muted/10"
+                          : ""
+                    }`}
+                  >
+                    {/* Row index label */}
+                    <td className="w-10 px-2 py-1 text-center font-mono text-[10px] text-muted-foreground border-r border-border bg-muted/40 select-none">
+                      {rowNumber}
+                    </td>
+                    {Array.from({ length: maxColumns })
+                      .map((_, cIdx) => ({
+                        cIdx,
+                        colLetter: getExcelColumnLetter(cIdx),
+                      }))
+                      .map(({ cIdx, colLetter }) => {
+                        const val = row[cIdx] || "";
+                        const isSelected =
+                          selectedCell?.r === rIdx && selectedCell?.c === cIdx;
+                        const isNum = isNumericValue(val);
+                        const isCellMatch = Boolean(
+                          searchQuery &&
+                            val
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase()),
+                        );
+
+                        return (
+                          <td
+                            key={`${rowId}-c${colLetter}`}
+                            className="p-0 border-r border-border/60"
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedCell({ r: rIdx, c: cIdx, val })
+                              }
+                              className={`w-full h-full transition-all cursor-cell max-w-72 truncate block ${
+                                isCompact
+                                  ? "px-2 py-0.5 text-[11px]"
+                                  : "px-3 py-1.5 text-xs"
+                              } ${isNum ? "text-right font-mono" : "text-left"} ${
+                                isSelected
+                                  ? "ring-2 ring-primary ring-inset bg-primary/10 font-semibold"
+                                  : ""
+                              } ${isCellMatch ? "bg-primary/20 text-foreground font-medium" : ""}`}
+                              title={val}
+                            >
+                              {val || "\u00A0"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                  </tr>
                 );
-
-              return (
-                <tr
-                  key={`row-${rIdx + 1}`}
-                  className={`border-b border-border/60 hover:bg-muted/30 transition-colors ${
-                    isMatchSearch
-                      ? "bg-amber-500/10"
-                      : rIdx % 2 === 1
-                        ? "bg-muted/10"
-                        : ""
-                  }`}
-                >
-                  {/* Row index label */}
-                  <td className="w-10 px-2 py-1 text-center font-mono text-[10px] text-muted-foreground border-r border-border bg-muted/40 select-none">
-                    {rIdx + 1}
-                  </td>
-                  {Array.from({ length: maxColumns }).map((_, cIdx) => {
-                    const val = row[cIdx] || "";
-                    const isSelected =
-                      selectedCell?.r === rIdx && selectedCell?.c === cIdx;
-                    const isCellMatch =
-                      searchQuery &&
-                      val.toLowerCase().includes(searchQuery.toLowerCase());
-                    const isNum = isNumericValue(val);
-                    const colLetter = getExcelColumnLetter(cIdx);
-
-                    return (
-                      <td
-                        key={`cell-${currentSheet.name}-r${rIdx + 1}-c${colLetter}`}
-                        className="p-0 border-r border-border/60"
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedCell({ r: rIdx, c: cIdx, val })
-                          }
-                          className={`w-full h-full transition-all cursor-cell max-w-72 truncate block ${
-                            isCompact
-                              ? "px-2 py-0.5 text-[11px]"
-                              : "px-3 py-1.5 text-xs"
-                          } ${isNum ? "text-right font-mono" : "text-left"} ${
-                            isSelected
-                              ? "ring-2 ring-primary ring-inset bg-primary/10 font-semibold"
-                              : ""
-                          } ${isCellMatch ? "bg-amber-400/25 text-amber-950 dark:text-amber-200" : ""}`}
-                          title={val}
-                        >
-                          {val || "\u00A0"}
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
+              })}
           </tbody>
         </table>
       </div>

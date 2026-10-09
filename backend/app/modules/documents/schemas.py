@@ -37,6 +37,9 @@ class RepositoryDocumentListItem(BaseModel):
     issuing_authority: str | None = None
     issued_date: date | None = None
     effective_date: date | None = None
+    status: str = "active"
+    current_revision_id: str | None = None
+    latest_revision_no: int = 0
     parse_status: str
     ocr_engine: str | None = None
     attached_collections_count: int = 0
@@ -62,10 +65,14 @@ class RepositoryDocumentResponse(BaseModel):
     issuing_authority: str | None = None
     issued_date: date | None = None
     effective_date: date | None = None
+    status: str = "active"
+    current_revision_id: str | None = None
+    latest_revision_no: int = 0
     parse_status: str
     ocr_engine: str | None = None
     parsed_markdown: str | None = None
     doc_metadata: dict[str, Any] = Field(default_factory=dict)
+    catalog_metadata: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = True
     attached_collections: list[AttachedCollectionInfo] = Field(default_factory=list)
     attached_collections_count: int = 0
@@ -119,3 +126,93 @@ class AttachRepositoryDocumentsResponse(BaseModel):
     attached_count: int
     created_document_ids: list[str]
     message: str
+
+
+# =========================================================================
+# V2 Revisions & Async Intake Schemas
+# =========================================================================
+
+
+class DocumentRevisionListItem(BaseModel):
+    """Summary of an immutable document revision."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    revision_no: int
+    based_on_revision_id: str | None = None
+    source_file_name: str
+    source_file_type: str
+    source_size_bytes: int
+    source_hash: str
+    canonical_hash: str | None = None
+    status: str
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    quality_report: dict[str, Any] | None = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentRevisionResponse(BaseModel):
+    """Detailed response of an immutable document revision with full manifests."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    revision_no: int
+    based_on_revision_id: str | None = None
+    source_file_name: str
+    source_file_type: str
+    source_size_bytes: int
+    source_hash: str
+    source_storage_path: str
+    canonical_markdown: str | None = None
+    canonical_hash: str | None = None
+    page_manifest: list[dict[str, Any]] | None = Field(default_factory=list)
+    citation_metadata: dict[str, Any] | None = Field(default_factory=dict)
+    parse_provenance: dict[str, Any] | None = Field(default_factory=dict)
+    quality_report: dict[str, Any] | None = Field(default_factory=dict)
+    status: str
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    idempotency_key: str | None = None
+    lock_version: int = 1
+    review_notes: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ReviewRevisionContentRequest(BaseModel):
+    """Payload to update canonical markdown during review phase."""
+
+    canonical_markdown: str = Field(..., min_length=1, description="Nội dung Markdown đã hiệu đính")
+    notes: str | None = Field(None, max_length=512, description="Ghi chú chỉnh sửa")
+    expected_lock_version: int = Field(..., ge=1, description="Phiên khóa lạc quan hiện tại")
+
+
+class SubmitRevisionReviewRequest(BaseModel):
+    """Action to finalize review decision."""
+
+    action: str = Field("approve", description="Quyết định: approve (chuyển ready) hoặc reject (chuyển review_required)")
+    notes: str | None = Field(None, max_length=512, description="Ghi chú duyệt")
+    expected_lock_version: int = Field(..., ge=1, description="Phiên khóa lạc quan hiện tại")
+
+
+class AsyncUploadDocumentResponse(BaseModel):
+    """Asynchronous response (HTTP 202 Accepted) returned for document intake."""
+
+    document_id: str
+    revision_id: str
+    revision_no: int
+    file_name: str
+    file_hash: str
+    job_id: str
+    status: str
+    deduplicated: bool = False
+    created_at: datetime

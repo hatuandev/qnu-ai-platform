@@ -1,8 +1,5 @@
 import re
 import sys
-import numpy as np
-from PIL import Image
-import pymupdf as fitz
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -88,11 +85,13 @@ def parse_markdown_semantic_blocks(markdown_text: str, is_first_page: bool, is_l
     }
 
 # Test parsing on TB2302
-from test_detector_live import main
 import asyncio
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
+
 
 async def run_test():
     async with AsyncSessionFactory() as db:
@@ -110,6 +109,6 @@ async def run_test():
         print("Signing right:", repr(parsed["signing_right"][:40]))
         print(f"Body blocks ({len(parsed['body'])}):")
         for i, b in enumerate(parsed["body"]):
-            print(f"  [{i+1}] {repr(b[:50])}")
+            print(f"  [{i+1}] {b[:50]!r}")
 
 asyncio.run(run_test())

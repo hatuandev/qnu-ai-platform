@@ -66,7 +66,7 @@ def get_llm_adapter(
             account_id=account_id,
         )
 
-    if pt in ("deepseek", "groq", "openrouter", "nvidia", "claude", "ollama_cloud", "ollama", "custom"):
+    if pt in ("deepseek", "groq", "openrouter", "nvidia", "claude", "ollama_cloud", "ollama", "custom", "vllm", "tei"):
         # OpenAI compatible endpoints
         from app.core.config import resolve_ollama_network_url, settings
 
@@ -84,14 +84,14 @@ def get_llm_adapter(
             "ollama": ollama_default,
         }
         effective_base = base_url or default_urls.get(pt)
-        if pt in ("ollama", "custom") and effective_base:
+        if pt in ("ollama", "custom", "vllm", "tei") and effective_base:
             effective_base = resolve_ollama_network_url(effective_base)
         if effective_base and not effective_base.endswith("/v1") and not effective_base.endswith("/v1/"):
             effective_base = f"{effective_base.rstrip('/')}/v1"
 
         return OpenAIAdapter(
             model_name=model_name,
-            api_key=api_key or ("ollama" if pt in ("ollama", "custom") else None),
+            api_key=api_key or ("vllm" if pt in ("vllm", "tei") else "ollama" if pt in ("ollama", "custom") else None),
             base_url=effective_base,
             timeout_seconds=timeout_seconds,
             provider_type=pt,

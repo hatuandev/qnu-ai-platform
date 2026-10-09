@@ -112,6 +112,17 @@ async def test_search_dense_positive_allowlist():
     indexer = VectorIndexer()
     indexer.client = AsyncMock()
     indexer.embed_texts = AsyncMock(return_value=[[0.1] * indexer.vector_size])
+    indexer._resolve_embedding_runtime = AsyncMock(
+        return_value=ModelRuntimeConfig(
+            provider_id="prov_test",
+            provider_type="cloudflare",
+            model_name="configured-model",
+            api_base_url=None,
+            api_key="test-token",
+            account_id="test-account",
+            timeout_seconds=20,
+        )
+    )
 
     mock_hit = MagicMock()
     mock_hit.id = "p1"
@@ -121,6 +132,7 @@ async def test_search_dense_positive_allowlist():
         "document_id": "d1",
         "content": "Quy chế đào tạo tín chỉ",
         "document_status": "ready",
+        "is_active": True,
         "is_retrievable": True,
         "tenant_id": "tenant_qnu",
         "workspace_id": "ws_default",
@@ -235,7 +247,9 @@ def test_semantic_cache_key_partition():
         workspace_id="ws_main",
         policy_version="v1",
     )
-    assert key_v1.startswith("rag:cache:tenant_qnu:ws_main:col_admissions:default:v1:")
+    assert key_v1.startswith(
+        "rag:cache:tenant_qnu:ws_main:col_admissions:e1:current:default:v1:"
+    )
 
     # Isolation check: different workspace yields different key
     key_other_ws = cache._make_key(
@@ -321,7 +335,24 @@ async def test_document_approval_lifecycle_to_ready():
 
     with patch("app.modules.rag.vector_indexer.vector_indexer.index_chunks", new_callable=AsyncMock) as mock_index:
         mock_index.return_value = 1
-        with patch("app.core.redis.semantic_cache.invalidate_collection", new_callable=AsyncMock):
+        with (
+            patch("app.core.redis.semantic_cache.invalidate_collection", new_callable=AsyncMock),
+            patch(
+                "app.modules.rag.vector_indexer.vector_indexer.verify_revision_parity",
+                new_callable=AsyncMock,
+                return_value=(True, "verified"),
+            ),
+            patch(
+                "app.modules.rag.vector_indexer.vector_indexer.activate_document_revision",
+                new_callable=AsyncMock,
+                return_value=1,
+            ),
+            patch(
+                "app.modules.rag.vector_indexer.vector_indexer.purge_stale_revisions",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+        ):
             res = await service.approve_document(mock_db, doc.id)
 
     # Document must reach 'ready' and 'indexed'

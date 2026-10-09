@@ -1,8 +1,10 @@
 import asyncio
 import sys
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import text
+
 from app.core.crypto import decrypt_secret
+from app.core.database import AsyncSessionFactory
 from app.modules.modelops.providers.gemini_adapter import GeminiAdapter
 from app.modules.modelops.schemas import ChatMessage
 
@@ -21,7 +23,7 @@ async def test_both_keys_adapter():
         
         for idx, k in enumerate(keys):
             decrypted = decrypt_secret(k.get("api_key", ""))
-            print(f"\n==========================================")
+            print("\n==========================================")
             print(f"Testing GeminiAdapter with Key #{idx} [{k.get('name')}]:")
             adapter = GeminiAdapter(
                 model_name="gemini-2.5-flash",
@@ -30,7 +32,7 @@ async def test_both_keys_adapter():
             )
             try:
                 resp = await adapter.generate(messages)
-                print(f"  -> SUCCESS!")
+                print("  -> SUCCESS!")
                 print(f"  -> Model used: {resp.model}")
                 print(f"  -> Latency: {resp.latency_ms} ms")
                 print(f"  -> Content: {resp.content.strip()}")

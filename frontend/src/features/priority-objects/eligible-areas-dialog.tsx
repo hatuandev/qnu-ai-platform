@@ -221,10 +221,15 @@ function EligibleAreasBody({
           </TableHeader>
           <TableBody>
             {areasQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={`skeleton-row-${i}`}>
-                  {Array.from({ length: 5 }).map((_, j) => (
-                    <TableCell key={`skeleton-cell-${i}-${j}`} className="py-3">
+              [
+                "area-sk-row-1",
+                "area-sk-row-2",
+                "area-sk-row-3",
+                "area-sk-row-4",
+              ].map((rowKey) => (
+                <TableRow key={rowKey}>
+                  {["c1", "c2", "c3", "c4", "c5"].map((colKey) => (
+                    <TableCell key={`${rowKey}-${colKey}`} className="py-3">
                       <Skeleton className="h-5 w-full" />
                     </TableCell>
                   ))}

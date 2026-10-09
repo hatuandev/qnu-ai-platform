@@ -770,6 +770,17 @@ async def test_approve_document_sets_index_status_and_records_job(monkeypatch):
     # Mock vector_indexer
     from app.modules.rag.vector_indexer import vector_indexer
     monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
+    monkeypatch.setattr(
+        vector_indexer,
+        "verify_revision_parity",
+        AsyncMock(return_value=(True, "verified")),
+    )
+    monkeypatch.setattr(
+        vector_indexer, "activate_document_revision", AsyncMock(return_value=1)
+    )
+    monkeypatch.setattr(
+        vector_indexer, "purge_stale_revisions", AsyncMock(return_value=0)
+    )
 
     res = await knowledge_service.approve_document(db, "doc_app_01")
     assert res["status"] == "ready"
@@ -878,6 +889,7 @@ async def test_reindex_document_endpoint_recovers_vector(monkeypatch):
         module_code="admissions",
         tenant_id="tenant_qnu",
         workspace_id="workspace_qnu",
+        collection_metadata={"data_processing": {"embedding_model": "bge-m3"}},
     )
     chunk = KnowledgeChunk(
         id="chk_reindex_01",
@@ -905,7 +917,19 @@ async def test_reindex_document_endpoint_recovers_vector(monkeypatch):
     db.execute.return_value = exec_res
 
     from app.modules.rag.vector_indexer import vector_indexer
+    monkeypatch.setattr(vector_indexer, "delete_by_document", AsyncMock(return_value=0))
     monkeypatch.setattr(vector_indexer, "index_chunks", AsyncMock(return_value=1))
+    monkeypatch.setattr(
+        vector_indexer,
+        "verify_revision_parity",
+        AsyncMock(return_value=(True, "verified")),
+    )
+    monkeypatch.setattr(
+        vector_indexer, "activate_document_revision", AsyncMock(return_value=1)
+    )
+    monkeypatch.setattr(
+        vector_indexer, "purge_stale_revisions", AsyncMock(return_value=0)
+    )
 
     res = await knowledge_service.reindex_document(db, "doc_reindex_01")
     assert res["status"] == "ready"
@@ -1236,6 +1260,17 @@ async def test_approve_document_with_pages_increments_revision_and_purges_old_ve
     mock_index = AsyncMock(return_value=1)
     monkeypatch.setattr(vector_indexer, "delete_by_document", mock_delete)
     monkeypatch.setattr(vector_indexer, "index_chunks", mock_index)
+    monkeypatch.setattr(
+        vector_indexer,
+        "verify_revision_parity",
+        AsyncMock(return_value=(True, "verified")),
+    )
+    monkeypatch.setattr(
+        vector_indexer, "activate_document_revision", AsyncMock(return_value=1)
+    )
+    monkeypatch.setattr(
+        vector_indexer, "purge_stale_revisions", AsyncMock(return_value=1)
+    )
 
     pages = [{"page_number": 1, "markdown_content": "# Thong tin tuyen sinh moi"}]
     res = await knowledge_service.approve_document(db, "doc_idempotent_01", pages=pages)

@@ -33,7 +33,7 @@ import {
   useRevokeResidence,
   useTransferResidence,
 } from "@/features/residences/api";
-import type { ResidenceDetail } from "@/features/residences/types";
+import type { ResidenceDetail as ResidenceDetailData } from "@/features/residences/types";
 import { formatDateOnly, formatDateValue } from "@/lib/date-utils";
 import { useRbac } from "@/rbac/context";
 
@@ -217,7 +217,7 @@ function ResidenceActionDialog({
   onClose,
 }: {
   action: ResidenceAction;
-  residence: ResidenceDetail;
+  residence: ResidenceDetailData;
   onClose: () => void;
 }) {
   const checkout = useCheckOut();

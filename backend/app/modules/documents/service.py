@@ -21,7 +21,11 @@ from app.modules.documents.schemas import (
     RepositoryDocumentStatsResponse,
     RepositoryDocumentUpdate,
 )
-from app.modules.knowledge.cleaner import clean_markdown_text, extract_sections_metadata
+from app.modules.knowledge.cleaner import (
+    clean_markdown_text,
+    extract_administrative_metadata,
+    extract_sections_metadata,
+)
 from app.modules.knowledge.models import KnowledgeDocument
 from app.modules.knowledge.parsers import get_document_parser
 
@@ -91,6 +95,8 @@ class DocumentRepositoryService:
             parse_status="pending",
             ocr_engine=ocr_engine,
             is_active=True,
+            status="active",
+            latest_revision_no=1,
             doc_metadata={
                 "original_filename": file_name,
                 "upload_channel": "repository_vault",
@@ -99,7 +105,18 @@ class DocumentRepositoryService:
         db.add(doc)
         await db.flush()
 
-        # 4. Trigger pre-parse pipeline if requested
+        # 4. Create initial revision v1 for unified revision tracking
+        from app.modules.documents.revision_service import document_revision_service
+
+        rev = await document_revision_service.create_initial_revision(
+            db=db,
+            doc=doc,
+            file_bytes=file_bytes,
+        )
+        doc.current_revision_id = rev.id
+        await db.flush()
+
+        # 5. Trigger pre-parse pipeline if requested
         if auto_parse:
             await self.parse_and_cache_document(
                 db=db,
@@ -135,6 +152,19 @@ class DocumentRepositoryService:
             # Clean and normalize Vietnamese Unicode NFC
             clean_md = clean_markdown_text(parsed.raw_text or "")
             sections = extract_sections_metadata(clean_md)
+            admin_meta = extract_administrative_metadata(clean_md)
+
+            # Auto-populate administrative metadata if not manually specified
+            if not doc.issued_date and admin_meta.get("issued_date"):
+                doc.issued_date = admin_meta["issued_date"]  # type: ignore[assignment]
+            if not doc.document_number and admin_meta.get("document_number"):
+                doc.document_number = str(admin_meta["document_number"])
+            if not doc.document_type_code and admin_meta.get("document_type_code"):
+                doc.document_type_code = str(admin_meta["document_type_code"])
+            if (not doc.title or doc.title == doc.file_name.rsplit(".", 1)[0]) and admin_meta.get("title"):
+                doc.title = str(admin_meta["title"])
+            if not doc.issuing_authority and admin_meta.get("issuing_authority"):
+                doc.issuing_authority = str(admin_meta["issuing_authority"])
 
             preview_pages: list[str] = []
             # If PDF, render page images to MinIO for thumbnail & preview
@@ -151,14 +181,54 @@ class DocumentRepositoryService:
                     "table_count": len(parsed.tables),
                     "preview_pages": preview_pages,
                     "sections_count": len(sections),
+                    "auto_detected_metadata": {
+                        k: str(v) for k, v in admin_meta.items()
+                    },
                 }
             )
-            doc.doc_metadata = metadata
-            logger.info("Pre-parsed document %s (%s): %d pages, %d tables.", doc.id, doc.file_name, parsed.page_count, len(parsed.tables))
+            # Sync to DocumentRevision if bound
+            if doc.current_revision_id:
+                from app.modules.documents.models import DocumentRevision
+                from app.modules.documents.quality_gate import evaluate_revision_quality
+
+                rev = await db.get(DocumentRevision, doc.current_revision_id)
+                if rev:
+                    rev.canonical_markdown = clean_md
+                    rev.canonical_hash = hashlib.sha256(clean_md.encode("utf-8")).hexdigest()
+                    rev.page_manifest = [
+                        {"page": i + 1, "chars": len(clean_md) // max(1, parsed.page_count)}
+                        for i in range(parsed.page_count)
+                    ]
+                    rev.quality_report = evaluate_revision_quality(
+                        markdown=clean_md,
+                        page_count=parsed.page_count,
+                        tables_count=len(parsed.tables),
+                        file_size_bytes=doc.file_size_bytes,
+                        ocr_engine=ocr_engine,
+                    )
+                    rev.status = "ready" if rev.quality_report.get("overall_status") == "passed" else "review_required"
+                    rev.finished_at = datetime.now(UTC)
+
+            logger.info(
+                "Pre-parsed document %s (%s): %d pages, %d tables. Auto-detected metadata: %s",
+                doc.id,
+                doc.file_name,
+                parsed.page_count,
+                len(parsed.tables),
+                list(admin_meta.keys()),
+            )
         except Exception as exc:
             logger.exception("Failed to pre-parse document %s (%s)", doc.id, doc.file_name)
             doc.parse_status = "failed"
 
+            if doc.current_revision_id:
+                from app.modules.documents.models import DocumentRevision
+
+                rev = await db.get(DocumentRevision, doc.current_revision_id)
+                if rev:
+                    rev.status = "failed"
+                    rev.failure_code = "PARSE_ERROR"
+                    rev.failure_detail = str(exc)
 
             metadata = dict(doc.doc_metadata or {})
             metadata["parse_error"] = str(exc)
@@ -398,47 +468,21 @@ class DocumentRepositoryService:
         return True
 
     async def get_stats(self, db: AsyncSession) -> RepositoryDocumentStatsResponse:
-        """Return aggregated KPI metrics for the repository dashboard."""
-        total_stmt = select(func.count()).select_from(RepositoryDocument).where(RepositoryDocument.is_active.is_(True))
-        total = (await db.execute(total_stmt)).scalar_one()
+        from sqlalchemy import case
 
-        parsed_stmt = (
-            select(func.count())
-            .select_from(RepositoryDocument)
-            .where(RepositoryDocument.is_active.is_(True), RepositoryDocument.parse_status == "parsed")
-        )
-        parsed = (await db.execute(parsed_stmt)).scalar_one()
-
-        pending_stmt = (
-            select(func.count())
-            .select_from(RepositoryDocument)
-            .where(
-                RepositoryDocument.is_active.is_(True),
-                RepositoryDocument.parse_status.in_(["pending", "parsing"]),
+        stats_stmt = (
+            select(
+                func.count().label("total"),
+                func.count(case((RepositoryDocument.parse_status == "parsed", 1))).label("parsed"),
+                func.count(case((RepositoryDocument.parse_status.in_(["pending", "parsing"]), 1))).label("pending"),
+                func.count(case((RepositoryDocument.parse_status == "failed", 1))).label("failed"),
+                func.coalesce(func.sum(RepositoryDocument.file_size_bytes), 0).label("total_size"),
+                func.count(func.distinct(RepositoryDocument.document_type_code)).label("types_count"),
             )
-        )
-        pending = (await db.execute(pending_stmt)).scalar_one()
-
-        failed_stmt = (
-            select(func.count())
-            .select_from(RepositoryDocument)
-            .where(RepositoryDocument.is_active.is_(True), RepositoryDocument.parse_status == "failed")
-        )
-        failed = (await db.execute(failed_stmt)).scalar_one()
-
-        size_stmt = (
-            select(func.coalesce(func.sum(RepositoryDocument.file_size_bytes), 0))
             .select_from(RepositoryDocument)
             .where(RepositoryDocument.is_active.is_(True))
         )
-        total_size = (await db.execute(size_stmt)).scalar_one()
-
-        types_stmt = (
-            select(func.count(func.distinct(RepositoryDocument.document_type_code)))
-            .select_from(RepositoryDocument)
-            .where(RepositoryDocument.is_active.is_(True))
-        )
-        types_count = (await db.execute(types_stmt)).scalar_one()
+        total, parsed, pending, failed, total_size, types_count = (await db.execute(stats_stmt)).one()
 
         usages_stmt = (
             select(func.count())

@@ -1,7 +1,10 @@
 import asyncio
+
 from sqlalchemy import select
+
 from app.core.database import AsyncSessionFactory
-from app.modules.knowledge.models import KnowledgeDocument, KnowledgeCollection
+from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
+
 
 async def check():
     async with AsyncSessionFactory() as session:

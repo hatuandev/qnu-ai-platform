@@ -335,6 +335,7 @@ class ModelOption(BaseModel):
     model_name: str
     category: str = "cloud"  # "cloud" | "custom"
     description: str | None = None
+    dimension: int | None = None
 
 
 class OCRComboItem(BaseModel):
@@ -364,29 +365,29 @@ class VisionAdapterConfig(BaseModel):
 
 class SystemModelDefaults(BaseModel):
     # Embedding
-    default_embedding_provider_id: str = "prov_rtx5090_ollama"
-    default_embedding_model: str = "bge-m3:latest"
+    default_embedding_provider_id: str | None = None
+    default_embedding_model: str | None = None
     default_embedding_mode: Literal["combo", "single"] = "single"
     default_embedding_combo_id: str | None = None
     embedding_combo_chain: list[OCRComboItem] = Field(default_factory=list)
 
     # Reranker
-    default_reranker_provider_id: str = "prov_cloudflare"
-    default_reranker_model: str = "@cf/baai/bge-reranker-base"
+    default_reranker_provider_id: str | None = None
+    default_reranker_model: str | None = None
     default_reranker_mode: Literal["combo", "single"] = "single"
     default_reranker_combo_id: str | None = None
     reranker_combo_chain: list[OCRComboItem] = Field(default_factory=list)
 
     # Vision & OCR
-    default_ocr_provider_id: str = "prov_gemini"
-    default_ocr_model: str = "gemini-3.1-flash-lite"
+    default_ocr_provider_id: str | None = None
+    default_ocr_model: str | None = None
     default_ocr_mode: Literal["combo", "single"] = "combo"
-    default_ocr_combo_id: str | None = "combo_qnu_ocr_master"
+    default_ocr_combo_id: str | None = None
     ocr_combo_chain: list[OCRComboItem] = Field(default_factory=list)
 
     # Chat & Reasoning
-    default_chat_provider_id: str = "prov_gemini"
-    default_chat_model: str = "gemini-3.1-flash-lite"
+    default_chat_provider_id: str | None = None
+    default_chat_model: str | None = None
     default_chat_mode: Literal["combo", "single"] = "single"
     default_chat_combo_id: str | None = None
     chat_combo_chain: list[OCRComboItem] = Field(default_factory=list)

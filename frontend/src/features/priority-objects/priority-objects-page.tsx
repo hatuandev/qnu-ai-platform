@@ -246,13 +246,11 @@ export function PriorityObjectsPage({
           </div>
         ),
         cell: ({ row }) => (
-          <div
-            className="flex items-center pl-1"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="flex items-center pl-1">
             <Checkbox
               aria-label={`Chọn ${row.original.name}`}
               checked={row.getIsSelected()}
+              onClick={(event) => event.stopPropagation()}
               onCheckedChange={(value) => row.toggleSelected(Boolean(value))}
             />
           </div>
@@ -324,10 +322,7 @@ export function PriorityObjectsPage({
         header: "",
         enableHiding: false,
         cell: ({ row }) => (
-          <div
-            className="flex justify-end"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -534,13 +529,25 @@ export function PriorityObjectsPage({
           </TableHeader>
           <TableBody>
             {query.isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {columns.map((_, j) => (
-                    <TableCell key={j} className="py-3">
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  ))}
+              [
+                "prio-sk-1",
+                "prio-sk-2",
+                "prio-sk-3",
+                "prio-sk-4",
+                "prio-sk-5",
+              ].map((rowKey) => (
+                <TableRow key={rowKey}>
+                  {columns.map((col) => {
+                    const colKey =
+                      col.id ||
+                      (col as { accessorKey?: string }).accessorKey ||
+                      "col";
+                    return (
+                      <TableCell key={`${rowKey}-${colKey}`} className="py-3">
+                        <Skeleton className="h-5 w-full" />
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : items.length === 0 ? (

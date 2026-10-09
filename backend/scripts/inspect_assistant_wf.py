@@ -1,8 +1,10 @@
 import asyncio
 import json
+
 from app.core.database import AsyncSessionFactory
 from app.modules.assistants.service import assistant_service
 from app.modules.workflows.service import workflow_service
+
 
 async def main():
     async with AsyncSessionFactory() as db:

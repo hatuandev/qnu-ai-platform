@@ -1,12 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, Cpu, FileText, Table2 } from "lucide-react";
+import {
+  Activity,
+  Cpu,
+  FileText,
+  Link2,
+  ShieldCheck,
+  Table2,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CollectionHeader } from "@/components/knowledge/collection-header";
-import { CollectionModelsTab } from "@/components/knowledge/tabs/collection-models-tab";
+import { AttachFromRepositoryDialog } from "@/components/knowledge/dialogs/attach-from-repository-dialog";
 import { CollectionExcelImportDialog } from "@/components/knowledge/dialogs/collection-excel-import-dialog";
 import { CollectionReconcileDialog } from "@/components/knowledge/dialogs/collection-reconcile-dialog";
 import { DocumentPreviewDialog } from "@/components/knowledge/dialogs/document-preview-dialog";
@@ -16,9 +23,11 @@ import {
   DocumentStudioWorkspace,
   StudioErrorBoundary,
 } from "@/components/knowledge/ocr";
-import { AttachFromRepositoryDialog } from "@/components/knowledge/dialogs/attach-from-repository-dialog";
+import { CollectionBindingsTab } from "@/components/knowledge/tabs/collection-bindings-tab";
 import { CollectionDocumentsTab } from "@/components/knowledge/tabs/collection-documents-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
+import { CollectionModelsTab } from "@/components/knowledge/tabs/collection-models-tab";
+import { CollectionParityAuditTab } from "@/components/knowledge/tabs/collection-parity-audit-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
 import type { CollectionDetailTab } from "@/components/knowledge/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -60,7 +69,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<CollectionDetailTab>(
-    initialTab || "documents",
+    initialTab || "bindings",
   );
 
   useEffect(() => {
@@ -78,7 +87,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   // Tasks Filters
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
-
 
   // Dialog States
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -101,7 +109,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [reconcileReport, setReconcileReport] =
     useState<KnowledgeReconciliationReport | null>(null);
-  const [isLoadingReconcile, setIsLoadingReconcile] = useState(false);
+  const [isLoadingReconcile] = useState(false);
   const [isFixingReconcile, setIsFixingReconcile] = useState(false);
 
   // Excel Facts Import State
@@ -253,7 +261,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     });
   }, [allTasks, taskSearchQuery, taskStatusFilter]);
 
-
   // Mutations
   const updateCollectionMutation = useMutation({
     mutationFn: () =>
@@ -397,20 +404,8 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   };
 
-  const handleOpenReconcile = async () => {
-    setIsReconcileOpen(true);
-    setIsLoadingReconcile(true);
-    setReconcileReport(null);
-    try {
-      const rep = await knowledgeApi.reconcileCollection(collection.id);
-      setReconcileReport(rep);
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Đối soát dữ liệu thất bại.",
-      );
-    } finally {
-      setIsLoadingReconcile(false);
-    }
+  const handleOpenReconcile = () => {
+    setActiveTab("audit");
   };
 
   const handleFixReconcile = async () => {
@@ -428,7 +423,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       setIsFixingReconcile(false);
     }
   };
-
 
   const handleReindexSingleDoc = async (docId: string) => {
     try {
@@ -521,6 +515,12 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         isReindexing={isReindexing}
         onStartIngest={() => setIsUploadOpen(true)}
         onAttachFromRepo={() => setIsAttachRepoOpen(true)}
+        onAddDocuments={() =>
+          navigate({
+            to: "/knowledge/$collectionId/add-documents",
+            params: { collectionId: collection.id },
+          })
+        }
         actionError={actionError}
         reindexJobId={reindexJobId}
       />
@@ -534,11 +534,19 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         <div className="w-full overflow-x-auto no-scrollbar pb-0.5">
           <TabsList className="h-9 p-1 bg-muted/60 inline-flex w-auto min-w-full sm:min-w-0 justify-start gap-1">
             <TabsTrigger
+              value="bindings"
+              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
+            >
+              <Link2 className="size-3.5" />
+              <span>Liên kết V2 (ADR-011)</span>
+            </TabsTrigger>
+
+            <TabsTrigger
               value="documents"
               className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
             >
               <FileText className="size-3.5" />
-              <span>Tài liệu</span>
+              <span>Tài liệu (Legacy V1)</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -563,6 +571,14 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             >
               <Cpu className="size-3.5" />
               <span>Mô hình & Cấu hình</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="audit"
+              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
+            >
+              <ShieldCheck className="size-3.5" />
+              <span>Đối Soát & Canary V2</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -599,6 +615,11 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onBatchApprove={handleBatchApprove}
             onBatchDelete={handleBatchDelete}
           />
+        </TabsContent>
+
+        {/* Tab 2: Liên Kết V2 & Xuất Bản Chỉ Mục (ADR-011) */}
+        <TabsContent value="bindings" className="mt-0 focus-visible:ring-0">
+          <CollectionBindingsTab collection={collection} />
         </TabsContent>
 
         {/* Tab 2: Facts Số */}
@@ -646,6 +667,22 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             setDataProcessingConfig={setConfigDataProcessing}
             isSaving={updateCollectionMutation.isPending}
             onSave={() => updateCollectionMutation.mutate()}
+          />
+        </TabsContent>
+
+        {/* Tab 6: Đối Soát & Canary V2 (Parity Audit & Shadow Test) */}
+        <TabsContent value="audit" className="mt-0 focus-visible:ring-0">
+          <CollectionParityAuditTab
+            collection={collection}
+            onNavigateToBinding={(bindingId) => {
+              navigate({
+                to: "/knowledge/$collectionId/documents/$bindingId",
+                params: {
+                  collectionId: collection.id,
+                  bindingId,
+                },
+              });
+            }}
           />
         </TabsContent>
       </Tabs>

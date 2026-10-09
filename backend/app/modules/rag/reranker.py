@@ -98,6 +98,59 @@ class RerankerClient:
             resp.raise_for_status()
             raise RuntimeError("Cloudflare reranker returned an empty response.")
 
+    async def _rerank_vllm_or_generic(
+        self,
+        query: str,
+        candidates: list[FusionCandidate],
+        runtime: ModelRuntimeConfig,
+        top_k: int = 5,
+    ) -> list[FusionCandidate]:
+        """Rerank candidates using vLLM / TEI / Cohere compatible /v1/rerank endpoint."""
+        import httpx
+
+        from app.core.config import resolve_ollama_network_url
+
+        raw_base = (runtime.api_base_url or "").strip().rstrip("/")
+        if not raw_base:
+            raise RuntimeError(
+                f"Provider '{runtime.provider_id}' chưa cấu hình api_base_url trong ModelOps."
+            )
+        resolved_base = resolve_ollama_network_url(raw_base).rstrip("/")
+        if resolved_base.endswith("/v1"):
+            url = f"{resolved_base}/rerank"
+        else:
+            url = f"{resolved_base}/v1/rerank"
+
+        model_name = runtime.model_name.strip()
+        headers = {"Content-Type": "application/json"}
+        if runtime.api_key and runtime.api_key not in ("vllm", "ollama", "none"):
+            headers["Authorization"] = f"Bearer {runtime.api_key}"
+
+        payload = {
+            "model": model_name,
+            "query": query,
+            "documents": [c.content for c in candidates],
+            "top_n": min(top_k, len(candidates)),
+        }
+
+        async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds or 10.0), trust_env=False) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            if resp.status_code == 200:
+                raw_json = resp.json()
+                data = await raw_json if asyncio.iscoroutine(raw_json) else raw_json
+                results = data.get("results", [])
+                score_map: dict[int, float] = {}
+                for item in results:
+                    idx = item.get("index")
+                    score = item.get("relevance_score")
+                    if idx is not None and score is not None:
+                        score_map[int(idx)] = float(score)
+
+                scored = _combine_rrf_and_ce_scores(candidates, score_map)
+                return scored[:top_k]
+            resp.raise_for_status()
+            raise RuntimeError(f"vLLM reranker returned HTTP {resp.status_code}: {resp.text}")
+
     async def _resolve_reranker_runtime(
         self,
         *,
@@ -164,6 +217,24 @@ class RerankerClient:
                         ranked = [c for c in ranked if getattr(c, "score", 0.0) >= score_threshold]
                     await self._finish_runtime_key(runtime)
                     provider = "cloudflare"
+                    logger.info(
+                        "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
+                        provider,
+                        (time.perf_counter() - start_time) * 1000,
+                        len(candidates),
+                        len(ranked),
+                    )
+                    return ranked
+                elif (
+                    runtime.provider_type in ("vllm", "tei", "custom", "ollama", "openai")
+                    or getattr(runtime, "api_base_url", None)
+                    or getattr(runtime, "base_url", None)
+                ):
+                    ranked = await self._rerank_vllm_or_generic(query, candidates, runtime, top_k)
+                    if score_threshold > 0.0:
+                        ranked = [c for c in ranked if getattr(c, "score", 0.0) >= score_threshold]
+                    await self._finish_runtime_key(runtime)
+                    provider = runtime.provider_type or "vllm"
                     logger.info(
                         "Rerank provider=%s latency_ms=%.2f in=%d out=%d",
                         provider,

@@ -86,7 +86,7 @@ function classifyStudioRegion(
   // 1. Header (chỉ ở đầu trang <= 16% và BẮT ĐẦU bằng từ khóa hành chính / số hiệu)
   if (top <= 16) {
     if (
-      /^(?:bộ giáo dục|trường đại học|cộng hòa xã hội|độc lập\s*-\s*tự do|số\s*[:\/])/i.test(
+      /^(?:bộ giáo dục|trường đại học|cộng hòa xã hội|độc lập\s*-\s*tự do|số\s*[:/])/i.test(
         clean,
       )
     ) {
@@ -97,7 +97,7 @@ function classifyStudioRegion(
   // 2. Signature (chỉ ở cuối trang >= 65% và BẮT ĐẦU bằng chức danh người ký / nơi nhận)
   if (top + height >= 68 || top >= 65) {
     if (
-      /^(?:hiệu trưởng|kt\.\s*hiệu trưởng|phó hiệu trưởng|trưởng phòng|giám đốc|chủ tịch|tl\.\s*hiệu trưởng|nơi nhận\s*[:\/])/i.test(
+      /^(?:hiệu trưởng|kt\.\s*hiệu trưởng|phó hiệu trưởng|trưởng phòng|giám đốc|chủ tịch|tl\.\s*hiệu trưởng|nơi nhận\s*[:/])/i.test(
         clean,
       )
     ) {
@@ -259,10 +259,7 @@ function mapVerificationDataToStudioDoc(
             );
             const height = Math.max(
               1.5,
-              Math.min(
-                100 - top,
-                rawH > 100 ? (rawH / pageBaseH) * 100 : rawH,
-              ),
+              Math.min(100 - top, rawH > 100 ? (rawH / pageBaseH) * 100 : rawH),
             );
 
             const classified = classifyStudioRegion(
@@ -388,8 +385,9 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [showBoxes, setShowBoxes] = useState<boolean>(true);
   const [regionFilter, setRegionFilter] = useState<OcrRegionFilter>("all");
-  const [selectedRegion, setSelectedRegion] =
-    useState<StudioOCRRegion | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<StudioOCRRegion | null>(
+    null,
+  );
   const [rightTab, setRightTab] = useState<OcrRightTab>("markdown");
   const [markdownViewMode, setMarkdownViewMode] =
     useState<OcrViewMode>("rendered");
@@ -565,9 +563,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
       if (onApproveSuccess) {
         onApproveSuccess();
       } else if (effectiveColId && onNavigate) {
-        onNavigate(
-          `/knowledge/${encodeURIComponent(effectiveColId)}`,
-        );
+        onNavigate(`/knowledge/${encodeURIComponent(effectiveColId)}`);
       } else if (onNavigate) {
         onNavigate("/knowledge");
       }
@@ -605,9 +601,7 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
     if (!targetCollectionId || !doc) return;
     setIsSaving(true);
     try {
-      const fullMarkdown = doc.pages
-        .map((p) => p.markdown)
-        .join("\n\n---\n\n");
+      const fullMarkdown = doc.pages.map((p) => p.markdown).join("\n\n---\n\n");
       const blob = new Blob([fullMarkdown], { type: "text/markdown" });
       const file = new File(
         [blob],
@@ -624,16 +618,14 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
         setSaveSuccess(false);
       }, 1200);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Lưu vào kho thất bại.";
+      const msg = err instanceof Error ? err.message : "Lưu vào kho thất bại.";
       toast.error(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const [layoutMode, setLayoutMode] =
-    useState<OcrViewLayoutMode>("continuous");
+  const [layoutMode, setLayoutMode] = useState<OcrViewLayoutMode>("continuous");
 
   const handleDownloadResults = () => {
     if (!doc) return;
@@ -955,7 +947,8 @@ export const ScanStudioPage: React.FC<ScanStudioPageProps> = ({
               </div>
               <div className="text-muted-foreground">{doc?.filename}</div>
               <div className="text-[11px] text-primary">
-                Sẽ tự động phân tích cú pháp và nạp vào Qdrant + PostgreSQL Facts.
+                Sẽ tự động phân tích cú pháp và nạp vào Qdrant + PostgreSQL
+                Facts.
               </div>
             </div>
             {saveSuccess && (

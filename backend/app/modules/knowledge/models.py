@@ -46,6 +46,7 @@ class KnowledgeCollection(Base):
         String(64), nullable=False, default="workspace_qnu", index=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    index_epoch: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     collection_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -62,6 +63,26 @@ class KnowledgeCollection(Base):
     facts: Mapped[list[KnowledgeFact]] = relationship(
         "KnowledgeFact", back_populates="collection", cascade="all, delete-orphan"
     )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"col_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "index_epoch", None) is None:
+            self.index_epoch = 1
+        if getattr(self, "is_active", None) is None:
+            self.is_active = True
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "collection_metadata", None) is None:
+            self.collection_metadata = {}
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
 
 
 class KnowledgeDocument(Base):
@@ -135,8 +156,28 @@ class KnowledgeDocument(Base):
         metadata = self.doc_metadata or {}
         return metadata.get("ocr_method")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"doc_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "version", None) is None:
+            self.version = 1
+        if getattr(self, "status", None) is None:
+            self.status = "pending"
+        if getattr(self, "index_status", None) is None:
+            self.index_status = "pending"
+        if getattr(self, "is_active", None) is None:
+            self.is_active = True
+        if getattr(self, "doc_metadata", None) is None:
+            self.doc_metadata = {}
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
 
 class KnowledgeChunk(Base):
+
     """Individual chunk extracted from document, stored for retrieval and citation."""
 
     __tablename__ = "knowledge_chunks"
@@ -151,6 +192,10 @@ class KnowledgeChunk(Base):
         index=True,
     )
     collection_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    # Optional scoping fields for Knowledge Publishing V2
+    binding_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -170,7 +215,19 @@ class KnowledgeChunk(Base):
     # Relationships
     document: Mapped[KnowledgeDocument] = relationship("KnowledgeDocument", back_populates="chunks")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"chk_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "token_count", None) is None:
+            self.token_count = 0
+        if getattr(self, "chunk_metadata", None) is None:
+            self.chunk_metadata = {}
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+
     __table_args__ = (Index("ix_chunks_col_doc", "collection_id", "document_id"),)
+
 
 
 class KnowledgeFact(Base):
@@ -193,6 +250,10 @@ class KnowledgeFact(Base):
         nullable=False,
         index=True,
     )
+
+    # Optional scoping fields for Knowledge Publishing V2
+    binding_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     entity_name: Mapped[str] = mapped_column(
         String(512), nullable=False, index=True
@@ -218,3 +279,237 @@ class KnowledgeFact(Base):
     document: Mapped[KnowledgeDocument] = relationship(
         "KnowledgeDocument", back_populates="facts"
     )
+
+
+# =========================================================================
+# V2 Knowledge Publishing & Safe Index Build Models (ADR-011)
+# =========================================================================
+
+
+class KnowledgeVectorGeneration(Base):
+    """Vector space configuration isolated per embedding model and dimension."""
+
+    __tablename__ = "knowledge_vector_generations"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"vg_{uuid.uuid4().hex[:12]}"
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    embedding_model: Mapped[str] = mapped_column(String(128), nullable=False)
+    provider_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    qdrant_collection_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_schema_version: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    embedding_dimension: Mapped[int] = mapped_column(Integer, nullable=False)
+    distance_metric: Mapped[str] = mapped_column(String(32), default="cosine", nullable=False)
+    generation_epoch: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)  # active, deprecated, draining
+    tenant_id: Mapped[str] = mapped_column(String(64), default="tenant_qnu", nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), default="workspace_qnu", nullable=False, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"vg_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "generation_epoch", None) is None:
+            self.generation_epoch = 1
+        if getattr(self, "payload_schema_version", None) is None:
+            self.payload_schema_version = 2
+        if getattr(self, "status", None) is None:
+            self.status = "active"
+        if getattr(self, "distance_metric", None) is None:
+            self.distance_metric = "cosine"
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+
+
+class KnowledgeBinding(Base):
+    """Binding associating a RepositoryDocument and target revision to a KnowledgeCollection."""
+
+    __tablename__ = "knowledge_bindings"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"bnd_{uuid.uuid4().hex[:12]}"
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    repository_document_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("repository_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_revision_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("document_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    active_index_revision_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_index_revisions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    active_epoch: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    chunk_strategy: Mapped[str] = mapped_column(String(64), default="ClauseBasedChunker", nullable=False)
+    sync_policy: Mapped[str] = mapped_column(String(32), default="manual", nullable=False)  # manual, auto_on_ready
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False, index=True)  # active, archived, detached
+    tenant_id: Mapped[str] = mapped_column(String(64), default="tenant_qnu", nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), default="workspace_qnu", nullable=False, index=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    collection: Mapped[KnowledgeCollection] = relationship("KnowledgeCollection")
+    active_index_revision: Mapped[KnowledgeIndexRevision | None] = relationship(
+        "KnowledgeIndexRevision",
+        foreign_keys=[active_index_revision_id],
+        post_update=True,
+    )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"bnd_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "active_epoch", None) is None:
+            self.active_epoch = 0
+        if getattr(self, "chunk_strategy", None) is None:
+            self.chunk_strategy = "ClauseBasedChunker"
+        if getattr(self, "sync_policy", None) is None:
+            self.sync_policy = "manual"
+        if getattr(self, "status", None) is None:
+            self.status = "active"
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+
+    __table_args__ = (
+        Index("ix_knowledge_bindings_col_doc", "collection_id", "repository_document_id", unique=True),
+        Index("ix_knowledge_bindings_tenant_ws", "tenant_id", "workspace_id"),
+    )
+
+
+class KnowledgeIndexRevision(Base):
+    """Immutable indexing artifact built in staging before atomic promotion."""
+
+    __tablename__ = "knowledge_index_revisions"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"idx_rev_{uuid.uuid4().hex[:12]}"
+    )
+    binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_bindings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    source_revision_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("document_revisions.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    vector_generation_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_vector_generations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    fact_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    point_ids: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    parity_report: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="building", nullable=False, index=True)  # building, validating, ready, active, archived, failed
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    binding: Mapped[KnowledgeBinding] = relationship("KnowledgeBinding", foreign_keys=[binding_id])
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"idx_rev_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "chunk_count", None) is None:
+            self.chunk_count = 0
+        if getattr(self, "fact_count", None) is None:
+            self.fact_count = 0
+        if getattr(self, "point_ids", None) is None:
+            self.point_ids = []
+        if getattr(self, "parity_report", None) is None:
+            self.parity_report = {}
+        if getattr(self, "status", None) is None:
+            self.status = "building"
+        if getattr(self, "lock_version", None) is None:
+            self.lock_version = 1
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+
+    __table_args__ = (
+        Index("ix_idx_rev_binding_rev_no", "binding_id", "revision_no", unique=True),
+        Index("ix_idx_rev_status", "status"),
+    )
+
+
+class KnowledgeIndexActivation(Base):
+    """Historical audit log of atomic pointer swaps (promotions, rollbacks, rebuilds)."""
+
+    __tablename__ = "knowledge_index_activations"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"act_{uuid.uuid4().hex[:12]}"
+    )
+    binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_bindings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    from_index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    to_index_revision_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(32), default="promote", nullable=False)  # promote, rollback, rebuild
+    epoch: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    activated_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"act_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "action", None) is None:
+            self.action = "promote"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()

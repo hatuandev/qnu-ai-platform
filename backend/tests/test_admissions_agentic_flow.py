@@ -1,5 +1,7 @@
 """End-to-End Integration test for Admissions Consulting Agent & File Export."""
 
+import os
+
 import pytest
 
 from app.core.database import AsyncSessionFactory, engine
@@ -8,6 +10,10 @@ from app.modules.assistants.services.assistant_chat_service import assistant_cha
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.getenv("QNU_RUN_LIVE_INTEGRATION") != "1",
+    reason="Yêu cầu PostgreSQL, ModelOps provider và dữ liệu tuyển sinh V2 đang hoạt động.",
+)
 async def test_admissions_consulting_chat_flow_returns_artifacts():
     """Verify that chatting with ast_admissions with an export intent produces downloadable artifacts."""
     await engine.dispose()
@@ -22,10 +28,9 @@ async def test_admissions_consulting_chat_flow_returns_artifacts():
         assert len(response.answer) > 50
 
         # Verify artifacts were generated and attached
-        assert len(response.artifacts) >= 2
+        assert len(response.artifacts) == 1
         types = [a["type"] for a in response.artifacts]
         assert "xlsx" in types
-        assert "docx" in types
 
         for art in response.artifacts:
             assert art["url"].startswith("/platform/v1alpha1/tools/artifacts/")

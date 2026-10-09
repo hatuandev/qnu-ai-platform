@@ -4,6 +4,7 @@ import asyncio
 import os
 import sys
 import time
+from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -93,8 +94,7 @@ async def step_ingest_documents():
             print(f"[!] File không tồn tại: {file_path}")
             continue
 
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
+        file_bytes = await asyncio.to_thread(Path(file_path).read_bytes)
 
         print(f"\n[+] Đang xử lý tệp: {file_info['file_name']} ({len(file_bytes)} bytes)...")
         async with AsyncSessionFactory() as session:
@@ -123,12 +123,12 @@ async def step_test_dag_queries():
     results = []
 
     for idx, tc in enumerate(TEST_QUERIES, 1):
-        print(f"\n----------------------------------------------------------------------")
+        print("\n----------------------------------------------------------------------")
         print(f"[{tc['id']}] {tc['category']}")
         print(f"Câu hỏi: \"{tc['question']}\"")
         print(f"Dự kiến luồng DAG: {tc['expected_branch']}")
         print(f"Tiêu chí chuẩn: {tc['ground_truth_criteria']}")
-        print(f"----------------------------------------------------------------------")
+        print("----------------------------------------------------------------------")
 
         t0 = time.perf_counter()
         async with AsyncSessionFactory() as session:

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, String, Text
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,11 +32,20 @@ class JobRecord(Base):
     collection_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     document_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     arq_job_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    phase: Mapped[str] = mapped_column(String(64), nullable=False, default="queued")
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    dispatch_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", index=True)
     progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     tenant_id: Mapped[str] = mapped_column(String(64), nullable=False, default="tenant_qnu")
+    workspace_id: Mapped[str] = mapped_column(String(64), nullable=False, default="workspace_qnu")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -56,6 +65,14 @@ class JobRecord(Base):
             self.result = {}
         if self.progress is None:
             self.progress = 0.0
+        if self.phase is None:
+            self.phase = "queued"
+        if self.attempt is None:
+            self.attempt = 0
+        if self.cancel_requested is None:
+            self.cancel_requested = False
+        if self.dispatch_status is None:
+            self.dispatch_status = "pending"
         now = utcnow()
         if self.created_at is None:
             self.created_at = now

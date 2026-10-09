@@ -63,6 +63,14 @@ class RagService:
     async def search(self, db: AsyncSession, req: SearchRequest) -> SearchResponse:
         start_time = time.perf_counter()
 
+        snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+            db,
+            req.collection_id,
+            pinned_snapshot=req.retrieval_snapshot or getattr(req, "snapshot", None),
+            tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
+        )
+
         candidates = await hybrid_retriever.retrieve(
             db=db,
             collection_id=req.collection_id,
@@ -71,6 +79,7 @@ class RagService:
             rerank_top_k=req.rerank_top_k,
             tenant_id=req.tenant_id,
             workspace_id=req.workspace_id,
+            snapshot=snapshot,
         )
 
         items = [
@@ -83,6 +92,9 @@ class RagService:
                 section=c.section,
                 page_number=c.page_number,
                 metadata=c.metadata or {},
+                binding_id=c.binding_id,
+                index_revision_id=c.index_revision_id,
+                document_revision=c.document_revision,
             )
             for idx, c in enumerate(candidates, start=1)
         ]
@@ -93,6 +105,8 @@ class RagService:
             collection_id=req.collection_id,
             total_found=len(items),
             items=items,
+            retrieval_snapshot=snapshot,
+            snapshot=snapshot,
             execution_time_ms=exec_ms,
         )
 
@@ -109,6 +123,15 @@ class RagService:
                 citations=[],
                 latency_ms=round((time.perf_counter() - start_time) * 1000, 2),
             )
+
+        snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+            db,
+            req.collection_id,
+            pinned_snapshot=req.retrieval_snapshot or getattr(req, "snapshot", None),
+            tenant_id=req.tenant_id,
+            workspace_id=req.workspace_id,
+        )
+        snapshot_fingerprint = snapshot.cache_fingerprint()
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
         history_list = req.history if isinstance(req.history, list) else []
@@ -129,6 +152,8 @@ class RagService:
                 tenant_id=req.tenant_id,
                 workspace_id=req.workspace_id,
                 history_hash=history_hash,
+                collection_epoch=snapshot.collection_epoch,
+                snapshot_fingerprint=snapshot_fingerprint,
             )
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
@@ -151,6 +176,7 @@ class RagService:
             workspace_id=req.workspace_id,
             subject_names=analysis.subject_names if analysis.subject_names else None,
             target_entities=analysis.target_entities if analysis.target_entities else None,
+            active_index_revision_ids=set(snapshot.binding_revisions.values()),
         )
         fact_markdown = fact_layer.format_facts_as_markdown(facts)
 
@@ -206,6 +232,7 @@ class RagService:
             sparse_weight=sparse_weight,
             sparse_variants=sparse_variants,
             reranker_policy=req.reranker_policy,
+            snapshot=snapshot,
         )
 
         # 5. No-Answer Policy if context is empty
@@ -216,6 +243,8 @@ class RagService:
                 answer=no_answer_text,
                 answer_format="paragraph",
                 citations=[],
+                retrieval_snapshot=snapshot,
+                snapshot=snapshot,
                 latency_ms=round((time.perf_counter() - start_time) * 1000, 2),
             )
 
@@ -226,6 +255,7 @@ class RagService:
             req.collection_id,
             window=1,
             max_expansions=2,
+            snapshot=snapshot,
         )
 
         # 6. Format Planning
@@ -339,6 +369,8 @@ class RagService:
             citations=final_citations,
             facts_used=facts_used_payload,
             suggested_questions=suggested_questions,
+            retrieval_snapshot=snapshot,
+            snapshot=snapshot,
             latency_ms=exec_ms,
             contexts=[c.content for c in candidates],
         )
@@ -353,6 +385,8 @@ class RagService:
                 tenant_id=req.tenant_id,
                 workspace_id=req.workspace_id,
                 history_hash=history_hash,
+                collection_epoch=snapshot.collection_epoch,
+                snapshot_fingerprint=snapshot_fingerprint,
             )
 
         return resp

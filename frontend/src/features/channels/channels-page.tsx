@@ -18,7 +18,13 @@ import * as React from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,9 +46,9 @@ export function ChannelsPage() {
   const [welcomeMessage, setWelcomeMessage] = React.useState(
     "Xin chào! Mình là Trợ lý ảo Trường Đại học Quy Nhơn. Mình có thể giúp gì cho bạn hôm nay?",
   );
-  const [position, setPosition] = React.useState<"bottom-right" | "bottom-left">(
-    "bottom-right",
-  );
+  const [position, setPosition] = React.useState<
+    "bottom-right" | "bottom-left"
+  >("bottom-right");
 
   // Preview interactive state
   const [previewOpen, setPreviewOpen] = React.useState(true);
@@ -94,7 +100,9 @@ export function ChannelsPage() {
       toast.success("Đã sao chép mã nhúng Widget vào clipboard!");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Không thể sao chép tự động. Vui lòng chọn và sao chép thủ công.");
+      toast.error(
+        "Không thể sao chép tự động. Vui lòng chọn và sao chép thủ công.",
+      );
     }
   };
 
@@ -125,12 +133,16 @@ export function ChannelsPage() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
               Kênh Phân Phối & Web Chat Widget
             </h1>
-            <Badge variant="outline" className="font-mono text-[11px] uppercase tracking-wider text-primary border-primary/30">
+            <Badge
+              variant="outline"
+              className="font-mono text-[11px] uppercase tracking-wider text-primary border-primary/30"
+            >
               CDN Embed
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Cấu hình tùy biến và nhúng Trợ lý AI trực tiếp vào Cổng thông tin trường (`qnu.edu.vn`, `tuyensinh.qnu.edu.vn`) qua 1 dòng script.
+            Cấu hình tùy biến và nhúng Trợ lý AI trực tiếp vào Cổng thông tin
+            trường (`qnu.edu.vn`, `tuyensinh.qnu.edu.vn`) qua 1 dòng script.
           </p>
         </div>
 
@@ -161,7 +173,8 @@ export function ChannelsPage() {
                     Tùy Biến Cấu Hình Widget
                   </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground">
-                    Điều chỉnh giao diện và hành vi bong bóng chat trên trang web đích.
+                    Điều chỉnh giao diện và hành vi bong bóng chat trên trang
+                    web đích.
                   </CardDescription>
                 </div>
               </div>
@@ -170,7 +183,10 @@ export function ChannelsPage() {
             <CardContent className="p-5 space-y-4 text-xs">
               {/* Select Assistant */}
               <div className="space-y-1.5">
-                <Label htmlFor="assistant-select" className="text-xs font-semibold text-foreground">
+                <Label
+                  htmlFor="assistant-select"
+                  className="text-xs font-semibold text-foreground"
+                >
                   Trợ lý AI mặc định
                 </Label>
                 <Select
@@ -195,7 +211,10 @@ export function ChannelsPage() {
 
               {/* Title Input */}
               <div className="space-y-1.5">
-                <Label htmlFor="widget-title" className="text-xs font-semibold text-foreground">
+                <Label
+                  htmlFor="widget-title"
+                  className="text-xs font-semibold text-foreground"
+                >
                   Tiêu đề thanh tiêu đề Widget
                 </Label>
                 <Input
@@ -209,7 +228,10 @@ export function ChannelsPage() {
 
               {/* Welcome Message */}
               <div className="space-y-1.5">
-                <Label htmlFor="welcome-msg" className="text-xs font-semibold text-foreground">
+                <Label
+                  htmlFor="welcome-msg"
+                  className="text-xs font-semibold text-foreground"
+                >
                   Lời chào ban đầu (Welcome Message)
                 </Label>
                 <Textarea
@@ -238,7 +260,9 @@ export function ChannelsPage() {
                     }`}
                   >
                     <span>Góc Dưới Phải (Khuyến nghị)</span>
-                    {position === "bottom-right" && <Check className="size-4" />}
+                    {position === "bottom-right" && (
+                      <Check className="size-4" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -270,7 +294,8 @@ export function ChannelsPage() {
                       Mã Nhúng HTML Script
                     </CardTitle>
                     <CardDescription className="text-xs text-muted-foreground">
-                      Dán đoạn mã này trước thẻ &lt;/body&gt; trên trang web của trường.
+                      Dán đoạn mã này trước thẻ &lt;/body&gt; trên trang web của
+                      trường.
                     </CardDescription>
                   </div>
                 </div>
@@ -301,9 +326,18 @@ export function ChannelsPage() {
                   <span>Ưu điểm của Web Chat Widget QNU:</span>
                 </div>
                 <ul className="list-disc list-inside space-y-0.5 text-muted-foreground text-[11px]">
-                  <li>Dung lượng siêu nhẹ (&lt; 15KB), không tải thêm thư viện cồng kềnh.</li>
-                  <li>Hỗ trợ phản hồi Streaming thời gian thực (SSE) mượt mà từng từ.</li>
-                  <li>Giao diện tự động tối ưu hiển thị dạng ngăn kéo (Drawer) trên điện thoại.</li>
+                  <li>
+                    Dung lượng siêu nhẹ (&lt; 15KB), không tải thêm thư viện
+                    cồng kềnh.
+                  </li>
+                  <li>
+                    Hỗ trợ phản hồi Streaming thời gian thực (SSE) mượt mà từng
+                    từ.
+                  </li>
+                  <li>
+                    Giao diện tự động tối ưu hiển thị dạng ngăn kéo (Drawer)
+                    trên điện thoại.
+                  </li>
                 </ul>
               </div>
             </CardContent>
@@ -321,7 +355,8 @@ export function ChannelsPage() {
                     Bảo Vệ Tên Miền (Domain Whitelist CORS)
                   </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground">
-                    Ngăn chặn website lạ bên ngoài tự ý lấy mã nhúng gây tiêu hao ngân sách Token.
+                    Ngăn chặn website lạ bên ngoài tự ý lấy mã nhúng gây tiêu
+                    hao ngân sách Token.
                   </CardDescription>
                 </div>
               </div>
@@ -329,7 +364,10 @@ export function ChannelsPage() {
 
             <CardContent className="p-5 space-y-3 text-xs">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="font-mono text-[11px] gap-1">
+                <Badge
+                  variant="outline"
+                  className="font-mono text-[11px] gap-1"
+                >
                   <Globe className="size-3 text-emerald-500" />
                   <span>*.qnu.edu.vn</span>
                 </Badge>
@@ -339,12 +377,17 @@ export function ChannelsPage() {
                 <Badge variant="outline" className="font-mono text-[11px]">
                   daotao.qnu.edu.vn
                 </Badge>
-                <Badge variant="secondary" className="font-mono text-[11px] text-muted-foreground">
+                <Badge
+                  variant="secondary"
+                  className="font-mono text-[11px] text-muted-foreground"
+                >
                   localhost:* (Dev)
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Tất cả request gọi API chat từ widget đều được kiểm tra header Origin/Referer. Các request không khớp danh sách Whitelist sẽ bị chặn với mã HTTP 403 Forbidden.
+                Tất cả request gọi API chat từ widget đều được kiểm tra header
+                Origin/Referer. Các request không khớp danh sách Whitelist sẽ bị
+                chặn với mã HTTP 403 Forbidden.
               </p>
             </CardContent>
           </Card>
@@ -409,7 +452,8 @@ export function ChannelsPage() {
                   Khởi Đầu Tương Lai Tại Đại Học Quy Nhơn
                 </h3>
                 <p className="text-xs text-teal-100/90 leading-relaxed">
-                  50+ ngành đào tạo đạt chuẩn kiểm định chất lượng giáo dục quốc gia và quốc tế.
+                  50+ ngành đào tạo đạt chuẩn kiểm định chất lượng giáo dục quốc
+                  gia và quốc tế.
                 </p>
               </div>
 

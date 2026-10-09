@@ -66,6 +66,9 @@ export async function exportToExcel<T>({
   XLSX.writeFile(workbook, cleanFilename);
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: Heterogeneous sheet data in multi-sheet workbooks
+export type AnyExcelSheet = ExcelSheet<any>;
+
 /**
  * Exports multiple datasets into separate sheets in a single Excel (.xlsx) workbook.
  */
@@ -74,7 +77,7 @@ export async function exportMultiSheetToExcel({
   sheets,
 }: {
   filename: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: Multi-sheet export allows heterogeneous row models per sheet
   sheets: ExcelSheet<any>[];
 }) {
   const XLSX = await import("xlsx");

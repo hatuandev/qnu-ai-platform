@@ -125,6 +125,11 @@ class CitationGuard:
                 source_pages = [c.page_number]
             entity_key = meta.get("entity_key")
 
+            binding_id = c.binding_id or meta.get("binding_id")
+            index_revision_id = c.index_revision_id or meta.get("index_revision_id")
+            source_revision_id = meta.get("source_revision_id")
+            revision_no = c.document_revision or meta.get("document_revision") or meta.get("revision_no")
+
             citations.append(
                 Citation(
                     source_id=c.document_id,
@@ -134,6 +139,10 @@ class CitationGuard:
                     quote=quote,
                     source_pages=source_pages,
                     entity_key=entity_key,
+                    binding_id=str(binding_id) if binding_id else None,
+                    index_revision_id=str(index_revision_id) if index_revision_id else None,
+                    source_revision_id=str(source_revision_id) if source_revision_id else None,
+                    revision_no=int(revision_no) if revision_no is not None else None,
                 )
             )
 

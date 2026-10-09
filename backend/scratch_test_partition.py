@@ -1,4 +1,3 @@
-import json
 from app.modules.ocr.adapters.gemini_adapter import GeminiOCRAdapter
 
 text = """BỘ GIÁO DỤC VÀ ĐÀO TẠO
@@ -43,7 +42,8 @@ Thời gian khai giảng và học môn đầu tiên: dự kiến ngày 18/10/20
 
 blks = GeminiOCRAdapter._semantic_markdown_partition(text, 1)
 import sys
+
 sys.stdout.reconfigure(encoding='utf-8')
 print(f"Total blocks: {len(blks)}")
 for i, b in enumerate(blks):
-    print(f"Block {i}: type={b['type']}, coords={b['coordinates']}, text={repr(b['content_snippet'][:45])}")
+    print(f"Block {i}: type={b['type']}, coords={b['coordinates']}, text={b['content_snippet'][:45]!r}")

@@ -215,10 +215,11 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
 
         {hasTestMsg && (
           <div
-            className={`p-2.5 sm:p-3 rounded-md text-xs flex items-center gap-2 ${testResult.success
+            className={`p-2.5 sm:p-3 rounded-md text-xs flex items-center gap-2 ${
+              testResult.success
                 ? "bg-success/10 text-success border border-success/30"
                 : "bg-destructive/10 text-destructive border border-destructive/30"
-              }`}
+            }`}
           >
             {testResult.success ? (
               <CheckCircle2 className="h-4 w-4 shrink-0" />

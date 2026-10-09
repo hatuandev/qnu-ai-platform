@@ -184,7 +184,10 @@ export const RegionsInspector: React.FC<RegionsInspectorProps> = ({
 
       <div className="p-2.5 bg-muted/30 border-t border-border text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
         <Info className="size-3.5 text-primary shrink-0" />
-        <span>Click vào từng khối vùng để highlight đối soát trực tiếp trên trang scan gốc.</span>
+        <span>
+          Click vào từng khối vùng để highlight đối soát trực tiếp trên trang
+          scan gốc.
+        </span>
       </div>
     </div>
   );

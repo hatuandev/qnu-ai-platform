@@ -61,13 +61,15 @@ class SemanticCache:
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
         history_hash: str | None = None,
+        collection_epoch: int = 1,
+        snapshot_fingerprint: str = "current",
     ) -> str:
         h = hashlib.sha256(query.strip().lower().encode("utf-8")).hexdigest()
         model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
         hist_part = history_hash or "nohist"
         return (
             f"rag:cache:{tenant_id}:{workspace_id}:{collection_id}:"
-            f"{model_part}:{policy_version}:{h}:{hist_part}"
+            f"e{collection_epoch}:{snapshot_fingerprint}:{model_part}:{policy_version}:{h}:{hist_part}"
         )
 
     @staticmethod
@@ -96,6 +98,8 @@ class SemanticCache:
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
         history_hash: str | None = None,
+        collection_epoch: int = 1,
+        snapshot_fingerprint: str = "current",
     ) -> dict[str, Any] | None:
         try:
             key = self._make_key(
@@ -106,6 +110,8 @@ class SemanticCache:
                 workspace_id,
                 policy_version,
                 history_hash,
+                collection_epoch,
+                snapshot_fingerprint,
             )
             val = await self.client.get(key)
             if val:
@@ -124,6 +130,8 @@ class SemanticCache:
         workspace_id: str = "workspace_qnu",
         policy_version: str = "v1",
         history_hash: str | None = None,
+        collection_epoch: int = 1,
+        snapshot_fingerprint: str = "current",
     ) -> None:
         try:
             key = self._make_key(
@@ -134,6 +142,8 @@ class SemanticCache:
                 workspace_id,
                 policy_version,
                 history_hash,
+                collection_epoch,
+                snapshot_fingerprint,
             )
             await self.client.setex(key, self.ttl, json.dumps(data, ensure_ascii=False))
         except Exception as exc:
@@ -144,8 +154,10 @@ class SemanticCache:
         try:
             pattern_v1 = f"rag:cache:*:*:{collection_id}:*"
             pattern_legacy = f"rag:cache:*:{collection_id}:*"
-            keys_v1 = await self.client.keys(pattern_v1)
-            keys_legacy = await self.client.keys(pattern_legacy)
+            keys_v1 = [key async for key in self.client.scan_iter(match=pattern_v1, count=200)]
+            keys_legacy = [
+                key async for key in self.client.scan_iter(match=pattern_legacy, count=200)
+            ]
             all_keys = list(set(keys_v1 + keys_legacy))
             if all_keys:
                 await self.client.delete(*all_keys)
@@ -156,7 +168,7 @@ class SemanticCache:
     async def clear(self) -> None:
         """Clear all RAG semantic cache entries."""
         try:
-            keys = await self.client.keys("rag:cache:*")
+            keys = [key async for key in self.client.scan_iter(match="rag:cache:*", count=200)]
             if keys:
                 await self.client.delete(*keys)
                 logger.info("Cleared %d RAG cache keys", len(keys))

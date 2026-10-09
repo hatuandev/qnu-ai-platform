@@ -266,10 +266,7 @@ export function BuildingsTable({
         header: "",
         enableHiding: false,
         cell: ({ row }) => (
-          <div
-            className="flex justify-end"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

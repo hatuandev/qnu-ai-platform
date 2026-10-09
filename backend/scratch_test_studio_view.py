@@ -1,6 +1,6 @@
 import asyncio
-import json
 import sys
+
 from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.services.ingestion_service import ingestion_service
 
@@ -16,11 +16,11 @@ async def main():
             boxes = p.get("bounding_boxes", [])
             print(f"bounding_boxes: {len(boxes)}")
             for b in boxes:
-                print(f"  Box: {b['type']}, label={b['label']}, coords={b['coordinates']}, snippet={repr(b['content_snippet'][:40])}")
+                print(f"  Box: {b['type']}, label={b['label']}, coords={b['coordinates']}, snippet={b['content_snippet'][:40]!r}")
             regs = p.get("regions", [])
             print(f"regions: {len(regs)}")
             for r in regs:
-                print(f"  Region: {r['type']}, title={r['title']}, details={repr(r.get('details', '')[:40])}")
+                print(f"  Region: {r['type']}, title={r['title']}, details={r.get('details', '')[:40]!r}")
 
 if __name__ == "__main__":
     asyncio.run(main())

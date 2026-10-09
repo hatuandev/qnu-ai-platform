@@ -1,17 +1,39 @@
 import type {
   ApproveDocumentResult,
+  AvailableRepositoryDocumentsResponse,
+  BackfillReport,
+  BackfillRequest,
+  BindingChunksResponse,
+  BuildStagingIndexRequest,
+  CanaryPolicyResponse,
   CollectionDataProcessingConfig,
+  CreateKnowledgeBindingsRequest,
+  CreateKnowledgeBindingsResponse,
   FactExcelImportResponse,
   FactListResponse,
+  GarbageCollectionReport,
+  GarbageCollectionRequest,
+  IndexActivationRequest,
+  IndexActivationResponse,
+  KnowledgeBinding,
   KnowledgeCollection,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
+  KnowledgeIndexRevision,
   KnowledgeReconciliationReport,
+  LegacyAuditReport,
   ParsePreviewResult,
   ReconcileFixResponse,
   ReindexDocumentResponse,
+  RollbackIndexRevisionRequest,
+  ShadowRetrievalReport,
+  ShadowRetrievalRequest,
+  SystemDecommissioningAuditReport,
+  SystemGarbageCollectionReport,
+  SystemGarbageCollectionRequest,
+  UpdateCanaryPolicyRequest,
 } from "@/types/knowledge";
-import { BASE_URL } from "./http-client";
+import { BASE_URL, getAuthHeaders } from "./http-client";
 
 export const knowledgeApi = {
   async getCollections(): Promise<KnowledgeCollection[]> {
@@ -47,9 +69,17 @@ export const knowledgeApi = {
           (code.includes("regulation") || code.includes("library")
             ? "PyMuPDF"
             : "Mistral"),
-        data_processing: ((d.collection_metadata as Record<string, unknown>)?.data_processing || (d.metadata as Record<string, unknown>)?.data_processing || d.data_processing) as KnowledgeCollection["data_processing"],
+        data_processing: ((d.collection_metadata as Record<string, unknown>)
+          ?.data_processing ||
+          (d.metadata as Record<string, unknown>)?.data_processing ||
+          d.data_processing) as KnowledgeCollection["data_processing"],
         embedding_model:
-          (((d.collection_metadata as Record<string, unknown>)?.data_processing || (d.metadata as Record<string, unknown>)?.data_processing || d.data_processing) as Record<string, unknown>)?.embedding_model as string ||
+          ((
+            ((d.collection_metadata as Record<string, unknown>)
+              ?.data_processing ||
+              (d.metadata as Record<string, unknown>)?.data_processing ||
+              d.data_processing) as Record<string, unknown>
+          )?.embedding_model as string) ||
           (d.embedding_model as string) ||
           "bge-m3:latest",
         updated_at:
@@ -67,11 +97,16 @@ export const knowledgeApi = {
     if (res.ok) {
       const item = await res.json();
       const meta = item.metadata || item.collection_metadata || {};
-      const dp = (meta.data_processing || item.data_processing) as Record<string, unknown> | undefined;
+      const dp = (meta.data_processing || item.data_processing) as
+        | Record<string, unknown>
+        | undefined;
       return {
         ...item,
         data_processing: dp as KnowledgeCollection["data_processing"],
-        embedding_model: (dp?.embedding_model as string) || item.embedding_model || "bge-m3:latest",
+        embedding_model:
+          (dp?.embedding_model as string) ||
+          item.embedding_model ||
+          "bge-m3:latest",
       };
     }
     const all = await this.getCollections();
@@ -596,5 +631,418 @@ export const knowledgeApi = {
 
   getDocumentDownloadUrl(documentId: string): string {
     return `${BASE_URL}/knowledge/documents/${documentId}/download`;
+  },
+
+  // ==============================================================================
+  // Knowledge Publishing V2 Methods (ADR-011)
+  // ==============================================================================
+
+  /**
+   * Lấy danh sách tài liệu từ kho trung tâm có thể liên kết vào bộ sưu tập
+   */
+  async getAvailableDocuments(
+    collectionId: string,
+    search?: string,
+    page = 1,
+    pageSize = 20,
+  ): Promise<AvailableRepositoryDocumentsResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (search) params.set("search", search);
+
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/available-documents?${params.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Không thể lấy danh sách tài liệu kho sẵn sàng (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Tạo liên kết tri thức từ kho tài liệu trung tâm (Knowledge Bindings)
+   */
+  async createBindings(
+    collectionId: string,
+    request: CreateKnowledgeBindingsRequest,
+  ): Promise<CreateKnowledgeBindingsResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/bindings`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(request),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Tạo liên kết tài liệu thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy danh sách các liên kết tài liệu (Knowledge Bindings) trong bộ sưu tập
+   */
+  async getBindings(
+    collectionId: string,
+    status?: string,
+    page = 1,
+    pageSize = 50,
+  ): Promise<KnowledgeBinding[]> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (status) params.set("status", status);
+
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/bindings?${params.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Không thể tải danh sách liên kết tri thức (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy chi tiết một liên kết tài liệu tri thức
+   */
+  async getBinding(bindingId: string): Promise<KnowledgeBinding> {
+    const res = await fetch(`${BASE_URL}/knowledge/bindings/${bindingId}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Không tìm thấy liên kết tri thức ID '${bindingId}' (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Hủy liên kết tài liệu khỏi bộ sưu tập tri thức
+   */
+  async detachBinding(bindingId: string): Promise<KnowledgeBinding> {
+    const res = await fetch(`${BASE_URL}/knowledge/bindings/${bindingId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Hủy liên kết tài liệu thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Xây dựng chỉ mục staging và kiểm tra Parity Gate cho một binding
+   */
+  async buildStagingIndex(
+    bindingId: string,
+    request: BuildStagingIndexRequest = {},
+  ): Promise<KnowledgeIndexRevision> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/build-index`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(request),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Dựng chỉ mục staging thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Kích hoạt nguyên tử (Atomic Pointer Swap) index revision cho một binding
+   */
+  async promoteIndexRevision(
+    bindingId: string,
+    request: IndexActivationRequest,
+  ): Promise<IndexActivationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/promote`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(request),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Kích hoạt chỉ mục thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy lịch sử các phiên bản chỉ mục (Index Revisions) của binding
+   */
+  async getIndexRevisions(
+    bindingId: string,
+  ): Promise<KnowledgeIndexRevision[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/revisions`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Không thể lấy lịch sử chỉ mục (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Chạy dọn dẹp các Index Revision cũ không còn sử dụng (Artifact GC với Rollback Protection)
+   */
+  async runGarbageCollection(
+    collectionId: string,
+    request?: GarbageCollectionRequest,
+  ): Promise<GarbageCollectionReport> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/gc`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(request || {}),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Dọn dẹp chỉ mục thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Hoàn tác tức thì (Instant Zero-Reindex Rollback) về index revision trước đó
+   */
+  async rollbackIndexRevision(
+    bindingId: string,
+    request: RollbackIndexRevisionRequest,
+  ): Promise<IndexActivationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/rollback`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(request),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Hoàn tác chỉ mục thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy danh sách các chunk phân đoạn của một binding hoặc revision cụ thể (Chunk Inspector)
+   */
+  async getBindingChunks(
+    bindingId: string,
+    indexRevisionId?: string,
+    page = 1,
+    pageSize = 50,
+  ): Promise<BindingChunksResponse> {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (indexRevisionId) {
+      params.set("index_revision_id", indexRevisionId);
+    }
+
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/chunks?${params.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Không thể lấy danh sách chunks (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Kiểm kê và phân loại dữ liệu legacy của collection (active-parity-ok / needs-rebuild / pending-intake)
+   */
+  async auditCollectionCanary(
+    collectionId: string,
+  ): Promise<LegacyAuditReport> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/canary/audit`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Kiểm kê Parity thất bại (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Chạy backfill an toàn (idempotent) chuyển đổi collection legacy sang chuẩn V2
+   */
+  async backfillCollectionCanary(
+    collectionId: string,
+    payload: BackfillRequest = {},
+  ): Promise<BackfillReport> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/canary/backfill`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Di trú Backfill thất bại (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Chạy shadow retrieval đối soát song song V1 Legacy và V2 Snapshot Isolation
+   */
+  async runShadowRetrievalTest(
+    collectionId: string,
+    payload: ShadowRetrievalRequest,
+  ): Promise<ShadowRetrievalReport> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/canary/shadow-test`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Chạy Shadow Retrieval thất bại (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy cấu hình Canary serving mode và chính sách lưu trữ (retention) của kho
+   */
+  async getCanaryPolicy(collectionId: string): Promise<CanaryPolicyResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/canary/policy`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`Lấy chính sách Canary thất bại (HTTP ${res.status}).`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Cập nhật chính sách Canary serving mode và retention revisions
+   */
+  async updateCanaryPolicy(
+    collectionId: string,
+    payload: UpdateCanaryPolicyRequest,
+  ): Promise<CanaryPolicyResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/canary/policy`,
+      {
+        method: "PUT",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Cập nhật chính sách Canary thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Chạy dọn dẹp Artifact Garbage Collection trên toàn bộ hệ thống
+   */
+  async runSystemWideGarbageCollection(
+    payload?: SystemGarbageCollectionRequest,
+  ): Promise<SystemGarbageCollectionReport> {
+    const res = await fetch(`${BASE_URL}/knowledge/gc/system-wide`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Thực thi Garbage Collection toàn hệ thống thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy báo cáo kiểm kê di trú V2 và mức độ sẵn sàng decommission legacy toàn trường
+   */
+  async getSystemDecommissioningAudit(): Promise<SystemDecommissioningAuditReport> {
+    const res = await fetch(`${BASE_URL}/knowledge/decommissioning/audit`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Lấy báo cáo kiểm kê chuyển đổi thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
   },
 };

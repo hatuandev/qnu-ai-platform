@@ -230,7 +230,7 @@ export function DashboardPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => void navigate({ to: "/assistants" as any })}
+              onClick={() => void navigate({ to: "/assistants" })}
               className="gap-1.5 cursor-pointer"
             >
               <Bot className="size-4" />
@@ -298,7 +298,7 @@ export function DashboardPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => void navigate({ to: "/assistants" as any })}
+                onClick={() => void navigate({ to: "/assistants" })}
                 className="text-xs gap-1 text-primary cursor-pointer"
               >
                 Xem tất cả
@@ -335,16 +335,14 @@ export function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                        <span className="size-1.5 rounded-full bg-primary" />
                         Sẵn sàng
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          void navigate({ to: "/assistants" as any })
-                        }
+                        onClick={() => void navigate({ to: "/assistants" })}
                         className="h-7 text-xs px-2.5 gap-1 group-hover:border-primary/50 cursor-pointer"
                       >
                         Trò chuyện
@@ -406,10 +404,10 @@ export function DashboardPage() {
 
                 <button
                   type="button"
-                  onClick={() => void navigate({ to: "/models" as any })}
-                  className="p-3.5 rounded-xl border border-border/60 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all cursor-pointer space-y-1.5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => void navigate({ to: "/models" })}
+                  className="p-3.5 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer space-y-1.5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
                     <Cpu className="size-4" />
                   </div>
                   <h5 className="text-xs font-semibold text-foreground">
@@ -430,7 +428,7 @@ export function DashboardPage() {
           <Card className="border-border/80 shadow-xs">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Activity className="size-5 text-emerald-500" />
+                <Activity className="size-5 text-primary" />
                 Cụm Hạ Tầng Hệ Thống
               </CardTitle>
               <p className="text-xs text-muted-foreground">
@@ -458,8 +456,8 @@ export function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                      <span className="size-1.5 rounded-full bg-primary animate-pulse" />
                       Online
                     </span>
                   </div>
@@ -483,7 +481,7 @@ export function DashboardPage() {
               <Button
                 variant="outline"
                 className="w-full justify-between h-9 text-xs cursor-pointer"
-                onClick={() => void navigate({ to: "/knowledge" as any })}
+                onClick={() => void navigate({ to: "/knowledge" })}
               >
                 <span className="flex items-center gap-2">
                   <BookOpen className="size-3.5 text-primary" />
@@ -495,10 +493,10 @@ export function DashboardPage() {
               <Button
                 variant="outline"
                 className="w-full justify-between h-9 text-xs cursor-pointer"
-                onClick={() => void navigate({ to: "/quality" as any })}
+                onClick={() => void navigate({ to: "/quality" as never })}
               >
                 <span className="flex items-center gap-2">
-                  <ShieldCheck className="size-3.5 text-emerald-500" />
+                  <ShieldCheck className="size-3.5 text-primary" />
                   Kiểm định Ragas TM-08
                 </span>
                 <ArrowRight className="size-3.5 text-muted-foreground" />
@@ -508,11 +506,11 @@ export function DashboardPage() {
                 variant="outline"
                 className="w-full justify-between h-9 text-xs cursor-pointer"
                 onClick={() =>
-                  void navigate({ to: "/settings/integrations" as any })
+                  void navigate({ to: "/settings/integrations" as never })
                 }
               >
                 <span className="flex items-center gap-2">
-                  <Share2 className="size-3.5 text-amber-500" />
+                  <Share2 className="size-3.5 text-primary" />
                   Cấu hình Web Chat Widget
                 </span>
                 <ArrowRight className="size-3.5 text-muted-foreground" />
@@ -521,10 +519,10 @@ export function DashboardPage() {
               <Button
                 variant="outline"
                 className="w-full justify-between h-9 text-xs cursor-pointer"
-                onClick={() => void navigate({ to: "/design-system" as any })}
+                onClick={() => void navigate({ to: "/design-system" })}
               >
                 <span className="flex items-center gap-2">
-                  <Sparkles className="size-3.5 text-purple-500" />
+                  <Sparkles className="size-3.5 text-primary" />
                   Design System Showcase
                 </span>
                 <ArrowRight className="size-3.5 text-muted-foreground" />

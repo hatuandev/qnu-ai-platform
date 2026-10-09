@@ -3,8 +3,8 @@ import {
   AlertCircle,
   CheckCircle2,
   Cpu,
-  FileText,
   Files,
+  FileText,
   Loader2,
   Plus,
   Scan,
@@ -101,7 +101,7 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
 export function DocumentUploadDialog({
@@ -230,8 +230,8 @@ export function DocumentUploadDialog({
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    const updated = selectedFiles.filter((_, idx) => idx !== index);
+  const handleRemoveFile = (fileToRemove: File) => {
+    const updated = selectedFiles.filter((f) => f !== fileToRemove);
     setSelectedFiles(updated);
     if (updated.length === 1) {
       const baseName = updated[0].name.replace(/\.[^/.]+$/, "");
@@ -453,7 +453,9 @@ export function DocumentUploadDialog({
     queryClient.invalidateQueries({ queryKey: ["ingestion-tasks"] });
 
     if (errorCount === 0 && duplicateCount === 0) {
-      toast.success(`Đã bóc tách thành công toàn bộ ${total} tài liệu vào kho.`);
+      toast.success(
+        `Đã bóc tách thành công toàn bộ ${total} tài liệu vào kho.`,
+      );
     } else {
       toast.info(
         `Bóc tách hoàn tất: ${successCount} thành công, ${duplicateCount} trùng lặp, ${errorCount} lỗi.`,
@@ -523,7 +525,10 @@ export function DocumentUploadDialog({
                   <CheckCircle2 className="size-4 text-primary" />
                   <span>Tổng kết bóc tách hàng loạt</span>
                 </p>
-                <Badge variant="default" className="text-xs font-mono font-bold">
+                <Badge
+                  variant="default"
+                  className="text-xs font-mono font-bold"
+                >
                   {batchItems.filter((i) => i.status === "success").length} /{" "}
                   {batchItems.length} thành công
                 </Badge>
@@ -823,20 +828,21 @@ export function DocumentUploadDialog({
                 </span>
                 {selectedFiles.length > 0 && (
                   <span className="text-[11px] font-normal text-muted-foreground">
-                    {selectedFiles.length} tệp • {formatBytes(totalSelectedSizeBytes)}
+                    {selectedFiles.length} tệp •{" "}
+                    {formatBytes(totalSelectedSizeBytes)}
                   </span>
                 )}
               </label>
 
               {selectedFiles.length === 0 ? (
                 /* Empty Drop Zone */
-                <div
+                <label
+                  htmlFor="upload-file-input"
                   onDragOver={handleDragOver}
                   onDragEnter={handleDragEnter}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-200 ${
+                  className={`block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-200 ${
                     isDragging
                       ? "border-primary bg-primary/10 ring-2 ring-primary/20 scale-[0.99]"
                       : "border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/30"
@@ -857,12 +863,13 @@ export function DocumentUploadDialog({
                       </p>
                     </div>
                   </div>
-                </div>
+                </label>
               ) : (
                 /* Selected Files Container */
                 <div className="space-y-2">
                   {/* Drop zone strip for adding more */}
-                  <div
+                  <section
+                    aria-label="Khu vực kéo thả thêm tệp"
                     onDragOver={handleDragOver}
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
@@ -901,11 +908,11 @@ export function DocumentUploadDialog({
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </section>
 
                   {/* Scrollable File List */}
                   <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 rounded-md border border-border/60 p-1.5 bg-background">
-                    {selectedFiles.map((file, idx) => {
+                    {selectedFiles.map((file) => {
                       const isDup = existingDocuments.some(
                         (d) =>
                           d.filename.trim().toLowerCase() ===
@@ -916,7 +923,7 @@ export function DocumentUploadDialog({
 
                       return (
                         <div
-                          key={`${file.name}-${file.size}-${idx}`}
+                          key={`${file.name}-${file.size}-${file.lastModified}`}
                           className={`flex items-center justify-between p-2 rounded-md border text-xs gap-2 transition-colors ${
                             isDup
                               ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
@@ -926,7 +933,9 @@ export function DocumentUploadDialog({
                           <div className="flex items-center gap-2 min-w-0">
                             <FileText
                               className={`size-4 shrink-0 ${
-                                isDup ? "text-amber-600 dark:text-amber-400" : "text-primary/70"
+                                isDup
+                                  ? "text-amber-600 dark:text-amber-400"
+                                  : "text-primary/70"
                               }`}
                             />
                             <div className="min-w-0">
@@ -947,7 +956,7 @@ export function DocumentUploadDialog({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleRemoveFile(idx)}
+                            onClick={() => handleRemoveFile(file)}
                             className="size-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 rounded-full"
                           >
                             <X className="size-3.5" />
@@ -964,8 +973,8 @@ export function DocumentUploadDialog({
                   <AlertCircle className="size-3.5 shrink-0 text-amber-600 mt-0.5" />
                   <span>
                     Lưu ý: Có <strong>{duplicateFiles.length} tệp</strong> đã có
-                    tên trong kho này. Nếu nội dung trùng lặp hoàn toàn, hệ thống
-                    sẽ tự động phát hiện và bỏ qua để tránh trùng dữ liệu.
+                    tên trong kho này. Nếu nội dung trùng lặp hoàn toàn, hệ
+                    thống sẽ tự động phát hiện và bỏ qua để tránh trùng dữ liệu.
                   </span>
                 </div>
               )}
@@ -994,8 +1003,8 @@ export function DocumentUploadDialog({
                   Tiêu đề tự động theo tên từng tệp
                 </p>
                 <p className="text-[11px]">
-                  Hệ thống sẽ tự động gán tiêu đề chuẩn theo tên của từng tệp tin
-                  trong danh sách (đã loại bỏ phần đuôi mở rộng).
+                  Hệ thống sẽ tự động gán tiêu đề chuẩn theo tên của từng tệp
+                  tin trong danh sách (đã loại bỏ phần đuôi mở rộng).
                 </p>
               </div>
             )}
@@ -1012,7 +1021,10 @@ export function DocumentUploadDialog({
                 value={documentTypeCode}
                 onValueChange={setDocumentTypeCode}
               >
-                <SelectTrigger id="document-type-select" className="h-9 text-xs">
+                <SelectTrigger
+                  id="document-type-select"
+                  className="h-9 text-xs"
+                >
                   <SelectValue placeholder="Chọn loại văn bản" />
                 </SelectTrigger>
                 <SelectContent>

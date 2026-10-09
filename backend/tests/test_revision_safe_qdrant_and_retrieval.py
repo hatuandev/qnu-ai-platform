@@ -10,9 +10,29 @@ from qdrant_client.http import models as qmodels
 from app.modules.rag.citation_guard import citation_guard
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.query_router import QueryClassifier, QueryIntent
-from app.modules.rag.schemas import AskRequest
+from app.modules.rag.schemas import AskRequest, RetrievalSnapshot
 from app.modules.rag.service import rag_service
 from app.modules.rag.vector_indexer import VectorIndexer
+
+
+@pytest.fixture(autouse=True)
+def _pin_rag_snapshot_for_unit_tests():
+    async def resolve(*args, **kwargs):
+        collection_id = args[1] if len(args) > 1 else kwargs["collection_id"]
+        return RetrievalSnapshot(
+            snapshot_id=f"snap_{collection_id}_test",
+            collection_id=collection_id,
+            collection_epoch=1,
+            binding_revisions={"bnd_test": "idx_test"},
+            tenant_id=kwargs.get("tenant_id"),
+            workspace_id=kwargs.get("workspace_id"),
+        )
+
+    with patch(
+        "app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
+        new=AsyncMock(side_effect=resolve),
+    ):
+        yield
 
 
 class TestQueryClassifier:

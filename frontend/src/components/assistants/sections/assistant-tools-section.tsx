@@ -229,7 +229,9 @@ export function AssistantToolsSection({
               </h4>
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Kích hoạt hoặc thu hồi các kỹ năng thực thi của Trợ lý AI. Hệ thống sử dụng hoàn toàn dữ liệu động từ Kho tri thức số hóa và cơ chế xuất file tự động mà không gán cứng mã nguồn.
+              Kích hoạt hoặc thu hồi các kỹ năng thực thi của Trợ lý AI. Hệ
+              thống sử dụng hoàn toàn dữ liệu động từ Kho tri thức số hóa và cơ
+              chế xuất file tự động mà không gán cứng mã nguồn.
             </p>
           </div>
 
@@ -241,7 +243,9 @@ export function AssistantToolsSection({
                 <div
                   key={tool.id}
                   className={`rounded-lg border p-3.5 transition-colors ${
-                    enabled ? "bg-card border-primary/30" : "bg-muted/15 border-border/50"
+                    enabled
+                      ? "bg-card border-primary/30"
+                      : "bg-muted/15 border-border/50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -285,7 +289,9 @@ export function AssistantToolsSection({
                       </Badge>
                       <Switch
                         checked={enabled}
-                        onCheckedChange={(checked) => toggleTool(tool.id, checked)}
+                        onCheckedChange={(checked) =>
+                          toggleTool(tool.id, checked)
+                        }
                         aria-label={`Bật/Tắt công cụ ${tool.name}`}
                       />
                     </div>

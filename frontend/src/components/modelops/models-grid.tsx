@@ -77,7 +77,13 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
   onQuickAddPresetModel,
 }) => {
   const [modelFilter, setModelFilter] = useState<
-    "all" | "embedding" | "ocr" | "vision" | "reasoning" | "reranker" | "default"
+    | "all"
+    | "embedding"
+    | "ocr"
+    | "vision"
+    | "reasoning"
+    | "reranker"
+    | "default"
   >("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
 
@@ -173,11 +179,15 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả mô hình</SelectItem>
-                <SelectItem value="embedding">Embedding (Vector nhúng)</SelectItem>
+                <SelectItem value="embedding">
+                  Embedding (Vector nhúng)
+                </SelectItem>
                 <SelectItem value="ocr">OCR & Bóc tách (Vision OCR)</SelectItem>
                 <SelectItem value="vision">Vision (Thị giác)</SelectItem>
                 <SelectItem value="reasoning">Reasoning (Suy luận)</SelectItem>
-                <SelectItem value="reranker">Reranker (Tái xếp hạng)</SelectItem>
+                <SelectItem value="reranker">
+                  Reranker (Tái xếp hạng)
+                </SelectItem>
                 <SelectItem value="default">Mặc định hệ thống</SelectItem>
               </SelectContent>
             </Select>

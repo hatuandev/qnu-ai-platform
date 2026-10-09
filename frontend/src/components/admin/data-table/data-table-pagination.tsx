@@ -126,12 +126,9 @@ export function DataTablePagination({
           >
             <ChevronLeft className="size-3.5" />
           </Button>
-          {items.map((item, idx) =>
+          {items.map((item) =>
             typeof item === "string" ? (
-              <span
-                key={`${item}-${idx}`}
-                className="px-1 text-xs text-muted-foreground"
-              >
+              <span key={item} className="px-1 text-xs text-muted-foreground">
                 …
               </span>
             ) : (

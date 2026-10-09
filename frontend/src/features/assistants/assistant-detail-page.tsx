@@ -74,19 +74,44 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     require_grounded_answer: cfg?.guardrails?.require_grounded_answer ?? true,
     protect_system_prompt: cfg?.guardrails?.protect_system_prompt ?? true,
     human_approval_required: cfg?.tools?.human_approval_required ?? true,
-    enabled_tools: cfg?.tools?.enabled_tools ?? ["export_universal_report", "lookup_fact_layer"],
+    enabled_tools: cfg?.tools?.enabled_tools ?? [
+      "export_universal_report",
+      "lookup_fact_layer",
+    ],
     require_citations: cfg?.output_policy?.require_citations ?? true,
     no_answer_message:
       cfg?.guardrails?.no_answer_message ||
       "Thông tin này chưa có trong nguồn văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ đơn vị phụ trách.",
-    reranker_enabled:
-      (cfg as unknown as Record<string, unknown>)?.knowledge_policy ? ((cfg as unknown as Record<string, { reranker_policy?: { enabled?: boolean } }>).knowledge_policy?.reranker_policy?.enabled ?? true) : true,
+    reranker_enabled: (cfg as unknown as Record<string, unknown>)
+      ?.knowledge_policy
+      ? ((
+          cfg as unknown as Record<
+            string,
+            { reranker_policy?: { enabled?: boolean } }
+          >
+        ).knowledge_policy?.reranker_policy?.enabled ?? true)
+      : true,
     reranker_model:
-      (cfg as unknown as Record<string, { reranker_policy?: { model_name?: string } }>)?.knowledge_policy?.reranker_policy?.model_name || "bge-reranker-base",
+      (
+        cfg as unknown as Record<
+          string,
+          { reranker_policy?: { model_name?: string } }
+        >
+      )?.knowledge_policy?.reranker_policy?.model_name || "bge-reranker-base",
     reranker_top_k:
-      (cfg as unknown as Record<string, { reranker_policy?: { top_k?: number } }>)?.knowledge_policy?.reranker_policy?.top_k ?? 5,
+      (
+        cfg as unknown as Record<
+          string,
+          { reranker_policy?: { top_k?: number } }
+        >
+      )?.knowledge_policy?.reranker_policy?.top_k ?? 5,
     reranker_score_threshold:
-      (cfg as unknown as Record<string, { reranker_policy?: { score_threshold?: number } }>)?.knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
+      (
+        cfg as unknown as Record<
+          string,
+          { reranker_policy?: { score_threshold?: number } }
+        >
+      )?.knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
   };
 }
 
@@ -248,7 +273,8 @@ export function AssistantDetailPage({
             require_citations: value.require_citations,
           },
           knowledge_policy: {
-            ...((current.config as unknown as Record<string, unknown>)?.knowledge_policy as Record<string, unknown> || {}),
+            ...(((current.config as unknown as Record<string, unknown>)
+              ?.knowledge_policy as Record<string, unknown>) || {}),
             collection_id: value.collection_id,
             reranker_policy: {
               enabled: value.reranker_enabled ?? true,

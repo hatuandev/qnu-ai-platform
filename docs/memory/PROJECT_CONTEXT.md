@@ -7,32 +7,232 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-07 15:30 (UTC+7)
-- **Phiên số**: #283 (Triển Khai Phân Hệ Kho Tài Liệu Tập Trung Lưu Trữ MinIO S3, Tiền Bóc Tách Markdown & Tích Hợp Kho Tri Thức Vector DB)
-- **Kết quả phiên #283**:
-  - **Kiến trúc Cơ sở dữ liệu & Migration**:
-    * Thiết kế bảng `repository_documents`: Khóa chính UUID (`rdoc_...`), khóa băm SHA-256 (`file_hash`) khử trùng lặp dữ liệu, đường dẫn MinIO (`storage_path`, `preview_image_path`), chuỗi Markdown sạch (`parsed_markdown`), trạng thái bóc tách (`parse_status`), metadata hành chính Nghị định 30/2020/NĐ-CP (`legal_number`, `issuing_date`, `signer_title`, `signer_name`, v.v.).
-    * Mở rộng bảng `knowledge_documents` bổ sung cột `repository_document_id` (nullable, foreign key ON DELETE SET NULL), đảm bảo 100% tương thích ngược.
-    * Tạo migration Alembic `backend/alembic/versions/20261007_document_repository.py` và cập nhật `required_tables` trong `backend/app/cli.py`.
-  - **Module Backend `documents` (Chuẩn 4 file Clean Architecture)**:
-    * `models.py`: Khai báo model `RepositoryDocument`.
-    * `schemas.py`: Pydantic DTOs cho upload, list, detail, update, stats, và attach.
-    * `service.py` (`DocumentRepositoryService`): Upload S3 MinIO với SHA-256 deduplication, tự động pre-parse Markdown bảo tồn cấu trúc bảng và chuẩn hóa Unicode NFC qua Strategy pattern, render ảnh trang đầu PDF qua PyMuPDF (`fitz`), quản lý CRUD, cập nhật metadata NĐ 30, tải file gốc/Markdown, tính toán KPI tổng hợp.
-    * `router.py`: REST API chuẩn RFC 7807 mounted tại `/platform/v1alpha1/documents` trong `backend/app/main.py`.
-  - **Đấu nối tích hợp vào phân hệ Kho Tri Thức (`/knowledge`)**:
-    * Mở rộng `ingestion_service.py` với phương thức `ingest_from_repository_documents`: đọc trực tiếp Markdown sạch đã bóc tách sẵn trong kho, nạp thẳng vào chunking và vector embedding (Qdrant), bỏ qua 100% chi phí chạy lại OCR/Docling.
-    * Bổ sung endpoint `POST /platform/v1alpha1/knowledge/collections/{collection_id}/attach-repository-documents`.
-  - **Frontend Master-Detail & 3-Tier Components**:
-    * Bổ sung điều hướng "Kho Tài Liệu" (`/documents`, icon `FileStack`) trong nhóm "Xây Dựng AI".
-    * Trang danh sách Master View (`/documents`): 4 thẻ KPI (`KpiMetric`), bộ lọc tìm kiếm & loại VB & định dạng & trạng thái parse, nút chuyển đổi `<ViewModeToggle />` giữa Thẻ lưới (`DocumentCard`) và Bảng danh sách (`DocumentsTable`).
-    * Modal tải lên (`DocumentUploadModal`): Kéo thả tệp, điền metadata NĐ 30, switch tự động parse.
-    * Trang chi tiết độc lập (`/documents/:documentId`): Bố cục 2 cột chuyên sâu (xem trước Markdown GFM sạch, xem ảnh trang đầu PDF từ MinIO, chỉnh sửa metadata NĐ 30, hiển thị danh sách Kho Tri Thức đang liên kết).
-    * Hộp thoại "Gắn Từ Kho" (`AttachFromRepositoryDialog`): Tích hợp trực tiếp trên Header Kho Tri Thức (`/knowledge/:id`), cho phép nạp tài liệu từ kho vào vector collection với 1 click.
-    * Đăng ký route TanStack Router: `/documents`, `/documents/`, `/documents/$documentId`.
+- **Thời gian cập nhật**: 2026-10-09 10:14 (UTC+7)
+- **Phiên số**: #303 (Khóa Race Condition, Chuẩn Hóa ModelOps Dimension Và Frontend Quality Gate)
+- **Kết quả phiên #303**:
+  - Loại bỏ các nhánh nuốt lỗi/fallback trong scope helpers; mọi thao tác yêu cầu khóa đều thực thi `SELECT ... FOR UPDATE`, kể cả luồng nội bộ không có `actor`.
+  - Cưỡng chế cấp phát `index_epoch` chỉ từ giá trị nguyên của `UPDATE ... RETURNING`; không còn đọc lại object rồi tự cộng một.
+  - Tập trung phân giải embedding dimension tại `ModelCatalogService.resolve_embedding_dimension`, kiểm tra provider/model/dimension và từ chối metadata snapshot sai lệch bằng RFC 7807.
+  - Khép kín race cooperative cancellation: worker kiểm tra quyền chuyển trạng thái ở cả checkpoint `running` lẫn trước khi công bố kết quả cuối.
+  - Chuẩn hóa màn cấu hình Knowledge bằng `Button` dùng chung, chọn model theo cặp provider-model và chặn lưu cấu hình thiếu dimension.
+  - Quality gate: Ruff 0 lỗi; 34/34 regression test trọng tâm pass; Biome kiểm tra 504 files với 0 lỗi; Vite + TypeScript build thành công.
+  - Full backend suite: **616 passed, 6 failed, 1 skipped**; sáu integration test còn lại cần PostgreSQL seed nhưng Docker daemon hiện không chạy. Không thêm mock/fallback production để tạo kết quả xanh giả.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_303_khoa_race_condition_modelops_dimension_va_frontend_quality_gate.md`](../nhat_ky/2026-10-09_phien_303_khoa_race_condition_modelops_dimension_va_frontend_quality_gate.md).
+
+- **Phiên trước #302 — Kết quả:**
+  - Xử lý triệt để 5 vấn đề cốt lõi hậu code review theo kiến trúc sạch, Production-First và Zero Hallucination:
+    1. **Tenant & Workspace Scoping (`scope_helper.py`)**: Tối ưu hóa `get_scoped_collection`, `get_scoped_binding`, `get_scoped_index_revision` dùng `await db.get(...)` trước để hit identity map cache, kiểm tra scope `tenant_id` / `workspace_id` chặt chẽ, xử lý coroutine unwrap an toàn cho cả async runtime và unit test mocks.
+    2. **Atomic SQL Epoch Increment**: Hàm `bump_collection_index_epoch` thực thi duy nhất 1 câu SQL nguyên tử `UPDATE knowledge_collections SET index_epoch = index_epoch + 1 WHERE id = ... RETURNING index_epoch`, loại bỏ race condition CAS và thay thế toàn bộ bare `except Exception:` bằng các lớp exception cụ thể (`SQLAlchemyError`, `TypeError`, `AttributeError`, `KeyError`).
+    3. **Connection Pool Optimization Trong Cooperative Job Cancellation**: Nâng cấp `is_job_cancelled(job_id, db=db)` nhận `db: AsyncSession | None = None` để tái sử dụng session hiện có trong worker checkpoints (`tasks.py`, `gc_service.py`), tránh tạo socket mới làm cạn connection pool; xây dựng helper `_extract_cancellation_state` an toàn nhận diện model object, SQLAlchemy Row, tuple, mapping.
+    4. **Dynamic ModelOps Vector Dimension Resolution & Partial Points Cleanup**: Loại bỏ hoàn toàn fallback `vector_size=1024` trong `IndexBuildService`, phân giải kích thước vector động từ ModelOps DB và fail-fast `EMBEDDING_DIMENSION_NOT_CONFIGURED` (400); checkpoints hủy tác vụ hợp tác (`_check_job_cancelled`) tự động gọi `vector_indexer.client.delete` dọn dẹp partial points trên Qdrant khi bị hủy và đổi status sang `failed` (`JOB_CANCELLED`).
+    5. **Frontend Quality Gate & Type Standardization**: Chuẩn hóa kiểu dữ liệu `ModelOption` (`label?: string`) và `exportMultiSheetToExcel` (`AnyExcelSheet`), loại bỏ các lỗi TypeScript typecheck còn tồn đọng; đạt **0 lỗi Biome linter** (483 files) và Vite build thành công 100% trong 3.89s (0 TypeScript errors).
+  - Toàn bộ test suites Publishing V2: `test_publishing_v2_hardening.py` (11), `test_publishing_v2_cutover_and_gc.py` (9), `test_publishing_v2_decommissioning_and_system_gc.py` (7), `test_publishing_v2_resilience_and_cancellation.py` (8) -> **35/35 PASSED (100%)**.
+  - Toàn bộ ModelOps test suites: `test_modelops.py` (22), `test_modelops_usage.py` (4), `test_model_runtime_resolver.py` (2) -> **28/28 PASSED (100%)**.
+  - Backend Ruff linter: **All checks passed (0 errors)**; Alembic: **20261008_publishing_v2_hardening (head)** (1 head duy nhất).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_302_hardened_tenant_scope_atomic_epoch_vector_and_cancellation.md`](../nhat_ky/2026-10-09_phien_302_hardened_tenant_scope_atomic_epoch_vector_and_cancellation.md).
+
+- **Phiên trước #301 — Kết quả:**
+  - Bảo vệ đa tenant/workspace bằng `AuthActor` giải mã từ phiên xác thực SSO / Dev Access Gate; loại bỏ 100% header `X-Tenant-Id` và `X-Workspace-Id` từ client; trả 404 cho cross-tenant nhằm chống rò rỉ siêu dữ liệu.
+  - Bổ sung workspace isolation cho Document Revision (`documents/revision_service.py` & `router.py`), kiểm tra đồng thời cả `tenant_id` và `workspace_id`.
+  - Khắc phục triệt để race condition index epoch bằng SQL nguyên tử `bump_collection_index_epoch` (`UPDATE knowledge_collections SET index_epoch = index_epoch + 1 RETURNING index_epoch`).
+  - Cưỡng chế CAS (Compare-And-Swap) với tham số bắt buộc `expected_epoch: int` cho cả promote và rollback, ném RFC 7807 409 `CAS_EPOCH_CONFLICT`.
+  - Triệt tiêu hoàn toàn runtime ModelOps hardcode: `get_system_model_defaults` chỉ đọc từ CSDL, fail-fast `MODEL_DEFAULT_NOT_CONFIGURED`, cấm tự seed hoặc gán cứng fallback model.
+  - Bảo toàn bất biến vector dimension: cấm truncate/pad im lặng trong `VectorIndexer._fit_dim` (ném `VECTOR_DIMENSION_MISMATCH`), validate dense vectors tính sẵn, raise `AppException(QDRANT_UPSERT_FAILED)` khi Qdrant upsert lỗi.
+  - Cơ chế cooperative job cancellation: kiểm tra tín hiệu hủy `_check_pre_execution_cancelled` trước khi chuyển sang `running`; 5 checkpoint trong staging build (`task_knowledge_index_build`); dọn dẹp dense points trên Qdrant khi bị hủy.
+  - Bảo vệ xoá/dọn dẹp Job: chỉ xoá job terminal (xoá running/queued báo 409 `job_not_terminal`); cleanup chỉ nhận terminal statuses (báo 400 `INVALID_CLEANUP_STATUS`).
+  - Chuẩn hóa Frontend: xoá sạch `as any` trong điều hướng TanStack Router (`add-documents`, `binding-detail`); Biome 0 lỗi.
+  - Quality Gate: Backend unit & regression test suites chính passed 100% (knowledge v2: 13/13, hardening: 11/11, jobs: 18/18, rag: 18/18); Ruff 0 lỗi; Biome 0 lỗi; Alembic 1 head.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-08_phien_301_hoan_thien_tenant_modelops_vector_va_job_cancellation.md`](../nhat_ky/2026-10-08_phien_301_hoan_thien_tenant_modelops_vector_va_job_cancellation.md).
+
+- **Phiên trước #300 — Kết quả:**
+  - Bảo vệ API Jobs theo quyền fine-grained (`require_permission`) và cô lập dữ liệu 100% theo tenant của `AuthActor`; trả 404 cho cross-tenant; retry job reset sạch cờ `cancel_requested`.
+  - Ràng buộc revision với document và tenant trong service; ngăn chặn truy cập trái phép chéo tài liệu hoặc chéo tenant.
+  - Chuẩn hóa DTO ParityReport (`parity_status: "passed" | "failed"`, `indexed_points`, `verified_points`), loại bỏ trạng thái giả `staging`, nút Promote chỉ hiển thị khi `ready` và parity passed.
+  - Khôi phục thao tác Rollback từ revision `archived` còn khả dụng dữ liệu (`is_rollback_available: bool`, `storage_state`); phân biệt rõ với `pruned`.
+  - Cưỡng chế CAS (Compare-And-Swap) với `expected_epoch` bắt buộc khi promote, ném RFC 7807 `409 Conflict` (`CAS_EPOCH_CONFLICT`) khi stale, frontend hiển thị Toast xung đột và tự động refetch.
+  - Thiết lập Vector Generation Invariants: cấm tuyệt đối truncate/padding âm thầm trong `_fit_dim` (ném `VECTOR_DIMENSION_MISMATCH`), verify số chiều Qdrant collection trong `ensure_collection`, truyền `vector_generation` thật từ ModelOps DB.
+  - Hỗ trợ cooperative job cancellation trong worker (`tasks.py`) tại các checkpoint trước và sau khi xử lý nặng.
+  - Khóa aggregate cha bằng `with_for_update()` chống race condition khi cấp số revision (`document_revision_no`, `index_revision_no`).
+  - Triệt tiêu 100% model/provider hardcode trong runtime nghiệp vụ, lấy defaults từ ModelOps DB.
+  - Quality Gate: Backend 31/31 unit & regression tests passed (100%), Ruff 0 lỗi, Biome 0 lỗi, Vite build 4.23s thành công, Alembic 1 head.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-08_phien_300_hardening_bao_mat_va_publishing_contract.md`](../nhat_ky/2026-10-08_phien_300_hardening_bao_mat_va_publishing_contract.md).
+
+- **Phiên trước #299 — Kết quả:**
+  - Sửa vòng đời revision: chỉ promote sau Quality Gate/duyệt, CAS bằng `expected_lock_version`, retry/review theo state machine thật.
+  - Hoàn thiện job outbox idempotent, dispatch reconciliation, heartbeat/attempt và lỗi worker fail-fast.
+  - Khóa tenant/workspace trên binding, revision, chunks và snapshot; parity PostgreSQL–Qdrant kiểm tra count/ID/hash thật.
+  - Đồng bộ activation/rollback theo `index_revision_id` và `expected_epoch`; Vector Generation phân giải ModelOps động, không trộn không gian embedding.
+  - RAG snapshot pin toàn bộ dense/sparse/facts/neighbors; cache mang epoch + fingerprint; loại bỏ dữ liệu fake/test shortcut.
+  - Backfill/canary/GC dùng artifact thật và thứ tự xóa an toàn; Reranker không hardcode model/endpoint runtime.
+  - OCR layout nhận diện danh sách bằng quy tắc hình thái/cú pháp tổng quát; frontend revision/binding contracts khớp API.
+  - Quality Gate: Backend `598 passed, 1 skipped`; Ruff toàn repository 0 lỗi; Alembic một head; frontend Vite + TypeScript build thành công.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-08_phien_299_hardening_quy_trinh_xuat_ban_tri_thuc_v2.md`](../nhat_ky/2026-10-08_phien_299_hardening_quy_trinh_xuat_ban_tri_thuc_v2.md).
+
+- **Phiên trước #298 — Kết quả:**
+  - **Xóa Bỏ Ollama & Dọn Dẹp Toàn Bộ Seed Data / Defaults Liên Quan**:
+    * Xóa bỏ hoàn toàn nhà cung cấp `QNU AI Server (RTX 5090 - Ollama)` (`prov_rtx5090_ollama`, URL `http://tormemrtxproto.tail0924dd.ts.net:11434`) khỏi `STANDARD_QNU_PROVIDERS`.
+    * Bổ sung cơ chế tự động dọn dẹp an toàn trong `seed_default_providers`: `if "prov_rtx5090_ollama" in existing: await db.delete(...)`.
+    * Cập nhật `DEFAULT_QNU_OCR_COMBO_CHAIN`: Ưu tiên 1 là Google Gemini (`gemini-3.1-flash-lite`), loại bỏ Ollama.
+    * Cập nhật `ast_drafting` và `ast_question_bank` trong `assistants/seeder.py` sang `prov_gemini` (`gemini-2.5-flash`), loại bỏ tham chiếu tới `prov_rtx5090_ollama`.
+  - **Cấu Hình & Seed Nhà Cung Cấp vLLM On-Premise Mới**:
+    * Nhà cung cấp mới: `QNU AI Server (RTX 5090 - vLLM)` (`prov_rtx5090_vllm`) tại `http://tormemrtxproto.tail0924dd.ts.net:8000/v1` (Port 8000 chuẩn vLLM trên mạng Tailscale).
+    * Đăng ký 3 mô hình cục bộ với `model_specs` chuẩn xác:
+      + `bge-m3`: vLLM pooling / embeddings (1,024 dims).
+      + `bge-reranker-v2-m3`: vLLM rerank / score Cross-Encoder tái chấm điểm Top-K.
+      + `qwen3-embedding-4b`: vLLM pooling / embeddings (2,560 dims) đã tải local.
+    * Cập nhật `DEFAULT_QNU_EMBEDDING_COMBO_CHAIN`: Ưu tiên 1 là `prov_rtx5090_vllm` (`bge-m3`).
+    * Cập nhật `DEFAULT_QNU_RERANKER_COMBO_CHAIN`: Ưu tiên 1 là `prov_rtx5090_vllm` (`bge-reranker-v2-m3`).
+    * Cập nhật `CollectionDataProcessingConfig` và `SystemModelDefaults`: Mặc định trỏ về `prov_rtx5090_vllm`.
+  - **Chỉ số Quality Gate**:
+    * Backend Pytest: `test_vllm_reranker.py` 4/4 tests passed 100% (bổ sung test case `test_vllm_seed_provider_config`).
+    * Backend Ruff: 0 lỗi (`All checks passed!`).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-08_phien_298_thay_the_ollama_bang_vllm_on_premise_bge_qwen.md`](./nhat_ky/2026-10-08_phien_298_thay_the_ollama_bang_vllm_on_premise_bge_qwen.md).
+
+- **Phiên trước #297**:
+  - Hoàn thành Retention, System-Wide Artifact Garbage Collection & Contract Migration Loại Bỏ Legacy An Toàn (ADR-011) — Đóng trọn vẹn 12 phiên Kế hoạch 11.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_297_hoan_thanh_retention_system_gc_va_contract_decommissioning.md`](./nhat_ky/2026-10-07_phien_297_hoan_thanh_retention_system_gc_va_contract_decommissioning.md).
+
+- **Phiên trước #295**:
+  - Bảng điều khiển kiểm định đối soát Parity Gate & Shadow Retrieval Dashboard V2 (`CollectionParityAuditTab`).
+  - Bento Grid 4 KPIs, Sub-tab 1 Parity Inventory, Sub-tab 2 Shadow Retrieval Tester (Zero Revision Leak).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_295_hoan_thanh_parity_audit_va_shadow_retrieval_dashboard_v2.md`](./nhat_ky/2026-10-07_phien_295_hoan_thanh_parity_audit_va_shadow_retrieval_dashboard_v2.md).
+
+- **Phiên trước #294**:
+  - Master-Detail Deep Routing Kho Tri Thức V2: Trang Thêm Tài Liệu (`/add-documents`) & Trang Chi Tiết Binding (`/documents/:bindingId`).
+  - Chunks Inspector Modal, Instant Rollback $O(1)$, Parity Gate verification.
+  - Backend `GET /knowledge/bindings/{binding_id}/chunks` phân trang (13/13 tests Pytest passed).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_294_hoan_thanh_frontend_kho_tri_thuc_v2_add_documents_va_binding_detail.md`](./nhat_ky/2026-10-07_phien_294_hoan_thanh_frontend_kho_tri_thuc_v2_add_documents_va_binding_detail.md).
+  - **Master-Detail Deep Routing Chuẩn AGENTS.md**:
+    * Tách bạch không gian danh sách tổng quan (`CollectionDetailPage`) với các trang nghiệp vụ chuyên sâu, sở hữu URL độc lập (`/knowledge/:collectionId/add-documents` và `/knowledge/:collectionId/documents/:bindingId`).
+  - **Trang Thêm Tài Liệu Từ Kho (`AddDocumentsPage`)**:
+    * Giao diện toàn màn hình, thanh tìm kiếm tức thì, bộ lọc trạng thái liên kết (Tất cả, Chưa liên kết, Đã liên kết).
+    * Bảng chọn tài liệu hàng loạt với Select All / Invert Selection, xem trạng thái thể thức NĐ 30 và file size.
+    * Panel cấu hình Chunking Strategy toàn cục (ClauseBasedChunker, Semantic, Recursive, Markdown Header) kèm Chunk Size/Overlap.
+    * Sticky Action Bar nổi khối (`motion.div`) với tùy chọn Tự kích hoạt (Auto-activate) và nút Submit batch mutations.
+  - **Trang Chi Tiết Binding Chuyên Sâu (`BindingDetailPage`)**:
+    * Header với breadcrumb phân cấp, trạng thái active revision, nút hành động Dựng Index Staging và Gỡ Liên Kết.
+    * Bento Grid 4 KPIs: Phiên Bản Nguồn, Chỉ Mục Phục Vụ, Kích Thước Dữ Liệu, Parity Gate & Tính Toàn Vẹn.
+    * 3 Tabs nghiệp vụ:
+      1. *Lịch Sử Index Revisions & Rollback $O(1)$*: Bảng phiên bản chỉ mục, dialog Promote hoán đổi con trỏ nguyên tử CAS và dialog Hoàn tác tức thì $O(1)$ với bảo vệ Rollback window.
+      2. *Trình Duyệt Chunks (Chunk Inspector)*: Lọc theo điều khoản / nội dung, Modal Chi Tiết Chunk xem toàn văn, metadata NĐ 30, Qdrant point ID.
+      3. *Thông Tin Nguồn & Thể Thức NĐ 30/2020/NĐ-CP*: Trích yếu, số hiệu, ngày ban hành, hash SHA-256, MinIO S3 path.
+  - **Mở rộng Backend**:
+    * Thêm endpoint phân trang `GET /knowledge/bindings/{binding_id}/chunks` hỗ trợ lọc theo revision.
+    * Phương thức `BindingService.list_binding_chunks` và `KnowledgeService.list_binding_chunks`.
+    * Unit test `test_list_binding_chunks_service_and_api` trong `test_knowledge_publishing_v2.py`.
+  - **Chỉ số Quality Gate**:
+    * Pytest Backend: 13/13 passed 100% trong 47.13s (`test_knowledge_publishing_v2.py`).
+    * Ruff Backend: 0 lỗi (`All checks passed!`).
+    * Biome Frontend: 0 lỗi, 0 warnings (`Checked 2 files. No fixes applied.`).
+    * TypeScript Frontend: 0 lỗi biên dịch (`tsc --noEmit` exit code 0).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_294_hoan_thanh_frontend_kho_tri_thuc_v2_add_documents_va_binding_detail.md`](./nhat_ky/2026-10-07_phien_294_hoan_thanh_frontend_kho_tri_thuc_v2_add_documents_va_binding_detail.md).
+
+- **Phiên trước #293**:
+  - Kích hoạt Cutover Toàn Diện V2 (`RAG_REVISION_READ_MODE = "revisioned"`, `KNOWLEDGE_REVISION_WRITES_ENABLED = True`).
+  - Đánh dấu Deprecated các endpoints cũ (`/upload`, `/reindex`) kèm headers chuẩn ASCII.
+  - Dịch vụ Artifact GC (`KnowledgeArtifactGCService`) có bảo vệ Instant Rollback window (active + 2 bản superseded).
+  - Khóa mã lỗi RFC 7807 `REVISION_ALREADY_PRUNED` chặn rollback bản đã dọn.
+  - Sổ tay vận hành production `cutover_and_operations_runbook.md`.
+  - 47/47 tests Kế hoạch 11 passed 100%, Ruff 0 lỗi, TSC 0 lỗi.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_293_hoan_thanh_pha_7_cutover_va_don_dep_legacy.md`](./nhat_ky/2026-10-07_phien_293_hoan_thanh_pha_7_cutover_va_don_dep_legacy.md).
+  - **Kích hoạt Cutover Toàn Diện V2 (`backend/app/core/config.py`, `retriever.py`)**:
+    * Chuyển chế độ đọc mặc định sang `RAG_REVISION_READ_MODE = "revisioned"`.
+    * Kích hoạt `KNOWLEDGE_REVISION_WRITES_ENABLED = True` và cấu hình bảo lưu `KNOWLEDGE_GC_RETENTION_REVISIONS = 2`.
+    * `HybridRetriever.search_with_snapshot` nghiêm ngặt cưỡng chế lọc chunks theo danh sách `active_index_revision_ids` của Snapshot (Zero Revision Leak).
+  - **Chính sách Deprecation Legacy Endpoints (`knowledge/router.py`)**:
+    * Đánh dấu `deprecated=True` trong OpenAPI spec và gắn HTTP Response Headers chuẩn ASCII (`Deprecation: @2026-10-07`, `X-API-Deprecation-Warning`) cho `/upload`, `/reindex`, `/documents/{id}/reindex`.
+  - **Dịch vụ Artifact Garbage Collection (GC) Có Bảo Vệ Rollback (`knowledge/services/gc_service.py`, `vector_indexer.py`)**:
+    * Triển khai `KnowledgeArtifactGCService.collect_garbage`: Bảo lưu bắt buộc revision `active` và $N=2$ bản `superseded` mới nhất cho mỗi tài liệu (cửa sổ Instant Rollback $O(1)$).
+    * Dọn dẹp an toàn các bản `superseded` cũ ngoài window và toàn bộ bản `failed`/`cancelled`: cập nhật status `"pruned"`, xóa triệt để `KnowledgeChunk` và `KnowledgeFact` trong PostgreSQL, xóa vector points trong Qdrant qua hàm `delete_points_by_index_revision`.
+    * Hỗ trợ cờ `dry_run=True` dự báo trước số lượng bản ghi cần dọn.
+  - **Cơ chế Chặn Rollback Bản Đã Bị Dọn (`index_build_service.py`)**:
+    * Chặn đứng mọi nỗ lực rollback về revision đã pruned với mã lỗi RFC 7807 `REVISION_ALREADY_PRUNED` (HTTP 400).
+    * Cho phép rollback tức thì $O(1)$ về các bản `superseded` vẫn còn lưu trong retention window.
+  - **Tích hợp Facade, REST API & Frontend UI**:
+    * Endpoint `POST /knowledge/collections/{collection_id}/gc` tiếp nhận `GarbageCollectionRequest` và trả về `GarbageCollectionReport`.
+    * Frontend: Bổ sung types trong `types/knowledge.ts`, hàm `runGarbageCollection` trong `services/knowledge-api.ts`, nút "Dọn Chỉ Mục Cũ (GC)" và Dialog xác nhận an toàn trên `CollectionBindingsTab`.
+  - **Sổ Tay Vận Hành & Runbook Production (`docs/ke_hoach/cutover_and_operations_runbook.md`)**:
+    * Ban hành tài liệu vận hành chi tiết: Cutover checklist, SLIs/SLOs, Parity Mismatch monitoring, Emergency rollback $O(1)$, cron maintenance GC.
+  - **Kiểm thử Toàn Diện Kế Hoạch 11**:
+    * Viết test suite chuyên biệt `test_publishing_v2_cutover_and_gc.py` với 7/7 tests PASSED 100%.
+    * Toàn bộ 6 test suites của Kế hoạch 11: **47/47 tests PASSED 100%**.
+    * Ruff linter: **All checks passed! (0 lỗi)**; TypeScript check: **0 lỗi**.
+  - **KẾ HOẠCH 11 ĐÃ HOÀN THÀNH 100% (Pha 0 -> Pha 7)**.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_293_hoan_thanh_pha_7_cutover_va_don_dep_legacy.md`](./nhat_ky/2026-10-07_phien_293_hoan_thanh_pha_7_cutover_va_don_dep_legacy.md).
+
+- **Phiên trước #292**:
+  - Triển khai Legacy Data Backfill & Classification (`CanaryService.audit_collection_legacy_state`, `backfill_legacy_collection`).
+  - Triển khai Shadow Retrieval Verification Engine so khớp song song V1 vs V2, bảo đảm `retrieval_revision_leak_total = 0`.
+  - Triển khai Compare-and-Swap (CAS) Concurrency Control (HTTP 409 `CAS_EPOCH_CONFLICT`) và Instant Zero-Reindex Rollback $O(1)$.
+  - Test suite `test_publishing_v2_e2e_canary.py` 9/9 passed 100%.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_292_hoan_thanh_pha_6_backfill_shadow_canary_va_e2e_testing.md`](./nhat_ky/2026-10-07_phien_292_hoan_thanh_pha_6_backfill_shadow_canary_va_e2e_testing.md).
+  - **Frontend Types & API Clients V2 (`types/documents.ts`, `types/knowledge.ts`, `services/documents-api.ts`, `services/knowledge-api.ts`)**:
+    * Mở rộng `types/documents.ts`: Thêm `current_revision_id` vào `RepositoryDocumentListItem`, bổ sung types `QualityReportCheck`, `QualityReport`, `DocumentRevisionListItem`, `DocumentRevision` (`review_notes`).
+    * Mở rộng `types/knowledge.ts`: Khai báo đầy đủ `AvailableRepositoryDocumentItem`, `AvailableRepositoryDocumentsResponse`, `CreateKnowledgeBindingsRequest`, `KnowledgeBinding`, `KnowledgeIndexRevision`, `IndexActivationRequest`, `IndexActivationResponse`.
+    * Mở rộng `documents-api.ts`: Bổ sung 5 API methods quản lý revision (`getRevisions`, `getRevision`, `updateRevisionContent`, `reviewRevision`, `retryRevision`).
+    * Mở rộng `knowledge-api.ts`: Bổ sung 7 API methods quản lý publishing V2 (`getAvailableDocuments`, `createBindings`, `getBindings`, `getBinding`, `detachBinding`, `buildStagingIndex`, `promoteIndexRevision`, `getIndexRevisions`).
+  - **Giao diện Chi tiết Tài liệu & Chuỗi Phiên bản (`features/documents/document-detail-page.tsx`)**:
+    * Bổ sung Tab "Phiên Bản (Revisions V2)" hiển thị lịch sử Audit Trail của tài liệu (v1, v2,...) với trạng thái Ready / Chờ Thẩm Định / Đang Xử Lý / Lỗi.
+    * Thẻ Quality Gate Report tự động: Hiển thị điểm % chất lượng, trạng thái Đạt Tiêu Chuẩn Xuất Bản, kiểm định 4 tiêu chí (Mật độ ký tự, Bảng biểu, Sạch Font UTF-8, Độ dài tối thiểu).
+    * Dialog "Hiệu đính Markdown": Cho phép biên tập viên chỉnh sửa Markdown trực tiếp và bắt buộc nhập lý do hiệu đính (kiểm toán ISO).
+    * Dialog "Thẩm định chất lượng": Phê duyệt chuyển sang trạng thái `ready` hoặc từ chối kèm ghi chú.
+    * Dialog "Thử lại bóc tách (Retry)": Hỗ trợ chọn công cụ OCR (`PyMuPdfParser` hoặc `DoclingParser`).
+  - **Giao diện Quản lý Liên kết Tri thức & Xuất bản Chỉ mục V2 (`components/knowledge/tabs/collection-bindings-tab.tsx`, `collection-detail-page.tsx`)**:
+    * Tạo component tab mới `CollectionBindingsTab` tích hợp vào Kho Tri Thức (Tab "Liên kết V2 (ADR-011)").
+    * Bảng danh sách Knowledge Bindings kết nối Bento Grid: Quản lý tài liệu liên kết, chiến lược chunking, active epoch.
+    * Dialog "+ Liên Kết Tài Liệu Từ Kho": Cho phép tìm kiếm và tích chọn nhiều tài liệu đã thẩm định từ Kho Trung Tâm.
+    * Chi tiết Index Revisions & Parity Gate: Kiểm tra so khớp 100% `vector_count` vs `expected_chunks` vs `lexical_count`.
+    * Nút & Dialog "Kích Hoạt Nguyên Tử (Promote)": Chuyển đổi con trỏ chỉ mục nguyên tử (Atomic Pointer Swap) mà không gián đoạn truy vấn AI (Zero Downtime).
+  - **Xác thực Chất lượng (Fast-Path Verification & Linters)**:
+    * Biome Linter: Đạt **0 lỗi, 0 cảnh báo** (100% compliant).
+    * TypeScript & Vite Production Build (`npm run build`): Đóng gói hoàn tất trong **4.41s**, **0 lỗi TypeScript, 0 lỗi JSX, exit code 0**.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_291_hoan_thanh_pha_5_giao_dien_quan_tri_revisions_va_bindings_v2.md`](./nhat_ky/2026-10-07_phien_291_hoan_thanh_pha_5_giao_dien_quan_tri_revisions_va_bindings_v2.md).
+
+- **Phiên trước #288**:
+
+  - **SQLAlchemy ORM Data Models**:
+    * Mở rộng `RepositoryDocument` (`models.py`) với `tenant_id`, `workspace_id`, `status`, `current_revision_id`, `latest_revision_no`, `row_version`, `catalog_metadata`.
+    * Khai báo mới model `DocumentRevision` (`models.py`) đáp ứng đầy đủ chuỗi phiên bản bất biến.
+  - **Alembic Safe Backfill Migration (`20261007_document_revisions.py`)**:
+    * Safe Backfill tự động tạo revision v1 từ toàn bộ tài liệu hiện hữu.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_287_hoan_thanh_pha_1_schema_csdl_document_revisions_va_dto_v2.md`](./nhat_ky/2026-10-07_phien_287_hoan_thanh_pha_1_schema_csdl_document_revisions_va_dto_v2.md).
+
+- **Phiên trước #286**:
+  - **Ban hành Kiến trúc Quyết định chính thức ADR-011**:
+    * Đã tạo lập văn kiện [`docs/adr/ADR-011-immutable-document-revisions-and-safe-knowledge-publishing.md`](../adr/ADR-011-immutable-document-revisions-and-safe-knowledge-publishing.md).
+    * Khóa cứng **Mười Bất Biến Bắt Buộc (The 10 Invariants)**: Source Immutability, Artifact Immutability, Zero-Downtime Reindexing, Single Active Pointer, Snapshot Consistency, Vector Space Invariance, Zero Hardcoded Models, Idempotent Retry, Tenant Isolation, Referential Integrity.
+    * Xác lập ranh giới: Kho Tài Liệu là Nguồn Sự Thật Duy Nhất (`DocumentRevision` bất biến); Kho Tri Thức chuyển sang mô hình liên kết `KnowledgeBinding` và artifact `KnowledgeIndexRevision` ở vùng Staging.
+    * Cơ chế Atomic Pointer Swap CAS và RetrievalSnapshot dùng chung cho Dense, Sparse, Facts, Citations triệt tiêu 100% mixed citations.
+  - **Ban hành Đặc tả Kỹ thuật API Contracts V2 & Kiểm kê Hệ thống**:
+    * Đã tạo lập văn kiện [`docs/ke_hoach/contracts_v2_specification.md`](../ke_hoach/contracts_v2_specification.md).
+    * Bản đồ đối chiếu 9 bảng CSDL, 12 endpoints chuyển đổi, nâng cấp Qdrant payload V2, quy chuẩn Idempotency-Key và ma trận Feature Flags/Kill Switches.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_286_chot_adr011_va_api_contracts_v2_tiep_nhan_mot_lan_xuat_ban_an_toan.md`](./nhat_ky/2026-10-07_phien_286_chot_adr011_va_api_contracts_v2_tiep_nhan_mot_lan_xuat_ban_an_toan.md).
+
+- **Phiên trước #285**:
+  - **Tối ưu hóa UI Nạp Tài Liệu Tập Trung (`DocumentUploadModal`)**:
+    * Chuyển đổi sang chế độ kéo thả nhiều file cùng lúc (`multiple={true}`, `maxFiles={50}`, `maxSize={50MB}`).
+    * Cải tiến component `FileUpload` (`src/components/admin/file-upload.tsx`) thêm container cuộn mượt mà `max-h-48 overflow-y-auto` cho danh sách tệp.
+    * Thêm thanh tóm tắt dung lượng trực quan (`Đã chọn X tệp (Tổng Y MB)`) kèm nút `Xóa tất cả`.
+    * **Loại bỏ hoàn toàn các trường bắt buộc nhập tay**: Xóa bỏ ô nhập `Ngày ban hành`, `Số hiệu văn bản`, `Người ký`, `Tiêu đề`.
+    * Bổ sung **Card Thông Tin Bóc Tách Tự Động (Smart Recognition Banner)** phong cách Academic Teal (`Sparkles` icon): Giải thích rõ AI & Parser NĐ 30 tự động nhận diện thông tin từ nội dung tệp.
+    * Cung cấp **Cấu hình chung tùy chọn cho lô tệp (`Collapsible`)**: Cho phép người dùng chọn loại văn bản chung hoặc cơ quan ban hành chung nếu cần gán nhãn hàng loạt.
+    * Triển khai cơ chế **Batch Upload Progress**: Hiển thị thanh tiến trình `<Progress />` theo thời gian thực và tên tệp đang xử lý, toast tổng kết số file nạp thành công.
+  - **Backend: Bóc tách tự động metadata thể thức hành chính Nghị định 30/2020/NĐ-CP**:
+    * `backend/app/modules/knowledge/cleaner.py`: Xây dựng hàm `extract_administrative_metadata(text: str)` trích xuất theo các bất biến cú pháp (Syntactic Invariants, tuân thủ Tôn chỉ 7): Ngày ban hành (`issued_date`), Số hiệu (`document_number`), Loại văn bản (`document_type_code`), Trích yếu (`title`), Cơ quan ban hành (`issuing_authority`), Người ký (`signer`).
+    * `backend/app/modules/documents/service.py`: Trong `parse_and_cache_document`, tự động điền các trường metadata còn thiếu vào `RepositoryDocument` và lưu vào `doc_metadata["auto_detected_metadata"]`.
   - **Kiểm thử chất lượng**:
-    * Backend Pytest: `test_document_repository.py` 5/5 PASSED 100% trong 3.99s.
-    * Backend Ruff: `ruff check app/modules/documents/ tests/test_document_repository.py` sạch 0 lỗi.
-    * Frontend Vite Build: `npm run build` hoàn tất trong 3.23s với **0 lỗi TypeScript, 0 lỗi cú pháp Vite**, exit code 0.
+    * Backend Pytest: `tests/test_document_repository.py` đạt **6/6 PASSED 100%** (bao gồm test case tự động bóc tách NĐ 30).
+    * Backend Ruff: **0 errors**.
+    * Frontend Typecheck (`tsc --noEmit`): **0 errors (Pass 100%)**.
+    * Frontend Biome Linter (`biome check`): **0 errors (Pass 100%)**.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_285_toi_uu_ui_nap_tai_lieu_multi_file_va_tu_dong_nhan_dien_ngay_ban_hanh_nd30.md`](./nhat_ky/2026-10-07_phien_285_toi_uu_ui_nap_tai_lieu_multi_file_va_tu_dong_nhan_dien_ngay_ban_hanh_nd30.md).
+
+- **Phiên trước #284**:
+  - Chuyển Đổi Hạ Tầng AI Server Sang vLLM & Tích Hợp Native vLLM Reranker (/v1/rerank) & Embedding (/v1/embeddings).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_284_chuyen_doi_ha_tang_ai_server_sang_vllm_va_tich_hop_native_reranker.md`](./nhat_ky/2026-10-07_phien_284_chuyen_doi_ha_tang_ai_server_sang_vllm_va_tich_hop_native_reranker.md).
+
+- **Phiên trước #283**:
+  - Triển Khai Phân Hệ Kho Tài Liệu Tập Trung (Document Repository) Lưu Trữ MinIO S3, Tiền Bóc Tách Markdown & Tích Hợp Kho Tri Thức Vector DB.
   - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-07_phien_283_trien_khai_kho_tai_lieu_tap_trung_minio_s3_va_tich_hop_kho_tri_thuc.md`](./nhat_ky/2026-10-07_phien_283_trien_khai_kho_tai_lieu_tap_trung_minio_s3_va_tich_hop_kho_tri_thuc.md).
 
 - **Phiên trước #282**:

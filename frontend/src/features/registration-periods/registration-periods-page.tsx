@@ -1710,14 +1710,12 @@ function CreateRegistrationPeriodDialog({
                       id="period-room-start"
                       value={field.state.value}
                       disabled={pending}
-                      minDate={
-                        form.getFieldValue("endAt")
-                          ? new Date(
-                              form.getFieldValue("endAt")!.getTime() +
-                                24 * 60 * 60 * 1000,
-                            )
-                          : undefined
-                      }
+                      minDate={(() => {
+                        const endAtVal = form.getFieldValue("endAt");
+                        return endAtVal
+                          ? new Date(endAtVal.getTime() + 24 * 60 * 60 * 1000)
+                          : undefined;
+                      })()}
                       onBlur={field.handleBlur}
                       onChange={(value) => field.handleChange(value)}
                       onValidationChange={(message) => {

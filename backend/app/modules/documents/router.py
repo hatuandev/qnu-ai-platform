@@ -19,12 +19,19 @@ from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.modules.auth.dependencies import require_permission
+from app.modules.auth.dependencies import AuthActor, require_permission
+from app.modules.documents.intake_service import document_intake_service
+from app.modules.documents.revision_service import document_revision_service
 from app.modules.documents.schemas import (
+    AsyncUploadDocumentResponse,
+    DocumentRevisionListItem,
+    DocumentRevisionResponse,
     ReparseDocumentRequest,
     RepositoryDocumentResponse,
     RepositoryDocumentStatsResponse,
     RepositoryDocumentUpdate,
+    ReviewRevisionContentRequest,
+    SubmitRevisionReviewRequest,
 )
 from app.modules.documents.service import document_repository_service
 
@@ -32,10 +39,43 @@ router = APIRouter(prefix="/documents", tags=["04b Kho Tài Liệu Tập Trung (
 
 
 @router.post(
+    "/intake",
+    response_model=AsyncUploadDocumentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Tiếp nhận tệp bất đồng bộ vào Kho Tài Liệu (Chuẩn V2 ADR-011)",
+)
+async def intake_document(
+    file: UploadFile = File(..., description="Tệp tài liệu gốc (PDF, Word, Excel, Text)"),
+    title: str | None = Form(None, description="Tiêu đề hiển thị văn bản"),
+    document_type_code: str | None = Form(None, description="Mã loại văn bản chuẩn NĐ 30"),
+    document_number: str | None = Form(None, description="Số hiệu văn bản (vd: 2139/QĐ-ĐHQN)"),
+    issuing_authority: str | None = Form(None, description="Cơ quan ban hành"),
+    issued_date: date | None = Form(None, description="Ngày ký ban hành"),
+    effective_date: date | None = Form(None, description="Ngày có hiệu lực"),
+    ocr_engine: str | None = Form(None, description="Engine OCR (auto, pymupdf_ocr, qwen3-vl:8b)"),
+    db: AsyncSession = Depends(get_db),
+    _auth: object = Depends(require_permission("ai.knowledge.upload")),
+) -> AsyncUploadDocumentResponse:
+    content = await file.read()
+    return await document_intake_service.intake_document(
+        db=db,
+        file_bytes=content,
+        file_name=file.filename or "tailieu_chuadattrang.pdf",
+        title=title,
+        document_type_code=document_type_code,
+        document_number=document_number,
+        issuing_authority=issuing_authority,
+        issued_date=issued_date,
+        effective_date=effective_date,
+        ocr_engine=ocr_engine,
+    )
+
+
+@router.post(
     "/upload",
     response_model=RepositoryDocumentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Tải lên tệp vào Kho Tài Liệu Tập Trung",
+    summary="Tải lên tệp vào Kho Tài Liệu Tập Trung (Compatibility V1)",
 )
 async def upload_document(
     file: UploadFile = File(..., description="Tệp tài liệu gốc (PDF, Word, Excel, Text)"),
@@ -76,7 +116,9 @@ async def list_documents(
     search: str | None = Query(None, description="Tìm kiếm theo tiêu đề, số hiệu, tên tệp"),
     document_type_code: str | None = Query(None, description="Lọc theo mã loại văn bản"),
     file_type: str | None = Query(None, description="Lọc theo định dạng tệp (pdf, docx, xlsx...)"),
-    parse_status: str | None = Query(None, description="Lọc theo trạng thái bóc tách (parsed, pending, failed)"),
+    parse_status: str | None = Query(
+        None, description="Lọc theo trạng thái bóc tách (parsed, pending, failed)"
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -144,7 +186,9 @@ async def update_document(
 )
 async def delete_document(
     document_id: str,
-    force: bool = Query(False, description="Xóa cưỡng bức ngay cả khi đang được gắn vào Kho Tri Thức"),
+    force: bool = Query(
+        False, description="Xóa cưỡng bức ngay cả khi đang được gắn vào Kho Tri Thức"
+    ),
     db: AsyncSession = Depends(get_db),
     _auth: object = Depends(require_permission("ai.knowledge.delete")),
 ) -> dict[str, str]:
@@ -224,3 +268,95 @@ async def preview_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"},
     )
+
+
+# =========================================================================
+# V2 Revision Lifecycle & Human Review Endpoints
+# =========================================================================
+
+
+@router.get(
+    "/{document_id}/revisions",
+    response_model=list[DocumentRevisionListItem],
+    summary="Danh sách toàn bộ các bản sửa đổi (Revisions) của tài liệu",
+)
+async def list_document_revisions(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> list[DocumentRevisionListItem]:
+    return await document_revision_service.list_document_revisions(
+        db, document_id, actor=actor
+    )
+
+
+@router.get(
+    "/{document_id}/revisions/{revision_id}",
+    response_model=DocumentRevisionResponse,
+    summary="Chi tiết một bản sửa đổi tài liệu (Manifests, Provenance & Quality)",
+)
+async def get_document_revision(
+    document_id: str,
+    revision_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> DocumentRevisionResponse:
+    return await document_revision_service.get_document_revision(
+        db, document_id, revision_id, actor=actor
+    )
+
+
+@router.patch(
+    "/{document_id}/revisions/{revision_id}/content",
+    response_model=DocumentRevisionResponse,
+    summary="Hiệu đính nội dung Markdown trong giai đoạn xem xét (Review Phase)",
+)
+async def update_revision_content(
+    document_id: str,
+    revision_id: str,
+    body: ReviewRevisionContentRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+) -> DocumentRevisionResponse:
+    return await document_revision_service.update_revision_content(
+        db, document_id, revision_id, body, actor=actor
+    )
+
+
+@router.post(
+    "/{document_id}/revisions/{revision_id}/review",
+    response_model=DocumentRevisionResponse,
+    summary="Phê duyệt hoặc từ chối bản sửa đổi tài liệu (Chuyển trạng thái Ready)",
+)
+async def submit_revision_review(
+    document_id: str,
+    revision_id: str,
+    body: SubmitRevisionReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+) -> DocumentRevisionResponse:
+    return await document_revision_service.submit_revision_review(
+        db, document_id, revision_id, body, actor=actor
+    )
+
+
+@router.post(
+    "/{document_id}/revisions/{revision_id}/retry",
+    response_model=DocumentRevisionResponse,
+    summary="Thử lại quy trình bóc tách và thẩm định chất lượng cho bản sửa đổi",
+)
+async def retry_revision(
+    document_id: str,
+    revision_id: str,
+    ocr_engine: str | None = Query(None, description="Tùy chọn OCR engine khi retry"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+) -> DocumentRevisionResponse:
+    rev = await document_revision_service.process_revision(
+        db,
+        revision_id=revision_id,
+        document_id=document_id,
+        actor=actor,
+        ocr_engine=ocr_engine,
+    )
+    return document_revision_service._to_response_dto(rev)

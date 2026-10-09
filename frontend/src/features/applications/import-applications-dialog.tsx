@@ -216,17 +216,9 @@ export function ImportApplicationsDialog({
                 Chọn file Excel dữ liệu{" "}
                 <span className="text-destructive">*</span>
               </Label>
-              <div
+              <label
+                htmlFor={fileInputId}
                 className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 text-center hover:bg-muted/40 cursor-pointer transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    fileInputRef.current?.click();
-                  }
-                }}
-                role="button"
-                tabIndex={0}
               >
                 <input
                   id={fileInputId}
@@ -257,7 +249,7 @@ export function ImportApplicationsDialog({
                     </p>
                   </div>
                 )}
-              </div>
+              </label>
             </div>
 
             {/* Alert thông tin cơ chế tự động */}
@@ -363,8 +355,11 @@ export function ImportApplicationsDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {importResult.errors.map((err, idx) => (
-                        <TableRow key={idx} className="text-xs">
+                      {importResult.errors.map((err) => (
+                        <TableRow
+                          key={`err-row-${err.rowNumber}`}
+                          className="text-xs"
+                        >
                           <TableCell className="text-center font-medium">
                             {err.rowNumber}
                           </TableCell>

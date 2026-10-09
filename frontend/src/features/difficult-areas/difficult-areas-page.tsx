@@ -242,8 +242,8 @@ export function DifficultAreasPage({
           const isWhole = row.original.isWholeArea;
           if (isWhole) {
             return (
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                <CheckCircle2 className="size-3.5 text-primary shrink-0" />
                 <span>Toàn bộ xã</span>
               </div>
             );
@@ -306,7 +306,7 @@ export function DifficultAreasPage({
         },
       },
     ],
-    [search.page, search.pageSize, canManage],
+    [search.page, search.pageSize],
   );
 
   const table = useReactTable({
@@ -606,8 +606,17 @@ export function DifficultAreasPage({
             </TableHeader>
             <TableBody>
               {areasQuery.isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={`skeleton-row-${i}`}>
+                [
+                  "diff-sk-1",
+                  "diff-sk-2",
+                  "diff-sk-3",
+                  "diff-sk-4",
+                  "diff-sk-5",
+                  "diff-sk-6",
+                  "diff-sk-7",
+                  "diff-sk-8",
+                ].map((rowKey) => (
+                  <TableRow key={rowKey}>
                     <TableCell>
                       <Skeleton className="h-4 w-4 mx-auto" />
                     </TableCell>

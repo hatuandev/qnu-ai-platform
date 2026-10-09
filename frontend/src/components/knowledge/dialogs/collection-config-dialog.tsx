@@ -1,5 +1,18 @@
-import { AlertCircle, Cpu, Eye, Lock, Settings, Sparkles } from "lucide-react";
-import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import {
+  AlertCircle,
+  Cpu,
+  ExternalLink,
+  Eye,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +24,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiClient } from "@/services/modelops-api";
 import type { CollectionDataProcessingConfig } from "@/types/knowledge";
+import type { ModelOption } from "@/types/modelops";
 
 interface CollectionConfigDialogProps {
   open: boolean;
@@ -28,61 +43,6 @@ interface CollectionConfigDialogProps {
   isSaving: boolean;
   onSave: () => void;
 }
-
-const AVAILABLE_EMBEDDINGS = [
-  {
-    model: "bge-m3:latest",
-    provider: "prov_rtx5090_ollama",
-    label: "BGE-M3 Multilingual (1024D) - RTX 5090 On-Premise",
-    dim: 1024,
-  },
-  {
-    model: "@cf/baai/bge-m3",
-    provider: "prov_cloudflare",
-    label: "Cloudflare BGE-M3 (1024D) - Cloud Edge",
-    dim: 1024,
-  },
-  {
-    model: "text-embedding-3-small",
-    provider: "prov_openai",
-    label: "OpenAI Text-Embedding-3 Small (1536D)",
-    dim: 1536,
-  },
-  {
-    model: "text-embedding-3-large",
-    provider: "prov_openai",
-    label: "OpenAI Text-Embedding-3 Large (3072D)",
-    dim: 3072,
-  },
-];
-
-const AVAILABLE_OCR_MODELS = [
-  {
-    model: "qwen3-vl:8b",
-    provider: "prov_rtx5090_ollama",
-    label: "Qwen3-VL 8B Instruct (RTX 5090 On-Premise) - Khuyến nghị",
-  },
-  {
-    model: "gemini-3.1-flash-lite",
-    provider: "prov_gemini",
-    label: "Google Gemini 3.1 Flash Lite (Google AI)",
-  },
-  {
-    model: "gemini-2.5-flash",
-    provider: "prov_gemini",
-    label: "Google Gemini 2.5 Flash (Google AI)",
-  },
-  {
-    model: "gpt-4o-mini",
-    provider: "prov_openai",
-    label: "OpenAI GPT-4o-mini Vision (OpenAI Cloud)",
-  },
-  {
-    model: "mistral-ocr-2503",
-    provider: "prov_mistral",
-    label: "Mistral OCR 2503 Document Understanding",
-  },
-];
 
 export function CollectionConfigDialog({
   open,
@@ -103,40 +63,56 @@ export function CollectionConfigDialog({
 
   const isVectorLocked = documentCount > 0;
 
-  const currentEmbeddingModel =
-    dataProcessingConfig.embedding_model || "bge-m3:latest";
-  const currentPrimaryOcr =
-    dataProcessingConfig.primary_ocr_model || "qwen3-vl:8b";
-  const currentFallbackOcr =
-    dataProcessingConfig.fallback_ocr_model || "gemini-3.1-flash-lite";
-  const isOcrRescueEnabled =
-    dataProcessingConfig.enable_ocr_rescue !== false;
+  // Dynamically resolve available models from ModelOps API
+  const {
+    data: modelDefaults,
+    isLoading: isModelsLoading,
+    isError: isModelsError,
+    refetch: refetchModels,
+  } = useQuery({
+    queryKey: ["system-model-defaults"],
+    queryFn: () => apiClient.getSystemModelDefaults(),
+    staleTime: 60000,
+  });
 
-  const handleSelectEmbedding = (item: (typeof AVAILABLE_EMBEDDINGS)[0]) => {
+  const availableEmbeddings: ModelOption[] =
+    modelDefaults?.available_embeddings || [];
+  const availableOcrs: ModelOption[] = modelDefaults?.available_ocrs || [];
+
+  const currentEmbeddingModel = dataProcessingConfig.embedding_model || "";
+  const currentEmbeddingProvider =
+    dataProcessingConfig.embedding_provider_id || "";
+  const currentPrimaryOcr = dataProcessingConfig.primary_ocr_model || "";
+  const currentPrimaryOcrProvider =
+    dataProcessingConfig.primary_ocr_provider_id || "";
+  const currentFallbackOcr = dataProcessingConfig.fallback_ocr_model || "";
+  const currentFallbackOcrProvider =
+    dataProcessingConfig.fallback_ocr_provider_id || "";
+  const isOcrRescueEnabled = dataProcessingConfig.enable_ocr_rescue !== false;
+
+  const handleSelectEmbedding = (item: ModelOption) => {
     if (isVectorLocked) return;
     setDataProcessingConfig((prev) => ({
       ...prev,
-      embedding_model: item.model,
-      embedding_provider_id: item.provider,
-      embedding_dimension: item.dim,
+      embedding_model: item.model_name,
+      embedding_provider_id: item.provider_id,
+      embedding_dimension: item.dimension || undefined,
     }));
   };
 
-  const handleSelectPrimaryOcr = (item: (typeof AVAILABLE_OCR_MODELS)[0]) => {
+  const handleSelectPrimaryOcr = (item: ModelOption) => {
     setDataProcessingConfig((prev) => ({
       ...prev,
-      primary_ocr_model: item.model,
-      primary_ocr_provider_id: item.provider,
+      primary_ocr_model: item.model_name,
+      primary_ocr_provider_id: item.provider_id,
     }));
   };
 
-  const handleSelectFallbackOcr = (
-    item: (typeof AVAILABLE_OCR_MODELS)[0],
-  ) => {
+  const handleSelectFallbackOcr = (item: ModelOption) => {
     setDataProcessingConfig((prev) => ({
       ...prev,
-      fallback_ocr_model: item.model,
-      fallback_ocr_provider_id: item.provider,
+      fallback_ocr_model: item.model_name,
+      fallback_ocr_provider_id: item.provider_id,
     }));
   };
 
@@ -146,6 +122,11 @@ export function CollectionConfigDialog({
       enable_ocr_rescue: checked,
     }));
   };
+
+  const isEmbeddingIncomplete =
+    !dataProcessingConfig.embedding_model ||
+    !dataProcessingConfig.embedding_provider_id ||
+    !dataProcessingConfig.embedding_dimension;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,8 +145,11 @@ export function CollectionConfigDialog({
               </div>
             </div>
             {documentCount > 0 && (
-              <Badge variant="outline" className="text-[10px] gap-1 font-mono">
-                <Lock className="size-3 text-amber-500" />
+              <Badge
+                variant="outline"
+                className="text-[10px] gap-1 font-mono text-warning border-warning/30 bg-warning/10"
+              >
+                <Lock className="size-3 text-warning" />
                 <span>{documentCount} tài liệu</span>
               </Badge>
             )}
@@ -231,65 +215,125 @@ export function CollectionConfigDialog({
           {/* TAB 2: VECTOR EMBEDDING */}
           <TabsContent value="embedding" className="space-y-4">
             {isVectorLocked && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-warning flex items-start gap-2.5">
                 <AlertCircle className="size-4 shrink-0 mt-0.5" />
                 <div className="space-y-0.5 text-[11px] leading-relaxed">
-                  <p className="font-semibold">
+                  <p className="font-semibold text-foreground">
                     Quy tắc Bất biến Không gian Vector (Vector Invariance)
                   </p>
-                  <p>
+                  <p className="text-muted-foreground">
                     Kho này hiện có <strong>{documentCount}</strong> tài liệu đã
                     được vector hóa và lập chỉ mục trong Qdrant. Không thể thay
                     đổi mô hình Embedding để tránh lệch không gian toán học. Để
-                    thay đổi, vui lòng xóa toàn bộ tài liệu trước.
+                    thay đổi, cần chạy quy trình di chuyển (migration) hoặc làm
+                    trống tài liệu.
                   </p>
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground block">
-                Mô hình Embedding được áp dụng
-              </label>
-              <div className="space-y-2">
-                {AVAILABLE_EMBEDDINGS.map((item) => {
-                  const isSelected = currentEmbeddingModel === item.model;
-                  return (
-                    <div
-                      key={item.model}
-                      onClick={() => handleSelectEmbedding(item)}
-                      className={`p-3 rounded-lg border text-left transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border hover:border-muted-foreground/30 bg-card"
-                      } ${isVectorLocked ? "opacity-75 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium text-xs text-foreground flex items-center gap-2">
-                          <Cpu className="size-3.5 text-primary" />
-                          <span>{item.label}</span>
-                        </div>
-                        {isSelected && (
-                          <Badge
-                            variant="default"
-                            className="text-[10px] px-1.5 py-0 h-4"
-                          >
-                            Đang dùng
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-3">
-                        <span>
-                          Model:{" "}
-                          <code className="text-foreground">{item.model}</code>
-                        </span>
-                        <span>•</span>
-                        <span>Kích thước vector: {item.dim} chiều</span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground block">
+                  Mô hình Embedding được áp dụng
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => refetchModels()}
+                  className="h-6 px-1.5 text-[10px] text-muted-foreground gap-1"
+                >
+                  <RefreshCw className="size-3" />
+                  <span>Làm mới</span>
+                </Button>
               </div>
+
+              {isModelsLoading ? (
+                <div className="p-6 text-center text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span>Đang tải danh sách mô hình từ ModelOps...</span>
+                </div>
+              ) : isModelsError || availableEmbeddings.length === 0 ? (
+                <div className="p-4 rounded-lg border border-border bg-card text-center space-y-2">
+                  <p className="text-xs font-medium text-foreground">
+                    Chưa có mô hình Embedding nào được cấu hình trong ModelOps
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Vui lòng thiết lập nhà cung cấp và mô hình tại trang Quản lý
+                    Mô hình trước khi cấu hình kho tri thức.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="h-7 text-xs gap-1.5 mt-2"
+                  >
+                    <Link to="/models">
+                      <ExternalLink className="size-3" />
+                      <span>Đến trang Quản lý Mô hình</span>
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {availableEmbeddings.map((item) => {
+                    const isSelected =
+                      currentEmbeddingModel === item.model_name &&
+                      currentEmbeddingProvider === item.provider_id;
+                    return (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        key={`${item.provider_id}-${item.model_name}`}
+                        onClick={() => handleSelectEmbedding(item)}
+                        disabled={isVectorLocked}
+                        className={`h-auto w-full justify-start whitespace-normal p-3 rounded-lg border text-left transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "border-border hover:border-muted-foreground/30 bg-card"
+                        } ${isVectorLocked ? "opacity-75 cursor-not-allowed" : "cursor-pointer"}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-xs text-foreground flex items-center gap-2">
+                            <Cpu className="size-3.5 text-primary" />
+                            <span>
+                              {item.model_name} ({item.provider_name})
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <Badge
+                              variant="default"
+                              className="text-[10px] px-1.5 py-0 h-4"
+                            >
+                              Đang dùng
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-3">
+                          <span>
+                            Nhà cung cấp:{" "}
+                            <span className="text-foreground">
+                              {item.provider_name}
+                            </span>
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Số chiều:{" "}
+                            {item.dimension ? `${item.dimension}D` : "Chưa rõ"}
+                          </span>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isEmbeddingIncomplete && (
+                <p className="text-[11px] text-destructive pt-1">
+                  Mô hình embedding đã chọn thiếu thông tin provider hoặc
+                  dimension trong ModelOps. Không thể lưu.
+                </p>
+              )}
             </div>
           </TabsContent>
 
@@ -304,8 +348,8 @@ export function CollectionConfigDialog({
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Tự động chuyển tiếp trang PDF scan hoặc ảnh sang mô hình Vision
-                  OCR chuyên sâu
+                  Tự động chuyển tiếp trang PDF scan hoặc ảnh sang mô hình
+                  Vision OCR chuyên sâu
                 </p>
               </div>
               <Switch
@@ -315,75 +359,120 @@ export function CollectionConfigDialog({
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground block">
+              <span className="text-xs font-semibold text-foreground block">
                 Mô hình Vision OCR Chính (Primary)
-              </label>
-              <div className="space-y-1.5">
-                {AVAILABLE_OCR_MODELS.map((item) => {
-                  const isSelected = currentPrimaryOcr === item.model;
-                  return (
-                    <div
-                      key={item.model}
-                      onClick={() => handleSelectPrimaryOcr(item)}
-                      className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                          : "border-border hover:border-muted-foreground/30 bg-card"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-xs text-foreground">
-                          {item.label}
-                        </span>
-                        {isSelected && (
-                          <Badge
-                            variant="default"
-                            className="text-[10px] px-1.5 py-0 h-4"
-                          >
-                            Chính
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              </span>
+              {isModelsLoading ? (
+                <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span>Đang tải mô hình OCR...</span>
+                </div>
+              ) : isModelsError || availableOcrs.length === 0 ? (
+                <div className="p-3 rounded-lg border border-border bg-card text-center space-y-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    Chưa có mô hình OCR nào được cấu hình trong ModelOps
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="h-7 text-xs gap-1.5"
+                  >
+                    <Link to="/models">
+                      <ExternalLink className="size-3" />
+                      <span>Cấu hình tại ModelOps</span>
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {availableOcrs.map((item) => {
+                    const isSelected =
+                      currentPrimaryOcr === item.model_name &&
+                      currentPrimaryOcrProvider === item.provider_id;
+                    return (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        key={`primary-${item.provider_id}-${item.model_name}`}
+                        onClick={() => handleSelectPrimaryOcr(item)}
+                        className={`h-auto w-full justify-start whitespace-normal p-2.5 rounded-lg border cursor-pointer text-left transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                            : "border-border hover:border-muted-foreground/30 bg-card"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-xs text-foreground">
+                            {item.model_name} — {item.provider_name}
+                          </span>
+                          {isSelected && (
+                            <Badge
+                              variant="default"
+                              className="text-[10px] px-1.5 py-0 h-4"
+                            >
+                              Chính
+                            </Badge>
+                          )}
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground block">
+              <span className="text-xs font-semibold text-foreground block">
                 Mô hình Vision OCR Dự phòng (Fallback)
-              </label>
-              <div className="space-y-1.5">
-                {AVAILABLE_OCR_MODELS.map((item) => {
-                  const isSelected = currentFallbackOcr === item.model;
-                  return (
-                    <div
-                      key={item.model}
-                      onClick={() => handleSelectFallbackOcr(item)}
-                      className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
-                        isSelected
-                          ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500/30"
-                          : "border-border hover:border-muted-foreground/30 bg-card"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-xs text-foreground">
-                          {item.label}
-                        </span>
-                        {isSelected && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-500/30 px-1.5 py-0 h-4"
-                          >
-                            Dự phòng
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              </span>
+              {isModelsLoading ? (
+                <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span>Đang tải mô hình OCR...</span>
+                </div>
+              ) : isModelsError || availableOcrs.length === 0 ? (
+                <div className="p-3 rounded-lg border border-border bg-card text-center text-muted-foreground">
+                  <p className="text-xs">
+                    Chưa có mô hình OCR dự phòng trong ModelOps
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {availableOcrs.map((item) => {
+                    const isSelected =
+                      currentFallbackOcr === item.model_name &&
+                      currentFallbackOcrProvider === item.provider_id;
+                    return (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        key={`fallback-${item.provider_id}-${item.model_name}`}
+                        onClick={() => handleSelectFallbackOcr(item)}
+                        className={`h-auto w-full justify-start whitespace-normal p-2.5 rounded-lg border cursor-pointer text-left transition-all ${
+                          isSelected
+                            ? "border-warning bg-warning/5 ring-1 ring-warning/30"
+                            : "border-border hover:border-muted-foreground/30 bg-card"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-xs text-foreground">
+                            {item.model_name} — {item.provider_name}
+                          </span>
+                          {isSelected && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-warning border-warning/30 px-1.5 py-0 h-4"
+                            >
+                              Dự phòng
+                            </Badge>
+                          )}
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
@@ -401,7 +490,7 @@ export function CollectionConfigDialog({
             size="sm"
             className="h-8 text-xs gap-1.5"
             onClick={onSave}
-            disabled={isSaving}
+            disabled={isSaving || isEmbeddingIncomplete}
           >
             {isSaving ? "Đang lưu cấu hình..." : "Lưu Cấu Hình"}
           </Button>

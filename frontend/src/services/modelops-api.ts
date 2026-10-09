@@ -460,3 +460,5 @@ export const modelopsApi = {
     return await res.json();
   },
 };
+
+export const apiClient = modelopsApi;

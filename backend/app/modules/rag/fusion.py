@@ -19,6 +19,9 @@ class FusionCandidate:
     section: str | None = None
     page_number: int | None = None
     metadata: dict[str, Any] | None = None
+    binding_id: str | None = None
+    index_revision_id: str | None = None
+    document_revision: int | None = None
 
 
 def _merge_ranked_list(
@@ -33,6 +36,11 @@ def _merge_ranked_list(
     for rank, item in enumerate(results, start=1):
         cid = str(item["chunk_id"])
         scores[cid] = scores.get(cid, 0.0) + (weight / (k + rank))
+        item_meta = item.get("metadata") or {}
+        b_id = item.get("binding_id") or item_meta.get("binding_id")
+        idx_rev_id = item.get("index_revision_id") or item_meta.get("index_revision_id")
+        doc_rev = item.get("document_revision") or item_meta.get("document_revision")
+
         if cid not in candidates:
             candidates[cid] = FusionCandidate(
                 chunk_id=cid,
@@ -41,11 +49,21 @@ def _merge_ranked_list(
                 rrf_score=0.0,
                 section=item.get("section"),
                 page_number=item.get("page_number"),
-                metadata=item.get("metadata", {}),
+                metadata=item_meta,
+                binding_id=str(b_id) if b_id else None,
+                index_revision_id=str(idx_rev_id) if idx_rev_id else None,
+                document_revision=int(doc_rev) if doc_rev is not None else None,
             )
             setattr(candidates[cid], rank_field, rank)
-        elif getattr(candidates[cid], rank_field, -1) == -1:
-            setattr(candidates[cid], rank_field, rank)
+        else:
+            if not candidates[cid].binding_id and b_id:
+                candidates[cid].binding_id = str(b_id)
+            if not candidates[cid].index_revision_id and idx_rev_id:
+                candidates[cid].index_revision_id = str(idx_rev_id)
+            if candidates[cid].document_revision is None and doc_rev is not None:
+                candidates[cid].document_revision = int(doc_rev)
+            if getattr(candidates[cid], rank_field, -1) == -1:
+                setattr(candidates[cid], rank_field, rank)
 
 
 def reciprocal_rank_fusion(

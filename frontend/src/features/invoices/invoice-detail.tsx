@@ -464,13 +464,151 @@ export function InvoiceDetailPage({
                   </p>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <PaymentForm
-                    paymentForm={paymentForm}
-                    remainingAmount={remainingAmount}
-                    paymentError={paymentError}
-                    setPaymentError={setPaymentError}
-                    createPayment={createPayment}
-                  />
+                  <form
+                    className="space-y-3"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (paymentForm.state.values.amount > remainingAmount) {
+                        setPaymentError(overpaymentMessage);
+                        return;
+                      }
+                      void paymentForm.handleSubmit();
+                    }}
+                  >
+                    <paymentForm.Field name="amount">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="invoice-payment-amount">
+                            Số tiền (₫)
+                          </FieldLabel>
+                          <Input
+                            id="invoice-payment-amount"
+                            type="text"
+                            inputMode="numeric"
+                            value={formatVndInput(field.state.value || 0)}
+                            disabled={createPayment.isPending}
+                            onChange={(event) => {
+                              const amount = parseVndInput(event.target.value);
+                              field.handleChange(amount);
+                              setPaymentError(
+                                amount > remainingAmount
+                                  ? overpaymentMessage
+                                  : undefined,
+                              );
+                            }}
+                          />
+                          <FieldDescription>
+                            Tối đa: {money(remainingAmount)}
+                          </FieldDescription>
+                          {firstError(field.state.meta.errors) ? (
+                            <FieldError>
+                              {firstError(field.state.meta.errors)}
+                            </FieldError>
+                          ) : null}
+                        </Field>
+                      )}
+                    </paymentForm.Field>
+                    <paymentForm.Field name="paymentMethod">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel>Phương thức</FieldLabel>
+                          <Select
+                            value={field.state.value}
+                            disabled={createPayment.isPending}
+                            onValueChange={(val) =>
+                              field.handleChange(val as PaymentMethod)
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cash">Tiền mặt</SelectItem>
+                              <SelectItem value="bank_transfer">
+                                Chuyển khoản
+                              </SelectItem>
+                              <SelectItem value="other">Khác</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      )}
+                    </paymentForm.Field>
+                    <paymentForm.Field name="referenceNo">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="invoice-payment-reference">
+                            Mã tham chiếu
+                          </FieldLabel>
+                          <Input
+                            id="invoice-payment-reference"
+                            value={field.state.value}
+                            placeholder="VD: FT20250821001"
+                            disabled={createPayment.isPending}
+                            onChange={(event) =>
+                              field.handleChange(event.target.value)
+                            }
+                          />
+                          {firstError(field.state.meta.errors) ? (
+                            <FieldError>
+                              {firstError(field.state.meta.errors)}
+                            </FieldError>
+                          ) : null}
+                        </Field>
+                      )}
+                    </paymentForm.Field>
+                    <paymentForm.Field name="note">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="invoice-payment-note">
+                            Ghi chú ({field.state.value.length}/2000)
+                          </FieldLabel>
+                          <Textarea
+                            id="invoice-payment-note"
+                            rows={2}
+                            value={field.state.value}
+                            disabled={createPayment.isPending}
+                            onChange={(event) =>
+                              field.handleChange(event.target.value)
+                            }
+                          />
+                          {firstError(field.state.meta.errors) ? (
+                            <FieldError>
+                              {firstError(field.state.meta.errors)}
+                            </FieldError>
+                          ) : null}
+                        </Field>
+                      )}
+                    </paymentForm.Field>
+                    <paymentForm.Subscribe
+                      selector={(state) => [
+                        state.canSubmit,
+                        state.isSubmitting,
+                      ]}
+                    >
+                      {([canSubmit, formSubmitting]) => (
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={
+                            !canSubmit ||
+                            formSubmitting ||
+                            createPayment.isPending
+                          }
+                          className="w-full"
+                        >
+                          {createPayment.isPending
+                            ? "Đang xử lý..."
+                            : "Xác nhận thanh toán"}
+                        </Button>
+                      )}
+                    </paymentForm.Subscribe>
+                    {paymentError || createPayment.isError ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {paymentError ?? "Không thể ghi nhận thanh toán."}
+                      </p>
+                    ) : null}
+                  </form>
                 </CardContent>
               </Card>
             )
@@ -960,150 +1098,5 @@ export function InvoiceDetailPage({
         }}
       />
     </div>
-  );
-}
-
-function PaymentForm({
-  paymentForm,
-  remainingAmount,
-  paymentError,
-  setPaymentError,
-  createPayment,
-}: {
-  paymentForm: any;
-  remainingAmount: number;
-  paymentError?: string;
-  setPaymentError: (value: string | undefined) => void;
-  createPayment: any;
-}) {
-  return (
-    <form
-      className="space-y-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (
-          (paymentForm.state.values as { amount: number }).amount >
-          remainingAmount
-        ) {
-          setPaymentError(overpaymentMessage);
-          return;
-        }
-        void paymentForm.handleSubmit();
-      }}
-    >
-      <paymentForm.Field name="amount">
-        {(field: any) => (
-          <Field>
-            <FieldLabel htmlFor="invoice-payment-amount">
-              Số tiền (₫)
-            </FieldLabel>
-            <Input
-              id="invoice-payment-amount"
-              type="text"
-              inputMode="numeric"
-              value={formatVndInput(field.state.value || 0)}
-              disabled={createPayment.isPending}
-              onChange={(event) => {
-                const amount = parseVndInput(event.target.value);
-                field.handleChange(amount);
-                setPaymentError(
-                  amount > remainingAmount ? overpaymentMessage : undefined,
-                );
-              }}
-            />
-            <FieldDescription>
-              Tối đa: {money(remainingAmount)}
-            </FieldDescription>
-            {firstError(field.state.meta.errors) ? (
-              <FieldError>{firstError(field.state.meta.errors)}</FieldError>
-            ) : null}
-          </Field>
-        )}
-      </paymentForm.Field>
-      <paymentForm.Field name="paymentMethod">
-        {(field: any) => (
-          <Field>
-            <FieldLabel>Phương thức</FieldLabel>
-            <Select
-              value={field.state.value}
-              disabled={createPayment.isPending}
-              onValueChange={field.handleChange}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Tiền mặt</SelectItem>
-                <SelectItem value="bank_transfer">Chuyển khoản</SelectItem>
-                <SelectItem value="other">Khác</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        )}
-      </paymentForm.Field>
-      <paymentForm.Field name="referenceNo">
-        {(field: any) => (
-          <Field>
-            <FieldLabel htmlFor="invoice-payment-reference">
-              Mã tham chiếu
-            </FieldLabel>
-            <Input
-              id="invoice-payment-reference"
-              value={field.state.value}
-              placeholder="VD: FT20250821001"
-              disabled={createPayment.isPending}
-              onChange={(event) => field.handleChange(event.target.value)}
-            />
-            {firstError(field.state.meta.errors) ? (
-              <FieldError>{firstError(field.state.meta.errors)}</FieldError>
-            ) : null}
-          </Field>
-        )}
-      </paymentForm.Field>
-      <paymentForm.Field name="note">
-        {(field: any) => (
-          <Field>
-            <FieldLabel htmlFor="invoice-payment-note">
-              Ghi chú ({field.state.value.length}/2000)
-            </FieldLabel>
-            <Textarea
-              id="invoice-payment-note"
-              rows={2}
-              value={field.state.value}
-              disabled={createPayment.isPending}
-              onChange={(event) => field.handleChange(event.target.value)}
-            />
-            {firstError(field.state.meta.errors) ? (
-              <FieldError>{firstError(field.state.meta.errors)}</FieldError>
-            ) : null}
-          </Field>
-        )}
-      </paymentForm.Field>
-      <paymentForm.Subscribe
-        selector={(state: any) => [state.canSubmit, state.isSubmitting]}
-      >
-        {(state: any) => {
-          const [canSubmit, formSubmitting] = state as [boolean, boolean];
-          return (
-            <Button
-              type="submit"
-              size="sm"
-              disabled={!canSubmit || formSubmitting || createPayment.isPending}
-              className="w-full"
-            >
-              {createPayment.isPending
-                ? "Đang xử lý..."
-                : "Xác nhận thanh toán"}
-            </Button>
-          );
-        }}
-      </paymentForm.Subscribe>
-      {paymentError || createPayment.isError ? (
-        <p className="text-xs text-destructive" role="alert">
-          {paymentError ?? "Không thể ghi nhận thanh toán."}
-        </p>
-      ) : null}
-    </form>
   );
 }

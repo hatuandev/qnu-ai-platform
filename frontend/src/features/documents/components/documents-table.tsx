@@ -85,7 +85,9 @@ export function DocumentsTable({
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-10">
               <Checkbox
-                checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                checked={
+                  allSelected ? true : someSelected ? "indeterminate" : false
+                }
                 onCheckedChange={onToggleSelectAll}
                 aria-label="Chọn tất cả"
               />

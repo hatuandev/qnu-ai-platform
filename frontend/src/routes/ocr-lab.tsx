@@ -18,7 +18,5 @@ function OcrLabRoute() {
   const docId = search.docId || search.documentId;
   const collectionId = search.collectionId;
 
-  return (
-    <ScanStudioPage documentId={docId} collectionId={collectionId} />
-  );
+  return <ScanStudioPage documentId={docId} collectionId={collectionId} />;
 }

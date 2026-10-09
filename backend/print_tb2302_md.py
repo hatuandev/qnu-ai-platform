@@ -1,7 +1,9 @@
 import asyncio
 import sys
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
 
 sys.stdout.reconfigure(encoding='utf-8')

@@ -237,9 +237,9 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                 newModelTestResult.status === "available"
                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
                   : newModelTestResult.status === "rate_limited" ||
-                    newModelTestResult.status === "temporarily_overloaded" ||
-                    newModelTestResult.message?.includes("503") ||
-                    newModelTestResult.message?.includes("quá tải")
+                      newModelTestResult.status === "temporarily_overloaded" ||
+                      newModelTestResult.message?.includes("503") ||
+                      newModelTestResult.message?.includes("quá tải")
                     ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
                     : "bg-destructive/10 text-destructive border border-destructive/30"
               }`}
@@ -276,12 +276,17 @@ export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
                       {newModelTestResult.message}
                     </span>
                     <span className="text-[10px] text-amber-600 dark:text-amber-300 block font-normal mt-0.5">
-                      Tên mô hình hợp lệ. Bạn vẫn có thể nhấn &ldquo;Thêm Mô Hình&rdquo; bên dưới để kích hoạt.
+                      Tên mô hình hợp lệ. Bạn vẫn có thể nhấn &ldquo;Thêm Mô
+                      Hình&rdquo; bên dưới để kích hoạt.
                     </span>
                   </div>
                 ) : (
                   <span>
-                    Không khả dụng ({newModelTestResult.status === "deprecated" ? "410 Hết hạn" : "404/Error"}): {newModelTestResult.message}
+                    Không khả dụng (
+                    {newModelTestResult.status === "deprecated"
+                      ? "410 Hết hạn"
+                      : "404/Error"}
+                    ): {newModelTestResult.message}
                   </span>
                 )}
               </div>

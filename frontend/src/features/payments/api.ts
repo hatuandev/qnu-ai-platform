@@ -101,7 +101,7 @@ export function usePaymentSubmissionsStatsQuery(
 export function usePaymentSubmissionQuery(id?: string, enabled = true) {
   return useQuery({
     queryKey: paymentQueryKeys.submission(id ?? "none"),
-    queryFn: () => apiClient.get<PaymentSubmission>(path + "/" + id),
+    queryFn: () => apiClient.get<PaymentSubmission>(`${path}/${id}`),
     enabled: Boolean(id) && enabled,
   });
 }
@@ -157,7 +157,7 @@ export function useVerifyPaymentSubmission() {
       reviewNote?: string;
       referenceNo?: string;
     }) =>
-      apiClient.post<void>(path + "/" + id + "/verify", {
+      apiClient.post<void>(`${path}/${id}/verify`, {
         reviewNote: reviewNote?.trim() || undefined,
         referenceNo: referenceNo?.trim() || undefined,
       }),
@@ -171,7 +171,7 @@ export function useRejectPaymentSubmission() {
 
   return useMutation({
     mutationFn: ({ id, reviewNote }: { id: string; reviewNote: string }) =>
-      apiClient.post<void>(path + "/" + id + "/reject", {
+      apiClient.post<void>(`${path}/${id}/reject`, {
         reviewNote: reviewNote.trim(),
       }),
     onSuccess: (_data, variables) =>

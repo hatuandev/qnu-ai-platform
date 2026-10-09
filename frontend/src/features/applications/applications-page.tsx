@@ -20,7 +20,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataTableBulkActions } from "@/components/admin/data-table/data-table-bulk-actions";
 import { DataTableEmpty } from "@/components/admin/data-table/data-table-empty";
@@ -237,25 +237,28 @@ export function ApplicationsPage({
     setSelectedIds(new Set());
   }, [selectionResetKey]);
 
-  const togglePageSelection = (checked: boolean) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      for (const item of reviewableItems) {
-        if (checked) next.add(item.id);
-        else next.delete(item.id);
-      }
-      return next;
-    });
-  };
+  const togglePageSelection = useCallback(
+    (checked: boolean) => {
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        for (const item of reviewableItems) {
+          if (checked) next.add(item.id);
+          else next.delete(item.id);
+        }
+        return next;
+      });
+    },
+    [reviewableItems],
+  );
 
-  const toggleSelection = (id: string, checked: boolean) => {
+  const toggleSelection = useCallback((id: string, checked: boolean) => {
     setSelectedIds((current) => {
       const next = new Set(current);
       if (checked) next.add(id);
       else next.delete(id);
       return next;
     });
-  };
+  }, []);
 
   const bulkActionLabel =
     bulkAction === "approve"
@@ -319,14 +322,12 @@ export function ApplicationsPage({
             row.original.status === "submitted" ||
             row.original.status === "need_supplement";
           return (
-            <div
-              className="flex items-center pl-1"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <div className="flex items-center pl-1">
               <Checkbox
                 aria-label={`Chọn hồ sơ ${row.original.applicationCode}`}
                 checked={selectedIds.has(row.original.id)}
                 disabled={!reviewable}
+                onClick={(event) => event.stopPropagation()}
                 onCheckedChange={(checked) =>
                   toggleSelection(row.original.id, checked === true)
                 }
@@ -429,16 +430,14 @@ export function ApplicationsPage({
             row.original.status !== "assigned";
 
           return (
-            <div
-              className="flex justify-end"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <div className="flex justify-end">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Thao tác với hồ sơ ${row.original.applicationCode}`}
+                    onClick={(event) => event.stopPropagation()}
                   >
                     <MoreHorizontal className="size-4" />
                   </Button>
@@ -491,13 +490,15 @@ export function ApplicationsPage({
         },
       },
     ],
-    // biome-ignore lint/correctness/useExhaustiveDependencies: navigate and reviewable state intentionally bound
     [
       allReviewableSelected,
-      someReviewableSelected,
+      can,
+      navigate,
       reviewableItems.length,
       selectedIds,
-      navigate,
+      someReviewableSelected,
+      togglePageSelection,
+      toggleSelection,
     ],
   );
 

@@ -367,7 +367,9 @@ export const ImportProvidersDialog: React.FC<ImportProvidersDialogProps> = ({
                 </span>
                 <RadioGroup
                   value={conflictStrategy}
-                  onValueChange={(val) => setConflictStrategy(val as ConflictStrategy)}
+                  onValueChange={(val) =>
+                    setConflictStrategy(val as ConflictStrategy)
+                  }
                   className="grid grid-cols-1 sm:grid-cols-3 gap-2"
                 >
                   <label

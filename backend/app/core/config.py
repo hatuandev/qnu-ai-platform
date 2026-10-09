@@ -210,6 +210,12 @@ class Settings(BaseSettings):
     OPENAI_MODEL_NAME: str = "gpt-4o-mini"
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
 
+    # --- vLLM Local Server (Tailscale / On-Premise) ---
+    VLLM_BASE_URL: str = Field(
+        default="http://tormemrtxproto.tail0924dd.ts.net:8000/v1",
+        validation_alias=AliasChoices("VLLM_BASE_URL", "VLLM_URL"),
+    )
+
     # --- Ollama / Local AI Server (Tailscale / On-Premise) ---
     OLLAMA_BASE_URL: str = Field(
         default="http://tormemrtxproto.tail0924dd.ts.net:11434",
@@ -241,6 +247,12 @@ class Settings(BaseSettings):
 
     DEFAULT_MONTHLY_TOKEN_QUOTA: int = 5_000_000
     DEFAULT_MONTHLY_COST_QUOTA_USD: float = 100.0
+
+    # --- ADR-011 Knowledge Publishing V2 & Cutover ---
+    RAG_REVISION_READ_MODE: str = "revisioned"  # "legacy" | "shadow" | "revisioned"
+    KNOWLEDGE_REVISION_WRITES_ENABLED: bool = True
+    KNOWLEDGE_GC_RETENTION_REVISIONS: int = 2
+    KNOWLEDGE_ALLOW_DIRECT_UPLOAD: bool = False  # Decommissioning guard: khi False, cấm upload trực tiếp vào collection, buộc nạp qua Kho Tài Liệu V2
 
     # --- Security & Auth ---
     SECRET_KEY: str = "qnu-ai-platform-super-secret-key-change-in-production-2026"

@@ -1,5 +1,7 @@
 """Unit & Integration Tests for Hybrid RAG Engine, RRF Fusion, Citation Guard and Facts."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -10,6 +12,27 @@ from app.modules.rag.composer import answer_format_planner
 from app.modules.rag.facts import fact_layer
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
+from app.modules.rag.schemas import RetrievalSnapshot
+
+
+@pytest.fixture(autouse=True)
+def _pin_rag_snapshot_for_unit_tests():
+    async def resolve(*args, **kwargs):
+        collection_id = args[1] if len(args) > 1 else kwargs["collection_id"]
+        return RetrievalSnapshot(
+            snapshot_id=f"snap_{collection_id}_test",
+            collection_id=collection_id,
+            collection_epoch=1,
+            binding_revisions={"bnd_test": "idx_test"},
+            tenant_id=kwargs.get("tenant_id"),
+            workspace_id=kwargs.get("workspace_id"),
+        )
+
+    with patch(
+        "app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
+        new=AsyncMock(side_effect=resolve),
+    ):
+        yield
 
 
 def test_reciprocal_rank_fusion():
@@ -177,13 +200,21 @@ async def test_cloudflare_embedding_fails_closed_without_credentials():
     assert exc_info.value.code == "EMBEDDING_PROVIDER_NOT_CONFIGURED"
 
 
-def test_fit_dim_pads_and_truncates():
-    """Model vectors must be fitted exactly to the Qdrant dimension."""
+def test_fit_dim_strict_dimension_invariant():
+    """Model vectors must match exactly the Qdrant dimension. Truncation or padding is strictly rejected."""
+    from app.core.exceptions import AppException
     from app.modules.rag.vector_indexer import VectorIndexer
 
     indexer = VectorIndexer()
-    assert len(indexer._fit_dim([0.5] * 2048)) == indexer.vector_size
-    assert len(indexer._fit_dim([0.5] * 10)) == indexer.vector_size
+    assert len(indexer._fit_dim([0.5] * indexer.vector_size)) == indexer.vector_size
+
+    with pytest.raises(AppException) as exc_info:
+        indexer._fit_dim([0.5] * (indexer.vector_size + 100))
+    assert exc_info.value.code == "VECTOR_DIMENSION_MISMATCH"
+
+    with pytest.raises(AppException) as exc_info:
+        indexer._fit_dim([0.5] * 10)
+    assert exc_info.value.code == "VECTOR_DIMENSION_MISMATCH"
 
 
 def test_citation_guard_no_answer():

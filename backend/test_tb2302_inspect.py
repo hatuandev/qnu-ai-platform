@@ -1,5 +1,7 @@
-import pymupdf as fitz
 import sys
+
+import pymupdf as fitz
+
 from app.modules.ocr.layout_detector import SmartLayoutDetector
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -14,7 +16,7 @@ for p_idx, page in enumerate(doc):
     page_text = page.get_text()
     print(f"\n================ PAGE {p_num} ================")
     print(f"Text length from page.get_text(): {len(page_text)}")
-    print(f"Sample text: {repr(page_text[:100])}")
+    print(f"Sample text: {page_text[:100]!r}")
     
     # Check tables detected by find_tables
     tables = page.find_tables()
@@ -28,4 +30,4 @@ for p_idx, page in enumerate(doc):
     res = detector.detect_layout_regions(None, markdown_text=page_text, page_number=p_num, fitz_page=page)
     print(f"\ndetector.detect_layout_regions returned {len(res)} regions:")
     for r in res:
-        print(f"  [{r['type']}] top={r['top']}, left={r['left']}, w={r['width']}, h={r['height']}, text={repr(r.get('text', '')[:40])}")
+        print(f"  [{r['type']}] top={r['top']}, left={r['left']}, w={r['width']}, h={r['height']}, text={r.get('text', '')[:40]!r}")

@@ -197,11 +197,11 @@ export function AssignDialog({
             {/* BƯỚC 1: TÌM KIẾM & CHỌN SINH VIÊN */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <User className="size-3.5 text-primary" />
                   1. Sinh viên cần xếp phòng{" "}
                   <span className="text-destructive">*</span>
-                </label>
+                </span>
                 {selectedApplication && (
                   <Button
                     type="button"
@@ -257,8 +257,7 @@ export function AssignDialog({
                           {eligible.data?.items.map((item) => (
                             <div
                               key={item.id}
-                              onClick={() => handleSelectStudent(item)}
-                              className="flex items-center justify-between p-3 hover:bg-muted/50 cursor-pointer transition-colors text-xs gap-3 group"
+                              className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-xs gap-3 group"
                             >
                               <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -313,6 +312,7 @@ export function AssignDialog({
                                 type="button"
                                 size="sm"
                                 variant="outline"
+                                onClick={() => handleSelectStudent(item)}
                                 className="shrink-0 h-7 text-xs px-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
                               >
                                 Chọn
@@ -386,11 +386,11 @@ export function AssignDialog({
             {selectedApplication && (
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Building2 className="size-3.5 text-primary" />
                     2. Chọn phòng còn chỗ phù hợp{" "}
                     <span className="text-destructive">*</span>
-                  </label>
+                  </span>
                   <span className="text-[11px] text-muted-foreground">
                     {compatibleRooms.length} phòng khả dụng
                   </span>
@@ -497,10 +497,14 @@ export function AssignDialog({
             {/* BƯỚC 3: GHI CHÚ */}
             {selectedApplication && (
               <div className="space-y-1.5 pt-2 border-t">
-                <label className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor="assignment-note"
+                  className="text-xs font-medium text-foreground"
+                >
                   Ghi chú phân phòng
                 </label>
                 <Textarea
+                  id="assignment-note"
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                   placeholder="Ghi chú phân phòng (ví dụ: Xếp theo diện ưu tiên chính sách, xếp hộ tại văn phòng...)"

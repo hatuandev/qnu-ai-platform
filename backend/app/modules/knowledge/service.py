@@ -17,11 +17,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import storage_service
 from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
 from app.modules.knowledge.schemas import (
+    CanaryPolicyResponse,
     CollectionCreateRequest,
     CollectionUpdateRequest,
     FactExcelImportResponse,
     FactListResponse,
     ParsePreviewResponse,
+    UpdateCanaryPolicyRequest,
+)
+from app.modules.knowledge.services.binding_service import (
+    BindingService,
+)
+from app.modules.knowledge.services.binding_service import (
+    binding_service as default_binding_service,
+)
+from app.modules.knowledge.services.canary_service import (
+    CanaryService,
+)
+from app.modules.knowledge.services.canary_service import (
+    canary_service as default_canary_service,
 )
 from app.modules.knowledge.services.collection_service import (
     CollectionService,
@@ -34,6 +48,18 @@ from app.modules.knowledge.services.facts_service import (
 )
 from app.modules.knowledge.services.facts_service import (
     facts_service as default_facts_service,
+)
+from app.modules.knowledge.services.gc_service import (
+    KnowledgeArtifactGCService,
+)
+from app.modules.knowledge.services.gc_service import (
+    gc_service as default_gc_service,
+)
+from app.modules.knowledge.services.index_build_service import (
+    IndexBuildService,
+)
+from app.modules.knowledge.services.index_build_service import (
+    index_build_service as default_index_build_service,
 )
 from app.modules.knowledge.services.ingestion_service import (
     IngestionService,
@@ -60,11 +86,19 @@ class KnowledgeService:
         ingestion_svc: IngestionService | None = None,
         facts_svc: FactsService | None = None,
         reconciliation_svc: ReconciliationService | None = None,
+        binding_svc: BindingService | None = None,
+        index_build_svc: IndexBuildService | None = None,
+        canary_svc: CanaryService | None = None,
+        gc_svc: KnowledgeArtifactGCService | None = None,
     ) -> None:
         self._collection = collection_svc or default_collection_service
         self._ingestion = ingestion_svc or default_ingestion_service
         self._facts = facts_svc or default_facts_service
         self._reconciliation = reconciliation_svc or default_reconciliation_service
+        self._binding = binding_svc or default_binding_service
+        self._index_build = index_build_svc or default_index_build_service
+        self._canary = canary_svc or default_canary_service
+        self._gc = gc_svc or default_gc_service
 
         # Link sub-services back to facade to honor test patches & monkeypatching
         self._collection.facade = self
@@ -76,25 +110,39 @@ class KnowledgeService:
     # 1. Collection Management (Delegated to collection_service)
     # ==========================================================================
     async def create_collection(
-        self, db: AsyncSession, req: CollectionCreateRequest
+        self, db: AsyncSession, req: CollectionCreateRequest, actor: Any | None = None
     ) -> KnowledgeCollection:
-        return await self._collection.create_collection(db, req)
+        return await self._collection.create_collection(db, req, actor=actor)
 
     async def list_collections(
-        self, db: AsyncSession, tenant_id: str = "tenant_qnu", workspace_id: str = "workspace_qnu"
+        self,
+        db: AsyncSession,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        actor: Any | None = None,
     ) -> list[KnowledgeCollection]:
-        return await self._collection.list_collections(db, tenant_id, workspace_id)
+        return await self._collection.list_collections(
+            db, tenant_id=tenant_id, workspace_id=workspace_id, actor=actor
+        )
 
-    async def get_collection(self, db: AsyncSession, collection_id: str) -> KnowledgeCollection:
-        return await self._collection.get_collection(db, collection_id)
+    async def get_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> KnowledgeCollection:
+        return await self._collection.get_collection(db, collection_id, actor=actor)
 
     async def update_collection(
-        self, db: AsyncSession, collection_id: str, req: CollectionUpdateRequest
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req: CollectionUpdateRequest,
+        actor: Any | None = None,
     ) -> KnowledgeCollection:
-        return await self._collection.update_collection(db, collection_id, req)
+        return await self._collection.update_collection(db, collection_id, req, actor=actor)
 
-    async def delete_collection(self, db: AsyncSession, collection_id: str) -> None:
-        await self._collection.delete_collection(db, collection_id)
+    async def delete_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> None:
+        await self._collection.delete_collection(db, collection_id, actor=actor)
 
     # ==========================================================================
     # 2. Document Ingestion & Studio Views (Delegated to ingestion_service)
@@ -142,7 +190,6 @@ class KnowledgeService:
         )
 
     async def parse_preview(
-
         self,
         file_bytes: bytes,
         file_name: str,
@@ -185,9 +232,7 @@ class KnowledgeService:
     ) -> bytes:
         return await self._ingestion.render_page_image(db, document_id, page_number)
 
-    async def get_preview_pdf(
-        self, db: AsyncSession, document_id: str
-    ) -> tuple[bytes, str]:
+    async def get_preview_pdf(self, db: AsyncSession, document_id: str) -> tuple[bytes, str]:
         return await self._ingestion.get_preview_pdf(db, document_id)
 
     async def _convert_office_to_pdf(self, file_bytes: bytes, file_name: str) -> bytes:
@@ -247,7 +292,9 @@ class KnowledgeService:
         module_code: str,
         prepared: dict,
     ) -> int:
-        return await self._ingestion.replace_document_content(db, doc, collection_id, module_code, prepared)
+        return await self._ingestion.replace_document_content(
+            db, doc, collection_id, module_code, prepared
+        )
 
     # ==========================================================================
     # 3. Structured Facts Management (Delegated to facts_service)
@@ -276,11 +323,271 @@ class KnowledgeService:
     async def reindex_document(self, db: AsyncSession, document_id: str) -> dict[str, Any]:
         return await self._reconciliation.reindex_document(db, document_id)
 
-    async def reconcile_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
-        return await self._reconciliation.reconcile_collection(db, collection_id)
+    async def reconcile_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> dict[str, Any]:
+        return await self._reconciliation.reconcile_collection(db, collection_id, actor=actor)
 
-    async def reconcile_fix_collection(self, db: AsyncSession, collection_id: str) -> dict[str, Any]:
-        return await self._reconciliation.reconcile_fix_collection(db, collection_id)
+    async def reconcile_fix_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> dict[str, Any]:
+        return await self._reconciliation.reconcile_fix_collection(db, collection_id, actor=actor)
+
+    # ==========================================================================
+    # 5. Knowledge Binding Management (Delegated to binding_service)
+    # ==========================================================================
+    async def get_available_documents(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        actor: Any | None = None,
+    ):
+        return await self._binding.get_available_documents(
+            db,
+            collection_id,
+            search=search,
+            page=page,
+            page_size=page_size,
+            actor=actor,
+        )
+
+    async def create_bindings(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        actor: Any | None = None,
+    ):
+        return await self._binding.create_bindings(
+            db,
+            collection_id,
+            req,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+            actor=actor,
+        )
+
+    async def list_bindings(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        actor: Any | None = None,
+    ):
+        return await self._binding.list_bindings(
+            db,
+            collection_id,
+            status=status,
+            page=page,
+            page_size=page_size,
+            actor=actor,
+        )
+
+    async def get_binding(self, db: AsyncSession, binding_id: str, actor: Any | None = None):
+        return await self._binding.get_binding(db, binding_id, actor=actor)
+
+    async def detach_binding(self, db: AsyncSession, binding_id: str, actor: Any | None = None):
+        return await self._binding.detach_binding(db, binding_id, actor=actor)
+
+    async def list_binding_chunks(
+        self,
+        db: AsyncSession,
+        binding_id: str,
+        index_revision_id: str | None = None,
+        page: int = 1,
+        page_size: int = 50,
+        actor: Any | None = None,
+    ):
+        return await self._binding.list_binding_chunks(
+            db,
+            binding_id=binding_id,
+            index_revision_id=index_revision_id,
+            page=page,
+            page_size=page_size,
+            actor=actor,
+        )
+
+    # ==========================================================================
+    # 6. Staging Index Build & Atomic Activation (Delegated to index_build_service)
+    # ==========================================================================
+    async def build_staging_index(
+        self,
+        db: AsyncSession,
+        binding_id: str,
+        source_revision_id: str | None = None,
+        chunk_strategy: str | None = None,
+        auto_activate: bool = False,
+        actor: Any | None = None,
+        job_id: str | None = None,
+    ):
+        return await self._index_build.build_staging_index(
+            db,
+            binding_id=binding_id,
+            source_revision_id=source_revision_id,
+            chunk_strategy=chunk_strategy,
+            auto_activate=auto_activate,
+            actor=actor,
+            job_id=job_id,
+        )
+
+    async def promote_index_revision(
+        self,
+        db: AsyncSession,
+        binding_id: str,
+        index_revision_id: str,
+        expected_epoch: int,
+        reason: str | None = None,
+        activated_by: str | None = None,
+        actor: Any | None = None,
+    ):
+        return await self._index_build.promote_index_revision(
+            db,
+            binding_id=binding_id,
+            index_revision_id=index_revision_id,
+            expected_epoch=expected_epoch,
+            reason=reason,
+            activated_by=activated_by,
+            actor=actor,
+        )
+
+    async def rollback_index_revision(
+        self,
+        db: AsyncSession,
+        binding_id: str,
+        target_index_revision_id: str,
+        expected_epoch: int,
+        reason: str | None = None,
+        activated_by: str | None = None,
+        actor: Any | None = None,
+    ):
+        return await self._index_build.rollback_index_revision(
+            db,
+            binding_id=binding_id,
+            target_index_revision_id=target_index_revision_id,
+            expected_epoch=expected_epoch,
+            reason=reason,
+            activated_by=activated_by,
+            actor=actor,
+        )
+
+    async def list_index_revisions(
+        self, db: AsyncSession, binding_id: str, actor: Any | None = None
+    ):
+        return await self._index_build.list_index_revisions(
+            db, binding_id=binding_id, actor=actor
+        )
+
+    # ==========================================================================
+    # 7. Legacy Canary, Backfill & Shadow Retrieval (Delegated to canary_service)
+    # ==========================================================================
+    async def audit_collection_legacy_state(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ):
+        return await self._canary.audit_collection_legacy_state(
+            db, collection_id, actor=actor
+        )
+
+    async def backfill_legacy_collection(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        actor_id: str | None = None,
+        force_rebuild: bool = False,
+        default_chunk_strategy: str = "ClauseBasedChunker",
+        actor: Any | None = None,
+    ):
+        return await self._canary.backfill_legacy_collection(
+            db,
+            collection_id=collection_id,
+            actor_id=actor_id,
+            force_rebuild=force_rebuild,
+            default_chunk_strategy=default_chunk_strategy,
+            actor=actor,
+        )
+
+    async def run_shadow_retrieval_comparison(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        query: str,
+        top_k: int = 5,
+        actor: Any | None = None,
+    ):
+        return await self._canary.run_shadow_retrieval_comparison(
+            db,
+            collection_id=collection_id,
+            query=query,
+            top_k=top_k,
+            actor=actor,
+        )
+
+    async def get_collection_canary_policy(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        actor: Any | None = None,
+    ) -> CanaryPolicyResponse:
+        return await self._canary.get_collection_canary_policy(
+            db, collection_id=collection_id, actor=actor
+        )
+
+    async def update_collection_canary_policy(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req: UpdateCanaryPolicyRequest,
+        actor: Any | None = None,
+    ) -> CanaryPolicyResponse:
+        return await self._canary.update_collection_canary_policy(
+            db, collection_id=collection_id, req=req, actor=actor
+        )
+
+    # ==========================================================================
+    # 8. Artifact Garbage Collection (Delegated to gc_service)
+    # ==========================================================================
+    async def collect_garbage(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        keep_revisions: int = 2,
+        dry_run: bool = False,
+        actor: Any | None = None,
+    ):
+        return await self._gc.collect_garbage(
+            db,
+            collection_id=collection_id,
+            keep_revisions=keep_revisions,
+            dry_run=dry_run,
+            actor=actor,
+        )
+
+    async def collect_garbage_system_wide(
+        self,
+        db: AsyncSession,
+        default_keep_revisions: int = 2,
+        dry_run: bool = False,
+        actor: Any | None = None,
+    ):
+        return await self._gc.collect_garbage_system_wide(
+            db,
+            default_keep_revisions=default_keep_revisions,
+            dry_run=dry_run,
+            actor=actor,
+        )
+
+    async def audit_system_decommissioning(
+        self,
+        db: AsyncSession,
+        actor: Any | None = None,
+    ):
+        return await self._gc.audit_system_decommissioning(db, actor=actor)
 
 
 knowledge_service = KnowledgeService()

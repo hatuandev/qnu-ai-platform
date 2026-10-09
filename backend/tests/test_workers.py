@@ -27,6 +27,7 @@ def _session_factory(mock_session: AsyncMock):
 def _execute_result(scalar=None, scalars_list=None):
     result = MagicMock()
     result.scalar_one_or_none = MagicMock(return_value=scalar)
+    result.first = MagicMock(return_value=scalar)
     scalars = MagicMock()
     scalars.all = MagicMock(return_value=scalars_list or [])
     result.scalars = MagicMock(return_value=scalars)
@@ -66,7 +67,8 @@ async def test_task_document_ingestion_happy_path():
             tasks_module.knowledge_service, "replace_document_content",
             new=AsyncMock(return_value=7),
         ),
-        patch.object(tasks_module.storage_service, "get", new=AsyncMock(return_value=b"%PDF")),
+            patch.object(tasks_module.storage_service, "get", new=AsyncMock(return_value=b"%PDF")),
+            patch.object(tasks_module, "is_job_cancelled", new=AsyncMock(return_value=False)),
     ):
         res = await task_document_ingestion({}, "job_1")
 
@@ -103,6 +105,7 @@ async def test_task_document_ingestion_cooperative_cancel():
             _execute_result(scalar=running),
             _execute_result(scalar=running),
             _execute_result(scalar=cancelled),
+            _execute_result(scalar=cancelled),
         ]
     )
     with (
@@ -136,10 +139,11 @@ async def test_task_reindex_collection_happy_path():
     )
     with (
         patch.object(tasks_module, "AsyncSessionFactory", _session_factory(session)),
-        patch(
-            "app.modules.rag.vector_indexer.vector_indexer.index_chunks",
-            new=AsyncMock(return_value=2),
-        ),
+            patch(
+                "app.modules.rag.vector_indexer.vector_indexer.index_chunks",
+                new=AsyncMock(return_value=2),
+            ),
+            patch.object(tasks_module, "is_job_cancelled", new=AsyncMock(return_value=False)),
     ):
         res = await task_reindex_collection({}, "job_3")
     assert res["status"] == "completed"
@@ -166,6 +170,7 @@ async def test_task_export_document_renders_real_docx():
 
 
 def test_worker_settings():
-    assert len(WorkerSettings.functions) == 3
+    assert len(WorkerSettings.functions) == 6
+    assert len(WorkerSettings.cron_jobs) == 1
     assert WorkerSettings.job_timeout == 300
     assert WorkerSettings.max_retries == 3

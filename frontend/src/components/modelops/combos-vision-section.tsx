@@ -794,7 +794,10 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
               </span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Mỗi Chuỗi Combo chỉ phục vụ <strong>DUY NHẤT 1 kênh tác vụ</strong> (Vision OCR, LLM Chat, Embedding hoặc Reranker). Không sử dụng chung giữa các loại tác vụ khác nhau.
+              Mỗi Chuỗi Combo chỉ phục vụ{" "}
+              <strong>DUY NHẤT 1 kênh tác vụ</strong> (Vision OCR, LLM Chat,
+              Embedding hoặc Reranker). Không sử dụng chung giữa các loại tác vụ
+              khác nhau.
             </DialogDescription>
           </DialogHeader>
 
@@ -1129,7 +1132,8 @@ export const CombosVisionSection: React.FC<CombosVisionSectionProps> = ({
               >
                 Đặt làm Chuỗi Dự Phòng MẶC ĐỊNH cho kênh:{" "}
                 <span className="text-primary font-bold">
-                  {TASK_TYPE_META[formTaskType]?.label || formTaskType.toUpperCase()}
+                  {TASK_TYPE_META[formTaskType]?.label ||
+                    formTaskType.toUpperCase()}
                 </span>
               </label>
             </div>

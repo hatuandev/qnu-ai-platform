@@ -57,6 +57,16 @@ class EntityAlreadyExistsError(DomainException):
         )
 
 
+class ValidationException(DomainException):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
+        super().__init__(
+            message,
+            code="validation_error",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details=details,
+        )
+
+
 class AuthenticationError(DomainException):
     def __init__(
         self, message: str = "Chưa xác thực danh tính", details: dict[str, Any] | None = None

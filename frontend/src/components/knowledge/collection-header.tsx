@@ -30,6 +30,7 @@ interface CollectionHeaderProps {
   isReindexing: boolean;
   onStartIngest: () => void;
   onAttachFromRepo?: () => void;
+  onAddDocuments?: () => void;
   actionError: string | null;
   reindexJobId: string | null;
 }
@@ -44,6 +45,7 @@ export function CollectionHeader({
   isReindexing,
   onStartIngest,
   onAttachFromRepo,
+  onAddDocuments,
   actionError,
   reindexJobId,
 }: CollectionHeaderProps) {
@@ -57,7 +59,8 @@ export function CollectionHeader({
   const isCloudflareModel = activeEmbeddingModel.includes("@cf/");
 
   const formatModelLabel = (model: string) => {
-    if (model === "bge-m3:latest" || model === "bge-m3") return "BGE-M3 (1024D)";
+    if (model === "bge-m3:latest" || model === "bge-m3")
+      return "BGE-M3 (1024D)";
     if (model === "@cf/baai/bge-m3") return "Cloudflare BGE-M3 (1024D)";
     if (model === "text-embedding-3-small") return "OpenAI Small (1536D)";
     if (model === "text-embedding-3-large") return "OpenAI Large (3072D)";
@@ -119,29 +122,43 @@ export function CollectionHeader({
           </div>
         </div>
 
-        {/* Action Buttons: Primary Ingest + Attach from Repo + Dropdown on Mobile */}
+        {/* Action Buttons: Primary Add from Repo V2 + Fast Attach + Direct Ingest */}
         <div className="flex items-center gap-2 w-full lg:w-auto shrink-0">
-          {onAttachFromRepo && (
+          {onAddDocuments ? (
+            <Button
+              size="sm"
+              onClick={onAddDocuments}
+              className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
+              title="Thêm tài liệu từ Kho Tài Liệu tập trung vào kho tri thức (Chuẩn V2 ADR-011)"
+            >
+              <FileStack className="size-3.5" />
+              <span>+ Thêm Từ Kho</span>
+            </Button>
+          ) : (
+            onAttachFromRepo && (
+              <Button
+                size="sm"
+                onClick={onAttachFromRepo}
+                className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
+                title="Gắn tài liệu từ Kho tập trung MinIO S3 mà không cần OCR lại"
+              >
+                <FileStack className="size-3.5" />
+                <span>Gắn Từ Kho</span>
+              </Button>
+            )
+          )}
+
+          {onAttachFromRepo && onAddDocuments && (
             <Button
               variant="outline"
               size="sm"
               onClick={onAttachFromRepo}
-              className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 font-medium shadow-xs border-border/80 hover:bg-primary/5 hover:text-primary transition-colors"
-              title="Gắn tài liệu từ Kho tập trung MinIO S3 mà không cần OCR lại"
+              className="hidden sm:inline-flex h-8 text-xs gap-1.5 font-medium shadow-xs border-border/80 hover:bg-primary/5 hover:text-primary transition-colors"
+              title="Gắn nhanh tài liệu từ Kho tài liệu qua hộp thoại"
             >
-              <FileStack className="size-3.5 text-primary" />
-              <span>Gắn Từ Kho</span>
+              <span>Gắn Nhanh</span>
             </Button>
           )}
-
-          <Button
-            size="sm"
-            onClick={onStartIngest}
-            className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
-          >
-            <Upload className="size-3.5" />
-            <span>Nạp tài liệu</span>
-          </Button>
 
           {/* Mobile Secondary Actions (Dropdown Menu) */}
           <div className="sm:hidden">
@@ -164,9 +181,16 @@ export function CollectionHeader({
                     className="gap-2 text-xs cursor-pointer py-2"
                   >
                     <FileStack className="size-3.5 text-primary" />
-                    <span>Gắn từ Kho tài liệu</span>
+                    <span>Gắn nhanh từ Kho</span>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  onClick={onStartIngest}
+                  className="gap-2 text-xs cursor-pointer py-2 text-muted-foreground"
+                >
+                  <Upload className="size-3.5" />
+                  <span>Nạp trực tiếp (Legacy V1)</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={onOpenReconcile}
                   className="gap-2 text-xs cursor-pointer py-2"
@@ -217,6 +241,35 @@ export function CollectionHeader({
               <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
             </Button>
 
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="size-8 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                  title="Tác vụ khác"
+                  aria-label="Tác vụ khác"
+                >
+                  <MoreHorizontal className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 text-xs">
+                <DropdownMenuItem
+                  onClick={onStartIngest}
+                  className="gap-2 text-xs cursor-pointer py-2 text-muted-foreground"
+                >
+                  <Upload className="size-3.5" />
+                  <div>
+                    <span className="block font-medium">
+                      Nạp trực tiếp (Legacy)
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Khuyến nghị dùng Kho Tài Liệu V2
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -232,7 +285,9 @@ export function CollectionHeader({
           ) : (
             <Cpu className="size-3.5 text-primary shrink-0" />
           )}
-          <span className="font-semibold">{formatModelLabel(activeEmbeddingModel)}</span>
+          <span className="font-semibold">
+            {formatModelLabel(activeEmbeddingModel)}
+          </span>
           <Badge
             variant="outline"
             className="text-[10px] px-1.5 py-0 border-success/30 text-success bg-success/10 font-sans font-medium"

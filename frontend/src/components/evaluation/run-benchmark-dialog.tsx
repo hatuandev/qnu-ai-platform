@@ -130,13 +130,15 @@ export const RunBenchmarkDialog: React.FC<RunBenchmarkDialogProps> = ({
                     Mô-đun trợ lý ảo tư vấn quy chế, quy định (regulations)
                   </option>
                   <option value="library">
-                    Mô-đun trợ lý ảo tra cứu, tư vấn khai thác tài nguyên thư viện (library)
+                    Mô-đun trợ lý ảo tra cứu, tư vấn khai thác tài nguyên thư
+                    viện (library)
                   </option>
                   <option value="drafting">
                     Mô-đun trợ lý ảo hỗ trợ soạn thảo văn bản (drafting)
                   </option>
                   <option value="question_bank">
-                    Mô-đun trợ lý ảo hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo chuẩn đầu ra (question_bank)
+                    Mô-đun trợ lý ảo hỗ trợ tạo câu hỏi, ngân hàng câu hỏi theo
+                    chuẩn đầu ra (question_bank)
                   </option>
                 </>
               ) : (

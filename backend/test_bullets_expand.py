@@ -53,4 +53,4 @@ for p in raw_paragraphs:
 
 print(f"Total expanded items: {len(expanded)}")
 for i, item in enumerate(expanded, 1):
-    print(f"  [{i:2d}] {repr(item[:40])}")
+    print(f"  [{i:2d}] {item[:40]!r}")

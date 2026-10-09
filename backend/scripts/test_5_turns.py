@@ -1,8 +1,11 @@
 import asyncio
 import json
+from pathlib import Path
+
 from app.core.database import AsyncSessionFactory
-from app.modules.assistants.service import assistant_service
 from app.modules.assistants.schemas import AssistantChatRequest
+from app.modules.assistants.service import assistant_service
+
 
 async def main():
     async with AsyncSessionFactory() as db:
@@ -35,8 +38,8 @@ async def main():
                 "answer": resp.answer
             })
             
-        with open("multi_turn_test_results.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(results, indent=2, ensure_ascii=False))
+        content = json.dumps(results, indent=2, ensure_ascii=False)
+        await asyncio.to_thread(Path("multi_turn_test_results.json").write_text, content, encoding="utf-8")
         print("\nAll 5 questions completed and saved to multi_turn_test_results.json")
 
 if __name__ == '__main__':

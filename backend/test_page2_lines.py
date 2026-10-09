@@ -1,7 +1,8 @@
-import pymupdf as fitz
-import numpy as np
-from PIL import Image
 import sys
+
+import numpy as np
+import pymupdf as fitz
+from PIL import Image
 
 sys.stdout.reconfigure(encoding='utf-8')
 

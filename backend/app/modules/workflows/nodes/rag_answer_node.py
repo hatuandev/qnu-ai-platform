@@ -89,6 +89,18 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             else config.get("preferred_provider_id")
         )
 
+        reranker_policy = (
+            getattr(getattr(profile, "knowledge_policy", None), "reranker_policy", None)
+            if hasattr(getattr(profile, "knowledge_policy", None), "reranker_policy")
+            else (
+                config.get("knowledge_policy", {}).get("reranker_policy")
+                if isinstance(config.get("knowledge_policy"), dict)
+                else None
+            )
+        )
+        if hasattr(reranker_policy, "model_dump"):
+            reranker_policy = reranker_policy.model_dump(mode="python")
+
         ask_req = AskRequest(
             question=query,
             collection_id=collection_id,
@@ -103,11 +115,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             preferred_provider_id=preferred_provider_id,
             fallback_model=fallback_model,
             history=context.inputs.get("conversation_history") or context.inputs.get("history"),
-            reranker_policy=(
-                getattr(getattr(profile, "knowledge_policy", None), "reranker_policy", None)
-                if hasattr(getattr(profile, "knowledge_policy", None), "reranker_policy")
-                else (config.get("knowledge_policy", {}).get("reranker_policy") if isinstance(config.get("knowledge_policy"), dict) else None)
-            ),
+            reranker_policy=reranker_policy,
         )
 
         # Universal Agentic Consulting & Artifact Generation
@@ -122,6 +130,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             preferred_model_name=primary_model,
             fallback_model=fallback_model,
         )
+        guidance = ""
         if dispatch_res.get("has_agentic_guidance"):
             guidance = dispatch_res.get("guidance_context", "")
             if guidance:
@@ -161,6 +170,11 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                         val = getattr(item, "attribute_value", "")
                     fact_lines.append(f"| {ent} | {attr} | **{val}** |")
                 context.node_data["fact_markdown"] = "\n".join(fact_lines)
+            if status == "insufficient_context" and guidance:
+                # Structured specialist guidance remains grounded even when
+                # free-text retrieval has no additional chunks.
+                answer_text = guidance
+                status = "answered"
         else:
             answer_text = f"Dựa trên tài liệu chính thức của ĐH Quy Nhơn cho câu hỏi: '{query}'."
             citations = []

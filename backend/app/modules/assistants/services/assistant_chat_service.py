@@ -233,6 +233,14 @@ class AssistantChatService:
 
         citations = workflow_response.outputs.get("citations", [])
         artifacts = workflow_response.outputs.get("artifacts", [])
+        if output_status == "insufficient_context" and isinstance(artifacts, list) and artifacts:
+            artifact_names = ", ".join(
+                str(item.get("name", "tệp kết xuất"))
+                for item in artifacts
+                if isinstance(item, dict)
+            )
+            answer = f"Đã tạo tệp theo yêu cầu: {artifact_names}."
+            output_status = "answered"
 
         # Record assistant answer in persistent conversation thread
         try:
@@ -434,6 +442,15 @@ class AssistantChatService:
                 answer = getattr(guardrails, "no_answer_message", "Xin lỗi, hiện tại tôi chưa có dữ liệu chính thức để trả lời câu hỏi này.")
             output_status = str(workflow_response.outputs.get("status") or workflow_response.status)
 
+        if output_status == "insufficient_context" and isinstance(artifacts, list) and artifacts:
+            artifact_names = ", ".join(
+                str(item.get("name", "tệp kết xuất"))
+                for item in artifacts
+                if isinstance(item, dict)
+            )
+            answer = f"Đã tạo tệp theo yêu cầu: {artifact_names}."
+            output_status = "answered"
+
         words = answer.split(" ")
         for idx, word in enumerate(words):
             suffix = " " if idx < len(words) - 1 else ""
@@ -469,7 +486,6 @@ class AssistantChatService:
             else:
                 sample_questions = []
 
-        output_status = str(workflow_response.outputs.get("status") or workflow_response.status)
         if output_status == "insufficient_context":
             try:
                 from app.modules.evaluation.service import evaluation_service

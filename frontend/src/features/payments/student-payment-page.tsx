@@ -329,11 +329,9 @@ function PaymentReceiptDialog({
                         <span className="text-destructive">*</span>
                       </Label>
 
-                      <div
+                      <label
+                        htmlFor="payment-receipt"
                         className="relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 p-4 text-center transition-colors hover:border-primary/50 hover:bg-muted/10 cursor-pointer"
-                        onClick={() =>
-                          document.getElementById("payment-receipt")?.click()
-                        }
                       >
                         <input
                           id="payment-receipt"
@@ -374,7 +372,7 @@ function PaymentReceiptDialog({
                             </p>
                           </div>
                         )}
-                      </div>
+                      </label>
 
                       {firstError(field.state.meta.errors) ? (
                         <p

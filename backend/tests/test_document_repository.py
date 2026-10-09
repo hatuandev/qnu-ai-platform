@@ -138,11 +138,16 @@ async def test_document_repository_update_and_stats() -> None:
     assert session.commit.called
 
     # Get stats
-    stats_values = iter([10, 8, 1, 1, 50000, 3, 5])
+    call_count = 0
 
     async def mock_stats_execute(stmt):
+        nonlocal call_count
+        call_count += 1
         mock_res = MagicMock()
-        mock_res.scalar_one = MagicMock(return_value=next(stats_values))
+        if call_count == 1:
+            mock_res.one = MagicMock(return_value=(10, 8, 1, 1, 50000, 3))
+        else:
+            mock_res.scalar_one = MagicMock(return_value=5)
         return mock_res
 
     session.execute = AsyncMock(side_effect=mock_stats_execute)
@@ -309,3 +314,46 @@ async def test_document_repository_api_endpoints() -> None:
                 assert data3["parsed_documents"] == 9
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_document_repository_auto_detect_nd30_metadata() -> None:
+    """Test Decree 30 administrative metadata auto-detection when user provides no metadata."""
+    sample_legal_text = (
+        "BỘ GIÁO DỤC VÀ ĐÀO TẠO\n"
+        "TRƯỜNG ĐẠI HỌC QUY NHƠN\n"
+        "Số: 2139/QĐ-ĐHQN\n\n"
+        "Quy Nhơn, ngày 15 tháng 8 năm 2025\n\n"
+        "QUYẾT ĐỊNH\n"
+        "V/v: Ban hành quy chế tổ chức đào tạo đại học năm học 2025 - 2026\n\n"
+        "Điều 1. Ban hành kèm theo Quyết định này Quy chế đào tạo đại học...\n\n"
+        "Nơi nhận:\n"
+        "- Ban Giám hiệu;\n"
+        "- Lưu: VT, ĐT.\n\n"
+        "HIỆU TRƯỞNG\n"
+        "Đỗ Ngọc Mỹ"
+    ).encode()
+
+    filename = "quyet_dinh_2139.txt"
+    session = _fresh_session()
+    session.execute = AsyncMock(return_value=_execute_result(scalar=None))
+
+    doc = await document_repository_service.upload_document(
+        db=session,
+        file_bytes=sample_legal_text,
+        file_name=filename,
+        # Intentionally passing NO metadata to test auto-detection:
+        title=None,
+        document_number=None,
+        issuing_authority=None,
+        issued_date=None,
+        document_type_code=None,
+        auto_parse=True,
+    )
+
+    assert doc.document_number == "2139/QĐ-ĐHQN"
+    assert doc.issued_date == date(2025, 8, 15)
+    assert doc.document_type_code == "quyet_dinh"
+    assert doc.title == "Ban hành quy chế tổ chức đào tạo đại học năm học 2025 - 2026"
+    assert doc.issuing_authority == "Trường Đại học Quy Nhơn"
+    assert doc.parse_status == "parsed"

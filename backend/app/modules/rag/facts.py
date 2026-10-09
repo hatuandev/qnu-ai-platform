@@ -91,6 +91,7 @@ class FactLayer:
         workspace_id: str | None = None,
         subject_names: list[str] | None = None,
         target_entities: list[str] | None = None,
+        active_index_revision_ids: set[str] | None = None,
     ) -> list[KnowledgeFact]:
         """Look up fact records matching identified keywords or entity codes, strictly bound to approved documents."""
         conditions = []
@@ -126,6 +127,8 @@ class FactLayer:
 
         if not conditions:
             return []
+        if active_index_revision_ids is not None and not active_index_revision_ids:
+            return []
 
         query = (
             select(KnowledgeFact)
@@ -154,6 +157,10 @@ class FactLayer:
             query = query.where(KnowledgeCollection.tenant_id == tenant_id)
         if workspace_id:
             query = query.where(KnowledgeCollection.workspace_id == workspace_id)
+        if active_index_revision_ids is not None:
+            query = query.where(
+                KnowledgeFact.index_revision_id.in_(active_index_revision_ids)
+            )
 
         # Over-fetch when ranking by subjects so the best AND-matches survive the cut.
         fetch_limit = limit * 3 if subject_names else limit
@@ -176,23 +183,22 @@ class FactLayer:
             )
         else:
             # Check if query specifically targeted any entity
-            query_entity_markers: list[str] = []
+            explicit_entity_markers: list[str] = []
             if entity_codes:
-                query_entity_markers.extend([c.strip().lower() for c in entity_codes if c and c.strip()])
+                explicit_entity_markers.extend(
+                    [c.strip().lower() for c in entity_codes if c and c.strip()]
+                )
             if target_entities:
-                query_entity_markers.extend([t.strip().lower() for t in target_entities if t and t.strip()])
-            if keywords:
-                for kw in keywords:
-                    clean_kw = kw.strip().lower()
-                    # An explicit entity code (e.g. '7480201', '6.8') or compound entity phrase (>= 2 words)
-                    if (
-                        re.search(r"^\d{4,}$", clean_kw)
-                        or re.search(r"^\d+\.\d+$", clean_kw)
-                        or len(clean_kw.split()) >= 2
-                    ):
-                        query_entity_markers.append(clean_kw)
+                explicit_entity_markers.extend(
+                    [t.strip().lower() for t in target_entities if t and t.strip()]
+                )
+            compound_keyword_markers = [
+                kw.strip().lower()
+                for kw in (keywords or [])
+                if len(kw.strip().split()) >= 2
+            ]
 
-            if not query_entity_markers:
+            if not explicit_entity_markers and not compound_keyword_markers:
                 # General query: exclude major-specific facts that were matched merely by common attribute name
                 rows = [f for f in rows if not _is_major_specific_fact(f)]
             else:
@@ -204,10 +210,17 @@ class FactLayer:
                     attr_val = (getattr(f, "attribute_value", "") or "").lower()
                     raw = getattr(f, "raw_data", {}) or {}
                     raw_str = str(raw).lower() if isinstance(raw, dict) else ""
-                    return any(
-                        m in ent_name or m in attr_val or m in raw_str
-                        for m in query_entity_markers
+                    explicit_match = any(
+                        marker in ent_name
+                        or marker in attr_val
+                        or marker in raw_str
+                        for marker in explicit_entity_markers
                     )
+                    keyword_entity_match = any(
+                        marker in ent_name or marker in raw_str
+                        for marker in compound_keyword_markers
+                    )
+                    return explicit_match or keyword_entity_match
                 rows = [f for f in rows if matches_entity(f)]
 
         return rows[:limit]

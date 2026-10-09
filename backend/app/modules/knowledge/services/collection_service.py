@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppException, EntityNotFoundError
+from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.knowledge.models import (
     KnowledgeChunk,
@@ -19,6 +20,9 @@ from app.modules.knowledge.schemas import (
     CollectionCreateRequest,
     CollectionUpdateRequest,
 )
+from app.modules.knowledge.services.scope_helper import (
+    get_scoped_collection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +31,11 @@ class CollectionService:
     """Service managing Knowledge Collections and their stats."""
 
     async def create_collection(
-        self, db: AsyncSession, req: CollectionCreateRequest
+        self, db: AsyncSession, req: CollectionCreateRequest, actor: Any | None = None
     ) -> KnowledgeCollection:
+        tenant_id = getattr(actor, "tenant_id", None) or req.tenant_id
+        workspace_id = getattr(actor, "workspace_id", None) or req.workspace_id
+
         meta = dict(req.metadata or {})
         if req.data_processing:
             meta["data_processing"] = (
@@ -37,22 +44,38 @@ class CollectionService:
                 else dict(req.data_processing)
             )
         elif "data_processing" not in meta:
+            from app.modules.modelops.services.model_catalog_service import model_catalog_service
+
+            catalog = await model_catalog_service.get_system_model_defaults(db)
+            defaults = catalog.defaults
+            if not defaults.default_embedding_provider_id or not defaults.default_embedding_model:
+                raise AppException(
+                    "Chưa cấu hình embedding provider/model mặc định trong ModelOps DB.",
+                    code="EMBEDDING_MODEL_NOT_CONFIGURED",
+                    status_code=400,
+                )
+            dim = await model_catalog_service.resolve_embedding_dimension(
+                db,
+                defaults.default_embedding_provider_id,
+                defaults.default_embedding_model,
+            )
+
             meta["data_processing"] = {
-                "embedding_provider_id": "prov_rtx5090_ollama",
-                "embedding_model": "bge-m3:latest",
-                "embedding_dimension": 1024,
-                "ocr_mode": "combo",
-                "primary_ocr_provider_id": "prov_rtx5090_ollama",
-                "primary_ocr_model": "qwen3-vl:8b",
-                "fallback_ocr_provider_id": "prov_gemini",
-                "fallback_ocr_model": "gemini-3.1-flash-lite",
+                "embedding_provider_id": defaults.default_embedding_provider_id,
+                "embedding_model": defaults.default_embedding_model,
+                "embedding_dimension": int(dim),
+                "ocr_mode": defaults.ocr_mode or "auto",
+                "primary_ocr_provider_id": defaults.default_ocr_provider_id,
+                "primary_ocr_model": defaults.default_ocr_model,
+                "fallback_ocr_provider_id": defaults.fallback_ocr_provider_id,
+                "fallback_ocr_model": defaults.fallback_ocr_model,
             }
         col = KnowledgeCollection(
             name=req.name,
             description=req.description,
             module_code=req.module_code,
-            tenant_id=req.tenant_id,
-            workspace_id=req.workspace_id,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             collection_metadata=meta,
         )
         db.add(col)
@@ -62,16 +85,22 @@ class CollectionService:
         return col
 
     async def list_collections(
-        self, db: AsyncSession, tenant_id: str = "tenant_qnu", workspace_id: str = "workspace_qnu"
+        self,
+        db: AsyncSession,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+        actor: Any | None = None,
     ) -> list[KnowledgeCollection]:
-        query = (
-            select(KnowledgeCollection)
-            .where(
-                KnowledgeCollection.tenant_id == tenant_id,
-                KnowledgeCollection.workspace_id == workspace_id,
-            )
-            .order_by(KnowledgeCollection.created_at.desc())
-        )
+        t_id = getattr(actor, "tenant_id", None) or tenant_id
+        w_id = getattr(actor, "workspace_id", None) or workspace_id
+
+        query = select(KnowledgeCollection)
+        if t_id:
+            query = query.where(KnowledgeCollection.tenant_id == t_id)
+        if w_id:
+            query = query.where(KnowledgeCollection.workspace_id == w_id)
+        query = query.order_by(KnowledgeCollection.created_at.desc())
+
         res = await db.execute(query)
         cols = list(res.scalars().all())
         await self._attach_collection_stats(db, cols)
@@ -112,19 +141,21 @@ class CollectionService:
             col.document_count = doc_res.scalar() or 0
             col.chunk_count = chunk_res.scalar() or 0
 
-    async def get_collection(self, db: AsyncSession, collection_id: str) -> KnowledgeCollection:
-        query = select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
-        res = await db.execute(query)
-        col = res.scalar_one_or_none()
-        if not col:
-            raise EntityNotFoundError(f"Bộ sưu tập '{collection_id}' không tồn tại.")
+    async def get_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> KnowledgeCollection:
+        col = await get_scoped_collection(db, collection_id, actor=actor)
         await self._attach_collection_stats(db, [col])
         return col
 
     async def update_collection(
-        self, db: AsyncSession, collection_id: str, req: CollectionUpdateRequest
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req: CollectionUpdateRequest,
+        actor: Any | None = None,
     ) -> KnowledgeCollection:
-        col = await self.get_collection(db, collection_id)
+        col = await self.get_collection(db, collection_id, actor=actor)
         updates = req.model_dump(exclude_unset=True)
         if "metadata" in updates:
             merged = dict(col.collection_metadata or {})
@@ -153,9 +184,11 @@ class CollectionService:
         await db.refresh(col)
         return col
 
-    async def delete_collection(self, db: AsyncSession, collection_id: str) -> None:
+    async def delete_collection(
+        self, db: AsyncSession, collection_id: str, actor: Any | None = None
+    ) -> None:
         """Delete a collection, all its documents, chunks, facts, and Qdrant index (zero ghost collections)."""
-        col = await self.get_collection(db, collection_id)
+        col = await self.get_collection(db, collection_id, actor=actor)
 
         # 0. Delete physical files from Storage driver
         docs = list(

@@ -14,7 +14,7 @@ function formatTimestamp(ts?: string): string {
     return trimmed;
   }
   const dateObj = new Date(trimmed);
-  if (!isNaN(dateObj.getTime())) {
+  if (!Number.isNaN(dateObj.getTime())) {
     return dateObj.toLocaleTimeString("vi-VN", {
       hour: "2-digit",
       minute: "2-digit",
@@ -31,7 +31,10 @@ function cleanCitationTitle(rawTitle?: string, docName?: string): string {
     return `Tài liệu tuyển sinh QNU (${chosen})`;
   }
   if (/^Tài liệu doc_[a-zA-Z0-9_-]+/i.test(chosen)) {
-    return chosen.replace(/^Tài liệu (doc_[a-zA-Z0-9_-]+)/i, "Tài liệu tuyển sinh QNU ($1)");
+    return chosen.replace(
+      /^Tài liệu (doc_[a-zA-Z0-9_-]+)/i,
+      "Tài liệu tuyển sinh QNU ($1)",
+    );
   }
   return chosen;
 }
@@ -108,9 +111,7 @@ export function formatConversationToMarkdown(
             ? `\n  > Trích dẫn: "${c.excerpt.trim()}"`
             : "";
           const title = cleanCitationTitle(c.title, c.document_name);
-          lines.push(
-            `- [${idx + 1}] **${title}**${pageStr}${excerptStr}`,
-          );
+          lines.push(`- [${idx + 1}] **${title}**${pageStr}${excerptStr}`);
         });
         lines.push("");
       }

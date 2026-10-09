@@ -1,8 +1,11 @@
 import asyncio
 import json
+from pathlib import Path
+
 from app.core.database import AsyncSessionFactory
-from app.modules.assistants.service import assistant_service
 from app.modules.assistants.schemas import AssistantChatRequest
+from app.modules.assistants.service import assistant_service
+
 
 async def main():
     async with AsyncSessionFactory() as db:
@@ -12,8 +15,8 @@ async def main():
             stream=False
         )
         resp = await assistant_service.chat(db, "ast_admissions", req)
-        with open("chat_response_debug.json", "w", encoding="utf-8") as f:
-            f.write(json.dumps(resp.model_dump(mode="json"), indent=2, ensure_ascii=False))
+        content = json.dumps(resp.model_dump(mode="json"), indent=2, ensure_ascii=False)
+        await asyncio.to_thread(Path("chat_response_debug.json").write_text, content, encoding="utf-8")
         print("Chat response saved to chat_response_debug.json")
 
 if __name__ == '__main__':

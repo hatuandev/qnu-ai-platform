@@ -1,7 +1,9 @@
 import asyncio
 import sys
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import text
+
+from app.core.database import AsyncSessionFactory
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")

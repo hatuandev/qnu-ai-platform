@@ -1,7 +1,9 @@
 import asyncio
 import sys
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -25,7 +27,7 @@ async def main():
                     text_str = str(b.get('text') or b.get('content_snippet') or "")
                     if b_type in ('table', 'signature') or 'Quản lý' in text_str or 'hình thức' in text_str.lower():
                         coords = b.get('coordinates', {})
-                        print(f"   [{b_type}] (y={coords.get('y')}, x={coords.get('x')}, w={coords.get('width')}, h={coords.get('height')}) label={b.get('label')}, text={repr(text_str[:40])}")
+                        print(f"   [{b_type}] (y={coords.get('y')}, x={coords.get('x')}, w={coords.get('width')}, h={coords.get('height')}) label={b.get('label')}, text={text_str[:40]!r}")
 
 if __name__ == "__main__":
     asyncio.run(main())

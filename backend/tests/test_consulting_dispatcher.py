@@ -35,7 +35,8 @@ async def test_dispatch_admissions_with_export():
     msg = "Em thi khối A00 được 24 điểm ở KV1, tư vấn ngành và xuất file excel kế hoạch nguyện vọng giúp em"
     res = await consulting_dispatcher.dispatch("admissions", msg)
     assert res["has_agentic_guidance"] is True
-    assert len(res["artifacts"]) >= 2  # XLSX and DOCX
+    assert len(res["artifacts"]) == 1
+    assert res["artifacts"][0]["type"] == "xlsx"
     assert "THÔNG TIN ĐIỂM XÉT TUYỂN" in res["guidance_context"]
 
 
@@ -50,4 +51,3 @@ async def test_dispatch_regulations_with_export():
     types = [a["type"] for a in res["artifacts"]]
     assert "xlsx" in types
     assert "docx" in types
-

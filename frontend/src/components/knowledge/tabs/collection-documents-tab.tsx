@@ -895,7 +895,8 @@ export function CollectionDocumentsTab({
                           }`}
                           title={
                             doc.status === "review_pending"
-                              ? doc.index_error || "Tài liệu có cảnh báo chất lượng cấu trúc, cần hiệu đính trong Studio"
+                              ? doc.index_error ||
+                                "Tài liệu có cảnh báo chất lượng cấu trúc, cần hiệu đính trong Studio"
                               : undefined
                           }
                         >

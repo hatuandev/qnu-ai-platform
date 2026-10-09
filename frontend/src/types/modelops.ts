@@ -80,6 +80,8 @@ export interface ModelProvider {
     | "mistral"
     | "cloudflare"
     | "nvidia"
+    | "vllm"
+    | "ollama"
     | "custom";
   is_active: boolean;
   circuit_breaker_status: "CLOSED" | "OPEN" | "HALF_OPEN";
@@ -101,8 +103,10 @@ export interface ModelOption {
   provider_name: string;
   provider_type: string;
   model_name: string;
+  label?: string;
   category: "cloud" | "custom";
   description?: string;
+  dimension?: number | null;
 }
 
 export interface OCRComboItem {

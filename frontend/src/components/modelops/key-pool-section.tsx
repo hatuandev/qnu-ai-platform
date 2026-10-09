@@ -122,7 +122,9 @@ export const KeyPoolSection: React.FC<KeyPoolSectionProps> = ({
                   className={`h-3.5 w-3.5 text-warning ${simulatingRotation ? "animate-spin" : ""}`}
                 />
                 <span>
-                  {simulatingRotation ? "Đang mô phỏng..." : "Mô phỏng Failover"}
+                  {simulatingRotation
+                    ? "Đang mô phỏng..."
+                    : "Mô phỏng Failover"}
                 </span>
               </Button>
 

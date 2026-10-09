@@ -1667,7 +1667,7 @@ class IngestionService:
             .all()
         )
         col_dp = (col.collection_metadata.get("data_processing") or {}) if col and col.collection_metadata else {}
-        col_embedding_model = col_dp.get("embedding_model") or "bge-m3:latest"
+        col_embedding_model = col_dp.get("embedding_model")
 
         chunks_payload = [
             {

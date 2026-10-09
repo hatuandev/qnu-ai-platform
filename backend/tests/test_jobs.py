@@ -24,10 +24,13 @@ def _fresh_session() -> AsyncMock:
     return session
 
 
-def _execute_result(scalar=None, all_rows=None):
+def _execute_result(scalar=None, all_rows=None, scalars_list=None):
     result = MagicMock()
     result.scalar_one_or_none = MagicMock(return_value=scalar)
     result.all = MagicMock(return_value=all_rows or [])
+    scalars = MagicMock()
+    scalars.all = MagicMock(return_value=scalars_list or [])
+    result.scalars = MagicMock(return_value=scalars)
     return result
 
 
@@ -133,7 +136,8 @@ async def test_retry_non_failed_job_rejected():
 async def test_retry_failed_job_requeues():
     job = SimpleNamespace(
         id="job_4", status="failed", job_type="reindex",
-        progress=100.0, error="boom", result={"a": 1},
+        progress=100.0, error="boom", result={"a": 1}, attempt=0,
+        dispatch_status="failed",
     )
     session = _fresh_session()
     session.execute = AsyncMock(return_value=_execute_result(scalar=job))
@@ -144,6 +148,33 @@ async def test_retry_failed_job_requeues():
     assert retried.status == "queued"
     assert retried.progress == 0.0
     assert retried.arq_job_id == "arq-2"
+
+
+@pytest.mark.asyncio
+async def test_reconcile_pending_dispatches_uses_deterministic_broker_id():
+    job = JobRecord(
+        id="job_pending_1",
+        job_type="document_revision_parse",
+        status="queued",
+        dispatch_status="pending",
+        attempt=2,
+    )
+    session = _fresh_session()
+    session.execute = AsyncMock(
+        return_value=_execute_result(scalars_list=[job])
+    )
+    enqueue = AsyncMock(return_value="job_pending_1:attempt:2")
+    with patch("app.modules.jobs.service.enqueue_arq_job", new=enqueue):
+        dispatched = await jobs_service.reconcile_pending_dispatches(session)
+
+    assert dispatched == 1
+    assert job.dispatch_status == "dispatched"
+    assert job.arq_job_id == "job_pending_1:attempt:2"
+    enqueue.assert_awaited_once_with(
+        "task_document_revision_parse",
+        "job_pending_1",
+        broker_job_id="job_pending_1:attempt:2",
+    )
 
 
 @pytest.mark.asyncio
@@ -240,3 +271,24 @@ async def test_api_cleanup_jobs():
     assert data["success"] is True
     assert data["deleted_count"] == 3
 
+@pytest.mark.asyncio
+async def test_delete_running_job_rejected_409():
+    """Deleting a non-terminal (running/queued) job must be rejected with 409."""
+    for active_status in ("queued", "running"):
+        job = SimpleNamespace(id=f"job_{active_status}", status=active_status)
+        session = _fresh_session()
+        session.execute = AsyncMock(return_value=_execute_result(scalar=job))
+        with pytest.raises(AppException) as exc_info:
+            await jobs_service.delete_job(session, job.id)
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.code == "job_not_terminal"
+
+
+@pytest.mark.asyncio
+async def test_cleanup_jobs_invalid_status_rejected_400():
+    """Cleanup with non-terminal status (e.g. running) must be rejected with 400."""
+    session = _fresh_session()
+    with pytest.raises(AppException) as exc_info:
+        await jobs_service.cleanup_jobs(session, statuses=["completed", "running"])
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.code == "INVALID_CLEANUP_STATUS"

@@ -243,9 +243,16 @@ export function DocumentsPage() {
       {/* 4. Content Area: Grid / Table / Empty */}
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {[
+            "doc-sk-1",
+            "doc-sk-2",
+            "doc-sk-3",
+            "doc-sk-4",
+            "doc-sk-5",
+            "doc-sk-6",
+          ].map((skKey) => (
             <div
-              key={`skeleton-${i}`}
+              key={skKey}
               className="h-44 rounded-lg border border-border/50 bg-muted/20 animate-pulse"
             />
           ))}
@@ -290,10 +297,7 @@ export function DocumentsPage() {
       )}
 
       {/* 5. Modals & Dialogs */}
-      <DocumentUploadModal
-        open={isUploadOpen}
-        onOpenChange={setIsUploadOpen}
-      />
+      <DocumentUploadModal open={isUploadOpen} onOpenChange={setIsUploadOpen} />
 
       <ConfirmDialog
         open={Boolean(deletingDoc)}

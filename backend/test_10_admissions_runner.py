@@ -2,9 +2,9 @@
 
 import asyncio
 import json
-import os
 import sys
 import time
+from pathlib import Path
 
 # Ensure UTF-8 output encoding
 if sys.platform == "win32":
@@ -12,8 +12,8 @@ if sys.platform == "win32":
     sys.stderr.reconfigure(encoding="utf-8")
 
 from app.core.database import AsyncSessionFactory
-from app.modules.assistants.services.assistant_chat_service import AssistantChatService
 from app.modules.assistants.schemas import AssistantChatRequest
+from app.modules.assistants.services.assistant_chat_service import AssistantChatService
 from app.modules.modelops.circuit_breaker import circuit_breaker_registry
 
 QUESTIONS = [
@@ -70,7 +70,8 @@ QUESTIONS = [
 ]
 
 from app.core.redis import get_redis_client
-from app.modules.modelops.circuit_breaker import circuit_breaker_registry, CircuitBreakerState
+from app.modules.modelops.circuit_breaker import CircuitBreakerState
+
 
 async def run_all_tests():
     # Clear old RAG cache in Redis
@@ -152,8 +153,8 @@ async def run_all_tests():
 
     # Save results to json
     output_path = "test_10_admissions_results.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
+    content = json.dumps(results, ensure_ascii=False, indent=2)
+    await asyncio.to_thread(Path(output_path).write_text, content, encoding="utf-8")
     print(f"\n ĐÃ LƯU KẾT QUẢ ĐẦY ĐỦ VÀO: {output_path}")
 
 if __name__ == "__main__":

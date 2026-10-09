@@ -348,7 +348,9 @@ export function CollectionFactsTab({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div className="bg-card p-3 rounded-lg border border-border flex items-center justify-between">
           <div>
-            <div className="text-[11px] text-muted-foreground">Tổng số facts</div>
+            <div className="text-[11px] text-muted-foreground">
+              Tổng số facts
+            </div>
             <div className="text-lg font-bold text-foreground font-mono mt-0.5">
               {totalCount}
             </div>
@@ -360,7 +362,9 @@ export function CollectionFactsTab({
 
         <div className="bg-card p-3 rounded-lg border border-border flex items-center justify-between">
           <div>
-            <div className="text-[11px] text-muted-foreground">Thực thể ngành / khoa</div>
+            <div className="text-[11px] text-muted-foreground">
+              Thực thể ngành / khoa
+            </div>
             <div className="text-lg font-bold text-foreground font-mono mt-0.5">
               {metrics.entityCount}
             </div>
@@ -372,7 +376,9 @@ export function CollectionFactsTab({
 
         <div className="bg-card p-3 rounded-lg border border-border flex items-center justify-between">
           <div>
-            <div className="text-[11px] text-muted-foreground">Loại thuộc tính</div>
+            <div className="text-[11px] text-muted-foreground">
+              Loại thuộc tính
+            </div>
             <div className="text-lg font-bold text-foreground font-mono mt-0.5">
               {metrics.attributeCount}
             </div>
@@ -384,7 +390,9 @@ export function CollectionFactsTab({
 
         <div className="bg-card p-3 rounded-lg border border-border flex items-center justify-between">
           <div>
-            <div className="text-[11px] text-muted-foreground">Độ tin cậy TB</div>
+            <div className="text-[11px] text-muted-foreground">
+              Độ tin cậy TB
+            </div>
             <div className="text-lg font-bold text-success font-mono mt-0.5">
               {metrics.avgConfidence}%
             </div>
@@ -618,7 +626,9 @@ export function CollectionFactsTab({
               <SelectItem value="entity_asc">Thực thể (A-Z)</SelectItem>
               <SelectItem value="entity_desc">Thực thể (Z-A)</SelectItem>
               <SelectItem value="attr_asc">Thuộc tính (A-Z)</SelectItem>
-              <SelectItem value="confidence_desc">Độ tin cậy cao nhất</SelectItem>
+              <SelectItem value="confidence_desc">
+                Độ tin cậy cao nhất
+              </SelectItem>
             </SelectContent>
           </Select>
 
@@ -1038,7 +1048,10 @@ export function CollectionFactsTab({
                   <span className="text-muted-foreground block text-[11px]">
                     Phân loại
                   </span>
-                  <Badge variant="outline" className="text-[10px] uppercase mt-0.5">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase mt-0.5"
+                  >
                     {inspectFact.entity_type}
                   </Badge>
                 </div>

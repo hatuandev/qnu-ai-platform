@@ -1,9 +1,10 @@
 import asyncio
-import json
+
 from app.core.database import AsyncSessionFactory
 from app.modules.rag.retriever import hybrid_retriever
-from app.modules.rag.service import rag_service
 from app.modules.rag.schemas import AskRequest
+from app.modules.rag.service import rag_service
+
 
 async def main():
     async with AsyncSessionFactory() as db:

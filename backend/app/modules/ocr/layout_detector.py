@@ -726,6 +726,9 @@ class SmartLayoutDetector:
             if self._is_doc_or_section_title(txt):
                 rtype = "title"
                 lbl = "title"
+            elif self._is_list_marker(txt):
+                rtype = "list"
+                lbl = "list"
             elif page_number == 1 and t < 15.0:
                 rtype = "header"
                 lbl = "header"

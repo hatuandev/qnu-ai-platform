@@ -265,3 +265,131 @@ def extract_sections_metadata(text: str) -> list[dict[str, str]]:
             }
         )
     return sections
+
+
+# Regex patterns for administrative document metadata (Decree 30/2020/ND-CP)
+_RE_ADMIN_DATE = re.compile(
+    r"(?:ngày|ng\u00e0y)\s+0?([1-9]|[12][0-9]|3[01])\s+th\u00e1ng\s+0?([1-9]|1[0-2])\s+n\u0103m\s+(19\d{2}|20\d{2})",
+    re.IGNORECASE,
+)
+_RE_ADMIN_DOC_NUMBER = re.compile(
+    r"(?:Số|S\u1ed1)\s*:\s*([0-9]+/[A-Z\u0110\u0111a-z0-9\-_/]+)",
+    re.IGNORECASE,
+)
+_RE_ADMIN_SUBJECT = re.compile(
+    r"(?:V/v|V\u1ec1\s+vi\u1ec7c)\s*[:\-]?\s*([^\n\r]+)",
+    re.IGNORECASE,
+)
+_RE_ADMIN_AUTHORITY = re.compile(
+    r"(?:TRƯỜNG\s+ĐẠI\s+HỌC\s+QUY\s+NHƠN|BỘ\s+GIÁO\s+DỤC\s+VÀ\s+ĐÀO\s+TẠO|UBND\s+[^\n\r,]+)",
+    re.IGNORECASE,
+)
+_RE_ADMIN_HEADING_TYPE = re.compile(
+    r"^\s*(QUYẾT\s+ĐỊNH|THÔNG\s+BÁO|KẾ\s+HOẠCH|HƯỚNG\s+DẪN|CHỈ\s+THỊ|NGHỊ\s+QUYẾT|BÁO\s+CÁO|QUY\s+CHẾ|QUY\s+ĐỊNH|TỜ\s+TRÌNH|CÔNG\s+VĂN|BIÊN\s+BẢN|ĐỀ\s+ÁN|PHƯƠNG\s+ÁN)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_RE_ADMIN_SIGNER = re.compile(
+    r"(?:HIỆU\s+TRƯỞNG|PHÓ\s+HIỆU\s+TRƯỞNG|GIÁM\s+ĐỐC|TRƯỞNG\s+PHÒNG|CHỦ\s+TỊCH)\s*\n+([A-ZÀ-Ỹ\s]{3,35})\b",
+    re.MULTILINE,
+)
+
+_ND30_ABBREV_MAP = {
+    "QD": "quyet_dinh",
+    "QĐ": "quyet_dinh",
+    "QC": "quy_che",
+    "NQ": "nghi_quyet",
+    "CT": "chi_thi",
+    "TB": "thong_bao",
+    "HD": "huong_dan",
+    "KH": "ke_hoach",
+    "PA": "phuong_an",
+    "DA": "de_an",
+    "ĐA": "de_an",
+    "BC": "bao_cao",
+    "BB": "bien_ban",
+    "TTR": "to_trinh",
+    "HDG": "hop_dong",
+    "CV": "cong_van",
+    "TT": "quy_dinh",
+    "CTR": "chuong_trinh",
+}
+
+
+def extract_administrative_metadata(text: str) -> dict[str, object]:
+    """Tự động trích xuất metadata thể thức văn bản hành chính theo Nghị định 30/2020/NĐ-CP.
+
+    Thuật toán dựa trên các bất biến cú pháp thể thức văn bản hành chính:
+    - issued_date: Ngày ký ban hành (dd/mm/yyyy -> datetime.date)
+    - document_number: Số hiệu văn bản
+    - document_type_code: Mã loại văn bản chuẩn NĐ 30
+    - title: Trích yếu / tiêu đề văn bản
+    - issuing_authority: Cơ quan ban hành
+    - signer: Người ký văn bản
+    """
+    if not text:
+        return {}
+
+    from datetime import date
+
+    from app.modules.document_types.catalog import normalize_document_type_code
+
+    result: dict[str, object] = {}
+    header_chunk = text[:3500]  # Thể thức hành chính NĐ 30 luôn nằm ở trang đầu
+
+    # 1. Trích xuất Ngày ban hành
+    date_match = _RE_ADMIN_DATE.search(header_chunk)
+    if date_match:
+        try:
+            day = int(date_match.group(1))
+            month = int(date_match.group(2))
+            year = int(date_match.group(3))
+            result["issued_date"] = date(year, month, day)
+        except ValueError:
+            pass
+
+    # 2. Trích xuất Số hiệu văn bản
+    num_match = _RE_ADMIN_DOC_NUMBER.search(header_chunk)
+    if num_match:
+        doc_num = num_match.group(1).strip()
+        result["document_number"] = doc_num
+
+        # 3. Phân tích loại văn bản từ số hiệu (vd: 123/QĐ-ĐHQN -> QĐ)
+        if "/" in doc_num:
+            suffix_part = doc_num.split("/", 1)[1]
+            abbrev = suffix_part.split("-")[0].strip().upper()
+            if abbrev in _ND30_ABBREV_MAP:
+                result["document_type_code"] = _ND30_ABBREV_MAP[abbrev]
+
+    # 4. Nếu chưa có loại văn bản từ số hiệu, tìm từ tiêu đề loại văn bản ở phần đầu
+    if "document_type_code" not in result:
+        type_match = _RE_ADMIN_HEADING_TYPE.search(header_chunk)
+        if type_match:
+            detected_type = normalize_document_type_code(type_match.group(1))
+            if detected_type:
+                result["document_type_code"] = detected_type
+
+    # 5. Trích xuất Trích yếu nội dung (Tiêu đề)
+    subject_match = _RE_ADMIN_SUBJECT.search(header_chunk)
+    if subject_match:
+        subj = subject_match.group(1).strip()
+        subj = re.sub(r"^[\s:\-\"]+", "", subj).strip("\"' ")
+        if len(subj) > 5:
+            result["title"] = subj
+
+    # 6. Trích xuất Cơ quan ban hành
+    if re.search(r"TRƯỜNG\s+ĐẠI\s+HỌC\s+QUY\s+NHƠN", header_chunk, re.IGNORECASE):
+        result["issuing_authority"] = "Trường Đại học Quy Nhơn"
+    else:
+        auth_match = _RE_ADMIN_AUTHORITY.search(header_chunk)
+        if auth_match:
+            result["issuing_authority"] = auth_match.group(0).strip().title()
+
+    # 7. Trích xuất Người ký ở 2500 ký tự cuối văn bản
+    tail_chunk = text[-2500:]
+    signer_match = _RE_ADMIN_SIGNER.search(tail_chunk)
+    if signer_match:
+        raw_signer = signer_match.group(1).strip()
+        if len(raw_signer) >= 3 and not any(kw in raw_signer.upper() for kw in ["NƠI NHẬN", "LƯU:"]):
+            result["signer"] = raw_signer.title()
+
+    return result

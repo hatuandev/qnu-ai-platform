@@ -1,9 +1,11 @@
 import asyncio
 import json
 import sys
+
 from sqlalchemy import text
-from app.core.database import AsyncSessionFactory
+
 from app.core.crypto import decrypt_secret
+from app.core.database import AsyncSessionFactory
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")

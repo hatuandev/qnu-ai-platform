@@ -88,7 +88,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     }
   }, [currentPath]);
 
-
   // Master View Category Filter Tab
   const [activeCategoryTab, setActiveCategoryTab] =
     useState<ProviderCategory>("all");
@@ -210,7 +209,6 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     }
     return list;
   }, [providers, activeCategoryTab, searchQuery]);
-
 
   const { data: presets = [] } = useQuery({
     queryKey: ["provider-presets"],
@@ -930,243 +928,236 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         </Card>
       </div>
 
-{/* Provider Grid & Content */}
-        <div className="space-y-4">
-          {/* Category Tabs & Realtime Search Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
-              <Button
-                variant={activeCategoryTab === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveCategoryTab("all")}
-                className="h-8 text-xs gap-1.5 rounded-full"
+      {/* Provider Grid & Content */}
+      <div className="space-y-4">
+        {/* Category Tabs & Realtime Search Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/70 pb-3">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0">
+            <Button
+              variant={activeCategoryTab === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("all")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <span>Tất Cả</span>
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
               >
-                <span>Tất Cả</span>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
-                >
-                  {providers.length}
-                </Badge>
-              </Button>
+                {providers.length}
+              </Badge>
+            </Button>
 
-              <Button
-                variant={activeCategoryTab === "cloud" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveCategoryTab("cloud")}
-                className="h-8 text-xs gap-1.5 rounded-full"
+            <Button
+              variant={activeCategoryTab === "cloud" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("cloud")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <Cloud className="size-3.5" />
+              <span>Cloud AI</span>
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
               >
-                <Cloud className="size-3.5" />
-                <span>Cloud AI</span>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
-                >
-                  {cloudProviders.length}
-                </Badge>
-              </Button>
+                {cloudProviders.length}
+              </Badge>
+            </Button>
 
-              <Button
-                variant={activeCategoryTab === "custom" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveCategoryTab("custom")}
-                className="h-8 text-xs gap-1.5 rounded-full"
+            <Button
+              variant={activeCategoryTab === "custom" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategoryTab("custom")}
+              className="h-8 text-xs gap-1.5 rounded-full"
+            >
+              <SlidersHorizontal className="size-3.5" />
+              <span>Custom</span>
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
               >
-                <SlidersHorizontal className="size-3.5" />
-                <span>Custom</span>
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] px-1.5 py-0 h-4 bg-background/30 text-inherit border-none font-mono"
-                >
-                  {customProviders.length}
-                </Badge>
-              </Button>
-            </div>
-
-            {/* Realtime Search Input */}
-            <div className="relative w-full sm:w-72 shrink-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm Provider hoặc Model..."
-                className="pl-8 h-8 text-xs"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  ×
-                </button>
-              )}
-            </div>
+                {customProviders.length}
+              </Badge>
+            </Button>
           </div>
 
-          {/* Provider List / Search Results */}
-          {isLoading ? (
-            <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-              <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-              <span>Đang tải danh sách nhà cung cấp...</span>
-            </div>
-          ) : providers.length === 0 ? (
-            <Card className="p-8 border-dashed border-border bg-card/50">
-              <EmptyState
-                icon={Server}
-                title="Chưa Có Provider Nào Được Cấu Hình"
-                description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
-                action={{
-                  label: "Thêm Provider Mới",
-                  onClick: () => openCreateModal("openai"),
-                }}
-              />
+          {/* Realtime Search Input */}
+          <div className="relative w-full sm:w-72 shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm Provider hoặc Model..."
+              className="pl-8 h-8 text-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Provider List / Search Results */}
+        {isLoading ? (
+          <div className="p-12 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+            <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+            <span>Đang tải danh sách nhà cung cấp...</span>
+          </div>
+        ) : providers.length === 0 ? (
+          <Card className="p-8 border-dashed border-border bg-card/50">
+            <EmptyState
+              icon={Server}
+              title="Chưa Có Provider Nào Được Cấu Hình"
+              description="Hệ thống đang ở trạng thái dữ liệu sạch. Bắt đầu bằng việc thêm nhà cung cấp LLM mới theo nhu cầu thực tế của đơn vị."
+              action={{
+                label: "Thêm Provider Mới",
+                onClick: () => openCreateModal("openai"),
+              }}
+            />
+          </Card>
+        ) : searchQuery.trim() ? (
+          filteredProviders.length === 0 ? (
+            <Card className="p-8 border-dashed border-border bg-card/40 text-center">
+              <p className="text-xs font-semibold text-foreground">
+                Không tìm thấy Provider hoặc Model nào khớp với &quot;
+                {searchQuery}&quot;
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Thử tìm kiếm với tên hãng (OpenAI, Gemini...), hoặc mã model
+                (gpt-4o, bge-m3...).
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="mt-3 text-xs text-primary"
+              >
+                Xóa bộ lọc tìm kiếm
+              </Button>
             </Card>
-          ) : searchQuery.trim() ? (
-            filteredProviders.length === 0 ? (
-              <Card className="p-8 border-dashed border-border bg-card/40 text-center">
-                <p className="text-xs font-semibold text-foreground">
-                  Không tìm thấy Provider hoặc Model nào khớp với &quot;
-                  {searchQuery}&quot;
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Thử tìm kiếm với tên hãng (OpenAI, Gemini...), hoặc mã model
-                  (gpt-4o, bge-m3...).
-                </p>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  Tìm thấy <strong>{filteredProviders.length}</strong> nhà cung
+                  cấp khớp với &quot;{searchQuery}&quot;
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSearchQuery("")}
-                  className="mt-3 text-xs text-primary"
+                  className="h-6 text-[11px]"
                 >
-                  Xóa bộ lọc tìm kiếm
+                  Xóa tìm kiếm
                 </Button>
-              </Card>
-            ) : (
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
+                {filteredProviders.map((prov) => (
+                  <ProviderCard
+                    key={prov.id}
+                    provider={prov}
+                    onSelect={handleSelectProvider}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        ) : (
+          <div className="space-y-6">
+            {/* Nhóm Cloud */}
+            {(activeCategoryTab === "all" || activeCategoryTab === "cloud") && (
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    Tìm thấy <strong>{filteredProviders.length}</strong> nhà
-                    cung cấp khớp với &quot;{searchQuery}&quot;
-                  </span>
+                <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                      <Cloud className="size-3.5" />
+                    </div>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Cloud AI Providers
+                    </h2>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {cloudProviders.length}
+                    </Badge>
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSearchQuery("")}
-                    className="h-6 text-[11px]"
+                    onClick={() => openCreateModal("openai")}
+                    className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
                   >
-                    Xóa tìm kiếm
+                    <Plus className="size-3" />
+                    <span>Thêm Cloud</span>
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
-                  {filteredProviders.map((prov) => (
-                    <ProviderCard
-                      key={prov.id}
-                      provider={prov}
-                      onSelect={handleSelectProvider}
-                    />
-                  ))}
-                </div>
+                {cloudProviders.length === 0 ? (
+                  <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
+                    Chưa có Provider đám mây nào.
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
+                    {cloudProviders.map((prov) => (
+                      <ProviderCard
+                        key={prov.id}
+                        provider={prov}
+                        onSelect={handleSelectProvider}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )
-          ) : (
-            <div className="space-y-6">
-              {/* Nhóm Cloud */}
-              {(activeCategoryTab === "all" ||
-                activeCategoryTab === "cloud") && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
-                        <Cloud className="size-3.5" />
-                      </div>
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Cloud AI Providers
-                      </h2>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-mono"
-                      >
-                        {cloudProviders.length}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openCreateModal("openai")}
-                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
-                    >
-                      <Plus className="size-3" />
-                      <span>Thêm Cloud</span>
-                    </Button>
-                  </div>
-                  {cloudProviders.length === 0 ? (
-                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
-                      Chưa có Provider đám mây nào.
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
-                      {cloudProviders.map((prov) => (
-                        <ProviderCard
-                          key={prov.id}
-                          provider={prov}
-                          onSelect={handleSelectProvider}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+            )}
 
-              {/* Nhóm Custom */}
-              {(activeCategoryTab === "all" ||
-                activeCategoryTab === "custom") && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                        <SlidersHorizontal className="size-3.5" />
-                      </div>
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                        Custom AI Gateways
-                      </h2>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] font-mono"
-                      >
-                        {customProviders.length}
-                      </Badge>
+            {/* Nhóm Custom */}
+            {(activeCategoryTab === "all" ||
+              activeCategoryTab === "custom") && (
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <SlidersHorizontal className="size-3.5" />
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openCreateModal("custom")}
-                      className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
-                    >
-                      <Plus className="size-3" />
-                      <span>Thêm Custom</span>
-                    </Button>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Custom AI Gateways
+                    </h2>
+                    <Badge variant="outline" className="text-[10px] font-mono">
+                      {customProviders.length}
+                    </Badge>
                   </div>
-                  {customProviders.length === 0 ? (
-                    <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
-                      Chưa có Provider tùy chỉnh nào.
-                    </Card>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
-                      {customProviders.map((prov) => (
-                        <ProviderCard
-                          key={prov.id}
-                          provider={prov}
-                          onSelect={handleSelectProvider}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openCreateModal("custom")}
+                    className="h-6 text-[11px] text-muted-foreground hover:text-primary gap-1"
+                  >
+                    <Plus className="size-3" />
+                    <span>Thêm Custom</span>
+                  </Button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+                {customProviders.length === 0 ? (
+                  <Card className="p-4 border-dashed border-border bg-card/30 text-center text-xs text-muted-foreground">
+                    Chưa có Provider tùy chỉnh nào.
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 min-[1800px]:grid-cols-4 gap-3.5">
+                    {customProviders.map((prov) => (
+                      <ProviderCard
+                        key={prov.id}
+                        provider={prov}
+                        onSelect={handleSelectProvider}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Provider Modal (Create / Edit with Presets) */}
       <ProviderModal

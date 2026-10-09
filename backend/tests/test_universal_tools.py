@@ -91,7 +91,6 @@ async def test_dispatch_admissions_with_dynamic_facts():
     res = await consulting_dispatcher.dispatch("admissions", msg)
     assert res["has_agentic_guidance"] is True
     assert res["score_calculation"] is not None
-    assert len(res["artifacts"]) >= 2
+    assert len(res["artifacts"]) == 1
     types = [a["type"] for a in res["artifacts"]]
     assert "xlsx" in types
-    assert "docx" in types

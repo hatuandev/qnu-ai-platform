@@ -364,7 +364,7 @@
       if (!fullAnswer.trim()) {
         botMsgEl.textContent = "Không nhận được phản hồi từ trợ lý.";
       }
-    } catch (err) {
+    } catch {
       botMsgEl.textContent =
         "Có lỗi xảy ra khi kết nối tới máy chủ. Vui lòng thử lại sau.";
     } finally {

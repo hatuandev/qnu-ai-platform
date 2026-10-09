@@ -61,7 +61,7 @@ function NavLeaf({
   const Icon = item.icon;
   const compact = state === "collapsed" && !isMobile;
   const content = (
-    <Link to={item.to as any} onClick={onNavigate}>
+    <Link to={item.to as never} onClick={onNavigate}>
       {Icon ? <Icon className="size-4 shrink-0" /> : null}
       <span className={cn("truncate", compact && "sr-only")}>{item.title}</span>
       {item.badge !== undefined && !compact ? (
@@ -123,7 +123,7 @@ function CollapsedParent({
           {item.children?.map((child) =>
             child.to ? (
               <DropdownMenuItem key={child.id} asChild>
-                <Link to={child.to as any} onClick={onNavigate}>
+                <Link to={child.to as never} onClick={onNavigate}>
                   {child.title}
                 </Link>
               </DropdownMenuItem>

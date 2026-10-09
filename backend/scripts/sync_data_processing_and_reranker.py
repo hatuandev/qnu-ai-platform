@@ -13,9 +13,11 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 from sqlalchemy import select
+
 from app.core.database import AsyncSessionFactory
-from app.modules.knowledge.models import KnowledgeCollection
 from app.modules.assistants.models import AssistantModel
+from app.modules.knowledge.models import KnowledgeCollection
+
 
 async def sync():
     async with AsyncSessionFactory() as db:
@@ -28,18 +30,18 @@ async def sync():
             
             # Default to RTX 5090 BGE-M3 and Qwen3-VL 8B
             needs_update = False
-            if not dp.get("embedding_model"):
-                dp["embedding_model"] = "bge-m3:latest"
-                dp["embedding_provider_id"] = "prov_rtx5090_ollama"
+            if not dp.get("embedding_model") or dp.get("embedding_provider_id") == "prov_rtx5090_ollama":
+                dp["embedding_model"] = "bge-m3"
+                dp["embedding_provider_id"] = "prov_rtx5090_vllm"
                 dp["embedding_dimension"] = 1024
                 needs_update = True
             
-            if not dp.get("primary_ocr_model"):
+            if not dp.get("primary_ocr_model") or dp.get("primary_ocr_provider_id") == "prov_rtx5090_ollama":
                 dp["ocr_mode"] = "combo"
-                dp["primary_ocr_model"] = "qwen3-vl:8b"
-                dp["primary_ocr_provider_id"] = "prov_rtx5090_ollama"
-                dp["fallback_ocr_model"] = "gemini-3.1-flash-lite"
-                dp["fallback_ocr_provider_id"] = "prov_gemini"
+                dp["primary_ocr_model"] = "gemini-3.1-flash-lite"
+                dp["primary_ocr_provider_id"] = "prov_gemini"
+                dp["fallback_ocr_model"] = "mistral-ocr-latest"
+                dp["fallback_ocr_provider_id"] = "prov_mistral"
                 dp["enable_ocr_rescue"] = True
                 needs_update = True
             

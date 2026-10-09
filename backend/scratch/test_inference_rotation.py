@@ -1,8 +1,9 @@
 import asyncio
 import sys
+
 from app.core.database import AsyncSessionFactory
+from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.services.inference_service import inference_service
-from app.modules.modelops.schemas import LLMGenerateRequest, ChatMessage
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")

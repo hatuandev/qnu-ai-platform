@@ -413,9 +413,8 @@ export function DifficultAreaFormDialog({
             </form.Field>
 
             {/* Danh sách thôn/ấp nếu !isWholeArea */}
-            <form.Subscribe
-              selector={(state) => state.values.isWholeArea}
-              children={(isWhole) =>
+            <form.Subscribe selector={(state) => state.values.isWholeArea}>
+              {(isWhole) =>
                 !isWhole ? (
                   <form.Field name="specificVillages">
                     {(field) => {
@@ -451,7 +450,7 @@ export function DifficultAreaFormDialog({
                   </form.Field>
                 ) : null
               }
-            />
+            </form.Subscribe>
           </div>
 
           <ResponsiveDialogFooter className="border-t px-4 py-3 sm:px-1">

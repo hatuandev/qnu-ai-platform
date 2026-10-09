@@ -90,8 +90,8 @@ const dateTime = (value?: string | null) =>
 
 const formatBytes = (value?: number | null) => {
   if (!value) return "Không rõ dung lượng";
-  if (value < 1024 * 1024) return String(Math.ceil(value / 1024)) + " KB";
-  return (value / (1024 * 1024)).toFixed(1) + " MB";
+  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 function StatusBadge({ status }: { status: PaymentSubmissionStatus }) {
@@ -167,14 +167,11 @@ function ReviewDialog({
     form.reset();
     setReviewMode(undefined);
     setReviewError(undefined);
-  }, [form, submissionId]);
+  }, [form]);
 
   const submission = detail.data;
   const receiptUrl = submissionId
-    ? runtimeConfig.apiBaseUrl +
-      "/PaymentSubmissions/" +
-      submissionId +
-      "/receipt"
+    ? `${runtimeConfig.apiBaseUrl}/PaymentSubmissions/${submissionId}/receipt`
     : "";
   const isImage = submission?.receiptContentType?.startsWith("image/") ?? false;
   const isPdf = submission?.receiptContentType === "application/pdf";
@@ -269,7 +266,7 @@ function ReviewDialog({
                 <div className="flex min-h-48 items-center justify-center rounded-md border bg-muted/20 p-3">
                   <img
                     src={receiptUrl}
-                    alt={"Biên lai của " + submission.studentName}
+                    alt={`Biên lai của ${submission.studentName}`}
                     className="max-h-[28rem] max-w-full rounded-md object-contain"
                   />
                 </div>
@@ -713,9 +710,11 @@ export function PaymentSubmissionsPage({
             </Alert>
           ) : query.isLoading ? (
             <div className="grid gap-2">
-              {Array.from({ length: 5 }, (_, index) => (
-                <Skeleton key={index} className="h-14" />
-              ))}
+              {["sub-sk-1", "sub-sk-2", "sub-sk-3", "sub-sk-4", "sub-sk-5"].map(
+                (skKey) => (
+                  <Skeleton key={skKey} className="h-14" />
+                ),
+              )}
             </div>
           ) : items.length === 0 ? (
             <DataTableEmpty

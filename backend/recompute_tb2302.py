@@ -1,7 +1,9 @@
 import asyncio
 import sys
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
 from app.modules.knowledge.services.ingestion_service import ingestion_service
 
@@ -31,7 +33,7 @@ async def main():
             print(f"\n--- Page {p_num} ({len(boxes)} boxes) ---")
             for b in boxes:
                 coords = b['coordinates']
-                print(f"  [{b['type']:10s}] (y={coords['y']:4.1f}%, x={coords['x']:4.1f}%, w={coords['width']:4.1f}%, h={coords['height']:4.1f}%) | {b['label']:18s} | snip={repr(b['content_snippet'][:40])}")
+                print(f"  [{b['type']:10s}] (y={coords['y']:4.1f}%, x={coords['x']:4.1f}%, w={coords['width']:4.1f}%, h={coords['height']:4.1f}%) | {b['label']:18s} | snip={b['content_snippet'][:40]!r}")
 
         # Check DB to confirm page_blocks in doc_metadata was updated
         res2 = await db.execute(select(KnowledgeDocument).where(KnowledgeDocument.id == 'doc_64869d87a6f9'))

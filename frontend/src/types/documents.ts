@@ -15,6 +15,7 @@ export interface RepositoryDocumentListItem {
   file_type: string;
   file_size_bytes: number;
   file_hash: string;
+  current_revision_id?: string | null;
   document_type_code?: string | null;
   document_type_name?: string | null;
   document_number?: string | null;
@@ -77,4 +78,68 @@ export interface AttachDocumentsRequest {
   document_ids: string[];
   chunk_strategy?: string;
   auto_approve?: boolean;
+}
+
+export interface QualityReportCheck {
+  passed: boolean;
+  detail: string;
+  score?: number;
+}
+
+export interface QualityReport {
+  overall_status: "passed" | "warning" | "failed";
+  overall_score?: number;
+  text_density?: number;
+  table_count?: number;
+  mojibake_clean?: boolean;
+  checks?: Record<string, QualityReportCheck>;
+  [key: string]: unknown;
+}
+
+export interface DocumentRevisionListItem {
+  id: string;
+  document_id: string;
+  revision_no: number;
+  based_on_revision_id?: string | null;
+  source_file_name: string;
+  source_file_type: string;
+  source_size_bytes: number;
+  source_hash: string;
+  canonical_hash?: string | null;
+  status:
+    | "queued"
+    | "processing"
+    | "validating"
+    | "review_required"
+    | "ready"
+    | "failed"
+    | "cancelled";
+  failure_code?: string | null;
+  failure_detail?: string | null;
+  quality_report?: QualityReport | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DocumentRevision extends DocumentRevisionListItem {
+  source_storage_path: string;
+  canonical_markdown?: string | null;
+  page_manifest?: Array<Record<string, unknown>> | null;
+  citation_metadata?: Record<string, unknown> | null;
+  parse_provenance?: Record<string, unknown> | null;
+  idempotency_key?: string | null;
+  lock_version: number;
+  review_notes?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  created_by?: string | null;
+}
+
+export interface AsyncUploadDocumentResponse {
+  message: string;
+  document_id: string;
+  revision_id: string;
+  status: string;
+  job_id?: string | null;
+  deduplicated?: boolean;
 }

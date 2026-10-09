@@ -1,9 +1,11 @@
 import asyncio
+
 from app.core.database import AsyncSessionFactory
-from app.modules.rag.retriever import hybrid_retriever
-from app.modules.modelops.schemas import LLMGenerateRequest, ChatMessage
+from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
+from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.service import build_generic_system_instruction
+
 
 async def main():
     async with AsyncSessionFactory() as db:

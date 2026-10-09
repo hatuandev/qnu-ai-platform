@@ -183,12 +183,9 @@ export function RegistrationPeriodRoomRulesDialog({
   }, [data?.rooms]);
 
   useEffect(() => {
-    if (
-      data?.buildings &&
-      data.buildings.length > 0 &&
-      buildingFilter === "all"
-    ) {
-      setBuildingFilter(data.buildings[0].buildingCode);
+    if (data?.buildings && data.buildings.length > 0) {
+      const firstCode = data.buildings[0].buildingCode;
+      setBuildingFilter((prev) => (prev === "all" ? firstCode : prev));
     }
   }, [data?.buildings]);
 

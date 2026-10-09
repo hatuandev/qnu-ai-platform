@@ -6,18 +6,27 @@ import asyncio
 import logging
 import re
 import unicodedata
+import uuid
 from typing import Any
 
 from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AppException, EntityNotFoundError
 from app.core.stopwords import (
     extract_collection_domain_stopwords,
     get_vietnamese_stopwords,
 )
-from app.modules.knowledge.models import KnowledgeChunk, KnowledgeDocument
+from app.modules.knowledge.models import (
+    KnowledgeBinding,
+    KnowledgeChunk,
+    KnowledgeCollection,
+    KnowledgeDocument,
+    KnowledgeIndexRevision,
+)
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
+from app.modules.rag.schemas import RetrievalSnapshot
 from app.modules.rag.vector_indexer import vector_indexer
 
 logger = logging.getLogger(__name__)
@@ -113,6 +122,92 @@ def is_unaccented_query(query: str) -> bool:
 class HybridRetriever:
     """Executes multi-stage hybrid retrieval with RRF fusion and reranking."""
 
+    async def resolve_retrieval_snapshot(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        pinned_snapshot: RetrievalSnapshot | None = None,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
+    ) -> RetrievalSnapshot:
+        """Resolve and validate an immutable tenant-scoped retrieval snapshot."""
+        binding_revisions: dict[str, str] = {}
+        vector_generations: dict[str, str] = {}
+
+        collection = await db.get(KnowledgeCollection, collection_id)
+        if not collection:
+            raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
+        if tenant_id and collection.tenant_id != tenant_id:
+            raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
+        if workspace_id and collection.workspace_id != workspace_id:
+            raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
+
+        try:
+            stmt_bindings = select(
+                KnowledgeBinding.id,
+                KnowledgeBinding.active_index_revision_id,
+                KnowledgeIndexRevision.vector_generation_id,
+            ).join(
+                KnowledgeIndexRevision,
+                KnowledgeBinding.active_index_revision_id == KnowledgeIndexRevision.id,
+            ).where(
+                KnowledgeBinding.collection_id == collection_id,
+                KnowledgeBinding.tenant_id == collection.tenant_id,
+                KnowledgeBinding.workspace_id == collection.workspace_id,
+                KnowledgeBinding.status == "active",
+                KnowledgeIndexRevision.status == "active",
+            )
+            bindings_res = await db.execute(stmt_bindings)
+            raw_rows = bindings_res.all()
+            if asyncio.iscoroutine(raw_rows):
+                raw_rows = await raw_rows
+            if isinstance(raw_rows, (list, tuple)):
+                for row in raw_rows:
+                    if len(row) >= 2 and row[1] is not None:
+                        binding_revisions[str(row[0])] = str(row[1])
+                    if len(row) >= 3 and row[2] is not None:
+                        vector_generations[str(row[0])] = str(row[2])
+        except Exception as exc:
+            raise AppException(
+                f"Không thể khóa retrieval snapshot: {exc}",
+                code="RETRIEVAL_SNAPSHOT_RESOLUTION_FAILED",
+                status_code=503,
+            ) from exc
+
+        current = RetrievalSnapshot(
+            snapshot_id=f"snap_{collection_id}_{collection.index_epoch}_{uuid.uuid4().hex[:8]}",
+            collection_id=collection_id,
+            collection_epoch=collection.index_epoch,
+            binding_revisions=binding_revisions,
+            vector_generations=vector_generations,
+            tenant_id=collection.tenant_id,
+            workspace_id=collection.workspace_id,
+        )
+
+        if pinned_snapshot:
+            valid = (
+                pinned_snapshot.collection_id == current.collection_id
+                and pinned_snapshot.collection_epoch == current.collection_epoch
+                and pinned_snapshot.binding_revisions == current.binding_revisions
+                and (
+                    not pinned_snapshot.vector_generations
+                    or pinned_snapshot.vector_generations == current.vector_generations
+                )
+                and (not pinned_snapshot.tenant_id or pinned_snapshot.tenant_id == current.tenant_id)
+                and (
+                    not pinned_snapshot.workspace_id
+                    or pinned_snapshot.workspace_id == current.workspace_id
+                )
+            )
+            if not valid:
+                raise AppException(
+                    "Retrieval snapshot đã cũ hoặc không thuộc phạm vi hiện tại.",
+                    code="STALE_RETRIEVAL_SNAPSHOT",
+                    status_code=409,
+                )
+            return pinned_snapshot
+        return current
+
     async def search_sparse_fts(
         self,
         db: AsyncSession,
@@ -123,10 +218,10 @@ class HybridRetriever:
         workspace_id: str | None = None,
         collection_name: str | None = None,
         extra_stopwords: set[str] | frozenset[str] | None = None,
+        snapshot: RetrievalSnapshot | None = None,
+        read_mode_override: str | None = None,
     ) -> list[dict[str, Any]]:
         """Perform lexical keyword search in PostgreSQL using weighted information density scoring & FTS."""
-        from app.modules.knowledge.models import KnowledgeCollection
-
         chunks: list[KnowledgeChunk] = []
         seen_ids: set[str] = set()
 
@@ -136,6 +231,42 @@ class HybridRetriever:
             effective_extra |= extract_collection_domain_stopwords(collection_name)
 
         weighted_tokens = extract_weighted_tokens(query, limit=12, extra_stopwords=effective_extra)
+
+        # Snapshot isolation: only retrieve chunks with active index_revision_id or legacy unindexed chunks
+        snapshot_filter = None
+        from app.core.config import settings
+
+        effective_read_mode = read_mode_override or getattr(
+            settings, "RAG_REVISION_READ_MODE", "revisioned"
+        )
+        if snapshot:
+            if collection_id:
+                try:
+                    col_obj = await db.get(KnowledgeCollection, collection_id)
+                    if col_obj and col_obj.collection_metadata:
+                        col_policy = col_obj.collection_metadata.get("canary_policy") or {}
+                        col_mode = col_policy.get("read_mode")
+                        if (
+                            not read_mode_override
+                            and col_mode
+                            and col_mode in ("revisioned", "shadow", "legacy")
+                        ):
+                            effective_read_mode = col_mode
+                except Exception:
+                    pass
+
+            if effective_read_mode == "revisioned" and not snapshot.binding_revisions:
+                return []
+            if effective_read_mode == "revisioned":
+                # Strict Cutover V2: only chunks strictly belonging to active revisions in snapshot
+                active_revs = list(snapshot.binding_revisions.values())
+                snapshot_filter = KnowledgeChunk.index_revision_id.in_(active_revs)
+            elif snapshot.binding_revisions:
+                active_revs = list(snapshot.binding_revisions.values())
+                snapshot_filter = or_(
+                    KnowledgeChunk.binding_id.is_(None),
+                    KnowledgeChunk.index_revision_id.in_(active_revs),
+                )
 
         # 1. Primary: Weighted Information Density ILIKE Matching with Document Anchor Scoping
         if weighted_tokens:
@@ -193,6 +324,8 @@ class HybridRetriever:
                     match_expr,
                 )
             )
+            if snapshot_filter is not None:
+                stmt_weighted = stmt_weighted.where(snapshot_filter)
             if tenant_id:
                 stmt_weighted = stmt_weighted.where(KnowledgeCollection.tenant_id == tenant_id)
             if workspace_id:
@@ -237,6 +370,8 @@ class HybridRetriever:
                         ts_vector.op("@@")(ts_query),
                     )
                 )
+                if snapshot_filter is not None:
+                    stmt_fts = stmt_fts.where(snapshot_filter)
                 if tenant_id:
                     stmt_fts = stmt_fts.where(KnowledgeCollection.tenant_id == tenant_id)
                 if workspace_id:
@@ -291,6 +426,8 @@ class HybridRetriever:
                             or_(*uni_conds),
                         )
                     )
+                    if snapshot_filter is not None:
+                        stmt_uni = stmt_uni.where(snapshot_filter)
                     if tenant_id:
                         stmt_uni = stmt_uni.where(KnowledgeCollection.tenant_id == tenant_id)
                     if workspace_id:
@@ -329,6 +466,7 @@ class HybridRetriever:
             doc_title = doc_title_map.get(c.document_id)
             if doc_title and not meta.get("document_title"):
                 meta["document_title"] = doc_title
+            doc_rev = meta.get("document_revision")
             results.append(
                 {
                     "chunk_id": c.id,
@@ -338,6 +476,9 @@ class HybridRetriever:
                     "page_number": c.page_number,
                     "score": 1.0 / idx,
                     "metadata": meta,
+                    "binding_id": c.binding_id,
+                    "index_revision_id": c.index_revision_id,
+                    "document_revision": int(doc_rev) if doc_rev is not None else None,
                 }
             )
         return results
@@ -349,6 +490,7 @@ class HybridRetriever:
         collection_id: str,
         window: int = 1,
         max_expansions: int = 2,
+        snapshot: RetrievalSnapshot | None = None,
     ) -> dict[str, list[str]]:
         """Fetch adjacent chunks (parent-style context) for top candidates.
 
@@ -398,6 +540,17 @@ class HybridRetriever:
                         .order_by(KnowledgeChunk.chunk_index)
                         .limit(window * 2)
                     )
+                if cand.binding_id and cand.index_revision_id:
+                    stmt = stmt.where(
+                        KnowledgeChunk.binding_id == cand.binding_id,
+                        KnowledgeChunk.index_revision_id == cand.index_revision_id,
+                    )
+                elif snapshot:
+                    stmt = stmt.where(
+                        KnowledgeChunk.index_revision_id.in_(
+                            list(snapshot.binding_revisions.values())
+                        )
+                    )
                 res = await db.execute(stmt)
                 scalars = res.scalars()
                 neighbors = list(scalars.all()) if hasattr(scalars, "all") else []
@@ -421,8 +574,20 @@ class HybridRetriever:
         sparse_weight: float = 1.0,
         sparse_variants: list[str] | None = None,
         reranker_policy: dict[str, Any] | None = None,
+        snapshot: RetrievalSnapshot | None = None,
+        pin_snapshot: bool = True,
+        read_mode_override: str | None = None,
     ) -> list[FusionCandidate]:
-        """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker."""
+        """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker with Snapshot Isolation."""
+        active_snapshot = snapshot
+        if active_snapshot is None and pin_snapshot:
+            active_snapshot = await self.resolve_retrieval_snapshot(
+                db,
+                collection_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
+
         async def _safe_dense_search() -> list[dict[str, Any]]:
             try:
                 return await vector_indexer.search_dense(
@@ -431,6 +596,7 @@ class HybridRetriever:
                     top_k=top_k,
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
+                    snapshot=active_snapshot,
                 )
             except Exception as exc:
                 logger.warning("Dense search encountered error, falling back to sparse degraded: %s", exc)
@@ -445,6 +611,8 @@ class HybridRetriever:
                     top_k=max(4, top_k // 2),
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
+                    snapshot=active_snapshot,
+                    read_mode_override=read_mode_override,
                 )
             except Exception as exc:
                 logger.debug("Variant sparse search skipped for '%s': %s", variant[:30], exc)
@@ -461,6 +629,8 @@ class HybridRetriever:
                 top_k=top_k,
                 tenant_id=tenant_id,
                 workspace_id=workspace_id,
+                snapshot=active_snapshot,
+                read_mode_override=read_mode_override,
             ),
             *(_safe_variant_search(v) for v in variant_queries[:2]),
         )

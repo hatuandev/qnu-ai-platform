@@ -41,7 +41,7 @@ class VectorIndexer:
         return f"col_{clean_id}"
 
     async def ensure_collection(self, collection_id: str, vector_size: int | None = None) -> str:
-        """Create collection on Qdrant if it does not already exist."""
+        """Create collection on Qdrant if not exist, or strictly verify dimension compatibility."""
         cname = self._get_collection_name(collection_id)
         target_size = vector_size or self.vector_size
         try:
@@ -57,8 +57,37 @@ class VectorIndexer:
                     hnsw_config=qmodels.HnswConfigDiff(m=16, ef_construct=100),
                 )
                 logger.info("Created Qdrant collection: %s (dim=%d)", cname, target_size)
+            else:
+                col_info = await self.client.get_collection(cname)
+                cfg = getattr(col_info, "config", None)
+                params = getattr(cfg, "params", None)
+                vectors = getattr(params, "vectors", None)
+                existing_size = None
+                if isinstance(vectors, qmodels.VectorParams):
+                    existing_size = vectors.size
+                elif isinstance(vectors, dict):
+                    default_v = vectors.get("") or next(iter(vectors.values()), None)
+                    existing_size = getattr(default_v, "size", None)
+                elif hasattr(vectors, "size"):
+                    existing_size = getattr(vectors, "size", None)
+
+                if existing_size is not None and existing_size != target_size:
+                    raise AppException(
+                        f"Collection '{cname}' trên Qdrant có số chiều vector ({existing_size}) không khớp với cấu hình thế hệ ({target_size}).",
+                        code="VECTOR_DIMENSION_MISMATCH",
+                        status_code=409,
+                        details={"collection_name": cname, "existing_size": existing_size, "target_size": target_size},
+                    )
+        except AppException:
+            raise
         except Exception as exc:
-            logger.warning("Could not ensure Qdrant collection %s: %s", cname, exc)
+            logger.error("Could not ensure Qdrant collection %s: %s", cname, exc)
+            raise AppException(
+                f"Không thể kết nối hoặc khởi tạo collection '{cname}' trên Qdrant: {exc}",
+                code="QDRANT_UNAVAILABLE",
+                status_code=503,
+                details={"collection_name": cname, "error": str(exc)},
+            ) from exc
         return cname
 
     @staticmethod
@@ -75,13 +104,16 @@ class VectorIndexer:
         return VectorIndexer.mock_embedding(text, dim)
 
     def _fit_dim(self, vec: list[float], target_dim: int | None = None) -> list[float]:
-        """Pad/truncate a model vector to the configured Qdrant dimension."""
+        """Validate vector dimension; strictly reject truncate/pad in production ingestion."""
         dim = target_dim or self.vector_size
-        if len(vec) == dim:
-            return [round(float(x), 6) for x in vec]
-        if len(vec) > dim:
-            return [round(float(x), 6) for x in vec[:dim]]
-        return [round(float(x), 6) for x in vec] + [0.0] * (dim - len(vec))
+        if len(vec) != dim:
+            raise AppException(
+                f"Độ dài vector ({len(vec)}) không khớp số chiều quy định ({dim}). Hệ thống từ chối padding/truncate âm thầm.",
+                code="VECTOR_DIMENSION_MISMATCH",
+                status_code=409,
+                details={"actual_dimension": len(vec), "expected_dimension": dim},
+            )
+        return [round(float(x), 6) for x in vec]
 
     async def _resolve_embedding_runtime(
         self,
@@ -256,11 +288,22 @@ class VectorIndexer:
             getattr(runtime, "api_base_url", None)
             or getattr(runtime, "base_url", None)
             or getattr(settings, "OLLAMA_BASE_URL", "")
-            or "http://tormemrtxproto.tail0924dd.ts.net:11434"
-        ).rstrip("/")
+        )
+        if not raw_base:
+            raise AppException(
+                f"Chưa cấu hình API endpoint cho embedding provider '{runtime.provider_id}'.",
+                code="PROVIDER_ENDPOINT_NOT_CONFIGURED",
+                status_code=503,
+            )
         resolved_base = resolve_ollama_network_url(raw_base).rstrip("/")
         clean_base = resolved_base.removesuffix("/v1")
-        model_name = (runtime.model_name or "bge-m3:latest").strip()
+        if not runtime.model_name or not runtime.model_name.strip():
+            raise AppException(
+                f"Chưa cấu hình model_name cho embedding provider '{runtime.provider_id}'.",
+                code="EMBEDDING_MODEL_NOT_CONFIGURED",
+                status_code=503,
+            )
+        model_name = runtime.model_name.strip()
 
         batch_size = 16
         all_vectors: list[list[float]] = []
@@ -268,31 +311,34 @@ class VectorIndexer:
         async with httpx.AsyncClient(timeout=float(runtime.timeout_seconds or 60.0), trust_env=False) as client:
             for i in range(0, len(texts), batch_size):
                 chunk_texts = texts[i : i + batch_size]
-                # 1. Try native Ollama /api/embed endpoint
-                try:
-                    resp = await client.post(
-                        f"{clean_base}/api/embed",
-                        json={"model": model_name, "input": chunk_texts},
-                    )
-                    if resp.status_code == 200:
-                        embeddings = resp.json().get("embeddings", [])
-                        if embeddings:
-                            all_vectors.extend([[float(x) for x in v] for v in embeddings])
-                            continue
-                except Exception as exc:
-                    logger.debug("Ollama /api/embed attempt failed: %s", exc)
+                # 1. Try native Ollama /api/embed endpoint (only for Ollama providers)
+                if runtime.provider_type in ("ollama", "ollama_local", "local"):
+                    try:
+                        resp = await client.post(
+                            f"{clean_base}/api/embed",
+                            json={"model": model_name, "input": chunk_texts},
+                        )
+                        if resp.status_code == 200:
+                            embeddings = resp.json().get("embeddings", [])
+                            if embeddings:
+                                all_vectors.extend([[float(x) for x in v] for v in embeddings])
+                                continue
+                    except Exception as exc:
+                        logger.debug("Ollama /api/embed attempt failed: %s", exc)
 
-                # 2. Fallback to OpenAI-compatible /v1/embeddings
+                # 2. Native vLLM / OpenAI-compatible /v1/embeddings
                 headers = {"Content-Type": "application/json"}
-                if runtime.api_key:
+                if runtime.api_key and runtime.api_key.strip() and runtime.api_key.lower() not in ("none", "null"):
                     headers["Authorization"] = f"Bearer {runtime.api_key}"
+
                 resp = await client.post(
                     f"{clean_base}/v1/embeddings",
                     headers=headers,
                     json={"model": model_name, "input": chunk_texts},
                 )
                 resp.raise_for_status()
-                data = resp.json()
+                raw_json = resp.json()
+                data = await raw_json if asyncio.iscoroutine(raw_json) else raw_json
                 items = data.get("data", [])
                 items.sort(key=lambda x: x.get("index", 0))
                 all_vectors.extend([[float(x) for x in item["embedding"]] for item in items])
@@ -303,6 +349,7 @@ class VectorIndexer:
         self,
         texts: list[str],
         runtime: ModelRuntimeConfig | None = None,
+        target_dim: int | None = None,
     ) -> list[list[float]]:
         """Batch-encode texts with the explicitly configured embedding provider."""
         if not texts:
@@ -313,22 +360,22 @@ class VectorIndexer:
             estimated_tokens=estimated_tokens
         )
         provider = runtime.provider_type
-        if provider in ("ollama", "ollama_local", "local"):
+        if provider in ("ollama", "ollama_local", "local", "vllm", "custom", "openai", "tei"):
             try:
                 vectors = await self._embed_texts_ollama(texts, runtime)
                 if len(vectors) != len(texts):
                     raise RuntimeError(
-                        f"Ollama returned {len(vectors)} vectors for {len(texts)} texts."
+                        f"Embedding provider '{provider}' returned {len(vectors)} vectors for {len(texts)} texts."
                     )
                 await self._finish_runtime_key(
                     runtime, total_tokens=estimated_tokens
                 )
-                return [self._fit_dim(v) for v in vectors]
+                return [self._fit_dim(v, target_dim=target_dim) for v in vectors]
             except Exception as exc:
                 await self._finish_runtime_key(runtime, error=exc)
-                logger.error("Ollama embedding unavailable: %s", exc)
+                logger.error("Embedding provider '%s' unavailable: %s", provider, exc)
                 raise AppException(
-                    f"Ollama Embedding không khả dụng: {exc}",
+                    f"Embedding provider '{provider}' không khả dụng: {exc}",
                     code="EMBEDDING_PROVIDER_UNAVAILABLE",
                     status_code=503,
                     details={"provider": provider},
@@ -356,7 +403,7 @@ class VectorIndexer:
                     await self._finish_runtime_key(
                         runtime, total_tokens=estimated_tokens
                     )
-                    return [self._fit_dim(v) for v in vectors]
+                    return [self._fit_dim(v, target_dim=target_dim) for v in vectors]
                 except asyncio.CancelledError:
                     if runtime.key_lease() is not None:
                         async with AsyncSessionFactory() as db:
@@ -392,12 +439,12 @@ class VectorIndexer:
         self,
         collection_id: str,
         chunks: list[dict[str, Any]],
+        vector_generation: Any | None = None,
     ) -> int:
         """Upload vectorized chunks into Qdrant collection with payload filtering."""
-        cname = await self.ensure_collection(collection_id)
-        points: list[qmodels.PointStruct] = []
+        target_size = vector_generation.embedding_dimension if vector_generation else self.vector_size
 
-        # Reject malformed payloads before making any paid/remote embedding call.
+        # Reject malformed payloads before making any paid/remote embedding or network call.
         for chunk in chunks:
             chunk_id = str(chunk.get("id") or chunk.get("chunk_id", ""))
             required_values = {
@@ -425,13 +472,26 @@ class VectorIndexer:
                     details={"chunk_id": chunk_id, "missing_fields": missing_fields},
                 )
 
+        cname = await self.ensure_collection(collection_id, vector_size=target_size)
+        points: list[qmodels.PointStruct] = []
+
         missing = [str(c["content"]) for c in chunks if not c.get("vector")]
+        pref_provider = vector_generation.provider_id if vector_generation else None
+        pref_model = vector_generation.embedding_model if vector_generation else None
         embedding_runtime = (
-            await self._resolve_embedding_runtime(collection_id=collection_id)
+            await self._resolve_embedding_runtime(
+                collection_id=collection_id,
+                preferred_provider_id=pref_provider,
+                preferred_model_name=pref_model,
+            )
             if missing
             else None
         )
-        encoded = await self.embed_texts(missing, embedding_runtime) if missing else []
+        encoded = (
+            await self.embed_texts(missing, embedding_runtime, target_dim=target_size)
+            if missing
+            else []
+        )
         encoded_iter = iter(encoded)
 
         for c in chunks:
@@ -446,7 +506,8 @@ class VectorIndexer:
                 except (ValueError, TypeError):
                     point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{collection_id}:{chunk_id}"))
             content = str(c.get("content", ""))
-            vector = c.get("vector") or next(encoded_iter)
+            raw_vector = c.get("vector") or next(encoded_iter)
+            vector = self._fit_dim(raw_vector, target_dim=target_size)
 
             tenant_id = c.get("tenant_id")
             workspace_id = c.get("workspace_id")
@@ -479,6 +540,11 @@ class VectorIndexer:
                 "page_number": c.get("page_number"),
                 "is_active": bool(c.get("is_active", True)),
             }
+            if c.get("binding_id"):
+                payload["binding_id"] = str(c["binding_id"])
+            if c.get("index_revision_id"):
+                payload["index_revision_id"] = str(c["index_revision_id"])
+
             if "metadata" in c and isinstance(c["metadata"], dict):
                 payload.update(c["metadata"])
 
@@ -495,17 +561,20 @@ class VectorIndexer:
                 await self.client.upsert(collection_name=cname, points=points)
                 logger.info("Indexed %d chunks into Qdrant collection %s", len(points), cname)
                 return len(points)
+            except AppException:
+                raise
             except Exception as exc:
                 logger.error("Failed to upsert points into Qdrant %s: %s", cname, exc)
+                raise AppException(
+                    f"Ghi điểm vector vào Qdrant collection '{cname}' thất bại: {exc}",
+                    code="QDRANT_UPSERT_FAILED",
+                    status_code=500,
+                    details={"collection_name": cname, "points_count": len(points), "error": str(exc)},
+                ) from exc
         return 0
 
     async def delete_by_document(self, collection_id: str, document_id: str) -> int:
         """Delete all Qdrant points of a document (prevents ghost citations and duplicate vectors)."""
-        from unittest.mock import Mock
-
-        if isinstance(self.index_chunks, Mock):
-            return 0
-
         cname = self._get_collection_name(collection_id)
         try:
             await self.client.delete(
@@ -562,16 +631,10 @@ class VectorIndexer:
         expected_count: int,
     ) -> tuple[bool, str]:
         """Verify that indexed points count and revision metadata in Qdrant match PostgreSQL chunks exactly before activation."""
-        from unittest.mock import Mock
-        if isinstance(self.index_chunks, Mock):
-            return True, f"Parity verified (mocked index_chunks): {expected_count}/{expected_count} points match."
-
         cname = self._get_collection_name(collection_id)
         try:
             exists = await self.client.collection_exists(cname)
             if not exists:
-                if settings.ENVIRONMENT in ("test", "testing"):
-                    return True, f"Parity verified (test env fallback): {expected_count}/{expected_count} points match."
                 return False, f"Bộ sưu tập Qdrant '{cname}' không tồn tại."
 
             parity_filter = qmodels.Filter(
@@ -612,11 +675,134 @@ class VectorIndexer:
             )
             return True, f"Parity verified: {actual_count}/{expected_count} points match."
         except Exception as exc:
-            if settings.ENVIRONMENT in ("test", "testing"):
-                return True, f"Parity verified (test env error fallback): {exc}"
             reason = f"Lỗi kiểm tra tính toàn vẹn revision Qdrant ({cname}): {exc}"
             logger.error(reason)
             return False, reason
+
+    async def verify_index_revision_parity(
+        self,
+        collection_id: str,
+        index_revision_id: str,
+        expected_points: dict[str, str],
+    ) -> tuple[bool, str, int]:
+        """Verify exact point IDs, revision scope and content hashes for one index artifact."""
+        cname = self._get_collection_name(collection_id)
+        expected_count = len(expected_points)
+        try:
+            exists = await self.client.collection_exists(cname)
+            if not exists:
+                return False, f"Bộ sưu tập Qdrant '{cname}' không tồn tại.", 0
+
+            revision_filter = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="index_revision_id",
+                        match=qmodels.MatchValue(value=index_revision_id),
+                    )
+                ]
+            )
+            count_res = await self.client.count(
+                collection_name=cname,
+                count_filter=revision_filter,
+                exact=True,
+            )
+            actual_count = int(count_res.count or 0)
+            if actual_count != expected_count:
+                return (
+                    False,
+                    f"Qdrant có {actual_count} points, PostgreSQL kỳ vọng {expected_count}.",
+                    actual_count,
+                )
+
+            points = await self.client.retrieve(
+                collection_name=cname,
+                ids=list(expected_points),
+                with_payload=True,
+                with_vectors=False,
+            )
+            actual_ids = {str(point.id) for point in points}
+            missing_ids = set(expected_points) - actual_ids
+            if missing_ids:
+                return False, f"Thiếu {len(missing_ids)} point IDs trong Qdrant.", actual_count
+
+            for point in points:
+                payload = point.payload or {}
+                point_id = str(point.id)
+                if payload.get("index_revision_id") != index_revision_id:
+                    return False, f"Point {point_id} sai index_revision_id.", actual_count
+                if payload.get("content_hash") != expected_points[point_id]:
+                    return False, f"Point {point_id} sai content_hash.", actual_count
+            return True, "Đối chiếu point ID, revision và content hash thành công.", actual_count
+        except Exception as exc:
+            logger.error("Strict parity verification failed for %s: %s", index_revision_id, exc)
+            return False, f"Không thể xác minh parity Qdrant: {exc}", 0
+
+    async def activate_index_revision(
+        self,
+        collection_id: str,
+        index_revision_id: str,
+        expected_count: int,
+    ) -> int:
+        """Make exactly one immutable index artifact retrievable and verify the affected count."""
+        cname = self._get_collection_name(collection_id)
+        revision_filter = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="index_revision_id",
+                    match=qmodels.MatchValue(value=index_revision_id),
+                )
+            ]
+        )
+        try:
+            await self.client.set_payload(
+                collection_name=cname,
+                payload={"is_retrievable": True, "document_status": "ready"},
+                points=revision_filter,
+            )
+            count_res = await self.client.count(
+                collection_name=cname,
+                count_filter=revision_filter,
+                exact=True,
+            )
+            activated_count = int(count_res.count or 0)
+            if activated_count != expected_count:
+                raise AppException(
+                    f"Kích hoạt Qdrant không đủ points ({activated_count}/{expected_count}).",
+                    code="REVISION_ACTIVATION_PARITY_MISMATCH",
+                    status_code=409,
+                )
+            return activated_count
+        except AppException:
+            raise
+        except Exception as exc:
+            raise AppException(
+                f"Kích hoạt index revision trong Qdrant thất bại: {exc}",
+                code="REVISION_ACTIVATION_FAILED",
+                status_code=503,
+            ) from exc
+
+    async def deactivate_index_revision(
+        self,
+        collection_id: str,
+        index_revision_id: str,
+    ) -> None:
+        """Close an old artifact after the PostgreSQL pointer has moved."""
+        revision_filter = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="index_revision_id",
+                    match=qmodels.MatchValue(value=index_revision_id),
+                )
+            ]
+        )
+        try:
+            await self.client.set_payload(
+                collection_name=self._get_collection_name(collection_id),
+                payload={"is_retrievable": False, "document_status": "archived"},
+                points=revision_filter,
+            )
+        except Exception as exc:
+            logger.warning("Could not deactivate old index revision %s: %s", index_revision_id, exc)
 
     async def activate_document_revision(
         self,
@@ -625,10 +811,6 @@ class VectorIndexer:
         target_revision: int,
     ) -> int:
         """Atomically activate document revision by setting is_retrievable=True and document_status='ready'."""
-        from unittest.mock import Mock
-        if isinstance(self.index_chunks, Mock):
-            return 1
-
         cname = self._get_collection_name(collection_id)
         try:
             activation_filter = qmodels.Filter(
@@ -685,10 +867,6 @@ class VectorIndexer:
         current_revision: int,
     ) -> int:
         """Safely purge older revision points of a document (strictly < current_revision) to prevent ghost chunks."""
-        from unittest.mock import Mock
-        if isinstance(self.index_chunks, Mock):
-            return 0
-
         cname = self._get_collection_name(collection_id)
         try:
             stale_filter = qmodels.Filter(
@@ -733,6 +911,84 @@ class VectorIndexer:
             )
             return 0
 
+    async def count_points_by_document(
+        self,
+        collection_id: str,
+        document_id: str,
+    ) -> int:
+        """Count exact points belonging to a document in Qdrant."""
+        cname = self._get_collection_name(collection_id)
+        try:
+            doc_filter = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="document_id",
+                        match=qmodels.MatchValue(value=document_id),
+                    )
+                ]
+            )
+            count_res = await self.client.count(
+                collection_name=cname,
+                count_filter=doc_filter,
+                exact=True,
+            )
+            return count_res.count
+        except Exception as exc:
+            raise AppException(
+                f"Không thể đếm Qdrant points của document '{document_id}': {exc}",
+                code="QDRANT_AUDIT_UNAVAILABLE",
+                status_code=503,
+            ) from exc
+
+    async def delete_points_by_index_revision(
+        self,
+        collection_id: str,
+        index_revision_id: str,
+    ) -> int:
+        """Safely delete all Qdrant vector points associated with a specific index_revision_id."""
+        cname = self._get_collection_name(collection_id)
+        try:
+            rev_filter = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="index_revision_id",
+                        match=qmodels.MatchValue(value=str(index_revision_id)),
+                    ),
+                ]
+            )
+
+            count_res = await self.client.count(
+                collection_name=cname,
+                count_filter=rev_filter,
+                exact=True,
+            )
+            count = count_res.count
+
+            if count > 0:
+                await self.client.delete(
+                    collection_name=cname,
+                    points_selector=qmodels.FilterSelector(filter=rev_filter),
+                )
+                logger.info(
+                    "Deleted %d Qdrant points for index_revision %s in collection %s",
+                    count,
+                    index_revision_id,
+                    cname,
+                )
+            return count
+        except Exception as exc:
+            logger.error(
+                "Failed to delete points for index_revision %s in %s: %s",
+                index_revision_id,
+                cname,
+                exc,
+            )
+            raise AppException(
+                f"Không thể xóa points của index revision '{index_revision_id}': {exc}",
+                code="QDRANT_GC_DELETE_FAILED",
+                status_code=503,
+            ) from exc
+
 
     async def search_dense(
         self,
@@ -743,10 +999,13 @@ class VectorIndexer:
         score_threshold: float = 0.35,
         tenant_id: str | None = None,
         workspace_id: str | None = None,
+        snapshot: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, and score threshold filtering."""
+        """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, score threshold and snapshot isolation filtering."""
         cname = self._get_collection_name(collection_id)
         try:
+            if snapshot is not None and not getattr(snapshot, "binding_revisions", None):
+                return []
             if query_vector is not None:
                 vec = query_vector
             else:
@@ -785,6 +1044,24 @@ class VectorIndexer:
                     )
                 )
 
+            if snapshot and getattr(snapshot, "binding_revisions", None):
+                revision_pairs = [
+                    qmodels.Filter(
+                        must=[
+                            qmodels.FieldCondition(
+                                key="binding_id",
+                                match=qmodels.MatchValue(value=binding_id),
+                            ),
+                            qmodels.FieldCondition(
+                                key="index_revision_id",
+                                match=qmodels.MatchValue(value=revision_id),
+                            ),
+                        ]
+                    )
+                    for binding_id, revision_id in snapshot.binding_revisions.items()
+                ]
+                must_conditions.append(qmodels.Filter(should=revision_pairs))
+
             qfilter = qmodels.Filter(must=must_conditions)
 
             if hasattr(self.client, "query_points"):
@@ -802,12 +1079,33 @@ class VectorIndexer:
                     limit=top_k,
                     query_filter=qfilter,
                 )
+
             results: list[dict[str, Any]] = []
             for hit in hits:
                 score = float(hit.score)
                 if score < score_threshold:
                     continue
                 payload = hit.payload or {}
+                if (
+                    payload.get("is_active") is not True
+                    or payload.get("is_retrievable") is not True
+                    or payload.get("document_status") not in ("ready", "approved")
+                ):
+                    logger.warning("Qdrant returned a point outside the lifecycle allowlist: %s", hit.id)
+                    continue
+                point_binding = payload.get("binding_id")
+                point_rev = payload.get("index_revision_id")
+                if snapshot is not None:
+                    expected_revision = snapshot.binding_revisions.get(point_binding)
+                    if expected_revision is None or point_rev != expected_revision:
+                        logger.warning(
+                            "Qdrant returned a point outside retrieval snapshot %s: binding=%s revision=%s",
+                            snapshot.snapshot_id,
+                            point_binding,
+                            point_rev,
+                        )
+                        continue
+
                 results.append(
                     {
                         "chunk_id": payload.get("chunk_id", str(hit.id)),
@@ -817,6 +1115,9 @@ class VectorIndexer:
                         "section": payload.get("section"),
                         "page_number": payload.get("page_number"),
                         "metadata": payload,
+                        "binding_id": point_binding,
+                        "index_revision_id": point_rev,
+                        "document_revision": payload.get("document_revision"),
                     }
                 )
             return results

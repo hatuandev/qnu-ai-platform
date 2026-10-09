@@ -1,5 +1,7 @@
 import type {
   AttachDocumentsRequest,
+  DocumentRevision,
+  DocumentRevisionListItem,
   DocumentStats,
   RepositoryDocument,
   RepositoryDocumentFilter,
@@ -44,7 +46,9 @@ export const documentsApi = {
       headers: getAuthHeaders(),
     });
     if (!res.ok) {
-      throw new Error(`Không tìm thấy tài liệu ID '${id}' (HTTP ${res.status}).`);
+      throw new Error(
+        `Không tìm thấy tài liệu ID '${id}' (HTTP ${res.status}).`,
+      );
     }
     return res.json();
   },
@@ -57,7 +61,9 @@ export const documentsApi = {
       headers: getAuthHeaders(),
     });
     if (!res.ok) {
-      throw new Error(`Không thể lấy thống kê kho tài liệu (HTTP ${res.status}).`);
+      throw new Error(
+        `Không thể lấy thống kê kho tài liệu (HTTP ${res.status}).`,
+      );
     }
     return res.json();
   },
@@ -199,6 +205,133 @@ export const documentsApi = {
       throw new Error(
         (err as { detail?: string }).detail ||
           `Gắn tài liệu vào kho tri thức thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy danh sách toàn bộ các bản sửa đổi (Revisions) của tài liệu (ADR-011)
+   */
+  async getRevisions(documentId: string): Promise<DocumentRevisionListItem[]> {
+    const res = await fetch(`${BASE_URL}/documents/${documentId}/revisions`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Không thể lấy danh sách phiên bản tài liệu (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy chi tiết một bản sửa đổi tài liệu (Manifests, Provenance & Quality Gate)
+   */
+  async getRevision(
+    documentId: string,
+    revisionId: string,
+  ): Promise<DocumentRevision> {
+    const res = await fetch(
+      `${BASE_URL}/documents/${documentId}/revisions/${revisionId}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Không thể lấy chi tiết phiên bản tài liệu (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Hiệu đính nội dung Markdown của revision trong giai đoạn thẩm định
+   */
+  async updateRevisionContent(
+    documentId: string,
+    revisionId: string,
+    parsedMarkdown: string,
+    expectedLockVersion: number,
+    editReason?: string,
+  ): Promise<DocumentRevision> {
+    const res = await fetch(
+      `${BASE_URL}/documents/${documentId}/revisions/${revisionId}/content`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          canonical_markdown: parsedMarkdown,
+          expected_lock_version: expectedLockVersion,
+          notes: editReason,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Cập nhật nội dung phiên bản thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Phê duyệt hoặc từ chối bản sửa đổi tài liệu (chuyển trạng thái ready)
+   */
+  async reviewRevision(
+    documentId: string,
+    revisionId: string,
+    action: "approve" | "reject",
+    expectedLockVersion: number,
+    reviewNotes?: string,
+  ): Promise<DocumentRevision> {
+    const res = await fetch(
+      `${BASE_URL}/documents/${documentId}/revisions/${revisionId}/review`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          action,
+          expected_lock_version: expectedLockVersion,
+          notes: reviewNotes,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Thẩm định phiên bản thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Thử lại quy trình bóc tách và thẩm định chất lượng cho revision
+   */
+  async retryRevision(
+    documentId: string,
+    revisionId: string,
+    ocrEngine?: string,
+  ): Promise<DocumentRevision> {
+    const url = new URL(
+      `${BASE_URL}/documents/${documentId}/revisions/${revisionId}/retry`,
+    );
+    if (ocrEngine) url.searchParams.set("ocr_engine", ocrEngine);
+
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          `Thử lại bóc tách thất bại (HTTP ${res.status}).`,
       );
     }
     return res.json();

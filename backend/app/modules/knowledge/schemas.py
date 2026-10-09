@@ -13,14 +13,17 @@ from pydantic import BaseModel, Field
 # ==============================================================================
 class CollectionDataProcessingConfig(BaseModel):
     """Cấu hình xử lý dữ liệu đặc thù cho từng Kho Tri Thức (Embedding & Vision OCR)."""
-    embedding_provider_id: str = Field("prov_rtx5090_ollama", description="ID nhà cung cấp embedding")
-    embedding_model: str = Field("bge-m3:latest", description="Mô hình vector embedding")
+
+    embedding_provider_id: str = Field("prov_rtx5090_vllm", description="ID nhà cung cấp embedding")
+    embedding_model: str = Field("bge-m3", description="Mô hình vector embedding")
     embedding_dimension: int = Field(1024, description="Số chiều vector (1024, 2560, 768, 1536)")
     ocr_mode: str = Field("combo", description="single hoặc combo")
-    primary_ocr_provider_id: str = Field("prov_rtx5090_ollama", description="ID nhà cung cấp OCR chính")
-    primary_ocr_model: str = Field("qwen3-vl:8b", description="Mô hình OCR chính")
-    fallback_ocr_provider_id: str | None = Field("prov_gemini", description="ID nhà cung cấp OCR dự phòng")
-    fallback_ocr_model: str | None = Field("gemini-3.1-flash-lite", description="Mô hình OCR dự phòng")
+    primary_ocr_provider_id: str = Field("prov_gemini", description="ID nhà cung cấp OCR chính")
+    primary_ocr_model: str = Field("gemini-3.1-flash-lite", description="Mô hình OCR chính")
+    fallback_ocr_provider_id: str | None = Field(
+        "prov_mistral", description="ID nhà cung cấp OCR dự phòng"
+    )
+    fallback_ocr_model: str | None = Field("mistral-ocr-latest", description="Mô hình OCR dự phòng")
 
 
 class CollectionCreateRequest(BaseModel):
@@ -272,3 +275,310 @@ class ReconcileFixResponse(BaseModel):
     total_reindexed_chunks: int = 0
     message: str
 
+
+# ==============================================================================
+# 5. Knowledge Publishing V2 Schemas (ADR-011)
+# ==============================================================================
+class AvailableRepositoryDocumentItem(BaseModel):
+    id: str
+    document_code: str
+    title: str
+    file_name: str
+    file_type: str
+    file_size_bytes: int = 0
+    current_revision_id: str | None = None
+    current_revision_no: int | None = None
+    revision_count: int = 0
+    status: str
+    is_bound: bool = False
+    bound_binding_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AvailableRepositoryDocumentsResponse(BaseModel):
+    items: list[AvailableRepositoryDocumentItem]
+    total: int
+
+
+class BindingSelectionItem(BaseModel):
+    repository_document_id: str
+    target_revision_id: str | None = None
+    chunk_strategy: str = "ClauseBasedChunker"
+    sync_policy: str = "manual"  # manual, auto_on_ready
+    auto_activate: bool = False
+
+
+class CreateKnowledgeBindingsRequest(BaseModel):
+    items: list[BindingSelectionItem]
+
+
+class BindingResultItem(BaseModel):
+    binding_id: str | None = None
+    repository_document_id: str
+    source_revision_id: str | None = None
+    status: str  # created, already_bound, failed
+    message: str | None = None
+    index_revision_id: str | None = None
+
+
+class CreateKnowledgeBindingsResponse(BaseModel):
+    collection_id: str
+    created_count: int
+    skipped_count: int
+    failed_count: int
+    bindings: list[BindingResultItem]
+
+
+class KnowledgeBindingResponse(BaseModel):
+    id: str
+    collection_id: str
+    repository_document_id: str
+    source_revision_id: str
+    active_index_revision_id: str | None = None
+    active_epoch: int = 0
+    chunk_strategy: str = "ClauseBasedChunker"
+    sync_policy: str = "manual"
+    status: str = "active"
+    document_title: str | None = None
+    document_code: str | None = None
+    file_name: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class KnowledgeChunkItemResponse(BaseModel):
+    id: str
+    chunk_index: int
+    content: str
+    token_count: int = 0
+    section: str | None = None
+    page_number: int | None = None
+    chunk_metadata: dict[str, Any] = Field(default_factory=dict)
+    index_revision_id: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class BindingChunksListResponse(BaseModel):
+    binding_id: str
+    index_revision_id: str | None = None
+    total: int = 0
+    page: int = 1
+    page_size: int = 20
+    items: list[KnowledgeChunkItemResponse] = Field(default_factory=list)
+
+
+class ParityReportDTO(BaseModel):
+    expected_chunks: int = 0
+    indexed_points: int = 0
+    verified_points: int = 0
+    point_ids_count: int = 0
+    parity_status: str = "pending"  # "passed" | "failed" | "pending"
+    reason: str = ""
+    checked_at: str = ""
+
+
+class KnowledgeIndexRevisionResponse(BaseModel):
+    id: str
+    binding_id: str
+    source_revision_id: str
+    vector_generation_id: str
+    revision_no: int
+    chunk_count: int = 0
+    fact_count: int = 0
+    point_ids: list[str] = Field(default_factory=list)
+    parity_report: ParityReportDTO = Field(default_factory=ParityReportDTO)
+    status: str = "building"
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    is_rollback_available: bool = False
+    storage_state: str = "available"  # "available" | "pruned"
+    created_at: datetime
+    finished_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class BuildStagingIndexRequest(BaseModel):
+    source_revision_id: str | None = None
+    chunk_strategy: str | None = None
+    auto_activate: bool = False
+
+
+class IndexActivationRequest(BaseModel):
+    to_index_revision_id: str
+    expected_epoch: int = Field(..., ge=0, description="Epoch hiện tại của binding để chống xung đột CAS")
+    reason: str | None = None
+
+
+class IndexActivationResponse(BaseModel):
+    id: str
+    binding_id: str
+    from_index_revision_id: str | None = None
+    to_index_revision_id: str
+    action: str = "promote"
+    epoch: int = 0
+    reason: str | None = None
+    activated_by: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RollbackIndexRevisionRequest(BaseModel):
+    target_index_revision_id: str
+    expected_epoch: int = Field(..., ge=0)
+    reason: str | None = None
+
+
+# ==============================================================================
+# 6. Legacy Backfill, Canary & Shadow Retrieval Schemas (ADR-011 Phase 6)
+# ==============================================================================
+class LegacyAuditItem(BaseModel):
+    document_id: str
+    document_title: str
+    repository_document_id: str | None = None
+    binding_id: str | None = None
+    active_index_revision_id: str | None = None
+    db_chunks_count: int = 0
+    qdrant_points_count: int = 0
+    classification: str  # 'active-parity-ok', 'needs-rebuild', 'pending-intake'
+    discrepancy_reason: str | None = None
+
+
+class LegacyAuditReport(BaseModel):
+    collection_id: str
+    total_documents: int
+    active_parity_ok_count: int
+    needs_rebuild_count: int
+    pending_intake_count: int
+    parity_ratio: float
+    items: list[LegacyAuditItem] = Field(default_factory=list)
+    audited_at: datetime
+
+
+class BackfillRequest(BaseModel):
+    force_rebuild: bool = False
+    default_chunk_strategy: str = "ClauseBasedChunker"
+
+
+class BackfillItemResult(BaseModel):
+    document_id: str
+    binding_id: str
+    index_revision_id: str
+    chunks_tagged: int
+    facts_tagged: int
+    classification: str
+    status: str  # 'created', 'updated', 'skipped', 'failed'
+
+
+class BackfillReport(BaseModel):
+    collection_id: str
+    documents_processed: int
+    bindings_created: int
+    index_revisions_created: int
+    chunks_tagged: int
+    facts_tagged: int
+    collection_epoch: int
+    status: str  # 'completed', 'partial', 'failed'
+    items: list[BackfillItemResult] = Field(default_factory=list)
+    completed_at: datetime
+
+
+class ShadowRetrievalRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+
+class ShadowRetrievalReport(BaseModel):
+    collection_id: str
+    query: str
+    v1_result_count: int
+    v2_result_count: int
+    overlap_count: int
+    jaccard_similarity: float
+    latency_v1_ms: float
+    latency_v2_ms: float
+    latency_delta_pct: float
+    retrieval_revision_leak_total: int
+    leak_detected: bool
+    v1_chunk_ids: list[str] = Field(default_factory=list)
+    v2_chunk_ids: list[str] = Field(default_factory=list)
+    tested_at: datetime
+
+
+class GarbageCollectionRequest(BaseModel):
+    keep_revisions: int = Field(
+        2, ge=1, le=10, description="Số lượng revision superseded gần nhất giữ lại cho rollback"
+    )
+    dry_run: bool = Field(False, description="Nếu true, chỉ tính toán và báo cáo không xóa dữ liệu")
+
+
+class GarbageCollectionReport(BaseModel):
+    collection_id: str
+    dry_run: bool
+    keep_revisions: int
+    total_bindings_scanned: int
+    pruned_revisions_count: int
+    pruned_revision_ids: list[str] = Field(default_factory=list)
+    pruned_chunks_count: int
+    pruned_facts_count: int
+    pruned_points_count: int
+    message: str
+    executed_at: datetime
+
+
+class CanaryPolicyResponse(BaseModel):
+    collection_id: str
+    read_mode: str  # "system" | "revisioned" | "shadow" | "legacy"
+    system_read_mode: str
+    effective_read_mode: str
+    retention_revisions: int
+    last_gc_report: dict[str, Any] | None = None
+
+
+class UpdateCanaryPolicyRequest(BaseModel):
+    read_mode: str = Field("system", description="Chế độ đọc: system, revisioned, shadow, legacy")
+    retention_revisions: int = Field(
+        2, ge=1, le=10, description="Số bản superseded lưu lại cho rollback"
+    )
+
+
+class SystemGarbageCollectionRequest(BaseModel):
+    dry_run: bool = Field(
+        False, description="Nếu true, chỉ tính toán và mô phỏng dọn dẹp toàn hệ thống"
+    )
+    default_keep_revisions: int = Field(
+        2,
+        ge=1,
+        le=10,
+        description="Số bản superseded lưu trữ mặc định nếu collection chưa cấu hình",
+    )
+
+
+class SystemGarbageCollectionReport(BaseModel):
+    total_collections_scanned: int
+    total_bindings_scanned: int
+    total_pruned_revisions_count: int
+    total_pruned_chunks_count: int
+    total_pruned_facts_count: int
+    total_pruned_points_count: int
+    dry_run: bool
+    reports: list[GarbageCollectionReport] = Field(default_factory=list)
+    message: str
+    executed_at: datetime
+
+
+class SystemDecommissioningAuditReport(BaseModel):
+    total_collections: int
+    total_legacy_documents: int
+    total_v2_bindings: int
+    v2_adoption_rate_pct: float
+    collections_in_revisioned_mode: int
+    collections_in_shadow_mode: int
+    collections_in_legacy_mode: int
+    total_prunable_revisions_estimate: int
+    audited_at: datetime

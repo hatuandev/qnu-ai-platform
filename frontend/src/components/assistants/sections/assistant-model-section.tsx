@@ -49,16 +49,17 @@ export function AssistantModelSection({
           <Select
             value={form.primary_model || "__none__"}
             onValueChange={(val) =>
-              onChange({ ...form, primary_model: val === "__none__" ? "" : val })
+              onChange({
+                ...form,
+                primary_model: val === "__none__" ? "" : val,
+              })
             }
           >
             <SelectTrigger id="detail-primary-model">
               <SelectValue placeholder="Chưa có mô hình" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">
-                Chưa có mô hình
-              </SelectItem>
+              <SelectItem value="__none__">Chưa có mô hình</SelectItem>
               {availableModels.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}
@@ -75,16 +76,17 @@ export function AssistantModelSection({
           <Select
             value={form.fallback_model || "__none__"}
             onValueChange={(val) =>
-              onChange({ ...form, fallback_model: val === "__none__" ? "" : val })
+              onChange({
+                ...form,
+                fallback_model: val === "__none__" ? "" : val,
+              })
             }
           >
             <SelectTrigger id="detail-fallback-model">
               <SelectValue placeholder="Chưa có mô hình" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">
-                Chưa có mô hình
-              </SelectItem>
+              <SelectItem value="__none__">Chưa có mô hình</SelectItem>
               {availableModels.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
                   {m.label}

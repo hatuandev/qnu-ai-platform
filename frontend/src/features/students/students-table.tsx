@@ -192,12 +192,10 @@ export function StudentsTable({
           </div>
         ),
         cell: ({ row }) => (
-          <div
-            className="flex items-center pl-1"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center pl-1">
             <Checkbox
               checked={row.getIsSelected()}
+              onClick={(e) => e.stopPropagation()}
               onCheckedChange={(value) => row.toggleSelected(Boolean(value))}
               aria-label={`Chọn ${row.original.fullName}`}
             />
@@ -332,16 +330,14 @@ export function StudentsTable({
         enableHiding: false,
         header: "",
         cell: ({ row }) => (
-          <div
-            className="flex justify-end"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   aria-label={`Thao tác với ${row.original.fullName}`}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="size-4" />
                 </Button>
@@ -391,7 +387,7 @@ export function StudentsTable({
 
   const selectedStudents = useMemo(
     () => table.getSelectedRowModel().rows.map((row) => row.original),
-    [table, rowSelection],
+    [table],
   );
 
   return (

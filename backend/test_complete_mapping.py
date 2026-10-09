@@ -1,8 +1,8 @@
 import re
 import sys
-import numpy as np
-from PIL import Image
+
 import pymupdf as fitz
+from PIL import Image
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -131,11 +131,14 @@ def associate_snippets_clean(
     return regions
 
 # Let's test with test_perfect_morphology regions!
-from test_perfect_morphology import detect_morphology_refined
 import asyncio
-from app.core.database import AsyncSessionFactory
+
 from sqlalchemy import select
+
+from app.core.database import AsyncSessionFactory
 from app.modules.knowledge.models import KnowledgeDocument
+from test_perfect_morphology import detect_morphology_refined
+
 
 async def main():
     async with AsyncSessionFactory() as db:
@@ -158,7 +161,6 @@ async def main():
         print(f"\n================ PAGE {p_num} (Mapped) ================")
         for idx, r in enumerate(mapped_regs, 1):
             coords = f"top={r['top']:4.1f}%, left={r['left']:4.1f}%, w={r['width']:4.1f}%, h={r['height']:4.1f}%"
-            txt_preview = repr(r['text'][:50].replace('\n', ' '))
             snip_preview = repr(r['content_snippet'][:40])
             print(f"[{idx:2d}] {r['type']:10s} | {coords} | {r['label']:18s} | snip={snip_preview}")
 

@@ -45,3 +45,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Kế hoạch chuẩn hóa Markdown, Qdrant và chất lượng tri thức RAG.
    - **Mục tiêu**: Loại dữ liệu bảng trùng, tái dựng bảng nhiều trang/ô gộp, chuẩn hóa thành record nghiệp vụ, bổ sung Quality Gate, Structured Facts, record-aware chunking và revision-safe Qdrant để LLM trả lời đúng và có trích dẫn kiểm chứng.
    - **Trạng thái**: Hướng dẫn triển khai chi tiết; ưu tiên bắt đầu từ P0 Duplicate-Free Parser và Multi-page Table Reconstruction.
+
+9. [**`11_ke_hoach_trien_khai_quy_trinh_tiep_nhan_mot_lan_xuat_ban_tri_thuc_an_toan.md`**](./11_ke_hoach_trien_khai_quy_trinh_tiep_nhan_mot_lan_xuat_ban_tri_thuc_an_toan.md):
+   - **Tên tài liệu**: Kế hoạch triển khai quy trình “Tiếp nhận một lần – Xuất bản tri thức an toàn”.
+   - **Mục tiêu**: Đưa Kho tài liệu thành nguồn sự thật duy nhất của tệp và nội dung chuẩn hóa; đưa Kho tri thức sang mô hình binding, revision-safe indexing, atomic activation và RetrievalSnapshot nhất quán.
+   - **Trạng thái**: Đã thống nhất phương án; sẵn sàng bắt đầu từ ADR, inventory và API contract V2, chưa triển khai mã nguồn.

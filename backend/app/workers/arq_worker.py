@@ -5,12 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
+from arq import cron
 from arq.connections import RedisSettings
 
 from app.core.config import settings
 from app.workers.tasks import (
     task_document_ingestion,
+    task_document_revision_parse,
     task_export_document,
+    task_knowledge_garbage_collection,
+    task_knowledge_index_build,
+    task_reconcile_pending_jobs,
     task_reindex_collection,
 )
 
@@ -34,7 +39,11 @@ class WorkerSettings:
         task_document_ingestion,
         task_reindex_collection,
         task_export_document,
+        task_document_revision_parse,
+        task_knowledge_index_build,
+        task_knowledge_garbage_collection,
     ]
+    cron_jobs = [cron(task_reconcile_pending_jobs, second=15)]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)

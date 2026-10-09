@@ -526,6 +526,11 @@ async def test_system_model_defaults_api():
                 "default_reranker_model": "@cf/baai/bge-reranker-base",
                 "default_ocr_provider_id": "prov_mistral",
                 "default_ocr_model": "mistral-ocr-latest",
+                "default_ocr_mode": "combo",
+                "ocr_combo_chain": [
+                    {"provider_id": "prov_mistral", "provider_name": "Mistral AI", "model_name": "mistral-ocr-latest"},
+                    {"provider_id": "prov_gemini", "provider_name": "Google Gemini", "model_name": "gemini-1.5-flash"},
+                ],
             }
         },
     )

@@ -172,13 +172,11 @@ export function FloorsTable({
           </div>
         ),
         cell: ({ row }) => (
-          <div
-            className="flex items-center pl-1"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="flex items-center pl-1">
             <Checkbox
               aria-label={`Chọn ${row.original.name}`}
               checked={row.getIsSelected()}
+              onClick={(event) => event.stopPropagation()}
               onCheckedChange={(value) => row.toggleSelected(Boolean(value))}
             />
           </div>
@@ -250,10 +248,7 @@ export function FloorsTable({
         header: "",
         enableHiding: false,
         cell: ({ row }) => (
-          <div
-            className="flex justify-end"
-            onClick={(event) => event.stopPropagation()}
-          >
+          <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

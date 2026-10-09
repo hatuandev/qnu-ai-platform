@@ -198,6 +198,13 @@ export const PRESET_SUGGESTED_MODELS: Record<string, string[]> = {
     "bge-m3:latest",
     "qwen3-embedding:4b-q8_0",
   ],
+  vllm: [
+    "bge-reranker-v2-m3",
+    "BAAI/bge-m3",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+    "Qwen/Qwen2.5-VL-7B-Instruct",
+  ],
   custom: [
     "qwen3:8b",
     "deepseek-r1:32b",
