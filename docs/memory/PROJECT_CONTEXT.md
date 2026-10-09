@@ -7,9 +7,16 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-09 10:14 (UTC+7)
-- **Phiên số**: #303 (Khóa Race Condition, Chuẩn Hóa ModelOps Dimension Và Frontend Quality Gate)
-- **Kết quả phiên #303**:
+- **Thời gian cập nhật**: 2026-10-09 10:23 (UTC+7)
+- **Phiên số**: #304 (Sao Lưu Main Cũ Và Commit Publishing V2)
+- **Kết quả phiên #304**:
+  - Nhánh sao lưu cục bộ `codex/main-before-knowledge-publishing-v2-20261009` bảo toàn `main` cũ tại commit `b2d61cb`.
+  - Toàn bộ mã nguồn, migration, tests và tài liệu Publishing V2 đã được lưu vào `main` bằng commit `6a223bc` (`feat: implement safe document-to-knowledge publishing v2`).
+  - Artefact `.pytest-review-*`, script vá tạm chưa theo dõi và dữ liệu runtime `storage/` không được đưa vào commit.
+  - Các nhánh và commit chưa được push lên remote.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_304_sao_luu_main_cu_va_commit_publishing_v2.md`](../nhat_ky/2026-10-09_phien_304_sao_luu_main_cu_va_commit_publishing_v2.md).
+
+- **Phiên trước #303 — Kết quả:**
   - Loại bỏ các nhánh nuốt lỗi/fallback trong scope helpers; mọi thao tác yêu cầu khóa đều thực thi `SELECT ... FOR UPDATE`, kể cả luồng nội bộ không có `actor`.
   - Cưỡng chế cấp phát `index_epoch` chỉ từ giá trị nguyên của `UPDATE ... RETURNING`; không còn đọc lại object rồi tự cộng một.
   - Tập trung phân giải embedding dimension tại `ModelCatalogService.resolve_embedding_dimension`, kiểm tra provider/model/dimension và từ chối metadata snapshot sai lệch bằng RFC 7807.
