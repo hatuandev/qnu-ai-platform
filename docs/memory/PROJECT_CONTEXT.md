@@ -7,9 +7,65 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-09 10:23 (UTC+7)
-- **Phiên số**: #304 (Sao Lưu Main Cũ Và Commit Publishing V2)
-- **Kết quả phiên #304**:
+- **Thời gian cập nhật**: 2026-10-09 20:30 (UTC+7)
+- **Phiên số**: #308 (Hoàn Thiện Toàn Diện Hardening Production Tích Hợp QNU SSO Giữa Hai Repositories: Chống JWKS Stampede Lock, 16 Test Cases Fetch Interceptor Thật, OIDC Authority Loopback Isolation, OpenIddict Dynamic Issuer, Idempotent Client Reconcile, Standard TSConfig & UTF-8 Docs)
+- **Kết quả phiên #308**:
+  - Chống JWKS refresh stampede bằng `asyncio.Lock`, double-checked locking và generation tracking (`_refresh_count`) trong `JwksCacheService`. Dập tắt triệt để race condition khi 10 request đồng thời cùng gặp khóa hết hạn hoặc unknown kid.
+  - Viết 16 test cases production thật cho `fetch-interceptor.ts` qua factory `createAuthFetchInterceptor` bao phủ đủ 16 kịch bản production thật (relative, same-origin, trusted origin, external, spoofed host, query string, caller auth preserved, headers merged, body preserved, 401 body replayed, 5 concurrent 401 calling silent renew once, max retry 1, new token used, no internal header, renew failed clean session, caller auth 401 no renew).
+  - Triển khai `resolveOidcAuthority` và `isLoopbackHostname` cách ly môi trường nghiêm ngặt (chấp nhận mọi loopback `localhost`, `127.0.0.1`, `::1` trong dev, bắt buộc HTTPS và cấm loopback trong prod, strip trailing slash).
+  - OpenIddict trên QNU SSO thiết lập dynamic issuer qua `options.SetIssuer(issuerUri)` khi `PUBLIC_BASE_URL` hoặc `OpenIddict:Issuer` có giá trị, bảo đảm tính nhất quán tuyệt đối across discovery, JWT iss, backend expected iss, và frontend authority.
+  - Reconcile máy khách OpenIddict idempotent không gọi `UpdateAsync` thừa khi tập hợp URI và permissions đã khớp; chuyển sang allow-list cho production redirect URIs (chỉ nhận HTTPS, loại bỏ http/ftp/loopback/custom schemes).
+  - Khôi phục tsconfig chuẩn (xóa `allowImportingTsExtensions`), giải quyết Node 24 ESM test runner bằng `src/app/auth/test-loader.mjs`, loại bỏ toàn bộ `.ts` trong file import theo đúng convention dự án.
+  - Chuẩn hóa tài liệu tích hợp `docs/integrations/qnu-ai-platform.md` sang UTF-8 sạch 100%, không còn lỗi mojibake hay dấu hỏi chấm `?`.
+  - Quality Gate:
+    - Backend: `pytest` 38/38 passed (`test_sso_auth.py`, `test_permission_contract.py`), Ruff 0 lỗi.
+    - Frontend: `npm test` 46/46 passed (`auth.test.ts`), Biome check 0 warnings / 0 errors, `npm run build` (`vite build && tsc --noEmit`) thành công 100% trong 3.24s.
+    - QNU SSO: `dotnet build` 0 warning / 0 error; `dotnet test` 120/120 tests passed (`Application.UnitTests` 104/104, `Domain.UnitTests` 8/8, `Infrastructure.IntegrationTests` 8/8).
+    - Git: `git diff --check` sạch 0 lỗi trên cả 2 repositories; bảo toàn 100% thay đổi không liên quan trong working tree.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_308_hoan_thien_hardening_qnu_sso_integration.md`](../nhat_ky/2026-10-09_phien_308_hoan_thien_hardening_qnu_sso_integration.md).
+
+- **Phiên trước #307 — Kết quả:**
+  - Đóng hoàn toàn lỗ hổng P0 anonymous dev admin: mọi request không có token trong production luôn trả HTTP 401; dev admin actor chỉ hoạt động khi đồng thời là dev/test, `DEV_AUTH_ENABLED=true` và không yêu cầu enforce auth; endpoint `/auth/login` bị vô hiệu hóa (HTTP 403) khi `DEV_AUTH_ENABLED=false` hoặc trong production; production cấm decode local JWT `qnu_session`.
+  - Validate JWT OIDC chuẩn xác: xác thực chữ ký JWKS, `exp`, `nbf`, `iss == clean_sso_authority`, `aud == SSO_AUDIENCE` (`ai.api`), cố định thuật toán `RS256`, cấm `verify_aud=False`. JWT sai fail-closed ngay lập tức, không fallback UserInfo. Opaque token bắt buộc verify scope `ai.api`.
+  - Triệt tiêu toàn bộ cơ chế tự cấp quyền: xóa bỏ default permissions theo `user_type`, cấm dùng substring `admin`, người dùng bắt buộc có ít nhất 1 role `AI.*` và permission `ai.access.read` (nếu thiếu trả HTTP 403 RFC 7807), từ chối permission `*` từ SSO token.
+  - Sửa semantic RBAC: exact match, `ai.access.admin` hoặc exact role `AI.Admin` cho phép toàn bộ `ai.*`, `ai.access.manage` không phải wildcard, `ai.access.read` không mở rộng.
+  - Đồng bộ danh mục permissions: thay thế toàn bộ `.edit` thành `.update` (`ai.assistants.update`, `ai.knowledge.update`) trên toàn bộ router và tests; tạo Contract Test AST tự động quét literals `require_permission(...)` đối soát với `qnu-ai-permissions.json` (pass 100%).
+  - Bảo vệ token Frontend: chuyển `oidc-client-ts` `userStore` sang `sessionStorage`, xóa bỏ token đọc trực tiếp từ `localStorage`, bảo toàn headers từ `Request` object, triển khai single-flight silent renew và retry đúng 1 lần khi HTTP 401 với anti-loop guard, dọn sạch session khi renew thất bại.
+  - Đồng bộ `qnu-sso`: Sửa `QnuAiClientSeed` (xử lý base URL qua `Uri`, fail-fast production, hỗ trợ `ReconcileExistingClientAsync` idempotent cập nhật an toàn không ghi đè cấu hình admin, không tạo secret cho public SPA), sửa Docker Compose không truyền chuỗi rỗng, hoàn thiện bootstrap `AI.Admin` cho system admins trong `AuthorizationSeed.cs`.
+  - Quality Gate: Backend pytest 34/34 passed (`test_auth.py`, `test_sso_auth.py`, `test_permission_contract.py`), Ruff 0 lỗi; Frontend Biome 0 lỗi, `npm run build` thành công 100% (Vite + TSC 0 lỗi); `qnu-sso` dotnet build thành công (0 warning, 0 error), dotnet test 123/123 passed (107 Application.UnitTests, 8 Domain.UnitTests, 8 Infrastructure.IntegrationTests).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_307_fail_closed_sso_integration_hardening.md`](../nhat_ky/2026-10-09_phien_307_fail_closed_sso_integration_hardening.md).
+
+- **Phiên trước #306 — Kết quả:**
+- **Kết quả phiên #306**:
+  - Bổ sung bộ lọc `tenant_id` và `workspace_id` cho các truy vấn KPI, danh sách tài liệu nhóm và luồng preview/attach server-side.
+  - Kết quả attach phân loại revision `failed`/`rejected` thành `status="failed"` nhất quán với aggregate counters và UI.
+  - Chuẩn hóa màu trạng thái nhóm tài liệu sang semantic tokens `success`, `info`, `warning`, `destructive`.
+  - Quality gate: full backend 636 passed, 1 skipped; test nhóm tài liệu 13 passed; Ruff 0 lỗi; Vite + TypeScript build đạt.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_306_hardening_review_document_groups.md`](../nhat_ky/2026-10-09_phien_306_hardening_review_document_groups.md).
+
+- **Phiên trước #305 — Kết quả:**
+- **Kết quả phiên #305**:
+  - Triển khai toàn diện phân hệ Nhóm Tài Liệu (`DocumentGroup`) và quan hệ nhiều-nhiều (`DocumentGroupMembership`).
+  - Migration Alembic additive `20261009_document_groups` (1 head duy nhất) với PostgreSQL functional unique index `uq_doc_groups_tenant_ws_lower_name` trên `(tenant_id, workspace_id, lower(name))`.
+  - Tách bạch ranh giới kiến trúc: file nguồn bất biến (`RepositoryDocument`), nhóm logic (`DocumentGroup`), quan hệ nhiều-nhiều (`DocumentGroupMembership`), không gian RAG (`KnowledgeCollection`), và liên kết tri thức (`KnowledgeBinding`).
+  - Đã khắc phục triệt để 13 vấn đề sau code review:
+    1. Frontend build sạch: xóa `ExternalLink`, `Check` thừa, sửa an toàn unknown error trong `__root.tsx`, `npm run build` (vite + tsc) thành công 100%.
+    2. Sửa rò rỉ mock singleton: dùng `monkeypatch.setattr(binding_service, "create_bindings", ...)` trong pytest; test hồi quy `test_knowledge_publishing_v2.py` pass 100% (26/26 tests passed kết hợp).
+    3. Cưỡng chế tenant & workspace isolation cho `/documents`: `list_documents` nhận `actor: AuthActor`, lọc bắt buộc tenant/workspace, từ chối `group_id` khác scope với code `DOCUMENT_GROUP_ACCESS_DENIED`, truy vấn badges nhóm tenant-scoped.
+    4. Server-side preview API: `POST /knowledge/collections/{id}/preview-document-group` (read-only), dùng chung helper `_evaluate_group_members` với `attach_document_group`.
+    5. Refactor dialog "Đưa vào kho": đọc preview từ server qua query key `["preview-document-group", collectionId, groupId]`, hiển thị Bento KPI và trạng thái từng tài liệu, invalidate đúng 5 query keys.
+    6. Chuẩn hóa tên nhóm: Pydantic validator Unicode NFC, collapse consecutive whitespace, trim, từ chối rỗng, giới hạn $\le 128$ ký tự.
+    7. Chống trùng tên nhóm ở CSDL: functional unique index `lower(name)` ở PostgreSQL, bắt `IntegrityError` rollback trả HTTP 409 `DOCUMENT_GROUP_NAME_CONFLICT`.
+    8. Atomic optimistic locking: câu lệnh SQL atomic `UPDATE ... WHERE lock_version = :expected_lock_version`, `rowcount == 0` trả HTTP 409 `OPTIMISTIC_LOCK_CONFLICT`.
+    9. Chuẩn hóa audit actor: `actor.actor_id` -> `actor.username` -> `"system"`.
+    10. Sửa KPI danh sách nhóm: tính chuẩn `processing_documents`, dùng `groupsData.total`, gắn nhãn rõ ràng "Trong kết quả" khi đang lọc.
+    11. Modal chọn tài liệu: hỗ trợ param `exclude_group_id` server-side với `NOT EXISTS`, loại bỏ filter client-side 100 tài liệu.
+    12. Validation API: `SUPPORTED_CHUNK_STRATEGIES`, `sync_policy: Literal["manual"]`, `strict_ready` trả chi tiết `STRICT_READY_VIOLATION`.
+    13. Mã nguồn sạch: `git diff --check` sạch 0 lỗi whitespace, Ruff 0 lỗi, Alembic 1 head duy nhất.
+  - Quality Gate: Backend pytest 26/26 passed (`test_document_groups_and_knowledge_attach.py` 13/13 + `test_knowledge_publishing_v2.py` 13/13), Ruff 0 lỗi; Frontend `npm run build` thành công 100% (0 lỗi TypeScript, 0 lỗi Biome).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_305_trien_khai_tinh_nang_nhom_tai_lieu_va_attach_knowledge_group.md`](../nhat_ky/2026-10-09_phien_305_trien_khai_tinh_nang_nhom_tai_lieu_va_attach_knowledge_group.md).
+
+- **Phiên trước #304 — Kết quả:**
   - Nhánh sao lưu cục bộ `codex/main-before-knowledge-publishing-v2-20261009` bảo toàn `main` cũ tại commit `b2d61cb`.
   - Toàn bộ mã nguồn, migration, tests và tài liệu Publishing V2 đã được lưu vào `main` bằng commit `6a223bc` (`feat: implement safe document-to-knowledge publishing v2`).
   - Artefact `.pytest-review-*`, script vá tạm chưa theo dõi và dữ liệu runtime `storage/` không được đưa vào commit.

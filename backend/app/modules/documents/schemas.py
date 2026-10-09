@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AttachedCollectionInfo(BaseModel):
@@ -18,6 +20,15 @@ class AttachedCollectionInfo(BaseModel):
     document_id: str
     index_status: str
     created_at: datetime
+
+
+class DocumentGroupMinimalItem(BaseModel):
+    """Minimal representation of a document group."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
 
 
 class RepositoryDocumentListItem(BaseModel):
@@ -43,6 +54,7 @@ class RepositoryDocumentListItem(BaseModel):
     parse_status: str
     ocr_engine: str | None = None
     attached_collections_count: int = 0
+    groups: list[DocumentGroupMinimalItem] = []
     created_at: datetime
     updated_at: datetime
 
@@ -216,3 +228,152 @@ class AsyncUploadDocumentResponse(BaseModel):
     status: str
     deduplicated: bool = False
     created_at: datetime
+
+
+# =========================================================================
+# Document Group Schemas
+# =========================================================================
+
+
+def normalize_group_name(v: Any) -> str:
+    """Normalize group name: Unicode NFC, trim, and collapse consecutive whitespace."""
+    if not isinstance(v, str):
+        raise TypeError("Tên nhóm tài liệu phải là chuỗi ký tự.")
+    normalized = unicodedata.normalize("NFC", v)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if not normalized:
+        raise ValueError("Tên nhóm tài liệu không được để trống hoặc chỉ chứa khoảng trắng.")
+    if len(normalized) > 128:
+        raise ValueError("Tên nhóm tài liệu không được vượt quá 128 ký tự sau khi chuẩn hóa.")
+    return normalized
+
+
+class DocumentGroupCreate(BaseModel):
+    """Payload to create a new logical document group."""
+
+    name: str = Field(..., description="Tên nhóm tài liệu")
+    description: str | None = Field(None, max_length=512, description="Mô tả nhóm tài liệu")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, v: Any) -> str:
+        return normalize_group_name(v)
+
+
+class DocumentGroupUpdate(BaseModel):
+    """Payload to update an existing document group."""
+
+    name: str | None = Field(None, description="Tên nhóm mới")
+    description: str | None = Field(None, max_length=512, description="Mô tả nhóm mới")
+    expected_lock_version: int = Field(..., ge=1, description="Phiên bản khóa lạc quan mong đợi")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, v: Any) -> str | None:
+        if v is None:
+            return None
+        return normalize_group_name(v)
+
+
+class DocumentGroupResponse(BaseModel):
+    """Detailed response of a document group."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    tenant_id: str
+    workspace_id: str
+    name: str
+    description: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    lock_version: int = 1
+    total_documents: int = 0
+    ready_documents: int = 0
+    processing_documents: int = 0
+    error_documents: int = 0
+
+
+class DocumentGroupListItem(BaseModel):
+    """Summary item of a document group for lists and cards."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    tenant_id: str
+    workspace_id: str
+    name: str
+    description: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    lock_version: int = 1
+    total_documents: int = 0
+    ready_documents: int = 0
+    processing_documents: int = 0
+    error_documents: int = 0
+
+
+class DocumentGroupListResponse(BaseModel):
+    """Paginated or listed response for document groups."""
+
+    items: list[DocumentGroupListItem]
+    total: int
+
+
+class AddGroupDocumentsRequest(BaseModel):
+    """Payload to add multiple documents to a group."""
+
+    document_ids: list[str] = Field(..., min_length=1, description="Danh sách ID tài liệu cần thêm vào nhóm")
+
+
+class AddGroupDocumentsResultItem(BaseModel):
+    """Individual result item when adding a document to a group."""
+
+    document_id: str
+    status: str = Field(..., description="added, skipped_existing, failed")
+    message: str | None = None
+
+
+class AddGroupDocumentsResponse(BaseModel):
+    """Batch response for adding documents to a group."""
+
+    group_id: str
+    added_count: int
+    skipped_existing_count: int
+    failed_count: int
+    items: list[AddGroupDocumentsResultItem]
+
+
+class GroupDocumentItem(BaseModel):
+    """Representation of a document within a group."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    title: str
+    file_name: str
+    file_type: str
+    file_size_bytes: int
+    file_hash: str
+    document_type_code: str | None = None
+    document_number: str | None = None
+    issuing_authority: str | None = None
+    issued_date: date | None = None
+    parse_status: str
+    current_revision_id: str | None = None
+    latest_revision_no: int = 0
+    revision_status: str | None = None
+    added_at: datetime
+    added_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class GroupDocumentsResponse(BaseModel):
+    """Response containing documents inside a specific group."""
+
+    group_id: str
+    items: list[GroupDocumentItem]
+    total: int

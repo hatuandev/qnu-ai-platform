@@ -352,6 +352,7 @@ async def run_db_seed(
                 from app.modules.modelops.service import modelops_service
 
                 logger.info("Initializing system model defaults...")
+                await modelops_service.seed_system_model_defaults(db)
                 await modelops_service.get_system_model_defaults(db)
                 logger.info("System model defaults initialized.")
 

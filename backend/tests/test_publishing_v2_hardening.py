@@ -61,7 +61,7 @@ def _make_actor(tenant_id: str = "tenant_a", username: str = "user_a") -> AuthAc
         workspace_id=f"ws_{tenant_id}",
         role="staff",
         roles=["staff"],
-        permissions=["ai.knowledge.view", "ai.knowledge.upload", "ai.knowledge.edit", "ai.knowledge.delete"],
+        permissions=["ai.knowledge.view", "ai.knowledge.upload", "ai.knowledge.update", "ai.knowledge.delete"],
         authenticated=True,
     )
 

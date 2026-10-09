@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
   CheckCircle2,
   FileStack,
+  FolderPlus,
+  Folders,
   HardDrive,
   Search,
   Upload,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +33,7 @@ import {
 } from "@/services/document-types-api";
 import { documentsApi } from "@/services/documents-api";
 import type { RepositoryDocumentListItem } from "@/types/documents";
+import { AddToGroupDialog } from "./components/add-to-group-dialog";
 import { DocumentCard } from "./components/document-card";
 import { DocumentUploadModal } from "./components/document-upload-modal";
 import { DocumentsTable } from "./components/documents-table";
@@ -46,7 +51,9 @@ export function DocumentsPage() {
   const [docTypeCode, setDocTypeCode] = useState<string>("all");
   const [fileType, setFileType] = useState<string>("all");
   const [parseStatus, setParseStatus] = useState<string>("all");
+  const [groupId, setGroupId] = useState<string>("all");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAddToGroupOpen, setIsAddToGroupOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deletingDoc, setDeletingDoc] =
     useState<RepositoryDocumentListItem | null>(null);
@@ -63,7 +70,14 @@ export function DocumentsPage() {
     queryFn: () => documentTypesApi.listDocumentTypes(),
   });
 
-  // 3. Fetch Documents List
+  // 3. Fetch Document Groups for filter
+  const { data: groupsData } = useQuery({
+    queryKey: ["document-groups"],
+    queryFn: () => documentsApi.getGroups({ page_size: 100 }),
+  });
+  const groups = groupsData?.items ?? [];
+
+  // 4. Fetch Documents List with group filter
   const { data: documentsData, isLoading } = useQuery({
     queryKey: [
       "repository-documents",
@@ -71,6 +85,7 @@ export function DocumentsPage() {
       docTypeCode,
       fileType,
       parseStatus,
+      groupId,
     ],
     queryFn: () =>
       documentsApi.getDocuments({
@@ -78,6 +93,7 @@ export function DocumentsPage() {
         document_type_code: docTypeCode !== "all" ? docTypeCode : undefined,
         file_type: fileType !== "all" ? fileType : undefined,
         parse_status: parseStatus !== "all" ? parseStatus : undefined,
+        group_id: groupId !== "all" ? groupId : undefined,
         limit: 100,
       }),
   });
@@ -137,6 +153,16 @@ export function DocumentsPage() {
         actions={
           <div className="flex items-center gap-2">
             <Button
+              asChild
+              variant="outline"
+              className="gap-1.5 shadow-xs"
+            >
+              <Link to="/documents/groups">
+                <Folders className="size-4" />
+                Nhóm Tài Liệu
+              </Link>
+            </Button>
+            <Button
               onClick={() => setIsUploadOpen(true)}
               className="gap-1.5 shadow-sm"
             >
@@ -147,36 +173,32 @@ export function DocumentsPage() {
         }
       />
 
-      {/* 2. KPI Metrics Banner */}
+      {/* 2. KPI Metrics Banner (Bỏ helper lặp lại ý nghĩa) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
         <KpiMetric
           label="Tổng Tài Liệu"
           value={String(stats?.total_documents ?? 0)}
           icon={FileStack}
-          helper="Tệp văn bản đã lưu trữ"
         />
         <KpiMetric
           label="Đã Bóc Tách MD"
           value={String(stats?.parsed_documents ?? 0)}
           icon={CheckCircle2}
-          helper="Sẵn sàng nạp vào Vector DB"
         />
         <KpiMetric
           label="Dung Lượng MinIO"
           value={formatFileSize(stats?.total_size_bytes ?? 0)}
           icon={HardDrive}
-          helper="Lưu trữ S3 phi cấu trúc"
         />
         <KpiMetric
           label="Liên Kết Kho Tri Thức"
           value={String(stats?.attached_usages_count ?? 0)}
           icon={BookOpen}
-          helper="Tổng lượt gắn vào RAG Collections"
         />
       </div>
 
-      {/* 3. Toolbar: Search + Filters + ViewModeToggle */}
-      <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      {/* 3. Seamless Toolbar: Search + Filters + ViewModeToggle (Bỏ khung Card/viền bao ngoài) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
           {/* Search Input */}
           <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
@@ -189,9 +211,24 @@ export function DocumentsPage() {
             />
           </div>
 
+          {/* Filter Document Group */}
+          <Select value={groupId} onValueChange={setGroupId}>
+            <SelectTrigger className="w-[160px] h-9 text-xs">
+              <SelectValue placeholder="Nhóm tài liệu" />
+            </SelectTrigger>
+            <SelectContent className="max-h-56">
+              <SelectItem value="all">Tất cả nhóm</SelectItem>
+              {groups.map((g) => (
+                <SelectItem key={g.id} value={g.id}>
+                  {g.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {/* Filter Document Type */}
           <Select value={docTypeCode} onValueChange={setDocTypeCode}>
-            <SelectTrigger className="w-[160px] h-9 text-xs">
+            <SelectTrigger className="w-[150px] h-9 text-xs">
               <SelectValue placeholder="Loại văn bản" />
             </SelectTrigger>
             <SelectContent className="max-h-56">
@@ -221,7 +258,7 @@ export function DocumentsPage() {
 
           {/* Filter Parse Status */}
           <Select value={parseStatus} onValueChange={setParseStatus}>
-            <SelectTrigger className="w-[140px] h-9 text-xs">
+            <SelectTrigger className="w-[130px] h-9 text-xs">
               <SelectValue placeholder="Trạng thái MD" />
             </SelectTrigger>
             <SelectContent>
@@ -265,7 +302,8 @@ export function DocumentsPage() {
             search ||
             docTypeCode !== "all" ||
             fileType !== "all" ||
-            parseStatus !== "all"
+            parseStatus !== "all" ||
+            groupId !== "all"
               ? "Không có tài liệu nào khớp với các bộ lọc đã chọn. Hãy thử xóa bớt bộ lọc."
               : "Kho tài liệu tập trung đang trống. Hãy bắt đầu bằng cách tải lên các tài liệu quy chế, thông báo hoặc biểu mẫu."
           }
@@ -280,6 +318,8 @@ export function DocumentsPage() {
             <DocumentCard
               key={doc.id}
               document={doc}
+              selected={selectedIds.includes(doc.id)}
+              onToggleSelect={handleToggleSelect}
               onReparse={(d) => reparseMutation.mutate(d.id)}
               onDelete={(d) => setDeletingDoc(d)}
             />
@@ -296,8 +336,42 @@ export function DocumentsPage() {
         />
       )}
 
-      {/* 5. Modals & Dialogs */}
+      {/* 5. Floating Bottom Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-xl border border-border/80 bg-background/95 backdrop-blur-md px-4 py-2.5 shadow-lg animate-in fade-in slide-in-from-bottom-4">
+          <span className="text-xs font-semibold text-foreground">
+            Đã chọn {selectedIds.length} tài liệu
+          </span>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            size="sm"
+            onClick={() => setIsAddToGroupOpen(true)}
+            className="gap-1.5 h-8 text-xs shadow-xs"
+          >
+            <FolderPlus className="size-3.5" />
+            Thêm Vào Nhóm
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds([])}
+            className="gap-1 h-8 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-3.5" />
+            Bỏ chọn
+          </Button>
+        </div>
+      )}
+
+      {/* 6. Modals & Dialogs */}
       <DocumentUploadModal open={isUploadOpen} onOpenChange={setIsUploadOpen} />
+
+      <AddToGroupDialog
+        open={isAddToGroupOpen}
+        onOpenChange={setIsAddToGroupOpen}
+        documentIds={selectedIds}
+        onSuccess={() => setSelectedIds([])}
+      />
 
       <ConfirmDialog
         open={Boolean(deletingDoc)}

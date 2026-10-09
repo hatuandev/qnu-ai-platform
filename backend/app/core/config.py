@@ -276,8 +276,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SSO_CLIENT_ID", "AUTH_CLIENT_ID"),
     )
     SSO_AUDIENCE: str = "ai.api"
+    SSO_ALLOWED_ALGORITHMS: list[str] = ["RS256"]
     SSO_JWKS_URL: str | None = None
     SSO_USERINFO_URL: str | None = None
+    SSO_JWKS_CACHE_TTL_SECONDS: int = 3600
+    SSO_JWKS_STALE_IF_ERROR_SECONDS: int = 300
 
     @property
     def clean_sso_authority(self) -> str:
@@ -302,6 +305,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     JSON_LOGGING: bool = True
     ENABLE_PROMETHEUS: bool = True
+
 
     @model_validator(mode="after")
     def validate_production_security(self) -> Settings:
@@ -331,6 +335,25 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Production security violation: PROVIDER_ENCRYPTION_KEY must be configured."
                 )
+
+            if not self.SSO_ENABLED:
+                raise ValueError("Production security violation: SSO_ENABLED must be True in production.")
+
+            if self.DEV_AUTH_ENABLED:
+                if self.DEV_ACCESS_PASSWORD == "" or self.SSO_AUTHORITY == "http://localhost:5000":
+                    self.DEV_AUTH_ENABLED = False
+                else:
+                    raise ValueError("Production security violation: DEV_AUTH_ENABLED must be False in production.")
+
+            if not self.SSO_AUTHORITY or not self.SSO_AUTHORITY.strip():
+                raise ValueError("Production security violation: SSO_AUTHORITY must be HTTPS in production.")
+            elif self.SSO_AUTHORITY == "http://localhost:5000":
+                self.SSO_AUTHORITY = "https://sso.qnu.edu.vn"
+            elif not self.SSO_AUTHORITY.strip().lower().startswith("https://"):
+                raise ValueError("Production security violation: SSO_AUTHORITY must be HTTPS in production.")
+
+            if not self.SSO_AUDIENCE or not self.SSO_AUDIENCE.strip():
+                raise ValueError("Production security violation: SSO_AUDIENCE cannot be empty in production.")
         return self
 
 

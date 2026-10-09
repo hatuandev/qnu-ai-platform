@@ -17,12 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.storage import storage_service
 from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
 from app.modules.knowledge.schemas import (
+    AttachDocumentGroupRequest,
     CanaryPolicyResponse,
     CollectionCreateRequest,
     CollectionUpdateRequest,
     FactExcelImportResponse,
     FactListResponse,
     ParsePreviewResponse,
+    PreviewDocumentGroupRequest,
     UpdateCanaryPolicyRequest,
 )
 from app.modules.knowledge.services.binding_service import (
@@ -369,6 +371,34 @@ class KnowledgeService:
             req,
             tenant_id=tenant_id,
             workspace_id=workspace_id,
+            actor=actor,
+        )
+
+    async def preview_document_group(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req: PreviewDocumentGroupRequest,
+        actor: Any | None = None,
+    ):
+        return await self._binding.preview_document_group(
+            db=db,
+            collection_id=collection_id,
+            req=req,
+            actor=actor,
+        )
+
+    async def attach_document_group(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        req: AttachDocumentGroupRequest,
+        actor: Any | None = None,
+    ):
+        return await self._binding.attach_document_group(
+            db=db,
+            collection_id=collection_id,
+            req=req,
             actor=actor,
         )
 

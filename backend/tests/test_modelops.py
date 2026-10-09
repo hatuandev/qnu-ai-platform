@@ -1112,6 +1112,46 @@ async def test_llm_generate_node_forwards_assistant_profile_models():
         assert called_req.max_tokens == 1500
 
 
+@pytest.mark.asyncio
+async def test_seed_system_model_defaults_lifecycle():
+    """Verify seed_system_model_defaults inserts default configuration and enables get_system_model_defaults."""
+    from app.modules.modelops.services.model_catalog_service import model_catalog_service
+
+    records: dict[str, ModelProviderConfig] = {}
+
+    mock_db = AsyncMock()
+
+    async def mock_execute(stmt):
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.side_effect = lambda: records.get("system_model_defaults")
+        mock_res.scalars.return_value.all.side_effect = lambda: list(records.values())
+        return mock_res
+
+    def mock_add(inst):
+        if isinstance(inst, ModelProviderConfig):
+            records[inst.id] = inst
+
+    mock_db.execute.side_effect = mock_execute
+    mock_db.add = MagicMock(side_effect=mock_add)
+    mock_db.commit = AsyncMock()
+
+    # 1. When DB is empty, get_system_model_defaults fails fast
+    with pytest.raises(AppException) as exc_info:
+        await model_catalog_service.get_system_model_defaults(mock_db)
+    assert exc_info.value.code == "MODEL_DEFAULT_NOT_CONFIGURED"
+
+    # 2. Seed defaults
+    cfg = await model_catalog_service.seed_system_model_defaults(mock_db)
+    assert cfg.id == "system_model_defaults"
+    assert cfg.extra_config["defaults"]["default_embedding_model"] == "bge-m3"
+    assert "system_model_defaults" in records
+
+    # 3. Reading defaults now succeeds
+    res = await model_catalog_service.get_system_model_defaults(mock_db)
+    assert res.defaults.default_embedding_model == "bge-m3"
+    assert res.defaults.default_ocr_model == "gemini-3.1-flash-lite"
+
+
 
 
 

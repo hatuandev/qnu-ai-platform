@@ -11,6 +11,8 @@ from app.modules.auth.schemas import AuthActor
 from app.modules.knowledge.schemas import (
     ApproveDocumentRequest,
     ApproveDocumentResponse,
+    AttachDocumentGroupRequest,
+    AttachDocumentGroupResponse,
     AvailableRepositoryDocumentsResponse,
     BackfillReport,
     BackfillRequest,
@@ -37,6 +39,8 @@ from app.modules.knowledge.schemas import (
     KnowledgeReconciliationResponse,
     LegacyAuditReport,
     ParsePreviewResponse,
+    PreviewDocumentGroupRequest,
+    PreviewDocumentGroupResponse,
     ReconcileFixResponse,
     ReindexDocumentResponse,
     RollbackIndexRevisionRequest,
@@ -106,7 +110,7 @@ async def update_collection(
     collection_id: str,
     body: CollectionUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
 ) -> CollectionResponse:
     col = await knowledge_service.update_collection(db, collection_id, body, actor=actor)
     return CollectionResponse.model_validate(col)
@@ -543,7 +547,7 @@ async def reconcile_collection(
 async def reconcile_fix_collection(
     collection_id: str,
     db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
 ) -> ReconcileFixResponse:
     res = await knowledge_service.reconcile_fix_collection(db, collection_id, actor=actor)
     return ReconcileFixResponse(**res)
@@ -588,6 +592,46 @@ async def create_bindings(
     actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
 ) -> CreateKnowledgeBindingsResponse:
     return await knowledge_service.create_bindings(
+        db,
+        collection_id=collection_id,
+        req=body,
+        actor=actor,
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/preview-document-group",
+    response_model=PreviewDocumentGroupResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Xem trước phân tích nhóm tài liệu trước khi đưa vào kho tri thức (Server-side Read-only)",
+)
+async def preview_document_group(
+    collection_id: str,
+    body: PreviewDocumentGroupRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> PreviewDocumentGroupResponse:
+    return await knowledge_service.preview_document_group(
+        db,
+        collection_id=collection_id,
+        req=body,
+        actor=actor,
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/attach-document-group",
+    response_model=AttachDocumentGroupResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Đưa toàn bộ tài liệu sẵn sàng của nhóm vào kho tri thức (Snapshot thủ công)",
+)
+async def attach_document_group(
+    collection_id: str,
+    body: AttachDocumentGroupRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.sync")),
+) -> AttachDocumentGroupResponse:
+    return await knowledge_service.attach_document_group(
         db,
         collection_id=collection_id,
         req=body,
@@ -831,7 +875,7 @@ async def update_collection_canary_policy(
     collection_id: str,
     body: UpdateCanaryPolicyRequest,
     db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
 ) -> CanaryPolicyResponse:
     return await knowledge_service.update_collection_canary_policy(
         db, collection_id=collection_id, req=body, actor=actor

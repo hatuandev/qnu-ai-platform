@@ -21,7 +21,16 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Access Gate"])
 @router.post("/login", response_model=AuthStatusResponse, summary="Đăng nhập Dev Access Gate bằng mật khẩu môi trường")
 async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
     """Verify dev access key and issue a secure HttpOnly session cookie."""
-    expected_password = settings.DEV_ACCESS_PASSWORD
+    current_settings = get_settings()
+    is_prod = current_settings.ENVIRONMENT.lower() in ("production", "prod")
+    if not current_settings.DEV_AUTH_ENABLED or is_prod:
+        raise AppException(
+            "Dev Access Gate bị vô hiệu hóa trong môi trường này.",
+            code="dev_auth_disabled",
+            status_code=403,
+        )
+
+    expected_password = current_settings.DEV_ACCESS_PASSWORD
     if not expected_password or not expected_password.strip():
         raise AppException(
             "Dev Access Gate chưa được cấu hình trên máy chủ.",
@@ -41,9 +50,9 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
         display_name="Cán bộ Quản trị QNU",
         tenant_id="tenant_qnu",
         workspace_id="workspace_qnu",
-        role="admin",
-        roles=["admin"],
-        permissions=["*"],
+        role="AI.Admin",
+        roles=["AI.Admin"],
+        permissions=["ai.access.admin"],
         authenticated=True,
         session_version="v1",
     )
@@ -57,16 +66,16 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
             "role": actor.role,
             "session_version": actor.session_version,
         },
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        expires_delta=timedelta(minutes=current_settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     response.set_cookie(
         key="qnu_session",
         value=token,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=current_settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
         samesite="lax",
-        secure=settings.ENVIRONMENT not in ("development", "test"),
+        secure=is_prod,
     )
     return AuthStatusResponse(
         authenticated=True,
@@ -85,40 +94,58 @@ async def logout(response: Response) -> dict[str, str]:
 @router.get("/me", response_model=AuthStatusResponse, summary="Kiểm tra trạng thái phiên làm việc hiện tại")
 async def get_current_user(request: Request) -> AuthStatusResponse:
     """Check current authentication status from QNU SSO Bearer token or Dev session cookie."""
+    current_settings = get_settings()
+    is_prod = current_settings.ENVIRONMENT.lower() in ("production", "prod")
+    dev_gate_allowed = (not is_prod) and current_settings.DEV_AUTH_ENABLED
+
     token: str | None = None
 
     auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
 
-    if not token:
+    if not token and dev_gate_allowed:
         token = request.cookies.get("qnu_session")
 
     if token:
-        # 1. Thử xác thực với QNU SSO
-        sso_actor = await validate_sso_token(token)
-        if sso_actor:
-            return AuthStatusResponse(authenticated=True, actor=sso_actor)
+        # Check if local dev token (HS256)
+        is_local_dev = False
+        if dev_gate_allowed:
+            try:
+                import jwt
 
-        # 2. Fallback Dev Access Gate token
+                header = jwt.get_unverified_header(token)
+                if header.get("alg") == current_settings.JWT_ALGORITHM:
+                    is_local_dev = True
+            except Exception:
+                pass
+
+        if is_local_dev:
+            try:
+                payload = decode_access_token(token)
+                actor = AuthActor(
+                    actor_id=str(payload.get("actor_id", "act_admin_qnu")),
+                    username=str(payload.get("sub", "admin")),
+                    display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
+                    email=str(payload.get("email", "admin@qnu.edu.vn")),
+                    user_type=str(payload.get("user_type", "admin")),
+                    tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
+                    workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
+                    role="AI.Admin",
+                    roles=["AI.Admin"],
+                    permissions=["ai.access.admin"],
+                    authenticated=True,
+                    session_version=str(payload.get("session_version", "v1")),
+                )
+                return AuthStatusResponse(authenticated=True, actor=actor)
+            except Exception:
+                return AuthStatusResponse(authenticated=False, actor=None, message="Phiên làm việc không hợp lệ")
+
+        # Validate SSO token
         try:
-            payload = decode_access_token(token)
-            actor = AuthActor(
-                actor_id=str(payload.get("actor_id", "act_admin_qnu")),
-                username=str(payload.get("sub", "admin")),
-                display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
-                email=str(payload.get("email", "admin@qnu.edu.vn")),
-                user_type=str(payload.get("user_type", "admin")),
-                tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
-                workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
-                role=str(payload.get("role", "admin")),
-                roles=["admin"],
-                permissions=["*"],
-                authenticated=True,
-                session_version=str(payload.get("session_version", "v1")),
-            )
-            return AuthStatusResponse(authenticated=True, actor=actor)
+            sso_actor = await validate_sso_token(token)
+            return AuthStatusResponse(authenticated=True, actor=sso_actor)
         except Exception:
-            pass
+            return AuthStatusResponse(authenticated=False, actor=None, message="Phiên làm việc không hợp lệ")
 
     return AuthStatusResponse(authenticated=False, actor=None, message="Chưa đăng nhập")

@@ -268,6 +268,64 @@ class ModelCatalogService:
 
         return dimension
 
+    async def seed_system_model_defaults(
+        self, db: AsyncSession, overwrite: bool = False
+    ) -> ModelProviderConfig:
+        """Seed system-wide default models into PostgreSQL database if not present."""
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults")
+        res = await db.execute(stmt)
+        cfg_record = res.scalar_one_or_none()
+
+        default_data: dict[str, Any] = {
+            "default_embedding_provider_id": "prov_rtx5090_vllm",
+            "default_embedding_model": "bge-m3",
+            "default_embedding_mode": "combo",
+            "default_embedding_combo_id": "combo_qnu_embedding_shield",
+            "embedding_combo_chain": DEFAULT_QNU_EMBEDDING_COMBO_CHAIN,
+
+            "default_reranker_provider_id": "prov_rtx5090_vllm",
+            "default_reranker_model": "bge-reranker-v2-m3",
+            "default_reranker_mode": "combo",
+            "default_reranker_combo_id": "combo_qnu_reranker_shield",
+            "reranker_combo_chain": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
+
+            "default_ocr_provider_id": "prov_gemini",
+            "default_ocr_model": "gemini-3.1-flash-lite",
+            "default_ocr_mode": "combo",
+            "default_ocr_combo_id": "combo_qnu_ocr_master",
+            "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,
+
+            "default_chat_provider_id": "prov_gemini",
+            "default_chat_model": "gemini-3.1-flash-lite",
+            "default_chat_mode": "single",
+            "default_chat_combo_id": "combo_qnu_chat_shield",
+            "chat_combo_chain": DEFAULT_QNU_CHAT_COMBO_CHAIN,
+
+            "model_combos": DEFAULT_INITIAL_COMBOS,
+            "vision_adapter": DEFAULT_VISION_ADAPTER,
+        }
+
+        if not cfg_record:
+            cfg_record = ModelProviderConfig(
+                id="system_model_defaults",
+                name="Cấu Hình Mặc Định Hệ Thống",
+                provider_type="system_routing",
+                model_name=default_data["default_embedding_model"],
+                is_active=True,
+                priority=0,
+                extra_config={"defaults": default_data},
+            )
+            db.add(cfg_record)
+            await db.commit()
+            logger.info("Đã khởi tạo bản ghi system_model_defaults trong CSDL.")
+        elif overwrite:
+            cfg_record.extra_config = {"defaults": default_data}
+            cfg_record.model_name = default_data["default_embedding_model"]
+            await db.commit()
+            logger.info("Đã cập nhật lại bản ghi system_model_defaults trong CSDL.")
+
+        return cfg_record
+
     async def get_system_model_defaults(self, db: AsyncSession) -> SystemModelDefaultsResponse:
         """Retrieve current system-wide default models for Embedding, Reranker, and OCR.
 

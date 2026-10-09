@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+import app.modules.auth.router as auth_router
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.main import app
@@ -25,7 +26,7 @@ async def test_auth_login_success():
         assert resp.status_code == 200
         data = resp.json()
         assert data["authenticated"] is True
-        assert data["actor"]["role"] == "admin"
+        assert data["actor"]["role"] == "AI.Admin"
         assert "qnu_session" in resp.cookies
 
         # Test /me with cookie
@@ -62,10 +63,6 @@ async def test_auth_login_invalid_password():
 @pytest.mark.asyncio
 async def test_auth_login_rejects_when_password_unconfigured():
     """Login must fail closed (503) instead of comparing against an empty password."""
-    from unittest.mock import patch
-
-    import app.modules.auth.router as auth_router
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         with patch.object(auth_router.settings, "DEV_ACCESS_PASSWORD", ""):
@@ -77,6 +74,32 @@ async def test_auth_login_rejects_when_password_unconfigured():
             assert resp.json().get("code") == "auth_not_configured"
 
 
+@pytest.mark.asyncio
+async def test_auth_login_disabled_when_dev_auth_false():
+    """Login must be rejected with 403 when DEV_AUTH_ENABLED is false."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        with patch.object(auth_router.settings, "DEV_AUTH_ENABLED", False):
+            resp = await client.post(
+                "/platform/v1alpha1/auth/login",
+                json={"access_key": settings.DEV_ACCESS_PASSWORD},
+            )
+            assert resp.status_code == 403
+            assert resp.json().get("code") == "dev_auth_disabled"
+
+
+@pytest.mark.asyncio
+async def test_auth_login_disabled_in_production():
+    """Login must be rejected with 403 in production environment."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        with patch.object(auth_router.settings, "ENVIRONMENT", "production"):
+            resp = await client.post(
+                "/platform/v1alpha1/auth/login",
+                json={"access_key": settings.DEV_ACCESS_PASSWORD},
+            )
+            assert resp.status_code == 403
+            assert resp.json().get("code") == "dev_auth_disabled"
 
 
 @pytest.mark.asyncio

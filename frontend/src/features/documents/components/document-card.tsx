@@ -15,6 +15,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +31,8 @@ import type { RepositoryDocumentListItem } from "@/types/documents";
 
 interface DocumentCardProps {
   document: RepositoryDocumentListItem;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
   onReparse: (doc: RepositoryDocumentListItem) => void;
   onDelete: (doc: RepositoryDocumentListItem) => void;
 }
@@ -43,13 +46,13 @@ function formatFileSize(bytes: number): string {
 function getFileIcon(fileType: string) {
   switch (fileType.toLowerCase()) {
     case "pdf":
-      return <FileText className="size-5 text-red-500" />;
+      return <FileText className="size-5 text-destructive" />;
     case "xlsx":
     case "xls":
-      return <FileSpreadsheet className="size-5 text-emerald-600" />;
+      return <FileSpreadsheet className="size-5 text-success" />;
     case "md":
     case "txt":
-      return <FileCode className="size-5 text-sky-500" />;
+      return <FileCode className="size-5 text-info" />;
     default:
       return <FileText className="size-5 text-primary" />;
   }
@@ -57,17 +60,28 @@ function getFileIcon(fileType: string) {
 
 export function DocumentCard({
   document,
+  selected = false,
+  onToggleSelect,
   onReparse,
   onDelete,
 }: DocumentCardProps) {
   const downloadUrl = documentsApi.getDownloadUrl(document.id);
 
   return (
-    <Card className="group relative flex flex-col transition-all duration-200 hover:border-primary/40 hover:shadow-md">
+    <Card className={`group relative flex flex-col transition-all duration-200 hover:border-primary/40 hover:shadow-md ${selected ? "border-primary bg-primary/5" : ""}`}>
       <CardContent className="flex flex-1 flex-col p-4">
-        {/* Header: File icon + Title + Menu */}
+        {/* Header: Checkbox + File icon + Title + Menu */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
+            {onToggleSelect && (
+              <div className="pt-1">
+                <Checkbox
+                  checked={selected}
+                  onCheckedChange={() => onToggleSelect(document.id)}
+                  aria-label={`Chọn ${document.title || document.file_name}`}
+                />
+              </div>
+            )}
             <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted/70 group-hover:bg-primary/10 transition-colors">
               {getFileIcon(document.file_type)}
             </div>
@@ -163,7 +177,7 @@ export function DocumentCard({
           {document.parse_status === "parsed" && (
             <Badge
               variant="outline"
-              className="gap-1 text-[11px] py-0 h-5 border-emerald-600/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+              className="gap-1 text-[11px] py-0 h-5 border-success/30 text-success bg-success/10"
             >
               <CheckCircle2 className="size-3" />
               Markdown Sạch
@@ -172,7 +186,7 @@ export function DocumentCard({
           {document.parse_status === "parsing" && (
             <Badge
               variant="outline"
-              className="gap-1 text-[11px] py-0 h-5 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+              className="gap-1 text-[11px] py-0 h-5 border-warning/30 text-warning bg-warning/10"
             >
               <Clock className="size-3 animate-spin" />
               Đang Bóc Tách
@@ -186,6 +200,20 @@ export function DocumentCard({
               <XCircle className="size-3" />
               Lỗi Bóc Tách
             </Badge>
+          )}
+
+          {document.groups && document.groups.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 w-full pt-1">
+              {document.groups.map((g) => (
+                <Badge
+                  key={g.id}
+                  variant="outline"
+                  className="text-[10px] py-0 h-4.5 bg-muted/40 text-muted-foreground border-border"
+                >
+                  {g.name}
+                </Badge>
+              ))}
+            </div>
           )}
         </div>
 

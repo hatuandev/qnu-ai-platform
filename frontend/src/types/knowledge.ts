@@ -541,3 +541,60 @@ export interface SystemDecommissioningAuditReport {
   total_prunable_revisions_estimate: number;
   audited_at: string;
 }
+
+export interface AttachDocumentGroupRequest {
+  group_id: string;
+  chunk_strategy?: string;
+  sync_policy?: string;
+  auto_activate?: boolean;
+  strict_ready?: boolean;
+}
+
+export interface AttachDocumentGroupItemResult {
+  document_id: string;
+  document_title?: string | null;
+  source_revision_id?: string | null;
+  binding_id?: string | null;
+  status: "created" | "already_bound" | "not_ready" | "failed";
+  message?: string | null;
+  index_revision_id?: string | null;
+}
+
+export interface AttachDocumentGroupResponse {
+  collection_id: string;
+  group_id: string;
+  group_name: string;
+  total_documents: number;
+  created_count: number;
+  already_bound_count: number;
+  not_ready_count: number;
+  failed_count: number;
+  items: AttachDocumentGroupItemResult[];
+}
+
+export interface PreviewDocumentGroupRequest {
+  group_id: string;
+}
+
+export interface PreviewDocumentGroupItem {
+  document_id: string;
+  title: string;
+  file_name: string;
+  current_revision_id?: string | null;
+  revision_status?: string | null;
+  already_bound: boolean;
+  eligible_for_binding: boolean;
+  reason?: string;
+}
+
+export interface PreviewDocumentGroupResponse {
+  collection_id: string;
+  group_id: string;
+  group_name: string;
+  total_documents: number;
+  ready_count: number;
+  already_bound_count: number;
+  not_ready_count: number;
+  failed_count: number;
+  items: PreviewDocumentGroupItem[];
+}

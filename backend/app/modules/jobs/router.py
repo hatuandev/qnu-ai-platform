@@ -65,7 +65,7 @@ async def get_job(
 async def cancel_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
 ) -> JobResponse:
     job = await jobs_service.cancel_job(db, job_id, actor=actor)
     return JobResponse.model_validate(job)
@@ -75,7 +75,7 @@ async def cancel_job(
 async def retry_job(
     job_id: str,
     db: AsyncSession = Depends(get_db),
-    actor: AuthActor = Depends(require_permission("ai.knowledge.edit")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
 ) -> JobResponse:
     job = await jobs_service.retry_job(db, job_id, actor=actor)
     return JobResponse.model_validate(job)

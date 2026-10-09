@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -110,6 +111,12 @@ class RepositoryDocument(Base):
         "DocumentRevision",
         foreign_keys=[current_revision_id],
         post_update=True,
+    )
+    group_memberships: Mapped[list[DocumentGroupMembership]] = relationship(
+        "DocumentGroupMembership",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __init__(self, **kwargs: Any) -> None:
@@ -239,4 +246,104 @@ class DocumentRevision(Base):
         Index("ix_doc_revisions_doc_rev_no", "document_id", "revision_no", unique=True),
         Index("ix_doc_revisions_doc_status", "document_id", "status"),
         Index("ix_doc_revisions_source_hash", "source_hash"),
+    )
+
+
+class DocumentGroup(Base):
+    """Logical administrative group of repository documents."""
+
+    __tablename__ = "document_groups"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"grp_{uuid.uuid4().hex[:12]}"
+    )
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), default="tenant_qnu", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="workspace_qnu", nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+    lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    # Relationships
+    memberships: Mapped[list[DocumentGroupMembership]] = relationship(
+        "DocumentGroupMembership",
+        back_populates="group",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"grp_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "lock_version", None) is None:
+            self.lock_version = 1
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index(
+            "uq_doc_groups_tenant_ws_lower_name",
+            "tenant_id",
+            "workspace_id",
+            text("lower(name)"),
+            unique=True,
+        ),
+        Index("ix_doc_groups_tenant_ws", "tenant_id", "workspace_id"),
+    )
+
+
+class DocumentGroupMembership(Base):
+    """Many-to-many relationship between DocumentGroup and RepositoryDocument."""
+
+    __tablename__ = "document_group_memberships"
+
+    group_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("document_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    document_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("repository_documents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    added_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    # Relationships
+    group: Mapped[DocumentGroup] = relationship(
+        "DocumentGroup",
+        back_populates="memberships",
+    )
+    document: Mapped[RepositoryDocument] = relationship(
+        "RepositoryDocument",
+        back_populates="group_memberships",
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if getattr(self, "added_at", None) is None:
+            self.added_at = utcnow()
+
+    __table_args__ = (
+        Index("ix_doc_group_memberships_doc_id", "document_id"),
     )

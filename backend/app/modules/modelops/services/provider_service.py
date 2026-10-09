@@ -780,6 +780,10 @@ class ProviderService:
 
         await db.commit()
         logger.info("Successfully seeded %d predefined AI Core providers", len(seeded_configs))
+
+        from app.modules.modelops.services.model_catalog_service import model_catalog_service
+        await model_catalog_service.seed_system_model_defaults(db, overwrite=overwrite)
+
         return [
             {
                 "id": c.id,

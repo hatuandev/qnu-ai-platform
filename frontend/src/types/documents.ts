@@ -8,6 +8,11 @@ export interface AttachedCollectionInfo {
   created_at: string;
 }
 
+export interface DocumentGroupMinimalItem {
+  id: string;
+  name: string;
+}
+
 export interface RepositoryDocumentListItem {
   id: string;
   title: string;
@@ -26,6 +31,7 @@ export interface RepositoryDocumentListItem {
   parse_status: "pending" | "parsing" | "parsed" | "failed";
   ocr_engine?: string | null;
   attached_collections_count: number;
+  groups?: DocumentGroupMinimalItem[];
   created_at: string;
   updated_at: string;
 }
@@ -60,8 +66,89 @@ export interface RepositoryDocumentFilter {
   document_type_code?: string;
   file_type?: string;
   parse_status?: string;
+  group_id?: string;
+  exclude_group_id?: string;
   skip?: number;
   limit?: number;
+}
+
+export interface DocumentGroup {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  lock_version: number;
+  total_documents: number;
+  ready_documents: number;
+  processing_documents: number;
+  error_documents: number;
+}
+
+export type DocumentGroupListItem = DocumentGroup;
+
+export interface DocumentGroupListResponse {
+  items: DocumentGroupListItem[];
+  total: number;
+}
+
+export interface DocumentGroupCreateRequest {
+  name: string;
+  description?: string;
+}
+
+export interface DocumentGroupUpdateRequest {
+  name?: string;
+  description?: string;
+  expected_lock_version?: number;
+}
+
+export interface AddGroupDocumentsRequest {
+  document_ids: string[];
+}
+
+export interface AddGroupDocumentsResultItem {
+  document_id: string;
+  status: "added" | "skipped_existing" | "failed";
+  message?: string | null;
+}
+
+export interface AddGroupDocumentsResponse {
+  group_id: string;
+  added_count: number;
+  skipped_existing_count: number;
+  failed_count: number;
+  items: AddGroupDocumentsResultItem[];
+}
+
+export interface GroupDocumentItem {
+  id: string;
+  title: string;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  file_hash: string;
+  document_type_code?: string | null;
+  document_number?: string | null;
+  issuing_authority?: string | null;
+  issued_date?: string | null;
+  parse_status: string;
+  current_revision_id?: string | null;
+  latest_revision_no: number;
+  revision_status?: string | null;
+  added_at: string;
+  added_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupDocumentsResponse {
+  group_id: string;
+  items: GroupDocumentItem[];
+  total: number;
 }
 
 export interface RepositoryDocumentUpdate {

@@ -1,10 +1,10 @@
 {
   "format": "qnu-sso.permissions",
-  "version": 1,
-  "applicationId": 4,
+  "version": 2,
+  "applicationId": 5,
   "applicationCode": "qnu-ai",
   "applicationName": "QNU AI Platform",
-  "exportedAt": "2026-10-04T07:00:00.0000000+00:00",
+  "exportedAt": "2026-10-09T07:00:00.0000000+00:00",
   "permissions": [
     {
       "name": "ai.access.read",
@@ -133,6 +133,15 @@
       "isSensitive": false
     },
     {
+      "name": "ai.knowledge.update",
+      "displayName": "Hiệu đính & Cập nhật Tri thức",
+      "description": "Hiệu đính Markdown, duyệt Revision và cập nhật thông tin tài liệu",
+      "resource": "knowledge",
+      "action": "update",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
       "name": "ai.knowledge.sync",
       "displayName": "Đồng bộ & Index Vector",
       "description": "Chạy đồng bộ nhúng Vector Qdrant và Lexical Index PostgreSQL FTS",
@@ -149,6 +158,15 @@
       "action": "delete",
       "isEnabled": true,
       "isSensitive": true
+    },
+    {
+      "name": "ai.facts.manage",
+      "displayName": "Quản lý Bảng Số Liệu (Facts)",
+      "description": "Quản lý tầng số liệu có cấu trúc Knowledge Facts",
+      "resource": "knowledge",
+      "action": "manage",
+      "isEnabled": true,
+      "isSensitive": false
     },
     {
       "name": "ai.models.view",

@@ -53,13 +53,13 @@ function formatFileSize(bytes: number): string {
 function getFileIcon(fileType: string) {
   switch (fileType.toLowerCase()) {
     case "pdf":
-      return <FileText className="size-4 text-red-500" />;
+      return <FileText className="size-4 text-destructive" />;
     case "xlsx":
     case "xls":
-      return <FileSpreadsheet className="size-4 text-emerald-600" />;
+      return <FileSpreadsheet className="size-4 text-success" />;
     case "md":
     case "txt":
-      return <FileCode className="size-4 text-sky-500" />;
+      return <FileCode className="size-4 text-info" />;
     default:
       return <FileText className="size-4 text-primary" />;
   }
@@ -139,6 +139,19 @@ export function DocumentsTable({
                       <span className="text-[11px] text-muted-foreground truncate block">
                         {doc.file_name}
                       </span>
+                      {doc.groups && doc.groups.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                          {doc.groups.map((g) => (
+                            <Badge
+                              key={g.id}
+                              variant="outline"
+                              className="text-[9px] py-0 h-4 px-1 text-muted-foreground bg-muted/40"
+                            >
+                              {g.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </TableCell>
@@ -169,7 +182,7 @@ export function DocumentsTable({
                   {doc.parse_status === "parsed" && (
                     <Badge
                       variant="outline"
-                      className="gap-1 text-[11px] py-0 h-5 border-emerald-600/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                      className="gap-1 text-[11px] py-0 h-5 border-success/30 text-success bg-success/10"
                     >
                       <CheckCircle2 className="size-3" />
                       Markdown Sạch
@@ -178,7 +191,7 @@ export function DocumentsTable({
                   {doc.parse_status === "parsing" && (
                     <Badge
                       variant="outline"
-                      className="gap-1 text-[11px] py-0 h-5 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                      className="gap-1 text-[11px] py-0 h-5 border-warning/30 text-warning bg-warning/10"
                     >
                       <Clock className="size-3 animate-spin" />
                       Đang Xử Lý

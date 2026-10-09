@@ -25,22 +25,19 @@ class AuthActor(BaseModel):
     authenticated: bool = True
 
     def has_permission(self, permission: str) -> bool:
-        """Check whether actor has a specific permission or wildcard access."""
+        """Check whether actor has a specific permission or full ai.* access via AI.Admin / ai.access.admin."""
         if not permission:
             return True
         p = permission.strip().lower()
         perms = {item.strip().lower() for item in self.permissions}
-        if "*" in perms or p in perms:
-            return True
         actor_roles = {r.strip().lower() for r in self.roles}
-        if "admin" in actor_roles or "administrator" in actor_roles or "super_admin" in actor_roles or "ai.access.admin" in perms:
+
+        # 1. Exact match on declared permission
+        if p in perms:
             return True
-        if "ai.access.manage" in perms and p.startswith("ai."):
-            return True
-        return bool(
-            "ai.access.read" in perms
-            and (p.endswith((".view", ".read", ".access")) or p == "ai.chat.access")
-        )
+
+        # 2. ai.access.admin permission or exact AI.Admin role grants all ai.* permissions
+        return bool(("ai.admin" in actor_roles or "ai.access.admin" in perms) and p.startswith("ai."))
 
 
 class AuthStatusResponse(BaseModel):

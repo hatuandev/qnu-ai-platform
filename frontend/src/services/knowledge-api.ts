@@ -1,5 +1,7 @@
 import type {
   ApproveDocumentResult,
+  AttachDocumentGroupRequest,
+  AttachDocumentGroupResponse,
   AvailableRepositoryDocumentsResponse,
   BackfillReport,
   BackfillRequest,
@@ -23,6 +25,7 @@ import type {
   KnowledgeReconciliationReport,
   LegacyAuditReport,
   ParsePreviewResult,
+  PreviewDocumentGroupResponse,
   ReconcileFixResponse,
   ReindexDocumentResponse,
   RollbackIndexRevisionRequest,
@@ -1041,6 +1044,64 @@ export const knowledgeApi = {
     if (!res.ok) {
       throw new Error(
         `Lấy báo cáo kiểm kê chuyển đổi thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Xem trước phân tích nhóm tài liệu trước khi đưa vào kho tri thức (Read-only)
+   */
+  async previewDocumentGroup(
+    collectionId: string,
+    groupId: string,
+  ): Promise<PreviewDocumentGroupResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/preview-document-group`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ group_id: groupId }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          (err as { message?: string }).message ||
+          `Xem trước nhóm tài liệu thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Đưa nhóm tài liệu vào kho tri thức (Snapshot thủ công)
+   */
+  async attachDocumentGroup(
+    collectionId: string,
+    payload: AttachDocumentGroupRequest,
+  ): Promise<AttachDocumentGroupResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/attach-document-group`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          (err as { message?: string }).message ||
+          `Đưa nhóm vào kho tri thức thất bại (HTTP ${res.status}).`,
       );
     }
     return res.json();

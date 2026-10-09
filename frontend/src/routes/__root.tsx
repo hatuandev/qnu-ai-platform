@@ -15,7 +15,9 @@ export const Route = createRootRoute({
   errorComponent: ({ error }) => (
     <div className="py-12">
       <h1 className="type-section-title">Đã xảy ra lỗi</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {error instanceof Error ? error.message : String(error)}
+      </p>
     </div>
   ),
 });

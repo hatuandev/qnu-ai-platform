@@ -1,8 +1,15 @@
 import type {
+  AddGroupDocumentsRequest,
+  AddGroupDocumentsResponse,
   AttachDocumentsRequest,
+  DocumentGroup,
+  DocumentGroupCreateRequest,
+  DocumentGroupListResponse,
+  DocumentGroupUpdateRequest,
   DocumentRevision,
   DocumentRevisionListItem,
   DocumentStats,
+  GroupDocumentsResponse,
   RepositoryDocument,
   RepositoryDocumentFilter,
   RepositoryDocumentListItem,
@@ -26,6 +33,9 @@ export const documentsApi = {
       params.set("document_type_code", filter.document_type_code);
     if (filter?.file_type) params.set("file_type", filter.file_type);
     if (filter?.parse_status) params.set("parse_status", filter.parse_status);
+    if (filter?.group_id) params.set("group_id", filter.group_id);
+    if (filter?.exclude_group_id)
+      params.set("exclude_group_id", filter.exclude_group_id);
     if (filter?.skip !== undefined) params.set("skip", String(filter.skip));
     if (filter?.limit !== undefined) params.set("limit", String(filter.limit));
 
@@ -335,5 +345,168 @@ export const documentsApi = {
       );
     }
     return res.json();
+  },
+
+  // =========================================================================
+  // Logical Document Groups APIs
+  // =========================================================================
+
+  /**
+   * Lấy danh sách các nhóm tài liệu
+   */
+  async getGroups(params?: {
+    search?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<DocumentGroupListResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.page_size) searchParams.set("page_size", String(params.page_size));
+
+    const res = await fetch(`${BASE_URL}/documents/groups?${searchParams.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Không thể tải danh sách nhóm tài liệu.");
+    }
+    return res.json();
+  },
+
+  /**
+   * Chi tiết nhóm tài liệu
+   */
+  async getGroup(groupId: string): Promise<DocumentGroup> {
+    const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || `Không tìm thấy nhóm tài liệu '${groupId}'.`);
+    }
+    return res.json();
+  },
+
+  /**
+   * Tạo nhóm tài liệu mới
+   */
+  async createGroup(data: DocumentGroupCreateRequest): Promise<DocumentGroup> {
+    const res = await fetch(`${BASE_URL}/documents/groups`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Tạo nhóm tài liệu thất bại.");
+    }
+    return res.json();
+  },
+
+  /**
+   * Cập nhật thông tin nhóm tài liệu
+   */
+  async updateGroup(groupId: string, data: DocumentGroupUpdateRequest): Promise<DocumentGroup> {
+    const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
+      method: "PATCH",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Cập nhật nhóm tài liệu thất bại.");
+    }
+    return res.json();
+  },
+
+  /**
+   * Xóa nhóm tài liệu
+   */
+  async deleteGroup(groupId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Xóa nhóm tài liệu thất bại.");
+    }
+  },
+
+  /**
+   * Lấy danh sách tài liệu trong nhóm
+   */
+  async getGroupDocuments(
+    groupId: string,
+    params?: {
+      search?: string;
+      status?: string;
+      page?: number;
+      page_size?: number;
+    },
+  ): Promise<GroupDocumentsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.page_size) searchParams.set("page_size", String(params.page_size));
+
+    const res = await fetch(
+      `${BASE_URL}/documents/groups/${groupId}/documents?${searchParams.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Không thể tải danh sách tài liệu trong nhóm.");
+    }
+    return res.json();
+  },
+
+  /**
+   * Thêm tài liệu vào nhóm
+   */
+  async addDocumentsToGroup(
+    groupId: string,
+    data: AddGroupDocumentsRequest,
+  ): Promise<AddGroupDocumentsResponse> {
+    const res = await fetch(`${BASE_URL}/documents/groups/${groupId}/documents`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Thêm tài liệu vào nhóm thất bại.");
+    }
+    return res.json();
+  },
+
+  /**
+   * Xóa một tài liệu khỏi nhóm
+   */
+  async removeDocumentFromGroup(groupId: string, documentId: string): Promise<void> {
+    const res = await fetch(
+      `${BASE_URL}/documents/groups/${groupId}/documents/${documentId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail || "Xóa tài liệu khỏi nhóm thất bại.");
+    }
   },
 };

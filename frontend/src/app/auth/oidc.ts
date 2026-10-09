@@ -4,26 +4,166 @@ import {
   type UserManagerSettings,
   WebStorageStateStore,
 } from "oidc-client-ts";
-import type { CurrentUser } from "@/app/auth/types";
+import type { CurrentUser } from "./types";
 
 let userManagerInstance: UserManager | null = null;
 
+export function isLoopbackHostname(hostname: string): boolean {
+  const clean = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return clean === "localhost" || clean === "127.0.0.1" || clean === "::1";
+}
+
+export function resolveOidcAuthority(
+  rawAuthority: string | undefined | null,
+  fallbackAuthority: string,
+  isProduction: boolean = false,
+): string {
+  const candidate = rawAuthority?.trim() || fallbackAuthority?.trim();
+  if (!candidate) {
+    throw new Error(
+      "SSO authority is required but neither rawAuthority nor fallbackAuthority was provided.",
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch (err) {
+    throw new Error(
+      `Invalid SSO authority '${candidate}': ${(err as Error).message}`,
+    );
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(
+      `Invalid SSO authority protocol '${parsed.protocol}', only HTTP and HTTPS are permitted. Received '${candidate}'`,
+    );
+  }
+
+  const isLoopback = isLoopbackHostname(parsed.hostname);
+
+  if (isProduction) {
+    if (parsed.protocol !== "https:") {
+      throw new Error(
+        `Production security violation: SSO authority must use HTTPS protocol, received '${candidate}'`,
+      );
+    }
+    if (isLoopback) {
+      throw new Error(
+        `Production security violation: SSO authority must not point to loopback address (${parsed.hostname}), received '${candidate}'`,
+      );
+    }
+  } else {
+    if (parsed.protocol === "http:" && !isLoopback) {
+      throw new Error(
+        `Invalid SSO authority: HTTP is only permitted for loopback hosts (localhost, 127.0.0.1, ::1), received '${candidate}'`,
+      );
+    }
+  }
+
+  // Normalize: remove trailing slash for stable oidc-client-ts discovery
+  const normalizedPath = parsed.pathname.replace(/\/+$/, "");
+  return `${parsed.origin}${normalizedPath}${parsed.search || ""}${parsed.hash || ""}`;
+}
+
+export function resolveOidcUrl(
+  rawUrl: string | undefined,
+  defaultPath: string,
+  origin: string,
+  isProduction: boolean = false,
+): string {
+  const candidate = rawUrl?.trim() || defaultPath;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate, origin);
+  } catch (err) {
+    throw new Error(
+      `Invalid SSO URL '${candidate}': ${(err as Error).message}`,
+    );
+  }
+
+  const isLoopback = isLoopbackHostname(parsed.hostname);
+
+  if (isProduction) {
+    if (parsed.protocol !== "https:") {
+      throw new Error(
+        `Production security violation: SSO redirect URI must use HTTPS protocol, received '${parsed.href}'`,
+      );
+    }
+  } else {
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error(
+        `Invalid SSO redirect URI scheme '${parsed.protocol}', only HTTP and HTTPS are permitted.`,
+      );
+    }
+    if (parsed.protocol === "http:" && !isLoopback) {
+      throw new Error(
+        `Invalid SSO redirect URI: HTTP is only permitted on localhost, received '${parsed.href}'`,
+      );
+    }
+  }
+
+  return parsed.href;
+}
+
+export function normalizeOidcScopes(rawScope: string | undefined): string {
+  const fallback = "openid profile email roles ai.api offline_access";
+  const candidate = rawScope?.trim() ? rawScope.trim() : fallback;
+
+  const tokens = candidate.split(/\s+/).filter(Boolean);
+  const uniqueScopes = Array.from(new Set(tokens));
+
+  if (!uniqueScopes.includes("openid")) {
+    throw new Error(
+      `Invalid SSO scope: 'openid' is required, received '${rawScope}'`,
+    );
+  }
+
+  if (!uniqueScopes.includes("ai.api")) {
+    throw new Error(
+      `Invalid SSO scope: 'ai.api' resource scope is required, received '${rawScope}'`,
+    );
+  }
+
+  return uniqueScopes.join(" ");
+}
+
+const isProduction =
+  typeof import.meta !== "undefined" &&
+  (import.meta.env?.PROD || import.meta.env?.MODE === "production");
+
+const defaultOrigin =
+  typeof window !== "undefined"
+    ? window.location.origin
+    : "http://localhost:3000";
+
+const defaultFallbackAuthority = isProduction
+  ? "https://sso.qnu.edu.vn"
+  : typeof window !== "undefined" &&
+      isLoopbackHostname(window.location.hostname)
+    ? "http://localhost:5000"
+    : "https://sso.qnu.edu.vn";
+
 export const OIDC_CONFIG = {
-  authority:
-    import.meta.env.VITE_SSO_AUTHORITY ||
-    (typeof window !== "undefined" && window.location.hostname === "localhost"
-      ? "http://localhost:5000"
-      : "https://sso.qnu.edu.vn"),
-  clientId: import.meta.env.VITE_SSO_CLIENT_ID || "qnu-ai-platform",
-  redirectUri:
-    typeof window !== "undefined"
-      ? `${window.location.origin}/signin-oidc`
-      : "http://localhost:3000/signin-oidc",
-  postLogoutRedirectUri:
-    typeof window !== "undefined"
-      ? `${window.location.origin}/sign-in`
-      : "http://localhost:3000/sign-in",
-  scope: "openid profile email roles ai.api offline_access",
+  authority: resolveOidcAuthority(
+    import.meta.env?.VITE_SSO_AUTHORITY,
+    defaultFallbackAuthority,
+    Boolean(isProduction),
+  ),
+  clientId: import.meta.env?.VITE_SSO_CLIENT_ID || "qnu-ai-platform",
+  redirectUri: resolveOidcUrl(
+    import.meta.env?.VITE_SSO_REDIRECT_URI,
+    "/signin-oidc",
+    defaultOrigin,
+    Boolean(isProduction),
+  ),
+  postLogoutRedirectUri: resolveOidcUrl(
+    import.meta.env?.VITE_SSO_POST_LOGOUT_REDIRECT_URI,
+    "/sign-in",
+    defaultOrigin,
+    Boolean(isProduction),
+  ),
+  scope: normalizeOidcScopes(import.meta.env?.VITE_SSO_SCOPE),
 };
 
 let cachedAccessToken: string | null = null;
@@ -33,25 +173,7 @@ export function setCachedAccessToken(token: string | null): void {
 }
 
 export function getAccessToken(): string | null {
-  if (cachedAccessToken) return cachedAccessToken;
-  if (typeof window === "undefined") return null;
-
-  try {
-    const authority = OIDC_CONFIG.authority.replace(/\/$/, "");
-    const clientId = OIDC_CONFIG.clientId;
-    const key = `oidc.user:${authority}:${clientId}`;
-    const raw = window.localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.access_token) {
-        cachedAccessToken = parsed.access_token;
-        return parsed.access_token;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return null;
+  return cachedAccessToken;
 }
 
 export function getUserManager(): UserManager {
@@ -67,13 +189,13 @@ export function getUserManager(): UserManager {
       loadUserInfo: true,
       userStore:
         typeof window !== "undefined"
-          ? new WebStorageStateStore({ store: window.localStorage })
+          ? new WebStorageStateStore({ store: window.sessionStorage })
           : undefined,
     };
 
     userManagerInstance = new UserManager(settings);
 
-    // Track access token lifetime & renewal
+    // Track access token lifetime, renewal & revocation
     userManagerInstance.events.addUserLoaded((user) => {
       setCachedAccessToken(user.access_token);
     });
@@ -81,12 +203,27 @@ export function getUserManager(): UserManager {
     userManagerInstance.events.addUserUnloaded(() => {
       setCachedAccessToken(null);
     });
+
+    userManagerInstance.events.addAccessTokenExpired(() => {
+      setCachedAccessToken(null);
+    });
+
+    userManagerInstance.events.addSilentRenewError(() => {
+      setCachedAccessToken(null);
+    });
+
+    userManagerInstance.events.addUserSignedOut(() => {
+      setCachedAccessToken(null);
+    });
   }
   return userManagerInstance;
 }
 
 export function parseOidcUser(oidcUser: OidcUser | null): CurrentUser | null {
-  if (!oidcUser || oidcUser.expired) return null;
+  if (!oidcUser || oidcUser.expired) {
+    setCachedAccessToken(null);
+    return null;
+  }
 
   if (oidcUser.access_token) {
     setCachedAccessToken(oidcUser.access_token);
@@ -95,50 +232,25 @@ export function parseOidcUser(oidcUser: OidcUser | null): CurrentUser | null {
   const profile = oidcUser.profile || {};
   const rawRoles = profile.role || profile.roles || [];
   const roles = Array.isArray(rawRoles)
-    ? rawRoles
-    : typeof rawRoles === "string"
-      ? [rawRoles]
+    ? (rawRoles as string[]).map((r) => String(r).trim()).filter(Boolean)
+    : typeof rawRoles === "string" && rawRoles.trim()
+      ? [rawRoles.trim()]
       : [];
 
   const rawPermissions = profile.permission || profile.permissions || [];
-  const permissions = Array.isArray(rawPermissions)
-    ? (rawPermissions as string[])
-    : typeof rawPermissions === "string"
-      ? [rawPermissions]
+  const rawPermList = Array.isArray(rawPermissions)
+    ? (rawPermissions as string[]).map((p) => String(p).trim()).filter(Boolean)
+    : typeof rawPermissions === "string" && rawPermissions.trim()
+      ? [rawPermissions.trim()]
       : [];
 
+  // Reject wildcard "*" from SSO tokens according to strict security contract
+  const permissions = rawPermList.filter((p) => p !== "*");
+
   const rawUserType =
-    (profile.user_type as string) ||
-    (profile.userType as string) ||
-    (roles.some((r) => r.toLowerCase().includes("admin"))
-      ? "admin"
-      : roles.some(
-            (r) =>
-              r.toLowerCase().includes("lecturer") ||
-              r.toLowerCase().includes("teacher"),
-          )
-        ? "lecturer"
-        : roles.some(
-              (r) =>
-                r.toLowerCase().includes("staff") ||
-                r.toLowerCase().includes("officer"),
-            )
-          ? "staff"
-          : "student");
+    (profile.user_type as string) || (profile.userType as string) || "user";
 
   const userType = String(rawUserType).toLowerCase();
-
-  // Mặc định quyền cơ bản nếu chưa được gán role chuyên biệt
-  const defaultPermissions =
-    userType === "student"
-      ? ["ai.access.read", "ai.chat.access", "ai.chat.export"]
-      : [
-          "ai.access.read",
-          "ai.chat.access",
-          "ai.chat.export",
-          "ai.assistants.view",
-          "ai.knowledge.view",
-        ];
 
   return {
     sub: oidcUser.profile.sub || "sso-user",
@@ -147,10 +259,10 @@ export function parseOidcUser(oidcUser: OidcUser | null): CurrentUser | null {
       oidcUser.profile.preferred_username ||
       "Cán bộ QNU",
     email: oidcUser.profile.email || "",
-    roles: roles.length > 0 ? roles : [userType],
+    roles,
     userType,
     studentId: (profile.student_id as string) || undefined,
-    permissions: permissions.length > 0 ? permissions : defaultPermissions,
+    permissions,
     roleMetadata: [],
     accessToken: oidcUser.access_token,
   };
@@ -179,6 +291,7 @@ export async function handleSsoCallback(): Promise<{
 }
 
 export async function logoutSso(): Promise<void> {
+  setCachedAccessToken(null);
   const mgr = getUserManager();
   try {
     await mgr.signoutRedirect();

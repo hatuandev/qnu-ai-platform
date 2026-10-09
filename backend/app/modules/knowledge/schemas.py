@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ==============================================================================
@@ -582,3 +582,120 @@ class SystemDecommissioningAuditReport(BaseModel):
     collections_in_legacy_mode: int
     total_prunable_revisions_estimate: int
     audited_at: datetime
+
+
+# ==============================================================================
+# 9. Document Group Attachment Schemas
+# ==============================================================================
+SUPPORTED_CHUNK_STRATEGIES: set[str] = {
+    "ClauseBasedChunker",
+    "SemanticChunker",
+    "AdmissionsRecordChunker",
+    "ImplementationTaskChunker",
+}
+
+
+class PreviewDocumentGroupRequest(BaseModel):
+    """Request payload to preview attaching a group to a collection."""
+
+    group_id: str = Field(..., description="ID của nhóm tài liệu cần xem trước")
+
+    @field_validator("group_id", mode="before")
+    @classmethod
+    def validate_group_id(cls, v: Any) -> str:
+        if not isinstance(v, str):
+            raise TypeError("group_id phải là chuỗi ký tự.")
+        val = v.strip()
+        if not val:
+            raise ValueError("ID nhóm tài liệu không được để trống.")
+        return val
+
+
+class PreviewDocumentGroupItem(BaseModel):
+    """Preview status of a single document member in the group."""
+
+    document_id: str
+    title: str
+    file_name: str
+    current_revision_id: str | None = None
+    revision_status: str | None = None
+    already_bound: bool = False
+    eligible_for_binding: bool = False
+    reason: str = ""
+
+
+class PreviewDocumentGroupResponse(BaseModel):
+    """Server-side preview breakdown of a document group before attaching."""
+
+    collection_id: str
+    group_id: str
+    group_name: str
+    total_documents: int
+    ready_count: int
+    already_bound_count: int
+    not_ready_count: int
+    failed_count: int
+    items: list[PreviewDocumentGroupItem]
+
+
+class AttachDocumentGroupRequest(BaseModel):
+    """Request payload to snapshot and attach all ready documents of a group to a collection."""
+
+    group_id: str = Field(..., description="ID của nhóm tài liệu cần đưa vào kho")
+    chunk_strategy: str = Field("ClauseBasedChunker", description="Chiến lược cắt đoạn")
+    sync_policy: Literal["manual"] = Field("manual", description="Chính sách đồng bộ (chỉ cho phép manual)")
+    auto_activate: bool = Field(False, description="Tự động kích hoạt lập chỉ mục tức thì sau khi gắn")
+    strict_ready: bool = Field(
+        False, description="Nếu true và có tài liệu chưa ready, từ chối toàn bộ và báo lỗi"
+    )
+
+    @field_validator("group_id", mode="before")
+    @classmethod
+    def validate_group_id(cls, v: Any) -> str:
+        if not isinstance(v, str):
+            raise TypeError("group_id phải là chuỗi ký tự.")
+        val = v.strip()
+        if not val:
+            raise ValueError("ID nhóm tài liệu không được để trống.")
+        return val
+
+    @field_validator("chunk_strategy", mode="before")
+    @classmethod
+    def validate_chunk_strategy(cls, v: Any) -> str:
+        if v is None:
+            return "ClauseBasedChunker"
+        if not isinstance(v, str):
+            raise TypeError("chunk_strategy phải là chuỗi ký tự.")
+        val = v.strip()
+        if val not in SUPPORTED_CHUNK_STRATEGIES:
+            supported = ", ".join(sorted(SUPPORTED_CHUNK_STRATEGIES))
+            raise ValueError(
+                f"Chiến lược phân đoạn '{val}' không được hỗ trợ. Các chiến lược hợp lệ: {supported}"
+            )
+        return val
+
+
+class AttachDocumentGroupItemResult(BaseModel):
+    """Result for each document evaluated during group attachment."""
+
+    document_id: str
+    document_title: str | None = None
+    source_revision_id: str | None = None
+    binding_id: str | None = None
+    status: str = Field(..., description="created, already_bound, not_ready, failed")
+    message: str | None = None
+    index_revision_id: str | None = None
+
+
+class AttachDocumentGroupResponse(BaseModel):
+    """Summary response when attaching a document group to a knowledge collection."""
+
+    collection_id: str
+    group_id: str
+    group_name: str
+    total_documents: int
+    created_count: int
+    already_bound_count: int
+    not_ready_count: int
+    failed_count: int
+    items: list[AttachDocumentGroupItemResult]

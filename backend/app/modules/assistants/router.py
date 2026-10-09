@@ -155,7 +155,7 @@ async def update_assistant(
     reference: str,
     body: AssistantUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _auth: object = Depends(require_permission("ai.assistants.edit")),
+    _auth: object = Depends(require_permission("ai.assistants.update")),
 ) -> AssistantResponse:
     return await assistant_service.update_assistant(db, reference, body)
 

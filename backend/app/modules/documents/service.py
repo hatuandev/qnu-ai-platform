@@ -6,16 +6,22 @@ import hashlib
 import logging
 import uuid
 from datetime import UTC, date, datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import EntityNotFoundError
+from app.core.exceptions import AppException, EntityNotFoundError
 from app.core.storage import storage_service
-from app.modules.documents.models import RepositoryDocument
+from app.modules.documents.models import (
+    DocumentGroup,
+    DocumentGroupMembership,
+    RepositoryDocument,
+)
 from app.modules.documents.schemas import (
     AttachedCollectionInfo,
+    DocumentGroupMinimalItem,
     RepositoryDocumentListItem,
     RepositoryDocumentResponse,
     RepositoryDocumentStatsResponse,
@@ -263,11 +269,52 @@ class DocumentRepositoryService:
         document_type_code: str | None = None,
         file_type: str | None = None,
         parse_status: str | None = None,
+        group_id: str | None = None,
+        exclude_group_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        actor: Any | None = None,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> tuple[list[RepositoryDocumentListItem], int]:
-        """List repository documents with search, filtering, and usage counts."""
-        query = select(RepositoryDocument).where(RepositoryDocument.is_active.is_(True))
+        """List repository documents with search, filtering, tenant scoping, and usage counts."""
+        r_tenant = getattr(actor, "tenant_id", None) or tenant_id or "tenant_qnu"
+        r_workspace = getattr(actor, "workspace_id", None) or workspace_id or "workspace_qnu"
+
+        query = select(RepositoryDocument).where(
+            RepositoryDocument.is_active.is_(True),
+            RepositoryDocument.tenant_id == r_tenant,
+            RepositoryDocument.workspace_id == r_workspace,
+        )
+
+        if group_id and group_id.strip():
+            gid = group_id.strip()
+            # Validate group existence and scope
+            grp = await db.get(DocumentGroup, gid)
+            if not grp:
+                raise AppException(
+                    message=f"Không tìm thấy nhóm tài liệu '{gid}'",
+                    code="DOCUMENT_GROUP_NOT_FOUND",
+                    status_code=404,
+                )
+            if grp.tenant_id != r_tenant or (r_workspace and grp.workspace_id != r_workspace):
+                raise AppException(
+                    message=f"Không có quyền truy cập nhóm tài liệu '{gid}' trong workspace hiện tại.",
+                    code="DOCUMENT_GROUP_ACCESS_DENIED",
+                    status_code=403,
+                )
+            query = query.join(
+                DocumentGroupMembership,
+                DocumentGroupMembership.document_id == RepositoryDocument.id,
+            ).where(DocumentGroupMembership.group_id == gid)
+
+        if exclude_group_id and exclude_group_id.strip():
+            egid = exclude_group_id.strip()
+            sub_exists = select(1).select_from(DocumentGroupMembership).where(
+                DocumentGroupMembership.document_id == RepositoryDocument.id,
+                DocumentGroupMembership.group_id == egid,
+            )
+            query = query.where(~sub_exists.exists())
 
         if search:
             term = f"%{search.strip()}%"
@@ -303,6 +350,7 @@ class DocumentRepositoryService:
         # Count attached knowledge documents per repository document
         doc_ids = [d.id for d in docs]
         usage_map: dict[str, int] = {}
+        groups_map: dict[str, list[DocumentGroupMinimalItem]] = {d.id: [] for d in docs}
         if doc_ids:
             usage_query = (
                 select(KnowledgeDocument.repository_document_id, func.count(KnowledgeDocument.id))
@@ -316,6 +364,26 @@ class DocumentRepositoryService:
             for r_id, cnt in usage_results:
                 if r_id:
                     usage_map[r_id] = cnt
+
+            # Fetch minimal groups for each document (strictly tenant/workspace scoped)
+            group_stmt = (
+                select(
+                    DocumentGroupMembership.document_id,
+                    DocumentGroup.id,
+                    DocumentGroup.name,
+                )
+                .join(DocumentGroup, DocumentGroup.id == DocumentGroupMembership.group_id)
+                .where(
+                    DocumentGroupMembership.document_id.in_(doc_ids),
+                    DocumentGroup.tenant_id == r_tenant,
+                    DocumentGroup.workspace_id == r_workspace,
+                )
+                .order_by(DocumentGroup.name.asc())
+            )
+            group_rows = (await db.execute(group_stmt)).all()
+            for d_id, g_id, g_name in group_rows:
+                if d_id in groups_map:
+                    groups_map[d_id].append(DocumentGroupMinimalItem(id=g_id, name=g_name))
 
         items = [
             RepositoryDocumentListItem(
@@ -334,6 +402,7 @@ class DocumentRepositoryService:
                 parse_status=d.parse_status,
                 ocr_engine=d.ocr_engine,
                 attached_collections_count=usage_map.get(d.id, 0),
+                groups=groups_map.get(d.id, []),
                 created_at=d.created_at,
                 updated_at=d.updated_at,
             )

@@ -15,7 +15,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.modelops.models import LLMUsageLog, TenantQuota
+from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import get_llm_adapter
 from app.modules.modelops.schemas import (
     LLMGenerateRequest,
@@ -213,6 +213,11 @@ class ModelOpsService:
         return await self._provider.import_providers(db, payload)
 
     # ---------------- Model Catalog & System Defaults ----------------
+
+    async def seed_system_model_defaults(
+        self, db: AsyncSession, overwrite: bool = False
+    ) -> ModelProviderConfig:
+        return await self._catalog.seed_system_model_defaults(db, overwrite=overwrite)
 
     async def get_system_model_defaults(self, db: AsyncSession) -> SystemModelDefaultsResponse:
         return await self._catalog.get_system_model_defaults(db)

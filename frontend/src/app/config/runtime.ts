@@ -26,18 +26,23 @@ function normalizeBasePath(
 const injectedConfig =
   typeof window === "undefined" ? undefined : window.__QNU_KTX_CONFIG__;
 
+const env =
+  typeof import.meta !== "undefined" && import.meta.env
+    ? import.meta.env
+    : ({} as Record<string, string | undefined>);
+
 export const runtimeConfig = Object.freeze({
   apiBaseUrl: normalizeBasePath(
-    injectedConfig?.apiBaseUrl ?? import.meta.env.VITE_API_BASE_URL,
+    injectedConfig?.apiBaseUrl ?? env.VITE_API_BASE_URL,
     "/api",
   ),
   bffBaseUrl: normalizeBasePath(
-    injectedConfig?.bffBaseUrl ?? import.meta.env.VITE_BFF_BASE_URL,
+    injectedConfig?.bffBaseUrl ?? env.VITE_BFF_BASE_URL,
     "/bff",
   ),
   authMode:
     injectedConfig?.authMode ??
-    (import.meta.env.VITE_AUTH_MODE === "demo" ? "demo" : "bff"),
+    (env.VITE_AUTH_MODE === "demo" ? "demo" : "bff"),
 });
 
 export type RuntimeConfig = typeof runtimeConfig;
