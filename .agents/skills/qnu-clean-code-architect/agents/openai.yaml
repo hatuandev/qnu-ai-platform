@@ -1,2 +1,6 @@
+interface:
+  display_name: "QNU Fast Clean Code"
+  short_description: "Vibe coding nhanh, tối giản và kiểm chứng theo rủi ro"
+  default_prompt: "Use $qnu-clean-code-architect to implement this change with the smallest safe diff and risk-proportional verification."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

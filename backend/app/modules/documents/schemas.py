@@ -224,7 +224,7 @@ class AsyncUploadDocumentResponse(BaseModel):
     revision_no: int
     file_name: str
     file_hash: str
-    job_id: str
+    job_id: str | None = None
     status: str
     deduplicated: bool = False
     created_at: datetime

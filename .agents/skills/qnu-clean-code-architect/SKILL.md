@@ -1,7 +1,7 @@
 ---
 name: qnu-clean-code-architect
 description: >-
-  Use this skill ONLY when explicitly requested by the user (or via $qnu-clean-code-architect) for deep architectural reviews, major refactoring audits, or code quality retrospectives across Frontend and Backend. Routine code tasks already enforce basic clean code standards via AGENTS.md.
+  Use when writing, fixing, reviewing, or refactoring QNU AI Platform code to keep changes simple, surgical, goal-driven, and verified with a risk-proportional test strategy. Apply automatically to vibe-coding tasks; use deeper audit mode only when requested.
 ---
 
 # Hướng Dẫn Kỹ Thuật Clean Code Khi Vibe Coding (QNU AI Platform)
@@ -10,7 +10,28 @@ Tài liệu này là cẩm nang bắt buộc dành cho mọi AI Agent và lập 
 
 > **Định nghĩa Tôn chỉ**: *Vibe Coding là sự thăng hoa về tốc độ và tư duy kiến trúc cùng AI, NHƯNG tuyệt đối KHÔNG ĐƯỢC để lại rác kỹ thuật. Tốc độ cao phải đi cùng sự chuẩn mực (Speed + Craftsmanship).*
 
+> **Nguồn tham khảo**: Skill này điều chỉnh bốn nguyên tắc từ [`multica-ai/andrej-karpathy-skills`](https://github.com/multica-ai/andrej-karpathy-skills) (MIT) cho kiến trúc, quality gates và nhịp Vibe Coding của QNU AI Platform.
+
 ---
+
+## 0. Fast Coding Loop — Chọn Độ Nghiêm Ngặt Theo Rủi Ro
+
+Luôn áp dụng bốn nguyên tắc:
+
+1. **Think Before Coding**: Làm rõ giả định có ảnh hưởng đến kết quả; không biến thay đổi hiển nhiên thành phiên lập kế hoạch dài.
+2. **Simplicity First**: Dùng lượng code tối thiểu đáp ứng yêu cầu, không tạo abstraction hoặc cấu hình cho nhu cầu chưa tồn tại.
+3. **Surgical Changes**: Mọi dòng diff phải phục vụ trực tiếp yêu cầu; chỉ dọn orphan/import/debug do chính thay đổi hiện tại tạo ra.
+4. **Goal-Driven Execution**: Xác định tiêu chí thành công quan sát được và tiếp tục đến khi kiểm chứng đạt.
+
+Chọn chế độ thực thi:
+
+| Mức rủi ro | Ví dụ | Cách làm |
+| :--- | :--- | :--- |
+| Cao | Mất dữ liệu, transaction, concurrency, idempotency, migration, auth/RBAC, tenant isolation, thanh toán | Viết regression test tái hiện lỗi trước, xác nhận test fail đúng nguyên nhân, sửa code, chạy test trọng tâm rồi final gate |
+| Trung bình | Tính năng CRUD/API/UI có contract rõ, refactor cục bộ | Đọc đủ phạm vi, sửa code theo một batch, rà diff, viết/cập nhật test hành vi, chạy kiểm tra một lần ở cuối |
+| Thấp | Microcopy, spacing, semantic token, đổi nhãn không đổi logic | Sửa trực tiếp, chạy Biome/build hoặc validator tương ứng; không tạo test hình thức |
+
+Không chạy full suite sau từng thay đổi nhỏ. Final verification vẫn phải tuân thủ quality gate Backend/Frontend trong `AGENTS.md`.
 
 ## 1. Mười Điều Răn Clean Code Bắt Buộc (The 10 Commandments)
 
@@ -18,14 +39,14 @@ Tài liệu này là cẩm nang bắt buộc dành cho mọi AI Agent và lập 
 ┌────────────────────────────────────────────────────────────────────────┐
 │               10 ĐIỀU RĂN CLEAN CODE KHI VIBE CODING                   │
 ├────────────────────────────────────────────────────────────────────────┤
-│ 1. The Boy Scout Rule      │ Để lại file sạch hơn lúc tìm thấy        │
-│ 2. Zero Dead Code & Junk   │ Xóa thẳng tay code cũ & console.log rác   │
+│ 1. Surgical Change Rule    │ Chỉ sửa đúng phạm vi, dọn rác mình tạo   │
+│ 2. Zero New Dead Code      │ Không để diff tạo dead code/debug junk    │
 │ 3. Zero 'any' Type Safety  │ 100% Typed, cấm bypass compiler           │
 │ 4. Self-Documenting Naming │ Tên nói lên mục đích (is/has/fetch/format)│
 │ 5. Single Responsibility   │ Hàm < 40 dòng, 1 việc duy nhất            │
 │ 6. Early Return Pattern    │ Triệt tiêu lồng ghép if/else đa tầng      │
 │ 7. No Swallowed Exceptions │ Cấm catch rỗng, luôn fallback/toast/log   │
-│ 8. Clean-As-You-Go Loop    │ Lint & Typecheck 0 lỗi trước khi trả lời  │
+│ 8. Risk-Based Verification │ Kiểm chứng tương xứng rủi ro, không lặp thừa│
 │ 9. Zero Hardcoded Data     │ Cấm fake submit, cấm gán chết mock cũ     │
 │ 10. Zero Mojibake          │ 100% UTF-8 NFC, triệt tiêu vỡ font tiếng Việt│
 └────────────────────────────────────────────────────────────────────────┘
@@ -167,8 +188,8 @@ except S3StorageError as exc:
     raise StorageUnavailableException(detail=f"Không thể kết nối MinIO lưu trữ: {exc}") from exc
 ```
 
-### 3.3. Dọn Dẹp Imports và Tự Động Định Dạng Bằng Ruff
-- Trước khi hoàn thành, kiểm tra và dọn dẹp định dạng có phạm vi trong các tệp vừa sửa:
+### 3.3. Dọn Dẹp Có Phạm Vi và Tự Động Định Dạng Bằng Ruff
+- Chỉ dọn import/biến không dùng do thay đổi hiện tại tạo ra. Trước khi hoàn thành, kiểm tra định dạng có phạm vi trong các tệp vừa sửa:
   ```bash
   uv run ruff check <tệp_hoặc_thư_mục_vừa_sửa> --fix
   ```
@@ -202,4 +223,4 @@ Mỗi lần AI Agent chuẩn bị trả kết quả cho người dùng, hãy rà
 - [ ] 4. Đã chạy `npm run lint` và `npm run typecheck` đạt 0 lỗi chưa?
 - [ ] 5. Tôi có đang **hardcode dữ liệu mẫu vào form, fake submit bằng `setTimeout` trỏ ID cũ, hay clone đè dữ liệu cũ lên file mới của người dùng** không?
 - [ ] 6. Mã nguồn và dữ liệu có bị **lỗi vỡ font tiếng Việt (Mojibake, ký tự rác `\ufffd`, `?`, thiếu UTF-8)** không?
-- [ ] 7. File này có sạch sẽ, dễ đọc hơn lúc tôi bắt đầu chạm vào không?
+- [ ] 7. Mọi dòng diff có phục vụ trực tiếp yêu cầu, và tôi đã tránh sửa phần lân cận không liên quan chưa?

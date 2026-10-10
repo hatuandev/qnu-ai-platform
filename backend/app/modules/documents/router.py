@@ -11,6 +11,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     Query,
     UploadFile,
     status,
@@ -61,8 +62,10 @@ async def intake_document(
     issued_date: date | None = Form(None, description="Ngày ký ban hành"),
     effective_date: date | None = Form(None, description="Ngày có hiệu lực"),
     ocr_engine: str | None = Form(None, description="Engine OCR (auto, pymupdf_ocr, qwen3-vl:8b)"),
+    group_id: str | None = Form(None, description="Tự động gán tài liệu vào kho sau khi tiếp nhận"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key", description="Khóa idempotency client"),
     db: AsyncSession = Depends(get_db),
-    _auth: object = Depends(require_permission("ai.knowledge.upload")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
 ) -> AsyncUploadDocumentResponse:
     content = await file.read()
     return await document_intake_service.intake_document(
@@ -76,6 +79,11 @@ async def intake_document(
         issued_date=issued_date,
         effective_date=effective_date,
         ocr_engine=ocr_engine,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        tenant_id=actor.tenant_id if actor else None,
+        workspace_id=actor.workspace_id if actor else None,
     )
 
 
@@ -83,7 +91,8 @@ async def intake_document(
     "/upload",
     response_model=RepositoryDocumentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Tải lên tệp vào Kho Tài Liệu Tập Trung (Compatibility V1)",
+    deprecated=True,
+    summary="Tải lên tệp vào Kho Tài Liệu Tập Trung (Compatibility V1 — Deprecated)",
 )
 async def upload_document(
     file: UploadFile = File(..., description="Tệp tài liệu gốc (PDF, Word, Excel, Text)"),
@@ -95,11 +104,14 @@ async def upload_document(
     effective_date: date | None = Form(None, description="Ngày có hiệu lực"),
     ocr_engine: str | None = Form(None, description="Engine OCR (auto, pymupdf_ocr, qwen3-vl:8b)"),
     auto_parse: bool = Form(True, description="Tự động bóc tách sang Markdown ngay sau khi tải"),
+    group_id: str | None = Form(None, description="Gán vào kho tài liệu (chuyển tiếp intake V2 an toàn)"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
-    _auth: object = Depends(require_permission("ai.knowledge.upload")),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
 ) -> RepositoryDocumentResponse:
     content = await file.read()
-    doc = await document_repository_service.upload_document(
+    # Compatibility adapter: All requests (with or without group_id) delegate to Intake V2
+    intake_res = await document_intake_service.intake_document(
         db=db,
         file_bytes=content,
         file_name=file.filename or "tailieu_chuadattrang.pdf",
@@ -110,9 +122,13 @@ async def upload_document(
         issued_date=issued_date,
         effective_date=effective_date,
         ocr_engine=ocr_engine,
-        auto_parse=auto_parse,
+        group_id=group_id,
+        idempotency_key=idempotency_key,
+        actor=actor,
+        tenant_id=actor.tenant_id if actor else None,
+        workspace_id=actor.workspace_id if actor else None,
     )
-    return await document_repository_service.get_document(db, doc.id)
+    return await document_repository_service.get_document(db, intake_res.document_id, actor=actor)
 
 
 @router.get(

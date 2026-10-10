@@ -12,9 +12,9 @@ import {
   FileStack,
   FileText,
   FolderOpen,
-  Plus,
   Search,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -24,7 +24,13 @@ import { EmptyState } from "@/components/admin/empty-state";
 import { KpiMetric } from "@/components/admin/kpi-metric";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -33,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -45,10 +52,62 @@ import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { documentsApi } from "@/services/documents-api";
 import type { GroupDocumentItem } from "@/types/documents";
 import { AttachGroupToKnowledgeDialog } from "./components/attach-group-to-knowledge-dialog";
-import { SelectDocumentsForGroupModal } from "./components/select-documents-for-group-modal";
+import { DocumentUploadModal } from "./components/document-upload-modal";
 
 interface DocumentGroupDetailPageProps {
   groupId: string;
+}
+
+function getRevisionStatusBadge(status?: string | null) {
+  switch (status) {
+    case "ready":
+      return (
+        <Badge variant="default" className="text-[10px]">
+          Sẵn sàng
+        </Badge>
+      );
+    case "queued":
+      return (
+        <Badge
+          variant="outline"
+          className="text-[10px] text-warning border-warning/30 bg-warning/10"
+        >
+          Chờ xử lý
+        </Badge>
+      );
+    case "processing":
+    case "validating":
+      return (
+        <Badge
+          variant="outline"
+          className="text-[10px] text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20"
+        >
+          Đang xử lý
+        </Badge>
+      );
+    case "review_required":
+      return (
+        <Badge
+          variant="outline"
+          className="text-[10px] text-purple-600 border-purple-300 bg-purple-50 dark:bg-purple-950/20"
+        >
+          Cần duyệt
+        </Badge>
+      );
+    case "failed":
+    case "cancelled":
+      return (
+        <Badge variant="destructive" className="text-[10px]">
+          Lỗi
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="outline" className="text-[10px]">
+          Chờ xử lý
+        </Badge>
+      );
+  }
 }
 
 function getFileIcon(fileType: string) {
@@ -72,25 +131,41 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProps) {
+export function DocumentGroupDetailPage({
+  groupId,
+}: DocumentGroupDetailPageProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isAttachDialogOpen, setIsAttachDialogOpen] = useState(false);
-  const [removingDoc, setRemovingDoc] = useState<GroupDocumentItem | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
+  const [removingDoc, setRemovingDoc] = useState<GroupDocumentItem | null>(
+    null,
+  );
 
   // 1. Fetch Group Details
-  const { data: group, isLoading: isLoadingGroup } = useQuery({
+  const {
+    data: group,
+    isLoading: isLoadingGroup,
+    isError: isErrorGroup,
+    error: groupError,
+    refetch: refetchGroup,
+  } = useQuery({
     queryKey: ["document-group", groupId],
     queryFn: () => documentsApi.getGroup(groupId),
   });
 
   // 2. Fetch Group Documents
-  const { data: groupDocsData, isLoading: isLoadingDocs } = useQuery({
+  const {
+    data: groupDocsData,
+    isLoading: isLoadingDocs,
+    isError: isErrorDocs,
+    error: docsError,
+    refetch: refetchDocs,
+  } = useQuery({
     queryKey: ["group-documents", groupId, search, statusFilter],
     queryFn: () =>
       documentsApi.getGroupDocuments(groupId, {
@@ -107,37 +182,72 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
     mutationFn: (docId: string) =>
       documentsApi.removeDocumentFromGroup(groupId, docId),
     onSuccess: () => {
-      toast.success("Đã xóa tài liệu khỏi nhóm (tài liệu gốc vẫn được bảo toàn).");
+      toast.success(
+        "Đã gỡ tài liệu khỏi kho (tài liệu gốc vẫn được bảo toàn nguyên vẹn).",
+      );
       queryClient.invalidateQueries({ queryKey: ["group-documents", groupId] });
       queryClient.invalidateQueries({ queryKey: ["document-group", groupId] });
       queryClient.invalidateQueries({ queryKey: ["document-groups"] });
       setRemovingDoc(null);
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Xóa tài liệu khỏi nhóm thất bại.");
+      toast.error(err.message || "Gỡ tài liệu khỏi kho thất bại.");
     },
   });
 
   if (isLoadingGroup) {
     return (
       <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="h-8 w-48 rounded bg-muted/30 animate-pulse" />
-        <div className="h-28 rounded-lg bg-muted/20 animate-pulse" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="rounded-xl border border-border/80 bg-card p-6 space-y-3">
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   }
 
-  if (!group) {
+  if (isErrorGroup || !group) {
+    const status = (groupError as { status?: number })?.status;
     return (
       <div className="flex-1 p-8 max-w-7xl mx-auto">
         <EmptyState
           icon={AlertCircle}
-          title="Không tìm thấy nhóm tài liệu"
-          description={`Nhóm tài liệu ID '${groupId}' không tồn tại hoặc bạn không có quyền truy cập.`}
-          action={{
-            label: "Quay Lại Danh Sách Nhóm",
-            onClick: () => navigate({ to: "/documents/groups" }),
-          }}
+          title={
+            status === 403
+              ? "Không có quyền truy cập kho tài liệu"
+              : status === 404
+                ? "Không tìm thấy kho tài liệu"
+                : "Không thể tải thông tin kho tài liệu"
+          }
+          description={
+            status === 403
+              ? `Bạn không có quyền truy cập kho tài liệu '${groupId}'. Vui lòng liên hệ quản trị viên.`
+              : status === 404
+                ? `Kho tài liệu ID '${groupId}' không tồn tại hoặc đã bị gỡ bỏ.`
+                : (groupError as Error)?.message ||
+                  "Đã xảy ra lỗi khi tải dữ liệu từ máy chủ. Vui lòng thử lại sau."
+          }
+          action={
+            status === 404
+              ? {
+                  label: "Quay Lại Kho Tài Liệu",
+                  onClick: () => navigate({ to: "/documents" }),
+                }
+              : {
+                  label: "Thử lại",
+                  onClick: () => refetchGroup(),
+                }
+          }
         />
       </div>
     );
@@ -150,19 +260,15 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate({ to: "/documents/groups" })}
+          onClick={() => navigate({ to: "/documents" })}
           className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" />
-          Về Danh Sách Nhóm
+          Về Kho Tài Liệu
         </Button>
         <span>/</span>
         <Link to="/documents" className="hover:text-foreground">
           Kho Tài Liệu
-        </Link>
-        <span>/</span>
-        <Link to="/documents/groups" className="hover:text-foreground">
-          Nhóm Tài Liệu
         </Link>
         <span>/</span>
         <span className="text-foreground font-medium">{group.name}</span>
@@ -189,27 +295,28 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
               </p>
             )}
             <div className="text-[11px] text-muted-foreground pt-0.5">
-              Cập nhật lần cuối: {new Date(group.updated_at).toLocaleString("vi-VN")}
+              Cập nhật lần cuối:{" "}
+              {new Date(group.updated_at).toLocaleString("vi-VN")}
             </div>
           </div>
         </div>
 
-        {/* Action Toolbar */}
+        {/* Action Toolbar: Tải lên & Đưa vào kho tri thức */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
           <Button
-            variant="outline"
-            onClick={() => setIsAddModalOpen(true)}
-            className="gap-1.5 h-9 text-xs"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="gap-1.5 h-9 text-xs shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground"
           >
-            <Plus className="size-4" />
-            Thêm Tài Liệu
+            <Upload className="size-4" />
+            Tải lên
           </Button>
           <Button
-            onClick={() => setIsAttachDialogOpen(true)}
-            className="gap-1.5 h-9 text-xs shadow-sm"
+            onClick={() => setIsAttachModalOpen(true)}
+            variant="outline"
+            className="gap-1.5 h-9 text-xs shadow-sm border-primary/30 text-primary hover:bg-primary/10"
           >
             <BookOpen className="size-4" />
-            Đưa Vào Kho Tri Thức
+            Đưa vào kho tri thức
           </Button>
         </div>
       </div>
@@ -245,7 +352,7 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
           <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Tìm kiếm tài liệu trong nhóm..."
+              placeholder="Tìm kiếm tài liệu trong kho..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-9 text-xs"
@@ -261,6 +368,8 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
               <SelectItem value="all">Tất cả trạng thái</SelectItem>
               <SelectItem value="ready">Sẵn sàng (Ready)</SelectItem>
               <SelectItem value="processing">Đang xử lý</SelectItem>
+              <SelectItem value="queued">Chờ xử lý</SelectItem>
+              <SelectItem value="review_required">Cần duyệt</SelectItem>
               <SelectItem value="error">Lỗi bóc tách</SelectItem>
             </SelectContent>
           </Select>
@@ -272,27 +381,49 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
         </div>
       </div>
 
-      {/* 5. Document List: Grid or Table */}
+      {/* 5. Document List: Grid or Table or Error */}
       {isLoadingDocs ? (
         <div className="h-64 rounded-lg border border-border/50 bg-muted/20 animate-pulse" />
+      ) : isErrorDocs ? (
+        <EmptyState
+          icon={AlertCircle}
+          title={
+            (docsError as { status?: number })?.status === 403
+              ? "Không có quyền xem tài liệu"
+              : "Không thể tải danh sách tài liệu"
+          }
+          description={
+            (docsError as { status?: number })?.status === 403
+              ? "Bạn không có quyền truy cập danh sách tài liệu trong kho này."
+              : (docsError as Error)?.message ||
+                "Đã xảy ra lỗi khi tải danh sách tài liệu. Vui lòng thử lại."
+          }
+          action={{
+            label: "Thử lại",
+            onClick: () => refetchDocs(),
+          }}
+        />
       ) : documents.length === 0 ? (
         <EmptyState
           icon={FileStack}
-          title="Nhóm tài liệu chưa có văn bản nào"
+          title="Kho tài liệu chưa có văn bản nào"
           description={
             search || statusFilter !== "all"
               ? "Không có tài liệu nào khớp với bộ lọc."
-              : "Hãy thêm các tài liệu từ Kho Tài Liệu vào nhóm để chuẩn bị đưa vào Kho Tri Thức."
+              : "Hãy bắt đầu bằng cách tải lên các tài liệu vào kho này."
           }
           action={{
-            label: "Thêm Tài Liệu Vào Nhóm",
-            onClick: () => setIsAddModalOpen(true),
+            label: "Tải lên",
+            onClick: () => setIsUploadModalOpen(true),
           }}
         />
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {documents.map((doc) => (
-            <Card key={doc.id} className="flex flex-col justify-between hover:border-primary/40 transition-all">
+            <Card
+              key={doc.id}
+              className="flex flex-col justify-between hover:border-primary/40 transition-all"
+            >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -303,22 +434,7 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
                       {doc.title || doc.file_name}
                     </CardTitle>
                   </div>
-                  <Badge
-                    variant={
-                      doc.revision_status === "ready"
-                        ? "default"
-                        : doc.revision_status === "failed" || doc.revision_status === "rejected"
-                          ? "destructive"
-                          : "outline"
-                    }
-                    className="text-[10px] shrink-0"
-                  >
-                    {doc.revision_status === "ready"
-                      ? "Ready"
-                      : doc.revision_status === "failed" || doc.revision_status === "rejected"
-                        ? "Lỗi"
-                        : "Processing"}
-                  </Badge>
+                  {getRevisionStatusBadge(doc.revision_status)}
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate mt-1">
                   {doc.file_name}
@@ -327,7 +443,10 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
 
               <CardContent className="space-y-1 text-[11px] text-muted-foreground py-1">
                 <div>Dung lượng: {formatFileSize(doc.file_size_bytes)}</div>
-                <div>Ngày thêm: {new Date(doc.added_at).toLocaleDateString("vi-VN")}</div>
+                <div>
+                  Ngày thêm:{" "}
+                  {new Date(doc.added_at).toLocaleDateString("vi-VN")}
+                </div>
               </CardContent>
 
               <CardFooter className="flex items-center justify-between border-t border-border/60 pt-2.5">
@@ -338,11 +457,19 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
                   className="h-7 text-xs text-muted-foreground hover:text-destructive gap-1 px-2"
                 >
                   <X className="size-3.5" />
-                  Gỡ khỏi nhóm
+                  Gỡ khỏi kho
                 </Button>
 
-                <Button asChild size="sm" variant="ghost" className="h-7 text-xs gap-1 px-2">
-                  <Link to="/documents/$documentId" params={{ documentId: doc.id }}>
+                <Button
+                  asChild
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs gap-1 px-2"
+                >
+                  <Link
+                    to="/documents/$documentId"
+                    params={{ documentId: doc.id }}
+                  >
                     <span>Chi tiết</span>
                     <ArrowUpRight className="size-3" />
                   </Link>
@@ -358,10 +485,14 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
               <TableRow className="h-9 hover:bg-transparent">
                 <TableHead className="text-xs">Tên Tài Liệu & Tệp</TableHead>
                 <TableHead className="w-36 text-xs">Loại Văn Bản</TableHead>
-                <TableHead className="w-32 text-xs">Trạng Thái Revision</TableHead>
-                <TableHead className="w-28 text-right text-xs">Dung Lượng</TableHead>
-                <TableHead className="w-32 text-xs">Ngày Thêm Vào Nhóm</TableHead>
-                <TableHead className="w-24 text-right text-xs">Thao Tác</TableHead>
+                <TableHead className="w-32 text-xs">Trạng Thái</TableHead>
+                <TableHead className="w-28 text-right text-xs">
+                  Dung Lượng
+                </TableHead>
+                <TableHead className="w-32 text-xs">Ngày Thêm</TableHead>
+                <TableHead className="w-24 text-right text-xs">
+                  Thao Tác
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -392,22 +523,7 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
                   </TableCell>
 
                   <TableCell>
-                    <Badge
-                      variant={
-                        doc.revision_status === "ready"
-                          ? "default"
-                          : doc.revision_status === "failed" || doc.revision_status === "rejected"
-                            ? "destructive"
-                            : "outline"
-                      }
-                      className="text-[10px]"
-                    >
-                      {doc.revision_status === "ready"
-                        ? "Ready"
-                        : doc.revision_status === "failed" || doc.revision_status === "rejected"
-                          ? "Lỗi"
-                          : "Processing"}
-                    </Badge>
+                    {getRevisionStatusBadge(doc.revision_status)}
                   </TableCell>
 
                   <TableCell className="text-right text-xs text-muted-foreground">
@@ -423,7 +539,7 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
                       variant="ghost"
                       size="icon"
                       onClick={() => setRemovingDoc(doc)}
-                      title="Gỡ khỏi nhóm (bảo toàn tài liệu gốc)"
+                      title="Gỡ khỏi kho (bảo toàn tài liệu gốc)"
                       className="size-8 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="size-3.5" />
@@ -436,17 +552,27 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
         </div>
       )}
 
-      {/* 6. Select Documents Modal */}
-      <SelectDocumentsForGroupModal
-        open={isAddModalOpen}
-        onOpenChange={setIsAddModalOpen}
+      {/* 6. Upload Documents Directly Into Group Modal */}
+      <DocumentUploadModal
+        open={isUploadModalOpen}
+        onOpenChange={setIsUploadModalOpen}
         groupId={group.id}
+        groupName={group.name}
+        onSuccess={() => {
+          queryClient.invalidateQueries({
+            queryKey: ["group-documents", groupId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["document-group", groupId],
+          });
+          queryClient.invalidateQueries({ queryKey: ["document-groups"] });
+        }}
       />
 
       {/* 7. Attach Group To Knowledge Dialog */}
       <AttachGroupToKnowledgeDialog
-        open={isAttachDialogOpen}
-        onOpenChange={setIsAttachDialogOpen}
+        open={isAttachModalOpen}
+        onOpenChange={setIsAttachModalOpen}
         group={group}
       />
 
@@ -454,13 +580,13 @@ export function DocumentGroupDetailPage({ groupId }: DocumentGroupDetailPageProp
       <ConfirmDialog
         open={Boolean(removingDoc)}
         onOpenChange={(open) => !open && setRemovingDoc(null)}
-        title="Xác nhận gỡ tài liệu khỏi nhóm"
+        title="Xác nhận gỡ tài liệu khỏi kho"
         description={
           removingDoc
-            ? `Bạn có chắc chắn muốn gỡ tài liệu "${removingDoc.title || removingDoc.file_name}" khỏi nhóm này? Thao tác này KHÔNG xóa tài liệu gốc khỏi Kho Tài Liệu và không ảnh hưởng đến các liên kết tri thức đã tạo.`
+            ? `Bạn có chắc chắn muốn gỡ tài liệu "${removingDoc.title || removingDoc.file_name}" khỏi kho này? Thao tác này chỉ xóa liên kết thành viên trong kho; tài liệu gốc vẫn được bảo toàn nguyên vẹn trong hệ thống và không ảnh hưởng đến bất kỳ snapshot Kho tri thức nào đã xuất bản trước đó.`
             : ""
         }
-        confirmText="Gỡ Khỏi Nhóm"
+        confirmText="Gỡ khỏi kho"
         confirmVariant="destructive"
         onConfirm={() => removingDoc && removeMutation.mutate(removingDoc.id)}
         isPending={removeMutation.isPending}

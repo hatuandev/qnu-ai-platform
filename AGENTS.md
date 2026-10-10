@@ -255,7 +255,7 @@ Agent có thể kích hoạt và tuân thủ các hướng dẫn chuyên sâu t�
 | **`qnu-rag-pipeline`** | [`.agents/skills/qnu-rag-pipeline/SKILL.md`](.agents/skills/qnu-rag-pipeline/SKILL.md) | Qdrant Dense, PostgreSQL FTS, RRF k=60, Cross-Encoder Reranking, Facts |
 | **`qnu-knowledge-ingestion`** | [`.agents/skills/qnu-knowledge-ingestion/SKILL.md`](.agents/skills/qnu-knowledge-ingestion/SKILL.md) | Ingestion pipeline, OCR đa tầng (PyMuPDF, Docling, EasyOCR), Chunking |
 | **`qnu-modelops-resilience`** | [`.agents/skills/qnu-modelops-resilience/SKILL.md`](.agents/skills/qnu-modelops-resilience/SKILL.md) | LLM Adapters, Circuit Breaker 3 trạng thái, Dynamic Fallback, Quota |
-| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](.agents/skills/qnu-clean-code-architect/SKILL.md) | Chuẩn mực Clean Code khi Vibe Coding: Boy Scout Rule, Zero Dead Code/Any, Guard Clauses, SRP |
+| **`qnu-clean-code-architect`** | [`.agents/skills/qnu-clean-code-architect/SKILL.md`](.agents/skills/qnu-clean-code-architect/SKILL.md) | Vibe Coding nhanh theo Karpathy Guidelines: tối giản, thay đổi phẫu thuật, test theo rủi ro, Zero Dead Code/Any |
 | **`diagram-design`** | [`.agents/skills/diagram-design/SKILL.md`](.agents/skills/diagram-design/SKILL.md) | Thiết kế sơ đồ kỹ thuật chuẩn Editorial HTML/SVG (Architecture, Sequence, State Machine, ERD, Flowchart, Medallion, Sankey) |
 
 ---
@@ -340,13 +340,30 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 
 "Vibe Coding" là phong cách lập trình tốc độ cao dựa trên trí tuệ nhân tạo, nhưng **tuyệt đối không được đánh đổi chất lượng mã nguồn lấy tốc độ**. Mọi AI Agent tham gia dự án QNU AI Platform phải tuân thủ nghiêm ngặt 10 điều răn Clean Code sau:
 
-### 8.1. Quy Tắc Hướng Đạo Sinh (The Boy Scout Rule)
-> *"Luôn để codebase sạch hơn lúc bạn tìm thấy nó."*
-- Khi mở bất kỳ file nào để sửa lỗi hoặc thêm tính năng, Agent **phải tự động dọn dẹp**: xóa bỏ các `import` không dùng, loại bỏ các biến chết (dead variables), và sửa các cảnh báo linter tiềm ẩn trong file đó.
-- Không để lại "rác kỹ thuật" (technical debt) với lý do "đó là code của người trước viết".
+### 8.0. Karpathy-Inspired Fast Coding Loop (Nhanh, Tối Giản, Có Tiêu Chí Kiểm Chứng)
+
+Áp dụng bốn nguyên tắc hành vi được điều chỉnh từ [`multica-ai/andrej-karpathy-skills`](https://github.com/multica-ai/andrej-karpathy-skills) (MIT):
+
+1. **Think Before Coding**: Nêu giả định hoặc mâu thuẫn có ảnh hưởng đến kết quả; chỉ hỏi khi thiếu thông tin thực sự làm thay đổi giải pháp. Không kéo dài phần lập kế hoạch cho thay đổi hiển nhiên.
+2. **Simplicity First**: Viết lượng code tối thiểu giải quyết đúng yêu cầu; không thêm abstraction, cấu hình hoặc tính năng dự phòng chưa được yêu cầu.
+3. **Surgical Changes**: Mọi dòng thay đổi phải truy ngược được tới yêu cầu hiện tại. Không refactor, format hoặc dọn code lân cận không liên quan; nếu phát hiện vấn đề ngoài phạm vi thì báo cáo thay vì tự sửa.
+4. **Goal-Driven Execution**: Chuyển yêu cầu thành tiêu chí hoàn thành quan sát được, triển khai đến khi đạt và kiểm chứng bằng gate tương xứng với rủi ro.
+
+Chọn chiến lược kiểm thử theo rủi ro để tối ưu tốc độ:
+
+- **Test-first bắt buộc** với lỗi có nguy cơ mất/sai dữ liệu, transaction, concurrency, idempotency, migration, authentication/authorization, tenant isolation, thanh toán, hoặc regression khó quan sát. Test phải thất bại vì đúng bug trước khi sửa.
+- **Code theo lô rồi test một lần** với tính năng thông thường đã có contract rõ: đọc đủ phạm vi, sửa hoàn chỉnh, rà diff, sau đó chạy test trọng tâm và quality gate cuối phiên; không chạy lại toàn bộ suite sau từng chỉnh sửa nhỏ.
+- **Chỉnh nhanh rồi lint/build** với microcopy, spacing, style hoặc thay đổi UI thuần túy không đổi logic; chỉ thêm test khi có hành vi tương tác đáng kể.
+- Quy tắc kiểm thử chuyên ngành tại các mục Backend/Frontend vẫn có hiệu lực cao hơn. Không dùng lý do “làm nhanh” để bỏ qua final verification bắt buộc.
+
+### 8.1. Quy Tắc Thay Đổi Phẫu Thuật (Surgical Change Rule)
+> *"Chỉ chạm vào phần cần thiết và chỉ dọn phần rác do chính thay đổi hiện tại tạo ra."*
+- Xóa import, biến, hàm hoặc nhánh code trở nên không dùng **do thay đổi của phiên hiện tại**.
+- Không tự động dọn dead code, đổi format, đổi tên hoặc refactor phần có sẵn nhưng không liên quan đến yêu cầu.
+- Nếu phát hiện technical debt ngoài phạm vi, ghi nhận trong báo cáo để người dùng quyết định; không âm thầm mở rộng diff.
 
 ### 8.2. Triệt Tiêu Mã Chết & Rác Debug (Zero Dead Code & Zero Debug Junk)
-- **Cấm tuyệt đối comment-out code cũ**: Không bao giờ để lại các khối lệnh bị comment `// const oldData = ...` hay `# def old_method():`. Nếu code không còn dùng, **XÓA THẲNG TAY** — Git lưu lại toàn bộ lịch sử.
+- **Cấm tuyệt đối comment-out code cũ trong phần đang thay đổi**: Không để lại các khối lệnh bị comment `// const oldData = ...` hay `# def old_method():`. Nếu thay đổi hiện tại làm code trở nên không còn dùng, hãy xóa — Git đã lưu lịch sử. Dead code có sẵn ngoài phạm vi chỉ được báo cáo, không tự ý dọn.
 - **Cấm để lại rác debug**: Tuyệt đối dọn sạch toàn bộ `console.log(...)`, `console.debug(...)`, `print(...)` debug tạm thời trước khi kết thúc turn. Chỉ giữ lại các structured log (`logger.info`, `logger.error`) có cấu trúc chuẩn.
 - **Không dùng placeholder cẩu thả**: Cấm để lại `// TODO: implement later`, `pass` trống rỗng hay mock giả tạm bợ mà không có fallback an toàn hoặc logic xử lý hoàn chỉnh.
 
@@ -397,18 +414,13 @@ Sau khi hoàn thành công việc, Agent **PHẢI** thực hiện **đồng th�
 - **CẤM fallback bằng mock data bịa đặt cho dữ liệu nghiệp vụ**: Tuyệt đối không trả số liệu giả (điểm chuẩn, học phí, chỉ tiêu, nội dung quy chế, trích dẫn văn bản,...) khi backend/RAG thất bại. Khi thiếu dữ liệu thật, Frontend phải hiển thị trạng thái lỗi/trống rõ ràng và Backend phải kích hoạt No-Answer Policy (điều hướng tới phòng ban phụ trách) — không bao giờ hiển thị số liệu giả như số liệu thật.
 
 ### 8.8. Vòng Lặp Tự Làm Sạch Tự Động (Clean-As-You-Go Loop)
-- Trước khi kết thúc bất kỳ lượt xử lý (turn) nào hoặc bàn giao code cho người dùng, Agent **BẮT BUỘC** phải tự chạy kiểm tra tĩnh và format:
-  ```bash
-  # Frontend:
-  npm run lint       # Biome tự động rà soát & format (0 lỗi)
-  npm run typecheck  # TypeScript kiểm tra 0 lỗi type (0 lỗi)
-  npm run build      # Đóng gói bundle thành công
-
-  # Backend:
-  uv run ruff check .           # Ruff kiểm tra & dọn imports (0 lỗi)
-  uv run --extra dev pytest -v  # Pass 100% test suite
-  ```
-- **Không bao giờ bàn giao code khi còn bất kỳ lỗi lint hay typecheck nào!**
+- Trong lúc triển khai, ưu tiên hoàn thành một batch thay đổi logic thống nhất rồi mới kiểm tra; không chạy full suite lặp lại sau từng chỉnh sửa nhỏ.
+- Trước khi bàn giao, bắt buộc chạy quality gate đúng phạm vi và đúng quy định chuyên ngành:
+  - Frontend thuần túy: Biome trên file đã sửa và `npm run build` theo Fast-Path Frontend Verification.
+  - Backend: Ruff, test regression trọng tâm, sau đó full Pytest theo quy chuẩn Backend.
+  - Thay đổi tài liệu/skill thuần túy: validator hoặc kiểm tra cấu trúc/encoding tương ứng; không chạy test ứng dụng không liên quan.
+- Nếu full suite có lỗi nền ngoài phạm vi, phải nêu rõ test lỗi và chứng minh regression test của phần vừa sửa đã đạt; không che giấu hoặc sửa lan man.
+- **Không bao giờ bàn giao code khi còn lỗi lint, typecheck hoặc build do chính thay đổi hiện tại gây ra.**
 
 ### 8.9. Tuyệt Đối Không Hardcode Logic & Dữ Liệu Khi Vibe Coding (Zero Hardcoded Data & Zero Mock Traps)
 > *"Vibe Coding là tăng tốc độ phát triển, KHÔNG PHẢI lừa dối người dùng bằng dữ liệu giả lập bị gán chết."*

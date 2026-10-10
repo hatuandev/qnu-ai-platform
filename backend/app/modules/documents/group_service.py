@@ -75,7 +75,7 @@ class DocumentGroupService:
         existing = (await db.execute(existing_stmt)).scalar_one_or_none()
         if existing:
             raise AppException(
-                message=f"Tên nhóm tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
+                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
                 code="DOCUMENT_GROUP_NAME_CONFLICT",
                 status_code=status.HTTP_409_CONFLICT,
             )
@@ -100,7 +100,7 @@ class DocumentGroupService:
         except IntegrityError:
             await db.rollback()
             raise AppException(
-                message=f"Tên nhóm tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
+                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
                 code="DOCUMENT_GROUP_NAME_CONFLICT",
                 status_code=status.HTTP_409_CONFLICT,
             )
@@ -136,14 +136,14 @@ class DocumentGroupService:
         group = await db.get(DocumentGroup, group_id)
         if not group:
             raise AppException(
-                message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                message=f"Không tìm thấy kho tài liệu '{group_id}'",
                 code="DOCUMENT_GROUP_NOT_FOUND",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
             raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này.",
+                message="Không có quyền truy cập kho tài liệu này.",
                 code="DOCUMENT_GROUP_ACCESS_DENIED",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
@@ -176,12 +176,12 @@ class DocumentGroupService:
             total += cnt
             if rev_status == "ready":
                 ready += cnt
-            elif rev_status in ("parsing", "pending", "review_required"):
+            elif rev_status in ("queued", "processing", "validating", "review_required"):
                 processing += cnt
-            elif rev_status in ("failed", "rejected"):
+            elif rev_status in ("failed", "cancelled"):
                 error += cnt
             else:
-                # If rev_status is None, count as processing/unparsed
+                # If rev_status is None, count as queued/processing
                 processing += cnt
 
         return DocumentGroupResponse(
@@ -270,9 +270,9 @@ class DocumentGroupService:
             stats_map[g_id]["total"] += cnt
             if rev_status == "ready":
                 stats_map[g_id]["ready"] += cnt
-            elif rev_status in ("parsing", "pending", "review_required"):
+            elif rev_status in ("queued", "processing", "validating", "review_required"):
                 stats_map[g_id]["processing"] += cnt
-            elif rev_status in ("failed", "rejected"):
+            elif rev_status in ("failed", "cancelled"):
                 stats_map[g_id]["error"] += cnt
             else:
                 stats_map[g_id]["processing"] += cnt
@@ -336,7 +336,7 @@ class DocumentGroupService:
                 check_group = await db.get(DocumentGroup, group_id)
                 if not check_group:
                     raise AppException(
-                        message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                        message=f"Không tìm thấy kho tài liệu '{group_id}'",
                         code="DOCUMENT_GROUP_NOT_FOUND",
                         status_code=status.HTTP_404_NOT_FOUND,
                     )
@@ -344,12 +344,12 @@ class DocumentGroupService:
                     r_workspace and check_group.workspace_id != r_workspace
                 ):
                     raise AppException(
-                        message="Không có quyền truy cập nhóm tài liệu này.",
+                        message="Không có quyền truy cập kho tài liệu này.",
                         code="DOCUMENT_GROUP_ACCESS_DENIED",
                         status_code=status.HTTP_403_FORBIDDEN,
                     )
                 raise AppException(
-                    message=f"Xung đột phiên bản: Nhóm đã bị sửa đổi bởi phiên khác (hiện tại: lock={check_group.lock_version}, yêu cầu: {req.expected_lock_version}).",
+                    message=f"Xung đột phiên bản: Kho tài liệu đã bị sửa đổi bởi phiên khác (hiện tại: lock={check_group.lock_version}, yêu cầu: {req.expected_lock_version}).",
                     code="OPTIMISTIC_LOCK_CONFLICT",
                     status_code=status.HTTP_409_CONFLICT,
                 )
@@ -357,7 +357,7 @@ class DocumentGroupService:
         except IntegrityError:
             await db.rollback()
             raise AppException(
-                message=f"Tên nhóm '{req.name}' đã tồn tại trong workspace này.",
+                message=f"Tên kho tài liệu '{req.name}' đã tồn tại trong workspace này.",
                 code="DOCUMENT_GROUP_NAME_CONFLICT",
                 status_code=status.HTTP_409_CONFLICT,
             )
@@ -380,14 +380,14 @@ class DocumentGroupService:
         group = await db.get(DocumentGroup, group_id)
         if not group:
             raise AppException(
-                message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                message=f"Không tìm thấy kho tài liệu '{group_id}'",
                 code="DOCUMENT_GROUP_NOT_FOUND",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
             raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này.",
+                message="Không có quyền truy cập kho tài liệu này.",
                 code="DOCUMENT_GROUP_ACCESS_DENIED",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
@@ -417,14 +417,14 @@ class DocumentGroupService:
         group = await db.get(DocumentGroup, group_id)
         if not group:
             raise AppException(
-                message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                message=f"Không tìm thấy kho tài liệu '{group_id}'",
                 code="DOCUMENT_GROUP_NOT_FOUND",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
             raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này.",
+                message="Không có quyền truy cập kho tài liệu này.",
                 code="DOCUMENT_GROUP_ACCESS_DENIED",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
@@ -462,14 +462,13 @@ class DocumentGroupService:
             if sf == "ready":
                 stmt = stmt.where(DocumentRevision.status == "ready")
             elif sf == "processing":
-                stmt = stmt.where(
-                    or_(
-                        DocumentRevision.status.in_(["parsing", "pending", "review_required"]),
-                        DocumentRevision.status.is_(None),
-                    )
-                )
-            elif sf == "error":
-                stmt = stmt.where(DocumentRevision.status.in_(["failed", "rejected"]))
+                stmt = stmt.where(DocumentRevision.status.in_(["processing", "validating"]))
+            elif sf == "queued":
+                stmt = stmt.where(DocumentRevision.status == "queued")
+            elif sf == "review_required":
+                stmt = stmt.where(DocumentRevision.status == "review_required")
+            elif sf in ("error", "failed", "cancelled"):
+                stmt = stmt.where(DocumentRevision.status.in_(["failed", "cancelled"]))
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
@@ -496,7 +495,7 @@ class DocumentGroupService:
                     parse_status=doc.parse_status,
                     current_revision_id=doc.current_revision_id,
                     latest_revision_no=doc.latest_revision_no,
-                    revision_status=rev_status or "pending",
+                    revision_status=rev_status or "queued",
                     added_at=added_at,
                     added_by=added_by,
                     created_at=doc.created_at,
@@ -525,14 +524,14 @@ class DocumentGroupService:
         group = await db.get(DocumentGroup, group_id)
         if not group:
             raise AppException(
-                message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                message=f"Không tìm thấy kho tài liệu '{group_id}'",
                 code="DOCUMENT_GROUP_NOT_FOUND",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
             raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này.",
+                message="Không có quyền truy cập kho tài liệu này.",
                 code="DOCUMENT_GROUP_ACCESS_DENIED",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
@@ -567,7 +566,7 @@ class DocumentGroupService:
                     AddGroupDocumentsResultItem(
                         document_id=doc_id,
                         status="skipped_existing",
-                        message="Tài liệu đã tồn tại trong nhóm này.",
+                        message="Tài liệu đã tồn tại trong kho tài liệu này.",
                     )
                 )
                 skipped_existing_count += 1
@@ -590,7 +589,7 @@ class DocumentGroupService:
                     AddGroupDocumentsResultItem(
                         document_id=doc_id,
                         status="failed",
-                        message="Tài liệu không thuộc tenant/workspace của nhóm này.",
+                        message="Tài liệu không thuộc tenant/workspace của kho tài liệu này.",
                     )
                 )
                 failed_count += 1
@@ -608,7 +607,7 @@ class DocumentGroupService:
                 AddGroupDocumentsResultItem(
                     document_id=doc.id,
                     status="added",
-                    message="Thêm vào nhóm thành công.",
+                    message="Thêm vào kho tài liệu thành công.",
                 )
             )
             added_count += 1
@@ -640,14 +639,14 @@ class DocumentGroupService:
         group = await db.get(DocumentGroup, group_id)
         if not group:
             raise AppException(
-                message=f"Không tìm thấy nhóm tài liệu '{group_id}'",
+                message=f"Không tìm thấy kho tài liệu '{group_id}'",
                 code="DOCUMENT_GROUP_NOT_FOUND",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
             raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này.",
+                message="Không có quyền truy cập kho tài liệu này.",
                 code="DOCUMENT_GROUP_ACCESS_DENIED",
                 status_code=status.HTTP_403_FORBIDDEN,
             )

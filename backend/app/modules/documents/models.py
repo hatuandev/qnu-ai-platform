@@ -47,7 +47,7 @@ class RepositoryDocument(Base):
     file_type: Mapped[str] = mapped_column(String(32), nullable=False)  # pdf, docx, xlsx, txt...
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     file_hash: Mapped[str] = mapped_column(
-        String(64), unique=True, index=True, nullable=False
+        String(64), index=True, nullable=False
     )  # SHA-256 for idempotency & deduplication
     storage_path: Mapped[str] = mapped_column(String(512), nullable=False)  # MinIO S3 object key
 
@@ -150,6 +150,13 @@ class RepositoryDocument(Base):
         Index("ix_repository_documents_doc_number", "document_number"),
         Index("ix_repository_documents_parse_status", "parse_status"),
         Index("ix_repository_documents_tenant_ws", "tenant_id", "workspace_id"),
+        Index(
+            "uq_repo_docs_tenant_ws_file_hash",
+            "tenant_id",
+            "workspace_id",
+            "file_hash",
+            unique=True,
+        ),
     )
 
 

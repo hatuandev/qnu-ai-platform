@@ -7,11 +7,7 @@
  */
 
 import { runtimeConfig } from "../config/runtime";
-import {
-  getAccessToken,
-  getUserManager,
-  setCachedAccessToken,
-} from "./oidc";
+import { getAccessToken, getUserManager, setCachedAccessToken } from "./oidc";
 
 let isInterceptorInstalled = false;
 let silentRenewPromise: Promise<string | null> | null = null;

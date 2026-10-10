@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { DocumentsPage } from "@/features/documents/documents-page";
+import { DocumentGroupsPage } from "@/features/documents/document-groups-page";
 
 export const Route = createFileRoute("/documents/")({
   component: DocumentsIndexRoute,
 });
 
 function DocumentsIndexRoute() {
-  return <DocumentsPage />;
+  return <DocumentGroupsPage />;
 }

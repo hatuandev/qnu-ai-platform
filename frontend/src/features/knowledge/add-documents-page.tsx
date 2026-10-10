@@ -460,8 +460,11 @@ export const AddDocumentsPage: React.FC<AddDocumentsPageProps> = ({
                     <SelectItem value="SemanticChunker">
                       Ngữ Nghĩa (Semantic)
                     </SelectItem>
-                    <SelectItem value="FixedSizeChunker">
-                      Độ Dài Cố Định (Fixed)
+                    <SelectItem value="AdmissionsRecordChunker">
+                      Đề Án & Tuyển Sinh
+                    </SelectItem>
+                    <SelectItem value="ImplementationTaskChunker">
+                      Nhiệm Vụ Kế Hoạch
                     </SelectItem>
                   </SelectContent>
                 </Select>

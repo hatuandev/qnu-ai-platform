@@ -14,6 +14,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -46,11 +47,21 @@ export function AttachGroupToKnowledgeDialog({
 }: AttachGroupToKnowledgeDialogProps) {
   const queryClient = useQueryClient();
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>("");
-  const [chunkStrategy, setChunkStrategy] = useState<string>("ClauseBasedChunker");
-  const [result, setResult] = useState<AttachDocumentGroupResponse | null>(null);
+  const [chunkStrategy, setChunkStrategy] =
+    useState<string>("ClauseBasedChunker");
+  const [allowPartial, setAllowPartial] = useState<boolean>(false);
+  const [result, setResult] = useState<AttachDocumentGroupResponse | null>(
+    null,
+  );
 
   // Fetch available knowledge collections
-  const { data: collections = [], isLoading: isLoadingCollections } = useQuery({
+  const {
+    data: collections = [],
+    isLoading: isLoadingCollections,
+    isError: isCollectionsError,
+    error: collectionsError,
+    refetch: refetchCollections,
+  } = useQuery({
     queryKey: ["knowledge-collections"],
     queryFn: () => knowledgeApi.getCollections(),
     enabled: open,
@@ -64,7 +75,8 @@ export function AttachGroupToKnowledgeDialog({
     error: previewError,
   } = useQuery({
     queryKey: ["knowledge-preview-group", selectedCollectionId, group.id],
-    queryFn: () => knowledgeApi.previewDocumentGroup(selectedCollectionId, group.id),
+    queryFn: () =>
+      knowledgeApi.previewDocumentGroup(selectedCollectionId, group.id),
     enabled: open && Boolean(selectedCollectionId),
   });
 
@@ -79,13 +91,16 @@ export function AttachGroupToKnowledgeDialog({
         chunk_strategy: chunkStrategy,
         sync_policy: "manual",
         auto_activate: false,
+        strict_ready: !allowPartial,
       });
     },
     onSuccess: (data) => {
       setResult(data);
-      toast.success(
-        `Đã đưa nhóm vào kho thành công: ${data.created_count} mới, ${data.already_bound_count} đã có sẵn.`,
-      );
+      const detailMsg =
+        data.already_bound_count > 0
+          ? `Đã gắn ${data.created_count} tài liệu vào Kho tri thức (${data.already_bound_count} tài liệu đã liên kết từ trước).`
+          : `Đã gắn ${data.created_count} tài liệu vào Kho tri thức.`;
+      toast.success(detailMsg);
       // Invalidate all related caches
       queryClient.invalidateQueries({
         queryKey: ["knowledge-collection", selectedCollectionId],
@@ -94,7 +109,13 @@ export function AttachGroupToKnowledgeDialog({
         queryKey: ["collection-bindings", selectedCollectionId],
       });
       queryClient.invalidateQueries({
+        queryKey: ["knowledge-preview-group", selectedCollectionId, group.id],
+      });
+      queryClient.invalidateQueries({
         queryKey: ["document-group", group.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["group-documents", group.id],
       });
       queryClient.invalidateQueries({
         queryKey: ["document-groups"],
@@ -104,7 +125,7 @@ export function AttachGroupToKnowledgeDialog({
       });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Đưa nhóm vào Kho Tri Thức thất bại.");
+      toast.error(err.message || "Đưa kho tài liệu vào Kho Tri Thức thất bại.");
     },
   });
 
@@ -113,8 +134,19 @@ export function AttachGroupToKnowledgeDialog({
     setTimeout(() => {
       setResult(null);
       setSelectedCollectionId("");
+      setAllowPartial(false);
     }, 200);
   };
+
+  const unreadyCount =
+    (previewData?.not_ready_count || 0) + (previewData?.failed_count || 0);
+  const isStrictBlocked = !allowPartial && unreadyCount > 0;
+  const canSubmit =
+    !attachMutation.isPending &&
+    Boolean(selectedCollectionId) &&
+    !isLoadingPreview &&
+    (previewData?.ready_count ?? 0) > 0 &&
+    !isStrictBlocked;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -125,13 +157,20 @@ export function AttachGroupToKnowledgeDialog({
               <BookOpen className="size-5" />
             </div>
             <div>
-              <DialogTitle>Đưa Nhóm Tài Liệu Vào Kho Tri Thức</DialogTitle>
+              <DialogTitle>Đưa Kho Tài Liệu Vào Kho Tri Thức</DialogTitle>
               <DialogDescription>
-                Tạo liên kết tri thức (Knowledge Binding) cho các tài liệu hợp lệ trong nhóm &ldquo;{group.name}&rdquo;.
+                Tạo liên kết tri thức (Knowledge Binding) cho các tài liệu hợp
+                lệ trong kho &ldquo;{group.name}&rdquo;.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
+
+        {/* Nguồn kho tài liệu */}
+        <div className="flex items-center justify-between rounded-lg border border-border/80 bg-muted/20 px-3.5 py-2 text-xs">
+          <span className="text-muted-foreground">Kho tài liệu nguồn:</span>
+          <span className="font-semibold text-foreground">{group.name}</span>
+        </div>
 
         {result ? (
           /* Success Result State */
@@ -139,18 +178,23 @@ export function AttachGroupToKnowledgeDialog({
             <div className="rounded-lg border border-success/30 bg-success/10 p-4">
               <div className="flex items-center gap-2 text-success font-semibold text-sm mb-1">
                 <CheckCircle2 className="size-5" />
-                Đưa Vào Kho Tri Thức Hoàn Tất!
+                Đã gắn nguồn tài liệu
               </div>
               <p className="text-xs text-muted-foreground">
-                Đã xử lý toàn bộ tài liệu theo cơ chế Snapshot thủ công.
+                Các tài liệu sẵn sàng đã được liên kết với Kho tri thức. Chúng
+                cần được lập chỉ mục trước khi có thể dùng để truy xuất RAG.
               </p>
             </div>
 
             {/* Results Breakdown Grid */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-center">
               <div className="rounded-md border border-border/70 bg-card p-2.5">
-                <div className="text-lg font-bold text-foreground">{result.total_documents}</div>
-                <div className="text-[11px] text-muted-foreground">Tổng tài liệu</div>
+                <div className="text-lg font-bold text-foreground">
+                  {result.total_documents}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Tổng tài liệu
+                </div>
               </div>
               <div className="rounded-md border border-success/30 bg-success/5 p-2.5">
                 <div className="text-lg font-bold text-success">
@@ -168,7 +212,9 @@ export function AttachGroupToKnowledgeDialog({
                 <div className="text-lg font-bold text-warning">
                   {result.not_ready_count}
                 </div>
-                <div className="text-[11px] text-warning">Chưa sẵn sàng</div>
+                <div className="text-[11px] text-warning">
+                  Bỏ qua / Chưa ready
+                </div>
               </div>
             </div>
 
@@ -196,7 +242,7 @@ export function AttachGroupToKnowledgeDialog({
                   >
                     {item.status === "created" && "Mới gắn"}
                     {item.status === "already_bound" && "Đã có sẵn"}
-                    {item.status === "not_ready" && "Chưa ready"}
+                    {item.status === "not_ready" && "Bỏ qua (Chưa ready)"}
                     {item.status === "failed" && "Thất bại"}
                   </Badge>
                 </div>
@@ -212,7 +258,7 @@ export function AttachGroupToKnowledgeDialog({
                   to="/knowledge/$collectionId"
                   params={{ collectionId: result.collection_id }}
                 >
-                  <span>Mở Trang Kho Tri Thức</span>
+                  <span>Mở Kho tri thức</span>
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -223,14 +269,39 @@ export function AttachGroupToKnowledgeDialog({
           <div className="space-y-4 py-2">
             {/* Step 1: Select Knowledge Collection */}
             <div className="space-y-1.5">
-              <label htmlFor="collection-select" className="text-xs font-semibold text-foreground">
-                1. Chọn Kho Tri Thức đích <span className="text-destructive">*</span>
+              <label
+                htmlFor="collection-select"
+                className="text-xs font-semibold text-foreground"
+              >
+                1. Chọn Kho Tri Thức đích{" "}
+                <span className="text-destructive">*</span>
               </label>
               {isLoadingCollections ? (
                 <div className="h-9 w-full rounded-md bg-muted/40 animate-pulse" />
+              ) : isCollectionsError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertCircle className="size-4 shrink-0 text-destructive" />
+                    <span className="truncate">
+                      {collectionsError instanceof Error
+                        ? collectionsError.message
+                        : "Không thể tải danh sách Kho Tri Thức."}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs shrink-0"
+                    onClick={() => refetchCollections()}
+                  >
+                    Thử lại
+                  </Button>
+                </div>
               ) : collections.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
-                  Chưa có Kho Tri Thức nào được tạo. Vui lòng tạo Kho Tri Thức trước.
+                  Chưa có Kho Tri Thức nào được tạo. Vui lòng tạo Kho Tri Thức
+                  trước.
                 </div>
               ) : (
                 <Select
@@ -253,11 +324,17 @@ export function AttachGroupToKnowledgeDialog({
 
             {/* Step 2: Select Chunking Strategy */}
             <div className="space-y-1.5">
-              <label htmlFor="chunk-strategy-select" className="text-xs font-semibold text-foreground">
+              <label
+                htmlFor="chunk-strategy-select"
+                className="text-xs font-semibold text-foreground"
+              >
                 2. Chiến lược cắt đoạn (Chunking Strategy)
               </label>
               <Select value={chunkStrategy} onValueChange={setChunkStrategy}>
-                <SelectTrigger id="chunk-strategy-select" className="w-full h-9">
+                <SelectTrigger
+                  id="chunk-strategy-select"
+                  className="w-full h-9"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -266,6 +343,12 @@ export function AttachGroupToKnowledgeDialog({
                   </SelectItem>
                   <SelectItem value="SemanticChunker">
                     Semantic Chunker (Theo ngữ nghĩa đoạn văn)
+                  </SelectItem>
+                  <SelectItem value="AdmissionsRecordChunker">
+                    Admissions Record Chunker (Đề án & Quy chế tuyển sinh)
+                  </SelectItem>
+                  <SelectItem value="ImplementationTaskChunker">
+                    Implementation Task Chunker (Nhiệm vụ & Kế hoạch hành động)
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -288,12 +371,14 @@ export function AttachGroupToKnowledgeDialog({
 
               {!selectedCollectionId ? (
                 <div className="rounded border border-dashed border-border/70 p-3 text-center text-xs text-muted-foreground">
-                  Vui lòng chọn Kho Tri Thức để hệ thống phân tích đối soát tự động.
+                  Vui lòng chọn Kho Tri Thức để hệ thống phân tích đối soát tự
+                  động.
                 </div>
               ) : isPreviewError ? (
                 <div className="rounded border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
                   <AlertCircle className="size-4 shrink-0" />
-                  {(previewError as Error)?.message || "Không thể tải xem trước phân tích nhóm."}
+                  {(previewError as Error)?.message ||
+                    "Không thể tải xem trước phân tích kho."}
                 </div>
               ) : previewData ? (
                 <>
@@ -302,7 +387,9 @@ export function AttachGroupToKnowledgeDialog({
                       <div className="text-sm font-bold text-foreground">
                         {previewData.total_documents}
                       </div>
-                      <div className="text-[10px] text-muted-foreground truncate">Tổng số</div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        Tổng số
+                      </div>
                     </div>
 
                     <div className="rounded border border-success/30 bg-success/10 p-2">
@@ -310,30 +397,114 @@ export function AttachGroupToKnowledgeDialog({
                         <CheckCircle2 className="size-3" />
                         {previewData.ready_count}
                       </div>
-                      <div className="text-[10px] text-success truncate">Sẵn sàng</div>
+                      <div className="text-[10px] text-success truncate">
+                        Sẵn sàng
+                      </div>
                     </div>
 
                     <div className="rounded border border-info/30 bg-info/10 p-2">
                       <div className="text-sm font-bold text-info">
                         {previewData.already_bound_count}
                       </div>
-                      <div className="text-[10px] text-info truncate">Đã có</div>
+                      <div className="text-[10px] text-info truncate">
+                        Đã có
+                      </div>
                     </div>
 
                     <div className="rounded border border-warning/30 bg-warning/10 p-2">
                       <div className="flex items-center justify-center gap-0.5 text-warning font-bold text-sm">
                         <Clock className="size-3" />
-                        {previewData.not_ready_count + previewData.failed_count}
+                        {unreadyCount}
                       </div>
-                      <div className="text-[10px] text-warning truncate">Chưa ready</div>
+                      <div className="text-[10px] text-warning truncate">
+                        Chưa ready
+                      </div>
                     </div>
                   </div>
+
+                  {/* Danh sách preview chi tiết từng tài liệu */}
+                  {previewData.items && previewData.items.length > 0 && (
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto rounded border border-border/60 bg-background/80 p-2 text-xs">
+                      {previewData.items.map((it) => (
+                        <div
+                          key={it.document_id}
+                          className="flex items-start justify-between gap-2 py-1 px-1.5 rounded hover:bg-muted/40"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-medium text-foreground truncate block">
+                              {it.title || it.file_name}
+                            </span>
+                            {it.reason && (
+                              <span className="text-[11px] text-muted-foreground block truncate">
+                                {it.reason}
+                              </span>
+                            )}
+                          </div>
+                          <Badge
+                            variant={
+                              it.already_bound
+                                ? "secondary"
+                                : it.eligible_for_binding
+                                  ? "default"
+                                  : "outline"
+                            }
+                            className="text-[10px] shrink-0"
+                          >
+                            {it.already_bound
+                              ? "Đã có"
+                              : it.eligible_for_binding
+                                ? "Sẵn sàng"
+                                : "Chưa ready"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Cảnh báo Strict Ready & Checkbox lựa chọn chủ động xuất bản một phần */}
+                  {unreadyCount > 0 && (
+                    <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-2">
+                      <div className="flex items-start gap-2 text-xs text-warning-foreground">
+                        <AlertTriangle className="size-4 shrink-0 text-warning mt-0.5" />
+                        <div>
+                          <p className="font-semibold">
+                            Phát hiện tài liệu chưa sẵn sàng (Strict Ready)
+                          </p>
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Kho tài liệu còn {unreadyCount}/
+                            {previewData.total_documents} tài liệu chưa ở trạng
+                            thái sẵn sàng (chờ xử lý hoặc lỗi). Mặc định chế độ{" "}
+                            <strong>Strict Ready</strong> đang bảo vệ để ngăn
+                            xuất bản kho khi chưa hoàn tất bóc tách.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 pt-1 border-t border-warning/20">
+                        <Checkbox
+                          id="allow-partial-publish"
+                          checked={allowPartial}
+                          onCheckedChange={(checked) =>
+                            setAllowPartial(Boolean(checked))
+                          }
+                        />
+                        <label
+                          htmlFor="allow-partial-publish"
+                          className="text-xs font-medium text-foreground cursor-pointer select-none"
+                        >
+                          Cho phép xuất bản một phần (bỏ qua {unreadyCount} tài
+                          liệu chưa sẵn sàng)
+                        </label>
+                      </div>
+                    </div>
+                  )}
 
                   {previewData.ready_count === 0 && (
                     <div className="flex items-center gap-2 rounded bg-warning/10 p-2 text-[11px] text-warning-foreground">
                       <AlertCircle className="size-4 shrink-0 text-warning" />
-                      {previewData.already_bound_count === previewData.total_documents && previewData.total_documents > 0
-                        ? "Toàn bộ tài liệu trong nhóm đã được liên kết vào kho tri thức này."
+                      {previewData.already_bound_count ===
+                        previewData.total_documents &&
+                      previewData.total_documents > 0
+                        ? "Toàn bộ tài liệu trong kho đã được liên kết vào kho tri thức này."
                         : "Không có tài liệu nào ở trạng thái ready để gắn mới vào kho."}
                     </div>
                   )}
@@ -347,29 +518,32 @@ export function AttachGroupToKnowledgeDialog({
               <div className="space-y-0.5">
                 <span className="font-semibold">Lưu ý quan trọng:</span>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Đây là thao tác snapshot thủ công tại thời điểm bấm. Những tài liệu được thêm vào nhóm sau này sẽ không tự động đồng bộ vào Kho Tri Thức production.
+                  Đây là thao tác snapshot thủ công tại thời điểm bấm. Những tài
+                  liệu được thêm vào kho sau này sẽ không tự động đồng bộ vào
+                  Kho Tri Thức production.
                 </p>
               </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="ghost" onClick={handleClose} disabled={attachMutation.isPending}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleClose}
+                disabled={attachMutation.isPending}
+              >
                 Hủy
               </Button>
               <Button
                 type="button"
                 onClick={() => attachMutation.mutate()}
-                disabled={
-                  attachMutation.isPending ||
-                  !selectedCollectionId ||
-                  isLoadingPreview ||
-                  !previewData ||
-                  previewData.ready_count === 0
-                }
+                disabled={!canSubmit}
                 className="gap-1.5"
               >
                 <BookOpen className="size-4" />
-                {attachMutation.isPending ? "Đang liên kết..." : "Đưa Vào Kho Tri Thức"}
+                {attachMutation.isPending
+                  ? "Đang liên kết..."
+                  : "Đưa Vào Kho Tri Thức"}
               </Button>
             </DialogFooter>
           </div>

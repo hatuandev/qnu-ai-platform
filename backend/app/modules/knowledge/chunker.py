@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.core.exceptions import AppException
+
 
 @dataclass
 class ChunkDraft:
@@ -598,14 +600,45 @@ class ImplementationTaskChunker(BaseChunker):
         return chunks
 
 
-def get_chunker(strategy: str = "semantic") -> BaseChunker:
-    """Factory creating appropriate chunking strategy."""
+CHUNK_STRATEGY_REGISTRY: dict[str, type[BaseChunker]] = {
+    # Canonical class names
+    "clausebasedchunker": ClauseBasedChunker,
+    "semanticchunker": SemanticChunker,
+    "admissionsrecordchunker": AdmissionsRecordChunker,
+    "implementationtaskchunker": ImplementationTaskChunker,
+    # Supported aliases
+    "clause": ClauseBasedChunker,
+    "clause_based": ClauseBasedChunker,
+    "regulations": ClauseBasedChunker,
+    "semantic": SemanticChunker,
+    "admissions": AdmissionsRecordChunker,
+    "admission_program": AdmissionsRecordChunker,
+    "admissions_record": AdmissionsRecordChunker,
+    "task": ImplementationTaskChunker,
+    "implementation_task": ImplementationTaskChunker,
+    "action_plan": ImplementationTaskChunker,
+}
+
+
+def get_chunker(strategy: str = "SemanticChunker") -> BaseChunker:
+    """Factory creating appropriate chunking strategy without silent fallback.
+
+    Raises:
+        AppException: with code INVALID_CHUNK_STRATEGY (status 400) if strategy is unknown.
+    """
+    if not strategy or not isinstance(strategy, str):
+        raise AppException(
+            message=f"Chiến lược cắt đoạn '{strategy}' không hợp lệ.",
+            code="INVALID_CHUNK_STRATEGY",
+            status_code=400,
+        )
     clean_strat = strategy.lower().strip()
-    if clean_strat in ("clause", "regulations", "clause_based"):
-        return ClauseBasedChunker()
-    if clean_strat in ("admissions", "admission_program", "admissions_record"):
-        return AdmissionsRecordChunker()
-    if clean_strat in ("task", "implementation_task", "action_plan"):
-        return ImplementationTaskChunker()
-    return SemanticChunker()
+    chunker_cls = CHUNK_STRATEGY_REGISTRY.get(clean_strat)
+    if not chunker_cls:
+        raise AppException(
+            message=f"Chiến lược cắt đoạn '{strategy}' không được hỗ trợ. Các chiến lược hợp lệ: ClauseBasedChunker, SemanticChunker, AdmissionsRecordChunker, ImplementationTaskChunker.",
+            code="INVALID_CHUNK_STRATEGY",
+            status_code=400,
+        )
+    return chunker_cls()
 

@@ -134,7 +134,10 @@ export function AddToGroupDialog({
 
           {mode === "select" ? (
             <div className="space-y-2">
-              <label htmlFor="group-select" className="text-xs font-medium text-foreground">
+              <label
+                htmlFor="group-select"
+                className="text-xs font-medium text-foreground"
+              >
                 Chọn nhóm mục tiêu
               </label>
               {isLoading ? (
@@ -175,7 +178,10 @@ export function AddToGroupDialog({
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <label htmlFor="group-name-input" className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor="group-name-input"
+                  className="text-xs font-medium text-foreground"
+                >
                   Tên nhóm tài liệu <span className="text-destructive">*</span>
                 </label>
                 <Input
@@ -188,7 +194,10 @@ export function AddToGroupDialog({
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="group-desc-input" className="text-xs font-medium text-foreground">
+                <label
+                  htmlFor="group-desc-input"
+                  className="text-xs font-medium text-foreground"
+                >
                   Mô tả nhóm (Tùy chọn)
                 </label>
                 <Textarea

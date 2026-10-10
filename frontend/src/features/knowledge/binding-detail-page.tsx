@@ -1021,8 +1021,11 @@ export const BindingDetailPage: React.FC<BindingDetailPageProps> = ({
                   <SelectItem value="SemanticChunker">
                     Ngữ Nghĩa Tự Nhiên (Semantic)
                   </SelectItem>
-                  <SelectItem value="FixedSizeChunker">
-                    Độ Dài Cố Định (Fixed 512 tokens)
+                  <SelectItem value="AdmissionsRecordChunker">
+                    Đề Án & Tuyển Sinh (Admissions)
+                  </SelectItem>
+                  <SelectItem value="ImplementationTaskChunker">
+                    Nhiệm Vụ & Kế Hoạch (Tasks)
                   </SelectItem>
                 </SelectContent>
               </Select>

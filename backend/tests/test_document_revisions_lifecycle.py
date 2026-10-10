@@ -145,6 +145,20 @@ async def test_intake_service_deduplication() -> None:
         is_active=True,
     )
 
+    existing_rev = DocumentRevision(
+        id="rev_existing_99",
+        document_id=existing_doc.id,
+        revision_no=1,
+        source_file_name="existing.txt",
+        source_file_type="txt",
+        source_size_bytes=len(content),
+        source_hash="dummy_hash_existing",
+        source_storage_path="documents/originals/dummy_hash_existing/existing.txt",
+        status="ready",
+        lock_version=1,
+    )
+    existing_doc.current_revision = existing_rev
+
     session = _fresh_session()
     session.execute = AsyncMock(return_value=_execute_result(scalar=existing_doc))
 
@@ -157,7 +171,7 @@ async def test_intake_service_deduplication() -> None:
     assert res.document_id == "rep_doc_existing_99"
     assert res.revision_id == "rev_existing_99"
     assert res.deduplicated is True
-    assert res.status == "parsed"
+    assert res.status == "ready"
 
 
 # =========================================================================

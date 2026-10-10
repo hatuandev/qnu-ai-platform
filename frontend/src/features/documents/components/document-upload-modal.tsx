@@ -9,11 +9,10 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { FileUpload } from "@/components/admin/file-upload";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
   CollapsibleContent,
@@ -46,6 +45,8 @@ interface DocumentUploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  groupId?: string;
+  groupName?: string;
 }
 
 interface UploadProgressState {
@@ -53,6 +54,43 @@ interface UploadProgressState {
   total: number;
   currentFileName: string;
   percent: number;
+}
+
+export interface UploadFileResult {
+  fileName: string;
+  status:
+    | "queued"
+    | "processing"
+    | "validating"
+    | "review_required"
+    | "ready"
+    | "failed"
+    | "cancelled";
+  statusLabel: string;
+  documentId?: string;
+  jobId?: string | null;
+  error?: string;
+}
+
+function getRevisionStatusLabel(status: string): string {
+  switch (status) {
+    case "queued":
+      return "Chờ xử lý";
+    case "processing":
+      return "Đang xử lý";
+    case "validating":
+      return "Đang kiểm tra";
+    case "review_required":
+      return "Cần duyệt";
+    case "ready":
+      return "Sẵn sàng";
+    case "failed":
+      return "Lỗi";
+    case "cancelled":
+      return "Đã hủy";
+    default:
+      return "Chờ xử lý";
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -66,6 +104,8 @@ export function DocumentUploadModal({
   open,
   onOpenChange,
   onSuccess,
+  groupId,
+  groupName,
 }: DocumentUploadModalProps) {
   const queryClient = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
@@ -73,11 +113,22 @@ export function DocumentUploadModal({
     "Trường Đại học Quy Nhơn",
   );
   const [documentTypeCode, setDocumentTypeCode] = useState("");
-  const [autoParse, setAutoParse] = useState(true);
   const [showBatchOptions, setShowBatchOptions] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [progressState, setProgressState] =
     useState<UploadProgressState | null>(null);
+  const [uploadResults, setUploadResults] = useState<UploadFileResult[]>([]);
+
+  const idempotencyKeysRef = useRef<WeakMap<File, string>>(new WeakMap());
+
+  function getOrCreateIdempotencyKey(file: File): string {
+    let key = idempotencyKeysRef.current.get(file);
+    if (!key) {
+      key = crypto.randomUUID();
+      idempotencyKeysRef.current.set(file, key);
+    }
+    return key;
+  }
 
   // Lấy danh mục loại văn bản
   const { data: documentTypes = [] } = useQuery({
@@ -97,7 +148,9 @@ export function DocumentUploadModal({
     setIssuingAuthority("Trường Đại học Quy Nhơn");
     setShowBatchOptions(false);
     setProgressState(null);
+    setUploadResults([]);
     setIsUploading(false);
+    idempotencyKeysRef.current = new WeakMap();
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -115,11 +168,14 @@ export function DocumentUploadModal({
     }
 
     setIsUploading(true);
+    setUploadResults([]);
     let successCount = 0;
     const errors: string[] = [];
+    const results: UploadFileResult[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const idempotencyKey = getOrCreateIdempotencyKey(file);
       const percent = Math.round(((i + 1) / files.length) * 100);
       setProgressState({
         current: i + 1,
@@ -129,42 +185,64 @@ export function DocumentUploadModal({
       });
 
       try {
-        await documentsApi.uploadDocument(file, {
+        const intakeRes = await documentsApi.intakeDocument(file, {
           issuing_authority: issuingAuthority.trim() || undefined,
           document_type_code: documentTypeCode || undefined,
-          auto_parse: autoParse,
+          group_id: groupId,
+          idempotency_key: idempotencyKey,
+        });
+
+        const rawStatus = (intakeRes.status ||
+          "queued") as UploadFileResult["status"];
+        results.push({
+          fileName: file.name,
+          status: rawStatus,
+          statusLabel: getRevisionStatusLabel(rawStatus),
+          documentId: intakeRes.document_id,
+          jobId: intakeRes.job_id,
         });
         successCount++;
       } catch (err: unknown) {
         const errorMsg =
-          err instanceof Error ? err.message : "Tải lên thất bại";
+          err instanceof Error ? err.message : "Tiếp nhận tệp thất bại";
         errors.push(`${file.name}: ${errorMsg}`);
+        results.push({
+          fileName: file.name,
+          status: "failed",
+          statusLabel: "Lỗi",
+          error: errorMsg,
+        });
       }
     }
 
+    setUploadResults(results);
     setIsUploading(false);
     setProgressState(null);
 
     // Đồng bộ lại dữ liệu
     queryClient.invalidateQueries({ queryKey: ["repository-documents"] });
     queryClient.invalidateQueries({ queryKey: ["repository-stats"] });
+    if (groupId) {
+      queryClient.invalidateQueries({ queryKey: ["group-documents", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["document-group", groupId] });
+      queryClient.invalidateQueries({ queryKey: ["document-groups"] });
+    }
 
     if (errors.length === 0) {
       toast.success(
-        `Đã nạp thành công toàn bộ ${successCount} tệp vào Kho Tài Liệu! Tất cả đang được tự động bóc tách.`,
+        groupName
+          ? `Đã tiếp nhận ${successCount} tệp vào hàng đợi xử lý của kho "${groupName}".`
+          : `Đã tiếp nhận ${successCount} tệp vào hàng đợi xử lý của Kho Tài Liệu.`,
       );
       resetForm();
       onOpenChange(false);
       onSuccess?.();
     } else if (successCount > 0) {
       toast.warning(
-        `Đã nạp thành công ${successCount}/${files.length} tệp. ${errors.length} tệp gặp sự cố.`,
+        `Đã tiếp nhận ${successCount}/${files.length} tệp. ${errors.length} tệp gặp sự cố.`,
       );
-      resetForm();
-      onOpenChange(false);
-      onSuccess?.();
     } else {
-      toast.error(`Không thể nạp tệp nào: ${errors[0]}`);
+      toast.error(`Không thể tiếp nhận tệp nào: ${errors[0]}`);
     }
   };
 
@@ -177,10 +255,15 @@ export function DocumentUploadModal({
               <FileStack className="size-5" />
             </div>
             <div>
-              <DialogTitle>Tải Tài Liệu Vào Kho Tập Trung</DialogTitle>
+              <DialogTitle>
+                {groupName
+                  ? `Tải lên tài liệu vào kho: ${groupName}`
+                  : "Tải tài liệu vào Kho Tài Liệu"}
+              </DialogTitle>
               <DialogDescription>
-                Hỗ trợ kéo thả nhiều tệp, lưu trữ MinIO S3 chống trùng lặp và tự
-                động nhận diện bóc tách.
+                {groupName
+                  ? `Tài liệu sau khi tải lên sẽ lưu trữ trên MinIO S3, đưa vào hàng đợi bóc tách V2 và trực thuộc kho "${groupName}".`
+                  : "Hỗ trợ kéo thả nhiều tệp, lưu trữ MinIO S3 chống trùng lặp và tự động nhận diện bóc tách bất đồng bộ."}
               </DialogDescription>
             </div>
           </div>
@@ -312,28 +395,12 @@ export function DocumentUploadModal({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Checkbox Auto Parse */}
-          <div className="flex items-start space-x-2.5 rounded-lg border border-border/60 bg-muted/20 p-3">
-            <Checkbox
-              id="auto-parse-checkbox"
-              checked={autoParse}
-              onCheckedChange={(checked) => setAutoParse(Boolean(checked))}
-              disabled={isUploading}
-              className="mt-0.5"
-            />
-            <label
-              htmlFor="auto-parse-checkbox"
-              className="text-xs text-foreground cursor-pointer select-none leading-relaxed"
-            >
-              <span className="font-semibold text-primary">
-                Tự động bóc tách sang Markdown sạch ngay lập tức
-              </span>
-              <br />
-              <span className="text-muted-foreground">
-                Trích xuất tiêu đề, bảng biểu, cấu trúc văn bản và chuẩn hóa NFC
-                Tiếng Việt sẵn sàng nạp vào mọi Kho Tri Thức.
-              </span>
-            </label>
+          {/* Thông tin tự động bóc tách V2 */}
+          <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+            <Sparkles className="size-4 shrink-0 text-primary" />
+            <span className="leading-relaxed">
+              Tài liệu sẽ được tự động bóc tách sau khi tiếp nhận.
+            </span>
           </div>
 
           {/* Progress bar khi đang tải lên nhiều tệp */}
@@ -341,7 +408,8 @@ export function DocumentUploadModal({
             <div className="space-y-1.5 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-foreground">
-                  Đang tải lên tệp {progressState.current}/{progressState.total}
+                  Đang tiếp nhận tệp {progressState.current}/
+                  {progressState.total}
                 </span>
                 <span className="font-semibold text-primary">
                   {progressState.percent}%
@@ -360,6 +428,55 @@ export function DocumentUploadModal({
               </p>
             </div>
           )}
+
+          {/* Danh sách kết quả từng file nếu có lỗi một phần */}
+          {uploadResults.length > 0 && !isUploading && (
+            <div className="space-y-2 rounded-lg border border-border/80 bg-muted/15 p-3">
+              <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                <span>Kết quả tiếp nhận từng tệp</span>
+                <span className="text-muted-foreground font-normal">
+                  {uploadResults.filter((r) => r.status !== "failed").length}/
+                  {uploadResults.length} thành công
+                </span>
+              </div>
+              <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                {uploadResults.map((r) => (
+                  <div
+                    key={`${r.fileName}-${r.documentId || r.status}`}
+                    className="flex items-center justify-between gap-2 rounded border border-border/50 bg-background/80 px-2.5 py-1.5 text-xs"
+                  >
+                    <span
+                      className="truncate font-medium text-foreground"
+                      title={r.fileName}
+                    >
+                      {r.fileName}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span
+                        className={
+                          r.status === "failed"
+                            ? "font-medium text-destructive"
+                            : r.status === "ready"
+                              ? "font-medium text-primary"
+                              : "font-medium text-warning"
+                        }
+                      >
+                        {r.statusLabel}
+                      </span>
+                      {r.error && (
+                        <span
+                          className="text-[11px] text-destructive truncate max-w-44"
+                          title={r.error}
+                        >
+                          ({r.error})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
@@ -368,7 +485,7 @@ export function DocumentUploadModal({
             onClick={() => handleOpenChange(false)}
             disabled={isUploading}
           >
-            Hủy Bỏ
+            {uploadResults.length > 0 && !isUploading ? "Đóng" : "Hủy Bỏ"}
           </Button>
           <Button
             onClick={handleBatchUpload}
@@ -378,7 +495,7 @@ export function DocumentUploadModal({
             {isUploading ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Đang Tải Lên (
+                Đang Tiếp Nhận (
                 {progressState
                   ? `${progressState.current}/${progressState.total}`
                   : "..."}
@@ -388,8 +505,12 @@ export function DocumentUploadModal({
               <>
                 <Upload className="size-4" />
                 {files.length > 1
-                  ? `Lưu ${files.length} Tệp Vào Kho`
-                  : "Lưu Vào Kho Tài Liệu"}
+                  ? groupName
+                    ? `Lưu ${files.length} Tệp Vào Kho`
+                    : `Lưu ${files.length} Tệp Vào Kho`
+                  : groupName
+                    ? `Lưu Vào Kho "${groupName}"`
+                    : "Lưu Vào Kho Tài Liệu"}
               </>
             )}
           </Button>

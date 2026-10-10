@@ -152,11 +152,7 @@ export function DocumentsPage() {
         description="Lưu trữ tài sản số trên MinIO S3, chống trùng lặp SHA-256, tiền xử lý Markdown sạch và gắn động vào các Kho Tri Thức."
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              className="gap-1.5 shadow-xs"
-            >
+            <Button asChild variant="outline" className="gap-1.5 shadow-xs">
               <Link to="/documents/groups">
                 <Folders className="size-4" />
                 Nhóm Tài Liệu

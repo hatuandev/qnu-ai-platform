@@ -1,10 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { DocumentGroupsPage } from "@/features/documents/document-groups-page";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/documents/groups/")({
-  component: DocumentGroupsRoute,
+  beforeLoad: () => {
+    throw redirect({ to: "/documents" });
+  },
 });
-
-function DocumentGroupsRoute() {
-  return <DocumentGroupsPage />;
-}

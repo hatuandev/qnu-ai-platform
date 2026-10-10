@@ -7,21 +7,66 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-09 20:30 (UTC+7)
-- **Phiên số**: #308 (Hoàn Thiện Toàn Diện Hardening Production Tích Hợp QNU SSO Giữa Hai Repositories: Chống JWKS Stampede Lock, 16 Test Cases Fetch Interceptor Thật, OIDC Authority Loopback Isolation, OpenIddict Dynamic Issuer, Idempotent Client Reconcile, Standard TSConfig & UTF-8 Docs)
-- **Kết quả phiên #308**:
-  - Chống JWKS refresh stampede bằng `asyncio.Lock`, double-checked locking và generation tracking (`_refresh_count`) trong `JwksCacheService`. Dập tắt triệt để race condition khi 10 request đồng thời cùng gặp khóa hết hạn hoặc unknown kid.
-  - Viết 16 test cases production thật cho `fetch-interceptor.ts` qua factory `createAuthFetchInterceptor` bao phủ đủ 16 kịch bản production thật (relative, same-origin, trusted origin, external, spoofed host, query string, caller auth preserved, headers merged, body preserved, 401 body replayed, 5 concurrent 401 calling silent renew once, max retry 1, new token used, no internal header, renew failed clean session, caller auth 401 no renew).
-  - Triển khai `resolveOidcAuthority` và `isLoopbackHostname` cách ly môi trường nghiêm ngặt (chấp nhận mọi loopback `localhost`, `127.0.0.1`, `::1` trong dev, bắt buộc HTTPS và cấm loopback trong prod, strip trailing slash).
-  - OpenIddict trên QNU SSO thiết lập dynamic issuer qua `options.SetIssuer(issuerUri)` khi `PUBLIC_BASE_URL` hoặc `OpenIddict:Issuer` có giá trị, bảo đảm tính nhất quán tuyệt đối across discovery, JWT iss, backend expected iss, và frontend authority.
-  - Reconcile máy khách OpenIddict idempotent không gọi `UpdateAsync` thừa khi tập hợp URI và permissions đã khớp; chuyển sang allow-list cho production redirect URIs (chỉ nhận HTTPS, loại bỏ http/ftp/loopback/custom schemes).
-  - Khôi phục tsconfig chuẩn (xóa `allowImportingTsExtensions`), giải quyết Node 24 ESM test runner bằng `src/app/auth/test-loader.mjs`, loại bỏ toàn bộ `.ts` trong file import theo đúng convention dự án.
-  - Chuẩn hóa tài liệu tích hợp `docs/integrations/qnu-ai-platform.md` sang UTF-8 sạch 100%, không còn lỗi mojibake hay dấu hỏi chấm `?`.
-  - Quality Gate:
-    - Backend: `pytest` 38/38 passed (`test_sso_auth.py`, `test_permission_contract.py`), Ruff 0 lỗi.
-    - Frontend: `npm test` 46/46 passed (`auth.test.ts`), Biome check 0 warnings / 0 errors, `npm run build` (`vite build && tsc --noEmit`) thành công 100% trong 3.24s.
-    - QNU SSO: `dotnet build` 0 warning / 0 error; `dotnet test` 120/120 tests passed (`Application.UnitTests` 104/104, `Domain.UnitTests` 8/8, `Infrastructure.IntegrationTests` 8/8).
-    - Git: `git diff --check` sạch 0 lỗi trên cả 2 repositories; bảo toàn 100% thay đổi không liên quan trong working tree.
+- **Thời gian cập nhật**: 2026-10-10 12:35 (UTC+7)
+- **Phiên số**: #315 (Tích Hợp Karpathy Guidelines Vào Agent & Skill Vibe Coding)
+- **Kết quả phiên #315**:
+  - Tích hợp bốn nguyên tắc `Think Before Coding`, `Simplicity First`, `Surgical Changes` và `Goal-Driven Execution` vào `AGENTS.md` và skill `qnu-clean-code-architect` hiện có.
+  - Áp dụng kiểm thử theo rủi ro: test-first cho dữ liệu/transaction/concurrency/idempotency/migration/auth/tenant/payment; code theo lô rồi test một lần cho tính năng thông thường; lint/build nhanh cho thay đổi UI thuần túy.
+  - Thay Boy Scout Rule mở rộng bằng Surgical Change Rule, ngăn AI tự ý refactor hoặc format code ngoài phạm vi.
+  - Bật `allow_implicit_invocation: true` để skill Clean Code tự động hỗ trợ các phiên coding, fix, review và refactor.
+  - Giữ nguyên các quality gate chuyên ngành Backend/Frontend; tối ưu số lần chạy chứ không bỏ final verification.
+  - Skill validator: `Skill is valid!`.
+  - Snapshot: [`docs/memory/snapshots/2026-10-10_session_248.md`](./snapshots/2026-10-10_session_248.md).
+
+- **Phiên trước #314 — Kết quả:**
+  - **1. Sửa Race Condition Xóa Nhầm Object Khi Upload Đồng Thời**:
+    - Trong nhánh `except IntegrityError`, rollback transaction và truy vấn winner document `(tenant_id, workspace_id, file_hash)` trước.
+    - Nếu tìm thấy winner: tuyệt đối không xóa `storage_key` (bảo toàn byte của winner theo content-addressed invariant); gắn membership vào Document Group idempotent; đọc revision thật và `JobRecord` đang hoạt động thật từ DB.
+    - Ném lỗi RFC 7807 HTTP 409 `DOCUMENT_REVISION_INVALID` nếu winner không có revision hợp lệ. Tuyệt đối không sinh revision ID giả hay job ID giả.
+    - Chỉ thực hiện compensation delete `storage_key` khi không có winner (transaction tạo tài liệu thất bại hoàn toàn).
+  - **2. Giữ Ổn Định Idempotency-Key Khi Retry**:
+    - Xây dựng `FileIdempotencyManager` (`useRef<WeakMap<File, string>>`) với helper `getOrCreate(file: File): string`.
+    - Cùng một đối tượng `File` trong modal và cùng phiên retry luôn nhận đúng UUID ban đầu.
+    - Reset kho key khi form reset hoặc đóng modal. File mới nhận key mới. Không dùng tên file đơn thuần.
+    - Tiếp tục gửi key qua header `Idempotency-Key`, không đưa vào `FormData`. Đã bổ sung 3 unit tests Bun test passed 100%.
+  - **3. Chuyển Toàn Bộ Endpoint Legacy V1 Sang Intake V2**:
+    - Mọi request tới `/documents/upload` (dù có hay không có `group_id`) đều đi qua orchestration bất đồng bộ `document_intake_service.intake_document(...)`.
+    - Tiếp nhận và chuyển tiếp header `Idempotency-Key`.
+    - Truyền đầy đủ `actor`, `tenant_id`, `workspace_id`, `group_id`, metadata NĐ 30.
+    - Map kết quả qua `document_repository_service.get_document(...)` để trả `RepositoryDocumentResponse` tương thích client cũ.
+    - Tuyệt đối không gọi `document_repository_service.upload_document(...)` từ router legacy nữa.
+  - **4. Chuẩn Hóa Thông Báo Gắn Nguồn Vào Kho Tri Thức (Honest Binding Semantics)**:
+    - Giữ `auto_activate: false`.
+    - Tiêu đề: *"Đã gắn nguồn tài liệu"*; Mô tả: *"Các tài liệu sẵn sàng đã được liên kết với Kho tri thức. Chúng cần được lập chỉ mục trước khi có thể dùng để truy xuất RAG."*; Toast: *"Đã gắn {created_count} tài liệu vào Kho tri thức."*.
+    - Loại bỏ triệt để các từ "xuất bản hoàn tất", "sẵn sàng sử dụng", "đã lập chỉ mục" khi chưa có `index_revision_id`.
+    - Nút hành động đổi thành *"Mở Kho tri thức"*.
+    - Xử lý error state khi tải Kho tri thức với banner lỗi và nút *"Thử lại"*.
+  - **Quality Gate**:
+    - Backend Ruff: `All checks passed! (0 errors)`.
+    - Backend Workflow & Lifecycle Unit Tests: **45/45 passed (100%)** (`test_document_repository_workflow.py` 24/24, `test_document_groups_and_knowledge_attach.py` 14/14, `test_document_revisions_lifecycle.py` 7/7).
+    - Frontend Unit Tests: **3/3 passed (100%)** (`idempotency.test.ts`).
+    - Frontend Biome: 13 files checked, 0 errors.
+    - Frontend Vite Build: `✓ built in 3.20s` (0 errors).
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-10_phien_314_xu_ly_dut_diem_4_van_de_con_lai_kho_tai_lieu.md`](../nhat_ky/2026-10-10_phien_314_xu_ly_dut_diem_4_van_de_con_lai_kho_tai_lieu.md).
+
+- **Phiên trước #313 — Kết quả:**
+  - Hoàn thiện dứt điểm 8 vấn đề cốt lõi của quy trình Kho tài liệu & Intake V2: Cô lập storage key theo scope tenant/workspace; HTTP Idempotency-Key header & replay conflict; Legacy V1 adapter chống orphan; xóa bỏ toggle autoParse; deduplicate đọc từ current_revision; hoàn thiện error state frontend; Alembic safe index inspector migration; chuẩn hóa semantic token `text-warning`. 40/40 tests passed, Ruff 0 lỗi, Biome 0 lỗi, Vite build đạt 100%.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-10_phien_313_hoan_thien_toan_dien_quy_trinh_kho_tai_lieu_va_intake_v2.md`](../nhat_ky/2026-10-10_phien_313_hoan_thien_toan_dien_quy_trinh_kho_tai_lieu_va_intake_v2.md).
+
+- **Phiên trước #312 — Kết quả:**
+  - Hoàn thiện dứt điểm toàn diện tích hợp QNU SSO giữa hai repositories theo hướng production-first: Truyền `environment.EnvironmentName` trực tiếp làm source of truth; fail-fast production khi thiếu base URL; frontend `resolveOidcAuthority` nhận diện mọi loopback (`localhost`, `127.0.0.1`, `::1`), strip trailing slash; chống JWKS stampede bằng `asyncio.Lock` và double-checked locking; 16 unit tests production thật cho `fetch-interceptor.ts`; strict HTTPS allow-list và idempotent client reconciliation; chuẩn hóa ESM loader hook cho Node 24 native test runner; đồng bộ OIDC issuer với `options.SetIssuer(issuerUri)`; toàn bộ 120/120 tests SSO passed, 38/38 backend tests passed, 46/46 frontend tests passed, Ruff 0 lỗi, Biome 0 lỗi, Vite build đạt 100%.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_312_hoan_thien_dut_diem_tich_hop_qnu_sso_production.md`](../nhat_ky/2026-10-09_phien_312_hoan_thien_dut_diem_tich_hop_qnu_sso_production.md).
+
+- **Phiên trước #311 — Kết quả:**
+  - Tái cấu trúc luồng Kho Tài Liệu `/documents` theo chuẩn UX Production: chuyển trang `/documents` thành trang quản lý các Kho Tài Liệu (Document Groups); loại bỏ nút "Nhóm Tài Liệu" và "Tải Lên Tài Liệu", chỉ giữ 1 nút "Tạo Kho Tài Liệu"; tự động làm mới dữ liệu và hiển thị kho mới tạo ngay trên màn hình; hỗ trợ click trực tiếp vào kho để mở chi tiết; chuẩn hóa nút "Tải Lên Tài Liệu" bên trong trang chi tiết kho; hỗ trợ ViewModeToggle (Grid/Table); Biome linter 0 lỗi, Vite build 5.42s thành công 100% 0 lỗi TypeScript.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_310_tai_cau_truc_luong_kho_tai_lieu_documents_theo_ux_production.md`](../nhat_ky/2026-10-09_phien_310_tai_cau_truc_luong_kho_tai_lieu_documents_theo_ux_production.md).
+
+- **Phiên trước #309 — Kết quả:**
+  - Hoàn thiện luồng tạo Nhóm tài liệu & tải lên trực tiếp trong chi tiết nhóm: sau khi tạo nhóm tự động điều hướng sang `/documents/groups/:groupId`; bổ sung nút "Tải Lên Tệp Mới" trong Action Toolbar và EmptyState của trang chi tiết nhóm; backend mở rộng `group_id` cho `/documents/upload` và `/documents/intake` tự động thêm thành viên vào nhóm; kiểm thử đầy đủ 14/14 Pytest passed 100%, Ruff 0 lỗi, Vite build 0 lỗi.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_309_hoan_thien_luong_upload_truc_tiep_trong_chi_tiet_nhom_tai_lieu.md`](../nhat_ky/2026-10-09_phien_309_hoan_thien_luong_upload_truc_tiep_trong_chi_tiet_nhom_tai_lieu.md).
+
+- **Phiên trước #308 — Kết quả:**
+  - Hoàn thiện toàn diện hardening production tích hợp QNU SSO giữa hai repositories: Chống JWKS stampede bằng `asyncio.Lock`, double-checked locking và generation tracking (`_refresh_count`); Viết 16 test cases production thật cho `fetch-interceptor.ts`; Triển khai `resolveOidcAuthority` loopback isolation; OpenIddict dynamic issuer; Reconcile idempotent; Khôi phục tsconfig chuẩn và Node 24 ESM test-loader; Docs UTF-8 sạch. 46/46 frontend tests pass, 38/38 backend tests pass, 120/120 SSO tests pass.
   - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-09_phien_308_hoan_thien_hardening_qnu_sso_integration.md`](../nhat_ky/2026-10-09_phien_308_hoan_thien_hardening_qnu_sso_integration.md).
 
 - **Phiên trước #307 — Kết quả:**

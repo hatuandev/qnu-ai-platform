@@ -556,7 +556,7 @@ class BindingService:
                     )
                 )
             elif not rev or rev.status != "ready":
-                if rev and rev.status in ("failed", "rejected"):
+                if rev and rev.status in ("failed", "cancelled"):
                     failed_count += 1
                     preview_items.append(
                         PreviewDocumentGroupItem(
@@ -681,14 +681,14 @@ class BindingService:
 
         if total_documents == 0:
             raise AppException(
-                message=f"Nhóm tài liệu '{group.name}' không có tài liệu nào.",
+                message=f"Kho tài liệu '{group.name}' không có tài liệu nào.",
                 code="DOCUMENT_GROUP_EMPTY",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         if req.strict_ready and (not_ready_count > 0 or failed_count > 0):
             raise AppException(
-                message=f"Chế độ strict_ready được bật: Phát hiện {not_ready_count + failed_count}/{total_documents} tài liệu trong nhóm chưa ở trạng thái sẵn sàng (ready).",
+                message=f"Chế độ strict_ready được bật: Phát hiện {not_ready_count + failed_count}/{total_documents} tài liệu trong kho tài liệu chưa ở trạng thái sẵn sàng (ready).",
                 code="STRICT_READY_VIOLATION",
                 status_code=status.HTTP_400_BAD_REQUEST,
                 details={
@@ -723,7 +723,7 @@ class BindingService:
                     items=results,
                 )
             raise AppException(
-                message="Không có tài liệu nào trong nhóm có phiên bản ready để đưa vào kho tri thức.",
+                message="Không có tài liệu nào trong kho tài liệu có phiên bản ready để đưa vào kho tri thức.",
                 code="NO_READY_DOCUMENTS",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )

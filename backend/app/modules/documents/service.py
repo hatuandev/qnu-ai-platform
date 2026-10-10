@@ -61,15 +61,26 @@ class DocumentRepositoryService:
         effective_date: date | None = None,
         ocr_engine: str | None = None,
         auto_parse: bool = True,
+        actor: Any | None = None,
+        tenant_id: str | None = None,
+        workspace_id: str | None = None,
     ) -> RepositoryDocument:
         """Upload a file to MinIO S3 and register it in the document repository."""
+        from app.modules.documents.intake_service import sanitize_safe_filename
+
+        resolved_tenant = getattr(actor, "tenant_id", None) or tenant_id or "tenant_qnu"
+        resolved_workspace = getattr(actor, "workspace_id", None) or workspace_id or "workspace_qnu"
+        resolved_created_by = getattr(actor, "actor_id", None) or getattr(actor, "username", None) or "system"
+
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else "txt"
         file_size = len(file_bytes)
         file_hash = self.compute_file_hash(file_bytes)
 
-        # 1. Deduplication check across active repository documents
+        # 1. Deduplication check scoped by tenant and workspace
         stmt = select(RepositoryDocument).where(
             RepositoryDocument.file_hash == file_hash,
+            RepositoryDocument.tenant_id == resolved_tenant,
+            RepositoryDocument.workspace_id == resolved_workspace,
             RepositoryDocument.is_active.is_(True),
         )
         existing = (await db.execute(stmt)).scalar_one_or_none()
@@ -77,9 +88,9 @@ class DocumentRepositoryService:
             logger.info("File '%s' with hash '%s' already exists in repository (%s).", file_name, file_hash, existing.id)
             return existing
 
-        # 2. Persist original file in MinIO S3 under immutable hash path
-        safe_name = file_name.replace(" ", "_")
-        storage_key = f"documents/originals/{file_hash}/{safe_name}"
+        # 2. Persist original file in MinIO S3 under scoped immutable hash path
+        safe_name = sanitize_safe_filename(file_name)
+        storage_key = f"documents/{resolved_tenant}/{resolved_workspace}/originals/{file_hash}/{safe_name}"
         await storage_service.save(storage_key, file_bytes)
         logger.info("Saved %d bytes to MinIO S3: %s", file_size, storage_key)
 
@@ -87,6 +98,8 @@ class DocumentRepositoryService:
         doc_id = f"rep_doc_{uuid.uuid4().hex[:12]}"
         doc = RepositoryDocument(
             id=doc_id,
+            tenant_id=resolved_tenant,
+            workspace_id=resolved_workspace,
             title=title or file_name.rsplit(".", 1)[0],
             file_name=file_name,
             file_type=ext,
@@ -118,6 +131,7 @@ class DocumentRepositoryService:
             db=db,
             doc=doc,
             file_bytes=file_bytes,
+            created_by=resolved_created_by,
         )
         doc.current_revision_id = rev.id
         await db.flush()

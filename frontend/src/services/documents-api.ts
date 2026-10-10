@@ -1,6 +1,8 @@
+import { ApiError } from "@/app/api/client";
 import type {
   AddGroupDocumentsRequest,
   AddGroupDocumentsResponse,
+  AsyncUploadDocumentResponse,
   AttachDocumentsRequest,
   DocumentGroup,
   DocumentGroupCreateRequest,
@@ -79,7 +81,60 @@ export const documentsApi = {
   },
 
   /**
-   * Tải tài liệu lên Kho Tài Liệu Tập Trung (lưu MinIO + Pre-parsing)
+   * Tiếp nhận tệp bất đồng bộ vào Kho Tài Liệu (Chuẩn V2 ADR-011)
+   */
+  async intakeDocument(
+    file: File,
+    meta?: {
+      title?: string;
+      document_number?: string;
+      issuing_authority?: string;
+      issued_date?: string;
+      effective_date?: string;
+      document_type_code?: string;
+      ocr_engine?: string;
+      group_id?: string;
+      idempotency_key?: string;
+    },
+  ): Promise<AsyncUploadDocumentResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (meta?.title) formData.append("title", meta.title);
+    if (meta?.document_number)
+      formData.append("document_number", meta.document_number);
+    if (meta?.issuing_authority)
+      formData.append("issuing_authority", meta.issuing_authority);
+    if (meta?.issued_date) formData.append("issued_date", meta.issued_date);
+    if (meta?.effective_date)
+      formData.append("effective_date", meta.effective_date);
+    if (meta?.document_type_code)
+      formData.append("document_type_code", meta.document_type_code);
+    if (meta?.ocr_engine) formData.append("ocr_engine", meta.ocr_engine);
+    if (meta?.group_id) formData.append("group_id", meta.group_id);
+
+    const headers = getAuthHeaders();
+    if (meta?.idempotency_key) {
+      headers.set("Idempotency-Key", meta.idempotency_key);
+    }
+
+    const res = await fetch(`${BASE_URL}/documents/intake`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        (err as { detail?: string; message?: string }).detail ||
+          (err as { message?: string }).message ||
+          `Tiếp nhận tài liệu thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Tải tài liệu lên Kho Tài Liệu Tập Trung (Compatibility V1 — Deprecated: ưu tiên dùng intakeDocument)
    */
   async uploadDocument(
     file: File,
@@ -91,6 +146,8 @@ export const documentsApi = {
       signer?: string;
       document_type_code?: string;
       auto_parse?: boolean;
+      group_id?: string;
+      idempotency_key?: string;
     },
   ): Promise<RepositoryDocument> {
     const formData = new FormData();
@@ -106,16 +163,23 @@ export const documentsApi = {
       formData.append("document_type_code", meta.document_type_code);
     if (meta?.auto_parse !== undefined)
       formData.append("auto_parse", String(meta.auto_parse));
+    if (meta?.group_id) formData.append("group_id", meta.group_id);
+
+    const headers = getAuthHeaders();
+    if (meta?.idempotency_key) {
+      headers.set("Idempotency-Key", meta.idempotency_key);
+    }
 
     const res = await fetch(`${BASE_URL}/documents/upload`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers,
       body: formData,
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(
-        (err as { detail?: string }).detail ||
+        (err as { detail?: string; message?: string }).detail ||
+          (err as { message?: string }).message ||
           `Tải lên tài liệu thất bại (HTTP ${res.status}).`,
       );
     }
@@ -348,11 +412,11 @@ export const documentsApi = {
   },
 
   // =========================================================================
-  // Logical Document Groups APIs
+  // Logical Document Groups APIs (Kho Tài Liệu)
   // =========================================================================
 
   /**
-   * Lấy danh sách các nhóm tài liệu
+   * Lấy danh sách các kho tài liệu
    */
   async getGroups(params?: {
     search?: string;
@@ -362,20 +426,27 @@ export const documentsApi = {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set("search", params.search);
     if (params?.page) searchParams.set("page", String(params.page));
-    if (params?.page_size) searchParams.set("page_size", String(params.page_size));
+    if (params?.page_size)
+      searchParams.set("page_size", String(params.page_size));
 
-    const res = await fetch(`${BASE_URL}/documents/groups?${searchParams.toString()}`, {
-      headers: getAuthHeaders(),
-    });
+    const res = await fetch(
+      `${BASE_URL}/documents/groups?${searchParams.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Không thể tải danh sách nhóm tài liệu.");
+      const message =
+        (err as { detail?: string }).detail ||
+        "Không thể tải danh sách kho tài liệu.";
+      throw new ApiError(res.status, message, err);
     }
     return res.json();
   },
 
   /**
-   * Chi tiết nhóm tài liệu
+   * Chi tiết kho tài liệu
    */
   async getGroup(groupId: string): Promise<DocumentGroup> {
     const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
@@ -383,13 +454,16 @@ export const documentsApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || `Không tìm thấy nhóm tài liệu '${groupId}'.`);
+      const message =
+        (err as { detail?: string }).detail ||
+        `Không tìm thấy kho tài liệu '${groupId}'.`;
+      throw new ApiError(res.status, message, err);
     }
     return res.json();
   },
 
   /**
-   * Tạo nhóm tài liệu mới
+   * Tạo kho tài liệu mới
    */
   async createGroup(data: DocumentGroupCreateRequest): Promise<DocumentGroup> {
     const res = await fetch(`${BASE_URL}/documents/groups`, {
@@ -402,15 +476,20 @@ export const documentsApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Tạo nhóm tài liệu thất bại.");
+      throw new Error(
+        (err as { detail?: string }).detail || "Tạo kho tài liệu thất bại.",
+      );
     }
     return res.json();
   },
 
   /**
-   * Cập nhật thông tin nhóm tài liệu
+   * Cập nhật thông tin kho tài liệu
    */
-  async updateGroup(groupId: string, data: DocumentGroupUpdateRequest): Promise<DocumentGroup> {
+  async updateGroup(
+    groupId: string,
+    data: DocumentGroupUpdateRequest,
+  ): Promise<DocumentGroup> {
     const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
       method: "PATCH",
       headers: {
@@ -421,13 +500,16 @@ export const documentsApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Cập nhật nhóm tài liệu thất bại.");
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          "Cập nhật kho tài liệu thất bại.",
+      );
     }
     return res.json();
   },
 
   /**
-   * Xóa nhóm tài liệu
+   * Xóa kho tài liệu
    */
   async deleteGroup(groupId: string): Promise<void> {
     const res = await fetch(`${BASE_URL}/documents/groups/${groupId}`, {
@@ -436,12 +518,14 @@ export const documentsApi = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Xóa nhóm tài liệu thất bại.");
+      throw new Error(
+        (err as { detail?: string }).detail || "Xóa kho tài liệu thất bại.",
+      );
     }
   },
 
   /**
-   * Lấy danh sách tài liệu trong nhóm
+   * Lấy danh sách tài liệu trong kho tài liệu
    */
   async getGroupDocuments(
     groupId: string,
@@ -456,7 +540,8 @@ export const documentsApi = {
     if (params?.search) searchParams.set("search", params.search);
     if (params?.status) searchParams.set("status", params.status);
     if (params?.page) searchParams.set("page", String(params.page));
-    if (params?.page_size) searchParams.set("page_size", String(params.page_size));
+    if (params?.page_size)
+      searchParams.set("page_size", String(params.page_size));
 
     const res = await fetch(
       `${BASE_URL}/documents/groups/${groupId}/documents?${searchParams.toString()}`,
@@ -466,37 +551,49 @@ export const documentsApi = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Không thể tải danh sách tài liệu trong nhóm.");
+      const message =
+        (err as { detail?: string }).detail ||
+        "Không thể tải danh sách tài liệu trong kho.";
+      throw new ApiError(res.status, message, err);
     }
     return res.json();
   },
 
   /**
-   * Thêm tài liệu vào nhóm
+   * Thêm tài liệu vào kho tài liệu
    */
   async addDocumentsToGroup(
     groupId: string,
     data: AddGroupDocumentsRequest,
   ): Promise<AddGroupDocumentsResponse> {
-    const res = await fetch(`${BASE_URL}/documents/groups/${groupId}/documents`, {
-      method: "POST",
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json",
+    const res = await fetch(
+      `${BASE_URL}/documents/groups/${groupId}/documents`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
       },
-      body: JSON.stringify(data),
-    });
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Thêm tài liệu vào nhóm thất bại.");
+      throw new Error(
+        (err as { detail?: string }).detail ||
+          "Thêm tài liệu vào kho thất bại.",
+      );
     }
     return res.json();
   },
 
   /**
-   * Xóa một tài liệu khỏi nhóm
+   * Gỡ một tài liệu khỏi kho tài liệu
    */
-  async removeDocumentFromGroup(groupId: string, documentId: string): Promise<void> {
+  async removeDocumentFromGroup(
+    groupId: string,
+    documentId: string,
+  ): Promise<void> {
     const res = await fetch(
       `${BASE_URL}/documents/groups/${groupId}/documents/${documentId}`,
       {
@@ -506,7 +603,9 @@ export const documentsApi = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error((err as { detail?: string }).detail || "Xóa tài liệu khỏi nhóm thất bại.");
+      throw new Error(
+        (err as { detail?: string }).detail || "Gỡ tài liệu khỏi kho thất bại.",
+      );
     }
   },
 };

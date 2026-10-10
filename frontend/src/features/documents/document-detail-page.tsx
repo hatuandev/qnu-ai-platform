@@ -594,7 +594,7 @@ export function DocumentDetailPage() {
                                     {rev.status === "review_required" && (
                                       <Badge
                                         variant="outline"
-                                        className="text-[10px] gap-1 border-amber-600/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                                        className="text-[10px] gap-1 border-warning/30 text-warning bg-warning/10"
                                       >
                                         <Clock className="size-3" />
                                         Chờ Thẩm Định
@@ -753,7 +753,7 @@ export function DocumentDetailPage() {
                                 {check.passed ? (
                                   <CheckCircle2 className="size-3 text-emerald-600" />
                                 ) : (
-                                  <AlertTriangle className="size-3 text-amber-600" />
+                                  <AlertTriangle className="size-3 text-warning" />
                                 )}
                               </div>
                               <p className="text-[10px] text-muted-foreground truncate">

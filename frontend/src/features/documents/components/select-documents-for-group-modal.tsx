@@ -210,7 +210,11 @@ export function SelectDocumentsForGroupModal({
 
         <DialogFooter className="flex items-center justify-between border-t border-border pt-3">
           <div className="text-xs text-muted-foreground">
-            Đã chọn: <span className="font-semibold text-foreground">{selectedIds.length}</span> tài liệu
+            Đã chọn:{" "}
+            <span className="font-semibold text-foreground">
+              {selectedIds.length}
+            </span>{" "}
+            tài liệu
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -229,7 +233,9 @@ export function SelectDocumentsForGroupModal({
               className="gap-1.5"
             >
               <Plus className="size-4" />
-              {addMutation.isPending ? "Đang thêm..." : `Thêm ${selectedIds.length} Tài Liệu`}
+              {addMutation.isPending
+                ? "Đang thêm..."
+                : `Thêm ${selectedIds.length} Tài Liệu`}
             </Button>
           </div>
         </DialogFooter>

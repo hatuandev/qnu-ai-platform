@@ -818,3 +818,50 @@ async def test_attach_group_strict_ready_rejects_unready() -> None:
     assert exc_strict.value.details.get("total_documents") == 2
     assert exc_strict.value.details.get("ready_count") == 1
     assert exc_strict.value.details.get("not_ready_count") == 1
+
+@pytest.mark.asyncio
+async def test_upload_with_group_id_calls_add_documents_to_group():
+    from unittest.mock import patch
+
+    from fastapi import UploadFile
+
+    from app.modules.documents.router import upload_document
+    from app.modules.documents.schemas import AsyncUploadDocumentResponse
+
+    session = _fresh_session()
+    actor = AuthActor(sub="user_1", username="admin_qnu", tenant_id="tenant_qnu", workspace_id="ws_default", roles=["admin"])
+    mock_file = AsyncMock(spec=UploadFile)
+    mock_file.read = AsyncMock(return_value=b'%PDF-1.4 test')
+    mock_file.filename = 'tuyensinh_2026.pdf'
+
+    mock_intake_res = AsyncUploadDocumentResponse(
+        document_id='doc_ts_1',
+        revision_id='rev_1',
+        revision_no=1,
+        file_name='tuyensinh_2026.pdf',
+        file_hash='hash_123',
+        job_id='job_1',
+        status='queued',
+        deduplicated=False,
+        created_at=datetime.now(UTC),
+    )
+
+    with (
+        patch('app.modules.documents.router.document_intake_service.intake_document', new_callable=AsyncMock) as mock_intake,
+        patch('app.modules.documents.router.document_repository_service.get_document', new_callable=AsyncMock) as mock_repo_get,
+    ):
+        mock_intake.return_value = mock_intake_res
+        mock_repo_get.return_value = MagicMock(id='doc_ts_1')
+
+        res = await upload_document(
+            file=mock_file,
+            group_id='grp_ts',
+            db=session,
+            actor=actor,
+        )
+
+        assert res.id == 'doc_ts_1'
+        mock_intake.assert_awaited_once()
+        call_kwargs = mock_intake.await_args.kwargs
+        assert call_kwargs['group_id'] == 'grp_ts'
+        assert call_kwargs['actor'] == actor

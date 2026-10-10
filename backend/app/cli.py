@@ -86,6 +86,22 @@ async def check_db_schema() -> bool:
             current_rev = version_res.scalar()
             logger.info("Current Alembic revision: %s", current_rev)
 
+            # Verify database revision is at Alembic HEAD
+            try:
+                from alembic.script import ScriptDirectory
+
+                alembic_script = ScriptDirectory.from_config(_get_alembic_config())
+                alembic_heads = set(alembic_script.get_heads())
+                if current_rev not in alembic_heads:
+                    logger.warning(
+                        "Database revision (%s) is behind Alembic HEAD (%s). Migration required.",
+                        current_rev,
+                        alembic_heads,
+                    )
+                    return False
+            except Exception as script_exc:
+                logger.warning("Could not verify Alembic HEAD revision: %s", script_exc)
+
             # 3. Check core tables
             tables = await conn.run_sync(
                 lambda sync_conn: set(inspect(sync_conn).get_table_names())
@@ -101,6 +117,8 @@ async def check_db_schema() -> bool:
                 "provider_key_events",
                 "conversation_feedbacks",
                 "repository_documents",
+                "document_groups",
+                "document_group_memberships",
             }
 
             missing = required_tables - tables

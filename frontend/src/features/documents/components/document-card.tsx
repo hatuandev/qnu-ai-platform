@@ -15,10 +15,10 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,7 +68,9 @@ export function DocumentCard({
   const downloadUrl = documentsApi.getDownloadUrl(document.id);
 
   return (
-    <Card className={`group relative flex flex-col transition-all duration-200 hover:border-primary/40 hover:shadow-md ${selected ? "border-primary bg-primary/5" : ""}`}>
+    <Card
+      className={`group relative flex flex-col transition-all duration-200 hover:border-primary/40 hover:shadow-md ${selected ? "border-primary bg-primary/5" : ""}`}
+    >
       <CardContent className="flex flex-1 flex-col p-4">
         {/* Header: Checkbox + File icon + Title + Menu */}
         <div className="flex items-start justify-between gap-2">
