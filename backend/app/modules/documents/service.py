@@ -18,6 +18,7 @@ from app.modules.documents.models import (
     DocumentGroup,
     DocumentGroupMembership,
     RepositoryDocument,
+    RepositoryFileRevision,
 )
 from app.modules.documents.schemas import (
     AttachedCollectionInfo,
@@ -26,13 +27,14 @@ from app.modules.documents.schemas import (
     RepositoryDocumentResponse,
     RepositoryDocumentStatsResponse,
     RepositoryDocumentUpdate,
+    RepositoryFileRevisionItem,
+    RepositoryFileRevisionResponse,
 )
 from app.modules.knowledge.cleaner import (
     clean_markdown_text,
     extract_administrative_metadata,
     extract_sections_metadata,
 )
-from app.modules.knowledge.models import KnowledgeDocument
 from app.modules.knowledge.parsers import get_document_parser
 
 logger = logging.getLogger(__name__)
@@ -111,7 +113,7 @@ class DocumentRepositoryService:
             issuing_authority=issuing_authority,
             issued_date=issued_date,
             effective_date=effective_date,
-            parse_status="pending",
+            parse_status="stored",
             ocr_engine=ocr_engine,
             is_active=True,
             status="active",
@@ -124,7 +126,7 @@ class DocumentRepositoryService:
         db.add(doc)
         await db.flush()
 
-        # 4. Create initial revision v1 for unified revision tracking
+        # 4. Create initial revision v1 and pure file revision (ADR-012 initial_status=stored)
         from app.modules.documents.revision_service import document_revision_service
 
         rev = await document_revision_service.create_initial_revision(
@@ -132,18 +134,17 @@ class DocumentRepositoryService:
             doc=doc,
             file_bytes=file_bytes,
             created_by=resolved_created_by,
+            initial_status="stored",
         )
         doc.current_revision_id = rev.id
         await db.flush()
 
-        # 5. Trigger pre-parse pipeline if requested
-        if auto_parse:
-            await self.parse_and_cache_document(
-                db=db,
-                doc=doc,
-                file_bytes=file_bytes,
-                ocr_engine=ocr_engine,
-            )
+        # 5. ADR-012: Pre-parse pipeline is deprecated during repository upload.
+        # Document intelligence, OCR, and chunking are triggered only during Knowledge import.
+        logger.info(
+            "Document %s uploaded to repository vault as stored without background parsing (ADR-012).",
+            doc.id,
+        )
 
         await db.commit()
         await db.refresh(doc)
@@ -366,6 +367,8 @@ class DocumentRepositoryService:
         usage_map: dict[str, int] = {}
         groups_map: dict[str, list[DocumentGroupMinimalItem]] = {d.id: [] for d in docs}
         if doc_ids:
+            from app.modules.knowledge.models import KnowledgeDocument
+
             usage_query = (
                 select(KnowledgeDocument.repository_document_id, func.count(KnowledgeDocument.id))
                 .where(
@@ -439,6 +442,8 @@ class DocumentRepositoryService:
         doc = (await db.execute(stmt)).scalar_one_or_none()
         if not doc:
             raise EntityNotFoundError(f"Tài liệu '{doc_id}' không tồn tại trong kho.")
+
+        from app.modules.knowledge.models import KnowledgeDocument
 
         kd_stmt = (
             select(KnowledgeDocument)
@@ -528,26 +533,23 @@ class DocumentRepositoryService:
         doc_id: str,
         force: bool = False,
     ) -> bool:
-        """Soft-delete document. Rejects deletion if attached to collections unless force=True."""
+        """Soft-delete repository document.
+
+        Under ADR-012, Knowledge imports are independent snapshots with their own lifecycle.
+        Deleting a repository document sets is_active=False without cascading or breaking
+        active RAG retrieval snapshots in the Knowledge domain.
+        """
         stmt = (
             select(RepositoryDocument)
             .where(RepositoryDocument.id == doc_id, RepositoryDocument.is_active.is_(True))
-            .options(selectinload(RepositoryDocument.knowledge_documents))
         )
         doc = (await db.execute(stmt)).scalar_one_or_none()
         if not doc:
             raise EntityNotFoundError(f"Tài liệu '{doc_id}' không tồn tại.")
 
-        active_usages = [kd for kd in doc.knowledge_documents if kd.is_active]
-        if active_usages and not force:
-            raise ValueError(
-                f"Tài liệu đang được sử dụng trong {len(active_usages)} Kho Tri Thức. "
-                "Vui lòng gỡ liên kết trước khi xóa hoặc dùng tùy chọn xóa cưỡng bức."
-            )
-
         doc.is_active = False
         await db.commit()
-        logger.info("Soft-deleted repository document %s (%s).", doc.id, doc.file_name)
+        logger.info("Soft-deleted repository document %s (%s). Knowledge snapshots decoupled.", doc.id, doc.file_name)
         return True
 
     async def get_stats(self, db: AsyncSession) -> RepositoryDocumentStatsResponse:
@@ -556,7 +558,7 @@ class DocumentRepositoryService:
         stats_stmt = (
             select(
                 func.count().label("total"),
-                func.count(case((RepositoryDocument.parse_status == "parsed", 1))).label("parsed"),
+                func.count(case((RepositoryDocument.parse_status.in_(["stored", "parsed"]), 1))).label("parsed"),
                 func.count(case((RepositoryDocument.parse_status.in_(["pending", "parsing"]), 1))).label("pending"),
                 func.count(case((RepositoryDocument.parse_status == "failed", 1))).label("failed"),
                 func.coalesce(func.sum(RepositoryDocument.file_size_bytes), 0).label("total_size"),
@@ -567,10 +569,12 @@ class DocumentRepositoryService:
         )
         total, parsed, pending, failed, total_size, types_count = (await db.execute(stats_stmt)).one()
 
+        from app.modules.knowledge.models import KnowledgeBinding
+
         usages_stmt = (
             select(func.count())
-            .select_from(KnowledgeDocument)
-            .where(KnowledgeDocument.is_active.is_(True), KnowledgeDocument.repository_document_id.is_not(None))
+            .select_from(KnowledgeBinding)
+            .where(KnowledgeBinding.repository_document_id.is_not(None))
         )
         usages_count = (await db.execute(usages_stmt)).scalar_one()
 
@@ -599,6 +603,42 @@ class DocumentRepositoryService:
             raise EntityNotFoundError(f"Không tìm thấy tệp nhị phân trên MinIO: {doc.storage_path}")
 
         return data, doc.file_name, doc.file_type
+
+    async def list_file_revisions(
+        self,
+        db: AsyncSession,
+        doc_id: str,
+        actor: Any | None = None,
+    ) -> RepositoryFileRevisionResponse:
+        """List immutable file revisions registered for a repository document."""
+        stmt = select(RepositoryDocument).where(
+            RepositoryDocument.id == doc_id,
+            RepositoryDocument.is_active.is_(True),
+        )
+        doc = (await db.execute(stmt)).scalar_one_or_none()
+        if not doc:
+            raise EntityNotFoundError(f"Tài liệu '{doc_id}' không tồn tại trong kho.")
+
+        r_tenant = getattr(actor, "tenant_id", None)
+        if r_tenant and doc.tenant_id != r_tenant:
+            raise AppException(
+                message=f"Không có quyền truy cập tài liệu '{doc_id}'.",
+                code="DOCUMENT_ACCESS_DENIED",
+                status_code=403,
+            )
+
+        rev_stmt = (
+            select(RepositoryFileRevision)
+            .where(RepositoryFileRevision.document_id == doc_id)
+            .order_by(RepositoryFileRevision.revision_no.desc())
+        )
+        file_revs = (await db.execute(rev_stmt)).scalars().all()
+        items = [RepositoryFileRevisionItem.model_validate(fr) for fr in file_revs]
+        return RepositoryFileRevisionResponse(
+            document_id=doc_id,
+            items=items,
+            total=len(items),
+        )
 
 
 document_repository_service = DocumentRepositoryService()

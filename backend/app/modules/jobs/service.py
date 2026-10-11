@@ -20,6 +20,9 @@ ARQ_FUNCTIONS: dict[str, str] = {
     "reindex": "task_reindex_collection",
     "export": "task_export_document",
     "document_revision_parse": "task_document_revision_parse",
+    "knowledge_source_ingestion": "task_knowledge_source_ingestion",
+    "knowledge_source_reparse": "task_knowledge_source_reparse",
+    "knowledge_source_purge": "task_knowledge_source_purge",
     "knowledge_index_build": "task_knowledge_index_build",
     "knowledge_garbage_collection": "task_knowledge_garbage_collection",
 }
@@ -240,6 +243,9 @@ class JobsService:
         actor: Any | None = None,
     ) -> JobRecord:
         job = await self.get_job(db, job_id, actor=actor)
+        if job.job_type == "knowledge_source_purge":
+            raise AppException("Xóa vĩnh viễn không thể hủy; có thể thử lại nếu lỗi.",
+                               code="PURGE_NOT_CANCELLABLE", status_code=409)
         if job.status == "cancelled":
             return job
         if job.status in TERMINAL_STATUSES:

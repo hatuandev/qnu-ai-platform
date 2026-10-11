@@ -12,6 +12,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 logger = logging.getLogger(__name__)
@@ -33,22 +34,23 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        query = (
-            context.node_data.get("normalized_query")
-            or context.node_data.get("user_message")
-            or context.inputs.get("message", "")
+        query = routed_text(
+            context,
+            node_spec.id,
+            ("question", "query", "normalized_query", "message", "text", "response"),
+            (
+                context.node_data.get("normalized_query")
+                or context.node_data.get("user_message")
+                or context.inputs.get("message", "")
+            ),
         )
         config = node_spec.config or {}
 
         profile = context.assistant_profile
         module_code = (
-            config.get("module_code")
-            or (profile.assistant_code if profile else None)
-            or "general"
+            config.get("module_code") or (profile.assistant_code if profile else None) or "general"
         )
-        collection_id = (profile.collection_id if profile else None) or config.get(
-            "collection_id"
-        )
+        collection_id = (profile.collection_id if profile else None) or config.get("collection_id")
         if not collection_id:
             fallback_collection = OFFICIAL_MODULE_COLLECTIONS.get(module_code)
             if fallback_collection:
@@ -108,8 +110,12 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             conversation_id=context.conversation_id,
             tenant_id=context.tenant_id or "tenant_qnu",
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
-            temperature=model_policy.temperature if model_policy else config.get("temperature", 0.2),
-            max_tokens=min(model_policy.max_tokens, 8192) if model_policy else config.get("max_tokens", 2000),
+            temperature=model_policy.temperature
+            if model_policy
+            else config.get("temperature", 0.2),
+            max_tokens=min(model_policy.max_tokens, 8192)
+            if model_policy
+            else config.get("max_tokens", 2000),
             thinking_budget=thinking_budget,
             preferred_model_name=primary_model,
             preferred_provider_id=preferred_provider_id,

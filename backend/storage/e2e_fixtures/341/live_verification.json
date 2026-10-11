@@ -1,0 +1,444 @@
+{
+  "collection_id": "col_b04b7104008f",
+  "sources": [
+    {
+      "id": "ks_rev_a93139a0c41a",
+      "version": "v2",
+      "page_manifest": [
+        {
+          "page": 1,
+          "chars": 203
+        },
+        {
+          "page": 2,
+          "chars": 314
+        }
+      ],
+      "hash": "63ecb6cb9f05824aca73e8995538a4b99eeaf4f553efe1aefaf535e5b5042ec1"
+    },
+    {
+      "id": "ks_rev_763a93050260",
+      "version": "v2",
+      "page_manifest": [
+        {
+          "page": 1,
+          "chars": 203
+        },
+        {
+          "page": 2,
+          "chars": 314
+        }
+      ],
+      "hash": "63ecb6cb9f05824aca73e8995538a4b99eeaf4f553efe1aefaf535e5b5042ec1"
+    },
+    {
+      "id": "ks_rev_51ead1497e99",
+      "version": "v2",
+      "page_manifest": [
+        {
+          "page": 1,
+          "chars": 203
+        },
+        {
+          "page": 2,
+          "chars": 311
+        }
+      ],
+      "hash": "d1731859605844cf85605b9bc2a4d941bb521a4c0b416719f3908467ab290dfb"
+    }
+  ],
+  "indices": [
+    {
+      "id": "idx_rev_d29ea0e66a98",
+      "chunk_count": 3,
+      "source_revision_id": "ks_rev_763a93050260",
+      "parity": {
+        "checked_at": "2026-10-11T07:23:30.556714+00:00",
+        "parity_passed": true,
+        "parity_reason": "Đối chiếu point ID, revision và content hash thành công.",
+        "expected_count": 3,
+        "verified_count": 3
+      }
+    },
+    {
+      "id": "idx_rev_eded9bb75d66",
+      "chunk_count": 3,
+      "source_revision_id": "ks_rev_51ead1497e99",
+      "parity": {
+        "checked_at": "2026-10-11T07:20:19.951133+00:00",
+        "parity_passed": true,
+        "parity_reason": "Đối chiếu point ID, revision và content hash thành công.",
+        "expected_count": 3,
+        "verified_count": 3
+      }
+    }
+  ],
+  "search": {
+    "query": "Trong bộ dữ liệu E2E341-PAGE2, học phí ngành Công nghệ thông tin là bao nhiêu?",
+    "collection_id": "col_b04b7104008f",
+    "total_found": 5,
+    "items": [
+      {
+        "chunk_id": "chk_7576eb27e7b5",
+        "document_id": "bnd_685681798e01",
+        "content": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả định chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại học Quy Nhơn.\n\nMã kiểm chứng: E2E341-PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+        "score": 0.0361,
+        "rank": 1,
+        "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số ",
+        "page_number": 2,
+        "binding_id": "bnd_685681798e01",
+        "index_revision_id": "idx_rev_d29ea0e66a98",
+        "revision_no": null,
+        "document_revision": 2,
+        "metadata": {
+          "chunk_id": "chk_7576eb27e7b5",
+          "document_id": "bnd_685681798e01",
+          "collection_id": "col_b04b7104008f",
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "document_revision": 2,
+          "document_status": "ready",
+          "is_retrievable": true,
+          "content_hash": "2753cc2a8d5b25d2ae9c3d049b4da3524f2297ddcd0edaf2d8fdcb5e75ab9e62",
+          "embedding_model": "bge-m3",
+          "payload_schema_version": "v1",
+          "content": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả định chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại học Quy Nhơn.\n\nMã kiểm chứng: E2E341-PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+          "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số ",
+          "page_number": 2,
+          "is_active": true,
+          "index_revision_id": "idx_rev_d29ea0e66a98",
+          "document_title": "e2e341_scan_2pages",
+          "binding_id": "bnd_685681798e01",
+          "source_revision_id": "ks_rev_763a93050260",
+          "chunk_set_id": "chk_set_c042feeaaafc",
+          "vector_generation_id": "vg_2a83fc999ba4",
+          "epoch": 1
+        }
+      },
+      {
+        "chunk_id": "chk_8dca7eb1fd71",
+        "document_id": "bnd_ed127e9fa220",
+        "content": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành\nCông nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả\nđịnh chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại\nhọc Quy Nhơn.\n\nMã kiểm chứng: E2E341­PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+        "score": 0.0355,
+        "rank": 2,
+        "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành",
+        "page_number": 2,
+        "binding_id": "bnd_ed127e9fa220",
+        "index_revision_id": "idx_rev_eded9bb75d66",
+        "revision_no": null,
+        "document_revision": 1,
+        "metadata": {
+          "chunk_id": "chk_8dca7eb1fd71",
+          "document_id": "bnd_ed127e9fa220",
+          "collection_id": "col_b04b7104008f",
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "document_revision": 1,
+          "document_status": "ready",
+          "is_retrievable": true,
+          "content_hash": "f621f262de86a9dc4bf0008c636e3a09f74bf31ccd3bcbde504c568a26bae14d",
+          "embedding_model": "bge-m3",
+          "payload_schema_version": "v1",
+          "content": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành\nCông nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả\nđịnh chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại\nhọc Quy Nhơn.\n\nMã kiểm chứng: E2E341­PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+          "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành",
+          "page_number": 2,
+          "is_active": true,
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "document_title": "e2e341_native_2pages",
+          "binding_id": "bnd_ed127e9fa220",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "chunk_set_id": "chk_set_4e4ae77a8d3e",
+          "vector_generation_id": "vg_2a83fc999ba4",
+          "epoch": 1
+        }
+      },
+      {
+        "chunk_id": "chk_0cef5500c947",
+        "document_id": "bnd_685681798e01",
+        "content": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra lương lưu trữ và OCR.\n\nMã kiểm chứng: E2E341-PAGE1. Thông số kiểm thử năm riêng ở trang 2.",
+        "score": 0.0342,
+        "rank": 3,
+        "section": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC",
+        "page_number": 1,
+        "binding_id": "bnd_685681798e01",
+        "index_revision_id": "idx_rev_d29ea0e66a98",
+        "revision_no": null,
+        "document_revision": 2,
+        "metadata": {
+          "chunk_id": "chk_0cef5500c947",
+          "document_id": "bnd_685681798e01",
+          "collection_id": "col_b04b7104008f",
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "document_revision": 2,
+          "document_status": "ready",
+          "is_retrievable": true,
+          "content_hash": "db8ad9af2dffe6eed76c8235cd161975ee63bfe8fdeab57741920800764c1a9d",
+          "embedding_model": "bge-m3",
+          "payload_schema_version": "v1",
+          "content": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra lương lưu trữ và OCR.\n\nMã kiểm chứng: E2E341-PAGE1. Thông số kiểm thử năm riêng ở trang 2.",
+          "section": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC",
+          "page_number": 1,
+          "is_active": true,
+          "index_revision_id": "idx_rev_d29ea0e66a98",
+          "document_title": "e2e341_scan_2pages",
+          "binding_id": "bnd_685681798e01",
+          "source_revision_id": "ks_rev_763a93050260",
+          "chunk_set_id": "chk_set_c042feeaaafc",
+          "vector_generation_id": "vg_2a83fc999ba4",
+          "epoch": 1
+        }
+      },
+      {
+        "chunk_id": "chk_d8c2e39be307",
+        "document_id": "bnd_ed127e9fa220",
+        "content": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+        "score": 0.0341,
+        "rank": 4,
+        "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+        "page_number": 2,
+        "binding_id": "bnd_ed127e9fa220",
+        "index_revision_id": "idx_rev_eded9bb75d66",
+        "revision_no": null,
+        "document_revision": 1,
+        "metadata": {
+          "chunk_id": "chk_d8c2e39be307",
+          "document_id": "bnd_ed127e9fa220",
+          "collection_id": "col_b04b7104008f",
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "document_revision": 1,
+          "document_status": "ready",
+          "is_retrievable": true,
+          "content_hash": "d06749c9a955c477f8b725762c9c7a444db1c80b1505bb401e391c9c048267e1",
+          "embedding_model": "bge-m3",
+          "payload_schema_version": "v1",
+          "content": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+          "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+          "page_number": 2,
+          "is_active": true,
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "document_title": "e2e341_native_2pages",
+          "binding_id": "bnd_ed127e9fa220",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "chunk_set_id": "chk_set_4e4ae77a8d3e",
+          "vector_generation_id": "vg_2a83fc999ba4",
+          "epoch": 1
+        }
+      },
+      {
+        "chunk_id": "chk_87cc24d6966a",
+        "document_id": "bnd_ed127e9fa220",
+        "content": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH\nTHỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra luồng lưu trữ\nvà OCR.\n\nMã kiểm chứng: E2E341­PAGE1. Thông số kiểm thử nằm riêng ở\ntrang 2.",
+        "score": 0.0341,
+        "rank": 5,
+        "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH",
+        "page_number": 1,
+        "binding_id": "bnd_ed127e9fa220",
+        "index_revision_id": "idx_rev_eded9bb75d66",
+        "revision_no": null,
+        "document_revision": 1,
+        "metadata": {
+          "chunk_id": "chk_87cc24d6966a",
+          "document_id": "bnd_ed127e9fa220",
+          "collection_id": "col_b04b7104008f",
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "document_revision": 1,
+          "document_status": "ready",
+          "is_retrievable": true,
+          "content_hash": "fc16c17a3e9d68a6b8c4000010cfe91c98621ef46f3e66a27a4d8dd17658e6fc",
+          "embedding_model": "bge-m3",
+          "payload_schema_version": "v1",
+          "content": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH\nTHỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra luồng lưu trữ\nvà OCR.\n\nMã kiểm chứng: E2E341­PAGE1. Thông số kiểm thử nằm riêng ở\ntrang 2.",
+          "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH",
+          "page_number": 1,
+          "is_active": true,
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "document_title": "e2e341_native_2pages",
+          "binding_id": "bnd_ed127e9fa220",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "chunk_set_id": "chk_set_4e4ae77a8d3e",
+          "vector_generation_id": "vg_2a83fc999ba4",
+          "epoch": 1
+        }
+      }
+    ],
+    "execution_time_ms": 350.54,
+    "retrieval_snapshot": {
+      "snapshot_id": "snap_col_b04b7104008f_2_1aa0536b",
+      "collection_id": "col_b04b7104008f",
+      "collection_epoch": 2,
+      "binding_revisions": {
+        "bnd_685681798e01": "idx_rev_d29ea0e66a98",
+        "bnd_ed127e9fa220": "idx_rev_eded9bb75d66"
+      },
+      "vector_generations": {
+        "bnd_685681798e01": "vg_2a83fc999ba4",
+        "bnd_ed127e9fa220": "vg_2a83fc999ba4"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-11T07:25:14.223949+00:00"
+    },
+    "snapshot": {
+      "snapshot_id": "snap_col_b04b7104008f_2_1aa0536b",
+      "collection_id": "col_b04b7104008f",
+      "collection_epoch": 2,
+      "binding_revisions": {
+        "bnd_685681798e01": "idx_rev_d29ea0e66a98",
+        "bnd_ed127e9fa220": "idx_rev_eded9bb75d66"
+      },
+      "vector_generations": {
+        "bnd_685681798e01": "vg_2a83fc999ba4",
+        "bnd_ed127e9fa220": "vg_2a83fc999ba4"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-11T07:25:14.223949+00:00"
+    }
+  },
+  "ask": {
+    "status_code": 200,
+    "body": {
+      "status": "answered",
+      "answer": "| **Năm áp dụng** | **Chỉ tiêu** | **Học phí** |\n| --- | --- | --- |\n|  |  | 21.341.000 đồng mỗi năm |\n\nLưu ý: Số liệu trên chỉ là giả định dùng kiểm thử và không phải học phí thực tế của Trường Đại học Quy Nhơn.",
+      "answer_format": "markdown_table",
+      "citations": [
+        {
+          "source_id": "bnd_685681798e01",
+          "title": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số ",
+          "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số ",
+          "page_number": 2,
+          "quote": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả định chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại học Quy Nhơn.\n\nMã kiểm chứng: E2E341-PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+          "source_pages": [
+            2
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_685681798e01",
+          "index_revision_id": "idx_rev_d29ea0e66a98",
+          "source_revision_id": "ks_rev_763a93050260",
+          "revision_no": 2
+        },
+        {
+          "source_id": "bnd_ed127e9fa220",
+          "title": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành",
+          "section": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành",
+          "page_number": 2,
+          "quote": "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành\nCông nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả\nđịnh chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại\nhọc Quy Nhơn.\n\nMã kiểm chứng: E2E341­PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+          "source_pages": [
+            2
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_ed127e9fa220",
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "revision_no": 1
+        },
+        {
+          "source_id": "bnd_685681798e01",
+          "title": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC",
+          "section": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC",
+          "page_number": 1,
+          "quote": "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra lương lưu trữ và OCR.\n\nMã kiểm chứng: E2E341-PAGE1. Thông số kiểm thử năm riêng ở trang 2.",
+          "source_pages": [
+            1
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_685681798e01",
+          "index_revision_id": "idx_rev_d29ea0e66a98",
+          "source_revision_id": "ks_rev_763a93050260",
+          "revision_no": 2
+        },
+        {
+          "source_id": "bnd_ed127e9fa220",
+          "title": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH",
+          "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH",
+          "page_number": 1,
+          "quote": "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH\nTHỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra luồng lưu trữ\nvà OCR.\n\nMã kiểm chứng: E2E341­PAGE1. Thông số kiểm thử nằm riêng ở\ntrang 2.",
+          "source_pages": [
+            1
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_ed127e9fa220",
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "revision_no": 1
+        },
+        {
+          "source_id": "bnd_ed127e9fa220",
+          "title": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+          "section": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+          "page_number": 2,
+          "quote": "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+          "source_pages": [
+            2
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_ed127e9fa220",
+          "index_revision_id": "idx_rev_eded9bb75d66",
+          "source_revision_id": "ks_rev_51ead1497e99",
+          "revision_no": 1
+        },
+        {
+          "source_id": "bnd_685681798e01",
+          "title": "## TÀI LIỆU KIỂM THỦ E2E 341 - TRANG 2",
+          "section": "## TÀI LIỆU KIỂM THỦ E2E 341 - TRANG 2",
+          "page_number": 2,
+          "quote": "## TÀI LIỆU KIỂM THỦ E2E 341 - TRANG 2",
+          "source_pages": [
+            2
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_685681798e01",
+          "index_revision_id": "idx_rev_d29ea0e66a98",
+          "source_revision_id": "ks_rev_763a93050260",
+          "revision_no": 2
+        }
+      ],
+      "facts_used": [],
+      "suggested_questions": [],
+      "latency_ms": 20.04,
+      "contexts": [
+        "Điều 2. Trong bộ dữ liệu tổng hợp E2E341-PAGE2, học phí ngành Công nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả định chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại học Quy Nhơn.\n\nMã kiểm chứng: E2E341-PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+        "Điều 2. Trong bộ dữ liệu tổng hợp E2E341­PAGE2, học phí ngành\nCông nghệ thông tin là 21.341.000 đồng mỗi năm. Đây là số liệu giả\nđịnh chỉ dùng kiểm thử, không phải học phí thực tế của Trường Đại\nhọc Quy Nhơn.\n\nMã kiểm chứng: E2E341­PAGE2. Chỉ tiêu giả định là 137 sinh viên.",
+        "TÀI LIỆU KIỂM THỦ E2E 341 - KHÔNG PHẢI VĂN BẢN CHÍNH THỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra lương lưu trữ và OCR.\n\nMã kiểm chứng: E2E341-PAGE1. Thông số kiểm thử năm riêng ở trang 2.",
+        "TÀI LIỆU KIỂM THỬ E2E 341 ­ KHÔNG PHẢI VĂN BẢN CHÍNH\nTHỨC\n\nTrang 1: Giới thiệu bộ dữ liệu tổng hợp dùng kiểm tra luồng lưu trữ\nvà OCR.\n\nMã kiểm chứng: E2E341­PAGE1. Thông số kiểm thử nằm riêng ở\ntrang 2.",
+        "TÀI LIỆU KIỂM THỬ E2E 341 ­ TRANG 2",
+        "## TÀI LIỆU KIỂM THỦ E2E 341 - TRANG 2"
+      ],
+      "retrieval_snapshot": {
+        "snapshot_id": "snap_col_b04b7104008f_2_10b00664",
+        "collection_id": "col_b04b7104008f",
+        "collection_epoch": 2,
+        "binding_revisions": {
+          "bnd_685681798e01": "idx_rev_d29ea0e66a98",
+          "bnd_ed127e9fa220": "idx_rev_eded9bb75d66"
+        },
+        "vector_generations": {
+          "bnd_685681798e01": "vg_2a83fc999ba4",
+          "bnd_ed127e9fa220": "vg_2a83fc999ba4"
+        },
+        "tenant_id": "tenant_qnu",
+        "workspace_id": "workspace_qnu",
+        "created_at": "2026-10-11T07:24:21.422397+00:00"
+      },
+      "snapshot": {
+        "snapshot_id": "snap_col_b04b7104008f_2_10b00664",
+        "collection_id": "col_b04b7104008f",
+        "collection_epoch": 2,
+        "binding_revisions": {
+          "bnd_685681798e01": "idx_rev_d29ea0e66a98",
+          "bnd_ed127e9fa220": "idx_rev_eded9bb75d66"
+        },
+        "vector_generations": {
+          "bnd_685681798e01": "vg_2a83fc999ba4",
+          "bnd_ed127e9fa220": "vg_2a83fc999ba4"
+        },
+        "tenant_id": "tenant_qnu",
+        "workspace_id": "workspace_qnu",
+        "created_at": "2026-10-11T07:24:21.422397+00:00"
+      }
+    }
+  }
+}

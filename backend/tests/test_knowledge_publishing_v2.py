@@ -101,7 +101,7 @@ def test_models_v2_instantiation_defaults() -> None:
     )
     assert bnd.id.startswith("bnd_")
     assert bnd.active_epoch == 0
-    assert bnd.status == "active"
+    assert bnd.status == "pending"
     assert bnd.chunk_strategy == "ClauseBasedChunker"
     assert bnd.sync_policy == "manual"
     assert bnd.tenant_id == "tenant_qnu"

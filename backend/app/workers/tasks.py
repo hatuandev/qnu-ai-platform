@@ -365,14 +365,23 @@ async def task_knowledge_index_build(ctx: dict[str, Any], job_id: str) -> dict[s
             return {"status": "cancelled", "job_id": job_id}
 
         try:
-            index_rev = await index_build_service.build_staging_index(
-                db=db,
-                binding_id=binding_id,
-                source_revision_id=source_revision_id,
-                job_id=job.id,
-            )
+            if payload.get("generation_id"):
+                from app.modules.knowledge.services.vector_generation_service import (
+                    vector_generation_service,
+                )
+
+                index_rev = await vector_generation_service.build_generation_for_source(
+                    db=db, collection_id=job.collection_id, binding_id=binding_id,
+                    generation_id=payload["generation_id"],
+                    expected_source_revision_id=source_revision_id,
+                    chunk_strategy=payload.get("chunk_strategy") or "ClauseBasedChunker", job_id=job.id,
+                )
+            else:
+                index_rev = await index_build_service.build_staging_index(
+                    db=db, binding_id=binding_id, source_revision_id=source_revision_id, job_id=job.id,
+                )
             if await _is_cancelled(db, job_id):
-                if index_rev.status in ("ready", "active"):
+                if not payload.get("generation_id") and index_rev.status in ("ready", "active"):
                     index_rev.status = "failed"
                     index_rev.failure_code = "JOB_CANCELLED"
                     index_rev.failure_detail = "Tác vụ dựng chỉ mục đã bị hủy bởi người dùng (cooperative cancel)."
@@ -392,7 +401,7 @@ async def task_knowledge_index_build(ctx: dict[str, Any], job_id: str) -> dict[s
                     "chunk_count": index_rev.chunk_count,
                     "fact_count": index_rev.fact_count,
                     "parity_passed": (index_rev.parity_report or {}).get("parity_status")
-                    == "passed",
+                    == "passed" or (index_rev.parity_report or {}).get("parity_passed") is True,
                 },
                 error=err,
             ):
@@ -471,6 +480,127 @@ async def task_knowledge_garbage_collection(ctx: dict[str, Any], job_id: str) ->
             )
             await _set_job(db, job, "failed", error=str(exc)[:500])
             return {"status": "failed", "job_id": job_id, "error": str(exc)[:500]}
+
+
+async def task_knowledge_source_ingestion(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
+    """Worker task to process a KnowledgeImportItem through Knowledge source ingestion pipeline."""
+    from app.modules.knowledge.services.source_ingestion_service import source_ingestion_service
+
+    async with AsyncSessionFactory() as db:
+        job = await _load_job(db, job_id)
+        if job is None:
+            return {"status": "failed", "job_id": job_id, "error": "Job record not found"}
+
+        payload = job.payload or {}
+        item_id = payload.get("item_id")
+        ocr_engine = payload.get("ocr_engine")
+
+        if not item_id:
+            await _set_job(db, job, "failed", error="Missing item_id in job payload")
+            return {"status": "failed", "job_id": job_id, "error": "Missing item_id"}
+
+        if await _check_pre_execution_cancelled(db, job):
+            return {"status": "cancelled", "job_id": job_id}
+
+        if not await _set_job(db, job, "running", progress=10.0):
+            return {"status": "cancelled", "job_id": job_id}
+        if await _is_cancelled(db, job_id):
+            return {"status": "cancelled", "job_id": job_id}
+
+        try:
+            source_rev = await source_ingestion_service.process_import_item(
+                db=db,
+                item_id=item_id,
+                ocr_engine=ocr_engine,
+            )
+            if await _is_cancelled(db, job_id):
+                return {"status": "cancelled", "job_id": job_id}
+
+            final_status = "completed" if source_rev.status in ("ready", "review_required") else "failed"
+            err = source_rev.failure_detail if source_rev.status == "failed" else None
+            await _set_job(
+                db,
+                job,
+                final_status,
+                progress=100.0,
+                result={
+                    "source_revision_id": source_rev.id,
+                    "status": source_rev.status,
+                    "quality_overall": (source_rev.quality_report or {}).get("overall_status"),
+                },
+                error=err,
+            )
+            return {
+                "status": final_status,
+                "job_id": job_id,
+                "source_revision_id": source_rev.id,
+                "source_status": source_rev.status,
+            }
+        except Exception as exc:
+            if await _is_cancelled(db, job_id):
+                return {"status": "cancelled", "job_id": job_id}
+            if getattr(exc, "code", None) == "IMPORT_CANCELLED":
+                await db.rollback()
+                await db.refresh(job)
+                await _set_job(db, job, "cancelled")
+                return {"status": "cancelled", "job_id": job_id}
+            logger.exception("task_knowledge_source_ingestion_failed", job_id=job_id, error=str(exc))
+            await _set_job(db, job, "failed", error=str(exc)[:500])
+            raise
+
+
+async def task_knowledge_source_reparse(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
+    from app.modules.knowledge.models import KnowledgeSourceRevision
+    from app.modules.knowledge.services.source_reparse import run_reparse
+
+    async with AsyncSessionFactory() as db:
+        job = await _load_job(db, job_id)
+        if not job:
+            return {"status": "failed", "job_id": job_id}
+        if await _check_pre_execution_cancelled(db, job):
+            revision = await db.get(KnowledgeSourceRevision, job.payload["revision_id"])
+            if revision and revision.status == "queued":
+                revision.status = "cancelled"
+                await db.commit()
+            return {"status": "cancelled", "job_id": job_id}
+        if not await _set_job(db, job, "running", progress=10.0):
+            revision = await db.get(KnowledgeSourceRevision, job.payload["revision_id"])
+            if revision and revision.status == "queued":
+                revision.status = "cancelled"
+                await db.commit()
+            return {"status": "cancelled", "job_id": job_id}
+        try:
+            revision = await run_reparse(db, job)
+            state = "completed" if revision.status in ("ready", "review_required") else revision.status if revision.status == "cancelled" else "failed"
+            await _set_job(db, job, state, progress=100.0, result={"source_revision_id": revision.id, "status": revision.status}, error=revision.failure_detail)
+            return {"status": state, "job_id": job_id}
+        except Exception as exc:
+            await db.refresh(job)
+            await _set_job(db, job, "failed", error=str(exc)[:500])
+            raise
+
+
+async def task_knowledge_source_purge(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
+    from app.modules.knowledge.services.source_purge import run_purge
+
+    async with AsyncSessionFactory() as db:
+        job = await _load_job(db, job_id)
+        if not job or job.status == "completed":
+            return {"status": "completed" if job else "missing", "job_id": job_id}
+        if job.job_type != "knowledge_source_purge":
+            raise ValueError("Unexpected purge job type")
+        job.status, job.phase = "running", "purging"
+        await db.commit()
+        try:
+            await run_purge(db, job)
+        except Exception as exc:
+            await db.rollback()
+            await db.refresh(job)
+            job.status, job.phase, job.error = "failed", "purge_failed", str(exc)[:500]
+            await db.commit()
+            logger.exception("knowledge_source_purge_failed", job_id=job_id)
+            raise
+        return {"status": "completed", "job_id": job_id}
 
 
 async def task_reconcile_pending_jobs(ctx: dict[str, Any]) -> dict[str, int]:

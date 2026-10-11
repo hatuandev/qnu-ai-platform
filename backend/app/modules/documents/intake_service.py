@@ -26,15 +26,17 @@ from app.modules.documents.models import (
     DocumentGroupMembership,
     DocumentRevision,
     RepositoryDocument,
+    RepositoryFileRevision,  # noqa: F401
 )
 from app.modules.documents.revision_service import document_revision_service
 from app.modules.documents.schemas import AsyncUploadDocumentResponse
 from app.modules.jobs.models import JobRecord
-from app.modules.jobs.service import enqueue_arq_job
+from app.modules.jobs.service import enqueue_arq_job  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 VALID_REVISION_STATUSES: frozenset[str] = frozenset({
+    "stored",
     "queued",
     "processing",
     "validating",
@@ -321,7 +323,7 @@ class DocumentIntakeService:
                 issuing_authority=issuing_authority,
                 issued_date=issued_date,
                 effective_date=effective_date,
-                parse_status="pending",
+                parse_status="stored",
                 ocr_engine=ocr_engine,
                 status="active",
                 is_active=True,
@@ -333,13 +335,14 @@ class DocumentIntakeService:
             db.add(doc)
             await db.flush()
 
-            # 6.2 Create initial DocumentRevision v1 (flush only, no commit)
+            # 6.2 Create initial DocumentRevision & RepositoryFileRevision (flush only)
             rev = await document_revision_service.create_initial_revision(
                 db=db,
                 doc=doc,
                 file_bytes=file_bytes,
                 idempotency_key=idempotency_key,
                 created_by=resolved_created_by,
+                initial_status="stored",
             )
             rev.request_hash = request_hash
             await db.flush()
@@ -356,30 +359,21 @@ class DocumentIntakeService:
                 group.updated_at = now
                 await db.flush()
 
-            # 6.4 Create persistent JobRecord in pending state
-            job_id = f"job_intake_{uuid.uuid4().hex[:12]}"
-            job_record = JobRecord(
-                id=job_id,
-                job_type="document_revision_parse",
-                status="queued",
-                document_id=doc.id,
-                tenant_id=resolved_tenant,
-                workspace_id=resolved_workspace,
-                idempotency_key=idempotency_key,
-                request_hash=request_hash,
-                dispatch_status="pending",
-                payload={
-                    "document_id": doc.id,
-                    "revision_id": rev.id,
-                    "ocr_engine": ocr_engine,
-                    "file_name": file_name,
-                },
-            )
-            db.add(job_record)
-            await db.flush()
-
-            # 6.5 Atomic durable commit before broker dispatch
+            # 6.4 ADR-012: Document Repository is a pure storage vault (zero parse jobs)
             await db.commit()
+            await db.refresh(rev)
+
+            return AsyncUploadDocumentResponse(
+                document_id=doc.id,
+                revision_id=rev.id,
+                revision_no=rev.revision_no,
+                file_name=file_name,
+                file_hash=file_hash,
+                job_id=None,
+                status="stored",
+                deduplicated=False,
+                created_at=rev.created_at or datetime.now(UTC),
+            )
         except IntegrityError:
             await db.rollback()
             # Concurrent race condition: another request committed the exact same document
@@ -391,27 +385,23 @@ class DocumentIntakeService:
             )
             winner_doc = (await db.execute(winner_stmt)).scalar_one_or_none()
             if winner_doc:
-                # Do NOT delete storage_key: winner uses this content-addressed artifact
-                logger.info("Concurrent race handled: linking to winning document %s", winner_doc.id)
-                if group_id:
-                    mem_check = select(DocumentGroupMembership).where(
-                        DocumentGroupMembership.group_id == group_id,
-                        DocumentGroupMembership.document_id == winner_doc.id,
-                    )
-                    existing_mem = (await db.execute(mem_check)).scalar_one_or_none()
-                    if not existing_mem:
-                        membership = DocumentGroupMembership(
-                            group_id=group_id,
-                            document_id=winner_doc.id,
-                            added_by=resolved_created_by,
-                            added_at=datetime.now(UTC),
+                # 1. Clean up orphan storage object if this request created a separate key from winner
+                if winner_doc.storage_path != storage_key:
+                    try:
+                        await storage_service.delete(storage_key)
+                    except Exception as cleanup_exc:
+                        logger.warning(
+                            "Failed to delete loser S3 storage_key %s during concurrent race compensation: %s",
+                            storage_key,
+                            cleanup_exc,
                         )
-                        db.add(membership)
-                        if group:
-                            group.updated_at = datetime.now(UTC)
-                        await db.commit()
+                else:
+                    logger.info(
+                        "Concurrent race handled: storage_key %s matches winner storage_path, retaining object",
+                        storage_key,
+                    )
 
-                # Resolve real revision of winning document
+                # 2. Resolve real revision of winning document
                 winner_rev = getattr(winner_doc, "current_revision", None)
                 if not winner_rev and winner_doc.current_revision_id:
                     candidate = await db.get(DocumentRevision, winner_doc.current_revision_id)
@@ -427,6 +417,7 @@ class DocumentIntakeService:
                     winner_rev = (await db.execute(rev_stmt)).scalar_one_or_none()
 
                 # Must have a valid V2 revision; never synthesize fake revision ID or default queued status
+                # If invalid or missing, raise immediately WITHOUT creating group membership
                 if not winner_rev or winner_rev.status not in VALID_REVISION_STATUSES:
                     raise AppException(
                         message=f"Tài liệu trùng lặp '{winner_doc.id}' không có phiên bản hợp lệ trong hệ thống.",
@@ -434,10 +425,72 @@ class DocumentIntakeService:
                         status_code=409,
                     )
 
-                # Resolve real job record if one exists
+                # Capture response primitives before a possible membership rollback expires ORM objects.
+                winner_document_id = winner_doc.id
+                winner_revision_id = winner_rev.id
+                winner_revision_no = winner_rev.revision_no
+                winner_file_name = winner_rev.source_file_name or winner_doc.file_name
+                winner_file_hash = winner_rev.source_hash or winner_doc.file_hash
+                winner_status = winner_rev.status
+                winner_created_at = winner_rev.created_at or winner_doc.created_at or datetime.now(UTC)
+
+                # 3. ONLY after revision is validated: ensure membership exists for group if specified
+                if group_id:
+                    try:
+                        mem_check = select(DocumentGroupMembership).where(
+                            DocumentGroupMembership.group_id == group_id,
+                            DocumentGroupMembership.document_id == winner_document_id,
+                        )
+                        existing_mem = (await db.execute(mem_check)).scalar_one_or_none()
+                        if not existing_mem:
+                            target_group = await db.get(DocumentGroup, group_id)
+                            if (
+                                not target_group
+                                or target_group.tenant_id != resolved_tenant
+                                or target_group.workspace_id != resolved_workspace
+                            ):
+                                raise AppException(
+                                    message=f"Không tìm thấy nhóm tài liệu '{group_id}'.",
+                                    code="DOCUMENT_GROUP_NOT_FOUND",
+                                    status_code=404,
+                                )
+                            membership = DocumentGroupMembership(
+                                group_id=group_id,
+                                document_id=winner_document_id,
+                                added_by=resolved_created_by,
+                                added_at=datetime.now(UTC),
+                            )
+                            db.add(membership)
+                            target_group.updated_at = datetime.now(UTC)
+                            await db.commit()
+                    except IntegrityError as membership_exc:
+                        await db.rollback()
+                        confirmed_mem_stmt = select(DocumentGroupMembership).where(
+                            DocumentGroupMembership.group_id == group_id,
+                            DocumentGroupMembership.document_id == winner_document_id,
+                        )
+                        confirmed_mem = (await db.execute(confirmed_mem_stmt)).scalar_one_or_none()
+                        if not confirmed_mem:
+                            logger.error(
+                                "Membership persistence failed for doc %s in group %s without a concurrent winner",
+                                winner_document_id,
+                                group_id,
+                            )
+                            raise AppException(
+                                message="Không thể gắn tài liệu vào nhóm do xung đột dữ liệu.",
+                                code="DOCUMENT_GROUP_MEMBERSHIP_FAILED",
+                                status_code=409,
+                            ) from membership_exc
+                        logger.info(
+                            "Concurrent membership addition for doc %s in group %s handled idempotently",
+                            winner_document_id,
+                            group_id,
+                        )
+
+                # 4. Resolve real job record if one exists
                 job_stmt = (
                     select(JobRecord)
-                    .where(JobRecord.document_id == winner_doc.id)
+                    .where(JobRecord.document_id == winner_document_id)
                     .order_by(JobRecord.created_at.desc())
                     .limit(1)
                 )
@@ -449,15 +502,15 @@ class DocumentIntakeService:
                 )
 
                 return AsyncUploadDocumentResponse(
-                    document_id=winner_doc.id,
-                    revision_id=winner_rev.id,
-                    revision_no=winner_rev.revision_no,
-                    file_name=winner_rev.source_file_name or winner_doc.file_name,
-                    file_hash=winner_rev.source_hash or winner_doc.file_hash,
+                    document_id=winner_document_id,
+                    revision_id=winner_revision_id,
+                    revision_no=winner_revision_no,
+                    file_name=winner_file_name,
+                    file_hash=winner_file_hash,
                     job_id=resolved_job_id,
-                    status=winner_rev.status,
+                    status=winner_status,
                     deduplicated=True,
-                    created_at=winner_rev.created_at or winner_doc.created_at or datetime.now(UTC),
+                    created_at=winner_created_at,
                 )
 
             # If no winner was found, the transaction failed completely: compensation-delete object
@@ -483,38 +536,5 @@ class DocumentIntakeService:
                 )
             raise
 
-        # 7. Post-commit ARQ dispatch. If Redis is offline, job remains pending for reconciliation.
-        try:
-            arq_job_id = await enqueue_arq_job(
-                "task_document_revision_parse",
-                job_record.id,
-                broker_job_id=f"{job_record.id}:attempt:{job_record.attempt or 0}",
-            )
-            if arq_job_id:
-                job_record.arq_job_id = arq_job_id
-                job_record.dispatch_status = "dispatched"
-                job_record.error = None
-            else:
-                job_record.dispatch_status = "pending"
-                job_record.error = "ARQ Redis offline — job remains pending for reconciliation"
-        except Exception as dispatch_exc:
-            logger.warning("ARQ dispatch failed, retaining pending status: %s", dispatch_exc)
-            job_record.dispatch_status = "pending"
-            job_record.error = f"ARQ Redis offline: {dispatch_exc}"
-
-        await db.commit()
-        await db.refresh(rev)
-
-        return AsyncUploadDocumentResponse(
-            document_id=doc.id,
-            revision_id=rev.id,
-            revision_no=rev.revision_no,
-            file_name=file_name,
-            file_hash=file_hash,
-            job_id=job_id,
-            status="queued",
-            deduplicated=False,
-            created_at=rev.created_at or datetime.now(UTC),
-        )
 
 document_intake_service = DocumentIntakeService()

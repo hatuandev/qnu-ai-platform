@@ -7,6 +7,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_payload, routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 
@@ -18,12 +19,25 @@ class OutputChatNodeHandler(BaseNodeHandler):
     ) -> NodeExecutionResult:
         config = node_spec.config or {}
         output_template = config.get("output_template")
+        payload = routed_payload(context, node_spec.id)
+        has_wired_answer = any(
+            key in payload for key in ("answer", "response", "content", "grounded", "input")
+        )
+        has_wired_answer = has_wired_answer or any(
+            key != "input" for key in context.node_inputs.get(node_spec.id, {})
+        )
 
         if output_template:
             # Predefined static or greeting template
             final_answer = output_template
             citations = []
             status = "answered"
+        elif has_wired_answer:
+            final_answer = routed_text(
+                context, node_spec.id, ("answer", "response", "content", "grounded"), ""
+            )
+            citations = payload.get("citations", [])
+            status = payload.get("status", "answered")
         else:
             # Derived from upstream RAG / LLM node
             final_answer = (
@@ -37,21 +51,37 @@ class OutputChatNodeHandler(BaseNodeHandler):
                 context.node_data.get("rag_status", "answered"),
             )
 
-        warnings = context.node_data.get("artifact_warnings", [])
+        warnings = (
+            payload.get("warnings", [])
+            if has_wired_answer
+            else context.node_data.get("artifact_warnings", [])
+        )
         if warnings:
             final_answer = f"{final_answer}\n\nLưu ý: {'; '.join(warnings)}"
 
         suggested_questions = (
-            context.node_data.get("suggested_questions")
-            or context.outputs.get("suggested_questions")
-            or []
+            payload.get("suggested_questions", [])
+            if has_wired_answer
+            else (
+                context.node_data.get("suggested_questions")
+                or context.outputs.get("suggested_questions")
+                or []
+            )
         )
-        artifacts = context.node_data.get("artifacts") or context.outputs.get("artifacts", [])
+        artifacts = (
+            payload.get("artifacts", [])
+            if has_wired_answer
+            else (context.node_data.get("artifacts") or context.outputs.get("artifacts", []))
+        )
         context.outputs["answer"] = final_answer
         context.outputs["citations"] = citations
         context.outputs["status"] = status
         context.outputs["suggested_questions"] = suggested_questions
-        if artifacts:
+        if has_wired_answer:
+            context.outputs["contexts"] = payload.get("contexts", [])
+            context.outputs["facts_used"] = payload.get("facts_used", [])
+            context.outputs["missing_fields"] = payload.get("missing_fields", [])
+        if artifacts or has_wired_answer:
             context.outputs["artifacts"] = artifacts
 
         return NodeExecutionResult(

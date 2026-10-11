@@ -377,3 +377,28 @@ class GroupDocumentsResponse(BaseModel):
     group_id: str
     items: list[GroupDocumentItem]
     total: int
+
+
+class RepositoryFileRevisionItem(BaseModel):
+    """Immutable representation of a file revision in repository."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    revision_no: int
+    source_file_name: str
+    source_file_type: str
+    source_size_bytes: int
+    source_hash: str
+    source_storage_path: str
+    created_by: str | None = None
+    created_at: datetime
+
+
+class RepositoryFileRevisionResponse(BaseModel):
+    """Response containing list of file revisions for a document."""
+
+    document_id: str
+    items: list[RepositoryFileRevisionItem]
+    total: int

@@ -178,9 +178,8 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
         "models": [
             "bge-m3",
             "bge-reranker-v2-m3",
-            "qwen3-embedding-4b",
         ],
-        "api_base_url": getattr(settings, "VLLM_BASE_URL", "") or "http://tormemrtxproto.tail0924dd.ts.net:8000/v1",
+        "api_base_url": getattr(settings, "VLLM_BASE_URL", "") or "http://100.105.13.53:8000/v1",
         "api_key": "",
         "priority": 1,
         "is_active": True,
@@ -189,7 +188,6 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
             "models": [
                 "bge-m3",
                 "bge-reranker-v2-m3",
-                "qwen3-embedding-4b",
             ],
             "model_specs": {
                 "bge-m3": {
@@ -205,30 +203,32 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "type": "reranker",
                     "description": "BGE-Reranker-v2-M3 — vLLM rerank / score Cross-Encoder tái xếp hạng Top-K",
                 },
-                "qwen3-embedding-4b": {
-                    "can_ocr": False,
-                    "can_vision": False,
-                    "type": "embedding",
-                    "dimension": 2560,
-                    "description": "Qwen3-Embedding-4B (2,560 dims) — vLLM pooling / embeddings đã tải local",
+            },
+            "api_keys": [],
+        },
+    },
+    {
+        "id": "prov_paddleocr_vl",
+        "name": "PaddleOCR-VL On-Premise (RTX 5090)",
+        "provider_type": "paddleocr",
+        "model_name": "PaddleOCR-VL",
+        "models": ["PaddleOCR-VL"],
+        "api_base_url": getattr(settings, "PADDLEOCR_BASE_URL", "") or "http://100.105.13.53:8080",
+        "api_key": "",
+        "priority": 1,
+        "is_active": True,
+        "timeout_seconds": 90,
+        "extra_config": {
+            "models": ["PaddleOCR-VL"],
+            "model_specs": {
+                "PaddleOCR-VL": {
+                    "can_ocr": True,
+                    "can_vision": True,
+                    "type": "vision_ocr",
+                    "description": "PaddleOCR-VL Document Layout Parsing & High-Speed OCR On-Premise",
                 },
             },
-            "api_keys": [
-                {
-                    "id": "key_rtx5090_vllm_primary",
-                    "name": "Tailscale WireGuard On-Premise",
-                    "api_key": "",
-                    "api_key_masked": "ON-PREMISE (NO KEY REQUIRED)",
-                    "priority": 1,
-                    "is_active": True,
-                    "status": "active",
-                    "quota_limit": None,
-                    "usage_tokens": 0,
-                    "cooldown_until": None,
-                    "last_used_at": None,
-                    "created_at": datetime.now(UTC).isoformat(),
-                }
-            ],
+            "api_keys": [],
         },
     },
     {
@@ -725,21 +725,24 @@ class ProviderService:
     async def seed_default_providers(
         self, db: AsyncSession, overwrite: bool = False
     ) -> list[dict[str, Any]]:
-        """Seed standard predefined QNU AI Core provider presets into PostgreSQL database."""
+        """Install missing presets without resetting managed providers or model defaults.
+
+        ``overwrite`` remains accepted for legacy callers, but is deliberately
+        non-destructive. Explicit provider edits belong to the update API.
+        """
         stmt = select(ModelProviderConfig)
         res = await db.execute(stmt)
         existing = {c.id: c for c in res.scalars().all()}
 
         seeded_configs = []
-        # Tự động dọn dẹp nhà cung cấp Ollama cũ đã bị thay thế bởi vLLM
-        if "prov_rtx5090_ollama" in existing:
-            await db.delete(existing["prov_rtx5090_ollama"])
-            del existing["prov_rtx5090_ollama"]
-            logger.info("Đã xóa bỏ nhà cung cấp Ollama cũ (prov_rtx5090_ollama) khỏi CSDL.")
+        from app.modules.modelops.services.local_seed_credentials import (
+            apply_local_seed_credentials,
+        )
 
         for p in STANDARD_QNU_PROVIDERS:
             p_id = p["id"]
-            if p_id in existing and not overwrite:
+            # Seeding installs missing presets; it must not reset user-managed credentials/config.
+            if p_id in existing:
                 seeded_configs.append(existing[p_id])
                 continue
 
@@ -762,27 +765,15 @@ class ProviderService:
                 extra_config=extra,
             )
 
-            if p_id in existing and overwrite:
-                old = existing[p_id]
-                old.name = cfg.name
-                old.provider_type = cfg.provider_type
-                old.model_name = cfg.model_name
-                old.api_base_url = cfg.api_base_url
-                old.api_key_encrypted = cfg.api_key_encrypted
-                old.priority = cfg.priority
-                old.is_active = cfg.is_active
-                old.timeout_seconds = cfg.timeout_seconds
-                old.extra_config = cfg.extra_config
-                seeded_configs.append(old)
-            else:
-                db.add(cfg)
-                seeded_configs.append(cfg)
+            db.add(cfg)
+            await apply_local_seed_credentials(db, cfg)
+            seeded_configs.append(cfg)
 
         await db.commit()
         logger.info("Successfully seeded %d predefined AI Core providers", len(seeded_configs))
 
         from app.modules.modelops.services.model_catalog_service import model_catalog_service
-        await model_catalog_service.seed_system_model_defaults(db, overwrite=overwrite)
+        await model_catalog_service.seed_system_model_defaults(db, overwrite=False)
 
         return [
             {
@@ -1158,11 +1149,24 @@ class ProviderService:
         account_id: str | None = None,
     ) -> tuple[bool, float, str]:
         """Perform real HTTP verification to the provider's API endpoint."""
+        if provider_type.strip().lower() in {"paddleocr", "paddleocr_vl", "paddle"}:
+            if not base_url:
+                return False, 0.0, "Thiếu Base URL PaddleOCR."
+            start = time.perf_counter()
+            try:
+                async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
+                    response = await client.get(f"{base_url.rstrip('/')}/health")
+                latency = round((time.perf_counter() - start) * 1000, 1)
+                if response.status_code == 200:
+                    return True, latency, "PaddleOCR health HTTP 200; không cần khóa. Chưa kiểm thử bóc tách tài liệu."
+                return False, latency, f"PaddleOCR health HTTP {response.status_code}."
+            except httpx.RequestError:
+                return False, 0.0, "Không kết nối được PaddleOCR; kiểm tra URL, mạng hoặc timeout."
         if not api_key:
             return False, 0.0, "Thiếu khóa API Secret Key."
 
         clean_key = decrypt_secret(api_key.strip()) if api_key else ""
-        if (
+        if provider_type not in {"vllm", "tei"} and (
             settings.ENVIRONMENT in ("test", "testing")
             or "mock" in clean_key.lower()
             or "test" in clean_key.lower()
@@ -1296,8 +1300,23 @@ class ProviderService:
         clean_model = model_name.strip()
         m_lower = clean_model.lower()
 
-        # Offline / Mock / Testing environment detection
-        if (
+        if provider_type.strip().lower() in {"paddleocr", "paddleocr_vl", "paddle"}:
+            success, latency, message = await self._ping_provider_api(provider_type, base_url, None)
+            return {
+                "model_name": clean_model, "success": success,
+                "status": "available" if success else "unavailable",
+                "latency_ms": latency, "message": message,
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+        if provider_type in {"vllm", "tei"} and not clean_key:
+            return {
+                "model_name": clean_model, "success": False, "status": "unavailable",
+                "latency_ms": 0.0, "message": "Thiếu khóa API; thêm khóa trong ModelOps trước khi kiểm tra.",
+                "tested_at": datetime.now(UTC).isoformat(),
+            }
+
+        # Keyed vLLM must be checked over HTTP, never marked healthy by a test shortcut.
+        if provider_type not in {"vllm", "tei"} and (
             settings.ENVIRONMENT in ("test", "testing")
             or "mock" in clean_key.lower()
             or "test" in clean_key.lower()

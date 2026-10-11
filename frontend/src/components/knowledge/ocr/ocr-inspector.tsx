@@ -4,6 +4,8 @@ import {
   Code,
   Copy,
   Eye,
+  Layers,
+  Pencil,
   Sparkles,
   Type,
 } from "lucide-react";
@@ -23,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import type { OcrInspectorProps, OcrRightTab } from "./types";
 
 export const OcrInspector: React.FC<OcrInspectorProps> = ({
@@ -35,16 +38,16 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
   markdownViewMode,
   onMarkdownViewModeChange,
   editableMarkdown,
-  onMarkdownChange: _onMarkdownChange,
+  onMarkdownChange,
   selectedRegion: _selectedRegion,
   onSelectRegion: _onSelectRegion,
   onCopyContent,
   isCopied,
-  isEditable: _isEditable = true,
+  isEditable = true,
 }) => {
   const [fontSize, setFontSize] = useState<"sm" | "base">("sm");
 
-  const currentMarkdown = editableMarkdown || pageData?.markdown || "";
+  const currentMarkdown = editableMarkdown;
 
   const formattedMarkdown = useMemo(() => {
     if (!currentMarkdown) return "";
@@ -177,13 +180,11 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
     }
 
     // Trích xuất năm
-    const yearMatch = (locationAndDate || subject || titleSource).match(
-      /\b(202[4-9]|203\d)\b/,
-    );
+    const yearMatch = locationAndDate.match(/\b\d{4}\b/);
     if (yearMatch) {
-      year = yearMatch[1];
+      year = yearMatch[0];
     } else {
-      year = new Date().getFullYear().toString();
+      year = "Chưa xác định";
     }
 
     // Quét chữ ký và nơi nhận trên toàn bộ các trang
@@ -257,8 +258,8 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
         className="flex flex-col h-full"
       >
         {/* Tab Header */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-muted/20 shrink-0">
-          <TabsList className="h-8 bg-muted/60 p-0.5 rounded-md">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-b border-border bg-muted/20 shrink-0">
+          <TabsList className="h-8 max-w-full shrink-0 bg-muted/60 p-0.5 rounded-md overflow-x-auto">
             <TabsTrigger
               value="markdown"
               className="text-xs px-3 h-7 gap-1.5 font-medium"
@@ -273,23 +274,32 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
               <Sparkles className="size-3 text-primary" />
               <span>Thực thể</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="regions"
+              className="text-xs px-3 h-7 gap-1.5 font-medium"
+            >
+              <Layers className="size-3 text-primary" />
+              <span>Vùng nhận diện</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Right actions */}
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setFontSize(fontSize === "sm" ? "base" : "sm")}
               className="px-1.5 py-0.5 text-muted-foreground hover:text-foreground rounded transition-colors text-xs font-serif border border-transparent hover:border-border"
               title="Thay đổi cỡ chữ"
             >
               Aa
-            </button>
+            </Button>
 
             {rightTab === "markdown" && (
               <div className="flex items-center rounded-md border border-border bg-muted/30 p-0.5 text-xs shrink-0">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onMarkdownViewModeChange("rendered")}
                   className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
                     markdownViewMode === "rendered"
@@ -300,9 +310,10 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
                 >
                   <Eye className="size-3 text-primary" />
                   <span>Xem</span>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onMarkdownViewModeChange("raw")}
                   className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded transition-colors whitespace-nowrap shrink-0 ${
                     markdownViewMode === "raw"
@@ -313,7 +324,19 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
                 >
                   <Code className="size-3 text-primary" />
                   <span>Mã</span>
-                </button>
+                </Button>
+                {isEditable && (
+                  <Button
+                    variant={
+                      markdownViewMode === "edit" ? "secondary" : "ghost"
+                    }
+                    size="sm"
+                    className="h-7 px-2 gap-1"
+                    onClick={() => onMarkdownViewModeChange("edit")}
+                  >
+                    <Pencil className="size-3" /> Sửa
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -433,7 +456,7 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
                     </div>
                   </Field>
 
-                  <Field label="Năm áp dụng">
+                  <Field label="Năm ban hành">
                     <div className="flex items-center h-8 px-2.5 rounded-md border border-border/70 bg-muted/20">
                       <span className="font-mono font-medium text-foreground">
                         {extractedEntities.year}
@@ -614,6 +637,90 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
               <pre className="font-mono text-xs p-3 bg-muted/40 rounded-md border border-border whitespace-pre-wrap select-text leading-relaxed">
                 {currentMarkdown || "(Trang không có nội dung)"}
               </pre>
+            )}
+            {markdownViewMode === "edit" && isEditable && (
+              <Textarea
+                aria-label="Hiệu đính Markdown của trang"
+                value={editableMarkdown}
+                onChange={(event) => onMarkdownChange(event.target.value)}
+                className="min-h-[400px] h-full font-mono text-sm leading-relaxed"
+              />
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: REGIONS (Đối soát 2 chiều khung <-> nội dung) */}
+        {rightTab === "regions" && (
+          <div className="flex-1 overflow-auto p-4 space-y-3 select-text">
+            {!pageData?.regions || pageData.regions.length === 0 ? (
+              <div className="py-12 text-center text-xs text-muted-foreground">
+                Không có dữ liệu vùng nhận diện trên trang này.
+              </div>
+            ) : (
+              pageData.regions.map((region, idx) => {
+                const isSelected = _selectedRegion === region;
+                const layoutConf = region.layoutConfidence;
+                const textConf = region.textConfidence;
+
+                return (
+                  <Button
+                    variant="ghost"
+                    key={
+                      region.id ||
+                      `${region.label}-${region.top}-${region.left}`
+                    }
+                    onClick={() => _onSelectRegion?.(region)}
+                    className={`block h-auto w-full whitespace-normal text-left p-3 rounded-lg border text-xs cursor-pointer transition-all space-y-2 ${
+                      isSelected
+                        ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30"
+                        : "border-border bg-card hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono"
+                        >
+                          #{idx + 1}
+                        </Badge>
+                        <span className="font-semibold text-foreground">
+                          {region.label || "Khối văn bản"}
+                        </span>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] font-mono"
+                      >
+                        {region.type}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-foreground/90 font-mono whitespace-pre-wrap leading-relaxed bg-muted/20 p-2 rounded border border-border/50">
+                      {region.text || "(Trống)"}
+                    </p>
+
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+                      <span>
+                        Khung nhận diện:{" "}
+                        <strong className="text-foreground">
+                          {typeof layoutConf === "number"
+                            ? `${Math.round(layoutConf * 100)}%`
+                            : "—"}
+                        </strong>
+                      </span>
+                      <span>
+                        Nhận dạng chữ (OCR):{" "}
+                        <strong className="text-foreground">
+                          {typeof textConf === "number"
+                            ? `${Math.round(textConf * 100)}%`
+                            : "Không được cung cấp"}
+                        </strong>
+                      </span>
+                    </div>
+                  </Button>
+                );
+              })
             )}
           </div>
         )}

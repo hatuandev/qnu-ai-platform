@@ -1,7 +1,6 @@
 import {
   AlertCircle,
   ArrowLeft,
-  Check,
   Download,
   Loader2,
   RefreshCw,
@@ -12,7 +11,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
+import { saveStudioRevision } from "@/features/knowledge/utils/studio-actions";
+import { mapVerificationDataToStudioDoc } from "@/features/knowledge/utils/studio-mapper";
 import {
   type DocumentVerificationData,
   type KnowledgeCollection,
@@ -21,6 +22,7 @@ import {
   type StudioOCRPage,
   type StudioOCRRegion,
 } from "@/services/api-client";
+import { knowledgeApi } from "@/services/knowledge-api";
 import { OcrCanvas } from "./ocr-canvas";
 import { OcrInspector } from "./ocr-inspector";
 import { OcrToolbar } from "./ocr-toolbar";
@@ -29,369 +31,14 @@ import type { OcrRightTab, OcrViewLayoutMode, OcrViewMode } from "./types";
 export interface DocumentStudioWorkspaceProps {
   collection: KnowledgeCollection;
   documentId: string;
+  revisionId?: string;
   onBack: () => void;
-  onApproveSuccess?: () => void;
-}
-
-function classifyStudioRegion(
-  text: string,
-  top: number,
-  height: number,
-  currentType?: string,
-  prevHasBottomTable = false,
-): { type: string; label: string } {
-  const clean = text.trim();
-  const existingType = currentType?.toLowerCase();
-
-  // 1. Giữ nguyên bảng và con dấu nếu backend đã định danh chuẩn
-  if (existingType === "table") {
-    return {
-      type: "table",
-      label:
-        prevHasBottomTable && top <= 15
-          ? "Bảng dữ liệu (tiếp nối)"
-          : "Bảng dữ liệu",
-    };
-  }
-  if (existingType === "stamp") {
-    return { type: "stamp", label: "Con dấu" };
-  }
-
-  // 2. Main Document Title (Ưu tiên cao nhất cho tên loại văn bản như KẾ HOẠCH, QUYẾT ĐỊNH...)
-  if (
-    /^(?:THÔNG BÁO|QUYẾT ĐỊNH|KẾ HOẠCH|QUY ĐỊNH|HƯỚNG DẪN|TỜ TRÌNH|BÁO CÁO|ĐỀ ÁN|PHƯƠNG ÁN|QUY CHẾ)\b/i.test(
-      clean,
-    )
-  ) {
-    return { type: "title", label: "Tiêu đề" };
-  }
-
-  // 3. Header hành chính (Quốc hiệu, Tiêu ngữ, Tên cơ quan, số hiệu)
-  if (
-    existingType === "header" ||
-    (top <= 18 &&
-      (/^(?:bộ\s+|sở\s+|trường\s+|viện\s+|đại học|cộng h[oò][aà]\s+xã hội|độc lập\s*-\s*tự do|số\s*[:/])/i.test(
-        clean,
-      ) ||
-        /cộng h[oò][aà]\s+xã hội\s+chủ nghĩa\s+việt nam/i.test(clean) ||
-        /độc lập\s*-\s*tự do\s*-\s*hạnh phúc/i.test(clean)))
-  ) {
-    return { type: "header", label: "Phần đầu văn bản" };
-  }
-
-  // 4. Signature & Nơi nhận
-  if (existingType === "signature") {
-    return { type: "signature", label: "Chữ ký / Nơi nhận" };
-  }
-  if (top + height >= 65 || top >= 60) {
-    if (
-      /^(?:hiệu trưởng|kt\.\s*hiệu trưởng|phó hiệu trưởng|trưởng phòng|giám đốc|chủ tịch|tl\.\s*hiệu trưởng|nơi nhận\s*[:/])/i.test(
-        clean,
-      )
-    ) {
-      return { type: "signature", label: "Chữ ký / Nơi nhận" };
-    }
-  }
-
-  // 5. Danh sách (list)
-  if (existingType === "list") {
-    return { type: "list", label: "Danh sách" };
-  }
-
-  // 6. Title (tiêu đề số La Mã lớn, in hoa)
-  if (/^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.\s+[A-ZÀ-Ỹ]/i.test(clean)) {
-    return { type: "title", label: "Tiêu đề" };
-  }
-  const firstLine = clean.split("\n")[0].trim();
-  const letters = firstLine.replace(/[^a-zA-ZÀ-ỹ]/g, "");
-  if (
-    top > 12 &&
-    letters.length >= 8 &&
-    letters.length <= 100 &&
-    firstLine.length <= 120
-  ) {
-    const upperCount = (letters.match(/[A-ZÀ-Ỹ]/g) || []).length;
-    if (upperCount / letters.length >= 0.8) {
-      return { type: "title", label: "Tiêu đề" };
-    }
-  }
-
-  // 7. Table continuation rescue
-  const isAdminParagraph =
-    /^(?:[a-z]\.|\d+\.|\+|-\s|Trường hợp|Theo quy định|Căn cứ|Riêng đối với)/i.test(
-      clean,
-    );
-  const hasTableSignals =
-    /\b7\d{6}\b/.test(clean) ||
-    /\b(?:A00|A01|A02|B00|B08|C00|C01|D01|D07|D08|D14|D15|H00|M00|M01|N00|T00|V00)\b/.test(
-      clean,
-    );
-  if (
-    !isAdminParagraph &&
-    hasTableSignals &&
-    ((prevHasBottomTable && top <= 30 && height <= 15) ||
-      (top <= 25 && height <= 12))
-  ) {
-    return { type: "table", label: "Bảng dữ liệu (tiếp nối)" };
-  }
-
-  // 8. Mặc định là Text
-  return { type: "text", label: "Khối văn bản" };
-}
-
-function cleanStudioRegions(regions: StudioOCRRegion[]): StudioOCRRegion[] {
-  const tables = regions.filter((r) => r.type === "table");
-  const nonTables = regions.filter((r) => r.type !== "table");
-
-  // Khử nested sub-tables: nếu bảng con A nằm lọt >= 70% trong bảng cha B, loại bỏ A
-  const validTables = tables.filter((ti, i) => {
-    const areaI = ti.width * ti.height;
-    if (areaI <= 0) return false;
-    for (let j = 0; j < tables.length; j++) {
-      if (i === j) continue;
-      const tj = tables[j];
-      const areaJ = tj.width * tj.height;
-      if (areaJ > areaI) {
-        const ix0 = Math.max(ti.left, tj.left);
-        const iy0 = Math.max(ti.top, tj.top);
-        const ix1 = Math.min(ti.left + ti.width, tj.left + tj.width);
-        const iy1 = Math.min(ti.top + ti.height, tj.top + tj.height);
-        if (ix1 > ix0 && iy1 > iy0) {
-          const interArea = (ix1 - ix0) * (iy1 - iy0);
-          if (interArea / areaI >= 0.7) {
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  });
-
-  // Khử text blocks rơi vào bên trong tables
-  const validNonTables = nonTables.filter((r) => {
-    if (r.type === "signature" || r.type === "header") return true;
-
-    const areaR = r.width * r.height;
-    if (areaR <= 0) return true;
-
-    let totalInterArea = 0;
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-
-    for (const t of validTables) {
-      if (
-        cx >= t.left - 0.5 &&
-        cx <= t.left + t.width + 0.5 &&
-        cy >= t.top - 0.5 &&
-        cy <= t.top + t.height + 0.5
-      ) {
-        return false;
-      }
-
-      const ix0 = Math.max(r.left, t.left);
-      const iy0 = Math.max(r.top, t.top);
-      const ix1 = Math.min(r.left + r.width, t.left + t.width);
-      const iy1 = Math.min(r.top + r.height, t.top + t.height);
-      if (ix1 > ix0 && iy1 > iy0) {
-        totalInterArea += (ix1 - ix0) * (iy1 - iy0);
-      }
-    }
-
-    if (totalInterArea / areaR >= 0.4) {
-      return false;
-    }
-
-    return true;
-  });
-
-  return [...validTables, ...validNonTables];
-}
-
-function mapVerificationDataToStudioDoc(
-  data: DocumentVerificationData,
-): StudioOCRDocument {
-  return {
-    filename: data.filename,
-    totalPages: data.total_pages,
-    size: `${data.file_size_mb} MB`,
-    provider: "QNU Vision OCR",
-    model: data.engine,
-    latencyMs: 120,
-    status: data.status,
-    indexStatus: data.index_status,
-    pdfUrl:
-      data.pdf_url ||
-      `/platform/v1alpha1/knowledge/documents/${data.document_id}/preview-pdf`,
-    pages: data.pages.map((p, pageIdx) => {
-      const prevPage = pageIdx > 0 ? data.pages[pageIdx - 1] : null;
-      let prevTableCoords: { left: number; width: number } | null = null;
-      if (prevPage) {
-        for (const b of prevPage.bounding_boxes || []) {
-          const bType = b.type?.toLowerCase();
-          const rawY = b.coordinates?.y ?? 0;
-          const rawH = b.coordinates?.height ?? 0;
-          const bottom =
-            rawY > 100 ? ((rawY + rawH) / 1131) * 100 : rawY + rawH;
-          if (bType === "table" && bottom >= 60) {
-            const rawX = b.coordinates?.x ?? 0;
-            const rawW = b.coordinates?.width ?? 0;
-            const left = rawX > 100 ? (rawX / 800) * 100 : rawX;
-            const width = rawW > 100 ? (rawW / 800) * 100 : rawW;
-            prevTableCoords = { left, width };
-          }
-        }
-      }
-      const prevHasBottomTable = prevTableCoords !== null;
-
-      const isLandscapePage = p.dimensions
-        ? p.dimensions.width > p.dimensions.height
-        : false;
-      const pageBaseW = isLandscapePage ? 1131 : 800;
-      const pageBaseH = isLandscapePage ? 800 : 1131;
-
-      const hasBoundingBoxes =
-        Array.isArray(p.bounding_boxes) && p.bounding_boxes.length > 0;
-      const mappedRegions: StudioOCRRegion[] = hasBoundingBoxes
-        ? p.bounding_boxes.map((b) => {
-            const rawX = b.coordinates?.x ?? 10;
-            const rawY = b.coordinates?.y ?? 10;
-            const rawW = b.coordinates?.width ?? 80;
-            const rawH = b.coordinates?.height ?? 8;
-
-            const left = Math.max(
-              0,
-              Math.min(98, rawX > 100 ? (rawX / pageBaseW) * 100 : rawX),
-            );
-            const top = Math.max(
-              0,
-              Math.min(98, rawY > 100 ? (rawY / pageBaseH) * 100 : rawY),
-            );
-            const width = Math.max(
-              2,
-              Math.min(
-                100 - left,
-                rawW > 100 ? (rawW / pageBaseW) * 100 : rawW,
-              ),
-            );
-            const height = Math.max(
-              1.5,
-              Math.min(100 - top, rawH > 100 ? (rawH / pageBaseH) * 100 : rawH),
-            );
-
-            const classified = classifyStudioRegion(
-              b.content_snippet || b.label || "",
-              top,
-              height,
-              b.type,
-              prevHasBottomTable,
-            );
-
-            const isContinuation =
-              classified.label.includes("tiếp nối") ||
-              (classified.type === "table" && prevHasBottomTable && top <= 15);
-            const finalLeft =
-              isContinuation && prevTableCoords ? prevTableCoords.left : left;
-            const finalWidth =
-              isContinuation && prevTableCoords ? prevTableCoords.width : width;
-            const isMissedTopRow =
-              isContinuation && top > 6.5 && top <= 10.0 && height <= 3.5;
-            const finalTop = isMissedTopRow
-              ? Math.max(5.0, top - 2.1)
-              : isContinuation
-                ? Math.max(0, top - 0.4)
-                : top;
-            const finalHeight = isMissedTopRow
-              ? height + (top - finalTop)
-              : isContinuation
-                ? height + 0.8
-                : height;
-
-            return {
-              type: classified.type,
-              label: b.label || classified.label,
-              text: b.content_snippet || "",
-              top: finalTop,
-              left: finalLeft,
-              width: finalWidth,
-              height: finalHeight,
-              confidence: b.confidence ?? 0.95,
-            };
-          })
-        : (p.regions || []).map((r, idx) => {
-            const top = Math.min(88, 8 + idx * 9);
-            const left = 8;
-            const width = 84;
-            const height = 7;
-
-            const classified = classifyStudioRegion(
-              r.details || r.title || "",
-              top,
-              height,
-              r.type,
-              prevHasBottomTable,
-            );
-
-            const isContinuation =
-              classified.label.includes("tiếp nối") ||
-              (classified.type === "table" && prevHasBottomTable && top <= 15);
-            const finalLeft =
-              isContinuation && prevTableCoords ? prevTableCoords.left : left;
-            const finalWidth =
-              isContinuation && prevTableCoords ? prevTableCoords.width : width;
-            const isMissedTopRow =
-              isContinuation && top > 6.5 && top <= 10.0 && height <= 3.5;
-            const finalTop = isMissedTopRow
-              ? Math.max(5.0, top - 2.1)
-              : isContinuation
-                ? Math.max(0, top - 0.4)
-                : top;
-            const finalHeight = isMissedTopRow
-              ? height + (top - finalTop)
-              : isContinuation
-                ? height + 0.8
-                : height;
-
-            return {
-              type: classified.type,
-              label: r.title || classified.label,
-              text: r.details || "",
-              top: finalTop,
-              left: finalLeft,
-              width: finalWidth,
-              height: finalHeight,
-              confidence: r.confidence ?? 0.95,
-            };
-          });
-
-      return {
-        pageNumber: p.page_number,
-        title: `Trang ${p.page_number}`,
-        isSigned:
-          (p.regions || []).some((r) => r.type === "signature") ||
-          (p.bounding_boxes || []).some((b) => b.type === "signature"),
-        hasTable:
-          (p.regions || []).some((r) => r.type === "table") ||
-          (p.bounding_boxes || []).some((b) => b.type === "table"),
-        imageUrl:
-          p.image_url ||
-          `/platform/v1alpha1/knowledge/documents/${data.document_id}/pages/${p.page_number}/image`,
-        markdown: p.markdown_content,
-        rawText: p.raw_text,
-        regions: cleanStudioRegions(mappedRegions),
-        dimensions: p.dimensions || {
-          width: isLandscapePage ? 1131 : 800,
-          height: isLandscapePage ? 800 : 1131,
-        },
-        wordCount: p.word_count,
-        lineCount: p.line_count,
-      };
-    }),
-  };
+  onApproveSuccess?: (revisionId?: string) => void;
 }
 
 export const DocumentStudioWorkspace: React.FC<
   DocumentStudioWorkspaceProps
-> = ({ collection, documentId, onBack, onApproveSuccess }) => {
+> = ({ collection, documentId, revisionId, onBack, onApproveSuccess }) => {
   // Document state
   const [doc, setDoc] = useState<StudioOCRDocument | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -411,7 +58,6 @@ export const DocumentStudioWorkspace: React.FC<
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRescanning, setIsRescanning] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
-  const [indexingProgress, setIndexingProgress] = useState<number>(0);
   const [indexingStage, setIndexingStage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -467,8 +113,25 @@ export const DocumentStudioWorkspace: React.FC<
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const verificationData =
-        await ocrStudioApi.getDocumentVerification(documentId);
+      let verificationData: DocumentVerificationData;
+      if (documentId.startsWith("bnd_") || documentId.startsWith("src_")) {
+        verificationData = await knowledgeApi.getSourceStudioView(
+          collection.id,
+          documentId,
+          revisionId,
+        );
+      } else {
+        try {
+          verificationData = await knowledgeApi.getSourceStudioView(
+            collection.id,
+            documentId,
+            revisionId,
+          );
+        } catch {
+          verificationData =
+            await ocrStudioApi.getDocumentVerification(documentId);
+        }
+      }
       const studioDoc = mapVerificationDataToStudioDoc(verificationData);
       setDoc(studioDoc);
       setCurrentPage(1);
@@ -487,7 +150,7 @@ export const DocumentStudioWorkspace: React.FC<
     } finally {
       setIsLoading(false);
     }
-  }, [documentId]);
+  }, [collection.id, documentId, revisionId]);
 
   useEffect(() => {
     loadData();
@@ -510,10 +173,6 @@ export const DocumentStudioWorkspace: React.FC<
   }, [currentPageData]);
 
   const totalPages = doc?.totalPages || doc?.pages?.length || 1;
-
-  const isAlreadyApproved = useMemo(() => {
-    return doc?.status === "ready" || doc?.status === "approved";
-  }, [doc?.status]);
 
   const hasEdits = useMemo(() => {
     if (!doc?.pages) return false;
@@ -545,13 +204,22 @@ export const DocumentStudioWorkspace: React.FC<
   const handleRescanLayout = async () => {
     setIsRescanning(true);
     try {
-      const verificationData = await ocrStudioApi.getDocumentVerification(
-        documentId,
-        true,
-      );
+      let verificationData: DocumentVerificationData;
+      if (documentId.startsWith("bnd_") || documentId.startsWith("src_")) {
+        verificationData = await knowledgeApi.getSourceStudioView(
+          collection.id,
+          documentId,
+          doc?.revisionId || revisionId,
+        );
+      } else {
+        verificationData = await ocrStudioApi.getDocumentVerification(
+          documentId,
+          true,
+        );
+      }
       const studioDoc = mapVerificationDataToStudioDoc(verificationData);
       setDoc(studioDoc);
-      toast.success("Đã làm mới bố cục và tính toán lại các khung nhận diện!");
+      toast.success("Đã tải lại dữ liệu bố cục đã lưu; không chạy OCR lại.");
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "Làm mới bố cục thất bại.";
@@ -561,67 +229,66 @@ export const DocumentStudioWorkspace: React.FC<
     }
   };
 
-  // Approve & Vectorize handler with multi-stage progress
-  const handleApproveAndIndex = async () => {
+  const handleSaveRevision = async (approve = false) => {
     if (!doc) return;
     setIsApproving(true);
-    setIndexingProgress(15);
-    setIndexingStage("Đang lưu nội dung hiệu đính...");
-
-    const stages = [
-      { p: 40, msg: "Phân mảnh ngữ nghĩa (Semantic Chunking)..." },
-      { p: 70, msg: "Tạo vector embeddings đa chiều..." },
-      { p: 90, msg: "Lập chỉ mục Qdrant Vector DB & Fact Layer..." },
-    ];
-    let stageIdx = 0;
-    const progressTimer = setInterval(() => {
-      if (stageIdx < stages.length) {
-        setIndexingProgress(stages[stageIdx].p);
-        setIndexingStage(stages[stageIdx].msg);
-        stageIdx++;
-      }
-    }, 600);
-
+    setIndexingStage(approve ? "Đang duyệt..." : "Đang lưu...");
     try {
-      const pagesPayload = doc.pages.map((p) => ({
-        page_number: p.pageNumber,
-        markdown_content:
-          editedPages[p.pageNumber] !== undefined
-            ? editedPages[p.pageNumber]
-            : p.markdown,
-      }));
-
-      await ocrStudioApi.saveDocumentVerification(documentId, {
-        pages: pagesPayload,
-      });
-
-      clearInterval(progressTimer);
-      setIndexingProgress(100);
-      setIndexingStage("Lập chỉ mục Vector DB hoàn tất thành công!");
-
-      toast.success(
-        isAlreadyApproved
-          ? "Đã cập nhật và tái lập chỉ mục Vector DB đồng bộ!"
-          : "Phê duyệt thành công! Tài liệu đã được đưa vào Kho Tri Thức.",
-      );
-
-      setTimeout(() => {
-        setIsApproving(false);
-        setIndexingProgress(0);
-        setIndexingStage("");
-        setDoc((prev) =>
-          prev ? { ...prev, status: "approved", indexStatus: "indexed" } : null,
+      let savedRevisionId = doc.revisionId;
+      if (documentId.startsWith("bnd_") || documentId.startsWith("src_")) {
+        if (!doc.revisionId)
+          throw new Error("Không xác định được bản đang hiển thị.");
+        const markdown = hasEdits
+          ? doc.pages
+              .map(
+                (p) =>
+                  `<!-- Trang ${p.pageNumber} -->\n\n${editedPages[p.pageNumber] ?? p.markdown}`,
+              )
+              .join("\n\n")
+          : undefined;
+        const targetId = await saveStudioRevision(
+          knowledgeApi,
+          collection.id,
+          documentId,
+          { id: doc.revisionId, status: doc.status },
+          markdown,
+          approve,
         );
-        onApproveSuccess?.();
-      }, 700);
+        const verified = await knowledgeApi.getSourceStudioView(
+          collection.id,
+          documentId,
+          targetId,
+        );
+        const refreshed = mapVerificationDataToStudioDoc(verified);
+        savedRevisionId = refreshed.revisionId;
+        setDoc(refreshed);
+        setEditedPages(
+          Object.fromEntries(
+            refreshed.pages.map((p) => [p.pageNumber, p.markdown]),
+          ),
+        );
+      } else {
+        await ocrStudioApi.saveDocumentVerification(documentId, {
+          pages: doc.pages.map((p) => ({
+            page_number: p.pageNumber,
+            markdown_content: editedPages[p.pageNumber] ?? p.markdown,
+          })),
+        });
+        await loadData();
+      }
+      toast.success(
+        approve
+          ? "Đã duyệt bản bóc tách."
+          : "Đã lưu bản hiệu đính; chỉ mục vector chưa thay đổi.",
+      );
+      onApproveSuccess?.(savedRevisionId);
     } catch (err: unknown) {
-      clearInterval(progressTimer);
+      toast.error(
+        err instanceof Error ? err.message : "Không lưu được bản bóc tách.",
+      );
+    } finally {
       setIsApproving(false);
-      setIndexingProgress(0);
       setIndexingStage("");
-      const msg =
-        err instanceof Error ? err.message : "Phê duyệt tài liệu thất bại.";
-      toast.error(msg);
     }
   };
 
@@ -757,14 +424,14 @@ export const DocumentStudioWorkspace: React.FC<
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <Button
             variant="outline"
             size="sm"
             onClick={handleRescanLayout}
             disabled={isRescanning || isApproving}
             className="h-8 text-xs px-2.5 gap-1.5 text-muted-foreground hover:text-foreground"
-            title="Phân tích lại bố cục và khung nhận diện scan"
+            title="Tải lại dữ liệu bố cục đã lưu"
           >
             {isRescanning ? (
               <Loader2 className="size-3 animate-spin" />
@@ -786,62 +453,58 @@ export const DocumentStudioWorkspace: React.FC<
             <Download className="size-3.5" />
           </Button>
 
-          {/* Primary CTA: Phê duyệt & Lập chỉ mục Vector */}
-          {isAlreadyApproved && !hasEdits ? (
-            <div className="flex items-center gap-1.5">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                className="h-8 text-xs px-3 gap-1.5 font-medium border-primary/30 bg-primary/10 text-primary cursor-default opacity-95"
-              >
-                <Check className="size-3 text-primary" strokeWidth={2.5} />
-                <span>Đã nạp Vector</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleApproveAndIndex}
-                disabled={isApproving}
-                className="h-8 text-xs px-2.5 gap-1.5 font-medium text-muted-foreground hover:text-foreground"
-                title="Tái lập chỉ mục sạch vào Qdrant Vector DB"
-              >
-                <RefreshCw className="size-3" />
-                <span className="hidden sm:inline">Tái index</span>
-              </Button>
-            </div>
-          ) : hasEdits ? (
-            <Button
-              size="sm"
-              onClick={handleApproveAndIndex}
-              disabled={isApproving}
-              className="h-8 text-xs px-3.5 gap-1.5 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-[0.98] transition-all shrink-0 whitespace-nowrap"
-              title="Lưu các nội dung đã hiệu đính và nạp vào Qdrant Vector DB"
-            >
-              {isApproving ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="size-3.5" />
-              )}
-              <span>Cập nhật</span>
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleApproveAndIndex}
-              disabled={isApproving}
-              className="h-8 text-xs px-3.5 gap-1.5 font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-[0.98] transition-all shrink-0 whitespace-nowrap"
-              title="Xác nhận & Nạp Vector vào kho tri thức"
-            >
-              {isApproving ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <ShieldCheck className="size-3.5" />
-              )}
-              <span>Nạp Vector</span>
-            </Button>
-          )}
+          <Button
+            size="sm"
+            onClick={() => handleSaveRevision()}
+            variant="outline"
+            disabled={isApproving || !hasEdits}
+          >
+            Lưu Markdown
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleSaveRevision(true)}
+            disabled={
+              isApproving || hasEdits || doc?.status !== "review_required"
+            }
+          >
+            <ShieldCheck className="size-3.5" /> Duyệt
+          </Button>
+          <VectorLoadControls
+            collectionId={collection.id}
+            targets={
+              doc.revisionId
+                ? [
+                    {
+                      binding_id: documentId,
+                      source_revision_id: doc.revisionId,
+                    },
+                  ]
+                : []
+            }
+            disabledReason={
+              isApproving
+                ? "Đang lưu Markdown."
+                : hasEdits
+                  ? "Hãy lưu Markdown trước khi nạp vector."
+                  : doc.status !== "ready"
+                    ? "Hãy duyệt Markdown trước khi nạp vector."
+                    : undefined
+            }
+          />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+        <Badge variant="outline">
+          {hasEdits
+            ? "Markdown chưa lưu"
+            : doc.status === "ready"
+              ? "MD sẵn sàng"
+              : "Chờ duyệt / xử lý"}
+        </Badge>
+        <span>Lưu Markdown → Duyệt nếu cần → Nạp vector → Xuất bản</span>
       </div>
 
       {/* Indexing Progress Banner */}
@@ -852,11 +515,7 @@ export const DocumentStudioWorkspace: React.FC<
               <Loader2 className="size-3.5 animate-spin" />
               <span>{indexingStage}</span>
             </span>
-            <span className="font-mono text-xs font-bold text-primary">
-              {indexingProgress}%
-            </span>
           </div>
-          <Progress value={indexingProgress} className="h-1.5" />
         </div>
       )}
 

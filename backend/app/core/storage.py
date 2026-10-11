@@ -31,6 +31,10 @@ class StorageDriver(ABC):
     async def delete(self, relative_path: str) -> bool:
         """Delete a file from storage."""
 
+    async def delete_confirmed(self, relative_path: str) -> None:
+        """Idempotent deletion; infrastructure errors must propagate to durable purge."""
+        raise NotImplementedError("Storage driver does not support confirmed deletion")
+
     @abstractmethod
     async def exists(self, relative_path: str) -> bool:
         """Check if file exists in storage."""
@@ -74,6 +78,10 @@ class LocalStorageDriver(StorageDriver):
             await asyncio.to_thread(target.unlink)
             return True
         return False
+
+    async def delete_confirmed(self, relative_path: str) -> None:
+        target = self._resolve(relative_path)
+        await asyncio.to_thread(target.unlink, missing_ok=True)
 
     async def exists(self, relative_path: str) -> bool:
         target = self._resolve(relative_path)
@@ -157,6 +165,10 @@ class S3StorageDriver(StorageDriver):
                 return False
 
         return await asyncio.to_thread(_delete)
+
+    async def delete_confirmed(self, relative_path: str) -> None:
+        await asyncio.to_thread(self.s3_client.delete_object, Bucket=self.bucket,
+                                Key=relative_path.lstrip("/\\"))
 
     async def exists(self, relative_path: str) -> bool:
         clean_key = relative_path.lstrip("/\\")

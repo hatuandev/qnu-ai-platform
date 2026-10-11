@@ -12,6 +12,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,11 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             or (profile.system_prompt if profile else None)
             or "Bạn là Trợ lý AI chính thức của Trường Đại học Quy Nhơn."
         )
-        user_message = (
-            context.node_data.get("user_message")
-            or context.inputs.get("message", "")
+        user_message = routed_text(
+            context,
+            node_spec.id,
+            ("message", "question", "text", "content", "response", "answer"),
+            (context.node_data.get("user_message") or context.inputs.get("message", "")),
         )
 
         messages = [ChatMessage(role="system", content=system_prompt)]
@@ -58,10 +61,7 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             or config.get("fallback_model")
             or (getattr(model_policy, "fallback_model", None) if model_policy else None)
         )
-        preferred_provider_id = (
-            config.get("preferred_provider_id")
-            or config.get("provider_id")
-        )
+        preferred_provider_id = config.get("preferred_provider_id") or config.get("provider_id")
 
         gen_req = LLMGenerateRequest(
             messages=messages,
@@ -84,7 +84,11 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             except Exception as exc:
                 fallback_text = config.get("fallback_text")
                 if fallback_text:
-                    logger.warning("LLM node '%s' generation failed: %s, using fallback_text", node_spec.id, exc)
+                    logger.warning(
+                        "LLM node '%s' generation failed: %s, using fallback_text",
+                        node_spec.id,
+                        exc,
+                    )
                     content = fallback_text
                     provider = "fallback"
                     tokens = 0
@@ -109,6 +113,7 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             status="completed",
             output={
                 "content": content,
+                "response": content,
                 "provider": provider,
                 "total_tokens": tokens,
             },

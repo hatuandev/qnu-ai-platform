@@ -2,6 +2,24 @@
 
 Tài liệu này mô tả chi tiết thứ tự điều phối nạp các container, kiểm tra tính sẵn sàng (Healthcheck Probes) và khởi tạo kết nối hạ tầng khi nền tảng khởi động.
 
+## Local dev cần worker — cập nhật #349
+
+Trên Windows, `make dev` / `.\make.ps1 dev` khởi động API, Frontend và ARQ worker. Nếu API/Frontend đã chạy, dùng `.\make.ps1 worker` để mở riêng worker; launcher dùng PID kèm thời điểm khởi động để tránh mở trùng khi gọi tuần tự. Đây là tiện ích local dev, không phải trình giám sát production hay khóa chống hai launcher chạy đồng thời.
+
+Worker chạy nền, nhật ký stdout/stderr và thông tin PID nằm tại `backend/storage/worker_logs/` (được gitignore). Worker phải truy cập được PostgreSQL, Redis, MinIO/Qdrant và server AI theo cấu hình ModelOps. Heartbeat cập nhật mỗi 15 giây; một health key cũ còn tồn tại không đủ chứng minh worker đang hoạt động. Cần đối chiếu timestamp, process và tiến trình job.
+
+API tạo job vào hàng đợi; worker thực hiện snapshot, parsing/OCR, chunking và build staging nếu đợt có vector generation đích. Đợt chỉ nạp nguồn không tự đồng nghĩa embedding/xuất bản. Worker không khôi phục batch đã hủy. Không reset DB để xử lý queue bị chờ.
+
+Production nhiều người dùng: chạy worker dưới Docker/service có restart và giám sát, tách khỏi API. `max_jobs=10` hiện là giới hạn tác vụ đồng thời **mỗi worker**, không phải cam kết tải OCR 10 file lớn; cần đo RAM, timeout và năng lực server AI trước khi tăng worker/concurrency. Chưa benchmark tải nhiều người dùng trong phiên này.
+
+## Chính sách seed Kho tri thức — cập nhật #347
+
+Reset/seed/khởi động thông thường chỉ tạo 5 kho mặc định **trống**. Không tự thêm tài liệu mẫu, chunks, facts hoặc embedding. Kiểm tra readiness yêu cầu provider và kho mặc định đúng scope, **không yêu cầu kho có chunks**; nếu không, mỗi lần khởi động sẽ nạp mẫu trở lại.
+
+Nội dung chỉ đến từ tài liệu thực tế người dùng nạp. Hàm legacy `seed_demo_knowledge` chỉ dành cho gọi chủ động để thử mẫu, không được gọi bởi `seed_default_knowledge`, CLI seed thông thường hay readiness. Seed không sửa cấu hình/nội dung các kho đã tồn tại.
+
+Với DB cũ đã nạp mẫu, `python -m scripts.clear_seed_knowledge` xem trước; thêm `--apply` để sao lưu vào storage rồi dọn đúng các bản mẫu legacy còn nguyên nội dung. Công cụ từ chối tài liệu/chunks/facts bị chỉnh sửa hoặc thuộc Repository/index revision; không reset DB, không xóa tệp gốc, không drop namespace Qdrant. Bản sao lưu chứa các hàng DB và metadata để có thể phục hồi có kiểm soát.
+
 ---
 
 ## 1. Sơ Đồ Tuần Tự Khởi Động (Boot Sequence Sequence Diagram)

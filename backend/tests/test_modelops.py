@@ -1149,7 +1149,7 @@ async def test_seed_system_model_defaults_lifecycle():
     # 3. Reading defaults now succeeds
     res = await model_catalog_service.get_system_model_defaults(mock_db)
     assert res.defaults.default_embedding_model == "bge-m3"
-    assert res.defaults.default_ocr_model == "gemini-3.1-flash-lite"
+    assert res.defaults.default_ocr_model == cfg.extra_config["defaults"]["default_ocr_model"]
 
 
 

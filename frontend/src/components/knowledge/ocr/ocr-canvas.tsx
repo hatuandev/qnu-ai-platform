@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { type OcrCanvasProps, REGION_COLORS } from "./types";
 
 export const OcrCanvas: React.FC<OcrCanvasProps> = ({
@@ -129,15 +130,13 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
     const naturalH = pageDim?.height ?? page.dimensions?.height ?? 1131;
     const isLandscape = pageDim?.isLandscape ?? naturalW > naturalH;
     const aspectRatio =
-      pageDim?.aspectRatio ?? (isLandscape ? Math.SQRT2 : 1 / Math.SQRT2);
+      pageDim?.aspectRatio ??
+      (naturalW > 0 && naturalH > 0 ? naturalW / naturalH : 1);
 
     const idealBaseWidth = isLandscape
       ? Math.min(containerWidth, 1200)
       : Math.min(containerWidth, 840);
     const pageRenderWidth = Math.round((idealBaseWidth * zoomLevel) / 100);
-
-    const baseW = isLandscape ? 1131 : 800;
-    const baseH = isLandscape ? 800 : 1131;
 
     return (
       <div
@@ -193,65 +192,41 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
                 [page.pageNumber]: true,
               }));
             }}
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (!target.src.includes("/ocr-cache/doc_ts_2026/")) {
-                target.src = `/ocr-cache/doc_ts_2026/page_${page.pageNumber}.jpg`;
-              } else {
-                setLoadedImages((prev) => ({
-                  ...prev,
-                  [page.pageNumber]: true,
-                }));
-              }
+            onError={() => {
+              setLoadedImages((prev) => ({
+                ...prev,
+                [page.pageNumber]: true,
+              }));
             }}
           />
 
           {/* Tầng 2: Visual Document AI Bounding Boxes Layer */}
           {showBoxes && (
             <div className="absolute inset-0 pointer-events-none z-10">
-              {pageRegions.map((region, idx) => {
+              {pageRegions.map((region) => {
                 const colorStyle =
                   REGION_COLORS[region.type] || REGION_COLORS.text;
                 const isSelected = selectedRegion === region;
 
-                // Safe coordinate normalization
-                const safeLeft = Math.max(
-                  0,
-                  Math.min(
-                    99,
-                    region.left > 100
-                      ? (region.left / baseW) * 100
-                      : region.left,
-                  ),
-                );
-                const safeTop = Math.max(
-                  0,
-                  Math.min(
-                    99,
-                    region.top > 100 ? (region.top / baseH) * 100 : region.top,
-                  ),
-                );
-                const rawWidth =
-                  region.width > 100
-                    ? (region.width / baseW) * 100
-                    : region.width;
-                const rawHeight =
-                  region.height > 100
-                    ? (region.height / baseH) * 100
-                    : region.height;
+                // Mapper supplies percentages; never infer coordinate units by magnitude.
+                const safeLeft = Math.max(0, Math.min(100, region.left));
+                const safeTop = Math.max(0, Math.min(100, region.top));
                 const safeWidth = Math.max(
-                  1,
-                  Math.min(100 - safeLeft, rawWidth),
+                  0,
+                  Math.min(100 - safeLeft, region.width),
                 );
                 const safeHeight = Math.max(
-                  1,
-                  Math.min(100 - safeTop, rawHeight),
+                  0,
+                  Math.min(100 - safeTop, region.height),
                 );
 
-                const boxKey = `box-${page.pageNumber}-${region.type}-${idx}-${safeTop.toFixed(1)}-${safeLeft.toFixed(1)}`;
+                const boxKey =
+                  region.id ||
+                  `box-${page.pageNumber}-${region.type}-${safeTop}-${safeLeft}`;
 
                 return (
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     key={boxKey}
                     onClick={() => onSelectRegion(region)}
@@ -280,7 +255,7 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
                     >
                       {region.type || region.label}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -304,7 +279,8 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
       {layoutMode === "single" && activePage && totalPagesCount > 1 && (
         <>
           {/* Floating Prev Button */}
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={() => onPageChange?.(activePage.pageNumber - 1)}
             disabled={activePage.pageNumber <= 1}
@@ -313,10 +289,11 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
             aria-label="Trang trước"
           >
             <ChevronLeft className="size-4.5" />
-          </button>
+          </Button>
 
           {/* Floating Next Button */}
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={() => onPageChange?.(activePage.pageNumber + 1)}
             disabled={activePage.pageNumber >= totalPagesCount}
@@ -325,7 +302,7 @@ export const OcrCanvas: React.FC<OcrCanvasProps> = ({
             aria-label="Trang sau"
           >
             <ChevronRight className="size-4.5" />
-          </button>
+          </Button>
 
           {/* Floating Bottom Page Indicator Pill */}
           <div className="sticky bottom-3 mx-auto px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700/80 shadow-md text-zinc-200 text-xs font-mono font-medium flex items-center gap-2 z-20 backdrop-blur-xs">

@@ -40,24 +40,32 @@ class VectorIndexer:
             return clean_id
         return f"col_{clean_id}"
 
-    async def ensure_collection(self, collection_id: str, vector_size: int | None = None) -> str:
+    async def ensure_collection(self, collection_id: str, vector_size: int | None = None, qdrant_collection_name: str | None = None) -> str:
         """Create collection on Qdrant if not exist, or strictly verify dimension compatibility."""
-        cname = self._get_collection_name(collection_id)
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
         target_size = vector_size or self.vector_size
         try:
             collections = await self.client.get_collections()
             existing_names = [c.name for c in collections.collections]
+            created = False
             if cname not in existing_names:
-                await self.client.create_collection(
-                    collection_name=cname,
-                    vectors_config=qmodels.VectorParams(
-                        size=target_size,
-                        distance=qmodels.Distance.COSINE,
-                    ),
-                    hnsw_config=qmodels.HnswConfigDiff(m=16, ef_construct=100),
-                )
-                logger.info("Created Qdrant collection: %s (dim=%d)", cname, target_size)
-            else:
+                try:
+                    await self.client.create_collection(
+                        collection_name=cname,
+                        vectors_config=qmodels.VectorParams(
+                            size=target_size,
+                            distance=qmodels.Distance.COSINE,
+                        ),
+                        hnsw_config=qmodels.HnswConfigDiff(m=16, ef_construct=100),
+                    )
+                    created = True
+                    logger.info("Created Qdrant collection: %s (dim=%d)", cname, target_size)
+                except Exception as create_exc:
+                    if "already exists" in str(create_exc).lower() or "409" in str(create_exc):
+                        logger.info("Qdrant collection %s was created concurrently by another worker", cname)
+                    else:
+                        raise
+            if not created:
                 col_info = await self.client.get_collection(cname)
                 cfg = getattr(col_info, "config", None)
                 params = getattr(cfg, "params", None)
@@ -129,7 +137,10 @@ class VectorIndexer:
             try:
                 from sqlalchemy import select
 
-                from app.modules.knowledge.models import KnowledgeCollection
+                from app.modules.knowledge.models import (
+                    KnowledgeCollection,
+                    KnowledgeVectorGeneration,
+                )
 
                 async with AsyncSessionFactory() as db:
                     stmt = select(KnowledgeCollection).where(
@@ -139,11 +150,19 @@ class VectorIndexer:
                     res = await db.execute(stmt)
                     col = res.scalar_one_or_none()
                     if col and col.collection_metadata:
-                        dp = col.collection_metadata.get("data_processing") or {}
-                        if dp.get("embedding_model"):
-                            preferred_model_name = dp.get("embedding_model")
-                        if dp.get("embedding_provider_id"):
-                            preferred_provider_id = dp.get("embedding_provider_id")
+                        act_gen_id = col.collection_metadata.get("active_vector_generation_id")
+                        if act_gen_id:
+                            gen = await db.get(KnowledgeVectorGeneration, act_gen_id)
+                            if gen and gen.embedding_model:
+                                preferred_model_name = gen.embedding_model
+                                preferred_provider_id = gen.provider_id
+
+                        if not preferred_model_name:
+                            dp = col.collection_metadata.get("data_processing") or {}
+                            if dp.get("embedding_model"):
+                                preferred_model_name = dp.get("embedding_model")
+                            if dp.get("embedding_provider_id"):
+                                preferred_provider_id = dp.get("embedding_provider_id")
             except Exception as exc:
                 logger.warning(
                     "Could not load data_processing config for collection %s: %s",
@@ -472,7 +491,10 @@ class VectorIndexer:
                     details={"chunk_id": chunk_id, "missing_fields": missing_fields},
                 )
 
-        cname = await self.ensure_collection(collection_id, vector_size=target_size)
+        cname = await self.ensure_collection(
+            collection_id, vector_size=target_size,
+            qdrant_collection_name=vector_generation.qdrant_collection_name if vector_generation else None,
+        )
         points: list[qmodels.PointStruct] = []
 
         missing = [str(c["content"]) for c in chunks if not c.get("vector")]
@@ -684,9 +706,10 @@ class VectorIndexer:
         collection_id: str,
         index_revision_id: str,
         expected_points: dict[str, str],
+        qdrant_collection_name: str | None = None,
     ) -> tuple[bool, str, int]:
         """Verify exact point IDs, revision scope and content hashes for one index artifact."""
-        cname = self._get_collection_name(collection_id)
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
         expected_count = len(expected_points)
         try:
             exists = await self.client.collection_exists(cname)
@@ -742,9 +765,10 @@ class VectorIndexer:
         collection_id: str,
         index_revision_id: str,
         expected_count: int,
+        qdrant_collection_name: str | None = None,
     ) -> int:
         """Make exactly one immutable index artifact retrievable and verify the affected count."""
-        cname = self._get_collection_name(collection_id)
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
         revision_filter = qmodels.Filter(
             must=[
                 qmodels.FieldCondition(
@@ -785,8 +809,10 @@ class VectorIndexer:
         self,
         collection_id: str,
         index_revision_id: str,
+        qdrant_collection_name: str | None = None,
     ) -> None:
         """Close an old artifact after the PostgreSQL pointer has moved."""
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
         revision_filter = qmodels.Filter(
             must=[
                 qmodels.FieldCondition(
@@ -797,7 +823,7 @@ class VectorIndexer:
         )
         try:
             await self.client.set_payload(
-                collection_name=self._get_collection_name(collection_id),
+                collection_name=cname,
                 payload={"is_retrievable": False, "document_status": "archived"},
                 points=revision_filter,
             )
@@ -940,13 +966,35 @@ class VectorIndexer:
                 status_code=503,
             ) from exc
 
+    async def delete_source_points(self, collection_id: str, binding_id: str, namespace: str,
+                                   *, tenant_id: str, workspace_id: str) -> None:
+        """Delete one source across an embedding namespace and verify acknowledgement."""
+        source_filter = qmodels.Filter(must=[
+            qmodels.FieldCondition(key="collection_id", match=qmodels.MatchValue(value=collection_id)),
+            qmodels.FieldCondition(key="binding_id", match=qmodels.MatchValue(value=binding_id)),
+            qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)),
+            qmodels.FieldCondition(key="workspace_id", match=qmodels.MatchValue(value=workspace_id)),
+        ])
+        try:
+            if not await self.client.collection_exists(namespace):
+                return
+            await self.client.delete(collection_name=namespace,
+                                     points_selector=qmodels.FilterSelector(filter=source_filter), wait=True)
+            remaining = await self.client.count(collection_name=namespace, count_filter=source_filter, exact=True)
+            if remaining.count:
+                raise RuntimeError(f"Remaining source points: {remaining.count}")
+        except Exception as exc:
+            raise AppException("Không thể xóa vector của nguồn; vui lòng thử lại.",
+                               code="SOURCE_VECTOR_DELETE_FAILED", status_code=503) from exc
+
     async def delete_points_by_index_revision(
         self,
         collection_id: str,
         index_revision_id: str,
+        qdrant_collection_name: str | None = None,
     ) -> int:
         """Safely delete all Qdrant vector points associated with a specific index_revision_id."""
-        cname = self._get_collection_name(collection_id)
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
         try:
             rev_filter = qmodels.Filter(
                 must=[
@@ -1000,17 +1048,40 @@ class VectorIndexer:
         tenant_id: str | None = None,
         workspace_id: str | None = None,
         snapshot: Any | None = None,
+        qdrant_collection_name: str | None = None,
     ) -> list[dict[str, Any]]:
         """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, score threshold and snapshot isolation filtering."""
-        cname = self._get_collection_name(collection_id)
+        cname = qdrant_collection_name or self._get_collection_name(collection_id)
+        snapshot_generation = None
+        if snapshot:
+            vg_map = getattr(snapshot, "vector_generations", None) or {}
+            if vg_map:
+                try:
+                    from app.modules.knowledge.models import KnowledgeVectorGeneration
+
+                    first_vg_id = next(iter(vg_map.values()))
+                    async with AsyncSessionFactory() as db:
+                        vg = await db.get(KnowledgeVectorGeneration, first_vg_id)
+                        if vg and vg.qdrant_collection_name:
+                            snapshot_generation = vg
+                            cname = qdrant_collection_name or vg.qdrant_collection_name
+                except Exception as exc:
+                    raise AppException("Không thể phân giải vector snapshot.", code="SNAPSHOT_GENERATION_UNAVAILABLE", status_code=503) from exc
         try:
             if snapshot is not None and not getattr(snapshot, "binding_revisions", None):
                 return []
             if query_vector is not None:
                 vec = query_vector
             else:
-                embedding_runtime = await self._resolve_embedding_runtime(collection_id=collection_id)
-                embedded = await self.embed_texts([query], runtime=embedding_runtime)
+                embedding_runtime = await self._resolve_embedding_runtime(
+                    collection_id=collection_id,
+                    preferred_provider_id=snapshot_generation.provider_id if snapshot_generation else None,
+                    preferred_model_name=snapshot_generation.embedding_model if snapshot_generation else None,
+                )
+                embedded = await self.embed_texts(
+                    [query], runtime=embedding_runtime,
+                    target_dim=snapshot_generation.embedding_dimension if snapshot_generation else None,
+                )
                 if not embedded:
                     return []
                 vec = embedded[0]
@@ -1045,21 +1116,28 @@ class VectorIndexer:
                 )
 
             if snapshot and getattr(snapshot, "binding_revisions", None):
-                revision_pairs = [
-                    qmodels.Filter(
-                        must=[
+                revision_pairs = []
+                snapshot_vg = getattr(snapshot, "vector_generations", None) or {}
+                for binding_id, revision_id in snapshot.binding_revisions.items():
+                    clause = [
+                        qmodels.FieldCondition(
+                            key="binding_id",
+                            match=qmodels.MatchValue(value=binding_id),
+                        ),
+                        qmodels.FieldCondition(
+                            key="index_revision_id",
+                            match=qmodels.MatchValue(value=revision_id),
+                        ),
+                    ]
+                    expected_vg = snapshot_vg.get(binding_id)
+                    if expected_vg:
+                        clause.append(
                             qmodels.FieldCondition(
-                                key="binding_id",
-                                match=qmodels.MatchValue(value=binding_id),
-                            ),
-                            qmodels.FieldCondition(
-                                key="index_revision_id",
-                                match=qmodels.MatchValue(value=revision_id),
-                            ),
-                        ]
-                    )
-                    for binding_id, revision_id in snapshot.binding_revisions.items()
-                ]
+                                key="vector_generation_id",
+                                match=qmodels.MatchValue(value=expected_vg),
+                            )
+                        )
+                    revision_pairs.append(qmodels.Filter(must=clause))
                 must_conditions.append(qmodels.Filter(should=revision_pairs))
 
             qfilter = qmodels.Filter(must=must_conditions)
@@ -1095,6 +1173,7 @@ class VectorIndexer:
                     continue
                 point_binding = payload.get("binding_id")
                 point_rev = payload.get("index_revision_id")
+                point_vg = payload.get("vector_generation_id")
                 if snapshot is not None:
                     expected_revision = snapshot.binding_revisions.get(point_binding)
                     if expected_revision is None or point_rev != expected_revision:
@@ -1103,6 +1182,17 @@ class VectorIndexer:
                             snapshot.snapshot_id,
                             point_binding,
                             point_rev,
+                        )
+                        continue
+                    snapshot_vg = getattr(snapshot, "vector_generations", None) or {}
+                    expected_vg = snapshot_vg.get(point_binding)
+                    if expected_vg and point_vg and point_vg != expected_vg:
+                        logger.warning(
+                            "Qdrant returned a point with mismatched vector generation in snapshot %s: binding=%s expected=%s actual=%s",
+                            snapshot.snapshot_id,
+                            point_binding,
+                            expected_vg,
+                            point_vg,
                         )
                         continue
 

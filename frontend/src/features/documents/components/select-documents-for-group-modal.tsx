@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckSquare, FileText, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -28,6 +27,14 @@ interface SelectDocumentsForGroupModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupId: string;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
 export function SelectDocumentsForGroupModal({
@@ -147,7 +154,7 @@ export function SelectDocumentsForGroupModal({
                   </TableHead>
                   <TableHead className="text-xs">Tên Tài Liệu</TableHead>
                   <TableHead className="w-32 text-xs">Loại / Tệp</TableHead>
-                  <TableHead className="w-28 text-xs">Trạng Thái MD</TableHead>
+                  <TableHead className="w-28 text-xs text-right">Dung Lượng</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,23 +189,8 @@ export function SelectDocumentsForGroupModal({
                       <TableCell className="text-xs text-muted-foreground">
                         {doc.document_type_name || doc.file_type.toUpperCase()}
                       </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            doc.parse_status === "parsed"
-                              ? "default"
-                              : doc.parse_status === "failed"
-                                ? "destructive"
-                                : "outline"
-                          }
-                          className="text-[10px]"
-                        >
-                          {doc.parse_status === "parsed"
-                            ? "Ready"
-                            : doc.parse_status === "failed"
-                              ? "Lỗi"
-                              : "Đang xử lý"}
-                        </Badge>
+                      <TableCell className="text-xs text-muted-foreground text-right font-mono">
+                        {formatFileSize(doc.file_size_bytes)}
                       </TableCell>
                     </TableRow>
                   );

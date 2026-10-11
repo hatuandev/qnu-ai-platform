@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import EntityNotFoundError
+from app.core.exceptions import AppException, EntityNotFoundError
 from app.modules.auth.dependencies import AuthActor
 from app.modules.knowledge.models import (
     KnowledgeBinding,
@@ -78,6 +78,7 @@ async def get_scoped_binding(
     binding_id: str,
     actor: AuthActor | None = None,
     for_update: bool = False,
+    allow_deleting: bool = False,
 ) -> KnowledgeBinding:
     """Retrieve a KnowledgeBinding ensuring it belongs to actor's tenant/workspace."""
     if actor is None and not for_update:
@@ -86,6 +87,8 @@ async def get_scoped_binding(
             raise EntityNotFoundError(
                 f"Không tìm thấy liên kết tài liệu '{binding_id}' trong phạm vi quản lý."
             )
+        if binding.status == "deleting" and not allow_deleting:
+            raise AppException("Nguồn đang xóa vĩnh viễn.", code="SOURCE_DELETING", status_code=409)
         return binding
 
     stmt = select(KnowledgeBinding).where(KnowledgeBinding.id == binding_id)
@@ -104,6 +107,8 @@ async def get_scoped_binding(
             f"Không tìm thấy liên kết tài liệu '{binding_id}' trong phạm vi quản lý."
         )
 
+    if binding.status == "deleting" and not allow_deleting:
+        raise AppException("Nguồn đang xóa vĩnh viễn.", code="SOURCE_DELETING", status_code=409)
     return binding
 
 

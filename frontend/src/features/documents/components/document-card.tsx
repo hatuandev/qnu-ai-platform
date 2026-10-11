@@ -1,19 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import {
   ArrowUpRight,
-  BookOpen,
   Calendar,
-  CheckCircle2,
-  Clock,
   Download,
   FileCode,
   FileSpreadsheet,
   FileText,
+  HardDrive,
   Hash,
   MoreVertical,
-  RefreshCw,
   Trash2,
-  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +29,6 @@ interface DocumentCardProps {
   document: RepositoryDocumentListItem;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
-  onReparse: (doc: RepositoryDocumentListItem) => void;
   onDelete: (doc: RepositoryDocumentListItem) => void;
 }
 
@@ -62,7 +57,6 @@ export function DocumentCard({
   document,
   selected = false,
   onToggleSelect,
-  onReparse,
   onDelete,
 }: DocumentCardProps) {
   const downloadUrl = documentsApi.getDownloadUrl(document.id);
@@ -114,7 +108,7 @@ export function DocumentCard({
                 <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem asChild>
                 <Link
                   to="/documents/$documentId"
@@ -122,7 +116,7 @@ export function DocumentCard({
                   className="gap-2 cursor-pointer"
                 >
                   <ArrowUpRight className="size-4 text-muted-foreground" />
-                  Xem Chi Tiết & MD
+                  Xem Chi Tiết
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -134,13 +128,6 @@ export function DocumentCard({
                   <Download className="size-4 text-muted-foreground" />
                   Tải Về Tệp Gốc
                 </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onReparse(document)}
-                className="gap-2 cursor-pointer"
-              >
-                <RefreshCw className="size-4 text-muted-foreground" />
-                Bóc Tách Lại MD
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -154,7 +141,7 @@ export function DocumentCard({
           </DropdownMenu>
         </div>
 
-        {/* Metadata Badges: Số hiệu & Loại VB */}
+        {/* Metadata Badges: Số hiệu & Loại VB & Nhóm */}
         <div className="flex flex-wrap items-center gap-1.5 mt-3.5">
           {document.document_number && (
             <Badge
@@ -175,34 +162,12 @@ export function DocumentCard({
             </Badge>
           )}
 
-          {/* Parse status */}
-          {document.parse_status === "parsed" && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-[11px] py-0 h-5 border-success/30 text-success bg-success/10"
-            >
-              <CheckCircle2 className="size-3" />
-              Markdown Sạch
-            </Badge>
-          )}
-          {document.parse_status === "parsing" && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-[11px] py-0 h-5 border-warning/30 text-warning bg-warning/10"
-            >
-              <Clock className="size-3 animate-spin" />
-              Đang Bóc Tách
-            </Badge>
-          )}
-          {document.parse_status === "failed" && (
-            <Badge
-              variant="outline"
-              className="gap-1 text-[11px] py-0 h-5 border-destructive/30 text-destructive bg-destructive/10"
-            >
-              <XCircle className="size-3" />
-              Lỗi Bóc Tách
-            </Badge>
-          )}
+          <Badge
+            variant="outline"
+            className="text-[10px] py-0 h-5 uppercase font-mono text-muted-foreground"
+          >
+            .{document.file_type}
+          </Badge>
 
           {document.groups && document.groups.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 w-full pt-1">
@@ -219,23 +184,15 @@ export function DocumentCard({
           )}
         </div>
 
-        {/* Footer info: Kho tri thức gắn & Ngày tạo */}
+        {/* Footer info: Dung lượng & Ngày tải */}
         <div className="mt-auto pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <BookOpen className="size-3.5 text-primary" />
-            <span>
-              {document.attached_collections_count > 0 ? (
-                <span className="font-medium text-foreground">
-                  Gắn trong {document.attached_collections_count} Kho
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Chưa gắn kho nào</span>
-              )}
-            </span>
+            <HardDrive className="size-3.5 text-muted-foreground" />
+            <span>{formatFileSize(document.file_size_bytes)}</span>
           </div>
 
           <div className="flex items-center gap-1">
-            <Calendar className="size-3" />
+            <Calendar className="size-3 text-muted-foreground" />
             <span>
               {new Date(document.created_at).toLocaleDateString("vi-VN")}
             </span>

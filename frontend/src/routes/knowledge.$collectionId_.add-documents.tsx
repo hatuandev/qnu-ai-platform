@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AddDocumentsPage } from "@/features/knowledge/add-documents-page";
 
-export const Route = createFileRoute("/knowledge/$collectionId/add-documents")({
+export const Route = createFileRoute("/knowledge/$collectionId_/add-documents")({
   component: AddDocumentsRoute,
 });
 

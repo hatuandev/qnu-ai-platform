@@ -1,4 +1,4 @@
-"""Database seeder for default official QNU knowledge collections, documents, and facts."""
+"""Empty collection presets; legacy sample content is available only by explicit invocation."""
 
 from __future__ import annotations
 
@@ -1123,6 +1123,32 @@ async def seed_question_bank_knowledge(db: AsyncSession) -> dict[str, int]:
 
 
 async def seed_default_knowledge(db: AsyncSession) -> dict[str, int]:
+    """Create empty collection presets only; content must come from real ingestion."""
+    presets = (
+        (DECREE_30_COLLECTION_ID, "Kho tri thức soạn thảo văn bản", "drafting"),
+        (REGULATIONS_COLLECTION_ID, "Kho tri thức quy chế học vụ", "regulations"),
+        (ADMISSIONS_COLLECTION_ID, "Kho tri thức tư vấn tuyển sinh", "admissions"),
+        (LIBRARY_COLLECTION_ID, "Kho tri thức thư viện", "library"),
+        (QUESTION_BANK_COLLECTION_ID, "Kho tri thức ngân hàng câu hỏi", "question_bank"),
+    )
+    created = 0
+    for collection_id, name, module_code in presets:
+        existing = (await db.execute(select(KnowledgeCollection).where(
+            KnowledgeCollection.id == collection_id,
+        ))).scalar_one_or_none()
+        if existing is not None:
+            continue  # Never overwrite user collection settings or content.
+        db.add(KnowledgeCollection(
+            id=collection_id, name=name, module_code=module_code,
+            tenant_id=DEFAULT_SEED_TENANT_ID, workspace_id=DEFAULT_SEED_WORKSPACE_ID,
+            collection_metadata={"document_count": 0, "chunk_count": 0},
+        ))
+        created += 1
+    await db.commit()
+    return {"collections_seeded": created, "documents_seeded": 0, "chunks_seeded": 0, "facts_seeded": 0}
+
+
+async def seed_demo_knowledge(db: AsyncSession) -> dict[str, int]:
     """Seed all official QNU default knowledge collections (Decree 30, Regulations, Admissions, Library, and Question Bank)."""
     res_drafting = await seed_drafting_knowledge(db)
     res_regulations = await seed_regulations_knowledge(db)

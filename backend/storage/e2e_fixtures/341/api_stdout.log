@@ -1,0 +1,73 @@
+2026-10-11T07:18:26.924855Z [info     ] Starting QNU.AI Platform Backend [app.main] environment=development port=8001 service=qnu-ai-platform
+2026-10-11T07:18:27.402347Z [info     ] setup plugin alembic.autogenerate.schemas [alembic.runtime.plugins]
+2026-10-11T07:18:27.416113Z [info     ] setup plugin alembic.autogenerate.tables [alembic.runtime.plugins]
+2026-10-11T07:18:27.429808Z [info     ] setup plugin alembic.autogenerate.types [alembic.runtime.plugins]
+2026-10-11T07:18:27.445431Z [info     ] setup plugin alembic.autogenerate.constraints [alembic.runtime.plugins]
+2026-10-11T07:18:27.461640Z [info     ] setup plugin alembic.autogenerate.defaults [alembic.runtime.plugins]
+2026-10-11T07:18:27.478139Z [info     ] setup plugin alembic.autogenerate.comments [alembic.runtime.plugins]
+2026-10-11T07:18:27.483861Z [info     ] setup plugin alembic.ext.checkconstraint_byname [alembic.runtime.plugins]
+2026-10-11T07:18:27.526740Z [info     ] Checking database and seed data readiness... [qnu-cli]
+2026-10-11T07:18:27.618945Z [info     ] Checking database connection and schema integrity... [qnu-cli]
+2026-10-11T07:18:27.632236Z [info     ] Database connection: OK        [qnu-cli]
+2026-10-11T07:18:27.651985Z [info     ] Current Alembic revision: 20261011_independent_index [qnu-cli]
+2026-10-11T07:18:27.722207Z [info     ] All required core tables are present (47 total tables). [qnu-cli]
+2026-10-11T07:18:27.725480Z [info     ] Database schema check: PASSED. [qnu-cli]
+2026-10-11T07:18:27.847793Z [info     ] Core seed verification passed: 11 providers and 5 visible knowledge collections. [qnu-cli]
+2026-10-11T07:18:27.850022Z [info     ] Du lieu mau da san sang.       [qnu-cli]
+2026-10-11T07:18:27.852394Z [info     ] Database va du lieu nen tang QNU AI Platform: SAN SANG. [qnu-cli]
+2026-10-11T07:18:27.867302Z [info     ] Live synchronized Cloudflare credentials into runtime settings [app.modules.modelops.services.provider_service]
+2026-10-11T07:18:27.869689Z [info     ] Synchronized 2 active model provider credentials into runtime settings [app.main]
+2026-10-11T07:19:53.436281Z [info     ] Created knowledge collection: id=col_b04b7104008f, name=E2E 341 v2 - Runtime mới [app.modules.knowledge.services.collection_service] correlation_id=corr_917afc7242f3 method=POST path=/platform/v1alpha1/knowledge/collections
+ 2026-10-11T07:23:18.745379Z [info     ] Shutting down QNU.AI Platform Backend... [app.main]
+2026-10-11T07:23:18.770549Z [info     ] Database connection pool closed. [app.main]
+2026-10-11T07:23:25.021113Z [info     ] Starting QNU.AI Platform Backend [app.main] environment=development port=8001 service=qnu-ai-platform
+2026-10-11T07:23:25.221659Z [info     ] setup plugin alembic.autogenerate.schemas [alembic.runtime.plugins]
+2026-10-11T07:23:25.221659Z [info     ] setup plugin alembic.autogenerate.tables [alembic.runtime.plugins]
+2026-10-11T07:23:25.226478Z [info     ] setup plugin alembic.autogenerate.types [alembic.runtime.plugins]
+2026-10-11T07:23:25.228037Z [info     ] setup plugin alembic.autogenerate.constraints [alembic.runtime.plugins]
+2026-10-11T07:23:25.229525Z [info     ] setup plugin alembic.autogenerate.defaults [alembic.runtime.plugins]
+2026-10-11T07:23:25.230548Z [info     ] setup plugin alembic.autogenerate.comments [alembic.runtime.plugins]
+2026-10-11T07:23:25.231568Z [info     ] setup plugin alembic.ext.checkconstraint_byname [alembic.runtime.plugins]
+2026-10-11T07:23:25.253475Z [info     ] Checking database and seed data readiness... [qnu-cli]
+2026-10-11T07:23:25.351839Z [info     ] Checking database connection and schema integrity... [qnu-cli]
+2026-10-11T07:23:25.363539Z [info     ] Database connection: OK        [qnu-cli]
+2026-10-11T07:23:25.377955Z [info     ] Current Alembic revision: 20261011_independent_index [qnu-cli]
+2026-10-11T07:23:25.414178Z [info     ] All required core tables are present (47 total tables). [qnu-cli]
+2026-10-11T07:23:25.418094Z [info     ] Database schema check: PASSED. [qnu-cli]
+2026-10-11T07:23:25.511384Z [info     ] Core seed verification passed: 11 providers and 5 visible knowledge collections. [qnu-cli]
+2026-10-11T07:23:25.512847Z [info     ] Du lieu mau da san sang.       [qnu-cli]
+2026-10-11T07:23:25.514537Z [info     ] Database va du lieu nen tang QNU AI Platform: SAN SANG. [qnu-cli]
+2026-10-11T07:23:25.528364Z [info     ] Live synchronized Cloudflare credentials into runtime settings [app.modules.modelops.services.provider_service]
+2026-10-11T07:23:25.529974Z [info     ] Synchronized 2 active model provider credentials into runtime settings [app.main]
+2026-10-11T07:23:57.347328Z [info     ] Reusing existing chunk set chk_set_c042feeaaafc for source revision ks_rev_763a93050260 (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service] correlation_id=corr_b7ef80e2f460 method=POST path=/platform/v1alpha1/knowledge/collections/col_b04b7104008f/vector-generations/vg_2a83fc999ba4/build
+2026-10-11T07:23:57.371167Z [info     ] Reusing existing index revision idx_rev_d29ea0e66a98 for generation vg_2a83fc999ba4 [app.modules.knowledge.services.vector_generation_service] correlation_id=corr_b7ef80e2f460 method=POST path=/platform/v1alpha1/knowledge/collections/col_b04b7104008f/vector-generations/vg_2a83fc999ba4/build
+2026-10-11T07:23:57.396235Z [info     ] Reusing existing chunk set chk_set_4e4ae77a8d3e for source revision ks_rev_51ead1497e99 (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service] correlation_id=corr_b7ef80e2f460 method=POST path=/platform/v1alpha1/knowledge/collections/col_b04b7104008f/vector-generations/vg_2a83fc999ba4/build
+2026-10-11T07:23:57.403411Z [info     ] Reusing existing index revision idx_rev_eded9bb75d66 for generation vg_2a83fc999ba4 [app.modules.knowledge.services.vector_generation_service] correlation_id=corr_b7ef80e2f460 method=POST path=/platform/v1alpha1/knowledge/collections/col_b04b7104008f/vector-generations/vg_2a83fc999ba4/build
+2026-10-11T07:23:57.414392Z [error    ] Failed to build index revision for binding bnd_ef38f9c9d4f0: Nguồn tri thức 'bnd_ef38f9c9d4f0' chưa có bản sửa đổi sẵn sàng ('ready') để lập chỉ mục vector. [app.modules.knowledge.services.vector_generation_service] correlation_id=corr_b7ef80e2f460 method=POST path=/platform/v1alpha1/knowledge/collections/col_b04b7104008f/vector-generations/vg_2a83fc999ba4/build
+2026-10-11T07:24:21.395346Z [info     ] Rerank provider=vllm latency_ms=145.36 in=6 out=5 [app.modules.rag.reranker] correlation_id=corr_2d0f64d8bcb7 method=POST path=/platform/v1alpha1/rag/search
+2026-10-11T07:24:21.766932Z [info     ] Rerank provider=vllm latency_ms=124.70 in=6 out=6 [app.modules.rag.reranker] correlation_id=corr_087f1a1a8546 method=POST path=/platform/v1alpha1/rag/ask
+2026-10-11T07:24:21.796115Z [info     ] Live synchronized Cloudflare credentials into runtime settings [app.modules.modelops.services.provider_service] correlation_id=corr_087f1a1a8546 method=POST path=/platform/v1alpha1/rag/ask
+ 2026-10-11T07:25:14.552905Z [info     ] Rerank provider=vllm latency_ms=140.51 in=6 out=5 [app.modules.rag.reranker] correlation_id=corr_8a8197c57eba method=POST path=/platform/v1alpha1/rag/search
+2026-10-11T07:25:14.581426Z [info     ] Semantic cache HIT for query='Trong bộ dữ liệu E2E341-PAGE2,' [app.modules.rag.service] correlation_id=corr_0e64e542c351 method=POST path=/platform/v1alpha1/rag/ask
+2026-10-11T07:28:18.718993Z [info     ] Shutting down QNU.AI Platform Backend... [app.main]
+2026-10-11T07:28:18.745253Z [info     ] Database connection pool closed. [app.main]
+ 2026-10-11T07:28:25.188536Z [info     ] Starting QNU.AI Platform Backend [app.main] environment=development port=8001 service=qnu-ai-platform
+2026-10-11T07:28:25.354405Z [info     ] setup plugin alembic.autogenerate.schemas [alembic.runtime.plugins]
+2026-10-11T07:28:25.354405Z [info     ] setup plugin alembic.autogenerate.tables [alembic.runtime.plugins]
+2026-10-11T07:28:25.354405Z [info     ] setup plugin alembic.autogenerate.types [alembic.runtime.plugins]
+2026-10-11T07:28:25.354405Z [info     ] setup plugin alembic.autogenerate.constraints [alembic.runtime.plugins]
+2026-10-11T07:28:25.367254Z [info     ] setup plugin alembic.autogenerate.defaults [alembic.runtime.plugins]
+2026-10-11T07:28:25.367254Z [info     ] setup plugin alembic.autogenerate.comments [alembic.runtime.plugins]
+2026-10-11T07:28:25.367254Z [info     ] setup plugin alembic.ext.checkconstraint_byname [alembic.runtime.plugins]
+2026-10-11T07:28:25.389801Z [info     ] Checking database and seed data readiness... [qnu-cli]
+2026-10-11T07:28:25.484363Z [info     ] Checking database connection and schema integrity... [qnu-cli]
+2026-10-11T07:28:25.495703Z [info     ] Database connection: OK        [qnu-cli]
+2026-10-11T07:28:25.512461Z [info     ] Current Alembic revision: 20261011_independent_index [qnu-cli]
+2026-10-11T07:28:25.553334Z [info     ] All required core tables are present (47 total tables). [qnu-cli]
+2026-10-11T07:28:25.558085Z [info     ] Database schema check: PASSED. [qnu-cli]
+2026-10-11T07:28:25.647853Z [info     ] Core seed verification passed: 11 providers and 5 visible knowledge collections. [qnu-cli]
+2026-10-11T07:28:25.648859Z [info     ] Du lieu mau da san sang.       [qnu-cli]
+2026-10-11T07:28:25.648859Z [info     ] Database va du lieu nen tang QNU AI Platform: SAN SANG. [qnu-cli]
+2026-10-11T07:28:25.668177Z [info     ] Live synchronized Cloudflare credentials into runtime settings [app.modules.modelops.services.provider_service]
+2026-10-11T07:28:25.670140Z [info     ] Synchronized 2 active model provider credentials into runtime settings [app.main]
+2026-10-11T08:06:16.196819Z [info     ] Deleted job id=job_9382ebea9432 [app.modules.jobs.service] correlation_id=corr_9bd8c93e2c94 method=DELETE path=/platform/v1alpha1/jobs/job_9382ebea9432

@@ -83,6 +83,9 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
 
   const providers = providersQuery.data || [];
   const selectedProvider = providers.find((p) => p.id === providerId) || null;
+  const isPaddleOcr = ["paddleocr", "paddleocr_vl", "paddle"].includes(
+    selectedProvider?.type || "",
+  );
 
   const { data: presets = [] } = useQuery({
     queryKey: ["provider-presets"],
@@ -103,7 +106,7 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
   } = useQuery({
     queryKey: ["provider-keys", providerId],
     queryFn: () => apiClient.getProviderKeys(providerId),
-    enabled: !!providerId,
+    enabled: !!providerId && !!selectedProvider && !isPaddleOcr,
     refetchInterval: activeTab === "keys" ? 10000 : false,
   });
 
@@ -524,19 +527,27 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
           <span>Mô hình</span>
         </Button>
 
-        <Button
-          variant={activeTab === "keys" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setActiveTab("keys")}
-          className="h-8 px-2.5 sm:px-3 text-xs gap-1.5 rounded-md shrink-0"
-        >
-          <KeyRound className="size-3.5 shrink-0" />
-          <span>Khóa API</span>
-        </Button>
+        {!isPaddleOcr && (
+          <Button
+            variant={activeTab === "keys" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setActiveTab("keys")}
+            className="h-8 px-2.5 sm:px-3 text-xs gap-1.5 rounded-md shrink-0"
+          >
+            <KeyRound className="size-3.5 shrink-0" />
+            <span>Khóa API</span>
+          </Button>
+        )}
       </div>
 
       {/* 4. Active Tab Content */}
-      {activeTab === "models" && (
+      {isPaddleOcr && (
+        <p className="text-sm text-muted-foreground">
+          Dịch vụ PaddleOCR không yêu cầu khóa API. Kiểm tra kết nối chỉ kiểm
+          tra health, không chạy OCR.
+        </p>
+      )}
+      {(activeTab === "models" || isPaddleOcr) && (
         <ModelsGrid
           selectedProvider={selectedProvider}
           presets={presets}
@@ -555,7 +566,7 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
         />
       )}
 
-      {activeTab === "keys" && (
+      {activeTab === "keys" && !isPaddleOcr && (
         <>
           {keysError && (
             <div className="text-sm text-destructive" role="alert">

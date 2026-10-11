@@ -120,7 +120,8 @@ async def test_intake_service_upload_new_document() -> None:
         assert res.document_id.startswith("rep_doc_")
         assert res.revision_id.startswith("rev_")
         assert res.revision_no == 1
-        assert res.status == "queued"
+        assert res.status == "stored"
+        assert res.job_id is None
         assert res.deduplicated is False
         assert mock_save.called
         assert session.add.called
@@ -306,7 +307,8 @@ async def test_api_intake_and_revisions_routes() -> None:
             assert intake_res.status_code == 202
             data = intake_res.json()
             assert "job_id" in data
-            assert data["status"] == "queued"
+            assert data["status"] == "stored"
+            assert data["job_id"] is None
 
         # Test 2: GET /documents/{id}/revisions
         mock_db.execute = AsyncMock(

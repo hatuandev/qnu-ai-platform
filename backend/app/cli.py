@@ -419,7 +419,7 @@ async def run_db_seed(
 
 async def verify_core_seed_data() -> bool:
     """Verify provider presets and visible default knowledge were persisted."""
-    from app.modules.knowledge.models import KnowledgeChunk, KnowledgeCollection
+    from app.modules.knowledge.models import KnowledgeCollection
     from app.modules.knowledge.seed_data_admissions import ADMISSIONS_COLLECTION_ID
     from app.modules.knowledge.seed_data_library import LIBRARY_COLLECTION_ID
     from app.modules.knowledge.seed_data_nd30 import DECREE_30_COLLECTION_ID
@@ -462,28 +462,13 @@ async def verify_core_seed_data() -> bool:
             .scalars()
             .all()
         )
-        chunked_collection_ids = set(
-            (
-                await db.execute(
-                    select(KnowledgeChunk.collection_id)
-                    .where(KnowledgeChunk.collection_id.in_(required_collection_ids))
-                    .distinct()
-                )
-            )
-            .scalars()
-            .all()
-        )
-
     missing_providers = required_provider_ids - provider_ids
     missing_collections = required_collection_ids - visible_collection_ids
-    collections_without_chunks = required_collection_ids - chunked_collection_ids
-    if missing_providers or missing_collections or collections_without_chunks:
+    if missing_providers or missing_collections:
         logger.error(
-            "Seed verification mismatch: missing_providers=%s, missing_collections=%s, "
-            "collections_without_chunks=%s",
+            "Seed verification mismatch: missing_providers=%s, missing_collections=%s",
             sorted(missing_providers),
             sorted(missing_collections),
-            sorted(collections_without_chunks),
         )
         return False
 

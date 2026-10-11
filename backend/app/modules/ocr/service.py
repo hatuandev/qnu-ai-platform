@@ -32,6 +32,7 @@ from app.modules.ocr.adapters.openai_vision_adapter import (
     OpenAIVisionOCRAdapter,
     QwenOCRAdapter,
 )
+from app.modules.ocr.adapters.paddleocr_adapter import PaddleOCRVLAdapter
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
 from app.modules.ocr.layout_detector import smart_layout_detector
 from app.modules.ocr.models import OCRJobLog
@@ -55,6 +56,7 @@ class OCRService:
             "gemini_ocr": GeminiOCRAdapter(),
             "mistral_ocr": MistralOCRAdapter(),
             "qwen_ocr": QwenOCRAdapter(),
+            "paddleocr_ocr": PaddleOCRVLAdapter(),
             "mock_ocr": MockOCRAdapter(),
         }
         self._adapters["gemini"] = self._adapters["gemini_ocr"]
@@ -63,6 +65,9 @@ class OCRService:
         self._adapters["qwen"] = self._adapters["qwen_ocr"]
         self._adapters["qwen_vl"] = self._adapters["qwen_ocr"]
         self._adapters["qwen-vl"] = self._adapters["qwen_ocr"]
+        self._adapters["paddleocr"] = self._adapters["paddleocr_ocr"]
+        self._adapters["paddleocr_vl"] = self._adapters["paddleocr_ocr"]
+        self._adapters["paddleocr-vl"] = self._adapters["paddleocr_ocr"]
         self._adapters["openai_vision_ocr"] = OpenAIVisionOCRAdapter()
         self._adapters["openai_vision"] = self._adapters["openai_vision_ocr"]
         self.default_engine = "pymupdf_ocr"
@@ -71,6 +76,7 @@ class OCRService:
         """List registered OCR engines with real availability status."""
         catalog = [
             ("eng_pymupdf", "pymupdf_ocr", "pymupdf", ["pdf", "png", "jpg", "tables"], 0.95, True),
+            ("eng_paddleocr", "paddleocr_ocr", "paddleocr", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "layout"], 0.98, False),
             ("eng_gemini", "gemini_ocr", "gemini", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.99, False),
             ("eng_qwen", "qwen_ocr", "qwen", ["pdf", "png", "jpg", "scan", "tables", "vietnamese", "multimodal"], 0.98, False),
             ("eng_mistral", "mistral_ocr", "mistral", ["pdf", "png", "jpg", "scan", "tables", "vietnamese"], 0.98, False),
@@ -138,6 +144,15 @@ class OCRService:
                 return MistralOCRAdapter(model_name=name_or_model)
             return self._adapters["mistral_ocr"]
 
+        # Check for PaddleOCR-VL
+        if "paddle" in norm:
+            base_url = kwargs.get("base_url")
+            if base_url:
+                return PaddleOCRVLAdapter(base_url=base_url, model_name=name_or_model)
+            if norm in ("paddleocr_ocr", "paddleocr", "paddleocr_vl", "paddleocr-vl"):
+                return self._adapters["paddleocr_ocr"]
+            return PaddleOCRVLAdapter(model_name=name_or_model)
+
         # Default fallback adapter
         return self._adapters.get(norm) or self._adapters[self.default_engine]
 
@@ -163,11 +178,19 @@ class OCRService:
         )
         provider = provider_result.scalar_one_or_none()
         if inspect.isawaitable(provider):
-            return await adapter.extract(content, filename)
+            provider = await provider
         if provider is None:
-            return await adapter.extract(content, filename)
+            raise AppException("Provider OCR không tồn tại hoặc đã ngừng hoạt động.", code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
 
         provider_type = provider.provider_type.strip().lower()
+        if provider_type in {"paddleocr", "paddleocr_vl", "paddle"}:
+            paddle_adapter = PaddleOCRVLAdapter(
+                base_url=provider.api_base_url,
+                model_name=model_name or provider.model_name,
+                timeout=provider.timeout_seconds,
+            )
+            return await paddle_adapter.extract(content, filename)
+
         if provider_type in {"ollama", "local", "on_premise"}:
             on_premise_adapter = QwenOCRAdapter(
                 model_name=model_name or "qwen3-vl:8b",
@@ -292,6 +315,27 @@ class OCRService:
 
         if requested == "combo":
             return await self._extract_combo_chain(session, content, filename, tenant_id, start_time)
+
+        if requested in {"paddleocr", "paddleocr_vl", "paddle", "paddleocr-vl"}:
+            stmt = select(ModelProviderConfig).where(
+                ModelProviderConfig.is_active.is_(True),
+                ModelProviderConfig.provider_type.in_({"paddleocr", "paddleocr_vl", "paddle"}),
+            ).order_by(
+                (ModelProviderConfig.id == str(defaults.get("default_ocr_provider_id") or "")).desc(),
+                ModelProviderConfig.priority, ModelProviderConfig.id,
+            ).limit(1)
+            provider = (await session.execute(stmt)).scalar_one_or_none()
+            if provider is None:
+                raise AppException("Chưa có provider PaddleOCR hoạt động trong ModelOps.",
+                                   code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
+            result = await self._extract_step_with_rotation(
+                session, {"provider_id": provider.id, "model_name": provider.model_name}, content, filename,
+            )
+            return await self._build_response(
+                session=session, result_dict=result, filename=filename, tenant_id=tenant_id,
+                start_time=start_time, fallback_triggered=False, fallback_engine=None,
+                cascade_trace=[], error_msg=None,
+            )
 
         try:
             adapter = self._resolve_adapter(requested, default_gemini_model=default_ocr_model)
@@ -745,6 +789,8 @@ class OCRService:
     ) -> OCRExtractResponse:
         """Persist the audit log and shape the final OCR response."""
         raw_text = result_dict.get("raw_text", "")
+        if not isinstance(raw_text, str) or not raw_text.strip():
+            raise AppException("OCR không trả về văn bản hợp lệ.", code="OCR_CONTENT_EMPTY", status_code=422)
         pages_in = result_dict.get("pages", [])
         if raw_text and raw_text.strip():
             from app.modules.ocr.cleaner import post_process_ocr_output
@@ -780,10 +826,12 @@ class OCRService:
                 page_number=p["page_number"],
                 extracted_text=p["extracted_text"],
                 confidence=p["confidence"],
+                confidence_source=p.get("confidence_source"),
                 word_count=p["word_count"],
                 line_count=p["line_count"],
                 has_tables=p.get("has_tables", False),
                 blocks=p.get("blocks", []) or [],
+                dimensions=p.get("dimensions"),
             )
             for p in result_dict.get("pages", [])
         ]
@@ -797,6 +845,7 @@ class OCRService:
             cascade_trace=cascade_trace or [],
             total_pages=total_pages,
             overall_confidence=confidence,
+            confidence_source=result_dict.get("confidence_source"),
             latency_ms=latency_ms,
             raw_text=result_dict.get("raw_text", ""),
             pages=pages,

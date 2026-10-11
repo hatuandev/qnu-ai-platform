@@ -25,10 +25,12 @@ class OCRPageResult(BaseModel):
     page_number: int
     extracted_text: str
     confidence: float
+    confidence_source: str | None = None
     word_count: int
     line_count: int
     has_tables: bool = False
     blocks: list[dict[str, Any]] = Field(default_factory=list)
+    dimensions: dict[str, float] | None = None
 
 
 class OCRExtractResponse(BaseModel):
@@ -40,6 +42,7 @@ class OCRExtractResponse(BaseModel):
     cascade_trace: list[str] = Field(default_factory=list)
     total_pages: int
     overall_confidence: float
+    confidence_source: str | None = None
     latency_ms: float
     raw_text: str
     pages: list[OCRPageResult] = Field(default_factory=list)

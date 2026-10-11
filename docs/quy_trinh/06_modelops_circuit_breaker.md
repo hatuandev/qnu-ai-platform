@@ -6,6 +6,14 @@ Tài liệu này đặc tả cơ chế chịu lỗi của hệ thống khi kết
 
 ## 1. Sơ Đồ Cơ Chế Ngắt Mạch & Chuyển Vùng Dự Phòng (Circuit Breaker & Fallback)
 
+### Xác thực AI server (#355)
+
+- **Reset dev/local (#357)**: Seed có thể khôi phục khóa vLLM từ `backend/storage/modelops-bootstrap/credentials.json` dưới dạng ciphertext, thư mục bị loại khỏi Git. `make reset-db` đi qua seed mặc định; chỉ preset mới được khởi tạo khóa vào DB primary/Key Pool, không ghi đè provider hiện có. Production bỏ qua. Giữ tệp bootstrap và cấu hình mã hóa app; đổi key server phải cập nhật bootstrap để lần reset sau không nạp khóa cũ.
+
+- PaddleOCR (`paddleocr`, `paddleocr_vl`, `paddle`) không yêu cầu khóa. ModelOps chỉ cần Base URL; không hiển thị Key Pool. Kiểm tra dùng `GET /health` không Authorization, không chứng minh bóc tách tài liệu đã thành công.
+- vLLM router cần khóa thật trong ModelOps trước khi kiểm tra/nạp vector. Thiếu khóa hoặc HTTP 401 không được coi là thành công.
+- Seed riêng: chạy tại `backend` bằng `python -m scripts.seed_ai_server_providers` trong môi trường ảo. Chỉ thêm hai provider AI server còn thiếu; không ghi đè URL/model/khóa/defaults hiện có. Không chứa secret trong source hay `.env`.
+
 ```mermaid
 flowchart TD
     REQ[Request sinh văn bản / Trả lời RAG] --> CB_CHECK{1. Trạng thái Circuit Breaker của Primary LLM?}

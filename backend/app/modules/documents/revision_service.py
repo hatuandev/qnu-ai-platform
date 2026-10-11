@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, EntityNotFoundError, ValidationException
 from app.core.storage import storage_service
-from app.modules.documents.models import DocumentRevision, RepositoryDocument
+from app.modules.documents.models import (
+    DocumentRevision,
+    RepositoryDocument,
+    RepositoryFileRevision,
+)
 from app.modules.documents.quality_gate import evaluate_revision_quality
 from app.modules.documents.schemas import (
     DocumentRevisionListItem,
@@ -78,8 +82,9 @@ class DocumentRevisionService:
         file_bytes: bytes,
         idempotency_key: str | None = None,
         created_by: str | None = None,
+        initial_status: str = "stored",
     ) -> DocumentRevision:
-        """Create the genesis v1 revision for a newly registered repository document."""
+        """Create the genesis v1 revision and pure file revision for a newly registered repository document."""
         rev_id = f"rev_{uuid.uuid4().hex[:12]}"
         rev = DocumentRevision(
             id=rev_id,
@@ -91,7 +96,7 @@ class DocumentRevisionService:
             source_size_bytes=doc.file_size_bytes,
             source_hash=doc.file_hash,
             source_storage_path=doc.storage_path,
-            status="queued",
+            status=initial_status,
             idempotency_key=idempotency_key,
             created_by=created_by,
             lock_version=1,
@@ -101,6 +106,21 @@ class DocumentRevisionService:
             parse_provenance={"trigger": "initial_upload"},
         )
         db.add(rev)
+
+        # ADR-012: Register pure immutable file revision without OCR/parse artifacts
+        file_rev = RepositoryFileRevision(
+            id=f"file_rev_{uuid.uuid4().hex[:12]}",
+            document_id=doc.id,
+            revision_no=1,
+            source_file_name=doc.file_name,
+            source_file_type=doc.file_type,
+            source_size_bytes=doc.file_size_bytes,
+            source_hash=doc.file_hash,
+            source_storage_path=doc.storage_path,
+            created_by=created_by,
+        )
+        db.add(file_rev)
+
         doc.latest_revision_no = 1
         await db.flush()
         return rev

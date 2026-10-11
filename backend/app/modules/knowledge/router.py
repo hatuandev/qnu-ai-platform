@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.auth.dependencies import require_permission
 from app.modules.auth.schemas import AuthActor
+from app.modules.jobs.schemas import JobResponse
 from app.modules.knowledge.schemas import (
+    ActivateVectorGenerationResponse,
     ApproveDocumentRequest,
     ApproveDocumentResponse,
     AttachDocumentGroupRequest,
     AttachDocumentGroupResponse,
+    AttachGroupSourceRequest,
     AvailableRepositoryDocumentsResponse,
     BackfillReport,
     BackfillRequest,
@@ -20,12 +25,20 @@ from app.modules.knowledge.schemas import (
     BatchApproveResponse,
     BindingChunksListResponse,
     BuildStagingIndexRequest,
+    BuildVectorGenerationRequest,
+    BuildVectorGenerationResponse,
     CanaryPolicyResponse,
+    CandidateGroupListResponse,
+    CandidateListResponse,
     CollectionCreateRequest,
     CollectionResponse,
+    CollectionSummaryMetrics,
     CollectionUpdateRequest,
     CreateKnowledgeBindingsRequest,
     CreateKnowledgeBindingsResponse,
+    CreateVectorGenerationRequest,
+    DetachGroupSourceRequest,
+    DetachGroupSourceResponse,
     DocumentDetailResponse,
     DocumentResponse,
     FactExcelImportResponse,
@@ -35,24 +48,54 @@ from app.modules.knowledge.schemas import (
     IndexActivationRequest,
     IndexActivationResponse,
     KnowledgeBindingResponse,
+    KnowledgeChunkSetResponse,
+    KnowledgeGroupSourceResponse,
+    KnowledgeImportBatchCreateRequest,
+    KnowledgeImportBatchResponse,
     KnowledgeIndexRevisionResponse,
     KnowledgeReconciliationResponse,
+    KnowledgeSourceDetailResponse,
+    KnowledgeSourceRevisionResponse,
+    KnowledgeVectorGenerationResponse,
     LegacyAuditReport,
     ParsePreviewResponse,
     PreviewDocumentGroupRequest,
     PreviewDocumentGroupResponse,
+    PreviewGroupSourceDiffResponse,
+    PublishGroupSourceResponse,
     ReconcileFixResponse,
     ReindexDocumentResponse,
+    ReparseSourceRequest,
+    ReviewSourceRevisionRequest,
     RollbackIndexRevisionRequest,
     ShadowRetrievalReport,
     ShadowRetrievalRequest,
     StudioViewResponse,
+    SyncGroupSourceRequest,
+    SyncGroupSourceResponse,
     SystemDecommissioningAuditReport,
     SystemGarbageCollectionReport,
     SystemGarbageCollectionRequest,
     UpdateCanaryPolicyRequest,
+    UpdateSourceContentRequest,
+    VectorLoadRequest,
 )
 from app.modules.knowledge.service import knowledge_service
+from app.modules.knowledge.services.backfill_service import BackfillV3Report, backfill_v3_service
+from app.modules.knowledge.services.candidate_service import candidate_service
+from app.modules.knowledge.services.chunk_set_service import chunk_set_service
+from app.modules.knowledge.services.group_source_service import group_source_service
+from app.modules.knowledge.services.import_batch_service import import_batch_service
+from app.modules.knowledge.services.reconciliation_service import (
+    ReconciliationReport,
+    reconciliation_service,
+)
+from app.modules.knowledge.services.source_ingestion_service import source_ingestion_service
+from app.modules.knowledge.services.vector_generation_service import vector_generation_service
+from app.modules.knowledge.services.vector_load_service import (
+    get_vector_load_state,
+    queue_vector_load,
+)
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge Bases"])
 
@@ -688,6 +731,27 @@ async def detach_binding(
     return await knowledge_service.detach_binding(db, binding_id=binding_id, actor=actor)
 
 
+@router.delete("/bindings/{binding_id}/purge", response_model=JobResponse,
+               status_code=202, summary="Xóa vĩnh viễn nguồn trong Kho tri thức")
+async def purge_source(binding_id: str, db: AsyncSession = Depends(get_db),
+                       actor: AuthActor = Depends(require_permission("ai.knowledge.delete"))) -> JobResponse:
+    from app.modules.knowledge.services.source_purge import request_purge
+
+    return await request_purge(db, binding_id, actor=actor)
+
+
+@router.get("/bindings/{binding_id}/purge/jobs/{job_id}", response_model=JobResponse)
+async def get_source_purge_job(binding_id: str, job_id: str, db: AsyncSession = Depends(get_db),
+                              actor: AuthActor = Depends(require_permission("ai.knowledge.delete"))) -> JobResponse:
+    from app.core.exceptions import EntityNotFoundError
+    from app.modules.jobs.service import jobs_service
+
+    job = await jobs_service.get_job(db, job_id, actor=actor)
+    if job.job_type != "knowledge_source_purge" or job.payload.get("binding_id") != binding_id:
+        raise EntityNotFoundError("Không tìm thấy tác vụ xóa nguồn.")
+    return job
+
+
 @router.post(
     "/bindings/{binding_id}/build-index",
     response_model=KnowledgeIndexRevisionResponse,
@@ -932,3 +996,657 @@ async def audit_system_decommissioning(
     actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> SystemDecommissioningAuditReport:
     return await knowledge_service.audit_system_decommissioning(db, actor=actor)
+
+
+# ==============================================================================
+# Long-Lived Knowledge Group Sources Endpoints
+# ==============================================================================
+
+
+@router.get(
+    "/collections/{collection_id}/sources",
+    response_model=list[KnowledgeGroupSourceResponse],
+    summary="Lấy danh sách các Nhóm tài liệu đang làm nguồn lâu dài cho Kho Tri Thức",
+)
+async def list_collection_group_sources(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> list[KnowledgeGroupSourceResponse]:
+    return await group_source_service.list_group_sources(
+        db, collection_id=collection_id, actor=actor
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/sources/preview-attach",
+    response_model=PreviewGroupSourceDiffResponse,
+    summary="Xem trước phân loại tài liệu (thêm mới, trùng lặp, chưa ready) trước khi liên kết nhóm",
+)
+async def preview_attach_group_source(
+    collection_id: str,
+    body: PreviewDocumentGroupRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> PreviewGroupSourceDiffResponse:
+    return await group_source_service.preview_attach_group(
+        db, collection_id=collection_id, group_id=body.group_id, actor=actor
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/sources",
+    response_model=KnowledgeGroupSourceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Liên kết một Nhóm tài liệu làm nguồn lâu dài cho Kho Tri Thức (idempotent)",
+)
+async def attach_group_source(
+    collection_id: str,
+    body: AttachGroupSourceRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.create")),
+) -> KnowledgeGroupSourceResponse:
+    return await group_source_service.attach_group_source(
+        db, collection_id=collection_id, req=body, actor=actor
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/preview",
+    response_model=PreviewGroupSourceDiffResponse,
+    summary="Xem trước các thay đổi (added, updated, removed) của nguồn nhóm tài liệu",
+)
+async def preview_group_source_sync(
+    collection_id: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> PreviewGroupSourceDiffResponse:
+    return await group_source_service.preview_source_sync(
+        db, collection_id=collection_id, source_id=source_id, actor=actor
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/sources/{source_id}/sync",
+    response_model=SyncGroupSourceResponse,
+    summary="Đồng bộ các tài liệu mới và revision mới từ Nhóm tài liệu vào Kho Tri Thức",
+)
+async def sync_group_source(
+    collection_id: str,
+    source_id: str,
+    body: SyncGroupSourceRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> SyncGroupSourceResponse:
+    req = body or SyncGroupSourceRequest()
+    return await group_source_service.sync_group_source(
+        db, collection_id=collection_id, source_id=source_id, req=req, actor=actor
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/sources/{source_id}/publish",
+    response_model=PublishGroupSourceResponse,
+    summary="Xuất bản các chỉ mục đã xác thực thành công ở staging lên chỉ mục hoạt động RAG",
+)
+async def publish_group_source(
+    collection_id: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> PublishGroupSourceResponse:
+    return await group_source_service.publish_group_source(
+        db, collection_id=collection_id, source_id=source_id, actor=actor
+    )
+
+
+@router.delete(
+    "/collections/{collection_id}/sources/{source_id}",
+    response_model=DetachGroupSourceResponse,
+    summary="Gỡ một Nhóm tài liệu khỏi nguồn Kho Tri Thức",
+)
+async def detach_group_source(
+    collection_id: str,
+    source_id: str,
+    detach_bindings: bool = Query(True, description="Nếu true, chuyển các bindings sang detached"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.delete")),
+) -> DetachGroupSourceResponse:
+    req = DetachGroupSourceRequest(detach_bindings=detach_bindings)
+    return await group_source_service.detach_group_source(
+        db, collection_id=collection_id, source_id=source_id, req=req, actor=actor
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/summary-metrics",
+    response_model=CollectionSummaryMetrics,
+    summary="Lấy trạng thái thực tế và các chỉ số đo lường tổng hợp của Kho Tri Thức",
+)
+async def get_collection_summary_metrics(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> CollectionSummaryMetrics:
+    return await group_source_service.get_collection_summary_metrics(
+        db, collection_id=collection_id, actor=actor
+    )
+
+
+# ==============================================================================
+# 11. Candidate Groups & Documents Diffing (ADR-012)
+# ==============================================================================
+@router.get(
+    "/collections/{collection_id}/candidate-groups",
+    response_model=CandidateGroupListResponse,
+    summary="Duyệt danh sách các nhóm/kho tài liệu ứng viên và thống kê số lượng tài liệu đã nạp",
+)
+async def get_candidate_groups(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> CandidateGroupListResponse:
+    return await candidate_service.get_candidate_groups(
+        collection_id=collection_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/candidate-documents",
+    response_model=CandidateListResponse,
+    summary="Duyệt danh sách tài liệu ứng viên từ kho tài liệu và đánh giá trạng thái 2 chiều (nguồn/vector)",
+)
+@router.get(
+    "/collections/{collection_id}/repository-candidates",
+    response_model=CandidateListResponse,
+    include_in_schema=False,
+)
+async def get_candidate_documents(
+    collection_id: str,
+    group_id: str | None = Query(None, description="Lọc theo nhóm tài liệu"),
+    vector_generation_id: str | None = Query(None, description="Thế hệ vector mục tiêu"),
+    source_state: str | None = Query(None, description="Lọc theo trạng thái nguồn (not_imported, current, update_available)"),
+    source_status: str | None = Query(None, description="Alias cho source_state"),
+    search: str | None = Query(None, description="Tìm kiếm theo tiêu đề hoặc tên tệp"),
+    limit: int = Query(50, ge=1, le=1000, description="Số lượng mục trên mỗi trang"),
+    offset: int = Query(0, ge=0, description="Vị trí bắt đầu"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> CandidateListResponse:
+    effective_state_filter = source_state or source_status
+    return await candidate_service.get_candidate_documents(
+        collection_id=collection_id,
+        group_id=group_id,
+        vector_generation_id=vector_generation_id,
+        source_state_filter=effective_state_filter,
+        search=search,
+        limit=limit,
+        offset=offset,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+
+
+# ==============================================================================
+# 12. Snapshot Import Batches (ADR-012)
+# ==============================================================================
+@router.post(
+    "/collections/{collection_id}/imports",
+    response_model=KnowledgeImportBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Khởi tạo đợt nạp tài liệu hàng loạt (snapshot import batch) độc lập",
+)
+async def create_import_batch(
+    collection_id: str,
+    payload: KnowledgeImportBatchCreateRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    response: Response = None,  # type: ignore
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeImportBatchResponse:
+    batch = await import_batch_service.create_import_batch(
+        collection_id=collection_id,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        created_by=actor.actor_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+    return KnowledgeImportBatchResponse.model_validate(batch)
+
+
+@router.get(
+    "/collections/{collection_id}/imports/{batch_id}",
+    response_model=KnowledgeImportBatchResponse,
+    summary="Lấy chi tiết trạng thái đợt nạp snapshot và danh sách tài liệu con",
+)
+async def get_import_batch(
+    collection_id: str,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> KnowledgeImportBatchResponse:
+    batch = await import_batch_service.get_import_batch(
+        collection_id=collection_id,
+        batch_id=batch_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+    return KnowledgeImportBatchResponse.model_validate(batch)
+
+
+@router.post(
+    "/collections/{collection_id}/imports/{batch_id}/retry-failed",
+    response_model=KnowledgeImportBatchResponse,
+    summary="Thử lại các tài liệu bị lỗi trong đợt nạp snapshot",
+)
+async def retry_failed_import_items(
+    collection_id: str,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeImportBatchResponse:
+    batch = await import_batch_service.retry_failed_items(
+        collection_id=collection_id,
+        batch_id=batch_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+    return KnowledgeImportBatchResponse.model_validate(batch)
+
+
+@router.post(
+    "/collections/{collection_id}/imports/{batch_id}/cancel",
+    response_model=KnowledgeImportBatchResponse,
+    summary="Hủy đợt nạp snapshot đang chờ hoặc đang xử lý",
+)
+async def cancel_import_batch(
+    collection_id: str,
+    batch_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeImportBatchResponse:
+    batch = await import_batch_service.cancel_import_batch(
+        collection_id=collection_id,
+        batch_id=batch_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        db=db,
+    )
+    return KnowledgeImportBatchResponse.model_validate(batch)
+
+
+# ==============================================================================
+# 13. Knowledge Source Lifecycle & Human Review (ADR-012)
+# ==============================================================================
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}",
+    response_model=KnowledgeSourceDetailResponse,
+    summary="Lấy chi tiết nguồn tri thức kèm bản bóc tách hoạt động và lịch sử sửa đổi",
+)
+async def get_knowledge_source(
+    collection_id: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> KnowledgeSourceDetailResponse:
+    binding = await source_ingestion_service.get_source(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    response = KnowledgeSourceDetailResponse.model_validate(binding)
+    revisions = await source_ingestion_service.get_source_revisions(
+        db, collection_id, source_id, actor.tenant_id, actor.workspace_id,
+    )
+    response.revisions = [KnowledgeSourceRevisionResponse.model_validate(rev) for rev in revisions]
+    return response
+
+
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/revisions",
+    response_model=list[KnowledgeSourceRevisionResponse],
+    summary="Danh sách các bản bóc tách và chuẩn hóa nội dung của một nguồn tri thức",
+)
+async def list_source_revisions(
+    collection_id: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> list[KnowledgeSourceRevisionResponse]:
+    revs = await source_ingestion_service.get_source_revisions(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    return [KnowledgeSourceRevisionResponse.model_validate(r) for r in revs]
+
+
+@router.patch(
+    "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/content",
+    response_model=KnowledgeSourceRevisionResponse,
+    summary="Hiệu đính nội dung Markdown chuẩn và đánh giá lại Quality Gate",
+)
+async def update_source_revision_content(
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    payload: UpdateSourceContentRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    rev = await source_ingestion_service.update_revision_content(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        revision_id=revision_id,
+        new_markdown=payload.canonical_markdown,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+@router.post(
+    "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/review",
+    response_model=KnowledgeSourceRevisionResponse,
+    summary="Phê duyệt hoặc từ chối bản bóc tách nguồn tri thức cần kiểm tra (review_required)",
+)
+async def review_source_revision(
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    payload: ReviewSourceRevisionRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    rev = await source_ingestion_service.review_source_revision(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        revision_id=revision_id,
+        decision=payload.decision,
+        comment=payload.comment,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/studio",
+    response_model=StudioViewResponse,
+    summary="Lấy dữ liệu đối soát Studio OCR (ảnh, khung bbox, regions, markdown) cho nguồn tri thức",
+)
+async def get_knowledge_source_studio_view(
+    collection_id: str,
+    source_id: str,
+    revision_id: str | None = Query(None, description="Lọc theo bản sửa đổi cụ thể"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> StudioViewResponse:
+    return await source_ingestion_service.get_source_studio_data(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        revision_id=revision_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/pages/{page_number}/image",
+    summary="Tải ảnh trang độ phân giải cao phục vụ đối soát Studio từ snapshot độc lập",
+    response_class=Response,
+)
+async def get_knowledge_source_page_image(
+    collection_id: str,
+    source_id: str,
+    page_number: int,
+    revision_id: str | None = Query(None, description="Lọc theo bản sửa đổi cụ thể"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> Response:
+    content, media_type = await source_ingestion_service.get_source_page_image(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        page_number=page_number,
+        revision_id=revision_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/sources/{source_id}/reparse",
+    response_model=KnowledgeSourceRevisionResponse,
+    summary="Bóc tách lại nguồn tri thức bằng snapshot độc lập (chống chạy trùng)",
+)
+async def reparse_knowledge_source(
+    collection_id: str,
+    source_id: str,
+    payload: ReparseSourceRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    rev = await source_ingestion_service.reparse_source(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        parser_profile=payload.parser_profile,
+        ocr_engine=payload.ocr_engine,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+# ==============================================================================
+# Vector Generations & Multi-Vector Spaces Endpoints (Mục 7.5 ADR-012)
+# ==============================================================================
+@router.get(
+    "/collections/{collection_id}/vector-generations",
+    response_model=list[KnowledgeVectorGenerationResponse],
+    summary="Danh sách các thế hệ không gian vector của bộ sưu tập",
+)
+async def list_vector_generations(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> list[KnowledgeVectorGenerationResponse]:
+    generations = await vector_generation_service.list_vector_generations(
+        db=db,
+        collection_id=collection_id,
+        actor=actor,
+    )
+    return [KnowledgeVectorGenerationResponse.model_validate(g) for g in generations]
+
+
+@router.post(
+    "/collections/{collection_id}/vector-generations",
+    response_model=KnowledgeVectorGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Khởi tạo một thế hệ không gian vector mới (ModelOps dynamic resolution)",
+)
+async def create_vector_generation(
+    collection_id: str,
+    payload: CreateVectorGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
+) -> KnowledgeVectorGenerationResponse:
+    gen = await vector_generation_service.create_vector_generation(
+        db=db,
+        collection_id=collection_id,
+        model_name=payload.embedding_model,
+        provider_id=payload.provider_id,
+        dimension=payload.embedding_dimension,
+        actor=actor,
+    )
+    return KnowledgeVectorGenerationResponse.model_validate(gen)
+
+
+@router.post(
+    "/collections/{collection_id}/vector-generations/{generation_id}/build",
+    response_model=BuildVectorGenerationResponse,
+    summary="Kích hoạt lập chỉ mục hàng loạt cho thế hệ vector từ các ChunkSet sẵn có (Parse Once, Embed Many)",
+)
+async def build_vector_generation(
+    collection_id: str,
+    generation_id: str,
+    payload: BuildVectorGenerationRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
+) -> BuildVectorGenerationResponse:
+    return await vector_generation_service.build_all_sources_for_generation(
+        db=db,
+        collection_id=collection_id,
+        generation_id=generation_id,
+        chunk_strategy=payload.chunk_strategy,
+        chunk_config=payload.chunk_config,
+        actor=actor,
+    )
+
+
+@router.post("/collections/{collection_id}/vector-load", response_model=list[JobResponse], status_code=202)
+async def load_selected_sources(
+    collection_id: str, payload: VectorLoadRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.upload")),
+) -> list[JobResponse]:
+    jobs = await queue_vector_load(db, collection_id, payload, actor)
+    return [JobResponse.model_validate(job) for job in jobs]
+
+
+@router.get("/collections/{collection_id}/vector-load")
+async def vector_load_state(
+    collection_id: str, db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> dict:
+    return await get_vector_load_state(db, collection_id, actor)
+
+
+@router.post(
+    "/collections/{collection_id}/vector-generations/{generation_id}/activate",
+    response_model=ActivateVectorGenerationResponse,
+    summary="Kích hoạt thế hệ vector thành không gian truy vấn mặc định qua Check-And-Set (CAS)",
+)
+async def activate_vector_generation(
+    collection_id: str,
+    generation_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> ActivateVectorGenerationResponse:
+    return await vector_generation_service.activate_vector_generation(
+        db=db,
+        collection_id=collection_id,
+        generation_id=generation_id,
+        actor=actor,
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/chunk-sets",
+    response_model=list[KnowledgeChunkSetResponse],
+    summary="Danh sách các tập đoạn cắt (ChunkSets) của nguồn tri thức",
+)
+async def list_source_chunk_sets(
+    collection_id: str,
+    source_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> list[KnowledgeChunkSetResponse]:
+    chunk_sets = await chunk_set_service.list_chunk_sets_for_source(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+    )
+    return [KnowledgeChunkSetResponse.model_validate(cs) for cs in chunk_sets]
+
+
+@router.post(
+    "/collections/{collection_id}/backfill-v3",
+    response_model=BackfillV3Report,
+    summary="Backfill dữ liệu nguồn và index cũ sang KnowledgeSourceRevision, ChunkSets và VectorGenerations (ADR-012)",
+)
+async def backfill_collection_v3_endpoint(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> BackfillV3Report:
+    return await backfill_v3_service.backfill_collection_v3(
+        db=db,
+        collection_id=collection_id,
+        actor=actor,
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/vector-generations/{generation_id}/rollback",
+    response_model=ActivateVectorGenerationResponse,
+    summary="Rollback thế hệ vector về một thế hệ trước đó an toàn qua atomic pointer swap",
+)
+async def rollback_vector_generation(
+    collection_id: str,
+    generation_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> ActivateVectorGenerationResponse:
+    return await vector_generation_service.rollback_vector_generation(
+        db=db,
+        collection_id=collection_id,
+        target_generation_id=generation_id,
+        actor=actor,
+    )
+
+
+@router.get(
+    "/collections/{collection_id}/reconciliation",
+    response_model=ReconciliationReport,
+    summary="Đối soát tính nhất quán 3 chiều giữa PostgreSQL, Qdrant và MinIO",
+)
+async def reconcile_collection_endpoint(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> ReconciliationReport:
+    return await reconciliation_service.reconcile_collection(
+        db=db,
+        collection_id=collection_id,
+        actor=actor,
+    )
+
+
+@router.post(
+    "/collections/{collection_id}/reconciliation/clean-orphans",
+    summary="Dọn dẹp các vector points mồ côi trong Qdrant không còn thuộc revision active",
+)
+async def clean_orphan_points_endpoint(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.delete")),
+) -> dict[str, Any]:
+    cleaned = await reconciliation_service.clean_orphan_points(
+        db=db,
+        collection_id=collection_id,
+        actor=actor,
+    )
+    return {"collection_id": collection_id, "cleaned_points": cleaned}

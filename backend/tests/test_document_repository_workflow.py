@@ -37,6 +37,7 @@ from app.modules.documents.models import (
     DocumentGroupMembership,
     DocumentRevision,
     RepositoryDocument,
+    RepositoryFileRevision,
 )
 from app.modules.documents.schemas import (
     AsyncUploadDocumentResponse,
@@ -199,7 +200,7 @@ async def test_01_create_document_repository_group_success() -> None:
 
 @pytest.mark.asyncio
 async def test_02_intake_upload_creates_doc_rev_membership_and_job_in_one_transaction() -> None:
-    """2. Upload vào kho tạo document, revision, membership và job trong cùng 1 transaction."""
+    """2. ADR-012: Upload vào kho tạo document, revision, file_revision, membership với trạng thái stored (không parse ngầm)."""
     session = _fresh_session()
     actor = _make_actor()
     group_id = "grp_tuyensinh_2026"
@@ -218,10 +219,7 @@ async def test_02_intake_upload_creates_doc_rev_membership_and_job_in_one_transa
     file_bytes = b"%PDF-1.4 De an tuyen sinh Dai hoc Quy Nhon 2026..."
     file_name = "de_an_tuyen_sinh_2026.pdf"
 
-    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock) as mock_s3_save, \
-         patch("app.modules.documents.intake_service.enqueue_arq_job", new_callable=AsyncMock) as mock_arq:
-        mock_arq.return_value = "arq_job_12345"
-
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock) as mock_s3_save:
         resp = await document_intake_service.intake_document(
             db=session,
             file_bytes=file_bytes,
@@ -232,22 +230,22 @@ async def test_02_intake_upload_creates_doc_rev_membership_and_job_in_one_transa
 
         assert resp.document_id.startswith("rep_doc_")
         assert resp.revision_id.startswith("rev_")
-        assert resp.job_id.startswith("job_intake_")
-        assert resp.status == "queued"
+        assert resp.job_id is None
+        assert resp.status == "stored"
         assert resp.deduplicated is False
         assert resp.file_name == file_name
 
         # Verify S3 persistence was called
         mock_s3_save.assert_awaited_once()
 
-        # Verify atomic orchestration added RepositoryDocument, DocumentRevision, DocumentGroupMembership, JobRecord
+        # Verify atomic orchestration added RepositoryDocument, DocumentRevision, RepositoryFileRevision, DocumentGroupMembership
         added_entities = [call[0][0] for call in session.add.call_args_list]
         added_types = [type(e) for e in added_entities]
 
         assert RepositoryDocument in added_types
         assert DocumentRevision in added_types
+        assert RepositoryFileRevision in added_types
         assert DocumentGroupMembership in added_types
-        assert JobRecord in added_types
 
         # Verify durable commit occurred
         assert session.commit.called
@@ -435,10 +433,8 @@ async def test_07_intake_redis_offline_retains_pending_job_without_rollback() ->
     file_bytes = b"Document uploaded during Redis maintenance"
     file_name = "ke_hoach_offline.pdf"
 
-    # Simulate Redis connection failure in enqueue_arq_job
-    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock), \
-         patch("app.modules.documents.intake_service.enqueue_arq_job", side_effect=ConnectionError("Redis connection refused")):
-
+    # ADR-012: Document Repository is a pure storage vault; upload succeeds with status stored
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock):
         resp = await document_intake_service.intake_document(
             db=session,
             file_bytes=file_bytes,
@@ -447,15 +443,9 @@ async def test_07_intake_redis_offline_retains_pending_job_without_rollback() ->
             actor=actor,
         )
 
-        assert resp.status == "queued"
-        # Find the added JobRecord in session
-        added_entities = [call[0][0] for call in session.add.call_args_list]
-        jobs = [e for e in added_entities if isinstance(e, JobRecord)]
-        assert len(jobs) == 1
-        # Job must be retained with pending status and error detail recorded
-        assert jobs[0].dispatch_status == "pending"
-        assert "Redis connection refused" in str(jobs[0].error)
-        # Transaction was not rolled back; durable commit succeeded
+        assert resp.status == "stored"
+        assert resp.job_id is None
+        # Transaction committed cleanly
         assert session.commit.called
 
 
@@ -692,7 +682,7 @@ async def test_12_e2e_workflow_contract_create_group_intake_preview_and_attach()
         )
 
         assert intake_res.document_id.startswith("rep_doc_")
-        assert intake_res.status == "queued"
+        assert intake_res.status == "stored"
         doc_id = intake_res.document_id
 
     # Step 3: Document parser completes and revision becomes 'ready'
@@ -1110,7 +1100,7 @@ async def test_http_route_intake_idempotency_header():
                 )
                 assert resp1.status_code == 202
                 data1 = resp1.json()
-                assert data1["status"] == "queued"
+                assert data1["status"] == "stored"
 
                 # 2. Retry with SAME key and SAME payload -> idempotent replay (HTTP 202 Accepted)
                 resp2 = await client.post(
@@ -1178,8 +1168,8 @@ async def test_legacy_v1_upload_with_invalid_group_does_not_create_orphan():
 
 @pytest.mark.asyncio
 async def test_concurrent_intake_winner_exists_does_not_delete_storage_object():
-    """Requirement 1.1: When concurrent upload loses DB race (IntegrityError) but winner exists,
-    storage_service.delete MUST NOT be called because winner depends on the stored artifact.
+    """Requirement 1.1: Khi upload đồng thời cùng hash và cùng storage path (tên file giống nhau),
+    winner tồn tại -> storage_service.delete KHÔNG được gọi vì winner đang sử dụng chính object đó.
     """
     session = _fresh_session()
     actor = _make_actor()
@@ -1194,9 +1184,13 @@ async def test_concurrent_intake_winner_exists_does_not_delete_storage_object():
     session.get.return_value = group
 
     file_bytes = b"Safe storage artifact content for race condition test"
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
     doc_id = "rep_doc_race_winner_safe"
     rev_id = "rev_race_winner_safe"
+    # Winner document uses the exact same storage_path as this request's storage_key
+    exact_storage_key = f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/{file_hash}/safe_race.pdf"
     doc_obj = _make_doc(doc_id, "safe_race.pdf", file_bytes, current_rev_id=rev_id)
+    doc_obj.storage_path = exact_storage_key
     rev_obj = _make_rev(rev_id, doc_id, "safe_race.pdf", file_bytes, status="ready")
     doc_obj.current_revision = rev_obj
 
@@ -1234,9 +1228,70 @@ async def test_concurrent_intake_winner_exists_does_not_delete_storage_object():
 
 
 @pytest.mark.asyncio
+async def test_concurrent_intake_different_filename_deletes_only_loser_storage_key():
+    """Requirement 1.2: Khi upload đồng thời cùng hash nhưng khác tên file/storage path,
+    winner tồn tại -> CHỈ xóa storage_key của request thua, TUYỆT ĐỐI không xóa winner_doc.storage_path.
+    """
+    session = _fresh_session()
+    actor = _make_actor()
+    group_id = "grp_diff_filename"
+    group = DocumentGroup(
+        id=group_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        name="Kho Khac Ten",
+        lock_version=1,
+    )
+    session.get.return_value = group
+
+    file_bytes = b"Identical binary payload with different file names"
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    doc_id = "rep_doc_winner_orig"
+    rev_id = "rev_winner_orig"
+
+    # Winner object key in MinIO
+    winner_storage_path = f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/{file_hash}/winner_orig.pdf"
+    # Loser object key in MinIO
+    loser_storage_key = f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/{file_hash}/loser_alias.pdf"
+
+    doc_obj = _make_doc(doc_id, "winner_orig.pdf", file_bytes, current_rev_id=rev_id)
+    doc_obj.storage_path = winner_storage_path
+    rev_obj = _make_rev(rev_id, doc_id, "winner_orig.pdf", file_bytes, status="ready")
+    doc_obj.current_revision = rev_obj
+
+    session.execute.side_effect = [
+        _execute_result(scalar=None),
+        _execute_result(scalar=doc_obj),
+        _execute_result(scalar=None),
+        _execute_result(scalar=None),
+    ]
+    session.commit.side_effect = [
+        IntegrityError("duplicate key", params={}, orig=Exception()),
+        None,
+    ]
+
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock), \
+         patch("app.modules.documents.intake_service.storage_service.delete", new_callable=AsyncMock) as mock_delete:
+
+        res = await document_intake_service.intake_document(
+            db=session,
+            file_bytes=file_bytes,
+            file_name="loser_alias.pdf",
+            group_id=group_id,
+            actor=actor,
+        )
+
+        assert res.document_id == doc_id
+        assert res.deduplicated is True
+        # Exact assertions: Only loser's key was deleted, winner's storage_path was NOT deleted
+        mock_delete.assert_awaited_once_with(loser_storage_key)
+        assert winner_storage_path != loser_storage_key
+
+
+@pytest.mark.asyncio
 async def test_concurrent_intake_integrity_error_no_winner_calls_compensation_delete():
-    """Requirement 1.2: When IntegrityError occurs but NO winner document exists (transaction completely failed),
-    storage_service.delete MUST be called to clean up the orphaned object.
+    """Requirement 1.3: When IntegrityError occurs but NO winner document exists (transaction completely failed),
+    storage_service.delete MUST be called to clean up the orphaned object with exact storage key.
     """
     session = _fresh_session()
     actor = _make_actor()
@@ -1251,6 +1306,8 @@ async def test_concurrent_intake_integrity_error_no_winner_calls_compensation_de
     session.get.return_value = group
 
     file_bytes = b"Artifact for completely failed transaction"
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    expected_storage_key = f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/{file_hash}/no_winner.pdf"
 
     # 1. Initial check: None
     # 2. Commit raises IntegrityError
@@ -1273,30 +1330,37 @@ async def test_concurrent_intake_integrity_error_no_winner_calls_compensation_de
                 actor=actor,
             )
 
-        # Compensation delete MUST be called!
-        assert mock_delete.called
-        assert "no_winner.pdf" in mock_delete.call_args[0][0]
+        # Compensation delete MUST be called with exact storage key!
+        mock_delete.assert_awaited_once_with(expected_storage_key)
 
 
 @pytest.mark.asyncio
 async def test_concurrent_intake_corrupted_winner_revision_raises_app_exception():
-    """Requirement 1.3: When winner document has no valid revision, intake MUST raise
-    AppException with code DOCUMENT_REVISION_INVALID and status 409 (RFC 7807), never return fake status.
+    """Requirement 1.4: When winner document has no valid revision, intake MUST raise
+    AppException with code DOCUMENT_REVISION_INVALID (HTTP 409), and MUST NOT create or commit membership.
     """
     session = _fresh_session()
     actor = _make_actor()
+    group_id = "grp_corrupted_test"
+    group = DocumentGroup(
+        id=group_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        name="Kho Corrupt Test",
+        lock_version=1,
+    )
+    session.get.return_value = group
 
     file_bytes = b"Payload for corrupt winner test"
     doc_id = "rep_doc_corrupt_winner"
-    # Winner doc without current_revision
     doc_obj = _make_doc(doc_id, "corrupt.pdf", file_bytes, current_rev_id="rev_missing")
     doc_obj.current_revision = None
 
     # 1. Initial check: None
     # 2. Commit raises IntegrityError
     # 3. Recovery query: doc_obj
-    # 4. db.get / query for revision: None
-    session.get.return_value = None
+    # 4. db.get for DocumentRevision: None, db.get for DocumentGroup: group
+    session.get.side_effect = lambda model, ident: group if model == DocumentGroup else None
     session.execute.side_effect = [
         _execute_result(scalar=None),
         _execute_result(scalar=doc_obj),
@@ -1304,22 +1368,34 @@ async def test_concurrent_intake_corrupted_winner_revision_raises_app_exception(
     ]
     session.commit.side_effect = IntegrityError("duplicate key", params={}, orig=Exception())
 
-    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock):
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock), \
+         patch("app.modules.documents.intake_service.storage_service.delete", new_callable=AsyncMock):
         with pytest.raises(AppException) as exc_info:
             await document_intake_service.intake_document(
                 db=session,
                 file_bytes=file_bytes,
                 file_name="corrupt.pdf",
+                group_id=group_id,
                 actor=actor,
             )
 
         assert exc_info.value.code == "DOCUMENT_REVISION_INVALID"
         assert exc_info.value.status_code == 409
 
+        # Verification: NO DocumentGroupMembership was added for winner_doc
+        added_memberships = [
+            obj for call_args in session.add.call_args_list
+            for obj in call_args[0]
+            if isinstance(obj, DocumentGroupMembership) and getattr(obj, "document_id", None) == doc_id
+        ]
+        assert len(added_memberships) == 0
+        # Verification: commit was not called after the initial failure
+        assert session.commit.call_count == 1
+
 
 @pytest.mark.asyncio
 async def test_concurrent_intake_winner_membership_not_duplicated():
-    """Requirement 1.4: When winner already has membership in group, no duplicate membership is added."""
+    """Requirement 1.5: When winner already has membership in group, no duplicate membership is added."""
     session = _fresh_session()
     actor = _make_actor()
     group_id = "grp_membership_exists"
@@ -1357,7 +1433,8 @@ async def test_concurrent_intake_winner_membership_not_duplicated():
     ]
     session.commit.side_effect = IntegrityError("duplicate key", params={}, orig=Exception())
 
-    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock):
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock), \
+         patch("app.modules.documents.intake_service.storage_service.delete", new_callable=AsyncMock):
         res = await document_intake_service.intake_document(
             db=session,
             file_bytes=file_bytes,
@@ -1375,6 +1452,134 @@ async def test_concurrent_intake_winner_membership_not_duplicated():
             if isinstance(obj, DocumentGroupMembership) and getattr(obj, "document_id", None) == doc_id
         ]
         assert len(added_winner_memberships) == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_intake_membership_conflict_handled_idempotently():
+    """Requirement 1.6: Khi 2 request cùng cố gắng thêm membership cho winner_doc vào group,
+    request bị IntegrityError ở membership commit sẽ rollback an toàn và trả kết quả thành công idempotent.
+    """
+    session = _fresh_session()
+    actor = _make_actor()
+    group_id = "grp_race_membership"
+    group = DocumentGroup(
+        id=group_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        name="Kho Race Membership",
+        lock_version=1,
+    )
+    session.get.return_value = group
+
+    file_bytes = b"Payload for concurrent membership race"
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    doc_id = "rep_doc_mem_race"
+    rev_id = "rev_mem_race"
+
+    doc_obj = _make_doc(doc_id, "race_mem.pdf", file_bytes, current_rev_id=rev_id)
+    doc_obj.storage_path = f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/{file_hash}/race_mem.pdf"
+    rev_obj = _make_rev(rev_id, doc_id, "race_mem.pdf", file_bytes, status="ready")
+    doc_obj.current_revision = rev_obj
+    confirmed_membership = DocumentGroupMembership(
+        group_id=group_id,
+        document_id=doc_id,
+        added_by=actor.actor_id,
+    )
+
+    # 1. Initial check: None
+    # 2. Recovery query: doc_obj
+    # 3. Membership check: None
+    # 4. Membership confirmation after rollback: concurrent winner exists
+    # 5. Job check: None
+    session.execute.side_effect = [
+        _execute_result(scalar=None),
+        _execute_result(scalar=doc_obj),
+        _execute_result(scalar=None),
+        _execute_result(scalar=confirmed_membership),
+        _execute_result(scalar=None),
+    ]
+    # Commit 1 (initial doc insert) -> IntegrityError
+    # Commit 2 (membership insert) -> IntegrityError (race with another request)
+    session.commit.side_effect = [
+        IntegrityError("doc duplicate key", params={}, orig=Exception()),
+        IntegrityError("membership duplicate key", params={}, orig=Exception()),
+    ]
+
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock), \
+         patch("app.modules.documents.intake_service.storage_service.delete", new_callable=AsyncMock):
+
+        res = await document_intake_service.intake_document(
+            db=session,
+            file_bytes=file_bytes,
+            file_name="race_mem.pdf",
+            group_id=group_id,
+            actor=actor,
+        )
+
+        assert res.document_id == doc_id
+        assert res.status == "ready"
+        assert res.deduplicated is True
+        # Rollback was called twice: once for doc, once for membership
+        assert session.rollback.call_count >= 2
+
+
+@pytest.mark.asyncio
+async def test_concurrent_intake_membership_integrity_error_without_winner_is_not_swallowed():
+    """Requirement 1.7: A membership IntegrityError is idempotent only when a real
+    concurrent membership can be re-queried after rollback.
+    """
+    session = _fresh_session()
+    actor = _make_actor()
+    group_id = "grp_membership_failure"
+    group = DocumentGroup(
+        id=group_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        name="Kho Membership Failure",
+        lock_version=1,
+    )
+    session.get.return_value = group
+
+    file_bytes = b"Payload for non-duplicate membership integrity failure"
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    doc_id = "rep_doc_mem_failure"
+    rev_id = "rev_mem_failure"
+
+    doc_obj = _make_doc(doc_id, "membership_failure.pdf", file_bytes, current_rev_id=rev_id)
+    doc_obj.storage_path = (
+        f"documents/{actor.tenant_id}/{actor.workspace_id}/originals/"
+        f"{file_hash}/membership_failure.pdf"
+    )
+    rev_obj = _make_rev(rev_id, doc_id, "membership_failure.pdf", file_bytes, status="ready")
+    doc_obj.current_revision = rev_obj
+
+    session.execute.side_effect = [
+        _execute_result(scalar=None),
+        _execute_result(scalar=doc_obj),
+        _execute_result(scalar=None),
+        _execute_result(scalar=None),
+    ]
+    session.commit.side_effect = [
+        IntegrityError("doc duplicate key", params={}, orig=Exception()),
+        IntegrityError("foreign key failure", params={}, orig=Exception()),
+    ]
+
+    with (
+        patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock),
+        patch("app.modules.documents.intake_service.storage_service.delete", new_callable=AsyncMock),
+        pytest.raises(AppException) as exc_info,
+    ):
+        await document_intake_service.intake_document(
+            db=session,
+            file_bytes=file_bytes,
+            file_name="membership_failure.pdf",
+            group_id=group_id,
+            actor=actor,
+        )
+
+    assert exc_info.value.code == "DOCUMENT_GROUP_MEMBERSHIP_FAILED"
+    assert exc_info.value.status_code == 409
+    assert session.rollback.call_count >= 2
 
 
 @pytest.mark.asyncio
@@ -1465,5 +1670,66 @@ async def test_legacy_v1_upload_always_routes_to_intake_v2_with_and_without_grou
     finally:
         app.dependency_overrides.pop(get_current_actor, None)
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_adr012_batch_upload_stored_status_and_zero_parse_invocations() -> None:
+    """ADR-012 Acceptance: Upload tệp vào kho trả về 'stored', tạo RepositoryFileRevision, và 0 parse/OCR jobs."""
+    actor = _make_actor()
+    session = _fresh_session()
+    session.execute.return_value = _execute_result(scalar=None)
+
+    with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock) as mock_s3_save, \
+         patch("app.modules.documents.service.get_document_parser") as mock_parser:
+
+        # Simulate batch intake of 10 documents
+        for i in range(10):
+            file_bytes = f"Noi dung van ban luu tru file #{i}".encode()
+            file_name = f"tailieu_luutru_{i}.pdf"
+
+            resp = await document_intake_service.intake_document(
+                db=session,
+                file_bytes=file_bytes,
+                file_name=file_name,
+                actor=actor,
+            )
+
+            # Contract checks:
+            assert resp.status == "stored"
+            assert resp.job_id is None
+            assert resp.document_id.startswith("rep_doc_")
+            assert resp.revision_id.startswith("rev_")
+            assert resp.deduplicated is False
+
+        # Verify RepositoryFileRevision records were added to database
+        added_entities = [call[0][0] for call in session.add.call_args_list]
+        file_revs = [e for e in added_entities if isinstance(e, RepositoryFileRevision)]
+        assert len(file_revs) == 10
+        for fr in file_revs:
+            assert fr.revision_no == 1
+            assert fr.source_hash is not None
+            assert fr.source_storage_path.startswith("documents/")
+
+        # Verify S3 was called 10 times
+        assert mock_s3_save.await_count == 10
+
+        # Acceptance invariant: zero parse/OCR invocations
+        mock_parser.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_adr012_delete_repository_document_decoupled_from_knowledge() -> None:
+    """ADR-012 Acceptance: Xóa tài liệu kho đặt is_active=False mà không phụ thuộc/cascade sang Knowledge."""
+    session = _fresh_session()
+    doc_id = "rep_doc_decoupled_1"
+    doc_obj = _make_doc(doc_id, "quy_dinh.pdf", b"Content to delete")
+    session.execute.return_value = _execute_result(scalar=doc_obj)
+
+    # Soft-delete must succeed cleanly without raising or querying legacy knowledge_documents relationship
+    result = await document_repository_service.delete_document(db=session, doc_id=doc_id)
+
+    assert result is True
+    assert doc_obj.is_active is False
+    assert session.commit.called
 
 

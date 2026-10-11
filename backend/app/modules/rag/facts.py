@@ -5,10 +5,15 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument, KnowledgeFact
+from app.modules.knowledge.models import (
+    KnowledgeBinding,
+    KnowledgeCollection,
+    KnowledgeDocument,
+    KnowledgeFact,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +137,13 @@ class FactLayer:
 
         query = (
             select(KnowledgeFact)
-            .join(
+            .outerjoin(
                 KnowledgeDocument,
                 KnowledgeFact.document_id == KnowledgeDocument.id,
+            )
+            .outerjoin(
+                KnowledgeBinding,
+                KnowledgeFact.binding_id == KnowledgeBinding.id,
             )
             .join(
                 KnowledgeCollection,
@@ -142,8 +151,17 @@ class FactLayer:
             )
             .where(
                 KnowledgeFact.collection_id == collection_id,
-                KnowledgeDocument.is_active.is_(True),
-                KnowledgeDocument.status.in_(["approved", "ready"]),
+                or_(
+                    and_(
+                        KnowledgeFact.binding_id.is_not(None),
+                        or_(KnowledgeBinding.id.is_(None), KnowledgeBinding.status == "active"),
+                    ),
+                    and_(
+                        KnowledgeFact.document_id.is_not(None),
+                        KnowledgeDocument.is_active.is_(True),
+                        KnowledgeDocument.status.in_(["approved", "ready"]),
+                    ),
+                ),
                 or_(*conditions),
             )
         )

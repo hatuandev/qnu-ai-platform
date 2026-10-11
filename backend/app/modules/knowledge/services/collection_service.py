@@ -60,15 +60,23 @@ class CollectionService:
                 defaults.default_embedding_model,
             )
 
+            fallback_provider = getattr(defaults, "fallback_ocr_provider_id", None)
+            fallback_model = getattr(defaults, "fallback_ocr_model", None)
+            if not fallback_provider and getattr(defaults, "ocr_combo_chain", None):
+                chain = defaults.ocr_combo_chain
+                if len(chain) > 1:
+                    fallback_provider = chain[1].provider_id
+                    fallback_model = chain[1].model_name
+
             meta["data_processing"] = {
                 "embedding_provider_id": defaults.default_embedding_provider_id,
                 "embedding_model": defaults.default_embedding_model,
                 "embedding_dimension": int(dim),
-                "ocr_mode": defaults.ocr_mode or "auto",
+                "ocr_mode": getattr(defaults, "default_ocr_mode", "combo") or "combo",
                 "primary_ocr_provider_id": defaults.default_ocr_provider_id,
                 "primary_ocr_model": defaults.default_ocr_model,
-                "fallback_ocr_provider_id": defaults.fallback_ocr_provider_id,
-                "fallback_ocr_model": defaults.fallback_ocr_model,
+                "fallback_ocr_provider_id": fallback_provider,
+                "fallback_ocr_model": fallback_model,
             }
         col = KnowledgeCollection(
             name=req.name,

@@ -72,7 +72,7 @@ async def test_enqueue_job_worker_offline_stays_queued():
 
 @pytest.mark.asyncio
 async def test_cancel_terminal_job_rejected():
-    job = SimpleNamespace(id="job_1", status="completed")
+    job = SimpleNamespace(id="job_1", job_type="ingestion", status="completed")
     session = _fresh_session()
     session.execute = AsyncMock(return_value=_execute_result(scalar=job))
     with pytest.raises(AppException) as exc_info:
@@ -82,7 +82,7 @@ async def test_cancel_terminal_job_rejected():
 
 @pytest.mark.asyncio
 async def test_cancel_running_job():
-    job = SimpleNamespace(id="job_2", status="running", error=None)
+    job = SimpleNamespace(id="job_2", job_type="ingestion", status="running", error=None)
     session = _fresh_session()
     session.execute = AsyncMock(return_value=_execute_result(scalar=job))
     cancelled = await jobs_service.cancel_job(session, "job_2")
@@ -91,7 +91,7 @@ async def test_cancel_running_job():
 
 @pytest.mark.asyncio
 async def test_cancel_already_cancelled_is_idempotent():
-    job = SimpleNamespace(id="job_cancelled", status="cancelled", error="cancelled previously")
+    job = SimpleNamespace(id="job_cancelled", job_type="ingestion", status="cancelled", error="cancelled previously")
     session = _fresh_session()
     session.execute = AsyncMock(return_value=_execute_result(scalar=job))
     cancelled = await jobs_service.cancel_job(session, "job_cancelled")

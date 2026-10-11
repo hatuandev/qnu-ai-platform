@@ -81,6 +81,9 @@ export interface ModelProvider {
     | "cloudflare"
     | "nvidia"
     | "vllm"
+    | "paddleocr"
+    | "paddleocr_vl"
+    | "paddle"
     | "ollama"
     | "custom";
   is_active: boolean;

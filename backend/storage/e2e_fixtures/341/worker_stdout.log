@@ -1,0 +1,494 @@
+2026-10-11T07:14:47.656036Z [info     ] arq_worker_starting_up         [app.workers.arq_worker] redis_url=redis://127.0.0.1:6379/0
+2026-10-11T07:15:13.146258Z [info     ]   0.07s → knowledge_ingest_job_b1b823b1045f:task_knowledge_source_ingestion('job_b1b823b1045f') [arq.worker]
+2026-10-11T07:15:13.183302Z [info     ]   0.10s → knowledge_ingest_job_66f24dbf7fd4:task_knowledge_source_ingestion('job_66f24dbf7fd4') [arq.worker]
+2026-10-11T07:15:13.306555Z [info     ]   0.21s → knowledge_ingest_job_50b4edac507c:task_knowledge_source_ingestion('job_50b4edac507c') [arq.worker]
+2026-10-11T07:15:13.678215Z [error    ] Failed to ingest import item imp_item_96ecef43051e [app.modules.knowledge.services.source_ingestion_service]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+Consider using the pymupdf_layout package for a greatly improved page layout analysis.
+2026-10-11T07:15:13.822261Z [info     ] pdf_inspector_success: type=text_based, pages=2, ocr_needed=[], time=16.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T07:15:13.909877Z [info     ] pdf_inspector_success: type=scanned, pages=2, ocr_needed=[1, 2], time=13.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T07:15:14.068527Z [info     ] pdf_inspector_success: type=scanned, pages=2, ocr_needed=[1, 2], time=11.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T07:15:14.128377Z [info     ] Calling PaddleOCR-VL layout parsing at http://100.105.13.53:8080/layout-parsing for e2e341_scan_2pages.pdf (12027816 bytes, type=PDF) [app.modules.ocr.adapters.paddleocr_adapter]
+2026-10-11T07:15:14.291525Z [error    ] task_knowledge_source_ingestion_failed [app.workers.tasks] error='Failed to open stream' job_id=job_50b4edac507c
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:15:14.318746Z [error    ]   1.01s ! knowledge_ingest_job_50b4edac507c:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream [arq.worker]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:15:14.368995Z [info     ] Reusing existing chunk set chk_set_6e26912db04e for source revision ks_rev_b73900301eb1 (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:15:15.316390Z [info     ]   1.00s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:15:15.333788Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:15:15.686012Z [info     ] Indexed 3 chunks into Qdrant collection col_4893132e0653_169f2ef17edd4ae5 [app.modules.rag.vector_indexer]
+2026-10-11T07:15:15.847106Z [info     ]   2.70s ← knowledge_ingest_job_b1b823b1045f:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_b1b823b1045f', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T07:15:19.869070Z [info     ] Reusing existing chunk set chk_set_608507886de5 for source revision ks_rev_3b15e094255a (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:15:20.139333Z [info     ] Indexed 3 chunks into Qdrant collection col_4893132e0653_169f2ef17edd4ae5 [app.modules.rag.vector_indexer]
+2026-10-11T07:15:20.266219Z [info     ]   7.08s ← knowledge_ingest_job_66f24dbf7fd4:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_66f24dbf7fd4', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T07:16:15.232008Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:16:15.250081Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:17:15.178015Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:17:15.194570Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:18:15.575466Z [info     ]   1.01s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:18:15.596066Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:19:15.247770Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:19:15.291045Z [info     ]   0.04s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:20:15.399791Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:20:15.417817Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:20:18.953476Z [info     ]   0.45s → knowledge_ingest_job_20fd1b566fa9:task_knowledge_source_ingestion('job_20fd1b566fa9') [arq.worker]
+2026-10-11T07:20:18.963938Z [info     ]   0.45s → knowledge_ingest_job_38cbd9acc45d:task_knowledge_source_ingestion('job_38cbd9acc45d') [arq.worker]
+2026-10-11T07:20:18.973781Z [info     ]   0.45s → knowledge_ingest_job_27d424bcd214:task_knowledge_source_ingestion('job_27d424bcd214') [arq.worker]
+2026-10-11T07:20:19.139515Z [error    ] Failed to ingest import item imp_item_81d56faeaee5 [app.modules.knowledge.services.source_ingestion_service]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:20:19.156853Z [info     ] Reusing existing parsed source artifact ks_rev_b73900301eb1 for document rep_doc_844b58c54044 (artifact_key=635d9b54b64f834b141c88d112377be763fc3185c591fb33766b3f16d132a53b) [app.modules.knowledge.services.source_ingestion_service]
+2026-10-11T07:20:19.192491Z [info     ] Reusing identical chunk set chk_set_6e26912db04e across revisions via chunk_set_key 813df347a28974d786d8187254f30ab2b82a5caeb1b9c62ad15e2d1209fe2554 [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:20:19.213962Z [error    ] task_knowledge_source_ingestion_failed [app.workers.tasks] error='Failed to open stream' job_id=job_27d424bcd214
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:20:19.231030Z [error    ]   0.26s ! knowledge_ingest_job_27d424bcd214:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream [arq.worker]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:20:19.302462Z [info     ] Reusing existing chunk set chk_set_4e4ae77a8d3e for source revision ks_rev_51ead1497e99 (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:20:19.447269Z [info     ] Reusing existing parsed source artifact ks_rev_3b15e094255a for document rep_doc_23b940f3e79d (artifact_key=b759b3013f1887a785dd1e9ebaaa86e826b917e3b3a46b8ddbd84bd2052c3d7d) [app.modules.knowledge.services.source_ingestion_service]
+2026-10-11T07:20:19.464075Z [info     ] Reusing identical chunk set chk_set_608507886de5 across revisions via chunk_set_key 29588211fe1f85b0bc64cd0ef80e64097d68f6207ecd693b2ea1c1680c3bcb5c [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:20:19.517229Z [info     ] Reusing existing chunk set chk_set_5e3cb21cccfb for source revision ks_rev_a93139a0c41a (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:20:19.611828Z [info     ] Qdrant collection col_b04b7104008f_169f2ef17edd4ae5 was created concurrently by another worker [app.modules.rag.vector_indexer]
+2026-10-11T07:20:19.626227Z [info     ] Created Qdrant collection: col_b04b7104008f_169f2ef17edd4ae5 (dim=1024) [app.modules.rag.vector_indexer]
+2026-10-11T07:20:19.734711Z [error    ] Failed to index chunks into Qdrant for idx_rev idx_rev_21e4e65fab95 [app.modules.knowledge.services.vector_generation_service]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 353, in build_generation_for_source
+    indexed_count = await vector_indexer.index_chunks(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 504, in index_chunks
+    await self._resolve_embedding_runtime(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 174, in _resolve_embedding_runtime
+    return await model_runtime_resolver.resolve(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\modelops\services\model_runtime_resolver.py", line 127, in resolve
+    raise AppException(
+app.core.exceptions.DomainException: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+2026-10-11T07:20:19.750859Z [error    ] Failed to ingest import item imp_item_1b5b7beeaff5 [app.modules.knowledge.services.source_ingestion_service]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 353, in build_generation_for_source
+    indexed_count = await vector_indexer.index_chunks(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 504, in index_chunks
+    await self._resolve_embedding_runtime(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 174, in _resolve_embedding_runtime
+    return await model_runtime_resolver.resolve(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\modelops\services\model_runtime_resolver.py", line 127, in resolve
+    raise AppException(
+app.core.exceptions.DomainException: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 333, in process_import_item
+    await vector_generation_service.build_generation_for_source(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 365, in build_generation_for_source
+    raise AppException(
+app.core.exceptions.DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+2026-10-11T07:20:19.807544Z [error    ] task_knowledge_source_ingestion_failed [app.workers.tasks] error="Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng." job_id=job_38cbd9acc45d
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 353, in build_generation_for_source
+    indexed_count = await vector_indexer.index_chunks(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 504, in index_chunks
+    await self._resolve_embedding_runtime(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 174, in _resolve_embedding_runtime
+    return await model_runtime_resolver.resolve(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\modelops\services\model_runtime_resolver.py", line 127, in resolve
+    raise AppException(
+app.core.exceptions.DomainException: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 333, in process_import_item
+    await vector_generation_service.build_generation_for_source(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 365, in build_generation_for_source
+    raise AppException(
+app.core.exceptions.DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+2026-10-11T07:20:19.824955Z [error    ]   0.86s ! knowledge_ingest_job_38cbd9acc45d:task_knowledge_source_ingestion failed, DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng. [arq.worker]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 353, in build_generation_for_source
+    indexed_count = await vector_indexer.index_chunks(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 504, in index_chunks
+    await self._resolve_embedding_runtime(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 174, in _resolve_embedding_runtime
+    return await model_runtime_resolver.resolve(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\modelops\services\model_runtime_resolver.py", line 127, in resolve
+    raise AppException(
+app.core.exceptions.DomainException: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 333, in process_import_item
+    await vector_generation_service.build_generation_for_source(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 365, in build_generation_for_source
+    raise AppException(
+app.core.exceptions.DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+2026-10-11T07:20:19.894972Z [info     ] Indexed 3 chunks into Qdrant collection col_b04b7104008f_169f2ef17edd4ae5 [app.modules.rag.vector_indexer]
+2026-10-11T07:20:20.029098Z [info     ]   1.08s ← knowledge_ingest_job_20fd1b566fa9:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_20fd1b566fa9', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T07:21:15.419253Z [info     ]   1.01s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:21:15.434457Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:22:15.504785Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:22:15.521652Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:23:15.603696Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:23:15.619679Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:23:29.863820Z [info     ]   0.19s → knowledge_ingest_job_cc9be6e13990:task_knowledge_source_ingestion('job_cc9be6e13990') [arq.worker]
+2026-10-11T07:23:29.872409Z [info     ]   0.19s → knowledge_ingest_job_050151aa7a9b:task_knowledge_source_ingestion('job_050151aa7a9b') [arq.worker]
+2026-10-11T07:23:29.983492Z [error    ] Failed to ingest import item imp_item_81d56faeaee5 [app.modules.knowledge.services.source_ingestion_service]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:23:30.068563Z [error    ] task_knowledge_source_ingestion_failed [app.workers.tasks] error='Failed to open stream' job_id=job_050151aa7a9b
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:23:30.095483Z [error    ]   0.22s ! knowledge_ingest_job_050151aa7a9b:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream [arq.worker]
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+2026-10-11T07:23:30.122515Z [info     ] Reusing existing parsed source artifact ks_rev_3b15e094255a for document rep_doc_23b940f3e79d (artifact_key=b759b3013f1887a785dd1e9ebaaa86e826b917e3b3a46b8ddbd84bd2052c3d7d) [app.modules.knowledge.services.source_ingestion_service]
+2026-10-11T07:23:30.140171Z [info     ] Reusing identical chunk set chk_set_608507886de5 across revisions via chunk_set_key 29588211fe1f85b0bc64cd0ef80e64097d68f6207ecd693b2ea1c1680c3bcb5c [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:23:30.212950Z [info     ] Reusing existing chunk set chk_set_c042feeaaafc for source revision ks_rev_763a93050260 (strategy=ClauseBasedChunker) [app.modules.knowledge.services.chunk_set_service]
+2026-10-11T07:23:30.504593Z [info     ] Indexed 3 chunks into Qdrant collection col_b04b7104008f_169f2ef17edd4ae5 [app.modules.rag.vector_indexer]
+2026-10-11T07:23:30.628587Z [info     ]   0.76s ← knowledge_ingest_job_cc9be6e13990:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_cc9be6e13990', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T07:24:15.557626Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:24:15.570523Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:25:15.560072Z [info     ]   1.01s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:25:15.574006Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:26:15.242305Z [info     ]   1.03s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:26:15.261301Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:27:15.268927Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:27:15.288721Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:28:15.282301Z [info     ]   1.03s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:28:15.299441Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T07:29:15.360326Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T07:29:15.381643Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:13.795830Z [info     ]   0.72s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:15.312020Z [info     ]   1.51s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:15.374294Z [info     ]   1.45s → cron:task_reconcile_pending_jobs() delayed=1.45s [arq.worker]
+2026-10-11T08:04:16.104513Z [info     ]   0.73s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:16.533124Z [info     ]   1.00s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:16.936687Z [info     ]   0.40s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:16.960955Z [info     ]   0.36s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:17.120081Z [info     ]   0.16s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:17.188876Z [info     ]   0.20s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:17.332295Z [info     ]   0.14s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:17.689102Z [info     ]   0.47s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:17.779190Z [info     ]   0.09s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:18.171173Z [info     ]   0.47s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:18.200149Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:18.679802Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:18.712098Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:19.197058Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:19.219376Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:19.701105Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:19.724466Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:20.198555Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:20.217089Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:20.696163Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:20.711048Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:21.201989Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:21.217927Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:21.707664Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:21.722369Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:22.224861Z [info     ]   0.52s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:22.238502Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:22.737011Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:22.752961Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:23.237617Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:23.255070Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:23.742759Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:23.756718Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:24.243841Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:24.257513Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:24.742735Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:24.756180Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:25.246865Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:25.261304Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:25.756745Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:25.771318Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:26.255626Z [info     ]   0.48s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:26.268607Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:26.746186Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:26.760901Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:27.258464Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:27.272506Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:27.778125Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:27.797863Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:28.268675Z [info     ]   0.48s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:28.282498Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:28.780409Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:28.795111Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:29.296388Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:29.310103Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:29.800373Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:29.813483Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:30.305570Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:30.323589Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:30.819292Z [info     ]   0.50s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:30.839053Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:31.322020Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:31.340894Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:31.816511Z [info     ]   0.49s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:31.830872Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:04:32.331474Z [info     ]   0.51s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:04:32.346521Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:05:15.491833Z [info     ]   1.03s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:05:15.506681Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:06:15.431045Z [info     ]   0.99s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:06:15.445707Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:06:43.853283Z [info     ]   0.17s → knowledge_ingest_job_429fd3201d85:task_knowledge_source_ingestion('job_429fd3201d85') [arq.worker]
+2026-10-11T08:06:43.863993Z [info     ]   0.17s → knowledge_ingest_job_3f21aebd34aa:task_knowledge_source_ingestion('job_3f21aebd34aa') [arq.worker]
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+2026-10-11T08:06:49.198658Z [info     ] pdf_inspector_success: type=text_based, pages=14, ocr_needed=[], time=1012.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T08:06:49.370884Z [info     ]   5.51s ← knowledge_ingest_job_3f21aebd34aa:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_3f21aebd34aa', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T08:06:49.910783Z [info     ] pdf_inspector_success: type=scanned, pages=48, ocr_needed=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48], time=14.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T08:06:49.983009Z [info     ] pdf_inspector_success: type=scanned, pages=48, ocr_needed=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48], time=15.00ms [app.modules.knowledge.parsers.pdf_inspector]
+2026-10-11T08:06:50.046731Z [info     ] Calling PaddleOCR-VL layout parsing at http://100.105.13.53:8080/layout-parsing for QĐ 2705_2021_Quy chế tuyển sinh và đào tạo ThS.pdf (18507242 bytes, type=PDF) [app.modules.ocr.adapters.paddleocr_adapter]
+2026-10-11T08:07:10.395052Z [info     ]  26.54s ← knowledge_ingest_job_429fd3201d85:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_429fd3201d85', 'source_revision_id': 'ks… [arq.worker]
+2026-10-11T08:07:15.519135Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:07:15.532677Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:08:15.586602Z [info     ]   1.00s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:08:15.600681Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:09:15.489551Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:09:15.501324Z [info     ]   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:10:15.556500Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:10:15.574423Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:11:15.374774Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:11:15.392510Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:12:15.474505Z [info     ]   1.02s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:12:15.491903Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:13:15.412079Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:13:15.427711Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:14:15.206941Z [info     ]   1.01s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:14:15.223506Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:14:48.179879Z [info     ] recording health: Oct-11 15:14:48 j_complete=66 j_failed=4 j_retried=0 j_ongoing=0 queued=0 [arq.worker]
+2026-10-11T08:15:15.248850Z [info     ]   1.04s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:15:15.263600Z [info     ]   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]
+2026-10-11T08:16:15.404952Z [info     ]   1.00s → cron:task_reconcile_pending_jobs() [arq.worker]
+2026-10-11T08:16:15.419631Z [info     ]   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0} [arq.worker]

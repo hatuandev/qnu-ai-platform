@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
+from app.core.exceptions import AppException
 from app.modules.workflows.nodes.base import NodeExecutionTrace, WorkflowContext
 from app.modules.workflows.registry import node_registry
 from app.modules.workflows.schemas import (
@@ -52,6 +53,8 @@ class WorkflowDAGEngine:
         max_allowed_steps = max_steps or dag_spec.policies.get("max_steps", 25)
         active_node_ids: set[str] = {start_node_id or dag_spec.entry_node_id}
         completed_ids = set(completed_node_ids or set())
+        active_node_ids.update(completed_ids)
+        active_node_ids.update(context.node_data.get("_dag_pending_nodes", []))
         executed_nodes: list[str] = list(completed_ids)
         steps_taken = 0
 
@@ -60,6 +63,8 @@ class WorkflowDAGEngine:
                 active_node_ids,
                 completed_ids,
                 edges_by_target,
+                edges_by_source,
+                nodes_by_id,
             )
             if not ready_node_ids:
                 return self._complete_or_stall_response(
@@ -92,13 +97,26 @@ class WorkflowDAGEngine:
                 )
 
             node_start_time = time.perf_counter()
-            context.node_inputs[current_node_id] = self._collect_node_inputs(
-                current_node_id,
-                edges_by_target.get(current_node_id, []),
-                completed_ids,
-                context.node_data,
-            )
             try:
+                selected_edges = context.node_data.get("_dag_selected_edges", {})
+                incoming = [
+                    e
+                    for e in edges_by_target.get(current_node_id, [])
+                    if e.source not in selected_edges
+                    or self._edge_key(e) in selected_edges[e.source]
+                ]
+                context.node_inputs[current_node_id] = self._collect_node_inputs(
+                    current_node_id,
+                    incoming,
+                    completed_ids,
+                    context.node_data,
+                )
+                context.node_input_sources[current_node_id] = [
+                    context.node_data[f"node:{e.source}"]
+                    for e in incoming
+                    if e.source in completed_ids
+                    and isinstance(context.node_data.get(f"node:{e.source}"), dict)
+                ]
                 result = await handler.execute(node_spec, context)
             except Exception as exc:
                 logger.exception("Node [%s] failed with an unexpected error", current_node_id)
@@ -125,6 +143,7 @@ class WorkflowDAGEngine:
             context.node_data[f"node:{current_node_id}"] = result.output
 
             if result.status == "paused_for_approval":
+                context.node_data["_dag_pending_nodes"] = sorted(active_node_ids - completed_ids)
                 elapsed = (time.perf_counter() - start_time) * 1000
                 return WorkflowExecuteResponse(
                     execution_id=context.execution_id or context.workflow_id,
@@ -145,6 +164,20 @@ class WorkflowDAGEngine:
                 )
 
             completed_ids.add(current_node_id)
+            outgoing = edges_by_source.get(current_node_id, [])
+            selected = [
+                e
+                for e in outgoing
+                if (
+                    (not result.next_node_override or e.target == result.next_node_override)
+                    and (not result.selected_port or e.source_port == result.selected_port)
+                    and node_spec.type not in _TERMINAL_NODE_TYPES
+                )
+            ]
+            context.node_data.setdefault("_dag_selected_edges", {})[current_node_id] = [
+                self._edge_key(e) for e in selected
+            ]
+            context.node_data["_dag_pending_nodes"] = []
             if node_spec.type in _TERMINAL_NODE_TYPES:
                 continue
             activation_error = self._activate_next_nodes(
@@ -188,18 +221,28 @@ class WorkflowDAGEngine:
 
             if edge.source_port:
                 if edge.source_port not in source_output:
-                    logger.warning(
-                        "Workflow edge %s -> %s references missing source port '%s'",
-                        edge.source,
-                        node_id,
-                        edge.source_port,
+                    raise AppException(
+                        f"Cạnh {edge.source} -> {node_id} thiếu cổng '{edge.source_port}'.",
+                        code="WORKFLOW_INPUT_PORT_MISSING",
+                        status_code=422,
                     )
-                    continue
                 value = source_output[edge.source_port]
             else:
                 value = source_output
 
             target_port = edge.target_port or "input"
+            if target_port in routed:
+                if edge.target_port:
+                    raise AppException(
+                        f"Node '{node_id}' có nhiều dữ liệu cho cổng '{target_port}'.",
+                        code="WORKFLOW_INPUT_PORT_AMBIGUOUS",
+                        status_code=422,
+                    )
+                previous = routed[target_port]
+                routed[target_port] = (
+                    [*previous, value] if isinstance(previous, list) else [previous, value]
+                )
+                continue
             routed[target_port] = value
         return routed
 
@@ -208,17 +251,36 @@ class WorkflowDAGEngine:
         active_node_ids: set[str],
         completed_node_ids: set[str],
         edges_by_target: dict[str, list[WorkflowEdgeSpec]],
+        edges_by_source: dict[str, list[WorkflowEdgeSpec]],
+        nodes_by_id: dict[str, WorkflowNodeSpec],
     ) -> list[str]:
+        # Unresolved branches may still activate deep predecessors of a join.
+        potential = set(active_node_ids - completed_node_ids)
+        pending = list(potential)
+        while pending:
+            source = pending.pop()
+            node = nodes_by_id.get(source)
+            if source in completed_node_ids or (node and node.type in _TERMINAL_NODE_TYPES):
+                continue
+            for edge in edges_by_source.get(source, []):
+                if edge.target not in potential and edge.target not in completed_node_ids:
+                    potential.add(edge.target)
+                    pending.append(edge.target)
         ready_node_ids: list[str] = []
         for node_id in sorted(active_node_ids - completed_node_ids):
             active_predecessors = {
                 edge.source
                 for edge in edges_by_target.get(node_id, [])
-                if edge.source in active_node_ids
+                if edge.source in active_node_ids or edge.source in potential
             }
             if active_predecessors.issubset(completed_node_ids):
                 ready_node_ids.append(node_id)
         return ready_node_ids
+
+    @staticmethod
+    def _edge_key(edge: WorkflowEdgeSpec) -> list[str | None]:
+        """JSON-safe routing identity persisted with approval checkpoints."""
+        return [edge.target, edge.source_port, edge.target_port]
 
     @staticmethod
     def _activate_next_nodes(
@@ -246,9 +308,7 @@ class WorkflowDAGEngine:
             return None
         if not outgoing_edges:
             return None
-        return (
-            f"Node '{current_node_id}' chọn cổng '{selected_port}' nhưng workflow không có cạnh tương ứng."
-        )
+        return f"Node '{current_node_id}' chọn cổng '{selected_port}' nhưng workflow không có cạnh tương ứng."
 
     def _complete_or_stall_response(
         self,

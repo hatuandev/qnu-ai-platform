@@ -231,7 +231,11 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
       selectedProviderId
         ? apiClient.getProviderKeys(selectedProviderId)
         : Promise.resolve([]),
-    enabled: !!selectedProviderId,
+    enabled:
+      !!selectedProviderId &&
+      !["paddleocr", "paddleocr_vl", "paddle"].includes(
+        providers.find((p) => p.id === selectedProviderId)?.type || "",
+      ),
   });
 
   const selectedProvider =
@@ -726,30 +730,38 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
         />
 
         {/* Key Pool & Specs Section */}
-        <KeyPoolSection
-          selectedProvider={selectedProvider}
-          providerKeys={effectiveKeys}
-          loadingKeys={loadingKeys && effectiveKeys.length === 0}
-          simulatingRotation={simulatingRotation}
-          rotationResult={rotationResult}
-          testingKeyId={testingKeyId}
-          keyTestFeedback={keyTestFeedback}
-          isAddingKey={addKeyMutation.isPending}
-          onSimulateRotation={handleSimulateRotation}
-          onSaveNewKey={(payload) =>
-            addKeyMutation.mutate({
-              providerId: selectedProvider.id,
-              payload,
-            })
-          }
-          onTestSingleKey={handleTestSingleKey}
-          onDeleteKey={(providerId, keyId) =>
-            deleteKeyMutation.mutate({ providerId, keyId })
-          }
-          onToggleKeyActive={(providerId, keyId, isActive) =>
-            toggleKeyMutation.mutate({ providerId, keyId, isActive })
-          }
-        />
+        {["paddleocr", "paddleocr_vl", "paddle"].includes(
+          selectedProvider.type,
+        ) ? (
+          <p className="text-sm text-muted-foreground">
+            PaddleOCR không yêu cầu khóa API.
+          </p>
+        ) : (
+          <KeyPoolSection
+            selectedProvider={selectedProvider}
+            providerKeys={effectiveKeys}
+            loadingKeys={loadingKeys && effectiveKeys.length === 0}
+            simulatingRotation={simulatingRotation}
+            rotationResult={rotationResult}
+            testingKeyId={testingKeyId}
+            keyTestFeedback={keyTestFeedback}
+            isAddingKey={addKeyMutation.isPending}
+            onSimulateRotation={handleSimulateRotation}
+            onSaveNewKey={(payload) =>
+              addKeyMutation.mutate({
+                providerId: selectedProvider.id,
+                payload,
+              })
+            }
+            onTestSingleKey={handleTestSingleKey}
+            onDeleteKey={(providerId, keyId) =>
+              deleteKeyMutation.mutate({ providerId, keyId })
+            }
+            onToggleKeyActive={(providerId, keyId, isActive) =>
+              toggleKeyMutation.mutate({ providerId, keyId, isActive })
+            }
+          />
+        )}
 
         {/* Add Custom Model Dialog */}
         <AddCustomModelDialog

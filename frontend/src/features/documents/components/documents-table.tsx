@@ -1,18 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import {
   ArrowUpRight,
-  BookOpen,
-  CheckCircle2,
-  Clock,
   Download,
   FileCode,
   FileSpreadsheet,
   FileText,
+  Folders,
   Hash,
   MoreHorizontal,
-  RefreshCw,
   Trash2,
-  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +36,6 @@ interface DocumentsTableProps {
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
-  onReparse: (doc: RepositoryDocumentListItem) => void;
   onDelete: (doc: RepositoryDocumentListItem) => void;
 }
 
@@ -70,7 +65,6 @@ export function DocumentsTable({
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
-  onReparse,
   onDelete,
 }: DocumentsTableProps) {
   const allSelected =
@@ -94,9 +88,9 @@ export function DocumentsTable({
             </TableHead>
             <TableHead>Tài Liệu & Tệp Gốc</TableHead>
             <TableHead className="w-44">Số Hiệu & Phân Loại</TableHead>
-            <TableHead className="w-36">Trạng Thái MD</TableHead>
+            <TableHead className="w-24 text-center">Định Dạng</TableHead>
             <TableHead className="w-28 text-right">Dung Lượng</TableHead>
-            <TableHead className="w-36 text-center">Kho Tri Thức</TableHead>
+            <TableHead className="w-44">Kho Lưu Trực Thuộc</TableHead>
             <TableHead className="w-32">Ngày Tải</TableHead>
             <TableHead className="w-16 text-right">Thao Tác</TableHead>
           </TableRow>
@@ -139,19 +133,6 @@ export function DocumentsTable({
                       <span className="text-[11px] text-muted-foreground truncate block">
                         {doc.file_name}
                       </span>
-                      {doc.groups && doc.groups.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                          {doc.groups.map((g) => (
-                            <Badge
-                              key={g.id}
-                              variant="outline"
-                              className="text-[9px] py-0 h-4 px-1 text-muted-foreground bg-muted/40"
-                            >
-                              {g.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </TableCell>
@@ -177,40 +158,9 @@ export function DocumentsTable({
                   </div>
                 </TableCell>
 
-                {/* Trạng thái bóc tách Markdown */}
-                <TableCell>
-                  {doc.parse_status === "parsed" && (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 text-[11px] py-0 h-5 border-success/30 text-success bg-success/10"
-                    >
-                      <CheckCircle2 className="size-3" />
-                      Markdown Sạch
-                    </Badge>
-                  )}
-                  {doc.parse_status === "parsing" && (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 text-[11px] py-0 h-5 border-warning/30 text-warning bg-warning/10"
-                    >
-                      <Clock className="size-3 animate-spin" />
-                      Đang Xử Lý
-                    </Badge>
-                  )}
-                  {doc.parse_status === "failed" && (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 text-[11px] py-0 h-5 border-destructive/30 text-destructive bg-destructive/10"
-                    >
-                      <XCircle className="size-3" />
-                      Thất Bại
-                    </Badge>
-                  )}
-                  {doc.parse_status === "pending" && (
-                    <Badge variant="outline" className="text-[11px] py-0 h-5">
-                      Chờ Xử Lý
-                    </Badge>
-                  )}
+                {/* Định dạng */}
+                <TableCell className="text-center font-mono text-xs uppercase text-muted-foreground">
+                  .{doc.file_type}
                 </TableCell>
 
                 {/* Dung lượng */}
@@ -218,18 +168,25 @@ export function DocumentsTable({
                   {formatFileSize(doc.file_size_bytes)}
                 </TableCell>
 
-                {/* Số Kho Tri Thức */}
-                <TableCell className="text-center">
-                  {doc.attached_collections_count > 0 ? (
-                    <Badge
-                      variant="secondary"
-                      className="gap-1 text-[11px] py-0 h-5 bg-primary/10 text-primary border-primary/20"
-                    >
-                      <BookOpen className="size-3" />
-                      {doc.attached_collections_count} Kho
-                    </Badge>
+                {/* Kho lưu trữ trực thuộc */}
+                <TableCell>
+                  {doc.groups && doc.groups.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {doc.groups.map((g) => (
+                        <Badge
+                          key={g.id}
+                          variant="outline"
+                          className="text-[10px] py-0 h-4 px-1.5 text-muted-foreground bg-muted/30 border-border"
+                        >
+                          <Folders className="size-2.5 mr-1" />
+                          {g.name}
+                        </Badge>
+                      ))}
+                    </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground">0</span>
+                    <span className="text-xs text-muted-foreground italic">
+                      Chưa gán kho
+                    </span>
                   )}
                 </TableCell>
 
@@ -258,7 +215,7 @@ export function DocumentsTable({
                           className="gap-2 cursor-pointer"
                         >
                           <ArrowUpRight className="size-4 text-muted-foreground" />
-                          Xem Chi Tiết & MD
+                          Xem Chi Tiết
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
@@ -270,13 +227,6 @@ export function DocumentsTable({
                           <Download className="size-4 text-muted-foreground" />
                           Tải Về Tệp Gốc
                         </a>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onReparse(doc)}
-                        className="gap-2 cursor-pointer"
-                      >
-                        <RefreshCw className="size-4 text-muted-foreground" />
-                        Bóc Tách Lại MD
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem

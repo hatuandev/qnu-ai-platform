@@ -83,7 +83,8 @@ async def test_list_engines_reflects_real_availability():
     service = OCRService()
     engines = service.list_engines()
     by_name = {e.name: e for e in engines}
-    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr", "qwen_ocr"}
+    assert set(by_name) == {"pymupdf_ocr", "gemini_ocr", "mock_ocr", "mistral_ocr", "qwen_ocr", "paddleocr_ocr"}
+    assert by_name["paddleocr_ocr"].is_active is False  # No implicit endpoint outside ModelOps.
     assert by_name["pymupdf_ocr"].is_active is True
     assert by_name["gemini_ocr"].is_active is service._adapters["gemini_ocr"].is_available()
     assert by_name["mistral_ocr"].is_active is service._adapters["mistral_ocr"].is_available()
@@ -246,29 +247,27 @@ def _blank_pdf_bytes() -> bytes:
 
 
 @pytest.mark.asyncio
-async def test_auto_routing_blank_scan_returns_honest_empty():
-    """Auto mode on a blank scan with no heavy/cloud engines available returns empty text."""
+async def test_auto_routing_blank_scan_rejects_empty_success():
+    """Blank scans must raise a domain error rather than claim successful extraction."""
     service = OCRService()
     mock_session = AsyncMock()
     mock_session.add = MagicMock()
     mock_session.commit = AsyncMock()
 
-    # When cloud OCR APIs are unavailable, return an honest empty result.
     with (
         patch("app.core.config.settings.MISTRAL_API_KEY", ""),
         patch.object(service._adapters["mistral_ocr"], "is_available", return_value=False),
         patch.object(service._adapters["gemini_ocr"], "is_available", return_value=False),
+        pytest.raises(AppException) as error,
     ):
-        resp = await service.extract_document(
+        await service.extract_document(
             session=mock_session,
             content=_blank_pdf_bytes(),
             filename="blank_scan.pdf",
             engine_name="auto",
         )
-    assert resp.success is True
-    assert resp.raw_text == ""
-    assert resp.engine_used == "pymupdf_ocr"
-    assert resp.fallback_triggered is False
+    assert error.value.code == "OCR_CONTENT_EMPTY"
+    assert error.value.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -387,8 +386,13 @@ async def test_ocr_combo_chain_sequential_failover_on_quota():
                 "raw_text": "Bóc tách thành công qua Mistral OCR dự phòng khi Gemini hết Quota",
             }
 
+    async def extract_configured_step(session, step, content, filename):
+        # Isolate sequence orchestration; ModelOps resolution has its own regression tests.
+        return await service._resolve_adapter(step["model_name"]).extract(content, filename)
+
     with (
         patch.object(service, "_get_active_combo_chain", return_value=custom_combo),
+        patch.object(service, "_extract_step_with_rotation", side_effect=extract_configured_step),
         patch.object(service, "_resolve_adapter", side_effect=lambda m: FailingQuotaAdapter() if "gemini" in m else SuccessfulSecondaryAdapter()),
     ):
         resp = await service.extract_document(
@@ -454,8 +458,12 @@ async def test_ocr_combo_explicit_engine_failure_triggers_combo_fallback():
                 "raw_text": "Noi dung duoc cuu nguy boi Mistral OCR",
             }
 
+    async def extract_configured_step(session, step, content, filename):
+        return await service._resolve_adapter(step["model_name"]).extract(content, filename)
+
     with (
         patch.object(service, "_get_active_combo_chain", return_value=custom_combo),
+        patch.object(service, "_extract_step_with_rotation", side_effect=extract_configured_step),
         patch.object(service, "_resolve_adapter", side_effect=lambda m: QuotaErrorAdapter() if "gemini" in m else BackupAdapter()),
     ):
         resp = await service.extract_document(

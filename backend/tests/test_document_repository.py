@@ -63,17 +63,24 @@ async def test_document_repository_upload_and_storage_lifecycle() -> None:
         document_number="1234/QD-DHQN",
         issuing_authority="Trường Đại học Quy Nhơn",
         issued_date=date(2026, 1, 15),
-        auto_parse=True,
     )
 
     assert doc.id.startswith("rep_doc_")
     assert doc.file_name == filename
-    assert doc.parse_status == "parsed"
-    assert doc.parsed_markdown is not None
-    assert "Quy che dao tao" in doc.parsed_markdown
+    assert doc.parse_status == "stored"
     assert session.add.called
     assert session.commit.called
     assert await storage_service.exists(doc.storage_path)
+
+    # Test explicit parse and cache
+    await document_repository_service.parse_and_cache_document(
+        db=session,
+        doc=doc,
+        file_bytes=content,
+    )
+    assert doc.parse_status == "parsed"
+    assert doc.parsed_markdown is not None
+    assert "Quy che dao tao" in doc.parsed_markdown
 
 
 @pytest.mark.asyncio
@@ -348,7 +355,14 @@ async def test_document_repository_auto_detect_nd30_metadata() -> None:
         issuing_authority=None,
         issued_date=None,
         document_type_code=None,
-        auto_parse=True,
+    )
+    assert doc.parse_status == "stored"
+
+    # Trigger parse to auto-detect ND30 metadata
+    await document_repository_service.parse_and_cache_document(
+        db=session,
+        doc=doc,
+        file_bytes=sample_legal_text,
     )
 
     assert doc.document_number == "2139/QĐ-ĐHQN"

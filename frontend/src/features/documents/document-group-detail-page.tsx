@@ -4,14 +4,13 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowUpRight,
-  BookOpen,
-  CheckCircle2,
-  Clock,
+  Calendar,
   FileCode,
   FileSpreadsheet,
   FileStack,
   FileText,
   FolderOpen,
+  Hash,
   Search,
   Trash2,
   Upload,
@@ -51,63 +50,10 @@ import {
 import { ViewModeToggle } from "@/components/ui/view-mode-toggle";
 import { documentsApi } from "@/services/documents-api";
 import type { GroupDocumentItem } from "@/types/documents";
-import { AttachGroupToKnowledgeDialog } from "./components/attach-group-to-knowledge-dialog";
 import { DocumentUploadModal } from "./components/document-upload-modal";
 
 interface DocumentGroupDetailPageProps {
   groupId: string;
-}
-
-function getRevisionStatusBadge(status?: string | null) {
-  switch (status) {
-    case "ready":
-      return (
-        <Badge variant="default" className="text-[10px]">
-          Sẵn sàng
-        </Badge>
-      );
-    case "queued":
-      return (
-        <Badge
-          variant="outline"
-          className="text-[10px] text-warning border-warning/30 bg-warning/10"
-        >
-          Chờ xử lý
-        </Badge>
-      );
-    case "processing":
-    case "validating":
-      return (
-        <Badge
-          variant="outline"
-          className="text-[10px] text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/20"
-        >
-          Đang xử lý
-        </Badge>
-      );
-    case "review_required":
-      return (
-        <Badge
-          variant="outline"
-          className="text-[10px] text-purple-600 border-purple-300 bg-purple-50 dark:bg-purple-950/20"
-        >
-          Cần duyệt
-        </Badge>
-      );
-    case "failed":
-    case "cancelled":
-      return (
-        <Badge variant="destructive" className="text-[10px]">
-          Lỗi
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="outline" className="text-[10px]">
-          Chờ xử lý
-        </Badge>
-      );
-  }
 }
 
 function getFileIcon(fileType: string) {
@@ -139,9 +85,8 @@ export function DocumentGroupDetailPage({
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
   const [removingDoc, setRemovingDoc] = useState<GroupDocumentItem | null>(
     null,
   );
@@ -166,16 +111,19 @@ export function DocumentGroupDetailPage({
     error: docsError,
     refetch: refetchDocs,
   } = useQuery({
-    queryKey: ["group-documents", groupId, search, statusFilter],
+    queryKey: ["group-documents", groupId, search],
     queryFn: () =>
       documentsApi.getGroupDocuments(groupId, {
         search: search.trim() || undefined,
-        status: statusFilter !== "all" ? statusFilter : undefined,
         page_size: 100,
       }),
   });
 
-  const documents = groupDocsData?.items ?? [];
+  const rawDocuments = groupDocsData?.items ?? [];
+  const documents =
+    fileTypeFilter === "all"
+      ? rawDocuments
+      : rawDocuments.filter((d) => d.file_type.toLowerCase() === fileTypeFilter);
 
   // Remove document from group mutation
   const removeMutation = useMutation({
@@ -205,8 +153,7 @@ export function DocumentGroupDetailPage({
           <Skeleton className="h-6 w-64" />
           <Skeleton className="h-4 w-96" />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Skeleton className="h-24 rounded-lg" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Skeleton className="h-24 rounded-lg" />
           <Skeleton className="h-24 rounded-lg" />
           <Skeleton className="h-24 rounded-lg" />
@@ -301,47 +248,34 @@ export function DocumentGroupDetailPage({
           </div>
         </div>
 
-        {/* Action Toolbar: Tải lên & Đưa vào kho tri thức */}
+        {/* Action Toolbar: Tải lên */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
           <Button
             onClick={() => setIsUploadModalOpen(true)}
             className="gap-1.5 h-9 text-xs shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Upload className="size-4" />
-            Tải lên
-          </Button>
-          <Button
-            onClick={() => setIsAttachModalOpen(true)}
-            variant="outline"
-            className="gap-1.5 h-9 text-xs shadow-sm border-primary/30 text-primary hover:bg-primary/10"
-          >
-            <BookOpen className="size-4" />
-            Đưa vào kho tri thức
+            Tải Lên Tệp Mới
           </Button>
         </div>
       </div>
 
-      {/* 3. KPI Bento Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
+      {/* 3. KPI Bento Grid (Storage Domain) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
         <KpiMetric
-          label="Tổng Tài Liệu"
+          label="Tổng Tài Liệu Trong Kho"
           value={String(group.total_documents)}
           icon={FileStack}
         />
         <KpiMetric
-          label="Sẵn Sàng Đưa Vào Kho"
-          value={String(group.ready_documents)}
-          icon={CheckCircle2}
+          label="Định Dạng Tệp"
+          value={String(new Set(rawDocuments.map((d) => d.file_type)).size || "0")}
+          icon={FileText}
         />
         <KpiMetric
-          label="Đang Xử Lý Bóc Tách"
-          value={String(group.processing_documents)}
-          icon={Clock}
-        />
-        <KpiMetric
-          label="Lỗi Cần Kiểm Tra"
-          value={String(group.error_documents)}
-          icon={AlertCircle}
+          label="Cập Nhật Lần Cuối"
+          value={new Date(group.updated_at).toLocaleDateString("vi-VN")}
+          icon={Calendar}
         />
       </div>
 
@@ -359,18 +293,18 @@ export function DocumentGroupDetailPage({
             />
           </div>
 
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px] h-9 text-xs">
-              <SelectValue placeholder="Trạng thái" />
+          {/* File Type Filter */}
+          <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
+            <SelectTrigger className="w-[140px] h-9 text-xs">
+              <SelectValue placeholder="Định dạng tệp" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả trạng thái</SelectItem>
-              <SelectItem value="ready">Sẵn sàng (Ready)</SelectItem>
-              <SelectItem value="processing">Đang xử lý</SelectItem>
-              <SelectItem value="queued">Chờ xử lý</SelectItem>
-              <SelectItem value="review_required">Cần duyệt</SelectItem>
-              <SelectItem value="error">Lỗi bóc tách</SelectItem>
+              <SelectItem value="all">Tất cả định dạng</SelectItem>
+              <SelectItem value="pdf">PDF (.pdf)</SelectItem>
+              <SelectItem value="docx">Word (.docx)</SelectItem>
+              <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
+              <SelectItem value="txt">Văn bản (.txt)</SelectItem>
+              <SelectItem value="md">Markdown (.md)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -408,12 +342,12 @@ export function DocumentGroupDetailPage({
           icon={FileStack}
           title="Kho tài liệu chưa có văn bản nào"
           description={
-            search || statusFilter !== "all"
+            search || fileTypeFilter !== "all"
               ? "Không có tài liệu nào khớp với bộ lọc."
               : "Hãy bắt đầu bằng cách tải lên các tài liệu vào kho này."
           }
           action={{
-            label: "Tải lên",
+            label: "Tải Lên Tệp Đầu Tiên",
             onClick: () => setIsUploadModalOpen(true),
           }}
         />
@@ -434,7 +368,9 @@ export function DocumentGroupDetailPage({
                       {doc.title || doc.file_name}
                     </CardTitle>
                   </div>
-                  {getRevisionStatusBadge(doc.revision_status)}
+                  <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                    .{doc.file_type}
+                  </Badge>
                 </div>
                 <div className="text-[11px] text-muted-foreground truncate mt-1">
                   {doc.file_name}
@@ -484,8 +420,8 @@ export function DocumentGroupDetailPage({
             <TableHeader className="bg-muted/20">
               <TableRow className="h-9 hover:bg-transparent">
                 <TableHead className="text-xs">Tên Tài Liệu & Tệp</TableHead>
-                <TableHead className="w-36 text-xs">Loại Văn Bản</TableHead>
-                <TableHead className="w-32 text-xs">Trạng Thái</TableHead>
+                <TableHead className="w-40 text-xs">Số Hiệu & Phân Loại</TableHead>
+                <TableHead className="w-24 text-center text-xs">Định Dạng</TableHead>
                 <TableHead className="w-28 text-right text-xs">
                   Dung Lượng
                 </TableHead>
@@ -518,15 +454,22 @@ export function DocumentGroupDetailPage({
                     </div>
                   </TableCell>
 
-                  <TableCell className="text-xs text-muted-foreground">
-                    {doc.document_type_code || doc.file_type.toUpperCase()}
+                  <TableCell className="text-xs">
+                    {doc.document_number ? (
+                      <div className="flex items-center gap-1 font-mono text-foreground">
+                        <Hash className="size-3 text-muted-foreground" />
+                        <span>{doc.document_number}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground italic">Chưa có số</span>
+                    )}
                   </TableCell>
 
-                  <TableCell>
-                    {getRevisionStatusBadge(doc.revision_status)}
+                  <TableCell className="text-center font-mono text-xs uppercase text-muted-foreground">
+                    .{doc.file_type}
                   </TableCell>
 
-                  <TableCell className="text-right text-xs text-muted-foreground">
+                  <TableCell className="text-right text-xs font-mono text-muted-foreground">
                     {formatFileSize(doc.file_size_bytes)}
                   </TableCell>
 
@@ -569,14 +512,7 @@ export function DocumentGroupDetailPage({
         }}
       />
 
-      {/* 7. Attach Group To Knowledge Dialog */}
-      <AttachGroupToKnowledgeDialog
-        open={isAttachModalOpen}
-        onOpenChange={setIsAttachModalOpen}
-        group={group}
-      />
-
-      {/* 8. Confirm Remove Document Dialog */}
+      {/* 7. Confirm Remove Document Dialog */}
       <ConfirmDialog
         open={Boolean(removingDoc)}
         onOpenChange={(open) => !open && setRemovingDoc(null)}

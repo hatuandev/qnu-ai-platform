@@ -39,6 +39,7 @@ from app.modules.documents.schemas import (
     RepositoryDocumentResponse,
     RepositoryDocumentStatsResponse,
     RepositoryDocumentUpdate,
+    RepositoryFileRevisionResponse,
     ReviewRevisionContentRequest,
     SubmitRevisionReviewRequest,
 )
@@ -458,6 +459,21 @@ async def preview_pdf(
         io.BytesIO(data),
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+@router.get(
+    "/{document_id}/file-revisions",
+    response_model=RepositoryFileRevisionResponse,
+    summary="Danh sách các phiên bản tệp gốc (File Revisions) của tài liệu",
+)
+async def list_document_file_revisions(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> RepositoryFileRevisionResponse:
+    return await document_repository_service.list_file_revisions(
+        db, document_id, actor=actor
     )
 
 

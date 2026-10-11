@@ -1,0 +1,682 @@
+s....................................................................... [  8%]
+.......FF............................................................... [ 16%]
+........................................................................ [ 24%]
+.....................F.................................................. [ 32%]
+.........................................................s.............. [ 40%]
+........................................................................ [ 48%]
+........................................................................ [ 56%]
+..............................FF.FF....F........F....................... [ 64%]
+....................................F................................... [ 73%]
+........................................................................ [ 81%]
+........................................................................ [ 89%]
+..........F.........F.............F.F................................... [ 97%]
+.......................                                                  [100%]
+================================== FAILURES ===================================
+____________________ test_dispatch_admissions_with_export _____________________
+
+    @pytest.mark.asyncio
+    async def test_dispatch_admissions_with_export():
+        """Test admissions agentic consulting dispatching with file generation."""
+        await engine.dispose()
+        msg = "Em thi kh\u1ed1i A00 \u0111\u01b0\u1ee3c 24 \u0111i\u1ec3m \u1edf KV1, t\u01b0 v\u1ea5n ng\xe0nh v\xe0 xu\u1ea5t file excel k\u1ebf ho\u1ea1ch nguy\u1ec7n v\u1ecdng gi\xfap em"
+        res = await consulting_dispatcher.dispatch("admissions", msg)
+        assert res["has_agentic_guidance"] is True
+>       assert len(res["artifacts"]) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests\test_consulting_dispatcher.py:38: AssertionError
+____________________ test_dispatch_regulations_with_export ____________________
+
+    @pytest.mark.asyncio
+    async def test_dispatch_regulations_with_export():
+        """Test regulations guidebook file generation."""
+        await engine.dispose()
+        msg = "Xu\u1ea5t file quy ch\u1ebf h\u1ecdc v\u1ee5 v\xe0 \u0111i\u1ec1u ki\u1ec7n t\u1ed1t nghi\u1ec7p gi\xfap em"
+        res = await consulting_dispatcher.dispatch("regulations", msg)
+        assert res["has_agentic_guidance"] is True
+>       assert len(res["artifacts"]) >= 2
+E       assert 0 >= 2
+E        +  where 0 = len([])
+
+tests\test_consulting_dispatcher.py:50: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:377 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000002C09EED19A0>>
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 375, in _close_connection
+    self._dialect.do_close(connection)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 721, in do_close
+    dbapi_connection.close()
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 903, in close
+    self.await_(self._connection.close())
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 1513, in close
+    await self._protocol.close(timeout)
+  File "asyncpg/protocol/protocol.pyx", line 630, in close
+  File "asyncpg/protocol/coreproto.pyx", line 1205, in asyncpg.protocol.protocol.CoreProtocol._terminate
+  File "asyncpg/protocol/protocol.pyx", line 956, in asyncpg.protocol.protocol.BaseProtocol._write
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 366, in write
+    self._loop_writing(data=bytes(data))
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 402, in _loop_writing
+    self._write_fut = self._loop._proactor.send(self._sock, data)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'send'
+____________________ test_import_facts_from_excel_service _____________________
+
+    @pytest.mark.asyncio
+    async def test_import_facts_from_excel_service() -> None:
+>       excel_bytes = _create_sample_excel_bytes()
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_excel_facts_ingestion.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_excel_facts_ingestion.py:31: in _create_sample_excel_bytes
+    wb.save(buf)
+.venv\Lib\site-packages\openpyxl\workbook\workbook.py:386: in save
+    save_workbook(self, filename)
+.venv\Lib\site-packages\openpyxl\writer\excel.py:294: in save_workbook
+    writer.save()
+.venv\Lib\site-packages\openpyxl\writer\excel.py:275: in save
+    self.write_data()
+.venv\Lib\site-packages\openpyxl\writer\excel.py:77: in write_data
+    self._write_worksheets()
+.venv\Lib\site-packages\openpyxl\writer\excel.py:215: in _write_worksheets
+    self.write_worksheet(ws)
+.venv\Lib\site-packages\openpyxl\writer\excel.py:199: in write_worksheet
+    writer = WorksheetWriter(ws)
+             ^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\openpyxl\worksheet\_writer.py:52: in __init__
+    out = create_temporary_file()
+          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\openpyxl\worksheet\_writer.py:36: in create_temporary_file
+    fobj = NamedTemporaryFile(mode='w+', suffix=suffix,
+C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\tempfile.py:582: in NamedTemporaryFile
+    file = _io.open(dir, mode, buffering=buffering,
+C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\tempfile.py:579: in opener
+    fd, name = _mkstemp_inner(dir, prefix, suffix, flags, output_type)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+dir = 'C:\\Users\\AnhTuan\\AppData\\Local\\Temp', pre = 'openpyxl.', suf = ''
+flags = 34050, output_type = <class 'str'>
+
+    def _mkstemp_inner(dir, pre, suf, flags, output_type):
+        """Code common to mkstemp, TemporaryFile, and NamedTemporaryFile."""
+    
+        dir = _os.path.abspath(dir)
+        names = _get_candidate_names()
+        if output_type is bytes:
+            names = map(_os.fsencode, names)
+    
+        for seq in range(TMP_MAX):
+            name = next(names)
+            file = _os.path.join(dir, pre + name + suf)
+            _sys.audit("tempfile.mkstemp", file)
+            try:
+>               fd = _os.open(file, flags, 0o600)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               OSError: [Errno 22] Invalid argument: 'C:\\Users\\AnhTuan\\AppData\\Local\\Temp\\openpyxl.03u7ljes'
+
+C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\tempfile.py:256: OSError
+____________________________ test_gc_api_endpoint _____________________________
+
+    @pytest.mark.asyncio
+    async def test_gc_api_endpoint() -> None:
+        """Verifies REST API endpoint POST /knowledge/collections/{id}/gc."""
+        session = _fresh_session()
+    
+        async def _get_test_db():
+            yield session
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = _mock_admin_actor
+    
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch.object(
+                knowledge_service,
+                "collect_garbage",
+                return_value=GarbageCollectionReport(
+                    collection_id="col_api_test",
+                    dry_run=False,
+                    keep_revisions=2,
+                    total_bindings_scanned=3,
+                    pruned_revisions_count=2,
+                    pruned_revision_ids=["rev_old_1", "rev_old_2"],
+                    pruned_chunks_count=10,
+                    pruned_facts_count=2,
+                    pruned_points_count=10,
+                    message="Th\u1ef1c thi ho\xe0n t\u1ea5t",
+                    executed_at=utcnow(),
+                ),
+            ):
+                res = await client.post(
+                    f"{settings.API_PREFIX}/knowledge/collections/col_api_test/gc",
+                    json={"keep_revisions": 2, "dry_run": False},
+                )
+>               assert res.status_code == 200
+E               assert 403 == 200
+E                +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_cutover_and_gc.py:456: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/knowledge/collections/col_api_test/gc "HTTP/1.1 403 Forbidden"
+____________________ test_canary_policy_get_and_update_api ____________________
+
+    @pytest.mark.asyncio
+    async def test_canary_policy_get_and_update_api() -> None:
+        """Verifies REST API endpoints GET and PUT /knowledge/collections/{id}/canary/policy."""
+        session = _fresh_session()
+    
+        async def _get_test_db():
+            yield session
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = _mock_admin_actor
+    
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with (
+                patch.object(
+                    knowledge_service,
+                    "get_collection_canary_policy",
+                    return_value=CanaryPolicyResponse(
+                        collection_id="col_canary_test",
+                        read_mode="system",
+                        system_read_mode="revisioned",
+                        effective_read_mode="revisioned",
+                        retention_revisions=2,
+                        last_gc_report=None,
+                    ),
+                ),
+                patch.object(
+                    knowledge_service,
+                    "update_collection_canary_policy",
+                    return_value=CanaryPolicyResponse(
+                        collection_id="col_canary_test",
+                        read_mode="shadow",
+                        system_read_mode="revisioned",
+                        effective_read_mode="shadow",
+                        retention_revisions=4,
+                        last_gc_report=None,
+                    ),
+                ),
+            ):
+                # 1. GET policy
+                res_get = await client.get(
+                    f"{settings.API_PREFIX}/knowledge/collections/col_canary_test/canary/policy"
+                )
+>               assert res_get.status_code == 200
+E               assert 403 == 200
+E                +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_cutover_and_gc.py:511: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/platform/v1alpha1/knowledge/collections/col_canary_test/canary/policy "HTTP/1.1 403 Forbidden"
+________________ test_direct_upload_blocked_when_flag_disabled ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002C0C394F620>
+
+    @pytest.mark.asyncio
+    async def test_direct_upload_blocked_when_flag_disabled(monkeypatch) -> None:
+        """Verify legacy direct upload is blocked when KNOWLEDGE_ALLOW_DIRECT_UPLOAD is False (default)."""
+        monkeypatch.setattr(settings, "KNOWLEDGE_ALLOW_DIRECT_UPLOAD", False)
+    
+        session = _fresh_session()
+    
+        async def _get_test_db():
+            yield session
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = _mock_admin_actor
+    
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            files = {"file": ("test_doc.txt", io.BytesIO(b"Noi dung test"), "text/plain")}
+            res = await client.post(
+                f"{settings.API_PREFIX}/knowledge/collections/col_decom_1/upload",
+                files=files,
+            )
+    
+>           assert res.status_code == 400
+E           assert 403 == 400
+E            +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_decommissioning_and_system_gc.py:106: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/knowledge/collections/col_decom_1/upload "HTTP/1.1 403 Forbidden"
+________________ test_direct_upload_allowed_when_flag_enabled _________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002C0C37EE8D0>
+
+    @pytest.mark.asyncio
+    async def test_direct_upload_allowed_when_flag_enabled(monkeypatch) -> None:
+        """Verify legacy direct upload is allowed when KNOWLEDGE_ALLOW_DIRECT_UPLOAD is temporarily enabled."""
+        monkeypatch.setattr(settings, "KNOWLEDGE_ALLOW_DIRECT_UPLOAD", True)
+    
+        session = _fresh_session()
+    
+        async def _get_test_db():
+            yield session
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = _mock_admin_actor
+    
+        mock_doc = MagicMock()
+        mock_doc.id = "doc_legacy_allowed"
+        mock_doc.collection_id = "col_decom_2"
+        mock_doc.document_type_code = None
+        mock_doc.title = "Test Doc"
+        mock_doc.file_name = "test_doc.txt"
+        mock_doc.file_type = "txt"
+        mock_doc.file_size_bytes = 12
+        mock_doc.file_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        mock_doc.version = 1
+        mock_doc.status = "queued"
+        mock_doc.index_status = "pending"
+        mock_doc.index_error = None
+        mock_doc.is_active = True
+        mock_doc.created_at = utcnow()
+        mock_doc.updated_at = utcnow()
+        mock_doc.chunk_count = 0
+        mock_doc.ocr_method = "PyMuPDF"
+    
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with patch.object(knowledge_service, "ingest_document", return_value=mock_doc):
+                files = {"file": ("test_doc.txt", io.BytesIO(b"Noi dung test"), "text/plain")}
+                res = await client.post(
+                    f"{settings.API_PREFIX}/knowledge/collections/col_decom_2/upload",
+                    files=files,
+                )
+    
+>               assert res.status_code == 201
+E               assert 403 == 201
+E                +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_decommissioning_and_system_gc.py:155: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/knowledge/collections/col_decom_2/upload "HTTP/1.1 403 Forbidden"
+___________ test_rest_api_system_wide_gc_and_decommissioning_audit ____________
+
+    @pytest.mark.asyncio
+    async def test_rest_api_system_wide_gc_and_decommissioning_audit() -> None:
+        """Verify REST API endpoints POST /knowledge/gc/system-wide and GET /knowledge/decommissioning/audit."""
+        session = _fresh_session()
+    
+        async def _get_test_db():
+            yield session
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = _mock_admin_actor
+    
+        mock_sys_gc = SystemGarbageCollectionReport(
+            total_collections_scanned=4,
+            total_bindings_scanned=12,
+            total_pruned_revisions_count=6,
+            total_pruned_chunks_count=18,
+            total_pruned_facts_count=3,
+            total_pruned_points_count=18,
+            dry_run=True,
+            reports=[],
+            message="Dry-run system complete",
+            executed_at=utcnow(),
+        )
+    
+        mock_audit = SystemDecommissioningAuditReport(
+            total_collections=5,
+            total_legacy_documents=2,
+            total_v2_bindings=20,
+            v2_adoption_rate_pct=90.9,
+            collections_in_revisioned_mode=4,
+            collections_in_shadow_mode=1,
+            collections_in_legacy_mode=0,
+            total_prunable_revisions_estimate=15,
+            audited_at=utcnow(),
+        )
+    
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            with (
+                patch.object(knowledge_service, "collect_garbage_system_wide", return_value=mock_sys_gc),
+                patch.object(knowledge_service, "audit_system_decommissioning", return_value=mock_audit),
+            ):
+                # 1. POST /knowledge/gc/system-wide
+                gc_res = await client.post(
+                    f"{settings.API_PREFIX}/knowledge/gc/system-wide",
+                    json={"dry_run": True, "default_keep_revisions": 2},
+                )
+>               assert gc_res.status_code == 200
+E               assert 403 == 200
+E                +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_decommissioning_and_system_gc.py:404: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/knowledge/gc/system-wide "HTTP/1.1 403 Forbidden"
+_____________________ test_api_routes_canary_and_rollback _____________________
+
+    @pytest.mark.asyncio
+    async def test_api_routes_canary_and_rollback():
+        """Verify HTTP endpoints for Canary Audit, Backfill, Shadow Test, and Rollback."""
+        mock_db = _fresh_session()
+    
+        async def _get_test_db():
+            yield mock_db
+    
+        app.dependency_overrides[get_db] = _get_test_db
+        app.dependency_overrides[get_current_actor] = lambda: AuthActor(
+            actor_id="admin_test",
+            username="admin",
+            display_name="Admin Test",
+            email="admin@qnu.edu.vn",
+            user_type="admin",
+            tenant_id="tenant_qnu",
+            workspace_id="workspace_qnu",
+            role="admin",
+            roles=["admin"],
+            permissions=["*"],
+            authenticated=True,
+            session_version="v1",
+        )
+    
+        prefix = f"{settings.API_PREFIX}/knowledge"
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. Rollback endpoint
+            with patch.object(
+                index_build_service,
+                "rollback_index_revision",
+                return_value=KnowledgeIndexActivation(
+                    id="act_rb_1",
+                    binding_id="bnd_test",
+                    to_index_revision_id="rev_old",
+                    action="rollback",
+                    epoch=3,
+                    created_at=datetime.now(UTC),
+                ),
+            ):
+                resp = await client.post(
+                    f"{prefix}/bindings/bnd_test/rollback",
+                    json={
+                        "target_index_revision_id": "rev_old",
+                        "expected_epoch": 2,
+                        "reason": "Test rollback",
+                    },
+                )
+>               assert resp.status_code == 200
+E               assert 403 == 200
+E                +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests\test_publishing_v2_e2e_canary.py:747: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/knowledge/bindings/bnd_test/rollback "HTTP/1.1 403 Forbidden"
+__________________ test_reconciliation_detects_discrepancies __________________
+
+    @pytest.mark.asyncio
+    async def test_reconciliation_detects_discrepancies():
+        """ReconciliationService must detect orphan points, legacy schemas, and missing points."""
+        service = ReconciliationService()
+        mock_db = AsyncMock()
+    
+        col = KnowledgeCollection(
+            id="col_rec",
+            name="B\u1ed9 s\u01b0u t\u1eadp",
+            tenant_id="tenant_qnu",
+            workspace_id="ws_default",
+        )
+        doc = KnowledgeDocument(
+            id="doc_rec_1",
+            collection_id=col.id,
+            title="T\xe0i li\u1ec7u 1",
+            file_name="doc_rec_1.pdf",
+            file_type="pdf",
+            file_hash="hash_rec_1",
+            storage_path="col_rec/doc_rec_1.pdf",
+            status="ready",
+            index_status="indexed",
+            is_active=True,
+            version=1,
+        )
+        chunk = KnowledgeChunk(
+            id="chunk_db_1",
+            document_id=doc.id,
+            collection_id=col.id,
+            chunk_index=0,
+            content="N\u1ed9i dung chunk",
+            chunk_hash="hash_1",
+        )
+    
+        service._get_collection = AsyncMock(return_value=col)
+    
+        # Mock DB query results for docs and chunks
+        mock_docs_res = MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[doc]))))
+        mock_chunks_res = MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[chunk]))))
+        mock_db.execute = AsyncMock(side_effect=[mock_docs_res, mock_chunks_res])
+    
+        # Mock Qdrant points: 1 legacy point without tenant_id, 1 orphan point
+        point_legacy = MagicMock(
+            id="pt_legacy",
+            payload={
+                "chunk_id": chunk.id,
+                "document_id": doc.id,
+                # Missing payload_schema_version and tenant_id
+            },
+        )
+        point_orphan = MagicMock(
+            id="pt_orphan",
+            payload={
+                "chunk_id": "non_existent_chunk",
+                "document_id": "non_existent_doc",
+                "payload_schema_version": "v1",
+                "tenant_id": "tenant_qnu",
+                "workspace_id": "ws_default",
+                "is_retrievable": True,
+                "document_status": "ready",
+            },
+        )
+    
+        with patch("app.modules.rag.vector_indexer.vector_indexer.client") as mock_qdrant_client:
+            mock_qdrant_client.collection_exists = AsyncMock(return_value=True)
+            mock_qdrant_client.count = AsyncMock(return_value=MagicMock(count=2))
+            mock_qdrant_client.scroll = AsyncMock(return_value=([point_legacy, point_orphan], None))
+    
+            with patch("app.core.storage.storage_service.exists", new_callable=AsyncMock) as mock_storage:
+                mock_storage.return_value = True
+    
+                report = await service.reconcile_collection(mock_db, col.id)
+    
+        assert report["db_documents_count"] == 1
+        assert report["db_chunks_count"] == 1
+        assert report["qdrant_points_count"] == 2
+    
+        disc_types = [d["type"] for d in report["discrepancies"]]
+>       assert "legacy_payload_schema" in disc_types
+E       AssertionError: assert 'legacy_payload_schema' in []
+
+tests\test_rag_data_truth_and_lifecycle.py:502: AssertionError
+______________________ test_fact_layer_lookup_tool_found ______________________
+
+    @pytest.mark.asyncio
+    async def test_fact_layer_lookup_tool_found():
+        from app.core.database import engine
+        await engine.dispose()
+        tool = FactLayerLookupTool()
+        assert tool.name == "lookup_fact_layer"
+        assert tool.category == "knowledge"
+    
+        res = await tool.execute({"keyword": "C\xf4ng ngh\u1ec7 th\xf4ng tin", "collection_id": "col_admissions"})
+        assert res["status"] == "success"
+>       assert res["found"] is True
+E       assert False is True
+
+tests\test_tools.py:30: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:377 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000002C0C48BB2F0>>
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 375, in _close_connection
+    self._dialect.do_close(connection)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 721, in do_close
+    dbapi_connection.close()
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 903, in close
+    self.await_(self._connection.close())
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 1513, in close
+    await self._protocol.close(timeout)
+  File "asyncpg/protocol/protocol.pyx", line 630, in close
+  File "asyncpg/protocol/coreproto.pyx", line 1205, in asyncpg.protocol.protocol.CoreProtocol._terminate
+  File "asyncpg/protocol/protocol.pyx", line 956, in asyncpg.protocol.protocol.BaseProtocol._write
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 366, in write
+    self._loop_writing(data=bytes(data))
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 402, in _loop_writing
+    self._write_fut = self._loop._proactor.send(self._sock, data)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'send'
+____________________ test_auth_session_cookie_actor_claims ____________________
+
+    @pytest.mark.asyncio
+    async def test_auth_session_cookie_actor_claims():
+        """Verify session cookie contains actor_id, display_name, session_version."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            login_resp = await client.post(
+                "/platform/v1alpha1/auth/login",
+                json={"access_key": settings.DEV_ACCESS_PASSWORD},
+            )
+            assert login_resp.status_code == 200
+            data = login_resp.json()
+            assert data["authenticated"] is True
+            actor = data["actor"]
+            assert actor["actor_id"] == "act_admin_qnu"
+            assert actor["display_name"] == "C\xe1n b\u1ed9 Qu\u1ea3n tr\u1ecb QNU"
+            assert actor["session_version"] == "v1"
+>           assert actor["role"] == "admin"
+E           AssertionError: assert 'AI.Admin' == 'admin'
+E             
+E             - admin
+E             + AI.Admin
+
+tests\test_trust_boundary_and_hitl.py:51: AssertionError
+------------------------------ Captured log call ------------------------------
+INFO     httpx:_client.py:1740 HTTP Request: POST http://test/platform/v1alpha1/auth/login "HTTP/1.1 200 OK"
+_________________________ test_fact_layer_lookup_tool _________________________
+
+    @pytest.mark.asyncio
+    async def test_fact_layer_lookup_tool():
+        """Verify generic FactLayerLookupTool reads from PostgreSQL knowledge_facts."""
+        await engine.dispose()
+        tool = FactLayerLookupTool()
+        res = await tool.execute({"keyword": "C\xf4ng ngh\u1ec7 th\xf4ng tin", "collection_id": "col_admissions"})
+        assert res["status"] == "success"
+>       assert res["found"] is True
+E       assert False is True
+
+tests\test_universal_tools.py:58: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:377 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000002C0C408C050>>
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 375, in _close_connection
+    self._dialect.do_close(connection)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 721, in do_close
+    dbapi_connection.close()
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 903, in close
+    self.await_(self._connection.close())
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 1513, in close
+    await self._protocol.close(timeout)
+  File "asyncpg/protocol/protocol.pyx", line 630, in close
+  File "asyncpg/protocol/coreproto.pyx", line 1205, in asyncpg.protocol.protocol.CoreProtocol._terminate
+  File "asyncpg/protocol/protocol.pyx", line 956, in asyncpg.protocol.protocol.BaseProtocol._write
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 366, in write
+    self._loop_writing(data=bytes(data))
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 402, in _loop_writing
+    self._write_fut = self._loop._proactor.send(self._sock, data)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'send'
+_________________ test_dispatch_admissions_with_dynamic_facts _________________
+
+    @pytest.mark.asyncio
+    async def test_dispatch_admissions_with_dynamic_facts():
+        """Verify admissions consulting uses dynamic facts and export without custom tool file."""
+        await engine.dispose()
+        msg = "Em t\xean l\xe0 Nguy\u1ec5n Ho\xe0ng Nam, thi kh\u1ed1i A00 \u0111\u01b0\u1ee3c 24.5 \u0111i\u1ec3m \u1edf KV1, h\xe3y t\u01b0 v\u1ea5n ng\xe0nh v\xe0 xu\u1ea5t file Excel k\u1ebf ho\u1ea1ch nguy\u1ec7n v\u1ecdng gi\xfap em"
+        res = await consulting_dispatcher.dispatch("admissions", msg)
+        assert res["has_agentic_guidance"] is True
+        assert res["score_calculation"] is not None
+>       assert len(res["artifacts"]) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests\test_universal_tools.py:94: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:377 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x000002C0C408EB70>>
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\pool\base.py", line 375, in _close_connection
+    self._dialect.do_close(connection)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 721, in do_close
+    dbapi_connection.close()
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\dialects\postgresql\asyncpg.py", line 903, in close
+    self.await_(self._connection.close())
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\util\_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\asyncpg\connection.py", line 1513, in close
+    await self._protocol.close(timeout)
+  File "asyncpg/protocol/protocol.pyx", line 630, in close
+  File "asyncpg/protocol/coreproto.pyx", line 1205, in asyncpg.protocol.protocol.CoreProtocol._terminate
+  File "asyncpg/protocol/protocol.pyx", line 956, in asyncpg.protocol.protocol.BaseProtocol._write
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 366, in write
+    self._loop_writing(data=bytes(data))
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\proactor_events.py", line 402, in _loop_writing
+    self._write_fut = self._loop._proactor.send(self._sock, data)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'send'
+============================== warnings summary ===============================
+tests/test_excel_facts_ingestion.py::test_collection_facts_api_routes
+  D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\_pytest\unraisableexception.py:67: PytestUnraisableExceptionWarning: Exception ignored in: <function ZipFile.__del__ at 0x000002C099F35F80>
+  
+  Traceback (most recent call last):
+    File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\zipfile\__init__.py", line 1966, in __del__
+      self.close()
+    File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\zipfile\__init__.py", line 1983, in close
+      self.fp.seek(self.start_dir)
+  ValueError: I/O operation on closed file.
+  
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+    warnings.warn(pytest.PytestUnraisableExceptionWarning(msg))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_consulting_dispatcher.py::test_dispatch_admissions_with_export
+FAILED tests/test_consulting_dispatcher.py::test_dispatch_regulations_with_export
+FAILED tests/test_excel_facts_ingestion.py::test_import_facts_from_excel_service
+FAILED tests/test_publishing_v2_cutover_and_gc.py::test_gc_api_endpoint - ass...
+FAILED tests/test_publishing_v2_cutover_and_gc.py::test_canary_policy_get_and_update_api
+FAILED tests/test_publishing_v2_decommissioning_and_system_gc.py::test_direct_upload_blocked_when_flag_disabled
+FAILED tests/test_publishing_v2_decommissioning_and_system_gc.py::test_direct_upload_allowed_when_flag_enabled
+FAILED tests/test_publishing_v2_decommissioning_and_system_gc.py::test_rest_api_system_wide_gc_and_decommissioning_audit
+FAILED tests/test_publishing_v2_e2e_canary.py::test_api_routes_canary_and_rollback
+FAILED tests/test_rag_data_truth_and_lifecycle.py::test_reconciliation_detects_discrepancies
+FAILED tests/test_tools.py::test_fact_layer_lookup_tool_found - assert False ...
+FAILED tests/test_trust_boundary_and_hitl.py::test_auth_session_cookie_actor_claims
+FAILED tests/test_universal_tools.py::test_fact_layer_lookup_tool - assert Fa...
+FAILED tests/test_universal_tools.py::test_dispatch_admissions_with_dynamic_facts
+14 failed, 871 passed, 2 skipped, 1 warning in 48.60s

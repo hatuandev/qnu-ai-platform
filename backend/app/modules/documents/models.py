@@ -118,6 +118,12 @@ class RepositoryDocument(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    file_revisions: Mapped[list[RepositoryFileRevision]] = relationship(
+        "RepositoryFileRevision",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -353,4 +359,56 @@ class DocumentGroupMembership(Base):
 
     __table_args__ = (
         Index("ix_doc_group_memberships_doc_id", "document_id"),
+    )
+
+
+class RepositoryFileRevision(Base):
+    """Pure immutable file revision stored in repository, without parsing or OCR artifacts."""
+
+    __tablename__ = "repository_file_revisions"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"file_rev_{uuid.uuid4().hex[:12]}"
+    )
+    document_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("repository_documents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Source File Attributes
+    source_file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_file_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source_storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    # Audit & Creator
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    # Relationships
+    document: Mapped[RepositoryDocument] = relationship(
+        "RepositoryDocument", back_populates="file_revisions", foreign_keys=[document_id]
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"file_rev_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+
+    __table_args__ = (
+        Index(
+            "uq_repo_file_revs_doc_rev_no",
+            "document_id",
+            "revision_no",
+            unique=True,
+        ),
+        Index("ix_repo_file_revs_source_hash", "source_hash"),
     )

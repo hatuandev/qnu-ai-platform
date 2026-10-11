@@ -15,6 +15,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 logger = logging.getLogger(__name__)
@@ -220,7 +221,7 @@ def fast_rule_normalize(text: str, extra_acronyms: dict[str, str] | None = None)
 
 def get_node_instruction(context: WorkflowContext, config: dict[str, Any]) -> str:
     """Resolve query rewrite instruction for this node.
-    
+
     Priority:
     1. Explicit instruction/prompt configured directly on this DAG node.
     2. Role description from the executing assistant profile (if attached).
@@ -228,9 +229,7 @@ def get_node_instruction(context: WorkflowContext, config: dict[str, Any]) -> st
     """
     # 1. Explicit instruction or prompt configured on this DAG node
     node_instruction = (
-        config.get("instruction")
-        or config.get("prompt")
-        or config.get("custom_prompt")
+        config.get("instruction") or config.get("prompt") or config.get("custom_prompt")
     )
     if node_instruction and str(node_instruction).strip():
         return str(node_instruction).strip()
@@ -297,14 +296,79 @@ def _unaccent(text: str) -> str:
 # Common functional/conversational words that do not carry specific domain content
 _FUNCTIONAL_STOPWORDS: frozenset[str] = frozenset(
     {
-        "bạn", "biết", "không", "cho", "nào", "tôi", "xin", "chào", "năm",
-        "được", "các", "những", "với", "của", "thế", "như", "bao", "nhiêu",
-        "gì", "là", "và", "trong", "trường", "đại", "học", "muốn", "hỏi",
-        "xét", "tuyển", "gồm", "danh", "sách", "thì", "sao", "ra", "vào",
-        "ở", "tại", "có", "hay", "hoặc", "nhé", "ạ", "ơi", "này", "đó",
-        "kia", "tất", "cả", "ai", "mấy", "sẽ", "đã", "đang", "về", "lại",
-        "đi", "nhất", "hơn", "theo", "ngay", "liệu", "thông", "tin", "cần",
-        "để", "ý", "em", "anh", "chị", "mình", "người", "ta",
+        "bạn",
+        "biết",
+        "không",
+        "cho",
+        "nào",
+        "tôi",
+        "xin",
+        "chào",
+        "năm",
+        "được",
+        "các",
+        "những",
+        "với",
+        "của",
+        "thế",
+        "như",
+        "bao",
+        "nhiêu",
+        "gì",
+        "là",
+        "và",
+        "trong",
+        "trường",
+        "đại",
+        "học",
+        "muốn",
+        "hỏi",
+        "xét",
+        "tuyển",
+        "gồm",
+        "danh",
+        "sách",
+        "thì",
+        "sao",
+        "ra",
+        "vào",
+        "ở",
+        "tại",
+        "có",
+        "hay",
+        "hoặc",
+        "nhé",
+        "ạ",
+        "ơi",
+        "này",
+        "đó",
+        "kia",
+        "tất",
+        "cả",
+        "ai",
+        "mấy",
+        "sẽ",
+        "đã",
+        "đang",
+        "về",
+        "lại",
+        "đi",
+        "nhất",
+        "hơn",
+        "theo",
+        "ngay",
+        "liệu",
+        "thông",
+        "tin",
+        "cần",
+        "để",
+        "ý",
+        "em",
+        "anh",
+        "chị",
+        "mình",
+        "người",
+        "ta",
     }
 )
 
@@ -335,7 +399,16 @@ _CORE_INTENT_TERMS: tuple[str, ...] = (
 )
 
 _COMBO_SUBJECT_TERMS: tuple[str, ...] = (
-    "toán", "lý", "hóa", "sinh", "văn", "sử", "địa", "tin", "tiếng anh", "ngoại ngữ"
+    "toán",
+    "lý",
+    "hóa",
+    "sinh",
+    "văn",
+    "sử",
+    "địa",
+    "tin",
+    "tiếng anh",
+    "ngoại ngữ",
 )
 
 
@@ -392,9 +465,7 @@ def extract_entity_from_text(text: str) -> str | None:
     return None
 
 
-def resolve_multiturn_query(
-    raw_query: str, history: list[dict[str, Any]] | None
-) -> str | None:
+def resolve_multiturn_query(raw_query: str, history: list[dict[str, Any]] | None) -> str | None:
     """Resolve short affirmative or pronoun follow-up queries using conversation history in 0ms."""
     if not history or not raw_query:
         return None
@@ -412,7 +483,9 @@ def resolve_multiturn_query(
         if last_assistant and last_user:
             break
 
-    detected_entity = extract_entity_from_text(last_user) or extract_entity_from_text(last_assistant)
+    detected_entity = extract_entity_from_text(last_user) or extract_entity_from_text(
+        last_assistant
+    )
 
     # 1. Pronoun substitution (e.g. 'học phí ngành này' -> 'học phí ngành Công nghệ thông tin')
     if detected_entity:
@@ -428,7 +501,9 @@ def resolve_multiturn_query(
     # 2. Affirmative short response (e.g. 'có tôi muốn', 'vâng', 'tiếp đi')
     is_affirmative = bool(_AFFIRMATIVE_SHORT_CUES.search(query_clean)) or (
         len(query_clean.split()) <= 4
-        and any(w in query_clean.lower() for w in ("có", "muốn", "tiếp", "thêm", "vâng", "ừ", "được"))
+        and any(
+            w in query_clean.lower() for w in ("có", "muốn", "tiếp", "thêm", "vâng", "ừ", "được")
+        )
     )
     if is_affirmative and last_assistant:
         m = re.search(
@@ -500,7 +575,12 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        raw_query = context.node_data.get("user_message") or context.inputs.get("message", "")
+        raw_query = routed_text(
+            context,
+            node_spec.id,
+            ("query", "question", "message", "text", "response"),
+            context.node_data.get("user_message") or context.inputs.get("message", ""),
+        )
         if not raw_query:
             return NodeExecutionResult(
                 node_id=node_spec.id,
@@ -621,7 +701,12 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
                 timeout=3.0,
             )
             raw_text = res.content.strip()
-            if not raw_text or "[Local " in raw_text or "máy chủ AI nội bộ" in raw_text or "Đã ghi nhận yêu cầu" in raw_text:
+            if (
+                not raw_text
+                or "[Local " in raw_text
+                or "máy chủ AI nội bộ" in raw_text
+                or "Đã ghi nhận yêu cầu" in raw_text
+            ):
                 logger.debug("LLM query rewrite returned fallback mock, keeping rule query.")
                 return query
 
@@ -631,22 +716,32 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
 
             filtered_lines: list[str] = []
             for line in lines:
-                cleaned = re.sub(
-                    r"^(output|input|kết quả|câu hỏi|sửa lại|note):\s*",
-                    "",
-                    line,
-                    flags=re.IGNORECASE,
-                ).strip().strip('"').strip("'")
+                cleaned = (
+                    re.sub(
+                        r"^(output|input|kết quả|câu hỏi|sửa lại|note):\s*",
+                        "",
+                        line,
+                        flags=re.IGNORECASE,
+                    )
+                    .strip()
+                    .strip('"')
+                    .strip("'")
+                )
                 if cleaned and not cleaned.endswith(":") and len(cleaned) > 3:
                     filtered_lines.append(cleaned)
 
             candidate = filtered_lines[-1] if filtered_lines else lines[-1]
-            candidate = re.sub(
-                r"^(output|input|kết quả|câu hỏi|sửa lại|note):\s*",
-                "",
-                candidate,
-                flags=re.IGNORECASE,
-            ).strip().strip('"').strip("'")
+            candidate = (
+                re.sub(
+                    r"^(output|input|kết quả|câu hỏi|sửa lại|note):\s*",
+                    "",
+                    candidate,
+                    flags=re.IGNORECASE,
+                )
+                .strip()
+                .strip('"')
+                .strip("'")
+            )
 
             # Defensive guard 1: Reject meta-instruction / chatbot prompt leakage
             leakage_patterns = re.compile(
@@ -704,7 +799,8 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
             # Defensive guard 4: Guard against unsolicited combo subject injection from history
             query_has_combo = any(_unaccent(s) in query_unaccented for s in _COMBO_SUBJECT_TERMS)
             cand_combo_count = sum(
-                1 for s in _COMBO_SUBJECT_TERMS
+                1
+                for s in _COMBO_SUBJECT_TERMS
                 if re.search(r"\b" + re.escape(_unaccent(s)) + r"\b", cand_unaccented)
             )
             if not query_has_combo and cand_combo_count >= 2:

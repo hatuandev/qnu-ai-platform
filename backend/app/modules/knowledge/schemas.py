@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.modules.documents.schemas import DocumentGroupMinimalItem
 
 
 # ==============================================================================
@@ -154,9 +156,12 @@ class StudioBox(BaseModel):
     id: str
     page_number: int
     type: str
-    coordinates: dict[str, float]
+    coordinates: dict[str, Any]
     label: str
-    confidence: float
+    confidence: float = 0.0
+    layout_confidence: float | None = None
+    text_confidence: float | None = None
+    confidence_source: str = "unavailable"
     content_snippet: str = ""
 
 
@@ -165,9 +170,12 @@ class StudioRegion(BaseModel):
     page_number: int
     title: str
     type: str
-    confidence: float
+    confidence: float = 0.0
+    layout_confidence: float | None = None
+    text_confidence: float | None = None
     reading_order: int
     details: str = ""
+    coordinates: dict[str, Any] | None = None
 
 
 class StudioPageView(BaseModel):
@@ -177,12 +185,20 @@ class StudioPageView(BaseModel):
     word_count: int
     line_count: int
     image_url: str | None = None
+    dimensions: dict[str, float] | None = None
+    has_tables: bool = False
     bounding_boxes: list[StudioBox] = Field(default_factory=list)
     regions: list[StudioRegion] = Field(default_factory=list)
 
 
+class ReparseSourceRequest(BaseModel):
+    parser_profile: Literal["standard", "vision_ocr", "layout_analysis"] = Field(default="vision_ocr", description="standard, vision_ocr, layout_analysis")
+    ocr_engine: str | None = Field(default=None, description="Tùy chọn engine cụ thể (auto, paddleocr, gemini_vision, mistral_ocr)")
+
+
 class StudioViewResponse(BaseModel):
     document_id: str
+    revision_id: str | None = None
     collection_id: str
     title: str
     filename: str
@@ -333,9 +349,11 @@ class CreateKnowledgeBindingsResponse(BaseModel):
 class KnowledgeBindingResponse(BaseModel):
     id: str
     collection_id: str
-    repository_document_id: str
-    source_revision_id: str
+    repository_document_id: str | None = None
+    source_revision_id: str | None = None
     active_index_revision_id: str | None = None
+    active_source_revision_id: str | None = None
+    source_status: str | None = None
     active_epoch: int = 0
     chunk_strategy: str = "ClauseBasedChunker"
     sync_policy: str = "manual"
@@ -384,7 +402,7 @@ class ParityReportDTO(BaseModel):
 class KnowledgeIndexRevisionResponse(BaseModel):
     id: str
     binding_id: str
-    source_revision_id: str
+    source_revision_id: str | None = None
     vector_generation_id: str
     revision_no: int
     chunk_count: int = 0
@@ -699,3 +717,456 @@ class AttachDocumentGroupResponse(BaseModel):
     not_ready_count: int
     failed_count: int
     items: list[AttachDocumentGroupItemResult]
+
+
+# ==============================================================================
+# 10. Long-Lived Knowledge Group Sources & Unified Metrics Schemas
+# ==============================================================================
+
+
+class DocumentSyncItemResult(BaseModel):
+    """Result for each document processed during group source attach, sync, or publish."""
+
+    document_id: str
+    binding_id: str | None = None
+    source_revision_id: str | None = None
+    staging_revision_id: str | None = None
+    status: Literal["success", "failed", "skipped"] = "success"
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class KnowledgeGroupSourceResponse(BaseModel):
+    """Unified DTO for a persistent KnowledgeGroupSource."""
+
+    id: str
+    collection_id: str
+    document_group_id: str
+    group_name: str
+    group_description: str | None = None
+    sync_policy: str
+    chunk_strategy: str
+    status: str  # pending, syncing, review_required, ready, failed, empty, up_to_date, updates_available, detached
+    last_synced_at: datetime | None = None
+    last_membership_hash: str | None = None
+    total_documents: int = 0
+    published_count: int = 0
+    new_revision_count: int = 0
+    new_document_count: int = 0
+    not_ready_count: int = 0
+    failed_count: int = 0
+    needs_build_count: int = 0
+    awaiting_publish_count: int = 0
+    publishable_count: int = 0
+    has_updates: bool = False
+    items: list[DocumentSyncItemResult] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class AttachGroupSourceRequest(BaseModel):
+    """Payload to establish a long-lived document group source for a collection."""
+
+    group_id: str = Field(..., description="ID của nhóm tài liệu cần liên kết làm nguồn")
+    chunk_strategy: str = Field("ClauseBasedChunker", description="Chiến lược cắt đoạn")
+    sync_policy: Literal["manual", "auto_on_ready"] = Field("manual", description="Chính sách đồng bộ")
+    auto_activate: bool = Field(False, description="Tự động kích hoạt lập chỉ mục tức thì nếu đủ điều kiện")
+
+    @field_validator("group_id", mode="before")
+    @classmethod
+    def validate_group_id(cls, v: Any) -> str:
+        if not isinstance(v, str):
+            raise TypeError("group_id phải là chuỗi ký tự.")
+        val = v.strip()
+        if not val:
+            raise ValueError("ID nhóm tài liệu không được để trống.")
+        return val
+
+    @field_validator("chunk_strategy", mode="before")
+    @classmethod
+    def validate_chunk_strategy(cls, v: Any) -> str:
+        if v is None:
+            return "ClauseBasedChunker"
+        if not isinstance(v, str):
+            raise TypeError("chunk_strategy phải là chuỗi ký tự.")
+        val = v.strip()
+        if val not in SUPPORTED_CHUNK_STRATEGIES:
+            supported = ", ".join(sorted(SUPPORTED_CHUNK_STRATEGIES))
+            raise ValueError(f"Chiến lược phân đoạn '{val}' không được hỗ trợ. Các chiến lược hợp lệ: {supported}")
+        return val
+
+
+class PreviewGroupSourceDiffItem(BaseModel):
+    """Differential classification of a document member in a group source."""
+
+    document_id: str
+    title: str
+    file_name: str = ""
+    revision_id: str | None = None
+    revision_status: str | None = None
+    category: Literal["added", "updated", "removed", "unchanged", "not_ready", "failed"]
+    reason: str = ""
+
+
+class PreviewGroupSourceDiffResponse(BaseModel):
+    """Server-side differential breakdown comparing current source bindings against group state."""
+
+    source_id: str | None = None
+    collection_id: str
+    group_id: str
+    group_name: str
+    membership_hash: str
+    last_membership_hash: str | None = None
+    has_changes: bool = False
+    total_documents_in_group: int = 0
+    added_count: int = 0
+    updated_count: int = 0
+    removed_count: int = 0
+    unchanged_count: int = 0
+    not_ready_count: int = 0
+    failed_count: int = 0
+    needs_build_count: int = 0
+    awaiting_publish_count: int = 0
+    publishable_count: int = 0
+    items: list[PreviewGroupSourceDiffItem] = Field(default_factory=list)
+
+
+class SyncGroupSourceRequest(BaseModel):
+    """Payload to synchronize changes from a document group to its bound collection."""
+
+    confirm_detach_removed: bool = Field(
+        False, description="Xác nhận gỡ bỏ các tài liệu không còn nằm trong nhóm tài liệu"
+    )
+    chunk_strategy: str | None = Field(None, description="Chiến lược cắt đoạn override nếu cần")
+    auto_publish: bool = Field(False, description="Tự động xuất bản lên active index sau khi validation đạt")
+
+
+class SyncGroupSourceResponse(BaseModel):
+    """Result summary of a group source synchronization."""
+
+    source_id: str
+    collection_id: str
+    status: str
+    synced_count: int
+    detached_count: int
+    failed_count: int
+    review_required_count: int = 0
+    published_count: int = 0
+    new_membership_hash: str | None = None
+    message: str
+    items: list[DocumentSyncItemResult] = Field(default_factory=list)
+
+
+class PublishGroupSourceResponse(BaseModel):
+    """Result summary of a group source index publication."""
+
+    source_id: str
+    collection_id: str
+    status: str
+    published_count: int
+    failed_count: int = 0
+    message: str
+    items: list[DocumentSyncItemResult] = Field(default_factory=list)
+
+
+class DetachGroupSourceRequest(BaseModel):
+    """Payload to detach a document group source from a knowledge collection."""
+
+    detach_bindings: bool = Field(True, description="Nếu true, chuyển tất cả bindings thuộc nhóm sang detached")
+
+
+class DetachGroupSourceResponse(BaseModel):
+    """Result summary of a group source detachment."""
+
+    source_id: str
+    collection_id: str
+    status: str
+    detached_bindings_count: int
+    message: str
+
+
+class CollectionSummaryMetrics(BaseModel):
+    """Unified metrics and real business status of a KnowledgeCollection."""
+
+    collection_id: str
+    total_sources: int
+    published_documents_count: int
+    documents_needing_sync_count: int
+    active_chunks_count: int
+    collection_status: str  # empty, pending, syncing, review_required, updates_available, ready, failed
+    configured_embedding_model: str | None = None
+    default_chunk_strategy: str | None = None
+
+
+# ==============================================================================
+# 10. Knowledge V3 Multi-Embedding & Snapshot Import Schemas (ADR-012)
+# ==============================================================================
+
+class KnowledgeSourceRevisionResponse(BaseModel):
+    """Normalized content revision representation owned by Knowledge domain."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    binding_id: str
+    revision_no: int
+    origin_document_id: str
+    origin_file_hash: str
+    canonical_hash: str | None = None
+    canonical_markdown: str | None = None
+    page_manifest: list[dict[str, Any]] = Field(default_factory=list)
+    citation_metadata: dict[str, Any] = Field(default_factory=dict)
+    quality_report: dict[str, Any] = Field(default_factory=dict)
+    status: str
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class UpdateSourceContentRequest(BaseModel):
+    """Payload to update and re-evaluate canonical Markdown content."""
+
+    canonical_markdown: str = Field(..., min_length=1, description="Nội dung Markdown đã hiệu đính")
+
+
+class ReviewSourceRevisionRequest(BaseModel):
+    """Payload for human-in-the-loop approval or rejection of source revision."""
+
+    decision: str = Field(..., description="Quyết định duyệt: approved hoặc rejected")
+    comment: str | None = Field(None, description="Ghi chú phản hồi duyệt")
+
+
+class KnowledgeSourceDetailResponse(BaseModel):
+    """Detailed representation of a Knowledge source entity and its revisions."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    collection_id: str
+    repository_document_id: str | None = None
+    status: str
+    active_source_revision_id: str | None = None
+    active_source_revision: KnowledgeSourceRevisionResponse | None = None
+    revisions: list[KnowledgeSourceRevisionResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+
+class KnowledgeChunkSetResponse(BaseModel):
+    """Materialized chunks and facts representation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source_revision_id: str
+    chunk_strategy: str
+    chunk_config: dict[str, Any] = Field(default_factory=dict)
+    config_hash: str
+    chunk_count: int
+    fact_count: int
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CreateVectorGenerationRequest(BaseModel):
+    """Payload to initiate a new vector generation for a collection."""
+
+    embedding_model: str = Field(..., description="Tên mô hình embedding được cấu hình trong ModelOps (ví dụ: text-embedding-3-small, BAAI/bge-m3)")
+    provider_id: str | None = Field(None, description="Mã nhà cung cấp ModelOps (nếu không truyền sẽ dùng provider mặc định)")
+    embedding_dimension: int | None = Field(None, description="Số chiều vector (nếu không truyền sẽ resolve động từ ModelOps)")
+
+
+class KnowledgeVectorGenerationResponse(BaseModel):
+    """Vector generation model space representation."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    collection_id: str
+    embedding_model: str
+    provider_id: str
+    embedding_dimension: int
+    distance_metric: str = "cosine"
+    generation_epoch: int
+    status: str
+    config_hash: str
+    created_at: datetime
+
+
+class ActivateVectorGenerationResponse(BaseModel):
+    """Response after atomically swapping active vector generation pointer via CAS."""
+
+    collection_id: str
+    activated_generation_id: str
+    previous_generation_id: str | None = None
+    new_epoch: int
+    status: str = "active"
+
+
+class BuildVectorGenerationRequest(BaseModel):
+    """Payload to trigger building index revisions for all sources in a vector generation."""
+
+    chunk_strategy: str | None = Field(None, description="Chiến lược cắt đoạn override nếu muốn khác mặc định")
+    chunk_config: dict[str, Any] = Field(default_factory=dict, description="Cấu hình chunk size / overlap")
+
+
+class VectorLoadItem(BaseModel):
+    binding_id: str = Field(min_length=1, max_length=64)
+    source_revision_id: str = Field(min_length=1, max_length=64)
+
+
+class VectorLoadRequest(BaseModel):
+    generation_id: str = Field(min_length=1, max_length=64)
+    items: list[VectorLoadItem] = Field(min_length=1, max_length=500)
+
+
+class VectorSourceIndexStatus(BaseModel):
+    id: str
+    binding_id: str
+    source_revision_v2_id: str | None = None
+    vector_generation_id: str
+    chunk_count: int
+    status: str
+    failure_detail: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class BuildVectorGenerationResponse(BaseModel):
+    """Summary of batch build triggered for a vector generation."""
+
+    collection_id: str
+    generation_id: str
+    total_sources: int
+    built_count: int
+    reused_count: int
+    failed_count: int
+    status: str
+
+
+
+class KnowledgeImportBatchCreateRequest(BaseModel):
+    """Payload to initiate a snapshot import batch from Document Repository."""
+
+    document_ids: list[str] = Field(
+        ..., min_length=1, max_length=500, description="Danh sách ID tài liệu từ Kho tài liệu"
+    )
+    vector_generation_id: str | None = Field(
+        None, description="Thế hệ vector mục tiêu (nếu để trống dùng generation active)"
+    )
+    parser_profile: str = Field(
+        "standard", description="Cấu hình bóc tách/OCR: standard, vision_ocr, layout_analysis"
+    )
+    chunk_strategy: str = Field(
+        "ClauseBasedChunker", description="Chiến lược chunking áp dụng cho batch"
+    )
+    chunk_config: dict[str, Any] = Field(
+        default_factory=dict, description="Tham số chunking tùy biến (chunk_size, overlap,...)"
+    )
+
+
+class KnowledgeImportItemResponse(BaseModel):
+    """Individual item within an import batch."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    batch_id: str
+    origin_document_id: str
+    origin_title: str
+    origin_file_name: str
+    origin_file_type: str
+    origin_file_hash: str
+    knowledge_binding_id: str | None = None
+    knowledge_source_revision_id: str | None = None
+    index_revision_id: str | None = None
+    phase: str
+    status: str
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    retry_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class KnowledgeImportBatchResponse(BaseModel):
+    """Status summary of a snapshot import batch."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    collection_id: str
+    vector_generation_id: str | None = None
+    parser_profile: str
+    chunk_strategy: str
+    total_count: int
+    queued_count: int
+    processing_count: int
+    review_required_count: int
+    succeeded_count: int
+    failed_count: int
+    skipped_count: int
+    status: str
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    items: list[KnowledgeImportItemResponse] = Field(default_factory=list)
+
+
+class RepositoryCandidateItem(BaseModel):
+    """Candidate document from Repository for importing into KnowledgeCollection."""
+
+    document_id: str
+    title: str
+    file_name: str
+    file_type: str
+    file_size_bytes: int
+    file_hash: str
+    document_type_code: str | None = None
+    document_number: str | None = None
+    issuing_authority: str | None = None
+    issued_date: date | None = None
+    groups: list[DocumentGroupMinimalItem] = Field(default_factory=list)
+
+    # 2-Dimensional state evaluation
+    source_state: str = Field(
+        ...,
+        description="Trạng thái nguồn: not_imported (Chưa có), current (Đã có), update_available (Cần cập nhật), processing, failed"
+    )
+    vector_state: str = Field(
+        ...,
+        description="Trạng thái vector theo generation: not_indexed, indexed, indexing, index_failed"
+    )
+    knowledge_source_id: str | None = None
+    imported_file_hash: str | None = None
+    selectable: bool = True
+    unselectable_reason: str | None = None
+
+
+class CandidateListResponse(BaseModel):
+    """List of candidate documents available for snapshot import."""
+
+    items: list[RepositoryCandidateItem]
+    total: int
+    vector_generation_id: str | None = None
+
+
+class CandidateGroupItem(BaseModel):
+    """Document group candidate summary for importing into a collection."""
+
+    id: str
+    name: str
+    description: str | None = None
+    total_documents: int = 0
+    imported_documents: int = 0
+    created_at: datetime | None = None
+
+
+class CandidateGroupListResponse(BaseModel):
+    """List of document groups available as candidates for importing."""
+
+    items: list[CandidateGroupItem]
+    total: int

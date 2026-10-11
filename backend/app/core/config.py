@@ -212,13 +212,19 @@ class Settings(BaseSettings):
 
     # --- vLLM Local Server (Tailscale / On-Premise) ---
     VLLM_BASE_URL: str = Field(
-        default="http://tormemrtxproto.tail0924dd.ts.net:8000/v1",
+        default="http://100.105.13.53:8000/v1",
         validation_alias=AliasChoices("VLLM_BASE_URL", "VLLM_URL"),
+    )
+
+    # --- PaddleOCR-VL Document Layout Parsing Server (On-Premise) ---
+    PADDLEOCR_BASE_URL: str = Field(
+        default="http://100.105.13.53:8080",
+        validation_alias=AliasChoices("PADDLEOCR_BASE_URL", "PADDLEOCR_URL"),
     )
 
     # --- Ollama / Local AI Server (Tailscale / On-Premise) ---
     OLLAMA_BASE_URL: str = Field(
-        default="http://tormemrtxproto.tail0924dd.ts.net:11434",
+        default="http://100.105.13.53:11434",
         validation_alias=AliasChoices("OLLAMA_BASE_URL", "OLLAMA_HOST"),
     )
 

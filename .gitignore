@@ -38,6 +38,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # Environment Variables & Secrets
+backend/storage/modelops-bootstrap/
 .env
 .env.local
 .env.development.local
@@ -63,10 +64,16 @@ storage/artifacts/*
 storage/backups/*
 !storage/backups/.gitkeep
 backend/storage/artifacts/*
+backend/storage/worker_logs/
 backend/storage/uploads/*
 backend/storage/backups/*
 backend/storage/ocr_cache/*
+backend/storage/snapshots/*
 storage/ocr_cache/*
+backend/storage/documents/*
+!backend/storage/documents/.gitkeep
+storage/documents/*
+!storage/documents/.gitkeep
 
 # Testing & Coverage
 .pytest_cache/

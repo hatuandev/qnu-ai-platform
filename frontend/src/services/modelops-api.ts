@@ -13,7 +13,7 @@ import type {
   TokenQuota,
   UsageStatsResponse,
 } from "@/types/modelops";
-import { BASE_URL } from "./http-client";
+import { BASE_URL, getAuthHeaders } from "./http-client";
 
 export const modelopsApi = {
   async getProviderKeyHistory(providerId: string): Promise<ProviderKeyEvent[]> {
@@ -326,7 +326,9 @@ export const modelopsApi = {
   },
 
   async getSystemModelDefaults(): Promise<SystemModelDefaultsResponse> {
-    const res = await fetch(`${BASE_URL}/modelops/defaults`);
+    const res = await fetch(`${BASE_URL}/modelops/defaults`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error("Không thể tải cấu hình mô hình mặc định");
     return await res.json();
   },

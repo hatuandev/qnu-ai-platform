@@ -58,6 +58,9 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
   const [models, setModels] = useState<string[]>([]);
   const [newModelInput, setNewModelInput] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const isPaddleOcr = ["paddleocr", "paddleocr_vl", "paddle"].includes(
+    providerType,
+  );
 
   useEffect(() => {
     if (editingProvider) {
@@ -107,7 +110,7 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
       name: name.trim(),
       type: providerType,
       api_base_url: apiBaseUrl.trim(),
-      api_key: apiKey.trim(),
+      api_key: isPaddleOcr ? "" : apiKey.trim(),
       account_id: accountId.trim(),
       models,
       is_active: isActive,
@@ -215,6 +218,9 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
                   <SelectItem value="vllm">
                     vLLM / TEI (On-Premise GPU & High-Throughput)
                   </SelectItem>
+                  <SelectItem value="paddleocr">
+                    PaddleOCR-VL (không cần khóa)
+                  </SelectItem>
                   <SelectItem value="ollama">
                     Ollama (Local / On-Premise)
                   </SelectItem>
@@ -231,6 +237,7 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
               Base URL Cổng API
             </span>
             <Input
+              required={isPaddleOcr}
               placeholder="VD: https://api.openai.com/v1 (Để trống nếu dùng mặc định)"
               value={apiBaseUrl}
               onChange={(e) => setApiBaseUrl(e.target.value)}
@@ -253,20 +260,32 @@ export const ProviderModal: React.FC<ProviderModalProps> = ({
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <span className="font-semibold text-foreground block">
-              {editingProvider
-                ? "Khóa API Key Mới (Để trống nếu không đổi)"
-                : "API Key Ban Đầu (Có thể bổ sung thêm sau trong Key Pool)"}
-            </span>
-            <Input
-              type="password"
-              placeholder={editingProvider ? "••••••••••••••••" : "sk-..."}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="text-xs h-9 font-mono"
-            />
-          </div>
+          {isPaddleOcr ? (
+            <p className="text-xs text-muted-foreground">
+              PaddleOCR không cần khóa API. Cấu hình Base URL để sử dụng OCR.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <span className="font-semibold text-foreground block">
+                {editingProvider
+                  ? "Khóa API Key Mới (Để trống nếu không đổi)"
+                  : "API Key Ban Đầu (Có thể bổ sung thêm sau trong Key Pool)"}
+              </span>
+              <Input
+                type="password"
+                placeholder={editingProvider ? "••••••••••••••••" : "sk-..."}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="text-xs h-9 font-mono"
+              />
+              {providerType === "vllm" && (
+                <p className="text-xs text-muted-foreground">
+                  vLLM cần khóa thật trước khi kiểm tra hoặc nạp vector. Có thể
+                  thêm khóa sau khi lưu provider.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Model Tags input */}
           <div className="space-y-1.5">

@@ -1,76 +1,44 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Activity,
-  Cpu,
-  FileText,
-  Link2,
-  ShieldCheck,
-  Table2,
-} from "lucide-react";
+import { Activity, Cpu, FolderGit2, Table2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { EmptyState } from "@/components/admin/empty-state";
 import { CollectionHeader } from "@/components/knowledge/collection-header";
-import { AttachFromRepositoryDialog } from "@/components/knowledge/dialogs/attach-from-repository-dialog";
 import { CollectionExcelImportDialog } from "@/components/knowledge/dialogs/collection-excel-import-dialog";
-import { CollectionReconcileDialog } from "@/components/knowledge/dialogs/collection-reconcile-dialog";
-import { DocumentPreviewDialog } from "@/components/knowledge/dialogs/document-preview-dialog";
-import { DocumentUploadDialog } from "@/components/knowledge/dialogs/document-upload-dialog";
 import { TaskLogDialog } from "@/components/knowledge/dialogs/task-log-dialog";
-import {
-  DocumentStudioWorkspace,
-  StudioErrorBoundary,
-} from "@/components/knowledge/ocr";
 import { CollectionBindingsTab } from "@/components/knowledge/tabs/collection-bindings-tab";
-import { CollectionDocumentsTab } from "@/components/knowledge/tabs/collection-documents-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
 import { CollectionModelsTab } from "@/components/knowledge/tabs/collection-models-tab";
-import { CollectionParityAuditTab } from "@/components/knowledge/tabs/collection-parity-audit-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
-import type { CollectionDetailTab } from "@/components/knowledge/types";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiClient } from "@/services/api-client";
 import { jobsApi } from "@/services/jobs-api";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type {
   CollectionDataProcessingConfig,
   IngestionTask,
-  KnowledgeCollection,
-  KnowledgeDocument,
-  KnowledgeReconciliationReport,
 } from "@/types/knowledge";
 
 export interface CollectionDetailPageProps {
   collectionId: string;
-  initialDocId?: string;
-  initialTab?: CollectionDetailTab;
+  initialTab?: "sources" | "facts" | "tasks" | "models";
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   collectionId,
-  initialDocId,
   initialTab,
 }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Active in-place OCR Studio Document (null = show normal tabs, string = in-place Studio)
-  const [activeStudioDocId, setActiveStudioDocId] = useState<string | null>(
-    initialDocId || null,
-  );
-
-  useEffect(() => {
-    if (initialDocId) {
-      setActiveStudioDocId(initialDocId);
-    }
-  }, [initialDocId]);
-
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<CollectionDetailTab>(
-    initialTab || "bindings",
-  );
+  // Active Tab: only 4 streamlined tabs
+  const [activeTab, setActiveTab] = useState<
+    "sources" | "facts" | "tasks" | "models"
+  >(initialTab || "sources");
 
   useEffect(() => {
     if (initialTab) {
@@ -78,73 +46,42 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   }, [initialTab]);
 
-  // Document Filters
-  const [docSearchQuery, setDocSearchQuery] = useState("");
-  const [selectedTypeFilter, setSelectedTypeFilter] = useState("all");
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
-  const [selectedPriorityFilter, setSelectedPriorityFilter] = useState("all");
-
   // Tasks Filters
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
 
-  // Dialog States
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isAttachRepoOpen, setIsAttachRepoOpen] = useState(false);
+  // Config States
   const [configName, setConfigName] = useState("");
   const [configDescription, setConfigDescription] = useState("");
   const [configDataProcessing, setConfigDataProcessing] =
     useState<CollectionDataProcessingConfig>({});
-  const [previewDoc, setPreviewDoc] = useState<KnowledgeDocument | null>(null);
   const [selectedTaskLog, setSelectedTaskLog] = useState<IngestionTask | null>(
     null,
   );
-  const [deleteDocTarget, setDeleteDocTarget] =
-    useState<KnowledgeDocument | null>(null);
-  const [isConfirmCleanupOpen, setIsConfirmCleanupOpen] = useState(false);
   const [deleteTaskTarget, setDeleteTaskTarget] =
     useState<IngestionTask | null>(null);
-
-  // Reconcile Dialog States
-  const [isReconcileOpen, setIsReconcileOpen] = useState(false);
-  const [reconcileReport, setReconcileReport] =
-    useState<KnowledgeReconciliationReport | null>(null);
-  const [isLoadingReconcile] = useState(false);
-  const [isFixingReconcile, setIsFixingReconcile] = useState(false);
 
   // Excel Facts Import State
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [selectedExcelFile, setSelectedExcelFile] = useState<File | null>(null);
 
-  // Reindex State
-  const [isReindexing, setIsReindexing] = useState(false);
-  const [reindexJobId, setReindexJobId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  // 1. Fetch Collections
-  const { data: collections = [] } = useQuery({
-    queryKey: ["collections"],
-    queryFn: () => knowledgeApi.getCollections(),
+  // 1. Fetch Collection Info directly
+  const {
+    data: collection,
+    isLoading: isCollectionLoading,
+    isError: isCollectionError,
+    error: collectionError,
+  } = useQuery({
+    queryKey: ["knowledge-collection", collectionId],
+    queryFn: () => knowledgeApi.getCollection(collectionId),
   });
 
-  // Current Collection object
-  const collection = useMemo<KnowledgeCollection>(() => {
-    const found = collections.find(
-      (c) => c.id === collectionId || c.code === collectionId,
-    );
-    if (found) return found;
-    return {
-      id: collectionId,
-      name: "Kho Tri Thức",
-      code: collectionId,
-      description: "",
-      document_count: 0,
-      chunk_count: 0,
-      chunking_strategy: "SemanticChunker",
-      ocr_profile: "PyMuPDF",
-      updated_at: new Date().toISOString(),
-    };
-  }, [collections, collectionId]);
+  // 2. Fetch Real Summary Metrics
+  const { data: summaryMetrics } = useQuery({
+    queryKey: ["collection-summary-metrics", collectionId],
+    queryFn: () => knowledgeApi.getCollectionSummaryMetrics(collectionId),
+    enabled: !!collection,
+  });
 
   useEffect(() => {
     if (collection) {
@@ -153,125 +90,61 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       if (collection.data_processing) {
         setConfigDataProcessing(collection.data_processing);
       } else {
-        setConfigDataProcessing({
-          embedding_model: "bge-m3:latest",
-          embedding_provider_id: "prov_rtx5090_ollama",
-          embedding_dimension: 1024,
-          ocr_mode: "combo",
-          primary_ocr_model: "qwen3-vl:8b",
-          primary_ocr_provider_id: "prov_rtx5090_ollama",
-          fallback_ocr_model: "gemini-3.1-flash-lite",
-          fallback_ocr_provider_id: "prov_gemini",
-          enable_ocr_rescue: true,
-        });
+        setConfigDataProcessing({});
       }
     }
   }, [collection]);
 
-  // 2. Fetch System Defaults for Embedding Model
-  const { data: systemDefaultsResponse } = useQuery({
-    queryKey: ["system-model-defaults"],
-    queryFn: () => apiClient.getSystemModelDefaults(),
-    staleTime: 60000,
-  });
-
-  // 3. Fetch Documents
-  const { data: allDocuments = [], refetch: refetchDocs } = useQuery({
-    queryKey: ["documents", collection.id],
-    queryFn: () => knowledgeApi.getDocuments(collection.id),
-    refetchInterval: (query) => {
-      const docs = query.state.data || [];
-      const hasProcessing = docs.some(
-        (d) => d.status === "processing" || d.index_status === "indexing",
-      );
-      return hasProcessing ? 3000 : false;
-    },
-  });
-
-  // 4. Fetch Tasks
-  const { data: allTasks = [], refetch: refetchTasks } = useQuery({
-    queryKey: ["ingestion-tasks", collection.id],
-    queryFn: () => jobsApi.getIngestionTasks(collection.id),
-  });
-
-  // 5. Fetch Facts (tải tới 500 facts phục vụ bộ lọc đa chiều & phân trang)
+  // 3. Fetch Facts
   const factsQuery = useQuery({
-    queryKey: ["collection-facts", collection.id],
-    queryFn: () => knowledgeApi.getCollectionFacts(collection.id, 500),
-    enabled: Boolean(collection.id),
+    queryKey: ["collection-facts", collection?.id],
+    queryFn: () =>
+      collection
+        ? knowledgeApi.getCollectionFacts(collection.id, 50)
+        : Promise.reject(new Error("No collection")),
+    enabled: !!collection && activeTab === "facts",
   });
 
-  // Filtered Documents
-  const filteredDocuments = useMemo(() => {
-    return allDocuments.filter((d) => {
-      const q = docSearchQuery.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        d.title.toLowerCase().includes(q) ||
-        d.filename.toLowerCase().includes(q);
+  // 4. Fetch Ingestion Tasks
+  const tasksQuery = useQuery<IngestionTask[]>({
+    queryKey: ["ingestion-tasks", collection?.id],
+    queryFn: () =>
+      collection
+        ? jobsApi.getIngestionTasks(collection.id)
+        : Promise.reject(new Error("No collection")),
+    enabled: !!collection && activeTab === "tasks",
+  });
 
-      const docType = (
-        d.document_type ||
-        d.document_type_code ||
-        ""
-      ).toLowerCase();
-      const filterType = selectedTypeFilter.toLowerCase();
-      const matchType =
-        selectedTypeFilter === "all" ||
-        docType === filterType ||
-        docType.includes(filterType) ||
-        filterType.includes(docType);
+  const allTasks: IngestionTask[] = tasksQuery.data || [];
 
-      const matchStatus =
-        selectedStatusFilter === "all" ||
-        d.status === selectedStatusFilter ||
-        (selectedStatusFilter === "pending" &&
-          (d.status === "pending" || d.status === "review_pending")) ||
-        (selectedStatusFilter === "approved" &&
-          (d.status === "ready" || d.status === "completed"));
-
-      const matchPriority =
-        selectedPriorityFilter === "all" ||
-        (d.priority_level || "core") === selectedPriorityFilter;
-
-      return matchSearch && matchType && matchStatus && matchPriority;
-    });
-  }, [
-    allDocuments,
-    docSearchQuery,
-    selectedTypeFilter,
-    selectedStatusFilter,
-    selectedPriorityFilter,
-  ]);
-
-  // Filtered Tasks
   const filteredTasks = useMemo(() => {
-    return allTasks.filter((t: IngestionTask) => {
-      const q = taskSearchQuery.toLowerCase().trim();
+    return allTasks.filter((task: IngestionTask) => {
       const matchSearch =
-        !q ||
-        t.task_name.toLowerCase().includes(q) ||
-        t.source_file.toLowerCase().includes(q) ||
-        t.worker_name.toLowerCase().includes(q);
-
+        taskSearchQuery.trim() === "" ||
+        task.task_name.toLowerCase().includes(taskSearchQuery.toLowerCase()) ||
+        task.source_file.toLowerCase().includes(taskSearchQuery.toLowerCase());
       const matchStatus =
-        taskStatusFilter === "all" || t.status === taskStatusFilter;
-
+        taskStatusFilter === "all" || task.status === taskStatusFilter;
       return matchSearch && matchStatus;
     });
   }, [allTasks, taskSearchQuery, taskStatusFilter]);
 
   // Mutations
   const updateCollectionMutation = useMutation({
-    mutationFn: () =>
-      knowledgeApi.updateCollection(collection.id, {
-        name: configName.trim() || undefined,
-        description: configDescription.trim() || undefined,
+    mutationFn: () => {
+      if (!collection) throw new Error("Chưa tải được thông tin kho tri thức.");
+      return knowledgeApi.updateCollection(collection.id, {
+        name: configName,
+        description: configDescription,
         data_processing: configDataProcessing,
-      }),
+      });
+    },
     onSuccess: () => {
-      toast.success("Cập nhật thông tin kho thành công.");
+      toast.success("Cập nhật cấu hình Kho Tri Thức thành công.");
       queryClient.invalidateQueries({ queryKey: ["collections"] });
+      queryClient.invalidateQueries({
+        queryKey: ["collection-summary-metrics", collection?.id],
+      });
     },
     onError: (err: Error) => {
       toast.error(`Cập nhật thất bại: ${err.message}`);
@@ -279,74 +152,31 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   });
 
   const importExcelMutation = useMutation({
-    mutationFn: (file: File) =>
-      knowledgeApi.importFactsExcel(collection.id, file),
+    mutationFn: (file: File) => {
+      if (!collection) throw new Error("Chưa tải được thông tin kho tri thức.");
+      return knowledgeApi.importFactsExcel(collection.id, file);
+    },
     onSuccess: (res) => {
       toast.success(
-        res.message || `Đã nạp ${res.imported_count} số liệu facts.`,
+        `Nhập dữ liệu thành công: đã tạo ${res.imported_count} facts số mới.`,
       );
       setIsExcelImportOpen(false);
       setSelectedExcelFile(null);
       queryClient.invalidateQueries({
-        queryKey: ["collection-facts", collection.id],
+        queryKey: ["collection-facts", collection?.id],
       });
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
     },
     onError: (err: Error) => {
-      toast.error(`Nạp bảng tính thất bại: ${err.message}`);
-    },
-  });
-
-  const deleteDocMutation = useMutation({
-    mutationFn: (docId: string) => knowledgeApi.deleteDocument(docId),
-    onSuccess: () => {
-      toast.success("Đã xóa tài liệu khỏi kho.");
-      queryClient.invalidateQueries({ queryKey: ["documents", collection.id] });
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
-      queryClient.invalidateQueries({
-        queryKey: ["collection-facts", collection.id],
-      });
-      setDeleteDocTarget(null);
-    },
-    onError: (err: Error) => {
-      toast.error(`Xóa tài liệu thất bại: ${err.message}`);
-    },
-  });
-
-  // Task Actions & Cleanup Mutations
-  const canCleanupTasks = useMemo(() => {
-    return allTasks.some(
-      (t: IngestionTask) =>
-        t.status === "completed" ||
-        t.status === "failed" ||
-        t.status === "cancelled",
-    );
-  }, [allTasks]);
-
-  const cleanupTasksMutation = useMutation({
-    mutationFn: () => jobsApi.cleanupJobs(collection.id),
-    onSuccess: (res) => {
-      toast.success(
-        res.deleted_count > 0
-          ? `Đã dọn dẹp ${res.deleted_count} tác vụ cũ.`
-          : "Không có tác vụ nào cần dọn dẹp.",
-      );
-      queryClient.invalidateQueries({
-        queryKey: ["ingestion-tasks", collection.id],
-      });
-      setIsConfirmCleanupOpen(false);
-    },
-    onError: (err: Error) => {
-      toast.error(`Dọn dẹp tác vụ thất bại: ${err.message}`);
+      toast.error(`Nhập Excel thất bại: ${err.message}`);
     },
   });
 
   const deleteTaskMutation = useMutation({
-    mutationFn: (taskId: string) => jobsApi.deleteJob(taskId),
+    mutationFn: (task: IngestionTask) => jobsApi.deleteJob(task.id),
     onSuccess: () => {
-      toast.success("Đã xóa tác vụ khỏi danh sách.");
+      toast.success("Đã xóa bản ghi tác vụ thành công.");
       queryClient.invalidateQueries({
-        queryKey: ["ingestion-tasks", collection.id],
+        queryKey: ["ingestion-tasks", collection?.id],
       });
       setDeleteTaskTarget(null);
     },
@@ -373,7 +203,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         toast.success("Đã gửi yêu cầu hủy tác vụ.");
       }
       queryClient.invalidateQueries({
-        queryKey: ["ingestion-tasks", collection.id],
+        queryKey: ["ingestion-tasks", collection?.id],
       });
     } catch (err) {
       toast.error(
@@ -384,169 +214,70 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     }
   };
 
-  // Handlers
-  const handleReindexCollection = async () => {
-    setIsReindexing(true);
-    setActionError(null);
-    try {
-      const res = await knowledgeApi.reindexCollection(collection.id);
-      setReindexJobId(res.job_id);
-      toast.success("Đã kích hoạt job reindex toàn bộ kho thành công.");
-      queryClient.invalidateQueries({
-        queryKey: ["ingestion-tasks", collection.id],
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Reindex thất bại.";
-      setActionError(msg);
-      toast.error(msg);
-    } finally {
-      setIsReindexing(false);
-    }
-  };
-
-  const handleOpenReconcile = () => {
-    setActiveTab("audit");
-  };
-
-  const handleFixReconcile = async () => {
-    setIsFixingReconcile(true);
-    try {
-      const res = await knowledgeApi.fixReconciliation(collection.id);
-      toast.success(res.message || "Đã đồng bộ dữ liệu sạch.");
-      const rep = await knowledgeApi.reconcileCollection(collection.id);
-      setReconcileReport(rep);
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
-      queryClient.invalidateQueries({ queryKey: ["documents", collection.id] });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Đồng bộ thất bại.");
-    } finally {
-      setIsFixingReconcile(false);
-    }
-  };
-
-  const handleReindexSingleDoc = async (docId: string) => {
-    try {
-      await knowledgeApi.reindexDocument(docId);
-      toast.success("Đã kích hoạt reindex cho tài liệu.");
-      refetchDocs();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Reindex tài liệu thất bại.",
-      );
-    }
-  };
-
-  const handleQuickApprove = async (docId: string) => {
-    try {
-      await knowledgeApi.approveDocument(docId);
-      toast.success("Đã phê duyệt tài liệu.");
-      refetchDocs();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Phê duyệt tài liệu thất bại.",
-      );
-    }
-  };
-
-  const handleBatchApprove = async (docIds: string[]) => {
-    try {
-      for (const id of docIds) {
-        await knowledgeApi.approveDocument(id);
-      }
-      toast.success(`Đã phê duyệt ${docIds.length} tài liệu.`);
-      refetchDocs();
-      queryClient.invalidateQueries({
-        queryKey: ["collection-facts", collection.id],
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Phê duyệt tài liệu thất bại.",
-      );
-    }
-  };
-
-  const handleBatchDelete = async (docIds: string[]) => {
-    try {
-      for (const id of docIds) {
-        await knowledgeApi.deleteDocument(id);
-      }
-      toast.success(`Đã xóa ${docIds.length} tài liệu.`);
-      refetchDocs();
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
-      queryClient.invalidateQueries({
-        queryKey: ["collection-facts", collection.id],
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Xóa tài liệu thất bại.",
-      );
-    }
-  };
-
-  // If a document is currently active in Studio mode, render full in-place workspace
-  if (activeStudioDocId) {
+  if (isCollectionLoading) {
     return (
-      <StudioErrorBoundary onReset={() => setActiveStudioDocId(null)}>
-        <DocumentStudioWorkspace
-          collection={collection}
-          documentId={activeStudioDocId}
-          onBack={() => setActiveStudioDocId(null)}
-          onApproveSuccess={() => {
-            refetchDocs();
-            refetchTasks();
-          }}
-        />
-      </StudioErrorBoundary>
+      <div className="space-y-4 max-w-7xl mx-auto pb-10">
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-10 w-80 rounded-lg" />
+        <Skeleton className="h-96 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isCollectionError || !collection) {
+    return (
+      <div className="space-y-4 max-w-7xl mx-auto pb-10 pt-8">
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <EmptyState
+              icon={FolderGit2}
+              title="Không tìm thấy kho tri thức"
+              description={
+                collectionError instanceof Error
+                  ? collectionError.message
+                  : `Kho tri thức '${collectionId}' không tồn tại hoặc bạn không có quyền truy cập.`
+              }
+              action={{
+                label: "Quay lại danh sách",
+                onClick: () => navigate({ to: "/knowledge" }),
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      {/* 1. Header Hero & Navigation Bar */}
+    <div className="space-y-4 max-w-7xl mx-auto pb-10">
+      {/* 1. Header with unified metrics and single primary CTA */}
       <CollectionHeader
         collection={collection}
-        documentCount={allDocuments.length}
-        systemDefaultEmbeddingModel={
-          systemDefaultsResponse?.defaults?.default_embedding_model
-        }
+        metrics={summaryMetrics}
         onBack={() => navigate({ to: "/knowledge" })}
-        onOpenReconcile={handleOpenReconcile}
-        onReindex={handleReindexCollection}
-        isReindexing={isReindexing}
-        onStartIngest={() => setIsUploadOpen(true)}
-        onAttachFromRepo={() => setIsAttachRepoOpen(true)}
-        onAddDocuments={() =>
-          navigate({
-            to: "/knowledge/$collectionId/add-documents",
-            params: { collectionId: collection.id },
-          })
+        onAddSource={() =>
+          navigate({ to: `/knowledge/${collection.id}/add-documents` })
         }
-        actionError={actionError}
-        reindexJobId={reindexJobId}
+        onOpenConfig={() => setActiveTab("models")}
+        onOpenExcelImport={() => setIsExcelImportOpen(true)}
       />
 
-      {/* 2. Responsive Tabs Navigation */}
+      {/* 2. Streamlined Navigation Tabs (4 main tabs) */}
       <Tabs
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as CollectionDetailTab)}
-        className="w-full space-y-4"
+        onValueChange={(val) =>
+          setActiveTab(val as "sources" | "facts" | "tasks" | "models")
+        }
+        className="space-y-4"
       >
-        <div className="w-full overflow-x-auto no-scrollbar pb-0.5">
-          <TabsList className="h-9 p-1 bg-muted/60 inline-flex w-auto min-w-full sm:min-w-0 justify-start gap-1">
+        <div className="border-b border-border/80 pb-2">
+          <TabsList className="bg-muted/60 p-1 h-9 rounded-lg border border-border/50 gap-1 w-full sm:w-auto overflow-x-auto justify-start">
             <TabsTrigger
-              value="bindings"
+              value="sources"
               className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
             >
-              <Link2 className="size-3.5" />
-              <span>Liên kết V2 (ADR-011)</span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="documents"
-              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
-            >
-              <FileText className="size-3.5" />
-              <span>Tài liệu (Legacy V1)</span>
+              <FolderGit2 className="size-3.5" />
+              <span>Nguồn tài liệu</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -554,7 +285,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
             >
               <Table2 className="size-3.5" />
-              <span>Facts số</span>
+              <span>Dữ liệu số</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -562,7 +293,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
             >
               <Activity className="size-3.5" />
-              <span>Tiến trình</span>
+              <span>Hoạt động</span>
             </TabsTrigger>
 
             <TabsTrigger
@@ -570,59 +301,17 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
             >
               <Cpu className="size-3.5" />
-              <span>Mô hình & Cấu hình</span>
-            </TabsTrigger>
-
-            <TabsTrigger
-              value="audit"
-              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
-            >
-              <ShieldCheck className="size-3.5" />
-              <span>Đối Soát & Canary V2</span>
+              <span>Cấu hình</span>
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* 3. Tab Contents */}
-        {/* Tab 1: Tài Liệu */}
-        <TabsContent value="documents" className="mt-0 focus-visible:ring-0">
-          <CollectionDocumentsTab
-            documents={filteredDocuments}
-            totalDocumentsCount={allDocuments.length}
-            searchQuery={docSearchQuery}
-            onSearchChange={setDocSearchQuery}
-            typeFilter={selectedTypeFilter}
-            onTypeFilterChange={setSelectedTypeFilter}
-            statusFilter={selectedStatusFilter}
-            onStatusFilterChange={setSelectedStatusFilter}
-            priorityFilter={selectedPriorityFilter}
-            onPriorityFilterChange={setSelectedPriorityFilter}
-            reindexingDocId={null}
-            downloadingId={null}
-            onReindexDoc={handleReindexSingleDoc}
-            onStartVerify={(docId) => {
-              setActiveStudioDocId(docId);
-            }}
-            onPreviewDoc={setPreviewDoc}
-            onDownloadDoc={(doc) => {
-              window.open(
-                knowledgeApi.getDocumentDownloadUrl(doc.id),
-                "_blank",
-              );
-            }}
-            onDeleteDoc={setDeleteDocTarget}
-            onQuickApprove={handleQuickApprove}
-            onBatchApprove={handleBatchApprove}
-            onBatchDelete={handleBatchDelete}
-          />
-        </TabsContent>
-
-        {/* Tab 2: Liên Kết V2 & Xuất Bản Chỉ Mục (ADR-011) */}
-        <TabsContent value="bindings" className="mt-0 focus-visible:ring-0">
+        {/* Tab 1: Nguồn Tài Liệu (Snapshot Sources & Bindings ADR-012) */}
+        <TabsContent value="sources" className="mt-0 focus-visible:ring-0">
           <CollectionBindingsTab collection={collection} />
         </TabsContent>
 
-        {/* Tab 2: Facts Số */}
+        {/* Tab 2: Dữ Liệu Số (Facts) */}
         <TabsContent value="facts" className="mt-0 focus-visible:ring-0">
           <CollectionFactsTab
             facts={factsQuery.data?.facts || []}
@@ -634,7 +323,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
           />
         </TabsContent>
 
-        {/* Tab 3: Tiến Trình Tác Vụ */}
+        {/* Tab 3: Hoạt Động (Tasks) */}
         <TabsContent value="tasks" className="mt-0 focus-visible:ring-0">
           <CollectionTasksTab
             tasks={filteredTasks}
@@ -644,18 +333,18 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             statusFilter={taskStatusFilter}
             onStatusFilterChange={setTaskStatusFilter}
             taskActionId={runningTaskActionId}
-            isCleaningTasks={cleanupTasksMutation.isPending}
-            canCleanup={canCleanupTasks}
+            isCleaningTasks={false}
+            canCleanup={false}
             taskSuccessMessage={null}
-            onRefresh={() => refetchTasks()}
-            onOpenConfirmCleanup={() => setIsConfirmCleanupOpen(true)}
+            onRefresh={() => tasksQuery.refetch()}
+            onOpenConfirmCleanup={() => {}}
             onViewLog={setSelectedTaskLog}
             onTaskAction={handleTaskAction}
             onDeleteTask={(task) => setDeleteTaskTarget(task)}
           />
         </TabsContent>
 
-        {/* Tab 4: Cấu Hình Kho & Mô Hình AI */}
+        {/* Tab 4: Cấu Hình Kho & Mô Hình */}
         <TabsContent value="models" className="mt-0 focus-visible:ring-0">
           <CollectionModelsTab
             collection={collection}
@@ -669,70 +358,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onSave={() => updateCollectionMutation.mutate()}
           />
         </TabsContent>
-
-        {/* Tab 6: Đối Soát & Canary V2 (Parity Audit & Shadow Test) */}
-        <TabsContent value="audit" className="mt-0 focus-visible:ring-0">
-          <CollectionParityAuditTab
-            collection={collection}
-            onNavigateToBinding={(bindingId) => {
-              navigate({
-                to: "/knowledge/$collectionId/documents/$bindingId",
-                params: {
-                  collectionId: collection.id,
-                  bindingId,
-                },
-              });
-            }}
-          />
-        </TabsContent>
       </Tabs>
 
-      {/* 4. Dialogs */}
-      {/* Nạp Tài Liệu */}
-      <DocumentUploadDialog
-        open={isUploadOpen}
-        onOpenChange={setIsUploadOpen}
-        collectionId={collection.id}
-        collectionName={collection.name}
-        onSuccess={() => {
-          refetchDocs();
-          refetchTasks();
-        }}
-        onOpenStudio={(docId) => setActiveStudioDocId(docId)}
-      />
-
-      {/* Gắn Tài Liệu Từ Kho Tập Trung */}
-      <AttachFromRepositoryDialog
-        open={isAttachRepoOpen}
-        onOpenChange={setIsAttachRepoOpen}
-        collectionId={collection.id}
-        collectionName={collection.name}
-        existingDocumentRepoIds={allDocuments
-          .map(
-            (d) =>
-              (d as unknown as Record<string, unknown>)
-                .repository_document_id as string,
-          )
-          .filter(Boolean)}
-        onSuccess={() => {
-          refetchDocs();
-          refetchTasks();
-        }}
-      />
-
-      {/* Đối Soát Dữ Liệu */}
-      <CollectionReconcileDialog
-        open={isReconcileOpen}
-        onOpenChange={setIsReconcileOpen}
-        collectionCode={collection.code}
-        reconcileReport={reconcileReport}
-        isLoading={isLoadingReconcile}
-        isFixing={isFixingReconcile}
-        onRefresh={handleOpenReconcile}
-        onFix={handleFixReconcile}
-      />
-
-      {/* Nhập Excel Facts */}
+      {/* Dialogs */}
       <CollectionExcelImportDialog
         open={isExcelImportOpen}
         onOpenChange={setIsExcelImportOpen}
@@ -742,69 +370,28 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         onImport={(file) => importExcelMutation.mutate(file)}
       />
 
-      {/* Xem Trước Tài Liệu */}
-      <DocumentPreviewDialog
-        open={Boolean(previewDoc)}
-        onOpenChange={(v) => {
-          if (!v) setPreviewDoc(null);
-        }}
-        document={previewDoc}
-        collectionName={collection.name}
-      />
-
-      {/* Xem Log Tác Vụ */}
       <TaskLogDialog
+        task={selectedTaskLog}
         open={Boolean(selectedTaskLog)}
         onOpenChange={(v) => {
           if (!v) setSelectedTaskLog(null);
         }}
-        task={selectedTaskLog}
       />
 
-      {/* Xác Nhận Xóa Tài Liệu */}
-      <ConfirmDialog
-        open={Boolean(deleteDocTarget)}
-        onOpenChange={(v) => {
-          if (!v) setDeleteDocTarget(null);
-        }}
-        title="Xóa tài liệu"
-        description={`Bạn có chắc chắn muốn xóa tài liệu "${deleteDocTarget?.title}"? Các vector embeddings liên kết trong Qdrant cũng sẽ bị gỡ bỏ.`}
-        confirmText="Xóa tài liệu"
-        cancelText="Hủy"
-        variant="destructive"
-        isLoading={deleteDocMutation.isPending}
-        onConfirm={() => {
-          if (deleteDocTarget) deleteDocMutation.mutate(deleteDocTarget.id);
-        }}
-      />
-
-      {/* Xác Nhận Dọn Dẹp Tác Vụ Cũ */}
-      <ConfirmDialog
-        open={isConfirmCleanupOpen}
-        onOpenChange={setIsConfirmCleanupOpen}
-        title="Dọn dẹp tác vụ cũ"
-        description="Bạn có chắc chắn muốn dọn dẹp các tác vụ đã hoàn tất, thất bại hoặc đã hủy? Lịch sử chạy của các tác vụ này sẽ được giải phóng."
-        confirmText="Dọn dẹp ngay"
-        cancelText="Hủy"
-        variant="destructive"
-        isLoading={cleanupTasksMutation.isPending}
-        onConfirm={() => cleanupTasksMutation.mutate()}
-      />
-
-      {/* Xác Nhận Xóa Tác Vụ */}
       <ConfirmDialog
         open={Boolean(deleteTaskTarget)}
-        onOpenChange={(v) => {
-          if (!v) setDeleteTaskTarget(null);
+        onOpenChange={(open) => {
+          if (!open) setDeleteTaskTarget(null);
         }}
-        title="Xóa tác vụ"
-        description={`Bạn có chắc chắn muốn xóa tác vụ "${deleteTaskTarget?.task_name}" khỏi danh sách?`}
-        confirmText="Xóa tác vụ"
-        cancelText="Hủy"
+        title="Xóa bản ghi tác vụ"
+        description={`Bạn có chắc chắn muốn xóa bản ghi tác vụ "${deleteTaskTarget?.task_name}"?`}
+        confirmLabel="Xóa tác vụ"
         variant="destructive"
         isLoading={deleteTaskMutation.isPending}
         onConfirm={() => {
-          if (deleteTaskTarget) deleteTaskMutation.mutate(deleteTaskTarget.id);
+          if (deleteTaskTarget) {
+            deleteTaskMutation.mutate(deleteTaskTarget);
+          }
         }}
       />
     </div>

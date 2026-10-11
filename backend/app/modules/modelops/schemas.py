@@ -213,6 +213,16 @@ class ProviderPresetItem(BaseModel):
 
 PROVIDER_PRESETS: list[ProviderPresetItem] = [
     ProviderPresetItem(
+        code="paddleocr",
+        name="PaddleOCR-VL",
+        category="custom",
+        icon="scan-text",
+        description="Dịch vụ OCR và nhận dạng bố cục tự triển khai, không yêu cầu khóa API.",
+        default_base_url="http://100.105.13.53:8080",
+        placeholder_key="",
+        help_text="Chỉ cần Base URL của dịch vụ PaddleOCR; không nhập khóa API.",
+    ),
+    ProviderPresetItem(
         code="openai",
         name="OpenAI",
         category="cloud",

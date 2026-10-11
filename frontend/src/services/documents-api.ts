@@ -16,6 +16,7 @@ import type {
   RepositoryDocumentFilter,
   RepositoryDocumentListItem,
   RepositoryDocumentUpdate,
+  RepositoryFileRevisionResponse,
 } from "@/types/documents";
 import { BASE_URL, getAuthHeaders } from "./http-client";
 
@@ -248,6 +249,26 @@ export const documentsApi = {
    */
   getPreviewPdfUrl(id: string, page = 1): string {
     return `${BASE_URL}/documents/${id}/preview-pdf?page=${page}`;
+  },
+
+  /**
+   * Lấy danh sách các phiên bản tệp gốc (File Revisions) của tài liệu
+   */
+  async getFileRevisions(
+    documentId: string,
+  ): Promise<RepositoryFileRevisionResponse> {
+    const res = await fetch(
+      `${BASE_URL}/documents/${documentId}/file-revisions`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(
+        `Không thể tải lịch sử phiên bản tệp (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
   },
 
   /**

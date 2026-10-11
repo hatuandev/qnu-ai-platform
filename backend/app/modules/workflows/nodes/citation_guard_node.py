@@ -11,6 +11,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_payload, routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 logger = logging.getLogger(__name__)
@@ -54,9 +55,7 @@ def _is_benign_structural_number(num_str: str) -> bool:
     return False
 
 
-def _gather_combined_context(
-    context: WorkflowContext, citations: list[dict[str, Any]]
-) -> str:
+def _gather_combined_context(context: WorkflowContext, citations: list[dict[str, Any]]) -> str:
     """Gather all ground-truth reference context text from citations, facts and node_data."""
     context_parts: list[str] = []
 
@@ -74,9 +73,7 @@ def _gather_combined_context(
                     context_parts.append(val.strip())
 
     # 3. Fact layer data or guidance context
-    fact_md = context.node_data.get("fact_markdown") or context.node_data.get(
-        "guidance_context"
-    )
+    fact_md = context.node_data.get("fact_markdown") or context.node_data.get("guidance_context")
     if fact_md and isinstance(fact_md, str):
         context_parts.append(fact_md)
 
@@ -119,9 +116,7 @@ def _detect_number_hallucinations(answer: str, combined_context: str) -> list[st
     return unsupported
 
 
-def _compute_sentence_groundedness_ratio(
-    answer: str, combined_context: str
-) -> float:
+def _compute_sentence_groundedness_ratio(answer: str, combined_context: str) -> float:
     """Measure what ratio of factual statements in the answer are grounded in context.
 
     Excludes introductory adverbial framing and source meta headers via syntactic parsing.
@@ -130,9 +125,7 @@ def _compute_sentence_groundedness_ratio(
         return 1.0
 
     raw_sentences = [
-        s.strip()
-        for s in re.split(r"(?<!\d)[.!?;\n]+(?!\d)", answer)
-        if len(s.strip()) > 8
+        s.strip() for s in re.split(r"(?<!\d)[.!?;\n]+(?!\d)", answer) if len(s.strip()) > 8
     ]
     if not raw_sentences:
         return 1.0
@@ -183,12 +176,14 @@ class CitationGuardNodeHandler(BaseNodeHandler):
         rag_status = context.node_data.get("rag_status") or context.outputs.get(
             "status", "answered"
         )
-        citations = context.node_data.get("citations") or context.outputs.get(
-            "citations", []
-        )
-        answer_text = context.node_data.get("rag_answer") or context.outputs.get(
-            "answer", ""
-        )
+        citations = context.node_data.get("citations") or context.outputs.get("citations", [])
+        answer_text = context.node_data.get("rag_answer") or context.outputs.get("answer", "")
+        payload = routed_payload(context, node_spec.id)
+        has_wired_answer = any(key in payload for key in ("answer", "response", "content", "input"))
+        if has_wired_answer:
+            answer_text = routed_text(context, node_spec.id, ("answer", "response", "content"), "")
+            citations = payload.get("citations", [])
+            rag_status = payload.get("status", "answered")
 
         is_grounded = True
         failure_reasons: list[str] = []
@@ -198,11 +193,7 @@ class CitationGuardNodeHandler(BaseNodeHandler):
             is_grounded = False
             failure_reasons.append(f"rag_status '{rag_status}' not in accepted")
 
-        if (
-            profile
-            and profile.guardrails.require_grounded_answer
-            and rag_status != "answered"
-        ):
+        if profile and profile.guardrails.require_grounded_answer and rag_status != "answered":
             is_grounded = False
             failure_reasons.append("require_grounded_answer set and status != answered")
 
@@ -218,21 +209,30 @@ class CitationGuardNodeHandler(BaseNodeHandler):
 
         # Check 4: If answer itself declares insufficient context, treat as ungrounded
         if (
-            "chưa có trong" in answer_text.lower()
-            or "không tìm thấy" in answer_text.lower()
+            "chưa có trong" in answer_text.lower() or "không tìm thấy" in answer_text.lower()
         ) and len(citations) == 0:
             is_grounded = False
             failure_reasons.append("answer self-declares lack of context")
 
         # Check 5: Mathematical Number Hallucination Detection (0ms)
         combined_context = _gather_combined_context(context, citations)
+        if has_wired_answer:
+            combined_context = " ".join(
+                [
+                    *(str(item) for item in payload.get("contexts", []) if item),
+                    *(
+                        str(c.get(field, ""))
+                        for c in citations
+                        if isinstance(c, dict)
+                        for field in ("quote", "content", "snippet", "title", "section")
+                    ),
+                ]
+            ).lower()
         unsupported_numbers: list[str] = []
         grounded_ratio = 1.0
 
         if is_grounded and combined_context and answer_text:
-            unsupported_numbers = _detect_number_hallucinations(
-                answer_text, combined_context
-            )
+            unsupported_numbers = _detect_number_hallucinations(answer_text, combined_context)
             if unsupported_numbers:
                 is_grounded = False
                 failure_reasons.append(
@@ -245,9 +245,7 @@ class CitationGuardNodeHandler(BaseNodeHandler):
                 )
 
             # Check 6: Sentence-level lexical groundedness ratio
-            grounded_ratio = _compute_sentence_groundedness_ratio(
-                answer_text, combined_context
-            )
+            grounded_ratio = _compute_sentence_groundedness_ratio(answer_text, combined_context)
             if grounded_ratio < 0.25 and len(citations) > 0:
                 is_grounded = False
                 failure_reasons.append(
@@ -279,9 +277,16 @@ class CitationGuardNodeHandler(BaseNodeHandler):
             output={
                 "is_grounded": is_grounded,
                 "grounded": answer_text,
-                "ungrounded": " ".join(failure_reasons) if failure_reasons else "Thiếu căn cứ dữ liệu chính thức.",
-                "response": answer_text,
                 "answer": answer_text,
+                "citations": citations,
+                "status": rag_status,
+                "contexts": payload.get("contexts", [])
+                if has_wired_answer
+                else context.node_data.get("contexts", []),
+                "ungrounded": " ".join(failure_reasons)
+                if failure_reasons
+                else "Thiếu căn cứ dữ liệu chính thức.",
+                "response": answer_text,
                 "citations_count": len(citations),
                 "port": selected_port,
                 "unsupported_numbers": unsupported_numbers,

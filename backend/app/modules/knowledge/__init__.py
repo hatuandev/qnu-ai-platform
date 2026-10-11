@@ -3,10 +3,12 @@
 from typing import TYPE_CHECKING, Any
 
 from app.modules.knowledge.models import (
+    KnowledgeBinding,
     KnowledgeChunk,
     KnowledgeCollection,
     KnowledgeDocument,
     KnowledgeFact,
+    KnowledgeGroupSource,
 )
 
 if TYPE_CHECKING:
@@ -30,11 +32,14 @@ def __getattr__(name: str) -> Any:
         return knowledge_service
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+
 __all__ = [
+    "KnowledgeBinding",
     "KnowledgeChunk",
     "KnowledgeCollection",
     "KnowledgeDocument",
     "KnowledgeFact",
+    "KnowledgeGroupSource",
     "knowledge_router",
     "knowledge_service",
 ]

@@ -1,15 +1,17 @@
 import {
   ArrowLeft,
   CheckCircle2,
-  CircleAlert,
+  Clock,
   Cpu,
-  FileStack,
+  FileCheck2,
+  FolderGit2,
+  FolderPlus,
+  Layers,
   MoreHorizontal,
   RefreshCw,
-  ShieldCheck,
-  Upload,
-  Zap,
+  Sparkles,
 } from "lucide-react";
+import type React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,57 +20,138 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { KnowledgeCollection } from "@/types";
+import { useVectorWorkflow } from "@/features/knowledge/components/use-vector-workflow";
+import type {
+  CollectionSummaryMetrics,
+  KnowledgeCollection,
+} from "@/types/knowledge";
 
 interface CollectionHeaderProps {
   collection: KnowledgeCollection;
-  documentCount: number;
-  systemDefaultEmbeddingModel?: string;
+  metrics?: CollectionSummaryMetrics | null;
   onBack: () => void;
-  onOpenReconcile: () => void;
-  onReindex: () => void;
-  isReindexing: boolean;
-  onStartIngest: () => void;
-  onAttachFromRepo?: () => void;
-  onAddDocuments?: () => void;
-  actionError: string | null;
-  reindexJobId: string | null;
+  onAddSource: () => void;
+  onOpenConfig?: () => void;
+  onOpenExcelImport?: () => void;
 }
 
-export function CollectionHeader({
+export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
   collection,
-  documentCount,
-  systemDefaultEmbeddingModel,
   onBack,
-  onOpenReconcile,
-  onReindex,
-  isReindexing,
-  onStartIngest,
-  onAttachFromRepo,
-  onAddDocuments,
-  actionError,
-  reindexJobId,
-}: CollectionHeaderProps) {
-  // Mô hình Vector Embedding đang áp dụng của riêng kho tri thức này
-  const activeEmbeddingModel =
-    collection.data_processing?.embedding_model ||
-    collection.embedding_model ||
-    systemDefaultEmbeddingModel ||
-    "bge-m3:latest";
+  onAddSource,
+  onOpenConfig,
+  onOpenExcelImport,
+}) => {
+  const { sources, generations, state } = useVectorWorkflow(collection.id);
+  const activeGeneration = generations.data?.find(
+    (generation) => generation.status === "active",
+  );
+  const published = (sources.data || []).filter((source) =>
+    state.data?.indexes.some(
+      (index) =>
+        index.id === source.active_index_revision_id &&
+        index.vector_generation_id === activeGeneration?.id,
+    ),
+  );
+  const activeChunks = published.reduce(
+    (total, source) =>
+      total +
+      (state.data?.indexes.find(
+        (index) => index.id === source.active_index_revision_id,
+      )?.chunk_count || 0),
+    0,
+  );
+  const needsIndex = (sources.data || []).filter(
+    (source) =>
+      !state.data?.indexes.some(
+        (index) =>
+          index.id === source.active_index_revision_id &&
+          index.source_revision_v2_id === source.active_source_revision_id &&
+          index.vector_generation_id === activeGeneration?.id,
+      ),
+  ).length;
+  const isKnown =
+    !!sources.data &&
+    !!state.data &&
+    !!generations.data &&
+    !sources.isError &&
+    !state.isError &&
+    !generations.isError;
+  // Model embedding name without fake hardcoding
+  const configuredModel = activeGeneration?.embedding_model;
+  const embeddingModelDisplay = configuredModel || "Chưa xuất bản chỉ mục";
 
-  const isCloudflareModel = activeEmbeddingModel.includes("@cf/");
+  // Business Status badge based on real metrics
+  const status: CollectionSummaryMetrics["collection_status"] = !isKnown
+    ? "pending"
+    : !sources.data?.length
+      ? "empty"
+      : state.data?.jobs.some((job) =>
+            ["queued", "running"].includes(job.status),
+          )
+        ? "syncing"
+        : published.length
+          ? needsIndex
+            ? "updates_available"
+            : "ready"
+          : "pending";
 
-  const formatModelLabel = (model: string) => {
-    if (model === "bge-m3:latest" || model === "bge-m3")
-      return "BGE-M3 (1024D)";
-    if (model === "@cf/baai/bge-m3") return "Cloudflare BGE-M3 (1024D)";
-    if (model === "text-embedding-3-small") return "OpenAI Small (1536D)";
-    if (model === "text-embedding-3-large") return "OpenAI Large (3072D)";
-    return model;
+  const renderStatusBadge = () => {
+    switch (status) {
+      case "ready":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-success/10 text-success border-success/30 font-medium text-xs py-0 gap-1"
+          >
+            <CheckCircle2 className="size-3" />
+            Sẵn sàng
+          </Badge>
+        );
+      case "updates_available":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-warning/10 text-warning border-warning/30 font-medium text-xs py-0 gap-1"
+          >
+            <Sparkles className="size-3" />
+            Có cập nhật
+          </Badge>
+        );
+      case "syncing":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-primary/10 text-primary border-primary/30 font-medium text-xs py-0 gap-1"
+          >
+            <RefreshCw className="size-3 animate-spin" />
+            Đang đồng bộ
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge
+            variant="outline"
+            className="bg-muted text-muted-foreground border-border font-medium text-xs py-0 gap-1"
+          >
+            <Clock className="size-3" />
+            {isKnown ? "Chờ nạp / xuất bản" : "Đang tải"}
+          </Badge>
+        );
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="bg-muted text-muted-foreground border-border font-medium text-xs py-0"
+          >
+            Trống
+          </Badge>
+        );
+    }
   };
 
   return (
-    <div className="bg-card border border-border rounded-lg p-3 sm:p-5 shadow-xs space-y-2.5">
+    <div className="bg-card border border-border rounded-lg p-3 sm:p-5 shadow-2xs space-y-3">
       {/* Top Header Section */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
@@ -78,20 +161,15 @@ export function CollectionHeader({
               size="sm"
               onClick={onBack}
               className="h-8 px-2.5 rounded-md shrink-0 text-muted-foreground hover:text-foreground text-xs gap-1.5"
-              title="Quay lại danh sách kho"
-              aria-label="Quay lại danh sách kho"
+              title="Quay lại danh sách kho tri thức"
+              aria-label="Quay lại danh sách kho tri thức"
             >
               <ArrowLeft className="size-3.5" />
               <span>Kho</span>
             </Button>
 
             <div className="flex items-center gap-1.5 sm:hidden">
-              <Badge
-                variant="outline"
-                className="bg-success/10 text-success border-success/30 font-medium text-[11px] py-0"
-              >
-                Sẵn sàng
-              </Badge>
+              {renderStatusBadge()}
               <span className="font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                 {collection.code}
               </span>
@@ -104,12 +182,7 @@ export function CollectionHeader({
                 {collection.name}
               </h1>
               <div className="hidden sm:flex items-center gap-1.5">
-                <Badge
-                  variant="outline"
-                  className="bg-success/10 text-success border-success/30 font-medium text-xs py-0"
-                >
-                  Sẵn sàng
-                </Badge>
+                {renderStatusBadge()}
                 <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                   {collection.code}
                 </span>
@@ -117,205 +190,113 @@ export function CollectionHeader({
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
               {collection.description ||
-                "Chưa có mô tả chi tiết cho kho tri thức này."}
+                "Kho tri thức phục vụ tra cứu thông tin và phản hồi RAG của Trợ lý AI."}
             </p>
           </div>
         </div>
 
-        {/* Action Buttons: Primary Add from Repo V2 + Fast Attach + Direct Ingest */}
-        <div className="flex items-center gap-2 w-full lg:w-auto shrink-0">
-          {onAddDocuments ? (
-            <Button
-              size="sm"
-              onClick={onAddDocuments}
-              className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
-              title="Thêm tài liệu từ Kho Tài Liệu tập trung vào kho tri thức (Chuẩn V2 ADR-011)"
-            >
-              <FileStack className="size-3.5" />
-              <span>+ Thêm Từ Kho</span>
-            </Button>
-          ) : (
-            onAttachFromRepo && (
-              <Button
-                size="sm"
-                onClick={onAttachFromRepo}
-                className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
-                title="Gắn tài liệu từ Kho tập trung MinIO S3 mà không cần OCR lại"
-              >
-                <FileStack className="size-3.5" />
-                <span>Gắn Từ Kho</span>
-              </Button>
-            )
-          )}
-
-          {onAttachFromRepo && onAddDocuments && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAttachFromRepo}
-              className="hidden sm:inline-flex h-8 text-xs gap-1.5 font-medium shadow-xs border-border/80 hover:bg-primary/5 hover:text-primary transition-colors"
-              title="Gắn nhanh tài liệu từ Kho tài liệu qua hộp thoại"
-            >
-              <span>Gắn Nhanh</span>
-            </Button>
-          )}
-
-          {/* Mobile Secondary Actions (Dropdown Menu) */}
-          <div className="sm:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="size-8 p-0 text-muted-foreground hover:text-foreground shrink-0"
-                  title="Tác vụ quản trị kho"
-                  aria-label="Tác vụ khác"
-                >
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 text-xs">
-                {onAttachFromRepo && (
-                  <DropdownMenuItem
-                    onClick={onAttachFromRepo}
-                    className="gap-2 text-xs cursor-pointer py-2"
-                  >
-                    <FileStack className="size-3.5 text-primary" />
-                    <span>Gắn nhanh từ Kho</span>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onClick={onStartIngest}
-                  className="gap-2 text-xs cursor-pointer py-2 text-muted-foreground"
-                >
-                  <Upload className="size-3.5" />
-                  <span>Nạp trực tiếp (Legacy V1)</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={onOpenReconcile}
-                  className="gap-2 text-xs cursor-pointer py-2"
-                >
-                  <ShieldCheck className="size-3.5 text-primary" />
-                  <span>Đối soát dữ liệu</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={onReindex}
-                  disabled={isReindexing}
-                  className="gap-2 text-xs cursor-pointer py-2"
-                >
-                  <RefreshCw
-                    className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
-                  />
-                  <span>
-                    {isReindexing ? "Đang reindex..." : "Reindex vector"}
-                  </span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Desktop Secondary Actions (Inline Buttons) */}
-          <div className="hidden sm:flex sm:items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenReconcile}
-              className="h-8 text-xs gap-1.5 px-2.5"
-              title="Đối soát dữ liệu giữa PostgreSQL, Qdrant và MinIO"
-            >
-              <ShieldCheck className="size-3.5 text-primary" />
-              <span>Đối soát</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onReindex}
-              disabled={isReindexing}
-              className="h-8 text-xs gap-1.5 px-2.5"
-              title="Tính toán lại toàn bộ vector embeddings trong kho"
-            >
-              <RefreshCw
-                className={`size-3.5 ${isReindexing ? "animate-spin text-primary" : ""}`}
-              />
-              <span>{isReindexing ? "Đang reindex..." : "Reindex"}</span>
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="size-8 p-0 text-muted-foreground hover:text-foreground shrink-0"
-                  title="Tác vụ khác"
-                  aria-label="Tác vụ khác"
-                >
-                  <MoreHorizontal className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 text-xs">
-                <DropdownMenuItem
-                  onClick={onStartIngest}
-                  className="gap-2 text-xs cursor-pointer py-2 text-muted-foreground"
-                >
-                  <Upload className="size-3.5" />
-                  <div>
-                    <span className="block font-medium">
-                      Nạp trực tiếp (Legacy)
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      Khuyến nghị dùng Kho Tài Liệu V2
-                    </span>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </div>
-
-      {/* Sub Meta Info Line */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground pt-2.5 border-t border-border/60">
-        <span
-          className="inline-flex items-center gap-1.5 font-mono text-xs text-primary bg-primary/5 px-2 py-0.5 rounded border border-primary/20"
-          title={`Mô hình Vector Embedding chuyên trách kho tri thức: ${activeEmbeddingModel}`}
-        >
-          {isCloudflareModel ? (
-            <Zap className="size-3.5 text-amber-500 shrink-0" />
-          ) : (
-            <Cpu className="size-3.5 text-primary shrink-0" />
-          )}
-          <span className="font-semibold">
-            {formatModelLabel(activeEmbeddingModel)}
-          </span>
-          <Badge
-            variant="outline"
-            className="text-[10px] px-1.5 py-0 border-success/30 text-success bg-success/10 font-sans font-medium"
+        {/* Action Button: ONLY ONE Primary CTA + Dropdown Menu */}
+        <div className="flex items-center gap-2 w-full lg:w-auto shrink-0 justify-end">
+          <Button
+            size="sm"
+            onClick={onAddSource}
+            className="flex-1 sm:flex-initial h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
+            title="Thêm nguồn từ Kho tài liệu"
           >
-            Đang áp dụng
-          </Badge>
-        </span>
+            <FolderPlus className="size-3.5" />
+            <span>Thêm nguồn</span>
+          </Button>
 
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-muted/50 rounded font-medium text-foreground">
-          <span>{documentCount} văn bản</span>
-          <span className="text-muted-foreground font-mono font-normal">
-            ({collection.chunk_count} chunks)
-          </span>
-        </span>
-
-        {reindexJobId && (
-          <span className="text-xs text-success font-medium ml-auto flex items-center gap-1">
-            <CheckCircle2 className="size-3.5" /> Job {reindexJobId}
-          </span>
-        )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                title="Tác vụ khác"
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="text-xs">
+              {onOpenExcelImport && (
+                <DropdownMenuItem onClick={onOpenExcelImport}>
+                  Nhập số liệu Excel
+                </DropdownMenuItem>
+              )}
+              {onOpenConfig && (
+                <DropdownMenuItem onClick={onOpenConfig}>
+                  Cấu hình Kho tri thức
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {actionError && (
-        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-xs text-destructive leading-relaxed">
-          <CircleAlert className="size-4 shrink-0 mt-0.5" />
-          <span>{actionError}</span>
+      {/* KPI Metrics Chips bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border/50 text-xs">
+        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+          <FolderGit2 className="size-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[11px] text-muted-foreground truncate">
+              Nguồn tài liệu
+            </div>
+            <div className="font-semibold text-foreground">
+              {isKnown ? sources.data?.length : "—"}
+            </div>
+          </div>
         </div>
-      )}
+
+        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+          <FileCheck2 className="size-4 text-success shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[11px] text-muted-foreground truncate">
+              Đã xuất bản
+            </div>
+            <div className="font-semibold text-foreground">
+              {isKnown ? published.length : "—"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+          <RefreshCw
+            className={`size-4 shrink-0 ${needsIndex > 0 ? "text-warning" : "text-muted-foreground"}`}
+          />
+          <div className="min-w-0">
+            <div className="text-[11px] text-muted-foreground truncate">
+              Chưa xuất bản bản mới
+            </div>
+            <div
+              className={`font-semibold ${needsIndex > 0 ? "text-warning font-bold" : "text-foreground"}`}
+            >
+              {isKnown ? needsIndex : "—"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30">
+          <Layers className="size-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="text-[11px] text-muted-foreground truncate">
+              Chunks hoạt động
+            </div>
+            <div className="font-semibold text-foreground">
+              {isKnown ? activeChunks : "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Embedding Model Info Chip */}
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+        <Cpu className="size-3 text-muted-foreground" />
+        <span>Mô hình Vector:</span>
+        <span className="font-medium text-foreground">
+          {embeddingModelDisplay}
+        </span>
+      </div>
     </div>
   );
-}
+};

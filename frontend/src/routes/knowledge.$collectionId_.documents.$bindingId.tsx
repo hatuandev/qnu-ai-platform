@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { BindingDetailPage } from "@/features/knowledge/binding-detail-page";
 
 export const Route = createFileRoute(
-  "/knowledge/$collectionId/documents/$bindingId",
+  "/knowledge/$collectionId_/documents/$bindingId",
 )({
   component: BindingDetailRoute,
 });

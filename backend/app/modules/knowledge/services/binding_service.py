@@ -9,7 +9,7 @@ from fastapi import status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppException, EntityNotFoundError
+from app.core.exceptions import AppException
 from app.modules.documents.models import (
     DocumentGroup,
     DocumentGroupMembership,
@@ -19,6 +19,9 @@ from app.modules.documents.models import (
 from app.modules.knowledge.models import (
     KnowledgeBinding,
     KnowledgeChunk,
+    KnowledgeIndexRevision,
+    KnowledgeSourceRevision,
+    KnowledgeVectorGeneration,
 )
 from app.modules.knowledge.schemas import (
     AttachDocumentGroupItemResult,
@@ -293,10 +296,10 @@ class BindingService:
         col = await get_scoped_collection(db, collection_id, actor=actor)
 
         stmt = (
-            select(KnowledgeBinding, RepositoryDocument)
-            .join(
-                RepositoryDocument,
-                KnowledgeBinding.repository_document_id == RepositoryDocument.id,
+            select(KnowledgeBinding, KnowledgeSourceRevision)
+            .outerjoin(
+                KnowledgeSourceRevision,
+                KnowledgeBinding.active_source_revision_id == KnowledgeSourceRevision.id,
             )
             .where(
                 KnowledgeBinding.collection_id == collection_id,
@@ -309,7 +312,7 @@ class BindingService:
         if status:
             stmt = stmt.where(KnowledgeBinding.status == status)
         else:
-            stmt = stmt.where(KnowledgeBinding.status != "detached")
+            stmt = stmt.where(KnowledgeBinding.status.notin_(["detached", "deleting"]))
 
         stmt = stmt.order_by(KnowledgeBinding.created_at.desc())
         offset = max(0, (page - 1) * page_size)
@@ -317,7 +320,8 @@ class BindingService:
 
         rows = (await db.execute(stmt)).all()
         items: list[KnowledgeBindingResponse] = []
-        for bnd, rep_doc in rows:
+        for bnd, source_rev in rows:
+            metadata = source_rev.snapshot_metadata if source_rev else {}
             items.append(
                 KnowledgeBindingResponse(
                     id=bnd.id,
@@ -325,13 +329,15 @@ class BindingService:
                     repository_document_id=bnd.repository_document_id,
                     source_revision_id=bnd.source_revision_id,
                     active_index_revision_id=bnd.active_index_revision_id,
+                    active_source_revision_id=bnd.active_source_revision_id,
+                    source_status=source_rev.status if source_rev else None,
                     active_epoch=bnd.active_epoch,
                     chunk_strategy=bnd.chunk_strategy,
                     sync_policy=bnd.sync_policy,
                     status=bnd.status,
-                    document_title=rep_doc.title,
-                    document_code=rep_doc.document_number or rep_doc.id,
-                    file_name=rep_doc.file_name,
+                    document_title=metadata.get("title") or bnd.id,
+                    document_code=metadata.get("document_number") or bnd.id,
+                    file_name=metadata.get("file_name"),
                     created_at=bnd.created_at,
                     updated_at=bnd.updated_at,
                 )
@@ -346,9 +352,8 @@ class BindingService:
     ) -> KnowledgeBindingResponse:
         """Get detail of a single knowledge binding."""
         bnd = await get_scoped_binding(db, binding_id, actor=actor)
-        rep_doc = await db.get(RepositoryDocument, bnd.repository_document_id)
-        if not rep_doc:
-            raise EntityNotFoundError(f"Không tìm thấy tài liệu kho cho binding '{binding_id}'")
+        source_rev = await db.get(KnowledgeSourceRevision, bnd.active_source_revision_id) if bnd.active_source_revision_id else None
+        metadata = source_rev.snapshot_metadata if source_rev else {}
 
         return KnowledgeBindingResponse(
             id=bnd.id,
@@ -356,13 +361,15 @@ class BindingService:
             repository_document_id=bnd.repository_document_id,
             source_revision_id=bnd.source_revision_id,
             active_index_revision_id=bnd.active_index_revision_id,
+            active_source_revision_id=bnd.active_source_revision_id,
+            source_status=source_rev.status if source_rev else None,
             active_epoch=bnd.active_epoch,
             chunk_strategy=bnd.chunk_strategy,
             sync_policy=bnd.sync_policy,
             status=bnd.status,
-            document_title=rep_doc.title,
-            document_code=rep_doc.document_number or rep_doc.id,
-            file_name=rep_doc.file_name,
+            document_title=metadata.get("title") or bnd.id,
+            document_code=metadata.get("document_number") or bnd.id,
+            file_name=metadata.get("file_name"),
             created_at=bnd.created_at,
             updated_at=bnd.updated_at,
         )
@@ -374,8 +381,31 @@ class BindingService:
         actor: Any | None = None,
     ) -> KnowledgeBindingResponse:
         """Detach a binding from a collection (soft delete)."""
+        from app.modules.knowledge.services.source_reparse import ensure_source_idle
+        from app.modules.rag.vector_indexer import vector_indexer
+
         bnd = await get_scoped_binding(db, binding_id, actor=actor)
+        collection = await get_scoped_collection(db, bnd.collection_id, actor=actor, for_update=True)
+        bnd = await get_scoped_binding(db, binding_id, actor=actor, for_update=True)
+        if bnd.status == "detached":
+            return await self.get_binding(db, binding_id, actor=actor)
+        await ensure_source_idle(db, binding_id)
+        revisions = list((await db.execute(select(KnowledgeIndexRevision).where(
+            KnowledgeIndexRevision.binding_id == binding_id,
+        ))).scalars().all())
+        if any(rev.status in ("building", "validating") for rev in revisions):
+            raise AppException("Nguồn đang lập chỉ mục; vui lòng chờ hoàn tất.", code="SOURCE_INDEX_BUSY", status_code=409)
+        for rev in revisions:
+            generation = await db.get(KnowledgeVectorGeneration, rev.vector_generation_id) if rev.vector_generation_id else None
+            await vector_indexer.deactivate_index_revision(
+                bnd.collection_id, rev.id,
+                qdrant_collection_name=generation.qdrant_collection_name if generation else None,
+            )
+            rev.status = "archived"
         bnd.status = "detached"
+        bnd.active_index_revision_id = None
+        bnd.active_epoch += 1
+        collection.index_epoch += 1
         await db.commit()
         return await self.get_binding(db, binding_id, actor=actor)
 

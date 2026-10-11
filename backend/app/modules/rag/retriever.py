@@ -143,6 +143,10 @@ class HybridRetriever:
             raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
 
         try:
+            active_gen_id = None
+            if collection.collection_metadata:
+                active_gen_id = collection.collection_metadata.get("active_vector_generation_id")
+
             stmt_bindings = select(
                 KnowledgeBinding.id,
                 KnowledgeBinding.active_index_revision_id,
@@ -157,6 +161,13 @@ class HybridRetriever:
                 KnowledgeBinding.status == "active",
                 KnowledgeIndexRevision.status == "active",
             )
+            if active_gen_id:
+                stmt_bindings = stmt_bindings.where(
+                    or_(
+                        KnowledgeIndexRevision.vector_generation_id == active_gen_id,
+                        KnowledgeIndexRevision.vector_generation_id.is_(None),
+                    )
+                )
             bindings_res = await db.execute(stmt_bindings)
             raw_rows = bindings_res.all()
             if asyncio.iscoroutine(raw_rows):
@@ -315,12 +326,22 @@ class HybridRetriever:
 
             stmt_weighted = (
                 select(KnowledgeChunk)
-                .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
+                .outerjoin(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                .outerjoin(KnowledgeBinding, KnowledgeChunk.binding_id == KnowledgeBinding.id)
+                .join(KnowledgeCollection, KnowledgeChunk.collection_id == KnowledgeCollection.id)
                 .where(
                     KnowledgeChunk.collection_id == collection_id,
-                    KnowledgeDocument.status.in_(["approved", "ready"]),
-                    KnowledgeDocument.is_active.is_(True),
+                    or_(
+                        and_(
+                            KnowledgeChunk.binding_id.is_not(None),
+                            or_(KnowledgeBinding.id.is_(None), KnowledgeBinding.status == "active"),
+                        ),
+                        and_(
+                            KnowledgeChunk.document_id.is_not(None),
+                            KnowledgeDocument.status.in_(["approved", "ready"]),
+                            KnowledgeDocument.is_active.is_(True),
+                        ),
+                    ),
                     match_expr,
                 )
             )
@@ -361,12 +382,22 @@ class HybridRetriever:
 
                 stmt_fts = (
                     select(KnowledgeChunk)
-                    .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                    .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
+                    .outerjoin(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                    .outerjoin(KnowledgeBinding, KnowledgeChunk.binding_id == KnowledgeBinding.id)
+                    .join(KnowledgeCollection, KnowledgeChunk.collection_id == KnowledgeCollection.id)
                     .where(
                         KnowledgeChunk.collection_id == collection_id,
-                        KnowledgeDocument.status.in_(["approved", "ready"]),
-                        KnowledgeDocument.is_active.is_(True),
+                        or_(
+                            and_(
+                                KnowledgeChunk.binding_id.is_not(None),
+                                or_(KnowledgeBinding.id.is_(None), KnowledgeBinding.status == "active"),
+                            ),
+                            and_(
+                                KnowledgeChunk.document_id.is_not(None),
+                                KnowledgeDocument.status.in_(["approved", "ready"]),
+                                KnowledgeDocument.is_active.is_(True),
+                            ),
+                        ),
                         ts_vector.op("@@")(ts_query),
                     )
                 )
@@ -417,12 +448,22 @@ class HybridRetriever:
                     )
                     stmt_uni = (
                         select(KnowledgeChunk)
-                        .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                        .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
+                        .outerjoin(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
+                        .outerjoin(KnowledgeBinding, KnowledgeChunk.binding_id == KnowledgeBinding.id)
+                        .join(KnowledgeCollection, KnowledgeChunk.collection_id == KnowledgeCollection.id)
                         .where(
                             KnowledgeChunk.collection_id == collection_id,
-                            KnowledgeDocument.status.in_(["approved", "ready"]),
-                            KnowledgeDocument.is_active.is_(True),
+                            or_(
+                                and_(
+                                    KnowledgeChunk.binding_id.is_not(None),
+                                    or_(KnowledgeBinding.id.is_(None), KnowledgeBinding.status == "active"),
+                                ),
+                                and_(
+                                    KnowledgeChunk.document_id.is_not(None),
+                                    KnowledgeDocument.status.in_(["approved", "ready"]),
+                                    KnowledgeDocument.is_active.is_(True),
+                                ),
+                            ),
                             or_(*uni_conds),
                         )
                     )
@@ -470,7 +511,7 @@ class HybridRetriever:
             results.append(
                 {
                     "chunk_id": c.id,
-                    "document_id": c.document_id,
+                    "document_id": c.document_id or c.binding_id,
                     "content": c.content,
                     "section": c.section or doc_title,
                     "page_number": c.page_number,

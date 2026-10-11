@@ -8,6 +8,10 @@ const JOB_TYPE_LABEL: Record<
   ingestion: { task_name: "Nạp & bóc tách tài liệu", category: "ingestion" },
   reindex: { task_name: "Nạp lại vector collection", category: "reindex" },
   export: { task_name: "Xuất tài liệu", category: "ingestion" },
+  knowledge_source_purge: {
+    task_name: "Xóa nguồn tri thức",
+    category: "ingestion",
+  },
 };
 
 export function mapJobToIngestionTask(

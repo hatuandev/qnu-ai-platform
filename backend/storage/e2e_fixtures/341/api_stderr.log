@@ -1,0 +1,54 @@
+INFO:     Will watch for changes in these directories: ['D:\\DuAnPhanMem\\qnu-ai-platform\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [18708] using WatchFiles
+INFO:     Started server process [9412]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts\verify_e2e_341_live.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [9412]
+INFO:     Started server process [12652]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts\verify_e2e_341_live.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [12652]
+WARNING:  WatchFiles detected changes in 'scripts\verify_e2e_341_live.py', 'scripts\create_e2e_341_fixtures.py'. Reloading...
+Process SpawnProcess-3:
+Traceback (most recent call last):
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 76, in subprocess_started
+    config.configure_logging()
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\uvicorn\config.py", line 398, in configure_logging
+    logging.config.dictConfig(self.log_config)
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 942, in dictConfig
+    dictConfigClass(config).configure()
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 587, in configure
+    formatters[name] = self.configure_formatter(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 699, in configure_formatter
+    result = self.configure_custom(config)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 485, in configure_custom
+    c = config.pop('()')
+        ^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 353, in pop
+    return self.convert_with_key(key, value, replace=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 311, in convert_with_key
+    result = self.configurator.convert(value)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\logging\config.py", line 472, in convert
+    m = self.CONVERT_PATTERN.match(value)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+INFO:     Started server process [21640]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

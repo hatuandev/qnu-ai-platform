@@ -230,3 +230,23 @@ export interface AsyncUploadDocumentResponse {
   job_id?: string | null;
   deduplicated?: boolean;
 }
+
+export interface RepositoryFileRevisionItem {
+  id: string;
+  document_id: string;
+  revision_no: number;
+  source_file_name: string;
+  source_file_type: string;
+  source_size_bytes: number;
+  source_hash: string;
+  source_storage_path: string;
+  created_by?: string | null;
+  created_at: string;
+}
+
+export interface RepositoryFileRevisionResponse {
+  document_id: string;
+  items: RepositoryFileRevisionItem[];
+  total: number;
+}
+

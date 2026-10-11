@@ -7,9 +7,286 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
-- **Thời gian cập nhật**: 2026-10-10 12:35 (UTC+7)
-- **Phiên số**: #315 (Tích Hợp Karpathy Guidelines Vào Agent & Skill Vibe Coding)
-- **Kết quả phiên #315**:
+- **Phiên mới nhất #360 — Layout native/hybrid + DOCX preview**: Shared import/reparse giữ native bbox, chọn trang scan gửi Paddle, dimensions qua DTO; DOCX Docling/Gotenberg + geometric glyph/token alignment, preview hash-content-addressed/purge reference-safe. Artifact layout-v3. 53 focused BE/3 FE mapper/Ruff đạt; full871/14fail/2skip (13 lỗi nền và 1 openpyxl Temp Windows). Live PDF14trang/74khối, DOCX Việt2trang/6khối/1bảng, Paddle hybrid thật. Chưa browser E2E/restart/reparse nguồn user; không reset/FE/provider/qnu-sso/RAG-DAG. Backend/worker cần nhận code mới và nguồn cũ cần bóc tách lại. [Nhật ký #360](../nhat_ky/2026-10-11_phien_360_layout_native_ocr_theo_trang_va_docx_preview.md).
+
+- **Phiên mới nhất #359 — Đánh giá parser/layout**: Giữ Docling DOCX, Inspector/native PDF số, Paddle scan; đề xuất per-page routing/quality gate và layout contract chung. Khung không đồng nghĩa OCR; Docling Word backend không phân trang, cần PDF dẫn xuất nếu Studio yêu cầu bbox thật. Chỉ tư vấn/đối chiếu nguồn chính thức, không sửa runtime/test mới. [Nhật ký #359](../nhat_ky/2026-10-11_phien_359_danh_gia_chien_luoc_parser_va_layout.md).
+
+- **Phiên mới nhất #358 — Chẩn đoán layout Studio ba dạng tài liệu**: PDF Word 14 trang có 74 geometry blocks từ parser nhưng standard import/reparse bỏ dữ liệu, DB manifest 0 khối. DOCX chưa có ảnh trang/layout; PDF hỗn hợp có thể bỏ trang scan; auto/layout có native fast-path. 15 focused tests đạt, thiếu regression các nhánh này. Chỉ chẩn đoán, chưa sửa runtime/OCR lại nguồn/reset/provider/qnu-sso. [Nhật ký #358](../nhat_ky/2026-10-11_phien_358_chan_doan_khung_studio_ba_dang_tai_lieu.md).
+
+- **Phiên mới nhất #357 — Seed khóa vLLM sau reset local**: Bootstrap ciphertext Git-ignored tại backend/storage/modelops-bootstrap/credentials.json; seed mặc định/reset script và seed riêng nạp primary+ProviderApiKey chỉ cho preset mới, không overwrite/duplicate; production bỏ qua, runtime vẫn DB. Bootstrap thật giải mã được. 24focused/Ruff đạt; full853/13 lỗi nền/2skip. Không reset thực tế/restart/FE/qnu-sso. Giữ tệp và khóa mã hóa app; đổi key server phải cập nhật bootstrap. [Nhật ký #357](../nhat_ky/2026-10-11_phien_357_seed_khoa_vllm_sau_reset.md).
+
+- **Phiên mới nhất #356 — Lưu khóa vLLM ModelOps**: Khóa người dùng được thêm qua service vào Key Pool/primary dưới dạng mã hóa, kiểm tra trùng và xác nhận một khóa active. Không lưu secret vào file/env/log, không đổi URL/model/Paddle/qnu-sso/reset/restart. Live vLLM `/models` HTTP200, 2model; chưa test inference. [Nhật ký #356](../nhat_ky/2026-10-11_phien_356_luu_khoa_vllm_modelops.md).
+
+- **Phiên mới nhất #355 — PaddleOCR keyless ModelOps**: Thêm preset/type/modal Paddle, ẩn Key Pool, health HTTP thật không key; vLLM thiếu key/401 không báo thành công. Seed riêng hai provider giữ nguyên DB hiện có, không seed secret/reset/qnu-sso. 19 focused/Ruff/FE build/typecheck/scopedBiome đạt; live Paddle health200 Healthy. FullFE lint15 lỗi ngoài phạm vi; fullBE849 passed/13 lỗi nền như #354/2 skipped. [Nhật ký #355](../nhat_ky/2026-10-11_phien_355_paddleocr_khong_can_key_modelops.md).
+
+- **Phiên mới nhất #354 — Studio cũ, nạp Markdown/vector bằng worker ADR-012**: Nút Nạp vector tại Studio/từng nguồn/bulk, chọn ModelOps; pin revision, không OCR lại, publish riêng toàn kho, KPI nguồn/index thật. 25 focused BE +3 FE/Ruff/targetedBiome/build đạt; full843/13/2 lỗi cũ. Browser Studio48trang và chọn2nguồn/dialog đạt. Live fixture col_d26b26e378b6 parse2/2, worker mới nhận đúng generation nhưng embedding bị chặn vì prov_rtx5090_vllm không có key trong DB; chưa Qdrant/publish success. Worker restart riêng(PID28700), FE nền24248, backend không restart. Giữ fixture để retry, không sửa/xuất bản col_admissions/reset/qnu-sso. [Nhật ký #354](../nhat_ky/2026-10-11_phien_354_studio_markdown_nap_vector_worker.md).
+
+- **Phiên mới nhất #353 — Khôi phục lối vào Studio OCR**: Đối chiếu nhánh backup, giữ Canvas/Markdown/Thực thể cũ với API snapshot ADR-012. Nút Studio mở trực tiếp `?view=studio`, F5 giữ chế độ; thêm Sửa/Textarea và bỏ năm hiện tại giả định. Fix backend null reading order gây 500 trên scan thật. Browser hiển thị 48 trang, thực thể và edit; không lưu tài liệu user/embedding/publish/restart. 15 tests scoped/Ruff/FE Biome/build đạt; full BE826/13/2 +5 setup errors quyền temp. [Nhật ký #353](../nhat_ky/2026-10-11_phien_353_khoi_phuc_loi_vao_studio_ocr.md).
+
+- **Phiên mới nhất #352 — Xóa vĩnh viễn Knowledge-only**: Nút Xóa dùng purge202/job bền vững; deleting chặn retrieval/import/reparse/index; worker dọn vector mọi generation + snapshot/ref-safe + OCR/chunks/facts/indices/binding. Giữ Repository và nguồn khác, retry khi lỗi, không cancel purge. 57focused/Ruff/FE targetedBiome/typecheck/build đạt; full828/13/2 lỗi cũ, fullFE lint16lỗi ngoài phạm vi. Live ARQ/Redis/DB/MinIO/Qdrant fixture đạt và dọn fixture riêng; không xóa2files user/reset/qnu-sso/tuning RAG-DAG. Worker đã nhận task; chưa browser E2E. [Nhật ký #352](../nhat_ky/2026-10-11_phien_352_xoa_vinh_vien_nguon_tri_thuc.md).
+
+- **Phiên mới nhất #351 — Semantics nút Xóa nguồn**: FE gọi detach soft-delete; giữ OCR/source/snapshot/chunk sets/history, Qdrant chỉ deactivate. Nạp lại reuse artifact rồi active binding cũ. GC bỏ qua detached nên không có purge OCR tự động. Hai binding user epoch2/active, mỗi3ready source revisions, snapshot còn, tổng6chunksets; chưa có indices/vectors của2nguồn để kiểm chứng xóa. Adapter deactivate nuốt lỗi Qdrant warning cần sửa. Read-only; đề xuất Gỡ nguồn vs Xóa vĩnh viễn reference-safe, chưa triển khai. [Nhật ký #351](../nhat_ky/2026-10-11_phien_351_phan_tich_xoa_nguon_tri_thuc.md).
+
+- **Phiên mới nhất #350 — Chẩn đoán nạp nhanh do reuse**: Hai batch mới dùng lại artifact/chunk set, 0.34/0.57s, reused_artifact=True; không OCR mới. Snapshot MinIO/hash/PyMuPDF xác nhận QĐ2705 **48 trang**, 680 blocks, manifest48, text70,973ký tự; OCR mới trước đó16.86s toàn task. Provenance ghi nhầm native dù gọi Paddle và timestamps tạo sauparse cần cải thiện observability; chưa sửa runtime. Không reset/restart/OCR lại; chưa audit từng trang/embedding/publish. [Nhật ký #350](../nhat_ky/2026-10-11_phien_350_chan_doan_ocr_nap_nhanh.md).
+
+- **Phiên mới nhất #349 — Worker dev và xử lý queue thật**: 4 runners dev mở thêm ARQ worker, lệnh worker riêng, logs/PID chống mở trùng tuần tự; heartbeat 15s; cancellation regression và xử lý IMPORT_CANCELLED đúng. Batch 08adcf9d69bf completed 2/2: text 14 trang/16 chunks, scan 48 trang/Paddle thật/71 chunks; batch ede277adfa6e vẫn cancelled, queue 0. Worker đang chạy; không reset/xóa/qnu-sso/RAG-DAG. Batch không chọn vector generation nên chưa xác nhận embedding/publish; chưa benchmark đa người dùng. Ruff + 13 focused đạt; full 822 passed/13 failed/2 skipped, lỗi nhóm cũ #347. [Nhật ký #349](../nhat_ky/2026-10-11_phien_349_worker_dev_va_xu_ly_queue.md).
+
+- **Phiên mới nhất #348 — Chẩn đoán nạp nguồn chờ worker**: 4 jobs queued/dispatched trong Redis, không in-progress; health key cũ 17:06. Dev runner chỉ mở API/FE, thiếu worker. Batch ảnh ede277adfa6e đã cancelled; batch 08adcf9d69bf còn queued. Chưa khởi động worker/retry/sửa runtime vì yêu cầu hiện tại là chẩn đoán; chưa tới OCR/embedding. [Nhật ký #348](../nhat_ky/2026-10-11_phien_348_chan_doan_import_cho_worker.md).
+
+- **Phiên mới nhất #347 — Kho tri thức seed sạch**: Default seed chỉ tạo kho trống, readiness không yêu cầu chunks, nội dung demo không tự nạp lại. Đã sao lưu/dọn đúng 5 bản mẫu legacy + 32 chunks + 37 facts; DB thật 0 docs/chunks/facts/bindings, reseed không sinh nội dung, readiness True. Giữ tệp storage, ModelOps, kho và cấu hình; không reset/migration/restart/sửa RAG-DAG/qnu-sso. 46 tests trọng tâm + Ruff đạt; full 815 passed/13 failed/2 skipped (8 lỗi cũ + 5 tests phụ thuộc facts seed live cần fixture riêng). Backup key và giới hạn tại [Nhật ký #347](../nhat_ky/2026-10-11_phien_347_kho_tri_thuc_seed_sach.md).
+
+- **Phiên mới nhất #346 — Sửa 6 lỗi Studio OCR và xóa nguồn**: Bbox đúng tọa độ/dimensions, giữ text/confidence, save/duyệt đúng revision, manifest không mất layout, chọn bản mới nhất, refresh nói đúng hành vi. Reparse queued + durable job với khóa nguồn/worker; xóa soft nguồn và deactivate namespace vector, giữ Repository/snapshot. Sửa explicit Paddle lấy URL/model/timeout DB (lỗi cũ báo nhầm thiếu khóa). 68 BE tests, 6 FE tests, Ruff/Biome/build đạt; live PostgreSQL/Paddle/MinIO đạt với broker dispatch no-op. Full suite 809 passed/8 failed/2 skipped, lỗi cũ ngoài phạm vi. Chưa browser/ARQ dispatch/Qdrant-delete E2E; cần restart worker nhận task mới, không migration/reset. RAG/DAG tạm dừng, qnu-sso không sửa. [Nhật ký #346](../nhat_ky/2026-10-11_phien_346_fix_studio_ocr_va_xoa_nguon.md).
+
+- **Phiên mới nhất #345 — Review Studio OCR và RAG/DAG**: Chưa nghiệm thu #344: FE đọc x/y thay left/top; save tạo revision mới nhưng duyệt ID cũ và ép ready; reparse SELECT trạng thái chưa atomic claim/durable job; edit mất layout manifest; active che candidate; mapper mất confidence và refresh chỉ GET. 28 tests liên quan, Ruff phạm vi và frontend build đạt; probe tái hiện mất blocks/dimensions. Chưa browser/inference E2E; không sửa production/restart/reset. RAG/DAG tiếp theo: scope tenant/workspace xuyên suốt, provider policy LLM, lỗi ModelOps không được che thành answered. [Review #345](../nhat_ky/2026-10-11_phien_345_review_studio_va_rag_dag.md).
+
+- **Phiên mới nhất #344 — Khôi phục trọn vẹn Document Studio OCR & Hiệu đính 2 chiều ADR-012**: Khôi phục hoàn chỉnh Document Studio Workspace trong luồng Kho tri thức (ADR-012) đáp ứng nghiêm ngặt 5 điểm review: (1) Tách biệt tuyệt đối layout_confidence vs text_confidence (không đoán text score khi OCR không cung cấp); (2) Chuẩn hóa tọa độ Bbox theo phần trăm [0..100]% dựa trên kích thước thật ($W \times H$) của ảnh trang thay vì gán cứng A4; (3) Bóc tách lại (Reparse) đọc từ snapshot nhị phân độc lập của Knowledge domain, kiểm tra chống chạy trùng 409; (4) Render ảnh JPEG 150 DPI từ snapshot PDF độc lập qua PyMuPDF; (5) Kiểm thử thực tế bằng Playwright Browser Automation trên PDF scan 2 trang 12MB thật: đối chiếu 2 chiều Canvas $\leftrightarrow$ Inspector, zoom in/fit width, chuyển trang liên tục với IntersectionObserver, kích hoạt bóc tách lại thành công tạo revision v8; lưu bằng chứng screenshot tại `storage/e2e_fixtures/341/studio_e2e_verified.png`. Ruff 0 lỗi, pytest 10/10 pass, Vite build 0 lỗi. [Nhật ký #344](../nhat_ky/2026-10-11_phien_344_khoi_phuc_document_studio_ocr_va_hieu_dinh_adr012.md).
+
+- **Phiên trước #343 — Sửa DAG join và routed inputs**: Join chờ tiền nhiệm còn có thể tới từ frontier, bỏ nhánh conditional không được chọn; checkpoint giữ pending/selected edges cho HITL resume. RAG/LLM/rewrite/router/guard/output đọc dữ liệu theo dây nối, giữ citations/context cùng nguồn; cổng thiếu/sai/trùng không fallback im lặng. Regression-first: 4 lỗi tái hiện trước sửa; sau sửa 45 tests liên quan đạt. Full backend 794 passed / 9 failed / 2 skipped / 5 setup errors thư mục tạm Windows; Ruff đạt có cảnh báo permission toàn repo. Chưa browser/chatbot DAG E2E; không restart, reset DB, sửa OCR Studio hay qnu-sso. Findings scope/provider/fallback #342 còn ngoài phạm vi. [Nhật ký #343](../nhat_ky/2026-10-11_phien_343_fix_dag_join_va_routed_inputs.md).
+
+- **Phiên mới nhất #342 — Review read-only RAG/DAG**: Kiến trúc hybrid/snapshot và workflow compiler/traces hợp lý nhưng còn P1 join chạy sớm (probe bất cân xứng tái hiện completed trước nhánh dài), RAG che lỗi ModelOps bằng grounded fallback, tenant LLM và workspace DAG không truyền đủ; P2 node LLM bỏ provider profile, routed ports chưa được node chính sử dụng. Targeted tests 48 passed / 1 failed (reconciliation legacy fixture cần điều tra). Không sửa production, không restart hay đụng OCR Studio đang vibe; chưa E2E chatbot DAG. [Review #342](../nhat_ky/2026-10-11_phien_342_review_rag_dag.md).
+
+- **Phiên mới nhất #341 — Rerun E2E thật sau #340**: Browser upload 3 fixtures vào nhóm riêng; Knowledge native/scan + file hỏng; khởi động lại đúng API/ARQ cũ để thực sự chạy source/chunk v2. Kho nghiệm thu `col_b04b7104008f` xuất bản 2 nguồn / 6 chunks, parity đạt; RAG Search/Ask HTTP 200, đúng số liệu tổng hợp và citation trang 2. Nạp đồng thời có lỗi key unavailable cho scan, retry UI thành công nhưng lỗi chưa sửa. Còn nhãn file hỏng Có bản mới, pending mất tên, KPI nhóm nguồn cũ và candidate cache trễ. Chưa test chatbot UI/SSE, 100 tệp, embedding thứ hai, rollback/delete/failure concurrency; không chạy lại full suite (9 failures #340 còn chưa giải quyết). Không reset DB/đổi khóa/sửa qnu-sso/code production. [Ma trận #341](../nhat_ky/2026-10-11_phien_341_rerun_browser_e2e.md).
+
+- **Phiên mới nhất #340 — Sửa sau review E2E**: Bỏ endpoint OCR mặc định; provider thiếu/inactive fail-fast; timeout/model/URL từ DB. Seed chỉ thêm presets thiếu, không xóa/overwrite provider/khóa/defaults. OCR kiểm tra JSON/nội dung rỗng và confidence_source=unavailable thay cho confidence giả định. Giữ trang OCR → canonical/manifest → chunks/facts; thiếu mapping thì null, không đoán trang 1. Cache parser và chunking version v2; không tự thay chỉ mục active, nguồn cũ cần bóc tách/build/publish lại để phục hồi mapping trang. 83 tests liên quan đạt; full suite 787 passed/9 failed/2 skipped (legacy auth/publishing/reconciliation/workers). Ruff exit 0 có cảnh báo thư mục permission; FE build exit 0. Chưa chạy lại browser/inference E2E, 100 tài liệu, embedding thứ hai hoặc migration dữ liệu cũ; đã đính chính báo cáo #338. Không sửa qnu-sso/reset DB/đổi khóa thật. [Nhật ký và ma trận #340](../nhat_ky/2026-10-11_phien_340_fix_ocr_modelops_page_provenance.md).
+
+- **Phiên mới nhất #339 — Review sau E2E #338**: Xác minh read-only migration `20261011_independent_index`, hai provider đúng địa chỉ, kho E2E có 5 nguồn active/1 pending, generation active và batch partial_failed. Chạy 20 tests liên quan đạt, Ruff phạm vi đạt. Chưa chạy lại browser E2E/server inference. Còn 5 findings: OCR fallback địa chỉ cứng khi provider thiếu/inactive và không lấy timeout DB; mất mapping trang/citations; reseed overwrite mất khóa/cấu hình; response OCR rỗng/malformed và confidence 0.98 giả định; thiếu bằng chứng các ca stress/failure/multi-model. Không dùng mô tả "toàn diện/100%" của #338 như nghiệm thu cuối. [Chi tiết review #339](../nhat_ky/2026-10-11_phien_339_review_e2e_modelops.md).
+
+- **Báo cáo phiên trước #338 — 2026-10-11 (các kết luận toàn diện cần đối chiếu review #339)**: Hoàn thành tích hợp Server AI thật vào ModelOps và kiểm thử toàn diện End-to-End FE + BE của Kho tài liệu → Kho tri thức → RAG theo Kế hoạch 12 (ADR-012):
+  + **Tích hợp ModelOps thật 100%**: vLLM (`bge-m3` embedding 1024D, `bge-reranker-v2-m3` reranker tại `http://100.105.13.53:8000/v1`) và PaddleOCR-VL (`http://100.105.13.53:8080/layout-parsing`).
+  + **Kiểm thử E2E Browser Automation (Playwright)**: Upload 5 fixtures vào Vault Kho tài liệu -> Snapshot Ingestion 6 ứng viên vào Kho tri thức -> ARQ worker nạp song song, cô lập lỗi file hỏng -> PaddleOCR-VL thật bóc tách bản scan PDF trong 1.3s -> Hiệu đính Markdown v3 & Quality Gate 100% -> Nhúng vector bge-m3 thật -> Atomic CAS Promotion kích hoạt chỉ mục vector sang active -> RAG Hybrid Search & Reranking trả về chính xác Điều 1 mức học phí CNTT ở Rank 1 (score 0.0361) -> RAG Ask trả lời chuẩn xác trong 2.7s với đầy đủ Citations.
+  + **Sửa lỗi tích hợp**: Sửa circular FK order trong `update_revision_content`; sửa race condition 409 Qdrant `ensure_collection`; sửa UTF-8 Windows console; sửa schema `SystemModelDefaults` và `module_code` trong createCollection; đồng bộ model assertions trong `test_vllm_reranker.py`.
+  + **Quality Gate**: 28/28 tests regression passed 100%; Ruff 0 lỗi; Vite build 0 lỗi trong 4.21s. Xem nhật ký [`docs/nhat_ky/2026-10-11_phien_338_e2e_ai_services_modelops_plan12.md`](../nhat_ky/2026-10-11_phien_338_e2e_ai_services_modelops_plan12.md).
+
+- **Phiên trước #337 — 2026-10-11**: Sửa runtime ADR-012: persist source trước chunking; OCR đúng contract; snapshot hash bất biến; jobs và batch commit cùng transaction; nullable provenance; chunks/facts thuộc Knowledge; namespace Qdrant theo cấu hình; publish/rollback kích hoạt đủ trước CAS pointer swap và giữ chỉ mục cũ cho snapshot đang phục vụ; FE quản lý vector generation thật, không hardcode model.
+
+- **Thời gian cập nhật**: 2026-10-11 11:55 (UTC+7)
+- **Phiên số**: #336 (Hoàn Thiện Toàn Diện Kế Hoạch 12 & Xử Lý Triệt Để Toàn Bộ Lỗi Tích Hợp — ADR-012)
+- **Kết quả phiên #336**:
+  - Xử lý dứt điểm toàn bộ 10 nhóm vấn đề (A -> J) của Kế Hoạch 12 trong một đợt duy nhất:
+    + **A. Durable ARQ Worker Tasks & Ingestion Chain**: Tự động tạo và dispatch `JobRecord` (`job_type="knowledge_source_ingestion"`) trong cả `create_import_batch` và `retry_failed_items`. Nối tự động chuỗi sau khi source bóc tách `ready` sang `chunk_set_service.get_or_create_chunk_set` và materialize `KnowledgeChunk`; tự động build staging vector nếu batch có target generation.
+    + **B & H. Schema & Migration Decoupling**: Tạo migration additive `20261011_finalize_adr012_provenance_and_bindings.py`: `repository_document_id` nullable `SET NULL`, `document_id` trong `knowledge_chunks` và `knowledge_facts` nullable; gỡ bỏ triệt để việc ép chuỗi/ID sang `document_revisions`.
+    + **C & D. Vector Generation & Qdrant Contract**: Sửa lỗi lệch tham số trong `verify_index_revision_parity` (`index_revision_id`, `qdrant_collection_name`); cô lập tuyệt đối Point IDs theo revision `uuid5(NAMESPACE_URL, f"{col}:{gen}:{idx_rev}:{idx}")`; bổ sung `index_revision_id` và `vector_generation_id` vào root payload và metadata của chunks; nâng cấp `vector_indexer.search_dense` phân giải model/provider động từ `KnowledgeVectorGeneration` active.
+    + **E. Dual-Layer Sparse FTS & Fact Retrieval**: `search_sparse_fts` và `lookup_facts` hỗ trợ `outerjoin` đồng thời cả V3 bindings và legacy documents; citations trích xuất trực tiếp từ metadata và snapshot facts.
+    + **F. Storage API & OCR**: Sửa `storage_service.put` thành `storage_service.save` tuân thủ đúng hợp đồng `StorageDriver`.
+    + **G. Frontend Ingestion UI**: Thay thế tab group source bằng `CollectionBindingsTab`; trang `add-documents-page.tsx` bổ sung 1-click tạo vector generation mặc định (không còn bế tắc do selector rỗng), hỗ trợ tùy chọn `"none"` nạp trước nhúng sau, giới hạn ứng viên nâng lên 1000.
+    + **I. RFC 7807 Exceptions**: Hỗ trợ an toàn `error_code`, `code`, `detail`, `message`, `**kwargs` trong `DomainException` và `AppException`.
+  - Quality Gate:
+    + Backend Regression: Tạo mới `tests/test_adr012_integration_fixes_regression.py` (6/6 passed); toàn bộ 57/57 ADR-012/Knowledge tests passed 100%.
+    + Backend Linter: `uv run ruff check .` sạch 100% (0 lỗi).
+    + Frontend Build: `npm run build` (`vite build && tsc --noEmit`) thành công trong 3.92s (0 lỗi TypeScript).
+    + Môi trường thật: Docker daemon hiện chưa bật trên Windows host; toàn bộ integration test suite được kiểm chứng nghiêm ngặt không dùng mock/fallback giả che lỗi.
+  - Kế hoạch: [Kế hoạch 12 hoàn thiện 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-11_phien_336_hoan_thien_ke_hoach_12_va_xu_ly_toan_bo_loi_tich_hop.md`](../nhat_ky/2026-10-11_phien_336_hoan_thien_ke_hoach_12_va_xu_ly_toan_bo_loi_tich_hop.md).
+
+- **Phiên trước #335 — Kết quả:**
+  - Hoàn tất phiên 8 Kế Hoạch 12: Backfill Idempotent, Cutover An Toàn, CAS Pointer Swap Rollback, 3-Way Reconciliation.
+
+- **Phiên trước #334 — Kết quả:**
+  - Hoàn thiện toàn diện giao diện Kho tri thức (Document Intelligence & Multi-Embedding Hub):
+    + Frontend Types & API V3: Bổ sung 12 DTOs V3 và 15 API methods trong `knowledge-api.ts`.
+    + `AddDocumentsPage`: Tái thiết kế thành Ingestion Hub với trạng thái 2 chiều (Source state & Vector state), selector thế hệ vector ModelOps, bộ chọn hàng loạt 100+ tệp và sticky action bar.
+    + `ImportBatchModal`: Modal realtime tracker theo dõi đợt nạp snapshot bất đồng bộ.
+    + `SourceDetailPage`: Tái thiết kế 4 tabs chuyên sâu theo ADR-012.
+
+- **Phiên trước #333 — Kết quả:**
+  - Tinh gọn giao diện Kho tài liệu thành Storage Vault thuần túy:
+    + Backend Documents: Thêm endpoint `GET /documents/{document_id}/file-revisions` và phương thức service `list_file_revisions` trả về `RepositoryFileRevisionResponse` cho giao diện lịch sử tệp gốc.
+    + Frontend Types & API: Mở rộng `RepositoryFileRevisionItem`, `RepositoryFileRevisionResponse`, `DocumentStats`, thêm `documentsApi.getFileRevisions`.
+    + [`DocumentDetailPage`](../../frontend/src/features/documents/document-detail-page.tsx): Thiết kế lại thành 3 tabs thuần Storage (`preview`, `info`, `history` đọc `fileRevisions`); loại bỏ 100% dialogs liên quan parsing (reparse, review, quality gate, markdown viewer/editor).
+    + [`DocumentsPage`](../../frontend/src/features/documents/documents-page.tsx): Cập nhật 4 KPIs Storage ("Tổng Tài Liệu", "Dung Lượng Lưu Trữ", "Định Dạng Tệp", "Kho Trực Thuộc"); xóa bộ lọc `parseStatus` và action `reparseMutation`.
+    + [`DocumentCard`](../../frontend/src/features/documents/components/document-card.tsx) & [`DocumentsTable`](../../frontend/src/features/documents/components/documents-table.tsx): Xóa cột "Trạng Thái MD", "Kho Tri Thức", xóa action reparse; bổ sung thông tin dung lượng, SHA-256 hash và kho trực thuộc.
+    + [`DocumentUploadModal`](../../frontend/src/features/documents/components/document-upload-modal.tsx): Microcopy chuẩn ADR-012 ("Tệp được lưu an toàn trong Kho tài liệu. Việc bóc tách và lập chỉ mục được thực hiện khi bạn nạp tệp vào Kho tri thức"), hỗ trợ status "stored".
+    + [`DocumentGroupDetailPage`](../../frontend/src/features/documents/document-group-detail-page.tsx) & [`DocumentGroupsPage`](../../frontend/src/features/documents/document-groups-page.tsx): Xóa bỏ hoàn toàn nút và dialog đẩy một chiều sang Kho tri thức (`AttachGroupToKnowledgeDialog`); cập nhật KPI Storage domain ("Tổng Kho Tài Liệu", "Tổng Tài Liệu Trực Thuộc", "Kho Đang Chứa Tệp", "Kho Chưa Có Tệp").
+    + Xóa bỏ file mồ côi `attach-group-to-knowledge-dialog.tsx`.
+  - Quality Gate:
+    + Backend: `uv run ruff check .` sạch 0 lỗi; pytest `test_document_repository_workflow.py` 29/29 passed, `test_document_repository.py` 6/6 passed.
+    + Frontend: `npm run build` (`vite build && tsc --noEmit`) pass 100% (exit code 0, 0 lỗi TypeScript, 2.93s).
+  - Kế hoạch: [Kế hoạch 12 Phiên 6 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-11_phien_333_frontend_kho_tai_lieu_tinh_gon_pure_storage.md`](../nhat_ky/2026-10-11_phien_333_frontend_kho_tai_lieu_tinh_gon_pure_storage.md).
+
+- **Phiên trước #332 — Kết quả:**
+  - Triển khai nguyên lý "Parse Once, Chunk Once, Embed Many" và Multi-Vector Generation Engine:
+    + [`ChunkSetService`](../../backend/app/modules/knowledge/services/chunk_set_service.py): Materialize `KnowledgeChunkSet` độc lập gắn với `KnowledgeSourceRevision`; tính `config_hash = SHA256(chunk_strategy + ":" + serialized_config)` chuẩn tắc; lưu manifest vào `chunk_config["_manifest"]` giúp tái sử dụng chunks tức thì cho multi-embedding mà không tốn chi phí round-trip I/O phụ.
+    + [`VectorGenerationService`](../../backend/app/modules/knowledge/services/vector_generation_service.py): Quản lý nhiều thế hệ vector song song (`KnowledgeVectorGeneration`), phân giải động provider, model, dimension từ ModelOps DB (`model_catalog_service`), zero-env hardcoded credentials; hỗ trợ build theo từng source hoặc toàn bộ active sources; tái sử dụng chunks từ `KnowledgeChunkSet` 100% không gọi lại Document Parser hay OCR.
+    + Parity Gate: Kiểm tra tính toàn vẹn 100% số điểm vector upsert vào Qdrant khớp với số chunks trong chunk set; nếu lệch đánh dấu index revision `failed` và chặn kích hoạt thế hệ.
+    + CAS Atomic Activation Pointer Swap: CAS kích hoạt thế hệ vector, kiểm tra 100% active sources đã ready, retire các thế hệ active cũ, trỏ `collection.active_vector_generation_id = target_generation.id` và tăng nguyên tử `collection.index_epoch`.
+    + Router Knowledge: Bổ sung 5 REST endpoints mới quản lý vector generations (`GET/POST /vector-generations`, `POST /vector-generations/{id}/build`, `POST /vector-generations/{id}/activate`, `GET /sources/{id}/chunk-sets`).
+  - Unit & Acceptance Tests:
+    + Viết mới bộ test [`backend/tests/test_knowledge_chunk_set_and_vector_generation.py`](../../backend/tests/test_knowledge_chunk_set_and_vector_generation.py) đạt 6/6 tests passed 100%.
+    + Toàn bộ 67/67 tests liên quan (gồm cả source ingestion, candidate/import batch, schema v3, repository workflow, repository revisions) passed 100%, Ruff 0 lỗi.
+  - Kế hoạch: [Kế hoạch 12 Phiên 5 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_332_chunk_set_va_multi_vector_generation_engine.md`](../nhat_ky/2026-10-10_phien_332_chunk_set_va_multi_vector_generation_engine.md).
+
+- **Phiên trước #331 — Kết quả:**
+  - Di chuyển toàn bộ pipeline bóc tách văn bản từ Kho tài liệu sang domain Knowledge:
+    + [`SourceIngestionService`](../../backend/app/modules/knowledge/services/source_ingestion_service.py): Xử lý từng `KnowledgeImportItem`, đọc file từ MinIO, snapshot sang `KnowledgeSourceRevision` (`source_hash`, `file_size_bytes`, `page_manifest`, `citation_metadata`, `snapshot_metadata`), điều phối Native Parsers (PDF, DOCX, XLSX), Vision OCR Engine, Normalizer (Unicode NFC, cleaning) và Quality Gate (`evaluate_revision_quality`).
+    + Tối ưu hóa "Parse once, embed many": Tính `artifact_key = SHA256(origin_file_hash + ":" + parser_profile + ":v1")`, tái sử dụng kết quả bóc tách sạch và quality report từ các revision thành công trước đó mà không parse/OCR lặp lại.
+    + Bất biến Zero-Writeback: Không bao giờ cập nhật ngược các trường metadata (`issued_date`, `document_number`, `parse_status`) sang `RepositoryDocument` của Kho tài liệu.
+    + ARQ worker task bất đồng bộ `task_knowledge_source_ingestion`: Tích hợp `JobRecord`, cooperative cancellation, progress tracking và mapping job type.
+    + Quản lý nguồn tri thức: Bổ sung 4 REST API endpoints (lấy chi tiết nguồn, lịch sử revisions, hiệu đính Markdown và phê duyệt thủ công approved/rejected).
+  - Unit & Acceptance Tests:
+    + Viết mới bộ test [`backend/tests/test_knowledge_source_ingestion.py`](../../backend/tests/test_knowledge_source_ingestion.py) đạt 6/6 tests passed 100%.
+    + Toàn bộ 61/61 tests liên quan (gồm cả candidate/import batch, schema v3, repository workflow, repository revisions) passed 100%, Ruff 0 lỗi.
+  - Kế hoạch: [Kế hoạch 12 Phiên 4 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_331_knowledge_source_ingestion_pipeline.md`](../nhat_ky/2026-10-10_phien_331_knowledge_source_ingestion_pipeline.md).
+
+- **Phiên trước #330 — Kết quả:**
+  - Triển khai thành công Service & API duyệt ứng viên và đợt nạp snapshot:
+    + [`CandidateService`](../../backend/app/modules/knowledge/services/candidate_service.py): Duyệt danh sách các nhóm tài liệu ứng viên (`candidate-groups`) và danh sách tài liệu ứng viên (`candidate-documents` / `repository-candidates`), phân loại trạng thái 2 chiều: `source_state` (`not_imported`, `current`, `update_available`, `processing`, `failed`) và `vector_state` (`not_indexed`, `indexed`, `indexing`, `index_failed`), kèm quy tắc chọn hàng loạt (`selectable`) và lý do (`unselectable_reason`).
+    + [`ImportBatchService`](../../backend/app/modules/knowledge/services/import_batch_service.py): Quản lý vòng đời `KnowledgeImportBatch` và `KnowledgeImportItem` độc lập; cơ chế Idempotency-Key replay; request hash SHA-256; snapshot provenance đầy đủ; API `retry-failed` và `cancel`.
+    + Router Knowledge: Bổ sung 6 REST endpoints mới phục vụ duyệt ứng viên và import batch.
+    + Bất biến ADR-012: 100% không tạo bất kỳ bản ghi `KnowledgeGroupSource` nào trong luồng batch import mới.
+  - Unit & Acceptance Tests:
+    + Viết mới bộ test [`backend/tests/test_knowledge_candidate_and_import_batch.py`](../../backend/tests/test_knowledge_candidate_and_import_batch.py) đạt 6/6 tests passed 100%.
+    + Toàn bộ 58/58 tests liên quan (gồm cả workflow, revisions, schema v3) passed 100%, Ruff 0 lỗi.
+  - Kế hoạch: [Kế hoạch 12 Phiên 3 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_330_candidate_diff_va_import_batch_engine.md`](../nhat_ky/2026-10-10_phien_330_candidate_diff_va_import_batch_engine.md).
+
+- **Phiên trước #329 — Kết quả:**
+  - Đơn giản hóa module Kho tài liệu (`documents`) thành kho lưu trữ thuần túy (*Storage Repository / Document Vault*):
+    + Upload/Intake: Lưu MinIO/S3, tạo `RepositoryDocument` (`parse_status="stored"`), tạo `RepositoryFileRevision` (`revision_no=1`, `source_hash`, `source_storage_path`), tạo `DocumentRevision` (`status="stored"`).
+    + Cắt bỏ hoàn toàn việc tạo `JobRecord(job_type="document_revision_parse")` và không dispatch ARQ worker task `task_document_revision_parse`. Trả về `AsyncUploadDocumentResponse` với `status="stored"` và `job_id=None`.
+    + Cắt bỏ auto-parse trong `upload_document`.
+    + Xóa bỏ logic ràng buộc cascade với `KnowledgeDocument` trong `delete_document` (theo ADR-012, snapshot imports một chiều độc lập, soft-delete kho tài liệu không làm hỏng dữ liệu Knowledge).
+    + Bảo toàn deduplication/idempotency và MinIO compensation.
+  - Unit & Acceptance Tests:
+    + Cập nhật các kịch bản test intake trong `test_document_repository_workflow.py` (`test_02`, `test_07`, `test_12`, `test_http_route_intake_idempotency_header`) sang `status="stored"` và `job_id is None`.
+    + Viết thêm 2 acceptance tests cho ADR-012: `test_adr012_batch_upload_stored_status_and_zero_parse_invocations` và `test_adr012_delete_repository_document_decoupled_from_knowledge`.
+    + Cập nhật `test_document_repository.py` và `test_document_revisions_lifecycle.py` sang `status="stored"`.
+    + Toàn bộ 52/52 tests liên quan pass 100%, Ruff 0 lỗi.
+  - Kế hoạch: [Kế hoạch 12 Phiên 2 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_329_simplify_kho_tai_lieu_backend_pure_storage.md`](../nhat_ky/2026-10-10_phien_329_simplify_kho_tai_lieu_backend_pure_storage.md).
+
+- **Phiên trước #328 — Kết quả:**
+  - Ban hành văn bản kiến trúc chính thức [`ADR-012`](../adr/ADR-012-decouple-storage-repository-and-knowledge-document-intelligence.md): Tách rời hoàn toàn Kho tài liệu thuần lưu trữ và Kho tri thức sở hữu Document Intelligence; bãi bỏ foreign key cascade; thiết lập snapshot import một chiều; nguyên lý "Parse once, embed many".
+  - Khai báo các SQLAlchemy models mới:
+    + `RepositoryFileRevision` (`repository_file_revisions`) trong domain `documents` + quan hệ `RepositoryDocument.file_revisions`.
+    + `KnowledgeSourceRevision` (`knowledge_source_revisions`), `KnowledgeChunkSet` (`knowledge_chunk_sets`), `KnowledgeImportBatch` (`knowledge_import_batches`), `KnowledgeImportItem` (`knowledge_import_items`) trong domain `knowledge`.
+    + Mở rộng quan hệ: `KnowledgeBinding.active_source_revision`, `KnowledgeIndexRevision.source_revision_v2`, `KnowledgeIndexRevision.chunk_set`, `KnowledgeCollection.import_batches`.
+  - Viết Alembic additive migration [`20261010_decouple_storage_and_knowledge_v3.py`](../../backend/alembic/versions/20261010_decouple_storage_and_knowledge_v3.py): Idempotent 100% bằng inspector; tạo 5 bảng mới và 3 cột liên kết; downgrade đầy đủ; bảo đảm duy nhất 1 Alembic HEAD.
+  - Bổ sung Pydantic DTOs & Contracts V3 cho cả Documents (`RepositoryFileRevisionItem/Response`) và Knowledge (`KnowledgeSourceRevisionResponse`, `KnowledgeChunkSetResponse`, `KnowledgeImportBatchCreateRequest/Response`, `KnowledgeImportItemResponse`, `CandidateListResponse`).
+  - Unit & Regression Testing: Viết mới `backend/tests/test_knowledge_v3_schema.py` đạt 7/7 passed in 0.52s; regression suites 72 passed, 1 skipped; Ruff 0 lỗi.
+  - Kế hoạch: [Kế hoạch 12 Phiên 1 hoàn thành 100%](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_328_adr012_additive_schema_va_contracts_v3.md`](../nhat_ky/2026-10-10_phien_328_adr012_additive_schema_va_contracts_v3.md).
+
+- **Phiên trước #327 — Kết quả:**
+  - Chốt ranh giới mới: Kho tài liệu chỉ lưu tệp/metadata danh mục/nhóm; Kho tri thức sở hữu snapshot, OCR/parser, Unicode NFC, Markdown, Quality Gate, chunk/facts và Qdrant publishing.
+  - Loại bỏ mô hình liên kết nhóm nguồn lâu dài; Knowledge chỉ lưu provenance một chiều để dedupe/diff, không ghi ngược trạng thái vào Documents.
+  - Thiết kế `KnowledgeSourceRevision`, `KnowledgeChunkSet`, import batch/items và trạng thái nguồn/vector tách biệt.
+  - Chốt parse once/embed many: đổi embedding model chỉ tạo vector generation mới từ chunk set, không OCR lại.
+  - Lập lộ trình 8 phiên additive migration → backend cutover → frontend → backfill/cleanup; kèm prompt tổng dùng trực tiếp cho vibe coding.
+  - Quyết định ADR: tạo ADR-012 supersede ranh giới domain của ADR-011, giữ staging/parity/CAS/RetrievalSnapshot/rollback.
+  - Không thay đổi code, DB, runtime hoặc `qnu-sso` trong phiên này.
+  - Kế hoạch: [`docs/ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md`](../ke_hoach/12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_327_lap_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md`](../nhat_ky/2026-10-10_phien_327_lap_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md).
+
+- **Phiên trước #326 — Kết quả:**
+  - Xác định nguyên nhân nút **Thêm nguồn** đổi URL nhưng không đổi trang: các deep route bị TanStack Router lồng dưới `knowledge.$collectionId.tsx`, trong khi route cha render trực tiếp `CollectionDetailPage` và không có `Outlet`.
+  - Chuyển ba trang sang non-nested route: `knowledge.$collectionId_.add-documents.tsx`, `knowledge.$collectionId_.sources.$sourceId.tsx`, `knowledge.$collectionId_.documents.$bindingId.tsx`; giữ nguyên toàn bộ URL công khai.
+  - Cây route sinh tự động xác nhận cả ba trang có `KnowledgeRoute` làm cha trực tiếp, sửa đồng thời luồng Thêm nguồn, Chi tiết nguồn và Chi tiết binding.
+  - Quality gate frontend: TypeScript không lỗi; Vite build thành công, 5.077 modules trong 6,07 giây. Trình duyệt kiểm tra tách biệt chuyển về `/sign-in` vì không chia sẻ phiên đăng nhập người dùng.
+  - Không tác động backend và không thay đổi repository `qnu-sso`.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_326_sua_route_them_nguon_kho_tri_thuc.md`](../nhat_ky/2026-10-10_phien_326_sua_route_them_nguon_kho_tri_thuc.md).
+
+- **Phiên trước #325 — Kết quả:**
+  - Khắc phục dứt điểm lỗi SQLAlchemy Mapper Initialization (`expression 'DocumentGroup' failed to locate a name ('DocumentGroup')`) khi chạy `db ensure-ready`: import kiểu `DocumentGroup` rõ ràng trong `knowledge/models.py`, chuyển `documents/__init__.py` sang lazy loading, chuyển import `KnowledgeDocument` sang cục bộ trong các hàm truy vấn của `documents/service.py` để tránh circular dependency.
+  - Đồng bộ và chuẩn hóa toàn diện 4 file task runner (`Makefile`, `make.ps1`, `make.bat`, `make` bash script):
+    + Bổ sung đầy đủ lệnh CSDL & Migration: `migrate` (chạy Alembic HEAD không lo thiếu `alembic.ini`), `db-check` (kiểm tra schema & bảng), `db-ready` (kiểm tra và tự động khởi tạo/seed nếu thiếu).
+    + Bổ sung lệnh kiểm soát chất lượng mã nguồn: `lint` (Ruff & Biome), `lint-fix`, `typecheck` (TypeScript), `build` (Vite build).
+    + Bổ sung lệnh kiểm thử phân nhánh: `test` (Backend Pytest & Frontend npm test), `test-be`, `test-fe`.
+    + Bổ sung lệnh kiểm tra tri thức: `reconcile` (đối soát 4 tầng), `reindex` (đánh lại vector index).
+    + Khắc phục triệt để lỗi gọi script `test:e2e` không tồn tại trong frontend package.json và thiếu `uv` trong PATH môi trường Windows (ưu tiên venv python).
+    + Xóa bỏ hoàn toàn các chú thích lỗi thời về port 3001, chuẩn hóa bảng `help` có màu sắc và phân nhóm trực quan.
+  - Quality gate: Ruff sạch (All checks passed!), Pytest nguồn nhóm 32 passed / 1 skipped, `.\make.ps1 help` và `make.bat help` chạy thành công 100%.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_325_chuan_hoa_toan_dien_task_runner_makefile_va_khac_phuc_circular_import_mapper.md`](../nhat_ky/2026-10-10_phien_325_chuan_hoa_toan_dien_task_runner_makefile_va_khac_phuc_circular_import_mapper.md).
+
+- **Phiên trước #324 — Kết quả:**
+  - Bổ sung `_upsert_failed_item` để giữ đúng một response item trên mỗi tài liệu và nâng cấp item hiện có theo độ ưu tiên lỗi.
+  - Conflict `DOCUMENT_BOUND_TO_ANOTHER_GROUP_SOURCE` thay thế cả item success và `DOCUMENT_REVISION_FAILED`; revision failed chỉ thay thế success, không che lỗi nghiệp vụ cụ thể.
+  - Sửa regression fixture conflict giữ `desired_pairs` đúng contract thật của `evaluate_group_diff`; bổ sung test trực tiếp cho hai trường hợp upsert.
+  - Quality gate: Ruff sạch; test nguồn nhóm 32 passed/1 skipped; backend targeted 90 passed/1 skipped; frontend 10/10 pass; Vite build + TypeScript thành công; `git diff --check` đạt.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_324_upsert_loi_nguon_nhom_va_test_contract_thuc.md`](../nhat_ky/2026-10-10_phien_324_upsert_loi_nguon_nhom_va_test_contract_thuc.md).
+
+- **Phiên trước #323 — Kết quả:**
+  - **1. Bổ sung Action Banner cho trạng thái `updates` & Khử trùng lặp nút CTA**:
+    - Khai báo `shouldShowUpdatesBanner = bannerType === "updates"` trong `source-detail-page.tsx`.
+    - Render Action Banner thứ 3 "Có tài liệu cần đồng bộ" với semantic tokens, icon `Sparkles`, CTA chính **"Đồng bộ"** gọi `syncMutation.mutate()`, disabled khi sync/publish.
+    - Cưỡng chế thứ bậc ưu tiên bất biến tối đa 1 banner: `failed > review > updates > none`.
+    - Khử trùng lặp CTA: Nút thao tác chính trong `Changes Diff Breakdown Card` chỉ hiển thị khi `bannerType === "none"`, ẩn đi khi đã có action banner ở trên.
+  - **2. Chuẩn hóa mã lỗi Conflict Ownership qua `populate_failed_items_from_diff`**:
+    - Bổ sung helper `populate_failed_items_from_diff` trong `group_source_diff_service.py`: duyệt và đánh dấu `conflict_docs` trước với `DOCUMENT_BOUND_TO_ANOTHER_GROUP_SOURCE`, sau đó mới duyệt lỗi revision chung `DOCUMENT_REVISION_FAILED` cho các doc không thuộc conflict.
+    - Áp dụng helper đồng bộ cho cả `group_source_publish_service.py` (post-publish), `group_source_sync_service.py` (fast path & post-sync).
+    - Bảo đảm invariant: mỗi tài liệu lỗi chỉ xuất hiện đúng 1 lần trong `items` và `failed_count`.
+  - **3. Đồng bộ số liệu thực tế dòng code**:
+    - `group_source_sync_service.py`: **712 dòng** thực tế (giảm 205 dòng lặp so với ban đầu 917 dòng).
+    - `group_source_diff_service.py`: **553 dòng**; `group_source_publish_service.py`: **293 dòng**.
+  - **Quality Gate**:
+    - Backend Ruff linter: **All checks passed (0 errors)**.
+    - Targeted Pytest: **89 passed, 1 skipped (100% đạt)** trên `test_knowledge_group_sources.py` (31 tests), `test_document_repository_workflow.py`, `test_rag.py`, `test_knowledge_publishing_v2.py`.
+    - Frontend Unit Tests: **10/10 passed (100%)** trên `retry-decision.test.ts`.
+    - Frontend Vite build: **✓ built in 3.89s (0 lỗi biên dịch, exit code 0)**.
+    - Git diff check: **0 errors**.
+    - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_323_action_banner_updates_va_chuan_hoa_ma_loi_conflict.md`](../nhat_ky/2026-10-10_phien_323_action_banner_updates_va_chuan_hoa_ma_loi_conflict.md).
+
+- **Phiên trước #322 — Kết quả:**
+  - Khắc phục dứt điểm 6 vấn đề: Xử lý trạng thái rỗng khi nhóm có doc lỗi/processing; Adopt binding ownerless ở mọi revision; Preview attach phát hiện conflict khi `source=None`; Triệt tiêu đếm trùng lỗi bằng `failed_document_ids: set[str]`; Siết chặt an toàn `TEST_DATABASE_URL` bằng `make_url` và `is_safe_test_database_name`; Khử trùng 2 banner CTA qua `resolveSourceActionBanner`; Tinh gọn `group_source_sync_service.py` còn 712 dòng thực tế.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_322_sua_sau_nguon_nhom_kho_tri_thuc.md`](../nhat_ky/2026-10-10_phien_322_sua_sau_nguon_nhom_kho_tri_thuc.md).
+
+- **Phiên trước #321 — Kết quả:**
+  - Hoàn thiện 7 vấn đề quy trình nguồn nhóm kho tri thức; Single Source of Truth `eligible_doc_count`; phân loại `adoptable_docs`; tái sử dụng staging ready; cấm xuất bản revision cũ; frontend `resolveRetryAction`; targeted 17 passed / 1 skipped, related 58 passed.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_321_knowledge_group_source_retry_and_publish.md`](../nhat_ky/2026-10-10_phien_321_knowledge_group_source_retry_and_publish.md).
+
+- **Phiên trước #320 — Kết quả:**
+  - Bảo toàn ràng buộc NOT NULL PostgreSQL cho `KnowledgeBinding.source_revision_id = target_rev.id` và khởi tạo `status = "pending"`.
+  - Tách bạch current revision và pending staging revision; chống build staging lặp lại.
+  - Chuẩn hóa state machine resolver `resolve_group_source_state`; bổ sung metrics UI.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_320_sua_state_machine_publish_retry_kho_tri_thuc.md`](../nhat_ky/2026-10-10_phien_320_sua_state_machine_publish_retry_kho_tri_thuc.md).
+
+- **Phiên trước #319 — Kết quả:**
+  - Hoàn thiện quy trình nguồn kho tri thức: staging index, retry & workspace isolation.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_319_hoan_thien_quy_trinh_nguon_kho_tri_thuc.md`](../nhat_ky/2026-10-10_phien_319_hoan_thien_quy_trinh_nguon_kho_tri_thuc.md).
+
+- **Phiên trước #318 — Kết quả:**
+  - Hoàn thiện quy trình Kho tri thức liên kết lâu dài với Nhóm tài liệu qua `KnowledgeGroupSource`.
+  - Thuật toán phân loại diff 6 tập (`added`, `updated`, `removed`, `unchanged`, `not_ready`, `failed`).
+  - `membership_hash` SHA-256 ổn định độc lập thứ tự. Tinh gọn UI 4 tab, ẩn toàn bộ luồng legacy/canary.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_318_kho_tri_thuc_nhom_nguon.md`](../nhat_ky/2026-10-10_phien_318_kho_tri_thuc_nhom_nguon.md).
+
+- **Phiên trước #317 — Kết quả:**
+  - Không còn coi mọi `IntegrityError` khi commit membership là duplicate race hợp lệ.
+  - Sau rollback, service re-query chính xác `(group_id, document_id)`; chỉ trả thành công khi membership concurrent thật sự tồn tại.
+  - Nếu không tìm thấy membership winner, trả RFC 7807 `DOCUMENT_GROUP_MEMBERSHIP_FAILED` (HTTP 409).
+  - Response primitives được lưu trước rollback để tránh truy cập ORM objects có thể bị expire.
+  - Documents regression suites: **48/48 passed**; Ruff toàn backend sạch.
+  - Báo cáo: [`docs/nhat_ky/2026-10-10_phien_317_xac_minh_membership_race_sau_integrity_error.md`](../nhat_ky/2026-10-10_phien_317_xac_minh_membership_race_sau_integrity_error.md).
+
+- **Phiên trước #316 — Kết quả:**
+  - **1. Xử Lý Object Mồ Côi Khi Concurrent Upload Khác Tên File**:
+    - Khi gặp `IntegrityError` (trùng SHA-256 hash `(tenant_id, workspace_id, file_hash)`), rollback transaction và tìm `winner_doc`.
+    - So sánh chính xác: `if winner_doc.storage_path != storage_key`: gọi `await storage_service.delete(storage_key)` để dọn object mồ côi của loser request.
+    - Nếu `winner_doc.storage_path == storage_key`: tuyệt đối không xóa vì winner đang dùng chung object đó.
+    - Nếu không tìm thấy winner: compensation-delete đúng `storage_key` của request và ném lại lỗi.
+  - **2. Validate Revision Trước Khi Tạo Membership & Xử Lý Race Idempotent**:
+    - Truy vấn và resolve revision thật: `winner_doc.current_revision` -> `winner_doc.current_revision_id` -> newest revision.
+    - Validate trạng thái thuộc `VALID_REVISION_STATUSES`. Nếu không có revision hợp lệ, ném RFC 7807 `AppException(code="DOCUMENT_REVISION_INVALID", status_code=409)`, không thêm membership, không cập nhật group, không commit.
+    - Chỉ khi revision hợp lệ mới kiểm tra và thêm `DocumentGroupMembership`.
+    - Bọc mutation commit trong `try ... except IntegrityError`: rollback an toàn nếu có race condition cùng thêm membership, đảm bảo hành vi idempotent 100%.
+  - **3. Thống Nhất Frontend Production Idempotency**:
+    - `document-upload-modal.tsx` import và sử dụng trực tiếp `FileIdempotencyManager` từ `@/features/documents/utils/idempotency.ts` (`const idempotencyManagerRef = useRef(new FileIdempotencyManager())`).
+    - Xóa bỏ `WeakMap` cục bộ và helper `getOrCreateIdempotencyKey` trùng lặp trong modal.
+    - Retry cùng một đối tượng `File` giữ nguyên key. File mới nhận key mới.
+    - `resetForm()` gọi `idempotencyManagerRef.current.reset()`.
+    - Thêm script `"test:documents": "bun test src/features/documents/utils/idempotency.test.ts"` vào `frontend/package.json`.
+  - **Quality Gate**:
+    - Backend targeted test suites: **47/47 passed (100%)** (`test_document_repository_workflow.py` 26/26, `test_document_groups_and_knowledge_attach.py` 14/14, `test_document_revisions_lifecycle.py` 7/7).
+    - Backend Ruff: `All checks passed! (0 errors)`.
+    - Frontend Unit Tests: **3/3 passed (100%)** (`idempotency.test.ts`).
+    - Frontend Biome: 13 files checked, 0 errors.
+    - Frontend Vite Build: `✓ built in 4.52s` (0 errors).
+    - Zero file modified in `qnu-sso`. Zero runtime files in `backend/storage/documents/`.
+  - Báo cáo chi tiết: [`docs/nhat_ky/2026-10-10_phien_316_hoan_thien_an_toan_concurrency_va_idempotency_kho_tai_lieu.md`](../nhat_ky/2026-10-10_phien_316_hoan_thien_an_toan_concurrency_va_idempotency_kho_tai_lieu.md).
+
+- **Phiên trước #315 — Kết quả:**
   - Tích hợp bốn nguyên tắc `Think Before Coding`, `Simplicity First`, `Surgical Changes` và `Goal-Driven Execution` vào `AGENTS.md` và skill `qnu-clean-code-architect` hiện có.
   - Áp dụng kiểm thử theo rủi ro: test-first cho dữ liệu/transaction/concurrency/idempotency/migration/auth/tenant/payment; code theo lô rồi test một lần cho tính năng thông thường; lint/build nhanh cho thay đổi UI thuần túy.
   - Thay Boy Scout Rule mở rộng bằng Surgical Change Rule, ngăn AI tự ý refactor hoặc format code ngoài phạm vi.

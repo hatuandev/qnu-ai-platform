@@ -1,5 +1,31 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
+## Bóc tách và khung Studio ADR-012 — cập nhật #360
+
+Luồng nguồn độc lập dùng chung `source_extraction` trong nạp mới và bóc tách lại. Kho tài liệu vẫn chỉ lưu tệp/metadata. Không đổi quy trình chunk → embedding → staging → xuất bản, không tự xuất bản sau OCR.
+
+- PDF có chữ: giữ parser PyMuPDF cùng metadata PDF Inspector; lưu blocks thật và kích thước từng trang trong manifest. Chuẩn hóa x/y thành left/top phần trăm, giữ nội dung, ID riêng từng trang; không gán confidence giả.
+- PDF scan/hỗn hợp: kiểm tra từng trang bằng lớp chữ, coverage ảnh và dấu lỗi mã hóa. Chỉ ghép các trang cần OCR thành PDF gửi PaddleOCR, lấy URL/model/timeout từ ModelOps và ánh xạ kết quả về số trang gốc. Trang trắng không bị dịch số trang. Không chấp nhận thiếu trang OCR hoặc âm thầm bỏ trang lỗi.
+- `vision_ocr`/standard mặc định là hybrid. `layout_analysis` hoặc engine được chọn rõ ràng không đi qua native fast-path mà gọi OCR trên toàn bộ PDF; chế độ này có thể dùng cho bố cục phức tạp. Các ngưỡng route là heuristic, cần đánh giá thêm trên tập tài liệu thực tế, không bảo đảm mọi lớp chữ lỗi đều tự phát hiện.
+- DOCX: Docling đọc cấu trúc và Markdown; Gotenberg hiện có render PDF dẫn xuất. Ánh xạ ranh giới trang bằng sequence alignment token, chỉ chấp nhận coverage ít nhất 90%; không khớp báo `DOCX_LAYOUT_ALIGNMENT_FAILED`, converter lỗi báo rõ, không tạo số trang/khung giả. Trang ảnh-only nhận dạng được giữ lại. Layout lấy từ PDF render, không được coi là tọa độ Word gốc tuyệt đối; phụ thuộc font trong renderer.
+- Khi renderer dùng font fallback, ký tự được tái ghép theo baseline, thứ tự tọa độ x và khoảng cách tương đối với median độ rộng glyph. Bỏ khoảng trắng giả bị glyph chồng lên, chuẩn hóa NFC; dùng kết quả để đối chiếu Docling với trang và nội dung khung. Không dùng từ điển vá tiếng Việt, không hạ ngưỡng 90% khi mapping sai.
+- PDF dẫn xuất lưu theo hash nội dung bên cạnh snapshot trong namespace Knowledge, đường dẫn lưu trong snapshot_metadata. Studio stream ảnh từ bản dẫn xuất độc lập, không phụ thuộc tệp Repository. Purge dọn cả snapshot và preview, kiểm tra tham chiếu nguồn khác trước khi xóa; artifact reuse sao chép preview vào namespace của nguồn nhận.
+- Adapter OCR → DTO → manifest giữ dimensions/blocks. Artifact version `layout-v3` tránh reuse artifact cũ mất geometry; không migration/reset. Nguồn cũ cần thao tác Bóc tách lại sau khi backend/worker nhận code mới. Bản đang phục vụ không bị thay đổi nếu bóc tách mới thất bại.
+
+Các sơ đồ legacy bên dưới không thay thế luồng ADR-012 này. Studio hiện có được tái sử dụng, không dựng giao diện mới.
+
+> **Khởi tạo sạch (#347):** Kho mặc định sau reset không có tài liệu, chunks hay dữ liệu số mẫu. Facts phải đến từ tài liệu/snapshot hoặc thao tác nhập thực tế của người dùng; không coi dữ liệu seed demo là nguồn vận hành. Chính sách bootstrap mới được mô tả tại Quy trình 01. Các sơ đồ legacy bên dưới không phải cơ chế seed tự động.
+
+## Xóa vĩnh viễn nguồn — cập nhật #352
+
+Nút Xóa trong danh sách/chi tiết nguồn gọi DELETE `/knowledge/bindings/{id}/purge`, trả 202 và job bền vững `knowledge_source_purge`. Nguồn chuyển sang deleting, rời tập truy xuất; chặn nạp lại/bóc tách/lập chỉ mục khi đang xóa. Worker xóa points đúng source/collection/tenant/workspace trong mọi namespace model của kho (không drop collection Qdrant), đợi acknowledgement và kiểm đếm hết points; sau đó xóa snapshot riêng, rồi chunks/facts/index revisions/chunk sets/source revisions/binding trong DB. Chỉ job completed mới báo xóa thành công trên UI.
+
+Không sửa/xóa RepositoryDocument, phiên bản tệp hay object `documents/` ở Kho tài liệu. Snapshot được nguồn khác tham chiếu giữ lại; cache/chunk set của nguồn khác không bị xóa. Nếu phát hiện tham chiếu index/source chéo bất thường, tác vụ báo lỗi để tránh cascade phá dữ liệu nguồn khác. Đường dẫn snapshot phải thuộc prefix của đúng nguồn.
+
+Lỗi external cleanup giữ DB plan và trạng thái deleting để thử lại; không khôi phục nguồn vào RAG và không báo thành công giả. Có thể thử lại từ cửa sổ xóa còn mở hoặc mục tác vụ. Không cho hủy purge vì có thể đã xóa một phần ở external services. Không cần migration/reset DB; worker phải nhận bản code mới.
+
+Giữ audit tối thiểu: import item chuyển skipped/purged/SOURCE_PURGED và bỏ ID nguồn/chỉ mục, counter batch cập nhật lại; job lưu trạng thái/kết quả đếm. Đây không phải cache OCR: markdown/layout/snapshot thuộc nguồn đã bị dọn. API detach legacy còn tồn tại như thao tác gỡ riêng, nhưng nút Xóa hiện dùng purge. Nạp lại cùng file sau purge sẽ tạo nguồn mới; chỉ reuse nếu **nguồn khác** còn giữ artifact hợp lệ cùng file/profile.
+
 Tài liệu này đặc tả toàn diện quy trình tiếp nhận tệp tài liệu từ người dùng/cán bộ QNU, lưu trữ đối tượng bền vững (**MinIO Object Storage / Local Dual-driver**), tự động hóa cấu hình (**Smart Auto-Recommendation**), phân nhánh kiểm tra văn bản số hóa thông qua **PDF Inspector**, kích hoạt mô hình OCR cứu hộ linh hoạt, bóc tách bảo toàn bảng biểu Markdown và `page_markdowns`, phân đoạn tri thức (Chunking), bóc tách số liệu sự thật (Fact Layer), **đối soát mắt & hiệu đính con người (Human-in-the-loop Studio)**, và chỉ đánh chỉ mục kép (**Dual Indexing: Qdrant + PostgreSQL FTS**) khi đã được phê duyệt.
 
 ---

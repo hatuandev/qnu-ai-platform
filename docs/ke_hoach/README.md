@@ -50,3 +50,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Kế hoạch triển khai quy trình “Tiếp nhận một lần – Xuất bản tri thức an toàn”.
    - **Mục tiêu**: Đưa Kho tài liệu thành nguồn sự thật duy nhất của tệp và nội dung chuẩn hóa; đưa Kho tri thức sang mô hình binding, revision-safe indexing, atomic activation và RetrievalSnapshot nhất quán.
    - **Trạng thái**: Đã thống nhất phương án; sẵn sàng bắt đầu từ ADR, inventory và API contract V2, chưa triển khai mã nguồn.
+
+10. [**`12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md`**](./12_ke_hoach_tach_kho_tai_lieu_va_nap_tri_thuc_da_embedding.md):
+   - **Tên tài liệu**: Kế hoạch tách Kho tài liệu thuần lưu trữ và pipeline nạp tri thức đa embedding.
+   - **Mục tiêu**: Kho tài liệu chỉ quản lý tệp và metadata danh mục; Kho tri thức nhập snapshot, bóc tách/OCR, chuẩn hóa, Quality Gate, chunk/facts và tái sử dụng một chunk set cho nhiều vector generations.
+   - **Trạng thái**: Đã thống nhất nghiệp vụ; kế hoạch 8 phiên và prompt tổng sẵn sàng triển khai. Kế hoạch này thay thế ranh giới domain cũ của Kế hoạch 11 nhưng giữ staging, parity gate, CAS, RetrievalSnapshot và rollback.

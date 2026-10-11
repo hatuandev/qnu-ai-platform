@@ -891,17 +891,20 @@ export const BindingDetailPage: React.FC<BindingDetailPageProps> = ({
                     Thông Tin Nguồn & Metadata Thể Thức NĐ 30/2020/NĐ-CP
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    Nguồn sự thật duy nhất (Single Source of Truth) lưu trữ tại
-                    Kho Tài Liệu Trung Tâm.
+                    Nguồn tri thức dùng bản sao độc lập. Tệp gốc có thể còn
+                    trong Kho tài liệu.
                   </CardDescription>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!binding.repository_document_id}
                   onClick={() =>
                     navigate({
                       to: "/documents/$documentId",
-                      params: { documentId: binding.repository_document_id },
+                      params: {
+                        documentId: binding.repository_document_id ?? "",
+                      },
                     })
                   }
                   className="text-xs gap-1.5"

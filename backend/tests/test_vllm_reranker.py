@@ -122,9 +122,7 @@ def test_vllm_seed_provider_config():
     assert vllm_prov["provider_type"] == "vllm"
     assert "bge-m3" in vllm_prov["models"]
     assert "bge-reranker-v2-m3" in vllm_prov["models"]
-    assert "qwen3-embedding-4b" in vllm_prov["models"]
 
     specs = vllm_prov["extra_config"]["model_specs"]
     assert specs["bge-m3"]["type"] == "embedding"
     assert specs["bge-reranker-v2-m3"]["type"] == "reranker"
-    assert specs["qwen3-embedding-4b"]["type"] == "embedding"

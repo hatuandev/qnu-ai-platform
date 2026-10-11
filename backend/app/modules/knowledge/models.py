@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.modules.documents.models import DocumentGroup
 
 
 def utcnow() -> datetime:
@@ -62,6 +63,12 @@ class KnowledgeCollection(Base):
     )
     facts: Mapped[list[KnowledgeFact]] = relationship(
         "KnowledgeFact", back_populates="collection", cascade="all, delete-orphan"
+    )
+    group_sources: Mapped[list[KnowledgeGroupSource]] = relationship(
+        "KnowledgeGroupSource", back_populates="collection", cascade="all, delete-orphan"
+    )
+    import_batches: Mapped[list[KnowledgeImportBatch]] = relationship(
+        "KnowledgeImportBatch", back_populates="collection", cascade="all, delete-orphan"
     )
 
     def __init__(self, **kwargs):
@@ -185,10 +192,10 @@ class KnowledgeChunk(Base):
     id: Mapped[str] = mapped_column(
         String(64), primary_key=True, default=lambda: f"chk_{uuid.uuid4().hex[:12]}"
     )
-    document_id: Mapped[str] = mapped_column(
+    document_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("knowledge_documents.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     collection_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -213,7 +220,7 @@ class KnowledgeChunk(Base):
     )
 
     # Relationships
-    document: Mapped[KnowledgeDocument] = relationship("KnowledgeDocument", back_populates="chunks")
+    document: Mapped[KnowledgeDocument | None] = relationship("KnowledgeDocument", back_populates="chunks")
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -244,10 +251,10 @@ class KnowledgeFact(Base):
         nullable=False,
         index=True,
     )
-    document_id: Mapped[str] = mapped_column(
+    document_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("knowledge_documents.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -276,7 +283,7 @@ class KnowledgeFact(Base):
     collection: Mapped[KnowledgeCollection] = relationship(
         "KnowledgeCollection", back_populates="facts"
     )
-    document: Mapped[KnowledgeDocument] = relationship(
+    document: Mapped[KnowledgeDocument | None] = relationship(
         "KnowledgeDocument", back_populates="facts"
     )
 
@@ -338,6 +345,92 @@ class KnowledgeVectorGeneration(Base):
 
 
 
+class KnowledgeGroupSource(Base):
+    """Long-lived source binding a DocumentGroup to a KnowledgeCollection."""
+
+    __tablename__ = "knowledge_group_sources"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"src_{uuid.uuid4().hex[:12]}"
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    document_group_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("document_groups.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    sync_policy: Mapped[str] = mapped_column(
+        String(32), default="manual", nullable=False
+    )  # manual, auto_on_ready
+    chunk_strategy: Mapped[str] = mapped_column(
+        String(64), default="ClauseBasedChunker", nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), default="empty", nullable=False, index=True
+    )  # empty, up_to_date, updates_available, syncing, review_required, ready, failed, detached
+    last_synced_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_membership_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), default="tenant_qnu", nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(64), default="workspace_qnu", nullable=False, index=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    # Relationships
+    collection: Mapped[KnowledgeCollection] = relationship(
+        "KnowledgeCollection", back_populates="group_sources"
+    )
+    document_group: Mapped[DocumentGroup] = relationship(
+        "DocumentGroup", foreign_keys=[document_group_id], lazy="selectin"
+    )
+    bindings: Mapped[list[KnowledgeBinding]] = relationship(
+        "KnowledgeBinding", back_populates="group_source"
+    )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"src_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "sync_policy", None) is None:
+            self.sync_policy = "manual"
+        if getattr(self, "chunk_strategy", None) is None:
+            self.chunk_strategy = "ClauseBasedChunker"
+        if getattr(self, "status", None) is None:
+            self.status = "empty"
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("ix_knowledge_group_sources_col_group", "collection_id", "document_group_id", unique=True),
+        Index("ix_knowledge_group_sources_tenant_ws", "tenant_id", "workspace_id"),
+        Index("ix_knowledge_group_sources_status", "status"),
+    )
+
+
 class KnowledgeBinding(Base):
     """Binding associating a RepositoryDocument and target revision to a KnowledgeCollection."""
 
@@ -352,16 +445,21 @@ class KnowledgeBinding(Base):
         nullable=False,
         index=True,
     )
-    repository_document_id: Mapped[str] = mapped_column(
+    repository_document_id: Mapped[str | None] = mapped_column(
         String(64),
-        ForeignKey("repository_documents.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("repository_documents.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
-    source_revision_id: Mapped[str] = mapped_column(
+    source_revision_id: Mapped[str | None] = mapped_column(
         String(64),
-        ForeignKey("document_revisions.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    group_source_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_group_sources.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     active_index_revision_id: Mapped[str | None] = mapped_column(
@@ -370,10 +468,18 @@ class KnowledgeBinding(Base):
         nullable=True,
         index=True,
     )
+    active_source_revision_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_source_revisions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     active_epoch: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     chunk_strategy: Mapped[str] = mapped_column(String(64), default="ClauseBasedChunker", nullable=False)
     sync_policy: Mapped[str] = mapped_column(String(32), default="manual", nullable=False)  # manual, auto_on_ready
-    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False, index=True)  # active, archived, detached
+    status: Mapped[str] = mapped_column(
+        String(32), default="pending", nullable=False, index=True
+    )  # pending: chưa staging/promote, không tham gia retrieval; active: đã promote, sẵn sàng RAG; archived; detached
     tenant_id: Mapped[str] = mapped_column(String(64), default="tenant_qnu", nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(64), default="workspace_qnu", nullable=False, index=True)
 
@@ -382,10 +488,24 @@ class KnowledgeBinding(Base):
 
     # Relationships
     collection: Mapped[KnowledgeCollection] = relationship("KnowledgeCollection")
+    group_source: Mapped[KnowledgeGroupSource | None] = relationship(
+        "KnowledgeGroupSource", back_populates="bindings"
+    )
     active_index_revision: Mapped[KnowledgeIndexRevision | None] = relationship(
         "KnowledgeIndexRevision",
         foreign_keys=[active_index_revision_id],
         post_update=True,
+    )
+    active_source_revision: Mapped[KnowledgeSourceRevision | None] = relationship(
+        "KnowledgeSourceRevision",
+        foreign_keys=[active_source_revision_id],
+        post_update=True,
+    )
+    source_revisions: Mapped[list[KnowledgeSourceRevision]] = relationship(
+        "KnowledgeSourceRevision",
+        back_populates="binding",
+        cascade="all, delete-orphan",
+        foreign_keys="KnowledgeSourceRevision.binding_id",
     )
 
     def __init__(self, **kwargs):
@@ -399,7 +519,7 @@ class KnowledgeBinding(Base):
         if getattr(self, "sync_policy", None) is None:
             self.sync_policy = "manual"
         if getattr(self, "status", None) is None:
-            self.status = "active"
+            self.status = "pending"
         if getattr(self, "tenant_id", None) is None:
             self.tenant_id = "tenant_qnu"
         if getattr(self, "workspace_id", None) is None:
@@ -413,6 +533,7 @@ class KnowledgeBinding(Base):
     __table_args__ = (
         Index("ix_knowledge_bindings_col_doc", "collection_id", "repository_document_id", unique=True),
         Index("ix_knowledge_bindings_tenant_ws", "tenant_id", "workspace_id"),
+        Index("ix_knowledge_bindings_group_source", "group_source_id"),
     )
 
 
@@ -430,10 +551,19 @@ class KnowledgeIndexRevision(Base):
         nullable=False,
         index=True,
     )
-    source_revision_id: Mapped[str] = mapped_column(
+    source_revision_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True,
+    )
+    source_revision_v2_id: Mapped[str | None] = mapped_column(
         String(64),
-        ForeignKey("document_revisions.id", ondelete="RESTRICT"),
-        nullable=False,
+        ForeignKey("knowledge_source_revisions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    chunk_set_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_chunk_sets.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     vector_generation_id: Mapped[str] = mapped_column(
@@ -457,6 +587,12 @@ class KnowledgeIndexRevision(Base):
 
     # Relationships
     binding: Mapped[KnowledgeBinding] = relationship("KnowledgeBinding", foreign_keys=[binding_id])
+    source_revision_v2: Mapped[KnowledgeSourceRevision | None] = relationship(
+        "KnowledgeSourceRevision", foreign_keys=[source_revision_v2_id]
+    )
+    chunk_set: Mapped[KnowledgeChunkSet | None] = relationship(
+        "KnowledgeChunkSet", foreign_keys=[chunk_set_id]
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -513,3 +649,342 @@ class KnowledgeIndexActivation(Base):
             self.action = "promote"
         if getattr(self, "created_at", None) is None:
             self.created_at = utcnow()
+
+
+class KnowledgeSourceRevision(Base):
+    """Immutable parsed markdown content revision owned by Knowledge domain."""
+
+    __tablename__ = "knowledge_source_revisions"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"ks_rev_{uuid.uuid4().hex[:12]}"
+    )
+    binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_bindings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    revision_no: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Provenance snapshot (No FK cascade to Documents)
+    origin_document_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    origin_file_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    snapshot_storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    snapshot_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    # Normalized content & hashes
+    canonical_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
+    canonical_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    # Page manifest, citations & quality report
+    page_manifest: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, nullable=False)
+    citation_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    parse_provenance: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    quality_report: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    parser_profile_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    normalizer_version: Mapped[str] = mapped_column(String(32), default="v1", nullable=False)
+    artifact_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    # State: queued | extracting | normalizing | validating | review_required | ready | failed | cancelled
+    status: Mapped[str] = mapped_column(
+        String(32), default="queued", nullable=False, index=True
+    )
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+    # Relationships
+    binding: Mapped[KnowledgeBinding] = relationship(
+        "KnowledgeBinding", back_populates="source_revisions", foreign_keys=[binding_id]
+    )
+    chunk_sets: Mapped[list[KnowledgeChunkSet]] = relationship(
+        "KnowledgeChunkSet",
+        back_populates="source_revision",
+        cascade="all, delete-orphan",
+        foreign_keys="KnowledgeChunkSet.source_revision_id",
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"ks_rev_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "page_manifest", None) is None:
+            self.page_manifest = []
+        if getattr(self, "citation_metadata", None) is None:
+            self.citation_metadata = {}
+        if getattr(self, "parse_provenance", None) is None:
+            self.parse_provenance = {}
+        if getattr(self, "quality_report", None) is None:
+            self.quality_report = {}
+        if getattr(self, "snapshot_metadata", None) is None:
+            self.snapshot_metadata = {}
+        if getattr(self, "lock_version", None) is None:
+            self.lock_version = 1
+        if getattr(self, "status", None) is None:
+            self.status = "queued"
+        if getattr(self, "normalizer_version", None) is None:
+            self.normalizer_version = "v1"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("uq_knowledge_source_rev_binding_rev_no", "binding_id", "revision_no", unique=True),
+        Index("ix_knowledge_source_rev_status", "status"),
+        Index("ix_knowledge_source_rev_origin_doc", "origin_document_id"),
+        Index("ix_knowledge_source_rev_artifact_key", "artifact_key"),
+    )
+
+
+class KnowledgeChunkSet(Base):
+    """Materialized chunks and facts set reusable across multiple vector generations."""
+
+    __tablename__ = "knowledge_chunk_sets"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"chk_set_{uuid.uuid4().hex[:12]}"
+    )
+    source_revision_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_source_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_strategy: Mapped[str] = mapped_column(
+        String(64), default="ClauseBasedChunker", nullable=False
+    )
+    chunk_config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    chunk_set_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    fact_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    manifest_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    status: Mapped[str] = mapped_column(String(32), default="building", nullable=False)  # building, ready, failed
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    source_revision: Mapped[KnowledgeSourceRevision] = relationship(
+        "KnowledgeSourceRevision", back_populates="chunk_sets", foreign_keys=[source_revision_id]
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"chk_set_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "chunk_strategy", None) is None:
+            self.chunk_strategy = "ClauseBasedChunker"
+        if getattr(self, "chunk_config", None) is None:
+            self.chunk_config = {}
+        if getattr(self, "chunk_count", None) is None:
+            self.chunk_count = 0
+        if getattr(self, "fact_count", None) is None:
+            self.fact_count = 0
+        if getattr(self, "status", None) is None:
+            self.status = "building"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("uq_knowledge_chunk_set_rev_config", "source_revision_id", "config_hash", unique=True),
+        Index("ix_knowledge_chunk_set_key", "chunk_set_key"),
+        Index("ix_knowledge_chunk_set_status", "status"),
+    )
+
+
+class KnowledgeImportBatch(Base):
+    """Batch orchestration for snapshot imports from Document Repository into KnowledgeCollection."""
+
+    __tablename__ = "knowledge_import_batches"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"imp_batch_{uuid.uuid4().hex[:12]}"
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(64), default="tenant_qnu", nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(64), default="workspace_qnu", nullable=False, index=True)
+    vector_generation_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_vector_generations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    parser_profile: Mapped[str] = mapped_column(String(64), default="standard", nullable=False)
+    chunk_strategy: Mapped[str] = mapped_column(String(64), default="ClauseBasedChunker", nullable=False)
+    chunk_config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    config_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Aggregate item counts
+    total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    queued_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    processing_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    review_required_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    succeeded_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Status: queued | processing | review_required | ready_to_publish | completed | partial_failed | failed | cancelled
+    status: Mapped[str] = mapped_column(
+        String(32), default="queued", nullable=False, index=True
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    collection: Mapped[KnowledgeCollection] = relationship(
+        "KnowledgeCollection", back_populates="import_batches"
+    )
+    vector_generation: Mapped[KnowledgeVectorGeneration | None] = relationship(
+        "KnowledgeVectorGeneration"
+    )
+    items: Mapped[list[KnowledgeImportItem]] = relationship(
+        "KnowledgeImportItem",
+        back_populates="batch",
+        cascade="all, delete-orphan",
+        foreign_keys="KnowledgeImportItem.batch_id",
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"imp_batch_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "tenant_id", None) is None:
+            self.tenant_id = "tenant_qnu"
+        if getattr(self, "workspace_id", None) is None:
+            self.workspace_id = "workspace_qnu"
+        if getattr(self, "parser_profile", None) is None:
+            self.parser_profile = "standard"
+        if getattr(self, "chunk_strategy", None) is None:
+            self.chunk_strategy = "ClauseBasedChunker"
+        if getattr(self, "chunk_config", None) is None:
+            self.chunk_config = {}
+        if getattr(self, "total_count", None) is None:
+            self.total_count = 0
+        if getattr(self, "queued_count", None) is None:
+            self.queued_count = 0
+        if getattr(self, "processing_count", None) is None:
+            self.processing_count = 0
+        if getattr(self, "review_required_count", None) is None:
+            self.review_required_count = 0
+        if getattr(self, "succeeded_count", None) is None:
+            self.succeeded_count = 0
+        if getattr(self, "failed_count", None) is None:
+            self.failed_count = 0
+        if getattr(self, "skipped_count", None) is None:
+            self.skipped_count = 0
+        if getattr(self, "status", None) is None:
+            self.status = "queued"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("ix_knowledge_import_batches_tenant_ws", "tenant_id", "workspace_id"),
+        Index("ix_knowledge_import_batches_status", "status"),
+        Index("ix_knowledge_import_batches_idem", "collection_id", "idempotency_key"),
+    )
+
+
+class KnowledgeImportItem(Base):
+    """Individual document item tracking within a KnowledgeImportBatch."""
+
+    __tablename__ = "knowledge_import_items"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"imp_item_{uuid.uuid4().hex[:12]}"
+    )
+    batch_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_import_batches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Snapshot provenance
+    origin_document_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    origin_group_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    origin_file_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    origin_file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    origin_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    origin_file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    origin_file_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    origin_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    # Knowledge entity linkages
+    knowledge_binding_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    knowledge_source_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Lifecycle Phase & Status
+    phase: Mapped[str] = mapped_column(
+        String(32), default="snapshot", nullable=False
+    )  # snapshot, parse, normalize, validate, chunk, facts, embed, parity, publish
+    status: Mapped[str] = mapped_column(
+        String(32), default="queued", nullable=False, index=True
+    )  # queued, processing, review_required, succeeded, failed, skipped
+    failure_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    failure_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    # Relationships
+    batch: Mapped[KnowledgeImportBatch] = relationship(
+        "KnowledgeImportBatch", back_populates="items", foreign_keys=[batch_id]
+    )
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"imp_item_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "origin_metadata", None) is None:
+            self.origin_metadata = {}
+        if getattr(self, "phase", None) is None:
+            self.phase = "snapshot"
+        if getattr(self, "status", None) is None:
+            self.status = "queued"
+        if getattr(self, "retry_count", None) is None:
+            self.retry_count = 0
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("uq_knowledge_import_item_batch_doc", "batch_id", "origin_document_id", unique=True),
+        Index("ix_knowledge_import_item_status", "status"),
+        Index("ix_knowledge_import_item_origin_doc", "origin_document_id"),
+    )

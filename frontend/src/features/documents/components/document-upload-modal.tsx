@@ -4,8 +4,8 @@ import {
   ChevronUp,
   FileStack,
   Loader2,
+  ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -40,6 +40,7 @@ import {
   documentTypesApi,
 } from "@/services/document-types-api";
 import { documentsApi } from "@/services/documents-api";
+import { FileIdempotencyManager } from "../utils/idempotency";
 
 interface DocumentUploadModalProps {
   open: boolean;
@@ -59,6 +60,7 @@ interface UploadProgressState {
 export interface UploadFileResult {
   fileName: string;
   status:
+    | "stored"
     | "queued"
     | "processing"
     | "validating"
@@ -74,6 +76,8 @@ export interface UploadFileResult {
 
 function getRevisionStatusLabel(status: string): string {
   switch (status) {
+    case "stored":
+      return "Đã lưu trữ";
     case "queued":
       return "Chờ xử lý";
     case "processing":
@@ -89,7 +93,7 @@ function getRevisionStatusLabel(status: string): string {
     case "cancelled":
       return "Đã hủy";
     default:
-      return "Chờ xử lý";
+      return "Đã lưu trữ";
   }
 }
 
@@ -119,16 +123,9 @@ export function DocumentUploadModal({
     useState<UploadProgressState | null>(null);
   const [uploadResults, setUploadResults] = useState<UploadFileResult[]>([]);
 
-  const idempotencyKeysRef = useRef<WeakMap<File, string>>(new WeakMap());
-
-  function getOrCreateIdempotencyKey(file: File): string {
-    let key = idempotencyKeysRef.current.get(file);
-    if (!key) {
-      key = crypto.randomUUID();
-      idempotencyKeysRef.current.set(file, key);
-    }
-    return key;
-  }
+  const idempotencyManagerRef = useRef<FileIdempotencyManager>(
+    new FileIdempotencyManager(),
+  );
 
   // Lấy danh mục loại văn bản
   const { data: documentTypes = [] } = useQuery({
@@ -150,7 +147,7 @@ export function DocumentUploadModal({
     setProgressState(null);
     setUploadResults([]);
     setIsUploading(false);
-    idempotencyKeysRef.current = new WeakMap();
+    idempotencyManagerRef.current.reset();
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -175,7 +172,7 @@ export function DocumentUploadModal({
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const idempotencyKey = getOrCreateIdempotencyKey(file);
+      const idempotencyKey = idempotencyManagerRef.current.getOrCreate(file);
       const percent = Math.round(((i + 1) / files.length) * 100);
       setProgressState({
         current: i + 1,
@@ -231,15 +228,15 @@ export function DocumentUploadModal({
     if (errors.length === 0) {
       toast.success(
         groupName
-          ? `Đã tiếp nhận ${successCount} tệp vào hàng đợi xử lý của kho "${groupName}".`
-          : `Đã tiếp nhận ${successCount} tệp vào hàng đợi xử lý của Kho Tài Liệu.`,
+          ? `Đã lưu trữ an toàn ${successCount} tệp vào kho "${groupName}".`
+          : `Đã lưu trữ an toàn ${successCount} tệp vào Kho Tài Liệu.`,
       );
       resetForm();
       onOpenChange(false);
       onSuccess?.();
     } else if (successCount > 0) {
       toast.warning(
-        `Đã tiếp nhận ${successCount}/${files.length} tệp. ${errors.length} tệp gặp sự cố.`,
+        `Đã lưu trữ ${successCount}/${files.length} tệp. ${errors.length} tệp gặp sự cố.`,
       );
     } else {
       toast.error(`Không thể tiếp nhận tệp nào: ${errors[0]}`);
@@ -261,9 +258,7 @@ export function DocumentUploadModal({
                   : "Tải tài liệu vào Kho Tài Liệu"}
               </DialogTitle>
               <DialogDescription>
-                {groupName
-                  ? `Tài liệu sau khi tải lên sẽ lưu trữ trên MinIO S3, đưa vào hàng đợi bóc tách V2 và trực thuộc kho "${groupName}".`
-                  : "Hỗ trợ kéo thả nhiều tệp, lưu trữ MinIO S3 chống trùng lặp và tự động nhận diện bóc tách bất đồng bộ."}
+                Tệp được lưu an toàn trong Kho tài liệu. Việc bóc tách và lập chỉ mục được thực hiện khi bạn nạp tệp vào Kho tri thức.
               </DialogDescription>
             </div>
           </div>
@@ -306,22 +301,17 @@ export function DocumentUploadModal({
             />
           </div>
 
-          {/* Banner Nhận diện thông minh (AI & NĐ 30 Engine) */}
+          {/* Banner Lưu trữ an toàn & Toàn vẹn SHA-256 */}
           <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed">
             <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
-              <Sparkles className="size-3.5" />
+              <ShieldCheck className="size-3.5" />
             </div>
             <div className="space-y-0.5">
               <p className="font-semibold text-foreground">
-                Tự động nhận diện thể thức văn bản (Nghị định 30/2020/NĐ-CP)
+                Lưu Trữ Tệp Gốc & Kiểm Soát Toàn Vẹn SHA-256
               </p>
               <p className="text-muted-foreground">
-                Hệ thống tự động phân tích và trích xuất{" "}
-                <span className="font-medium text-foreground">
-                  Số hiệu, Ngày ban hành, Tiêu đề trích yếu và Người ký
-                </span>{" "}
-                từ nội dung từng văn bản sau khi tải lên. Bạn không cần phải
-                nhập thủ công.
+                Tệp được lưu an toàn trong Kho tài liệu. Việc bóc tách và lập chỉ mục được thực hiện khi bạn nạp tệp vào Kho tri thức.
               </p>
             </div>
           </div>
@@ -394,14 +384,6 @@ export function DocumentUploadModal({
               </div>
             </CollapsibleContent>
           </Collapsible>
-
-          {/* Thông tin tự động bóc tách V2 */}
-          <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-            <Sparkles className="size-4 shrink-0 text-primary" />
-            <span className="leading-relaxed">
-              Tài liệu sẽ được tự động bóc tách sau khi tiếp nhận.
-            </span>
-          </div>
 
           {/* Progress bar khi đang tải lên nhiều tệp */}
           {progressState && (

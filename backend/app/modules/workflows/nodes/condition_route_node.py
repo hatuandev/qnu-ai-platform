@@ -16,6 +16,7 @@ from app.modules.workflows.nodes.base import (
     NodeExecutionResult,
     WorkflowContext,
 )
+from app.modules.workflows.nodes.routed_inputs import routed_text
 from app.modules.workflows.schemas import WorkflowNodeSpec
 
 logger = logging.getLogger(__name__)
@@ -94,9 +95,7 @@ def _is_pure_greeting(message: str, tokens: list[str]) -> bool:
     clean_remainder = re.sub(r"[!.,~:;/\-_\s]+", "", remainder)
 
     # 6. Check remaining substantive word count
-    remaining_words = [
-        w for w in re.findall(r"\b\w{2,}\b", remainder) if w not in all_greetings
-    ]
+    remaining_words = [w for w in re.findall(r"\b\w{2,}\b", remainder) if w not in all_greetings]
     if len(remaining_words) >= 2 or len(clean_remainder) >= 8:
         return False
 
@@ -199,7 +198,13 @@ class ConditionRouteNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
-        message = context.node_data.get("user_message", "").lower()
+        routed_message = routed_text(
+            context,
+            node_spec.id,
+            ("message", "question", "query", "text", "response"),
+            context.node_data.get("user_message", ""),
+        )
+        message = routed_message.lower()
         config = node_spec.config or {}
         rules = config.get("rules", [])
         default_node = config.get("default_node")
@@ -221,9 +226,7 @@ class ConditionRouteNodeHandler(BaseNodeHandler):
                     clean_pat = re.sub(r"\\[bBsSwWdD]", " ", pattern)
                     clean_pat = re.sub(r"[()?:^$+*]", " ", clean_pat)
                     greeting_tokens = [
-                        re.sub(r"\s+", " ", t).strip()
-                        for t in clean_pat.split("|")
-                        if t.strip()
+                        re.sub(r"\s+", " ", t).strip() for t in clean_pat.split("|") if t.strip()
                     ]
                     if _is_pure_greeting(message, greeting_tokens):
                         next_target = rule.get("to")
@@ -242,9 +245,7 @@ class ConditionRouteNodeHandler(BaseNodeHandler):
                     if not is_match:
                         tokens = [t.strip() for t in pattern.split("|") if t.strip()]
                         safe_regex = (
-                            r"(?:^|\W)(?:"
-                            + "|".join(re.escape(t) for t in tokens)
-                            + r")(?:\W|$)"
+                            r"(?:^|\W)(?:" + "|".join(re.escape(t) for t in tokens) + r")(?:\W|$)"
                         )
                         if re.search(safe_regex, message, re.IGNORECASE):
                             is_match = True
@@ -275,8 +276,8 @@ class ConditionRouteNodeHandler(BaseNodeHandler):
             output={
                 "next_node": next_target,
                 "matched_rule_id": matched_rule_id,
-                "message": context.node_data.get("user_message", ""),
-                "response": context.node_data.get("user_message", ""),
+                "message": routed_message,
+                "response": routed_message,
             },
             next_node_override=next_target,
         )

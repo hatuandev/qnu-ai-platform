@@ -1,16 +1,26 @@
 import type {
+  ActivateVectorGenerationResponse,
   ApproveDocumentResult,
   AttachDocumentGroupRequest,
   AttachDocumentGroupResponse,
+  AttachGroupSourceRequest,
   AvailableRepositoryDocumentsResponse,
   BackfillReport,
   BackfillRequest,
   BindingChunksResponse,
   BuildStagingIndexRequest,
+  BuildVectorGenerationRequest,
+  BuildVectorGenerationResponse,
   CanaryPolicyResponse,
+  CandidateGroupListResponse,
+  CandidateListResponse,
   CollectionDataProcessingConfig,
+  CollectionSummaryMetrics,
   CreateKnowledgeBindingsRequest,
   CreateKnowledgeBindingsResponse,
+  CreateVectorGenerationRequest,
+  DetachGroupSourceResponse,
+  DocumentVerificationData,
   FactExcelImportResponse,
   FactListResponse,
   GarbageCollectionReport,
@@ -18,27 +28,139 @@ import type {
   IndexActivationRequest,
   IndexActivationResponse,
   KnowledgeBinding,
+  KnowledgeChunkSetResponse,
   KnowledgeCollection,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
+  KnowledgeGroupSource,
+  KnowledgeImportBatchCreateRequest,
+  KnowledgeImportBatchResponse,
   KnowledgeIndexRevision,
   KnowledgeReconciliationReport,
+  KnowledgeSourceDetailResponse,
+  KnowledgeSourceRevisionResponse,
+  KnowledgeVectorGenerationResponse,
   LegacyAuditReport,
   ParsePreviewResult,
   PreviewDocumentGroupResponse,
+  PreviewGroupSourceDiffResponse,
+  PublishGroupSourceResponse,
   ReconcileFixResponse,
   ReindexDocumentResponse,
   RollbackIndexRevisionRequest,
   ShadowRetrievalReport,
   ShadowRetrievalRequest,
+  SyncGroupSourceRequest,
+  SyncGroupSourceResponse,
   SystemDecommissioningAuditReport,
   SystemGarbageCollectionReport,
   SystemGarbageCollectionRequest,
   UpdateCanaryPolicyRequest,
+  VectorLoadItem,
+  VectorLoadJob,
+  VectorLoadState,
 } from "@/types/knowledge";
 import { BASE_URL, getAuthHeaders } from "./http-client";
 
+/**
+ * Chuẩn hóa đọc lỗi RFC 7807 (ưu tiên detail -> message -> title -> fallback)
+ */
+export function extractErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "string" && err.trim()) return err;
+  if (err && typeof err === "object") {
+    const e = err as Record<string, unknown>;
+    if (typeof e.detail === "string" && e.detail.trim()) return e.detail;
+    if (typeof e.message === "string" && e.message.trim()) return e.message;
+    if (typeof e.title === "string" && e.title.trim()) return e.title;
+  }
+  return fallback;
+}
+
+export interface KnowledgePurgeJob {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  error: string | null;
+}
+
 export const knowledgeApi = {
+  async getAllBindings(collectionId: string): Promise<KnowledgeBinding[]> {
+    const items: KnowledgeBinding[] = [];
+    let page = 1;
+    while (true) {
+      const batch = await knowledgeApi.getBindings(
+        collectionId,
+        undefined,
+        page,
+        100,
+      );
+      items.push(...batch);
+      if (batch.length < 100) return items;
+      page += 1;
+    }
+  },
+
+  async getVectorLoadState(collectionId: string): Promise<VectorLoadState> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-load`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) throw new Error("Không tải được trạng thái nạp vector.");
+    return res.json();
+  },
+
+  async loadSourceVectors(
+    collectionId: string,
+    generationId: string,
+    items: VectorLoadItem[],
+  ): Promise<VectorLoadJob[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-load`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ generation_id: generationId, items }),
+      },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không xếp hàng nạp vector được.",
+        ),
+      );
+    return res.json();
+  },
+  async purgeSource(bindingId: string): Promise<KnowledgePurgeJob> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/purge`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        err.detail || `Không xóa được nguồn (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+
+  async getSourcePurgeJob(
+    bindingId: string,
+    jobId: string,
+  ): Promise<KnowledgePurgeJob> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/purge/jobs/${jobId}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok)
+      throw new Error(`Không đọc được tiến trình xóa (HTTP ${res.status}).`);
+    return res.json();
+  },
   async getCollections(): Promise<KnowledgeCollection[]> {
     const res = await fetch(`${BASE_URL}/knowledge/collections`);
     if (!res.ok) {
@@ -130,13 +252,36 @@ export const knowledgeApi = {
     chunking_strategy?: string;
     data_processing?: CollectionDataProcessingConfig;
   }): Promise<KnowledgeCollection> {
+    const moduleCode =
+      payload.code?.trim() ||
+      payload.name
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "_")
+        .slice(0, 32) ||
+      "admissions";
+    const bodyPayload = {
+      name: payload.name,
+      description: payload.description,
+      module_code: moduleCode,
+      metadata: {
+        ocr_profile: payload.ocr_profile,
+        chunking_strategy: payload.chunking_strategy,
+      },
+      data_processing: payload.data_processing,
+    };
     const res = await fetch(`${BASE_URL}/knowledge/collections`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify(bodyPayload),
     });
     if (!res.ok) {
-      throw new Error(`Tạo kho tri thức thất bại (HTTP ${res.status}).`);
+      const errData = await res.json().catch(() => null);
+      const detail = errData?.detail || errData?.message;
+      throw new Error(
+        detail
+          ? `Tạo kho tri thức thất bại: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`
+          : `Tạo kho tri thức thất bại (HTTP ${res.status}).`,
+      );
     }
     return await res.json();
   },
@@ -1102,6 +1247,717 @@ export const knowledgeApi = {
         (err as { detail?: string }).detail ||
           (err as { message?: string }).message ||
           `Đưa nhóm vào kho tri thức thất bại (HTTP ${res.status}).`,
+      );
+    }
+    return res.json();
+  },
+  /**
+   * Lấy danh sách nguồn nhóm tài liệu của Kho Tri Thức
+   */
+  async getGroupSources(collectionId: string): Promise<KnowledgeGroupSource[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi tải nguồn nhóm (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Xem trước một nhóm tài liệu trước khi thêm làm nguồn
+   */
+  async previewAttachGroup(
+    collectionId: string,
+    groupId: string,
+  ): Promise<PreviewGroupSourceDiffResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/preview-attach`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ group_id: groupId }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Xem trước nguồn nhóm thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Thêm một nhóm tài liệu làm nguồn lâu dài
+   */
+  async attachGroupSource(
+    collectionId: string,
+    payload: AttachGroupSourceRequest,
+  ): Promise<KnowledgeGroupSource> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Thêm nguồn nhóm thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Xem trước thay đổi của một nguồn nhóm đã liên kết
+   */
+  async previewSourceSync(
+    collectionId: string,
+    sourceId: string,
+  ): Promise<PreviewGroupSourceDiffResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/preview`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Xem trước đồng bộ thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Đồng bộ nguồn nhóm tài liệu
+   */
+  async syncGroupSource(
+    collectionId: string,
+    sourceId: string,
+    payload?: SyncGroupSourceRequest,
+  ): Promise<SyncGroupSourceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/sync`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload || {}),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Đồng bộ nguồn nhóm thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Xuất bản chỉ mục staging của nguồn nhóm
+   */
+  async publishGroupSource(
+    collectionId: string,
+    sourceId: string,
+  ): Promise<PublishGroupSourceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/publish`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Xuất bản nguồn nhóm thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Gỡ nguồn nhóm tài liệu khỏi Kho Tri Thức
+   */
+  async detachGroupSource(
+    collectionId: string,
+    sourceId: string,
+    detachBindings: boolean = true,
+  ): Promise<DetachGroupSourceResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}?detach_bindings=${detachBindings}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Gỡ nguồn nhóm thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  /**
+   * Lấy số liệu đo lường tổng hợp và trạng thái nghiệp vụ thật của Kho Tri Thức
+   */
+  async getCollectionSummaryMetrics(
+    collectionId: string,
+  ): Promise<CollectionSummaryMetrics> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/summary-metrics`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi tải số liệu kho (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  // ==============================================================================
+  // V3 Candidate Groups & Documents (ADR-012)
+  // ==============================================================================
+
+  async getCandidateGroups(
+    collectionId: string,
+  ): Promise<CandidateGroupListResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/candidate-groups`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi tải nhóm ứng viên (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  async getCandidateDocuments(
+    collectionId: string,
+    params: {
+      group_id?: string;
+      vector_generation_id?: string;
+      source_status?: string;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<CandidateListResponse> {
+    const sp = new URLSearchParams();
+    if (params.group_id) sp.set("group_id", params.group_id);
+    if (params.vector_generation_id)
+      sp.set("vector_generation_id", params.vector_generation_id);
+    if (params.source_status) sp.set("source_status", params.source_status);
+    if (params.search) sp.set("search", params.search);
+    if (params.limit) sp.set("limit", String(params.limit));
+    if (params.offset) sp.set("offset", String(params.offset));
+
+    const qs = sp.toString() ? `?${sp.toString()}` : "";
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/candidate-documents${qs}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi tải tài liệu ứng viên (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  // ==============================================================================
+  // V3 Snapshot Import Batches (ADR-012)
+  // ==============================================================================
+
+  async createImportBatch(
+    collectionId: string,
+    payload: KnowledgeImportBatchCreateRequest,
+    idempotencyKey?: string,
+  ): Promise<KnowledgeImportBatchResponse> {
+    const headers = new Headers(getAuthHeaders());
+    headers.set("Content-Type", "application/json");
+    if (idempotencyKey) {
+      headers.set("Idempotency-Key", idempotencyKey);
+    }
+
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/imports`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Tạo đợt nạp tài liệu thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async getImportBatch(
+    collectionId: string,
+    batchId: string,
+  ): Promise<KnowledgeImportBatchResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/imports/${batchId}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi tải đợt nạp (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  async retryFailedImportItems(
+    collectionId: string,
+    batchId: string,
+  ): Promise<KnowledgeImportBatchResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/imports/${batchId}/retry-failed`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Thử lại đợt nạp thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async cancelImportBatch(
+    collectionId: string,
+    batchId: string,
+  ): Promise<KnowledgeImportBatchResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/imports/${batchId}/cancel`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Hủy đợt nạp thất bại (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  // ==============================================================================
+  // V3 Knowledge Source Lifecycle & Human Review (ADR-012)
+  // ==============================================================================
+
+  async getKnowledgeSource(
+    collectionId: string,
+    sourceId: string,
+  ): Promise<KnowledgeSourceDetailResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi tải nguồn tri thức (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async listSourceRevisions(
+    collectionId: string,
+    sourceId: string,
+  ): Promise<KnowledgeSourceRevisionResponse[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi tải danh sách bản sửa đổi (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async updateSourceRevisionContent(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    markdown: string,
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/content`,
+      {
+        method: "PATCH",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ canonical_markdown: markdown }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi hiệu đính nội dung (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async reviewSourceRevision(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    decision: "approved" | "rejected",
+    comment?: string,
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/review`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ decision, comment }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi phê duyệt bản sửa đổi (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async getSourceStudioView(
+    collectionId: string,
+    sourceId: string,
+    revisionId?: string,
+  ): Promise<DocumentVerificationData> {
+    const url = revisionId
+      ? `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/studio?revision_id=${revisionId}`
+      : `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/studio`;
+    const res = await fetch(url, { headers: getAuthHeaders() });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Không tải được dữ liệu bóc tách Studio (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    const v = (await res.json()) as {
+      document_id: string;
+      revision_id?: string;
+      collection_id: string;
+      title: string;
+      filename: string;
+      engine: string;
+      status?: string;
+      index_status?: string;
+      total_pages: number;
+      file_size_bytes?: number;
+      total_chunks?: number;
+      pages: {
+        page_number: number;
+        markdown_content: string;
+        raw_text: string;
+        word_count: number;
+        line_count: number;
+        image_url: string | null;
+        dimensions?: { width: number; height: number };
+        has_tables?: boolean;
+        bounding_boxes: DocumentVerificationData["pages"][number]["bounding_boxes"];
+        regions: DocumentVerificationData["pages"][number]["regions"];
+      }[];
+    };
+    const totalChars = v.pages.reduce(
+      (sum, p) => sum + (p.markdown_content ? p.markdown_content.length : 0),
+      0,
+    );
+    const sizeBytes =
+      typeof v.file_size_bytes === "number" ? v.file_size_bytes : 0;
+    return {
+      document_id: v.document_id,
+      revision_id: v.revision_id,
+      collection_id: v.collection_id,
+      title: v.title,
+      filename: v.filename,
+      status: v.status,
+      index_status: v.index_status,
+      file_size_mb: Math.round((sizeBytes / 1048576) * 100) / 100,
+      total_pages: v.total_pages,
+      engine: v.engine,
+      total_chars: totalChars,
+      estimated_chunks: typeof v.total_chunks === "number" ? v.total_chunks : 0,
+      pages: v.pages.map((p) => ({
+        page_number: p.page_number,
+        word_count: p.word_count,
+        line_count: p.line_count,
+        image_url: p.image_url || undefined,
+        dimensions: p.dimensions,
+        has_tables: p.has_tables,
+        markdown_content: p.markdown_content,
+        raw_text: p.raw_text,
+        bounding_boxes: p.bounding_boxes || [],
+        regions: p.regions || [],
+      })),
+    };
+  },
+
+  async reparseSource(
+    collectionId: string,
+    sourceId: string,
+    payload: { parser_profile: string; ocr_engine?: string },
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/reparse`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Bóc tách lại nguồn tài liệu thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  // ==============================================================================
+  // V3 Vector Generations & Multi-Vector Spaces (ADR-012)
+  // ==============================================================================
+
+  async listVectorGenerations(
+    collectionId: string,
+  ): Promise<KnowledgeVectorGenerationResponse[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi tải thế hệ vector (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
+  async createVectorGeneration(
+    collectionId: string,
+    payload: CreateVectorGenerationRequest,
+  ): Promise<KnowledgeVectorGenerationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Tạo thế hệ vector thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async buildVectorGeneration(
+    collectionId: string,
+    generationId: string,
+    payload: BuildVectorGenerationRequest = {},
+  ): Promise<BuildVectorGenerationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/build`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lập chỉ mục thế hệ vector thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async activateVectorGeneration(
+    collectionId: string,
+    generationId: string,
+  ): Promise<ActivateVectorGenerationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/activate`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Kích hoạt thế hệ vector thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    return res.json();
+  },
+
+  async rollbackVectorGeneration(
+    collectionId: string,
+    generationId: string,
+  ): Promise<ActivateVectorGenerationResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/rollback`,
+      { method: "POST", headers: getAuthHeaders() },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, "Khôi phục chỉ mục thất bại."));
+    }
+    return res.json();
+  },
+
+  async listSourceChunkSets(
+    collectionId: string,
+    sourceId: string,
+  ): Promise<KnowledgeChunkSetResponse[]> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/chunk-sets`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Lỗi tải danh sách tập đoạn cắt (HTTP ${res.status}).`,
+        ),
       );
     }
     return res.json();

@@ -1,6 +1,10 @@
 /** Types for Studio OCR & Document Sandbox */
 
 export interface StudioOCRRegion {
+  id?: string;
+  readingOrder?: number;
+  layoutConfidence?: number | null;
+  textConfidence?: number | null;
   type: string;
   label: string;
   text: string;
@@ -32,6 +36,7 @@ export interface StudioOCRPage {
 }
 
 export interface StudioOCRDocument {
+  revisionId?: string;
   filename: string;
   totalPages: number;
   size: string;

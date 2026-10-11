@@ -30,6 +30,7 @@ class WorkflowContext:
     execution_id: str | None = None
     node_traces: list[NodeExecutionTrace] = field(default_factory=list)
     node_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    node_input_sources: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
 
 @dataclass

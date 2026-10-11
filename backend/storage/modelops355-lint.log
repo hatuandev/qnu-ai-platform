@@ -1,0 +1,1552 @@
+npm notice run qnu-ai-platform-frontend@0.1.0 lint
+npm notice run biome check .
+biome.json:2:14 deserialize ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The configuration schema version does not match the CLI version 2.5.15
+  
+    1 │ {
+  > 2 │   "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+      │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    3 │   "files": {
+    4 │     "includes": ["**", "!dist", "!src/routeTree.gen.ts"]
+  
+  i   Expected:                     2.5.15
+      Found:                        2.5.7
+  
+  
+  i Run the command biome migrate to migrate the configuration file.
+  
+
+biome.json:17:13 deserialize  DEPRECATED  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The use of the recommended field has been deprecated, and will removed in the next major version of Biome. Use preset instead.
+  
+    15 │     }
+    16 │   },
+  > 17 │   "linter": {
+       │             ^
+  > 18 │     "enabled": true,
+  > 19 │     "rules": {
+  > 20 │       "recommended": true
+  > 21 │     }
+  > 22 │   },
+       │   ^
+    23 │   "javascript": {
+    24 │     "formatter": {
+  
+  i Migrate the configuration with the proper command
+  
+  $ biome migrate
+  
+
+src\components\knowledge\tabs\collection-group-sources-tab.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·useMutation,·useQuery,·useQueryClient·}·from·"@tanstack/react-query";
+      2     │ - import·{·useNavigate·}·from·"@tanstack/react-router";
+      3     │ - import·{
+      4     │ - ··AlertCircle,
+      5     │ - ··CheckCircle2,
+      6     │ - ··Clock,
+      7     │ - ··Eye,
+      8     │ - ··FileCheck2,
+      9     │ - ··FolderGit2,
+     10     │ - ··RefreshCw,
+     11     │ - ··Search,
+     12     │ - ··Sparkles,
+     13     │ - }·from·"lucide-react";
+     14     │ - import·type·React·from·"react";
+     15     │ - import·{·useState·}·from·"react";
+     16     │ - import·{·toast·}·from·"sonner";
+     17     │ - import·{·EmptyState·}·from·"@/components/admin/empty-state";
+     18     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     19     │ - import·{·Button·}·from·"@/components/ui/button";
+     20     │ - import·{
+     21     │ - ··Card,
+     22     │ - ··CardContent,
+     23     │ - ··CardDescription,
+     24     │ - ··CardFooter,
+     25     │ - ··CardHeader,
+     26     │ - ··CardTitle,
+     27     │ - }·from·"@/components/ui/card";
+     28     │ - import·{·Input·}·from·"@/components/ui/input";
+     29     │ - import·{·extractErrorMessage,·knowledgeApi·}·from·"@/services/knowledge-api";
+     30     │ - import·type·{
+     31     │ - ··KnowledgeCollection,
+     32     │ - ··KnowledgeGroupSource,
+     33     │ - }·from·"@/types/knowledge";
+     34     │ - 
+     35     │ - interface·CollectionGroupSourcesTabProps·{
+     36     │ - ··collection:·KnowledgeCollection;
+     37     │ - ··onAddSource:·()·=>·void;
+     38     │ - }
+     39     │ - 
+     40     │ - export·const·CollectionGroupSourcesTab:·React.FC<
+     41     │ - ··CollectionGroupSourcesTabProps
+     42     │ - >·=·({·collection,·onAddSource·})·=>·{
+     43     │ - ··const·queryClient·=·useQueryClient();
+     44     │ - ··const·navigate·=·useNavigate();
+     45     │ - ··const·[search,·setSearch]·=·useState("");
+     46     │ - ··const·[syncingSourceId,·setSyncingSourceId]·=·useState<string·|·null>(null);
+     47     │ - 
+     48     │ - ··//·1.·Fetch·Group·Sources
+     49     │ - ··const·{
+     50     │ - ····data:·sources·=·[],
+     51     │ - ····isLoading,
+     52     │ - ····refetch,
+     53     │ - ····isRefetching,
+     54     │ - ··}·=·useQuery({
+     55     │ - ····queryKey:·["knowledge-group-sources",·collection.id],
+     56     │ - ····queryFn:·()·=>·knowledgeApi.getGroupSources(collection.id),
+     57     │ - ··});
+     58     │ - 
+     59     │ - ··//·2.·Mutation·Sync·Group·Source
+     60     │ - ··const·syncMutation·=·useMutation({
+     61     │ - ····mutationFn:·(sourceId:·string)·=>·{
+     62     │ - ······setSyncingSourceId(sourceId);
+     63     │ - ······return·knowledgeApi.syncGroupSource(collection.id,·sourceId,·{
+     64     │ - ········confirm_detach_removed:·false,
+     65     │ - ······});
+     66     │ - ····},
+     67     │ - ····onSuccess:·(data)·=>·{
+     68     │ - ······if·(data.failed_count·>·0·||·data.status·===·"failed")·{
+     69     │ - ········toast.error(data.message·||·`Đồng·bộ·nguồn·nhóm·có·${data.failed_count}·lỗi.`);
+     70     │ - ······}·else·if·(data.status·===·"review_required")·{
+     71     │ - ········toast.info(data.message·||·"Đã·lập·chỉ·mục·staging,·chờ·xuất·bản.");
+     72     │ - ······}·else·{
+     73     │ - ········toast.success(data.message·||·"Đồng·bộ·nguồn·nhóm·tài·liệu·thành·công.");
+     74     │ - ······}
+     75     │ - 
+     76     │ - ······queryClient.invalidateQueries({
+     77     │ - ········queryKey:·["knowledge-group-sources",·collection.id],
+     78     │ - ······});
+     79     │ - ······queryClient.invalidateQueries({
+     80     │ - ········queryKey:·["preview-source-sync",·collection.id],
+     81     │ - ······});
+     82     │ - ······queryClient.invalidateQueries({
+     83     │ - ········queryKey:·["collection-summary-metrics",·collection.id],
+     84     │ - ······});
+     85     │ - ······queryClient.invalidateQueries({
+     86     │ - ········queryKey:·["knowledge-collection",·collection.id],
+     87     │ - ······});
+     88     │ - ····},
+     89     │ - ····onError:·(err:·unknown)·=>·{
+     90     │ - ······toast.error(extractErrorMessage(err,·"Đồng·bộ·thất·bại."));
+     91     │ - ····},
+     92     │ - ····onSettled:·()·=>·{
+     93     │ - ······setSyncingSourceId(null);
+     94     │ - ····},
+     95     │ - ··});
+     96     │ - 
+     97     │ - ··//·Filter·sources·by·search·query
+     98     │ - ··const·filteredSources·=·sources.filter((s)·=>
+     99     │ - ····s.group_name.toLowerCase().includes(search.toLowerCase()),
+    100     │ - ··);
+    101     │ - 
+    102     │ - ··const·getStatusBadge·=·(status:·KnowledgeGroupSource["status"])·=>·{
+    103     │ - ····switch·(status)·{
+    104     │ - ······case·"ready":
+    105     │ - ········return·(
+    106     │ - ··········<Badge
+    107     │ - ············variant="outline"
+    108     │ - ············className="bg-success/10·text-success·border-success/30·gap-1·text-[11px]"
+    109     │ - ··········>
+    110     │ - ············<CheckCircle2·className="size-3"·/>
+    111     │ - ············Sẵn·sàng
+    112     │ - ··········</Badge>
+    113     │ - ········);
+    114     │ - ······case·"updates_available":
+    115     │ - ········return·(
+    116     │ - ··········<Badge
+    117     │ - ············variant="outline"
+    118     │ - ············className="bg-warning/10·text-warning·border-warning/30·gap-1·text-[11px]"
+    119     │ - ··········>
+    120     │ - ············<Sparkles·className="size-3"·/>
+    121     │ - ············Có·cập·nhật
+    122     │ - ··········</Badge>
+    123     │ - ········);
+    124     │ - ······case·"up_to_date":
+    125     │ - ········return·(
+    126     │ - ··········<Badge
+    127     │ - ············variant="outline"
+    128     │ - ············className="bg-success/10·text-success·border-success/30·gap-1·text-[11px]"
+    129     │ - ··········>
+    130     │ - ············<CheckCircle2·className="size-3"·/>
+    131     │ - ············Đã·đồng·bộ
+    132     │ - ··········</Badge>
+    133     │ - ········);
+    134     │ - ······case·"pending":
+    135     │ - ········return·(
+    136     │ - ··········<Badge
+    137     │ - ············variant="outline"
+    138     │ - ············className="bg-muted·text-muted-foreground·border-border·gap-1·text-[11px]"
+    139     │ - ··········>
+    140     │ - ············<Clock·className="size-3"·/>
+    141     │ - ············Chờ·xử·lý
+    142     │ - ··········</Badge>
+    143     │ - ········);
+    144     │ - ······case·"review_required":
+    145     │ - ········return·(
+    146     │ - ··········<Badge
+    147     │ - ············variant="outline"
+    148     │ - ············className="bg-primary/10·text-primary·border-primary/30·gap-1·text-[11px]"
+    149     │ - ··········>
+    150     │ - ············<FileCheck2·className="size-3"·/>
+  718 more lines truncated
+  
+
+src\features\documents\components\document-card.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·Link·}·from·"@tanstack/react-router";
+      2     │ - import·{
+      3     │ - ··ArrowUpRight,
+      4     │ - ··Calendar,
+      5     │ - ··Download,
+      6     │ - ··FileCode,
+      7     │ - ··FileSpreadsheet,
+      8     │ - ··FileText,
+      9     │ - ··HardDrive,
+     10     │ - ··Hash,
+     11     │ - ··MoreVertical,
+     12     │ - ··Trash2,
+     13     │ - }·from·"lucide-react";
+     14     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     15     │ - import·{·Button·}·from·"@/components/ui/button";
+     16     │ - import·{·Card,·CardContent·}·from·"@/components/ui/card";
+     17     │ - import·{·Checkbox·}·from·"@/components/ui/checkbox";
+     18     │ - import·{
+     19     │ - ··DropdownMenu,
+     20     │ - ··DropdownMenuContent,
+     21     │ - ··DropdownMenuItem,
+     22     │ - ··DropdownMenuSeparator,
+     23     │ - ··DropdownMenuTrigger,
+     24     │ - }·from·"@/components/ui/dropdown-menu";
+     25     │ - import·{·documentsApi·}·from·"@/services/documents-api";
+     26     │ - import·type·{·RepositoryDocumentListItem·}·from·"@/types/documents";
+     27     │ - 
+     28     │ - interface·DocumentCardProps·{
+     29     │ - ··document:·RepositoryDocumentListItem;
+     30     │ - ··selected?:·boolean;
+     31     │ - ··onToggleSelect?:·(id:·string)·=>·void;
+     32     │ - ··onDelete:·(doc:·RepositoryDocumentListItem)·=>·void;
+     33     │ - }
+     34     │ - 
+     35     │ - function·formatFileSize(bytes:·number):·string·{
+     36     │ - ··if·(bytes·<·1024)·return·`${bytes}·B`;
+     37     │ - ··if·(bytes·<·1024·*·1024)·return·`${(bytes·/·1024).toFixed(1)}·KB`;
+     38     │ - ··return·`${(bytes·/·(1024·*·1024)).toFixed(1)}·MB`;
+     39     │ - }
+     40     │ - 
+     41     │ - function·getFileIcon(fileType:·string)·{
+     42     │ - ··switch·(fileType.toLowerCase())·{
+     43     │ - ····case·"pdf":
+     44     │ - ······return·<FileText·className="size-5·text-destructive"·/>;
+     45     │ - ····case·"xlsx":
+     46     │ - ····case·"xls":
+     47     │ - ······return·<FileSpreadsheet·className="size-5·text-success"·/>;
+     48     │ - ····case·"md":
+     49     │ - ····case·"txt":
+     50     │ - ······return·<FileCode·className="size-5·text-info"·/>;
+     51     │ - ····default:
+     52     │ - ······return·<FileText·className="size-5·text-primary"·/>;
+     53     │ - ··}
+     54     │ - }
+     55     │ - 
+     56     │ - export·function·DocumentCard({
+     57     │ - ··document,
+     58     │ - ··selected·=·false,
+     59     │ - ··onToggleSelect,
+     60     │ - ··onDelete,
+     61     │ - }:·DocumentCardProps)·{
+     62     │ - ··const·downloadUrl·=·documentsApi.getDownloadUrl(document.id);
+     63     │ - 
+     64     │ - ··return·(
+     65     │ - ····<Card
+     66     │ - ······className={`group·relative·flex·flex-col·transition-all·duration-200·hover:border-primary/40·hover:shadow-md·${selected·?·"border-primary·bg-primary/5"·:·""}`}
+     67     │ - ····>
+     68     │ - ······<CardContent·className="flex·flex-1·flex-col·p-4">
+     69     │ - ········{/*·Header:·Checkbox·+·File·icon·+·Title·+·Menu·*/}
+     70     │ - ········<div·className="flex·items-start·justify-between·gap-2">
+     71     │ - ··········<div·className="flex·items-start·gap-2.5·min-w-0">
+     72     │ - ············{onToggleSelect·&&·(
+     73     │ - ··············<div·className="pt-1">
+     74     │ - ················<Checkbox
+     75     │ - ··················checked={selected}
+     76     │ - ··················onCheckedChange={()·=>·onToggleSelect(document.id)}
+     77     │ - ··················aria-label={`Chọn·${document.title·||·document.file_name}`}
+     78     │ - ················/>
+     79     │ - ··············</div>
+     80     │ - ············)}
+     81     │ - ············<div·className="flex·size-9·shrink-0·items-center·justify-center·rounded-lg·bg-muted/70·group-hover:bg-primary/10·transition-colors">
+     82     │ - ··············{getFileIcon(document.file_type)}
+     83     │ - ············</div>
+     84     │ - ············<div·className="min-w-0">
+     85     │ - ··············<Link
+     86     │ - ················to="/documents/$documentId"
+     87     │ - ················params={{·documentId:·document.id·}}
+     88     │ - ················className="font-medium·text-sm·text-foreground·hover:text-primary·transition-colors·line-clamp-1"
+     89     │ - ················title={document.title·||·document.file_name}
+     90     │ - ··············>
+     91     │ - ················{document.title·||·document.file_name}
+     92     │ - ··············</Link>
+     93     │ - ··············<div·className="flex·items-center·gap-2·mt-0.5·text-xs·text-muted-foreground·truncate">
+     94     │ - ················<span>{document.file_name}</span>
+     95     │ - ················<span>•</span>
+     96     │ - ················<span>{formatFileSize(document.file_size_bytes)}</span>
+     97     │ - ··············</div>
+     98     │ - ············</div>
+     99     │ - ··········</div>
+    100     │ - 
+    101     │ - ··········<DropdownMenu>
+    102     │ - ············<DropdownMenuTrigger·asChild>
+    103     │ - ··············<Button
+    104     │ - ················variant="ghost"
+    105     │ - ················size="icon"
+    106     │ - ················className="size-7·shrink-0·text-muted-foreground·hover:text-foreground"
+    107     │ - ··············>
+    108     │ - ················<MoreVertical·className="size-4"·/>
+    109     │ - ··············</Button>
+    110     │ - ············</DropdownMenuTrigger>
+    111     │ - ············<DropdownMenuContent·align="end"·className="w-44">
+    112     │ - ··············<DropdownMenuItem·asChild>
+    113     │ - ················<Link
+    114     │ - ··················to="/documents/$documentId"
+    115     │ - ··················params={{·documentId:·document.id·}}
+    116     │ - ··················className="gap-2·cursor-pointer"
+    117     │ - ················>
+    118     │ - ··················<ArrowUpRight·className="size-4·text-muted-foreground"·/>
+    119     │ - ··················Xem·Chi·Tiết
+    120     │ - ················</Link>
+    121     │ - ··············</DropdownMenuItem>
+    122     │ - ··············<DropdownMenuItem·asChild>
+    123     │ - ················<a
+    124     │ - ··················href={downloadUrl}
+    125     │ - ··················download={document.file_name}
+    126     │ - ··················className="gap-2·cursor-pointer"
+    127     │ - ················>
+    128     │ - ··················<Download·className="size-4·text-muted-foreground"·/>
+    129     │ - ··················Tải·Về·Tệp·Gốc
+    130     │ - ················</a>
+    131     │ - ··············</DropdownMenuItem>
+    132     │ - ··············<DropdownMenuSeparator·/>
+    133     │ - ··············<DropdownMenuItem
+    134     │ - ················onClick={()·=>·onDelete(document)}
+    135     │ - ················className="gap-2·text-destructive·focus:text-destructive·cursor-pointer"
+    136     │ - ··············>
+    137     │ - ················<Trash2·className="size-4"·/>
+    138     │ - ················Xóa·Khỏi·Kho
+    139     │ - ··············</DropdownMenuItem>
+    140     │ - ············</DropdownMenuContent>
+    141     │ - ··········</DropdownMenu>
+    142     │ - ········</div>
+    143     │ - 
+    144     │ - ········{/*·Metadata·Badges:·Số·hiệu·&·Loại·VB·&·Nhóm·*/}
+    145     │ - ········<div·className="flex·flex-wrap·items-center·gap-1.5·mt-3.5">
+    146     │ - ··········{document.document_number·&&·(
+    147     │ - ············<Badge
+    148     │ - ··············variant="outline"
+    149     │ - ··············className="gap-1·font-mono·text-[11px]·py-0·h-5"
+    150     │ - ············>
+  259 more lines truncated
+  
+
+src\features\documents\components\document-upload-modal.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    259 259 │                 </DialogTitle>␍
+    260 260 │                 <DialogDescription>␍
+    261     │ - ················Tệp·được·lưu·an·toàn·trong·Kho·tài·liệu.·Việc·bóc·tách·và·lập·chỉ·mục·được·thực·hiện·khi·bạn·nạp·tệp·vào·Kho·tri·thức.␍
+        261 │ + ················Tệp·được·lưu·an·toàn·trong·Kho·tài·liệu.·Việc·bóc·tách·và·lập␍
+        262 │ + ················chỉ·mục·được·thực·hiện·khi·bạn·nạp·tệp·vào·Kho·tri·thức.␍
+    262 263 │                 </DialogDescription>␍
+    263 264 │               </div>␍
+    ······· │ 
+    312 313 │                 </p>␍
+    313 314 │                 <p className="text-muted-foreground">␍
+    314     │ - ················Tệp·được·lưu·an·toàn·trong·Kho·tài·liệu.·Việc·bóc·tách·và·lập·chỉ·mục·được·thực·hiện·khi·bạn·nạp·tệp·vào·Kho·tri·thức.␍
+        315 │ + ················Tệp·được·lưu·an·toàn·trong·Kho·tài·liệu.·Việc·bóc·tách·và·lập␍
+        316 │ + ················chỉ·mục·được·thực·hiện·khi·bạn·nạp·tệp·vào·Kho·tri·thức.␍
+    315 317 │                 </p>␍
+    316 318 │               </div>␍
+  
+
+src\features\documents\components\documents-table.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·Link·}·from·"@tanstack/react-router";
+      2     │ - import·{
+      3     │ - ··ArrowUpRight,
+      4     │ - ··Download,
+      5     │ - ··FileCode,
+      6     │ - ··FileSpreadsheet,
+      7     │ - ··FileText,
+      8     │ - ··Folders,
+      9     │ - ··Hash,
+     10     │ - ··MoreHorizontal,
+     11     │ - ··Trash2,
+     12     │ - }·from·"lucide-react";
+     13     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     14     │ - import·{·Button·}·from·"@/components/ui/button";
+     15     │ - import·{·Checkbox·}·from·"@/components/ui/checkbox";
+     16     │ - import·{
+     17     │ - ··DropdownMenu,
+     18     │ - ··DropdownMenuContent,
+     19     │ - ··DropdownMenuItem,
+     20     │ - ··DropdownMenuSeparator,
+     21     │ - ··DropdownMenuTrigger,
+     22     │ - }·from·"@/components/ui/dropdown-menu";
+     23     │ - import·{
+     24     │ - ··Table,
+     25     │ - ··TableBody,
+     26     │ - ··TableCell,
+     27     │ - ··TableHead,
+     28     │ - ··TableHeader,
+     29     │ - ··TableRow,
+     30     │ - }·from·"@/components/ui/table";
+     31     │ - import·{·documentsApi·}·from·"@/services/documents-api";
+     32     │ - import·type·{·RepositoryDocumentListItem·}·from·"@/types/documents";
+     33     │ - 
+     34     │ - interface·DocumentsTableProps·{
+     35     │ - ··documents:·RepositoryDocumentListItem[];
+     36     │ - ··selectedIds:·string[];
+     37     │ - ··onToggleSelect:·(id:·string)·=>·void;
+     38     │ - ··onToggleSelectAll:·()·=>·void;
+     39     │ - ··onDelete:·(doc:·RepositoryDocumentListItem)·=>·void;
+     40     │ - }
+     41     │ - 
+     42     │ - function·formatFileSize(bytes:·number):·string·{
+     43     │ - ··if·(bytes·<·1024)·return·`${bytes}·B`;
+     44     │ - ··if·(bytes·<·1024·*·1024)·return·`${(bytes·/·1024).toFixed(1)}·KB`;
+     45     │ - ··return·`${(bytes·/·(1024·*·1024)).toFixed(1)}·MB`;
+     46     │ - }
+     47     │ - 
+     48     │ - function·getFileIcon(fileType:·string)·{
+     49     │ - ··switch·(fileType.toLowerCase())·{
+     50     │ - ····case·"pdf":
+     51     │ - ······return·<FileText·className="size-4·text-destructive"·/>;
+     52     │ - ····case·"xlsx":
+     53     │ - ····case·"xls":
+     54     │ - ······return·<FileSpreadsheet·className="size-4·text-success"·/>;
+     55     │ - ····case·"md":
+     56     │ - ····case·"txt":
+     57     │ - ······return·<FileCode·className="size-4·text-info"·/>;
+     58     │ - ····default:
+     59     │ - ······return·<FileText·className="size-4·text-primary"·/>;
+     60     │ - ··}
+     61     │ - }
+     62     │ - 
+     63     │ - export·function·DocumentsTable({
+     64     │ - ··documents,
+     65     │ - ··selectedIds,
+     66     │ - ··onToggleSelect,
+     67     │ - ··onToggleSelectAll,
+     68     │ - ··onDelete,
+     69     │ - }:·DocumentsTableProps)·{
+     70     │ - ··const·allSelected·=
+     71     │ - ····documents.length·>·0·&&·selectedIds.length·===·documents.length;
+     72     │ - ··const·someSelected·=
+     73     │ - ····selectedIds.length·>·0·&&·selectedIds.length·<·documents.length;
+     74     │ - 
+     75     │ - ··return·(
+     76     │ - ····<div·className="rounded-lg·border·border-border/70·bg-card·overflow-hidden">
+     77     │ - ······<Table>
+     78     │ - ········<TableHeader>
+     79     │ - ··········<TableRow·className="hover:bg-transparent">
+     80     │ - ············<TableHead·className="w-10">
+     81     │ - ··············<Checkbox
+     82     │ - ················checked={
+     83     │ - ··················allSelected·?·true·:·someSelected·?·"indeterminate"·:·false
+     84     │ - ················}
+     85     │ - ················onCheckedChange={onToggleSelectAll}
+     86     │ - ················aria-label="Chọn·tất·cả"
+     87     │ - ··············/>
+     88     │ - ············</TableHead>
+     89     │ - ············<TableHead>Tài·Liệu·&·Tệp·Gốc</TableHead>
+     90     │ - ············<TableHead·className="w-44">Số·Hiệu·&·Phân·Loại</TableHead>
+     91     │ - ············<TableHead·className="w-24·text-center">Định·Dạng</TableHead>
+     92     │ - ············<TableHead·className="w-28·text-right">Dung·Lượng</TableHead>
+     93     │ - ············<TableHead·className="w-44">Kho·Lưu·Trực·Thuộc</TableHead>
+     94     │ - ············<TableHead·className="w-32">Ngày·Tải</TableHead>
+     95     │ - ············<TableHead·className="w-16·text-right">Thao·Tác</TableHead>
+     96     │ - ··········</TableRow>
+     97     │ - ········</TableHeader>
+     98     │ - ········<TableBody>
+     99     │ - ··········{documents.map((doc)·=>·{
+    100     │ - ············const·isSelected·=·selectedIds.includes(doc.id);
+    101     │ - ············const·downloadUrl·=·documentsApi.getDownloadUrl(doc.id);
+    102     │ - 
+    103     │ - ············return·(
+    104     │ - ··············<TableRow
+    105     │ - ················key={doc.id}
+    106     │ - ················data-state={isSelected·?·"selected"·:·undefined}
+    107     │ - ················className="h-11·hover:bg-muted/40·transition-colors"
+    108     │ - ··············>
+    109     │ - ················{/*·Checkbox·*/}
+    110     │ - ················<TableCell>
+    111     │ - ··················<Checkbox
+    112     │ - ····················checked={isSelected}
+    113     │ - ····················onCheckedChange={()·=>·onToggleSelect(doc.id)}
+    114     │ - ····················aria-label={`Chọn·${doc.title·||·doc.file_name}`}
+    115     │ - ··················/>
+    116     │ - ················</TableCell>
+    117     │ - 
+    118     │ - ················{/*·Tên·tài·liệu·&·Tệp·*/}
+    119     │ - ················<TableCell>
+    120     │ - ··················<div·className="flex·items-center·gap-2.5·min-w-0">
+    121     │ - ····················<div·className="flex·size-7·shrink-0·items-center·justify-center·rounded-md·bg-muted/60">
+    122     │ - ······················{getFileIcon(doc.file_type)}
+    123     │ - ····················</div>
+    124     │ - ····················<div·className="min-w-0">
+    125     │ - ······················<Link
+    126     │ - ························to="/documents/$documentId"
+    127     │ - ························params={{·documentId:·doc.id·}}
+    128     │ - ························className="font-medium·text-xs·sm:text-sm·text-foreground·hover:text-primary·transition-colors·truncate·block"
+    129     │ - ························title={doc.title·||·doc.file_name}
+    130     │ - ······················>
+    131     │ - ························{doc.title·||·doc.file_name}
+    132     │ - ······················</Link>
+    133     │ - ······················<span·className="text-[11px]·text-muted-foreground·truncate·block">
+    134     │ - ························{doc.file_name}
+    135     │ - ······················</span>
+    136     │ - ····················</div>
+    137     │ - ··················</div>
+    138     │ - ················</TableCell>
+    139     │ - 
+    140     │ - ················{/*·Số·hiệu·&·Loại·VB·*/}
+    141     │ - ················<TableCell>
+    142     │ - ··················<div·className="space-y-0.5">
+    143     │ - ····················{doc.document_number·?·(
+    144     │ - ······················<div·className="flex·items-center·gap-1·font-mono·text-xs·text-foreground">
+    145     │ - ························<Hash·className="size-3·text-muted-foreground"·/>
+    146     │ - ························<span>{doc.document_number}</span>
+    147     │ - ······················</div>
+    148     │ - ····················)·:·(
+    149     │ - ······················<span·className="text-xs·text-muted-foreground·italic">
+    150     │ - ························Chưa·có·số
+  349 more lines truncated
+  
+
+src\features\documents\components\select-documents-for-group-modal.tsx format ━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    155 155 │                     <TableHead className="text-xs">Tên Tài Liệu</TableHead>␍
+    156 156 │                     <TableHead className="w-32 text-xs">Loại / Tệp</TableHead>␍
+    157     │ - ··················<TableHead·className="w-28·text-xs·text-right">Dung·Lượng</TableHead>␍
+        157 │ + ··················<TableHead·className="w-28·text-xs·text-right">␍
+        158 │ + ····················Dung·Lượng␍
+        159 │ + ··················</TableHead>␍
+    158 160 │                   </TableRow>␍
+    159 161 │                 </TableHeader>␍
+  
+
+src\features\documents\document-detail-page.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·useMutation,·useQuery,·useQueryClient·}·from·"@tanstack/react-query";
+      2     │ - import·{·Link,·useNavigate,·useParams·}·from·"@tanstack/react-router";
+      3     │ - import·{
+      4     │ - ··ArrowLeft,
+      5     │ - ··CheckCircle2,
+      6     │ - ··Download,
+      7     │ - ··Eye,
+      8     │ - ··FileCode,
+      9     │ - ··FileSpreadsheet,
+     10     │ - ··FileText,
+     11     │ - ··Folders,
+     12     │ - ··HardDrive,
+     13     │ - ··History,
+     14     │ - ··Info,
+     15     │ - ··Pencil,
+     16     │ - ··ShieldCheck,
+     17     │ - ··Trash2,
+     18     │ - ··XCircle,
+     19     │ - }·from·"lucide-react";
+     20     │ - import·{·useState·}·from·"react";
+     21     │ - import·{·toast·}·from·"sonner";
+     22     │ - import·{·ConfirmDialog·}·from·"@/components/admin/confirm-dialog";
+     23     │ - import·{·EmptyState·}·from·"@/components/admin/empty-state";
+     24     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     25     │ - import·{·Button·}·from·"@/components/ui/button";
+     26     │ - import·{
+     27     │ - ··Card,
+     28     │ - ··CardContent,
+     29     │ - ··CardDescription,
+     30     │ - ··CardHeader,
+     31     │ - ··CardTitle,
+     32     │ - }·from·"@/components/ui/card";
+     33     │ - import·{
+     34     │ - ··Dialog,
+     35     │ - ··DialogContent,
+     36     │ - ··DialogFooter,
+     37     │ - ··DialogHeader,
+     38     │ - ··DialogTitle,
+     39     │ - }·from·"@/components/ui/dialog";
+     40     │ - import·{·Input·}·from·"@/components/ui/input";
+     41     │ - import·{
+     42     │ - ··Table,
+     43     │ - ··TableBody,
+     44     │ - ··TableCell,
+     45     │ - ··TableHead,
+     46     │ - ··TableHeader,
+     47     │ - ··TableRow,
+     48     │ - }·from·"@/components/ui/table";
+     49     │ - import·{·Tabs,·TabsContent,·TabsList,·TabsTrigger·}·from·"@/components/ui/tabs";
+     50     │ - import·{·documentsApi·}·from·"@/services/documents-api";
+     51     │ - 
+     52     │ - function·formatFileSize(bytes:·number):·string·{
+     53     │ - ··if·(bytes·<·1024)·return·`${bytes}·B`;
+     54     │ - ··if·(bytes·<·1024·*·1024)·return·`${(bytes·/·1024).toFixed(1)}·KB`;
+     55     │ - ··return·`${(bytes·/·(1024·*·1024)).toFixed(1)}·MB`;
+     56     │ - }
+     57     │ - 
+     58     │ - function·getFileIcon(fileType:·string)·{
+     59     │ - ··switch·(fileType.toLowerCase())·{
+     60     │ - ····case·"pdf":
+     61     │ - ······return·<FileText·className="size-5·text-destructive"·/>;
+     62     │ - ····case·"xlsx":
+     63     │ - ····case·"xls":
+     64     │ - ······return·<FileSpreadsheet·className="size-5·text-success"·/>;
+     65     │ - ····case·"md":
+     66     │ - ····case·"txt":
+     67     │ - ······return·<FileCode·className="size-5·text-info"·/>;
+     68     │ - ····default:
+     69     │ - ······return·<FileText·className="size-5·text-primary"·/>;
+     70     │ - ··}
+     71     │ - }
+     72     │ - 
+     73     │ - export·function·DocumentDetailPage()·{
+     74     │ - ··const·{·documentId·}·=·useParams({·from:·"/documents/$documentId"·});
+     75     │ - ··const·navigate·=·useNavigate();
+     76     │ - ··const·queryClient·=·useQueryClient();
+     77     │ - 
+     78     │ - ··const·[activeTab,·setActiveTab]·=·useState("preview");
+     79     │ - ··const·[isEditOpen,·setIsEditOpen]·=·useState(false);
+     80     │ - ··const·[isDeleteOpen,·setIsDeleteOpen]·=·useState(false);
+     81     │ - 
+     82     │ - ··//·1.·Fetch·document·details
+     83     │ - ··const·{
+     84     │ - ····data:·document,
+     85     │ - ····isLoading,
+     86     │ - ····error,
+     87     │ - ··}·=·useQuery({
+     88     │ - ····queryKey:·["repository-document",·documentId],
+     89     │ - ····queryFn:·()·=>·documentsApi.getDocument(documentId),
+     90     │ - ··});
+     91     │ - 
+     92     │ - ··//·2.·Fetch·File·Revisions·(immutable·storage·revisions)
+     93     │ - ··const·{·data:·fileRevisionsData,·isLoading:·isFileRevisionsLoading·}·=
+     94     │ - ····useQuery({
+     95     │ - ······queryKey:·["document-file-revisions",·documentId],
+     96     │ - ······queryFn:·()·=>·documentsApi.getFileRevisions(documentId),
+     97     │ - ····});
+     98     │ - 
+     99     │ - ··const·fileRevisions·=·fileRevisionsData?.items·??·[];
+    100     │ - 
+    101     │ - ··//·Edit·form·state·(administrative·metadata)
+    102     │ - ··const·[editTitle,·setEditTitle]·=·useState("");
+    103     │ - ··const·[editDocNumber,·setEditDocNumber]·=·useState("");
+    104     │ - ··const·[editAuthority,·setEditAuthority]·=·useState("");
+    105     │ - ··const·[editIssuedDate,·setEditIssuedDate]·=·useState("");
+    106     │ - 
+    107     │ - ··const·handleOpenEdit·=·()·=>·{
+    108     │ - ····if·(!document)·return;
+    109     │ - ····setEditTitle(document.title·||·"");
+    110     │ - ····setEditDocNumber(document.document_number·||·"");
+    111     │ - ····setEditAuthority(document.issuing_authority·||·"");
+    112     │ - ····setEditIssuedDate(document.issued_date·||·"");
+    113     │ - ····setIsEditOpen(true);
+    114     │ - ··};
+    115     │ - 
+    116     │ - ··//·Update·administrative·metadata·mutation
+    117     │ - ··const·updateMutation·=·useMutation({
+    118     │ - ····mutationFn:·()·=>
+    119     │ - ······documentsApi.updateDocument(documentId,·{
+    120     │ - ········title:·editTitle.trim()·||·undefined,
+    121     │ - ········document_number:·editDocNumber.trim()·||·undefined,
+    122     │ - ········issuing_authority:·editAuthority.trim()·||·undefined,
+    123     │ - ········issued_date:·editIssuedDate·||·undefined,
+    124     │ - ······}),
+    125     │ - ····onSuccess:·(data)·=>·{
+    126     │ - ······toast.success("Đã·cập·nhật·thông·tin·tài·liệu.");
+    127     │ - ······queryClient.setQueryData(["repository-document",·documentId],·data);
+    128     │ - ······queryClient.invalidateQueries({·queryKey:·["repository-documents"]·});
+    129     │ - ······setIsEditOpen(false);
+    130     │ - ····},
+    131     │ - ····onError:·(err:·Error)·=>·{
+    132     │ - ······toast.error(err.message·||·"Cập·nhật·tài·liệu·thất·bại.");
+    133     │ - ····},
+    134     │ - ··});
+    135     │ - 
+    136     │ - ··//·Delete·mutation
+    137     │ - ··const·deleteMutation·=·useMutation({
+    138     │ - ····mutationFn:·()·=>·documentsApi.deleteDocument(documentId),
+    139     │ - ····onSuccess:·()·=>·{
+    140     │ - ······toast.success("Đã·xóa·tài·liệu·khỏi·kho·tập·trung.");
+    141     │ - ······navigate({·to:·"/documents"·});
+    142     │ - ····},
+    143     │ - ····onError:·(err:·Error)·=>·{
+    144     │ - ······toast.error(err.message·||·"Xóa·tài·liệu·thất·bại.");
+    145     │ - ····},
+    146     │ - ··});
+    147     │ - 
+    148     │ - ··if·(isLoading)·{
+    149     │ - ····return·(
+    150     │ - ······<div·className="flex-1·space-y-6·p-4·sm:p-6·lg:p-8·max-w-7xl·mx-auto·animate-pulse">
+  1270 more lines truncated
+  
+
+src\features\documents\document-group-detail-page.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·useMutation,·useQuery,·useQueryClient·}·from·"@tanstack/react-query";
+      2     │ - import·{·Link,·useNavigate·}·from·"@tanstack/react-router";
+      3     │ - import·{
+      4     │ - ··AlertCircle,
+      5     │ - ··ArrowLeft,
+      6     │ - ··ArrowUpRight,
+      7     │ - ··Calendar,
+      8     │ - ··FileCode,
+      9     │ - ··FileSpreadsheet,
+     10     │ - ··FileStack,
+     11     │ - ··FileText,
+     12     │ - ··FolderOpen,
+     13     │ - ··Hash,
+     14     │ - ··Search,
+     15     │ - ··Trash2,
+     16     │ - ··Upload,
+     17     │ - ··X,
+     18     │ - }·from·"lucide-react";
+     19     │ - import·{·useState·}·from·"react";
+     20     │ - import·{·toast·}·from·"sonner";
+     21     │ - import·{·ConfirmDialog·}·from·"@/components/admin/confirm-dialog";
+     22     │ - import·{·EmptyState·}·from·"@/components/admin/empty-state";
+     23     │ - import·{·KpiMetric·}·from·"@/components/admin/kpi-metric";
+     24     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     25     │ - import·{·Button·}·from·"@/components/ui/button";
+     26     │ - import·{
+     27     │ - ··Card,
+     28     │ - ··CardContent,
+     29     │ - ··CardFooter,
+     30     │ - ··CardHeader,
+     31     │ - ··CardTitle,
+     32     │ - }·from·"@/components/ui/card";
+     33     │ - import·{·Input·}·from·"@/components/ui/input";
+     34     │ - import·{
+     35     │ - ··Select,
+     36     │ - ··SelectContent,
+     37     │ - ··SelectItem,
+     38     │ - ··SelectTrigger,
+     39     │ - ··SelectValue,
+     40     │ - }·from·"@/components/ui/select";
+     41     │ - import·{·Skeleton·}·from·"@/components/ui/skeleton";
+     42     │ - import·{
+     43     │ - ··Table,
+     44     │ - ··TableBody,
+     45     │ - ··TableCell,
+     46     │ - ··TableHead,
+     47     │ - ··TableHeader,
+     48     │ - ··TableRow,
+     49     │ - }·from·"@/components/ui/table";
+     50     │ - import·{·ViewModeToggle·}·from·"@/components/ui/view-mode-toggle";
+     51     │ - import·{·documentsApi·}·from·"@/services/documents-api";
+     52     │ - import·type·{·GroupDocumentItem·}·from·"@/types/documents";
+     53     │ - import·{·DocumentUploadModal·}·from·"./components/document-upload-modal";
+     54     │ - 
+     55     │ - interface·DocumentGroupDetailPageProps·{
+     56     │ - ··groupId:·string;
+     57     │ - }
+     58     │ - 
+     59     │ - function·getFileIcon(fileType:·string)·{
+     60     │ - ··switch·(fileType.toLowerCase())·{
+     61     │ - ····case·"pdf":
+     62     │ - ······return·<FileText·className="size-4·text-destructive"·/>;
+     63     │ - ····case·"xlsx":
+     64     │ - ····case·"xls":
+     65     │ - ······return·<FileSpreadsheet·className="size-4·text-success"·/>;
+     66     │ - ····case·"md":
+     67     │ - ····case·"txt":
+     68     │ - ······return·<FileCode·className="size-4·text-info"·/>;
+     69     │ - ····default:
+     70     │ - ······return·<FileText·className="size-4·text-primary"·/>;
+     71     │ - ··}
+     72     │ - }
+     73     │ - 
+     74     │ - function·formatFileSize(bytes:·number):·string·{
+     75     │ - ··if·(bytes·<·1024)·return·`${bytes}·B`;
+     76     │ - ··if·(bytes·<·1024·*·1024)·return·`${(bytes·/·1024).toFixed(1)}·KB`;
+     77     │ - ··return·`${(bytes·/·(1024·*·1024)).toFixed(1)}·MB`;
+     78     │ - }
+     79     │ - 
+     80     │ - export·function·DocumentGroupDetailPage({
+     81     │ - ··groupId,
+     82     │ - }:·DocumentGroupDetailPageProps)·{
+     83     │ - ··const·queryClient·=·useQueryClient();
+     84     │ - ··const·navigate·=·useNavigate();
+     85     │ - 
+     86     │ - ··const·[viewMode,·setViewMode]·=·useState<"grid"·|·"table">("table");
+     87     │ - ··const·[search,·setSearch]·=·useState("");
+     88     │ - ··const·[fileTypeFilter,·setFileTypeFilter]·=·useState<string>("all");
+     89     │ - ··const·[isUploadModalOpen,·setIsUploadModalOpen]·=·useState(false);
+     90     │ - ··const·[removingDoc,·setRemovingDoc]·=·useState<GroupDocumentItem·|·null>(
+     91     │ - ····null,
+     92     │ - ··);
+     93     │ - 
+     94     │ - ··//·1.·Fetch·Group·Details
+     95     │ - ··const·{
+     96     │ - ····data:·group,
+     97     │ - ····isLoading:·isLoadingGroup,
+     98     │ - ····isError:·isErrorGroup,
+     99     │ - ····error:·groupError,
+    100     │ - ····refetch:·refetchGroup,
+    101     │ - ··}·=·useQuery({
+    102     │ - ····queryKey:·["document-group",·groupId],
+    103     │ - ····queryFn:·()·=>·documentsApi.getGroup(groupId),
+    104     │ - ··});
+    105     │ - 
+    106     │ - ··//·2.·Fetch·Group·Documents
+    107     │ - ··const·{
+    108     │ - ····data:·groupDocsData,
+    109     │ - ····isLoading:·isLoadingDocs,
+    110     │ - ····isError:·isErrorDocs,
+    111     │ - ····error:·docsError,
+    112     │ - ····refetch:·refetchDocs,
+    113     │ - ··}·=·useQuery({
+    114     │ - ····queryKey:·["group-documents",·groupId,·search],
+    115     │ - ····queryFn:·()·=>
+    116     │ - ······documentsApi.getGroupDocuments(groupId,·{
+    117     │ - ········search:·search.trim()·||·undefined,
+    118     │ - ········page_size:·100,
+    119     │ - ······}),
+    120     │ - ··});
+    121     │ - 
+    122     │ - ··const·rawDocuments·=·groupDocsData?.items·??·[];
+    123     │ - ··const·documents·=
+    124     │ - ····fileTypeFilter·===·"all"
+    125     │ - ······?·rawDocuments
+    126     │ - ······:·rawDocuments.filter((d)·=>·d.file_type.toLowerCase()·===·fileTypeFilter);
+    127     │ - 
+    128     │ - ··//·Remove·document·from·group·mutation
+    129     │ - ··const·removeMutation·=·useMutation({
+    130     │ - ····mutationFn:·(docId:·string)·=>
+    131     │ - ······documentsApi.removeDocumentFromGroup(groupId,·docId),
+    132     │ - ····onSuccess:·()·=>·{
+    133     │ - ······toast.success(
+    134     │ - ········"Đã·gỡ·tài·liệu·khỏi·kho·(tài·liệu·gốc·vẫn·được·bảo·toàn·nguyên·vẹn).",
+    135     │ - ······);
+    136     │ - ······queryClient.invalidateQueries({·queryKey:·["group-documents",·groupId]·});
+    137     │ - ······queryClient.invalidateQueries({·queryKey:·["document-group",·groupId]·});
+    138     │ - ······queryClient.invalidateQueries({·queryKey:·["document-groups"]·});
+    139     │ - ······setRemovingDoc(null);
+    140     │ - ····},
+    141     │ - ····onError:·(err:·Error)·=>·{
+    142     │ - ······toast.error(err.message·||·"Gỡ·tài·liệu·khỏi·kho·thất·bại.");
+    143     │ - ····},
+    144     │ - ··});
+    145     │ - 
+    146     │ - ··if·(isLoadingGroup)·{
+    147     │ - ····return·(
+    148     │ - ······<div·className="flex-1·space-y-6·p-4·sm:p-6·lg:p-8·max-w-7xl·mx-auto">
+    149     │ - ········<div·className="flex·items-center·gap-2">
+    150     │ - ··········<Skeleton·className="h-8·w-32"·/>
+  928 more lines truncated
+  
+
+src\features\documents\document-groups-page.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    195 195 │           <KpiMetric␍
+    196 196 │             label={␍
+    197     │ - ············isFiltered␍
+    198     │ - ··············?·"Kho·Có·Tệp·(Trong·kết·quả)"␍
+    199     │ - ··············:·"Kho·Đang·Chứa·Tệp"␍
+        197 │ + ············isFiltered·?·"Kho·Có·Tệp·(Trong·kết·quả)"·:·"Kho·Đang·Chứa·Tệp"␍
+    200 198 │             }␍
+    201 199 │             value={String(activeGroupsCount)}␍
+    ······· │ 
+    203 201 │           />␍
+    204 202 │           <KpiMetric␍
+    205     │ - ··········label={␍
+    206     │ - ············isFiltered·?·"Kho·Trống·(Trong·kết·quả)"·:·"Kho·Chưa·Có·Tệp"␍
+    207     │ - ··········}␍
+        203 │ + ··········label={isFiltered·?·"Kho·Trống·(Trong·kết·quả)"·:·"Kho·Chưa·Có·Tệp"}␍
+    208 204 │             value={String(emptyGroupsCount)}␍
+    209 205 │             icon={FolderPlus}␍
+  
+
+src\features\documents\documents-page.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·useMutation,·useQuery,·useQueryClient·}·from·"@tanstack/react-query";
+      2     │ - import·{·Link·}·from·"@tanstack/react-router";
+      3     │ - import·{
+      4     │ - ··FileStack,
+      5     │ - ··FileText,
+      6     │ - ··FolderPlus,
+      7     │ - ··Folders,
+      8     │ - ··HardDrive,
+      9     │ - ··Search,
+     10     │ - ··Upload,
+     11     │ - ··X,
+     12     │ - }·from·"lucide-react";
+     13     │ - import·{·useMemo,·useState·}·from·"react";
+     14     │ - import·{·toast·}·from·"sonner";
+     15     │ - import·{·ConfirmDialog·}·from·"@/components/admin/confirm-dialog";
+     16     │ - import·{·EmptyState·}·from·"@/components/admin/empty-state";
+     17     │ - import·{·KpiMetric·}·from·"@/components/admin/kpi-metric";
+     18     │ - import·{·PageHeader·}·from·"@/components/admin/page-header";
+     19     │ - import·{·Button·}·from·"@/components/ui/button";
+     20     │ - import·{·Input·}·from·"@/components/ui/input";
+     21     │ - import·{
+     22     │ - ··Select,
+     23     │ - ··SelectContent,
+     24     │ - ··SelectItem,
+     25     │ - ··SelectTrigger,
+     26     │ - ··SelectValue,
+     27     │ - }·from·"@/components/ui/select";
+     28     │ - import·{·ViewModeToggle·}·from·"@/components/ui/view-mode-toggle";
+     29     │ - import·{
+     30     │ - ··type·DocumentTypeItem,
+     31     │ - ··documentTypesApi,
+     32     │ - }·from·"@/services/document-types-api";
+     33     │ - import·{·documentsApi·}·from·"@/services/documents-api";
+     34     │ - import·type·{·RepositoryDocumentListItem·}·from·"@/types/documents";
+     35     │ - import·{·AddToGroupDialog·}·from·"./components/add-to-group-dialog";
+     36     │ - import·{·DocumentCard·}·from·"./components/document-card";
+     37     │ - import·{·DocumentUploadModal·}·from·"./components/document-upload-modal";
+     38     │ - import·{·DocumentsTable·}·from·"./components/documents-table";
+     39     │ - 
+     40     │ - function·formatFileSize(bytes:·number):·string·{
+     41     │ - ··if·(bytes·<·1024)·return·`${bytes}·B`;
+     42     │ - ··if·(bytes·<·1024·*·1024)·return·`${(bytes·/·1024).toFixed(1)}·KB`;
+     43     │ - ··return·`${(bytes·/·(1024·*·1024)).toFixed(1)}·MB`;
+     44     │ - }
+     45     │ - 
+     46     │ - export·function·DocumentsPage()·{
+     47     │ - ··const·queryClient·=·useQueryClient();
+     48     │ - ··const·[viewMode,·setViewMode]·=·useState<"grid"·|·"table">("grid");
+     49     │ - ··const·[search,·setSearch]·=·useState("");
+     50     │ - ··const·[docTypeCode,·setDocTypeCode]·=·useState<string>("all");
+     51     │ - ··const·[fileType,·setFileType]·=·useState<string>("all");
+     52     │ - ··const·[groupId,·setGroupId]·=·useState<string>("all");
+     53     │ - ··const·[isUploadOpen,·setIsUploadOpen]·=·useState(false);
+     54     │ - ··const·[isAddToGroupOpen,·setIsAddToGroupOpen]·=·useState(false);
+     55     │ - ··const·[selectedIds,·setSelectedIds]·=·useState<string[]>([]);
+     56     │ - ··const·[deletingDoc,·setDeletingDoc]·=
+     57     │ - ····useState<RepositoryDocumentListItem·|·null>(null);
+     58     │ - 
+     59     │ - ··//·1.·Fetch·KPI·Stats
+     60     │ - ··const·{·data:·stats·}·=·useQuery({
+     61     │ - ····queryKey:·["repository-stats"],
+     62     │ - ····queryFn:·()·=>·documentsApi.getStats(),
+     63     │ - ··});
+     64     │ - 
+     65     │ - ··//·2.·Fetch·Document·Types·for·filter
+     66     │ - ··const·{·data:·documentTypes·=·[]·}·=·useQuery({
+     67     │ - ····queryKey:·["document-types"],
+     68     │ - ····queryFn:·()·=>·documentTypesApi.listDocumentTypes(),
+     69     │ - ··});
+     70     │ - 
+     71     │ - ··//·3.·Fetch·Document·Groups·for·filter
+     72     │ - ··const·{·data:·groupsData·}·=·useQuery({
+     73     │ - ····queryKey:·["document-groups"],
+     74     │ - ····queryFn:·()·=>·documentsApi.getGroups({·page_size:·100·}),
+     75     │ - ··});
+     76     │ - ··const·groups·=·groupsData?.items·??·[];
+     77     │ - 
+     78     │ - ··//·4.·Fetch·Documents·List·with·group·filter
+     79     │ - ··const·{·data:·documentsData,·isLoading·}·=·useQuery({
+     80     │ - ····queryKey:·[
+     81     │ - ······"repository-documents",
+     82     │ - ······search,
+     83     │ - ······docTypeCode,
+     84     │ - ······fileType,
+     85     │ - ······groupId,
+     86     │ - ····],
+     87     │ - ····queryFn:·()·=>
+     88     │ - ······documentsApi.getDocuments({
+     89     │ - ········search:·search.trim()·||·undefined,
+     90     │ - ········document_type_code:·docTypeCode·!==·"all"·?·docTypeCode·:·undefined,
+     91     │ - ········file_type:·fileType·!==·"all"·?·fileType·:·undefined,
+     92     │ - ········group_id:·groupId·!==·"all"·?·groupId·:·undefined,
+     93     │ - ········limit:·100,
+     94     │ - ······}),
+     95     │ - ··});
+     96     │ - 
+     97     │ - ··const·documents·=·useMemo(
+     98     │ - ····()·=>·documentsData?.items·??·[],
+     99     │ - ····[documentsData?.items],
+    100     │ - ··);
+    101     │ - 
+    102     │ - ··//·Delete·mutation
+    103     │ - ··const·deleteMutation·=·useMutation({
+    104     │ - ····mutationFn:·(id:·string)·=>·documentsApi.deleteDocument(id),
+    105     │ - ····onSuccess:·()·=>·{
+    106     │ - ······toast.success("Đã·xóa·tài·liệu·khỏi·kho·tập·trung.");
+    107     │ - ······queryClient.invalidateQueries({·queryKey:·["repository-documents"]·});
+    108     │ - ······queryClient.invalidateQueries({·queryKey:·["repository-stats"]·});
+    109     │ - ······setDeletingDoc(null);
+    110     │ - ····},
+    111     │ - ····onError:·(err:·Error)·=>·{
+    112     │ - ······toast.error(err.message·||·"Xóa·tài·liệu·thất·bại.");
+    113     │ - ····},
+    114     │ - ··});
+    115     │ - 
+    116     │ - ··//·Selection·handlers
+    117     │ - ··const·handleToggleSelect·=·(id:·string)·=>·{
+    118     │ - ····setSelectedIds((prev)·=>
+    119     │ - ······prev.includes(id)·?·prev.filter((i)·=>·i·!==·id)·:·[...prev,·id],
+    120     │ - ····);
+    121     │ - ··};
+    122     │ - 
+    123     │ - ··const·handleToggleSelectAll·=·()·=>·{
+    124     │ - ····if·(selectedIds.length·===·documents.length)·{
+    125     │ - ······setSelectedIds([]);
+    126     │ - ····}·else·{
+    127     │ - ······setSelectedIds(documents.map((d)·=>·d.id));
+    128     │ - ····}
+    129     │ - ··};
+    130     │ - 
+    131     │ - ··return·(
+    132     │ - ····<div·className="flex-1·space-y-6·p-4·sm:p-6·lg:p-8·max-w-7xl·mx-auto">
+    133     │ - ······{/*·1.·Page·Header·*/}
+    134     │ - ······<PageHeader
+    135     │ - ········title="Kho·Tài·Liệu·Tập·Trung"
+    136     │ - ········description="Lưu·trữ·tài·sản·số·an·toàn·trên·MinIO·S3,·chống·trùng·lặp·mã·băm·SHA-256·và·quản·lý·phân·loại·danh·mục·theo·kho·lưu·trữ."
+    137     │ - ········actions={
+    138     │ - ··········<div·className="flex·items-center·gap-2">
+    139     │ - ············<Button·asChild·variant="outline"·className="gap-1.5·shadow-xs">
+    140     │ - ··············<Link·to="/documents/groups">
+    141     │ - ················<Folders·className="size-4"·/>
+    142     │ - ················Nhóm·Tài·Liệu
+    143     │ - ··············</Link>
+    144     │ - ············</Button>
+    145     │ - ············<Button
+    146     │ - ··············onClick={()·=>·setIsUploadOpen(true)}
+    147     │ - ··············className="gap-1.5·shadow-sm"
+    148     │ - ············>
+    149     │ - ··············<Upload·className="size-4"·/>
+    150     │ - ··············Tải·Lên·Tài·Liệu
+  547 more lines truncated
+  
+
+src\features\knowledge\components\import-batch-modal.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·{·useMutation,·useQuery,·useQueryClient·}·from·"@tanstack/react-query";
+      2     │ - import·{
+      3     │ - ··AlertCircle,
+      4     │ - ··CheckCircle2,
+      5     │ - ··Clock,
+      6     │ - ··Layers,
+      7     │ - ··RefreshCw,
+      8     │ - ··XCircle,
+      9     │ - }·from·"lucide-react";
+     10     │ - import·type·React·from·"react";
+     11     │ - import·{·toast·}·from·"sonner";
+     12     │ - import·{·Badge·}·from·"@/components/ui/badge";
+     13     │ - import·{·Button·}·from·"@/components/ui/button";
+     14     │ - import·{
+     15     │ - ··Dialog,
+     16     │ - ··DialogContent,
+     17     │ - ··DialogDescription,
+     18     │ - ··DialogFooter,
+     19     │ - ··DialogHeader,
+     20     │ - ··DialogTitle,
+     21     │ - }·from·"@/components/ui/dialog";
+     22     │ - import·{·Progress·}·from·"@/components/ui/progress";
+     23     │ - import·{
+     24     │ - ··Table,
+     25     │ - ··TableBody,
+     26     │ - ··TableCell,
+     27     │ - ··TableHead,
+     28     │ - ··TableHeader,
+     29     │ - ··TableRow,
+     30     │ - }·from·"@/components/ui/table";
+     31     │ - import·{·extractErrorMessage,·knowledgeApi·}·from·"@/services/knowledge-api";
+     32     │ - import·type·{·KnowledgeImportBatchResponse·}·from·"@/types/knowledge";
+     33     │ - 
+     34     │ - interface·ImportBatchModalProps·{
+     35     │ - ··open:·boolean;
+     36     │ - ··onOpenChange:·(open:·boolean)·=>·void;
+     37     │ - ··collectionId:·string;
+     38     │ - ··batchId:·string·|·null;
+     39     │ - ··onComplete?:·()·=>·void;
+     40     │ - }
+     41     │ - 
+     42     │ - export·const·ImportBatchModal:·React.FC<ImportBatchModalProps>·=·({
+     43     │ - ··open,
+     44     │ - ··onOpenChange,
+     45     │ - ··collectionId,
+     46     │ - ··batchId,
+     47     │ - ··onComplete,
+     48     │ - })·=>·{
+     49     │ - ··const·queryClient·=·useQueryClient();
+     50     │ - 
+     51     │ - ··//·1.·Fetch·Batch·Status·with·smart·polling
+     52     │ - ··const·{
+     53     │ - ····data:·batch,
+     54     │ - ····isLoading,
+     55     │ - ····refetch,
+     56     │ - ··}·=·useQuery<KnowledgeImportBatchResponse>({
+     57     │ - ····queryKey:·["knowledge-import-batch",·collectionId,·batchId],
+     58     │ - ····queryFn:·()·=>
+     59     │ - ······batchId
+     60     │ - ········?·knowledgeApi.getImportBatch(collectionId,·batchId)
+     61     │ - ········:·Promise.reject(new·Error("No·batchId")),
+     62     │ - ····enabled:·!!batchId·&&·open,
+     63     │ - ····refetchInterval:·(query)·=>·{
+     64     │ - ······const·data·=·query.state.data;
+     65     │ - ······if·(!data)·return·2000;
+     66     │ - ······if·(data.status·===·"queued"·||·data.status·===·"processing")·{
+     67     │ - ········return·2000;
+     68     │ - ······}
+     69     │ - ······return·false;
+     70     │ - ····},
+     71     │ - ··});
+     72     │ - 
+     73     │ - ··//·2.·Retry·mutation
+     74     │ - ··const·retryMutation·=·useMutation({
+     75     │ - ····mutationFn:·()·=>·{
+     76     │ - ······if·(!batchId)·throw·new·Error("Chưa·có·mã·đợt·nạp.");
+     77     │ - ······return·knowledgeApi.retryFailedImportItems(collectionId,·batchId);
+     78     │ - ····},
+     79     │ - ····onSuccess:·()·=>·{
+     80     │ - ······toast.success("Đang·thử·lại·các·tài·liệu·gặp·lỗi...");
+     81     │ - ······refetch();
+     82     │ - ······queryClient.invalidateQueries({
+     83     │ - ········queryKey:·["knowledge-import-batch",·collectionId,·batchId],
+     84     │ - ······});
+     85     │ - ····},
+     86     │ - ····onError:·(err:·unknown)·=>·{
+     87     │ - ······toast.error(extractErrorMessage(err,·"Thử·lại·đợt·nạp·thất·bại."));
+     88     │ - ····},
+     89     │ - ··});
+     90     │ - 
+     91     │ - ··//·3.·Cancel·mutation
+     92     │ - ··const·cancelMutation·=·useMutation({
+     93     │ - ····mutationFn:·()·=>·{
+     94     │ - ······if·(!batchId)·throw·new·Error("Chưa·có·mã·đợt·nạp.");
+     95     │ - ······return·knowledgeApi.cancelImportBatch(collectionId,·batchId);
+     96     │ - ····},
+     97     │ - ····onSuccess:·()·=>·{
+     98     │ - ······toast.success("Đã·gửi·yêu·cầu·hủy·đợt·nạp·tài·liệu.");
+     99     │ - ······refetch();
+    100     │ - ····},
+    101     │ - ····onError:·(err:·unknown)·=>·{
+    102     │ - ······toast.error(extractErrorMessage(err,·"Hủy·đợt·nạp·thất·bại."));
+    103     │ - ····},
+    104     │ - ··});
+    105     │ - 
+    106     │ - ··if·(!batchId)·return·null;
+    107     │ - 
+    108     │ - ··const·total·=·batch?.total_count·||·1;
+    109     │ - ··const·finished·=
+    110     │ - ····(batch?.succeeded_count·||·0)·+
+    111     │ - ····(batch?.failed_count·||·0)·+
+    112     │ - ····(batch?.skipped_count·||·0);
+    113     │ - ··const·percent·=·Math.min(100,·Math.round((finished·/·total)·*·100));
+    114     │ - ··const·isFinished·=
+    115     │ - ····batch?.status·===·"completed"·||
+    116     │ - ····batch?.status·===·"partial_failed"·||
+    117     │ - ····batch?.status·===·"failed"·||
+    118     │ - ····batch?.status·===·"cancelled";
+    119     │ - 
+    120     │ - ··return·(
+    121     │ - ····<Dialog·open={open}·onOpenChange={onOpenChange}>
+    122     │ - ······<DialogContent·className="sm:max-w-3xl·max-h-[90vh]·flex·flex-col·p-0·overflow-hidden">
+    123     │ - ········<DialogHeader·className="p-5·pb-3·border-b·border-border">
+    124     │ - ··········<div·className="flex·items-center·justify-between·gap-3">
+    125     │ - ············<div·className="flex·items-center·gap-2">
+    126     │ - ··············<div·className="flex·size-9·items-center·justify-center·rounded-lg·bg-primary/10·text-primary">
+    127     │ - ················<Layers·className="size-5"·/>
+    128     │ - ··············</div>
+    129     │ - ··············<div>
+    130     │ - ················<DialogTitle·className="text-base·font-bold·text-foreground·flex·items-center·gap-2">
+    131     │ - ··················<span>Tiến·Trình·Đợt·Nạp·Tài·Liệu</span>
+    132     │ - ··················{batch·&&·(
+    133     │ - ····················<Badge
+    134     │ - ······················variant="outline"
+    135     │ - ······················className={`text-[11px]·${
+    136     │ - ························batch.status·===·"completed"
+    137     │ - ··························?·"bg-success/10·text-success·border-success/30"
+    138     │ - ··························:·batch.status·===·"partial_failed"·||
+    139     │ - ······························batch.status·===·"failed"
+    140     │ - ····························?·"bg-destructive/10·text-destructive·border-destructive/30"
+    141     │ - ····························:·"bg-primary/10·text-primary·border-primary/30"
+    142     │ - ······················}`}
+    143     │ - ····················>
+    144     │ - ······················{batch.status·===·"completed"
+    145     │ - ························?·"Hoàn·tất"
+    146     │ - ························:·batch.status·===·"partial_failed"
+    147     │ - ··························?·"Lỗi·một·phần"
+    148     │ - ··························:·batch.status·===·"failed"
+    149     │ - ····························?·"Thất·bại"
+    150     │ - ····························:·batch.status·===·"cancelled"
+  572 more lines truncated
+  
+
+src\features\knowledge\knowledge-page.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    676 676 │                     <SelectContent>␍
+    677 677 │                       <SelectItem value="PyMuPDF">PyMuPDF (Nhanh)</SelectItem>␍
+    678     │ - ····················<SelectItem·value="PaddleOCR">PaddleOCR-VL·(RTX·5090)</SelectItem>␍
+        678 │ + ····················<SelectItem·value="PaddleOCR">␍
+        679 │ + ······················PaddleOCR-VL·(RTX·5090)␍
+        680 │ + ····················</SelectItem>␍
+    679 681 │                       <SelectItem value="Gemini">Gemini Vision</SelectItem>␍
+    680 682 │                       <SelectItem value="Mistral">Mistral OCR</SelectItem>␍
+  
+
+src\features\knowledge\utils\retry-decision.test.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+      1     │ - import·assert·from·"node:assert/strict";
+      2     │ - import·test·from·"node:test";
+      3     │ - import·{
+      4     │ - ··resolveRetryAction,
+      5     │ - ··resolveSourceActionBanner,
+      6     │ - }·from·"./retry-decision";
+      7     │ - 
+      8     │ - test("resolveSourceActionBanner:·1.·failed·+·awaiting_publish·->·'failed'",·()·=>·{
+      9     │ - ··const·banner·=·resolveSourceActionBanner({
+     10     │ - ····status:·"failed",
+     11     │ - ····failed_count:·1,
+     12     │ - ····awaiting_publish_count:·2,
+     13     │ - ····publishable_count:·2,
+     14     │ - ····needs_build_count:·3,
+     15     │ - ··});
+     16     │ - ··assert.equal(banner,·"failed");
+     17     │ - });
+     18     │ - 
+     19     │ - test("resolveSourceActionBanner:·2.·review_required·không·failed·->·'review'",·()·=>·{
+     20     │ - ··const·banner·=·resolveSourceActionBanner({
+     21     │ - ····status:·"review_required",
+     22     │ - ····failed_count:·0,
+     23     │ - ····awaiting_publish_count:·2,
+     24     │ - ····publishable_count:·2,
+     25     │ - ····needs_build_count:·1,
+     26     │ - ··});
+     27     │ - ··assert.equal(banner,·"review");
+     28     │ - });
+     29     │ - 
+     30     │ - test("resolveSourceActionBanner:·3.·needs_build_count·>·0·->·'updates'",·()·=>·{
+     31     │ - ··const·banner·=·resolveSourceActionBanner({
+     32     │ - ····status:·"ready",
+     33     │ - ····failed_count:·0,
+     34     │ - ····awaiting_publish_count:·0,
+     35     │ - ····publishable_count:·0,
+     36     │ - ····needs_build_count:·4,
+     37     │ - ··});
+     38     │ - ··assert.equal(banner,·"updates");
+     39     │ - });
+     40     │ - 
+     41     │ - test("resolveSourceActionBanner:·4.·updates_available·->·'updates'",·()·=>·{
+     42     │ - ··const·banner·=·resolveSourceActionBanner({
+     43     │ - ····status:·"updates_available",
+     44     │ - ····failed_count:·0,
+     45     │ - ····awaiting_publish_count:·0,
+     46     │ - ····publishable_count:·0,
+     47     │ - ····needs_build_count:·0,
+     48     │ - ··});
+     49     │ - ··assert.equal(banner,·"updates");
+     50     │ - });
+     51     │ - 
+     52     │ - test("resolveSourceActionBanner:·5.·ready·->·'none'",·()·=>·{
+     53     │ - ··const·banner·=·resolveSourceActionBanner({
+     54     │ - ····status:·"ready",
+     55     │ - ····failed_count:·0,
+     56     │ - ····awaiting_publish_count:·0,
+     57     │ - ····publishable_count:·0,
+     58     │ - ····needs_build_count:·0,
+     59     │ - ··});
+     60     │ - ··assert.equal(banner,·"none");
+     61     │ - });
+     62     │ - 
+     63     │ - test("resolveSourceActionBanner:·6.·empty·->·'none'",·()·=>·{
+     64     │ - ··const·banner·=·resolveSourceActionBanner({
+     65     │ - ····status:·"empty",
+     66     │ - ····failed_count:·0,
+     67     │ - ····awaiting_publish_count:·0,
+     68     │ - ····publishable_count:·0,
+     69     │ - ····needs_build_count:·0,
+     70     │ - ··});
+     71     │ - ··assert.equal(banner,·"none");
+     72     │ - });
+     73     │ - 
+     74     │ - test("resolveSourceActionBanner:·7.·pending·->·'none'",·()·=>·{
+     75     │ - ··const·banner·=·resolveSourceActionBanner({
+     76     │ - ····status:·"pending",
+     77     │ - ····failed_count:·0,
+     78     │ - ····awaiting_publish_count:·0,
+     79     │ - ····publishable_count:·0,
+     80     │ - ····needs_build_count:·0,
+     81     │ - ··});
+     82     │ - ··assert.equal(banner,·"none");
+     83     │ - });
+     84     │ - 
+     85     │ - test("resolveSourceActionBanner:·Độ·ưu·tiên·thứ·bậc·failed·>·review·>·updates·>·none",·()·=>·{
+     86     │ - ··//·Khi·vừa·có·failed,·vừa·có·awaiting_publish·và·needs_build:·failed·thắng
+     87     │ - ··assert.equal(
+     88     │ - ····resolveSourceActionBanner({
+     89     │ - ······status:·"failed",
+     90     │ - ······failed_count:·1,
+     91     │ - ······awaiting_publish_count:·5,
+     92     │ - ······needs_build_count:·10,
+     93     │ - ····}),
+     94     │ - ····"failed",
+     95     │ - ··);
+     96     │ - 
+     97     │ - ··//·Khi·không·failed,·có·awaiting_publish·và·needs_build:·review·thắng
+     98     │ - ··assert.equal(
+     99     │ - ····resolveSourceActionBanner({
+    100     │ - ······status:·"review_required",
+    101     │ - ······failed_count:·0,
+    102     │ - ······awaiting_publish_count:·5,
+    103     │ - ······needs_build_count:·10,
+    104     │ - ····}),
+    105     │ - ····"review",
+    106     │ - ··);
+    107     │ - 
+    108     │ - ··//·Khi·không·failed,·không·staging,·nhưng·có·needs_build:·updates·thắng
+    109     │ - ··assert.equal(
+    110     │ - ····resolveSourceActionBanner({
+    111     │ - ······status:·"ready",
+    112     │ - ······failed_count:·0,
+    113     │ - ······awaiting_publish_count:·0,
+    114     │ - ······needs_build_count:·2,
+    115     │ - ····}),
+    116     │ - ····"updates",
+    117     │ - ··);
+    118     │ - 
+    119     │ - ··//·Khi·null·/·undefined:·none
+    120     │ - ··assert.equal(resolveSourceActionBanner(null),·"none");
+    121     │ - ··assert.equal(resolveSourceActionBanner(undefined),·"none");
+    122     │ - });
+    123     │ - 
+    124     │ - test("resolveRetryAction:·Failed·+·staging·->·retry·action·là·'publish'",·()·=>·{
+    125     │ - ··const·actionWithPublishable·=·resolveRetryAction({
+    126     │ - ····publishable_count:·2,
+    127     │ - ····awaiting_publish_count:·0,
+    128     │ - ····needs_build_count:·1,
+    129     │ - ··});
+    130     │ - ··assert.equal(actionWithPublishable,·"publish");
+    131     │ - 
+    132     │ - ··const·actionWithAwaiting·=·resolveRetryAction({
+    133     │ - ····publishable_count:·0,
+    134     │ - ····awaiting_publish_count:·1,
+    135     │ - ····needs_build_count:·0,
+    136     │ - ··});
+    137     │ - ··assert.equal(actionWithAwaiting,·"publish");
+    138     │ - });
+    139     │ - 
+    140     │ - test("resolveRetryAction:·Failed·không·staging·->·retry·action·là·'sync'",·()·=>·{
+    141     │ - ··const·action·=·resolveRetryAction({
+    142     │ - ····publishable_count:·0,
+    143     │ - ····awaiting_publish_count:·0,
+    144     │ - ····needs_build_count:·2,
+    145     │ - ··});
+    146     │ - ··assert.equal(action,·"sync");
+    147     │ - ··assert.equal(resolveRetryAction(null),·"sync");
+    148     │ - ··assert.equal(resolveRetryAction({}),·"sync");
+    149     │ - });
+          1 │ + import·assert·from·"node:assert/strict";␍
+  149 more lines truncated
+  
+
+src\features\knowledge\utils\retry-decision.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     1    │ - /**
+     2    │ - ·*·Helper·quyết·định·hành·động·thử·lại·(Retry)·và·banner·hành·động·duy·nhất
+     3    │ - ·*·cho·nguồn·nhóm·tài·liệu·trong·Kho·tri·thức.
+     4    │ - ·*
+     5    │ - ·*·Thứ·tự·ưu·tiên·banner:
+     6    │ - ·*·1.·failed:·Khi·có·lỗi·lập·chỉ·mục·hoặc·xuất·bản
+     7    │ - ·*·2.·review:·Khi·có·staging·index·chờ·xuất·bản
+     8    │ - ·*·3.·updates:·Khi·có·cập·nhật·mới·cần·đồng·bộ
+     9    │ - ·*·4.·none:·Khi·nguồn·đã·sẵn·sàng·hoặc·rỗng·bình·thường
+    10    │ - ·*/
+    11    │ - 
+    12    │ - export·interface·SourceBannerDecisionSource·{
+    13    │ - ··status?:·string·|·null;
+    14    │ - ··failed_count?:·number·|·null;
+    15    │ - ··publishable_count?:·number·|·null;
+    16    │ - ··awaiting_publish_count?:·number·|·null;
+    17    │ - ··needs_build_count?:·number·|·null;
+    18    │ - }
+    19    │ - 
+    20    │ - export·type·SourceActionBanner·=·"failed"·|·"review"·|·"updates"·|·"none";
+    21    │ - 
+    22    │ - export·function·resolveSourceActionBanner(
+    23    │ - ··source?:·SourceBannerDecisionSource·|·null,
+    24    │ - ):·SourceActionBanner·{
+    25    │ - ··if·(!source)·return·"none";
+    26    │ - 
+    27    │ - ··const·isFailed·=·source.status·===·"failed"·||·(source.failed_count·??·0)·>·0;
+    28    │ - ··if·(isFailed)·{
+    29    │ - ····return·"failed";
+    30    │ - ··}
+    31    │ - 
+    32    │ - ··const·isReviewRequired·=
+    33    │ - ····source.status·===·"review_required"·||
+    34    │ - ····(source.publishable_count·??·0)·>·0·||
+    35    │ - ····(source.awaiting_publish_count·??·0)·>·0;
+    36    │ - ··if·(isReviewRequired)·{
+    37    │ - ····return·"review";
+    38    │ - ··}
+    39    │ - 
+    40    │ - ··const·hasUpdates·=
+    41    │ - ····source.status·===·"updates_available"·||
+    42    │ - ····(source.needs_build_count·??·0)·>·0;
+    43    │ - ··if·(hasUpdates)·{
+    44    │ - ····return·"updates";
+    45    │ - ··}
+    46    │ - 
+    47    │ - ··return·"none";
+    48    │ - }
+    49    │ - 
+    50    │ - export·interface·RetryDecisionSource·{
+    51    │ - ··publishable_count?:·number·|·null;
+    52    │ - ··awaiting_publish_count?:·number·|·null;
+    53    │ - ··needs_build_count?:·number·|·null;
+    54    │ - }
+    55    │ - 
+    56    │ - export·type·RetryAction·=·"publish"·|·"sync";
+    57    │ - 
+    58    │ - export·function·resolveRetryAction(source?:·RetryDecisionSource·|·null):·RetryAction·{
+    59    │ - ··if·(!source)·return·"sync";
+    60    │ - 
+    61    │ - ··const·hasAwaitingPublish·=
+    62    │ - ····(source.publishable_count·??·0)·>·0·||
+    63    │ - ····(source.awaiting_publish_count·??·0)·>·0;
+    64    │ - 
+    65    │ - ··if·(hasAwaitingPublish)·{
+    66    │ - ····return·"publish";
+    67    │ - ··}
+    68    │ - ··return·"sync";
+    69    │ - }
+        1 │ + /**␍
+        2 │ + ·*·Helper·quyết·định·hành·động·thử·lại·(Retry)·và·banner·hành·động·duy·nhất␍
+        3 │ + ·*·cho·nguồn·nhóm·tài·liệu·trong·Kho·tri·thức.␍
+        4 │ + ·*␍
+        5 │ + ·*·Thứ·tự·ưu·tiên·banner:␍
+        6 │ + ·*·1.·failed:·Khi·có·lỗi·lập·chỉ·mục·hoặc·xuất·bản␍
+        7 │ + ·*·2.·review:·Khi·có·staging·index·chờ·xuất·bản␍
+        8 │ + ·*·3.·updates:·Khi·có·cập·nhật·mới·cần·đồng·bộ␍
+        9 │ + ·*·4.·none:·Khi·nguồn·đã·sẵn·sàng·hoặc·rỗng·bình·thường␍
+       10 │ + ·*/␍
+       11 │ + ␍
+       12 │ + export·interface·SourceBannerDecisionSource·{␍
+       13 │ + ··status?:·string·|·null;␍
+       14 │ + ··failed_count?:·number·|·null;␍
+       15 │ + ··publishable_count?:·number·|·null;␍
+       16 │ + ··awaiting_publish_count?:·number·|·null;␍
+       17 │ + ··needs_build_count?:·number·|·null;␍
+       18 │ + }␍
+       19 │ + ␍
+       20 │ + export·type·SourceActionBanner·=·"failed"·|·"review"·|·"updates"·|·"none";␍
+       21 │ + ␍
+       22 │ + export·function·resolveSourceActionBanner(␍
+       23 │ + ··source?:·SourceBannerDecisionSource·|·null,␍
+       24 │ + ):·SourceActionBanner·{␍
+       25 │ + ··if·(!source)·return·"none";␍
+       26 │ + ␍
+       27 │ + ··const·isFailed·=·source.status·===·"failed"·||·(source.failed_count·??·0)·>·0;␍
+       28 │ + ··if·(isFailed)·{␍
+       29 │ + ····return·"failed";␍
+       30 │ + ··}␍
+       31 │ + ␍
+       32 │ + ··const·isReviewRequired·=␍
+       33 │ + ····source.status·===·"review_required"·||␍
+       34 │ + ····(source.publishable_count·??·0)·>·0·||␍
+       35 │ + ····(source.awaiting_publish_count·??·0)·>·0;␍
+       36 │ + ··if·(isReviewRequired)·{␍
+       37 │ + ····return·"review";␍
+       38 │ + ··}␍
+       39 │ + ␍
+       40 │ + ··const·hasUpdates·=␍
+       41 │ + ····source.status·===·"updates_available"·||␍
+       42 │ + ····(source.needs_build_count·??·0)·>·0;␍
+       43 │ + ··if·(hasUpdates)·{␍
+       44 │ + ····return·"updates";␍
+       45 │ + ··}␍
+       46 │ + ␍
+       47 │ + ··return·"none";␍
+       48 │ + }␍
+       49 │ + ␍
+       50 │ + export·interface·RetryDecisionSource·{␍
+       51 │ + ··publishable_count?:·number·|·null;␍
+       52 │ + ··awaiting_publish_count?:·number·|·null;␍
+       53 │ + ··needs_build_count?:·number·|·null;␍
+       54 │ + }␍
+       55 │ + ␍
+       56 │ + export·type·RetryAction·=·"publish"·|·"sync";␍
+       57 │ + ␍
+       58 │ + export·function·resolveRetryAction(␍
+       59 │ + ··source?:·RetryDecisionSource·|·null,␍
+       60 │ + ):·RetryAction·{␍
+       61 │ + ··if·(!source)·return·"sync";␍
+       62 │ + ␍
+       63 │ + ··const·hasAwaitingPublish·=␍
+       64 │ + ····(source.publishable_count·??·0)·>·0·||␍
+       65 │ + ····(source.awaiting_publish_count·??·0)·>·0;␍
+       66 │ + ␍
+       67 │ + ··if·(hasAwaitingPublish)·{␍
+       68 │ + ····return·"publish";␍
+       69 │ + ··}␍
+       70 │ + ··return·"sync";␍
+       71 │ + }␍
+    70 72 │   
+  
+
+src\routes\knowledge.$collectionId_.add-documents.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+     2  2 │   import { AddDocumentsPage } from "@/features/knowledge/add-documents-page";␍
+     3  3 │   ␍
+     4    │ - export·const·Route·=·createFileRoute("/knowledge/$collectionId_/add-documents")({␍
+     5    │ - ··component:·AddDocumentsRoute,␍
+     6    │ - });␍
+        4 │ + export·const·Route·=·createFileRoute("/knowledge/$collectionId_/add-documents")(␍
+        5 │ + ··{␍
+        6 │ + ····component:·AddDocumentsRoute,␍
+        7 │ + ··},␍
+        8 │ + );␍
+     7  9 │   ␍
+     8 10 │   function AddDocumentsRoute() {␍
+  
+
+src\types\documents.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    250 250 │     total: number;␍
+    251 251 │   }␍
+    252     │ - ␍
+    253 252 │   
+  
+
+Checked 530 files in 2s. No fixes applied.
+Found 15 errors.
+Found 2 infos.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+

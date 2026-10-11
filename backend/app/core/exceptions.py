@@ -23,13 +23,16 @@ class DomainException(Exception):
         details: dict[str, Any] | None = None,
         title: str | None = None,
         detail: str | None = None,
+        error_code: str | None = None,
+        **kwargs: Any,
     ):
+        effective_code = error_code or code or "domain_error"
         msg = message or detail or title or "Domain error"
         super().__init__(msg)
         self.message = msg
-        self.code = code
+        self.code = effective_code
         self.status_code = status_code
-        self.details = details or {}
+        self.details = details or kwargs.get("extra_details") or {}
         self.title = title or msg
         self.detail = detail or msg
 

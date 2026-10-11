@@ -1,0 +1,267 @@
+14:14:47: Starting worker for 8 functions: task_document_ingestion, task_reindex_collection, task_export_document, task_document_revision_parse, task_knowledge_source_ingestion, task_knowledge_index_build, task_knowledge_garbage_collection, cron:task_reconcile_pending_jobs
+14:14:47: redis_version=7.4.11 mem_usage=1.70M clients_connected=2 db_keys=30
+14:15:13:   0.07s → knowledge_ingest_job_b1b823b1045f:task_knowledge_source_ingestion('job_b1b823b1045f')
+14:15:13:   0.10s → knowledge_ingest_job_66f24dbf7fd4:task_knowledge_source_ingestion('job_66f24dbf7fd4')
+14:15:13:   0.21s → knowledge_ingest_job_50b4edac507c:task_knowledge_source_ingestion('job_50b4edac507c')
+14:15:14:   1.01s ! knowledge_ingest_job_50b4edac507c:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+14:15:15:   1.00s → cron:task_reconcile_pending_jobs()
+14:15:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:15:15:   2.70s ← knowledge_ingest_job_b1b823b1045f:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_b1b823b1045f', 'source_revision_id': 'ks…
+14:15:20:   7.08s ← knowledge_ingest_job_66f24dbf7fd4:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_66f24dbf7fd4', 'source_revision_id': 'ks…
+14:16:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:16:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:17:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:17:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:18:15:   1.01s → cron:task_reconcile_pending_jobs()
+14:18:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:19:15:   1.04s → cron:task_reconcile_pending_jobs()
+14:19:15:   0.04s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:20:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:20:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:20:18:   0.45s → knowledge_ingest_job_20fd1b566fa9:task_knowledge_source_ingestion('job_20fd1b566fa9')
+14:20:18:   0.45s → knowledge_ingest_job_38cbd9acc45d:task_knowledge_source_ingestion('job_38cbd9acc45d')
+14:20:18:   0.45s → knowledge_ingest_job_27d424bcd214:task_knowledge_source_ingestion('job_27d424bcd214')
+14:20:19:   0.26s ! knowledge_ingest_job_27d424bcd214:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+14:20:19:   0.86s ! knowledge_ingest_job_38cbd9acc45d:task_knowledge_source_ingestion failed, DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 353, in build_generation_for_source
+    indexed_count = await vector_indexer.index_chunks(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 504, in index_chunks
+    await self._resolve_embedding_runtime(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\rag\vector_indexer.py", line 174, in _resolve_embedding_runtime
+    return await model_runtime_resolver.resolve(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\modelops\services\model_runtime_resolver.py", line 127, in resolve
+    raise AppException(
+app.core.exceptions.DomainException: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 333, in process_import_item
+    await vector_generation_service.build_generation_for_source(
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\vector_generation_service.py", line 365, in build_generation_for_source
+    raise AppException(
+app.core.exceptions.DomainException: Lỗi lập chỉ mục vector vào Qdrant: Provider mặc định 'prov_rtx5090_vllm' không còn khóa khả dụng.
+14:20:20:   1.08s ← knowledge_ingest_job_20fd1b566fa9:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_20fd1b566fa9', 'source_revision_id': 'ks…
+14:21:15:   1.01s → cron:task_reconcile_pending_jobs()
+14:21:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:22:15:   1.04s → cron:task_reconcile_pending_jobs()
+14:22:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:23:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:23:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:23:29:   0.19s → knowledge_ingest_job_cc9be6e13990:task_knowledge_source_ingestion('job_cc9be6e13990')
+14:23:29:   0.19s → knowledge_ingest_job_050151aa7a9b:task_knowledge_source_ingestion('job_050151aa7a9b')
+14:23:30:   0.22s ! knowledge_ingest_job_050151aa7a9b:task_knowledge_source_ingestion failed, FileDataError: Failed to open stream
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2981, in __init__
+    doc = mupdf.fz_open_document_with_stream_and_dir(filetype if filetype else '', fz_stream, archive.this)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\mupdf.py", line 53426, in fz_open_document_with_stream_and_dir
+    return _mupdf.fz_open_document_with_stream_and_dir(magic, stream, dir)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pymupdf.mupdf.FzErrorFormat: code=7: no objects found
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\arq\worker.py", line 599, in run_job
+    result = await asyncio.wait_for(task, timeout_s)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\workers\tasks.py", line 502, in task_knowledge_source_ingestion
+    source_rev = await source_ingestion_service.process_import_item(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\services\source_ingestion_service.py", line 214, in process_import_item
+    parsed = await parser.parse(file_bytes, item.origin_file_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\knowledge\parsers\pdf_parser.py", line 252, in parse
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\pymupdf\__init__.py", line 2984, in __init__
+    raise FileDataError('Failed to open stream') from e
+pymupdf.FileDataError: Failed to open stream
+14:23:30:   0.76s ← knowledge_ingest_job_cc9be6e13990:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_cc9be6e13990', 'source_revision_id': 'ks…
+14:24:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:24:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:25:15:   1.01s → cron:task_reconcile_pending_jobs()
+14:25:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:26:15:   1.03s → cron:task_reconcile_pending_jobs()
+14:26:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:27:15:   1.02s → cron:task_reconcile_pending_jobs()
+14:27:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:28:15:   1.03s → cron:task_reconcile_pending_jobs()
+14:28:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+14:29:15:   1.04s → cron:task_reconcile_pending_jobs()
+14:29:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:13:   0.72s → cron:task_reconcile_pending_jobs()
+15:04:15:   1.51s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:15:   1.45s → cron:task_reconcile_pending_jobs() delayed=1.45s
+15:04:16:   0.73s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:16:   1.00s → cron:task_reconcile_pending_jobs()
+15:04:16:   0.40s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:16:   0.36s → cron:task_reconcile_pending_jobs()
+15:04:17:   0.16s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:17:   0.20s → cron:task_reconcile_pending_jobs()
+15:04:17:   0.14s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:17:   0.47s → cron:task_reconcile_pending_jobs()
+15:04:17:   0.09s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:18:   0.47s → cron:task_reconcile_pending_jobs()
+15:04:18:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:18:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:18:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:19:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:19:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:19:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:19:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:20:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:20:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:20:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:20:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:21:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:21:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:21:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:21:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:22:   0.52s → cron:task_reconcile_pending_jobs()
+15:04:22:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:22:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:22:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:23:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:23:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:23:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:23:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:24:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:24:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:24:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:24:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:25:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:25:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:25:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:25:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:26:   0.48s → cron:task_reconcile_pending_jobs()
+15:04:26:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:26:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:26:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:27:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:27:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:27:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:27:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:28:   0.48s → cron:task_reconcile_pending_jobs()
+15:04:28:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:28:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:28:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:29:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:29:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:29:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:29:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:30:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:30:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:30:   0.50s → cron:task_reconcile_pending_jobs()
+15:04:30:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:31:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:31:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:31:   0.49s → cron:task_reconcile_pending_jobs()
+15:04:31:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:04:32:   0.51s → cron:task_reconcile_pending_jobs()
+15:04:32:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:05:15:   1.03s → cron:task_reconcile_pending_jobs()
+15:05:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:06:15:   0.99s → cron:task_reconcile_pending_jobs()
+15:06:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:06:43:   0.17s → knowledge_ingest_job_429fd3201d85:task_knowledge_source_ingestion('job_429fd3201d85')
+15:06:43:   0.17s → knowledge_ingest_job_3f21aebd34aa:task_knowledge_source_ingestion('job_3f21aebd34aa')
+15:06:49:   5.51s ← knowledge_ingest_job_3f21aebd34aa:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_3f21aebd34aa', 'source_revision_id': 'ks…
+15:07:10:  26.54s ← knowledge_ingest_job_429fd3201d85:task_knowledge_source_ingestion ● {'status': 'completed', 'job_id': 'job_429fd3201d85', 'source_revision_id': 'ks…
+15:07:15:   1.02s → cron:task_reconcile_pending_jobs()
+15:07:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:08:15:   1.00s → cron:task_reconcile_pending_jobs()
+15:08:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:09:15:   1.04s → cron:task_reconcile_pending_jobs()
+15:09:15:   0.01s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:10:15:   1.02s → cron:task_reconcile_pending_jobs()
+15:10:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:11:15:   1.02s → cron:task_reconcile_pending_jobs()
+15:11:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:12:15:   1.02s → cron:task_reconcile_pending_jobs()
+15:12:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:13:15:   1.04s → cron:task_reconcile_pending_jobs()
+15:13:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:14:15:   1.01s → cron:task_reconcile_pending_jobs()
+15:14:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:14:48: recording health: Oct-11 15:14:48 j_complete=66 j_failed=4 j_retried=0 j_ongoing=0 queued=0
+15:15:15:   1.04s → cron:task_reconcile_pending_jobs()
+15:15:15:   0.03s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}
+15:16:15:   1.00s → cron:task_reconcile_pending_jobs()
+15:16:15:   0.02s ← cron:task_reconcile_pending_jobs ● {'dispatched': 0}

@@ -75,13 +75,25 @@ export interface DocumentBoundingBox {
   id: string;
   page_number: number;
   type: "text" | "table" | "stamp" | "header" | "title" | "signature" | "list";
-  coordinates: { x: number; y: number; width: number; height: number }; // percentages 0-100
+  coordinates: {
+    x?: number;
+    y?: number;
+    left?: number;
+    top?: number;
+    width: number;
+    height: number;
+    coordinate_system?: string;
+    is_valid?: boolean;
+  };
   label: string;
   confidence: number;
   content_snippet: string;
 }
 
 export interface DocumentRegion {
+  layout_confidence?: number | null;
+  text_confidence?: number | null;
+  coordinates?: DocumentBoundingBox["coordinates"];
   id: string;
   page_number: number;
   title: string;
@@ -140,6 +152,7 @@ export interface ApproveDocumentResult {
 }
 
 export interface DocumentVerificationData {
+  revision_id?: string;
   document_id: string;
   collection_id: string;
   title: string;
@@ -287,9 +300,11 @@ export interface CreateKnowledgeBindingsResponse {
 export interface KnowledgeBinding {
   id: string;
   collection_id: string;
-  repository_document_id: string;
-  source_revision_id: string;
+  repository_document_id: string | null;
+  source_revision_id: string | null;
   active_index_revision_id?: string | null;
+  active_source_revision_id?: string | null;
+  source_status?: string | null;
   active_epoch: number;
   chunk_strategy: string;
   sync_policy: string;
@@ -314,7 +329,7 @@ export interface ParityReport {
 export interface KnowledgeIndexRevision {
   id: string;
   binding_id: string;
-  source_revision_id: string;
+  source_revision_id: string | null;
   vector_generation_id: string;
   revision_no: number;
   chunk_count: number;
@@ -597,4 +612,414 @@ export interface PreviewDocumentGroupResponse {
   not_ready_count: number;
   failed_count: number;
   items: PreviewDocumentGroupItem[];
+}
+
+export interface DocumentSyncItemResult {
+  document_id: string;
+  binding_id?: string | null;
+  source_revision_id?: string | null;
+  staging_revision_id?: string | null;
+  status: "success" | "failed" | "skipped";
+  error_code?: string | null;
+  error_message?: string | null;
+}
+
+export interface KnowledgeGroupSource {
+  id: string;
+  collection_id: string;
+  document_group_id: string;
+  group_name: string;
+  group_description?: string | null;
+  sync_policy: string;
+  chunk_strategy: string;
+  status:
+    | "pending"
+    | "empty"
+    | "up_to_date"
+    | "updates_available"
+    | "syncing"
+    | "review_required"
+    | "ready"
+    | "failed"
+    | "detached";
+  last_synced_at?: string | null;
+  last_membership_hash?: string | null;
+  total_documents: number;
+  published_count: number;
+  new_revision_count: number;
+  new_document_count: number;
+  not_ready_count: number;
+  failed_count: number;
+  needs_build_count?: number;
+  awaiting_publish_count?: number;
+  publishable_count?: number;
+  has_updates: boolean;
+  items?: DocumentSyncItemResult[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttachGroupSourceRequest {
+  group_id: string;
+  chunk_strategy?: string;
+  sync_policy?: "manual" | "auto_on_ready";
+  auto_activate?: boolean;
+}
+
+export interface PreviewGroupSourceDiffItem {
+  document_id: string;
+  title: string;
+  file_name: string;
+  revision_id?: string | null;
+  revision_status?: string | null;
+  category:
+    | "added"
+    | "updated"
+    | "removed"
+    | "unchanged"
+    | "not_ready"
+    | "failed";
+  reason?: string;
+}
+
+export interface PreviewGroupSourceDiffResponse {
+  source_id?: string | null;
+  collection_id: string;
+  group_id: string;
+  group_name: string;
+  membership_hash: string;
+  last_membership_hash?: string | null;
+  has_changes: boolean;
+  total_documents_in_group: number;
+  added_count: number;
+  updated_count: number;
+  removed_count: number;
+  unchanged_count: number;
+  not_ready_count: number;
+  failed_count: number;
+  needs_build_count?: number;
+  awaiting_publish_count?: number;
+  publishable_count?: number;
+  items: PreviewGroupSourceDiffItem[];
+}
+
+export interface SyncGroupSourceRequest {
+  confirm_detach_removed?: boolean;
+  chunk_strategy?: string;
+  auto_publish?: boolean;
+}
+
+export interface SyncGroupSourceResponse {
+  source_id: string;
+  collection_id: string;
+  status: string;
+  synced_count: number;
+  detached_count: number;
+  failed_count: number;
+  review_required_count: number;
+  published_count: number;
+  new_membership_hash?: string | null;
+  message: string;
+  items?: DocumentSyncItemResult[];
+}
+
+export interface PublishGroupSourceResponse {
+  source_id: string;
+  collection_id: string;
+  status: string;
+  published_count: number;
+  failed_count?: number;
+  message: string;
+  items?: DocumentSyncItemResult[];
+}
+
+export interface DetachGroupSourceResponse {
+  source_id: string;
+  collection_id: string;
+  status: string;
+  detached_bindings_count: number;
+  message: string;
+}
+
+export interface CollectionSummaryMetrics {
+  collection_id: string;
+  total_sources: number;
+  published_documents_count: number;
+  documents_needing_sync_count: number;
+  active_chunks_count: number;
+  collection_status:
+    | "empty"
+    | "pending"
+    | "syncing"
+    | "review_required"
+    | "updates_available"
+    | "ready"
+    | "failed";
+  configured_embedding_model?: string | null;
+  default_chunk_strategy?: string | null;
+}
+
+// ==============================================================================
+// V3 Types: Candidate Groups & Documents (ADR-012)
+// ==============================================================================
+
+export interface CandidateGroupItem {
+  id: string;
+  name: string;
+  description: string | null;
+  total_documents: number;
+  imported_documents: number;
+  created_at: string | null;
+}
+
+export interface CandidateGroupListResponse {
+  items: CandidateGroupItem[];
+  total: number;
+}
+
+export interface RepositoryCandidateItem {
+  document_id: string;
+  title: string;
+  file_name: string;
+  file_type: string;
+  file_size_bytes: number;
+  file_hash: string;
+  document_type_code?: string | null;
+  document_number?: string | null;
+  issuing_authority?: string | null;
+  issued_date?: string | null;
+  groups: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+  }>;
+  source_state:
+    | "not_imported"
+    | "current"
+    | "update_available"
+    | "processing"
+    | "failed";
+  vector_state: "not_indexed" | "indexed" | "indexing" | "index_failed";
+  knowledge_source_id?: string | null;
+  imported_file_hash?: string | null;
+  selectable: boolean;
+  unselectable_reason?: string | null;
+}
+
+export interface CandidateListResponse {
+  items: RepositoryCandidateItem[];
+  total: number;
+  vector_generation_id?: string | null;
+}
+
+// ==============================================================================
+// V3 Types: Snapshot Import Batches (ADR-012)
+// ==============================================================================
+
+export interface KnowledgeImportBatchCreateRequest {
+  document_ids: string[];
+  vector_generation_id?: string | null;
+  parser_profile?: string;
+  chunk_strategy?: string;
+  chunk_config?: Record<string, unknown>;
+}
+
+export interface KnowledgeImportItemResponse {
+  id: string;
+  batch_id: string;
+  origin_document_id: string;
+  origin_title: string;
+  origin_file_name: string;
+  origin_file_type: string;
+  origin_file_hash: string;
+  knowledge_binding_id?: string | null;
+  knowledge_source_revision_id?: string | null;
+  index_revision_id?: string | null;
+  phase: string;
+  status: "queued" | "processing" | "succeeded" | "failed" | "skipped";
+  failure_code?: string | null;
+  failure_detail?: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeImportBatchResponse {
+  id: string;
+  collection_id: string;
+  vector_generation_id?: string | null;
+  parser_profile: string;
+  chunk_strategy: string;
+  total_count: number;
+  queued_count: number;
+  processing_count: number;
+  review_required_count: number;
+  succeeded_count: number;
+  failed_count: number;
+  skipped_count: number;
+  status:
+    | "queued"
+    | "processing"
+    | "review_required"
+    | "completed"
+    | "partial_failed"
+    | "failed"
+    | "cancelled";
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+  items: KnowledgeImportItemResponse[];
+}
+
+// ==============================================================================
+// V3 Types: Knowledge Sources & Revisions (ADR-012)
+// ==============================================================================
+
+export interface KnowledgeSourceRevisionResponse {
+  id: string;
+  binding_id: string;
+  revision_no: number;
+  origin_document_id: string;
+  origin_file_hash: string;
+  canonical_hash?: string | null;
+  canonical_markdown?: string | null;
+  page_manifest: Array<Record<string, unknown>>;
+  citation_metadata: Record<string, unknown>;
+  quality_report: {
+    passed?: boolean;
+    quality_score?: number;
+    metrics?: Record<string, unknown>;
+    violations?: Array<{
+      rule_name: string;
+      level: "warning" | "error";
+      description: string;
+      snippet?: string;
+    }>;
+    [key: string]: unknown;
+  };
+  status:
+    | "queued"
+    | "extracting"
+    | "normalizing"
+    | "validating"
+    | "review_required"
+    | "ready"
+    | "failed"
+    | "cancelled";
+  failure_code?: string | null;
+  failure_detail?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeSourceDetailResponse {
+  id: string;
+  collection_id: string;
+  repository_document_id: string | null;
+  status: string;
+  active_source_revision_id?: string | null;
+  active_source_revision?: KnowledgeSourceRevisionResponse | null;
+  revisions: KnowledgeSourceRevisionResponse[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateSourceContentRequest {
+  canonical_markdown: string;
+}
+
+export interface ReviewSourceRevisionRequest {
+  decision: "approved" | "rejected";
+  comment?: string;
+}
+
+// ==============================================================================
+// V3 Types: Chunk Sets & Multi-Vector Generations (ADR-012)
+// ==============================================================================
+
+export interface KnowledgeChunkSetResponse {
+  id: string;
+  source_revision_id: string;
+  chunk_strategy: string;
+  chunk_config: Record<string, unknown>;
+  config_hash: string;
+  chunk_count: number;
+  fact_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateVectorGenerationRequest {
+  embedding_model: string;
+  provider_id?: string;
+  embedding_dimension?: number;
+}
+
+export interface KnowledgeVectorGenerationResponse {
+  id: string;
+  collection_id: string;
+  embedding_model: string;
+  provider_id: string;
+  embedding_dimension: number;
+  distance_metric: string;
+  generation_epoch: number;
+  status: "building" | "ready" | "active" | "retired";
+  config_hash: string;
+  created_at: string;
+}
+
+export interface ActivateVectorGenerationResponse {
+  collection_id: string;
+  activated_generation_id: string;
+  previous_generation_id?: string | null;
+  new_epoch: number;
+  status: string;
+}
+
+export interface BuildVectorGenerationRequest {
+  chunk_strategy?: string;
+  chunk_config?: Record<string, unknown>;
+}
+
+export interface VectorLoadItem {
+  binding_id: string;
+  source_revision_id: string;
+}
+
+export interface VectorLoadJob {
+  id: string;
+  status: string;
+  progress: number;
+  error?: string | null;
+  payload: {
+    binding_id?: string;
+    generation_id?: string;
+    source_revision_id?: string;
+  };
+}
+
+export interface VectorSourceIndexStatus {
+  id: string;
+  binding_id: string;
+  source_revision_v2_id?: string | null;
+  vector_generation_id: string;
+  chunk_count: number;
+  status: string;
+  failure_detail?: string | null;
+}
+
+export interface VectorLoadState {
+  jobs: VectorLoadJob[];
+  indexes: VectorSourceIndexStatus[];
+}
+
+export interface BuildVectorGenerationResponse {
+  collection_id: string;
+  generation_id: string;
+  total_sources: number;
+  built_count: number;
+  reused_count: number;
+  failed_count: number;
+  status: string;
 }

@@ -3,8 +3,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowUpRight,
-  CheckCircle2,
-  Clock,
   FileStack,
   FolderOpen,
   FolderPlus,
@@ -156,21 +154,15 @@ export function DocumentGroupsPage() {
     (acc, g) => acc + g.total_documents,
     0,
   );
-  const totalReadyDocsInGroups = groups.reduce(
-    (acc, g) => acc + g.ready_documents,
-    0,
-  );
-  const totalProcessingDocsInGroups = groups.reduce(
-    (acc, g) => acc + g.processing_documents,
-    0,
-  );
+  const activeGroupsCount = groups.filter((g) => g.total_documents > 0).length;
+  const emptyGroupsCount = groups.filter((g) => g.total_documents === 0).length;
 
   return (
     <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* 1. Header: Nút Thêm kho duy nhất */}
       <PageHeader
         title="Kho Tài Liệu"
-        description="Quản lý và tổ chức các kho tài liệu số tập trung, lưu trữ trên MinIO S3, tiền xử lý Markdown sạch và gắn động vào các Kho Tri Thức."
+        description="Tổ chức và quản lý các nhóm tài liệu lưu trữ tập trung trên MinIO S3 với mã băm toàn vẹn SHA-256, sẵn sàng nạp vào các Kho Tri Thức."
         actions={
           <Button
             onClick={() => {
@@ -195,7 +187,7 @@ export function DocumentGroupsPage() {
         />
         <KpiMetric
           label={
-            isFiltered ? "Tài Liệu (Trong kết quả)" : "Tổng Tài Liệu Trong Kho"
+            isFiltered ? "Tài Liệu (Trong kết quả)" : "Tổng Tài Liệu Trực Thuộc"
           }
           value={String(totalDocsInGroups)}
           icon={FileStack}
@@ -203,18 +195,18 @@ export function DocumentGroupsPage() {
         <KpiMetric
           label={
             isFiltered
-              ? "Sẵn Sàng (Trong kết quả)"
-              : "Sẵn Sàng Đưa Vào Kho Tri Thức"
+              ? "Kho Có Tệp (Trong kết quả)"
+              : "Kho Đang Chứa Tệp"
           }
-          value={String(totalReadyDocsInGroups)}
-          icon={CheckCircle2}
+          value={String(activeGroupsCount)}
+          icon={FolderOpen}
         />
         <KpiMetric
           label={
-            isFiltered ? "Đang Xử Lý (Trong kết quả)" : "Đang Xử Lý Bóc Tách"
+            isFiltered ? "Kho Trống (Trong kết quả)" : "Kho Chưa Có Tệp"
           }
-          value={String(totalProcessingDocsInGroups)}
-          icon={Clock}
+          value={String(emptyGroupsCount)}
+          icon={FolderPlus}
         />
       </div>
 
@@ -326,21 +318,15 @@ export function DocumentGroupsPage() {
               </CardHeader>
 
               <CardContent className="space-y-3 py-2 text-xs">
-                {/* Status Breakdown Chips */}
+                {/* Storage Status Breakdown */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                    <CheckCircle2 className="size-3" />
-                    {grp.ready_documents} sẵn sàng
+                  <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    <FileStack className="size-3" />
+                    {grp.total_documents} tệp lưu trữ
                   </span>
-                  {grp.processing_documents > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
-                      <Clock className="size-3" />
-                      {grp.processing_documents} đang xử lý
-                    </span>
-                  )}
-                  {grp.error_documents > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                      {grp.error_documents} lỗi
+                  {grp.total_documents === 0 && (
+                    <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      Kho trống
                     </span>
                   )}
                 </div>
@@ -408,7 +394,7 @@ export function DocumentGroupsPage() {
                 <TableHead className="w-[120px] text-center">
                   Số Tài Liệu
                 </TableHead>
-                <TableHead className="w-[200px]">Trạng Thái</TableHead>
+                <TableHead className="w-[180px]">Trạng Thái Lưu Trữ</TableHead>
                 <TableHead className="w-[130px]">Cập Nhật</TableHead>
                 <TableHead className="w-[140px] text-right">Thao Tác</TableHead>
               </TableRow>
@@ -444,23 +430,16 @@ export function DocumentGroupsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="inline-flex items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-[11px] font-medium text-success">
-                        <CheckCircle2 className="size-2.5" />
-                        {grp.ready_documents}
+                    {grp.total_documents > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                        <FolderOpen className="size-2.5" />
+                        Đang lưu trữ tệp
                       </span>
-                      {grp.processing_documents > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
-                          <Clock className="size-2.5" />
-                          {grp.processing_documents}
-                        </span>
-                      )}
-                      {grp.error_documents > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
-                          {grp.error_documents}
-                        </span>
-                      )}
-                    </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        Kho trống
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {new Date(grp.updated_at).toLocaleDateString("vi-VN")}
@@ -522,8 +501,8 @@ export function DocumentGroupsPage() {
               <div>
                 <DialogTitle>Tạo Kho Tài Liệu Mới</DialogTitle>
                 <DialogDescription>
-                  Phân loại và quản lý các văn bản tập trung trước khi đưa vào
-                  Kho Tri Thức.
+                  Phân loại và tổ chức các tệp tài liệu số lưu trữ tập trung
+                  trong hệ thống.
                 </DialogDescription>
               </div>
             </div>
@@ -659,7 +638,7 @@ export function DocumentGroupsPage() {
         title="Xác nhận xóa kho tài liệu"
         description={
           deletingGroup
-            ? `Bạn có chắc chắn muốn xóa kho "${deletingGroup.name}"? Thao tác này chỉ xóa phân loại kho; toàn bộ tài liệu gốc và các liên kết Kho Tri Thức đã tạo sẽ được bảo toàn nguyên vẹn.`
+            ? `Bạn có chắc chắn muốn xóa kho "${deletingGroup.name}"? Thao tác này chỉ xóa phân loại nhóm; toàn bộ tệp tài liệu gốc lưu trữ trên MinIO S3 vẫn được bảo toàn nguyên vẹn.`
             : ""
         }
         confirmText="Xóa Kho Tài Liệu"

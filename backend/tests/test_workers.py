@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import app.workers.tasks as tasks_module
+from app.core.exceptions import AppException
 from app.workers.arq_worker import WorkerSettings
 from app.workers.tasks import (
     task_document_ingestion,
@@ -42,6 +43,24 @@ def _fresh_session() -> AsyncMock:
     session.refresh = AsyncMock()
     session.delete = AsyncMock()
     return session
+
+
+@pytest.mark.asyncio
+async def test_knowledge_ingestion_cancelled_batch_is_not_worker_failure():
+    job = SimpleNamespace(id="job_cancelled_batch", payload={"item_id": "item"})
+    session = _fresh_session()
+    with (
+        patch.object(tasks_module, "AsyncSessionFactory", _session_factory(session)),
+        patch.object(tasks_module, "_load_job", AsyncMock(return_value=job)),
+        patch.object(tasks_module, "_check_pre_execution_cancelled", AsyncMock(return_value=False)),
+        patch.object(tasks_module, "_is_cancelled", AsyncMock(return_value=False)),
+        patch.object(tasks_module, "_set_job", AsyncMock(return_value=True)) as state,
+        patch("app.modules.knowledge.services.source_ingestion_service.source_ingestion_service.process_import_item",
+              AsyncMock(side_effect=AppException("Cancelled batch", code="IMPORT_CANCELLED", status_code=409))),
+    ):
+        result = await tasks_module.task_knowledge_source_ingestion({}, job.id)
+    assert result["status"] == "cancelled"
+    assert state.call_args.args[2] == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -170,7 +189,12 @@ async def test_task_export_document_renders_real_docx():
 
 
 def test_worker_settings():
-    assert len(WorkerSettings.functions) == 6
+    assert {function.__name__ for function in WorkerSettings.functions} == {
+        "task_document_ingestion", "task_reindex_collection", "task_export_document",
+        "task_document_revision_parse", "task_knowledge_source_ingestion",
+        "task_knowledge_source_reparse", "task_knowledge_index_build", "task_knowledge_garbage_collection",
+        "task_knowledge_source_purge",
+    }
     assert len(WorkerSettings.cron_jobs) == 1
     assert WorkerSettings.job_timeout == 300
     assert WorkerSettings.max_retries == 3

@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
-  BookOpen,
-  CheckCircle2,
   FileStack,
+  FileText,
   FolderPlus,
   Folders,
   HardDrive,
@@ -50,7 +49,6 @@ export function DocumentsPage() {
   const [search, setSearch] = useState("");
   const [docTypeCode, setDocTypeCode] = useState<string>("all");
   const [fileType, setFileType] = useState<string>("all");
-  const [parseStatus, setParseStatus] = useState<string>("all");
   const [groupId, setGroupId] = useState<string>("all");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAddToGroupOpen, setIsAddToGroupOpen] = useState(false);
@@ -84,7 +82,6 @@ export function DocumentsPage() {
       search,
       docTypeCode,
       fileType,
-      parseStatus,
       groupId,
     ],
     queryFn: () =>
@@ -92,7 +89,6 @@ export function DocumentsPage() {
         search: search.trim() || undefined,
         document_type_code: docTypeCode !== "all" ? docTypeCode : undefined,
         file_type: fileType !== "all" ? fileType : undefined,
-        parse_status: parseStatus !== "all" ? parseStatus : undefined,
         group_id: groupId !== "all" ? groupId : undefined,
         limit: 100,
       }),
@@ -102,18 +98,6 @@ export function DocumentsPage() {
     () => documentsData?.items ?? [],
     [documentsData?.items],
   );
-
-  // Reparse mutation
-  const reparseMutation = useMutation({
-    mutationFn: (id: string) => documentsApi.reparseDocument(id),
-    onSuccess: (data) => {
-      toast.success(`Đã bóc tách lại thành công: ${data.file_name}`);
-      queryClient.invalidateQueries({ queryKey: ["repository-documents"] });
-    },
-    onError: (err: Error) => {
-      toast.error(err.message || "Bóc tách lại tài liệu thất bại.");
-    },
-  });
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -149,7 +133,7 @@ export function DocumentsPage() {
       {/* 1. Page Header */}
       <PageHeader
         title="Kho Tài Liệu Tập Trung"
-        description="Lưu trữ tài sản số trên MinIO S3, chống trùng lặp SHA-256, tiền xử lý Markdown sạch và gắn động vào các Kho Tri Thức."
+        description="Lưu trữ tài sản số an toàn trên MinIO S3, chống trùng lặp mã băm SHA-256 và quản lý phân loại danh mục theo kho lưu trữ."
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" className="gap-1.5 shadow-xs">
@@ -169,7 +153,7 @@ export function DocumentsPage() {
         }
       />
 
-      {/* 2. KPI Metrics Banner (Bỏ helper lặp lại ý nghĩa) */}
+      {/* 2. KPI Metrics Banner (Storage Domain) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
         <KpiMetric
           label="Tổng Tài Liệu"
@@ -177,23 +161,23 @@ export function DocumentsPage() {
           icon={FileStack}
         />
         <KpiMetric
-          label="Đã Bóc Tách MD"
-          value={String(stats?.parsed_documents ?? 0)}
-          icon={CheckCircle2}
-        />
-        <KpiMetric
           label="Dung Lượng MinIO"
           value={formatFileSize(stats?.total_size_bytes ?? 0)}
           icon={HardDrive}
         />
         <KpiMetric
-          label="Liên Kết Kho Tri Thức"
-          value={String(stats?.attached_usages_count ?? 0)}
-          icon={BookOpen}
+          label="Loại Văn Bản"
+          value={String(stats?.document_types_count ?? documentTypes.length)}
+          icon={FileText}
+        />
+        <KpiMetric
+          label="Tổng Kho Lưu Trữ"
+          value={String(groups.length)}
+          icon={Folders}
         />
       </div>
 
-      {/* 3. Seamless Toolbar: Search + Filters + ViewModeToggle (Bỏ khung Card/viền bao ngoài) */}
+      {/* 3. Seamless Toolbar: Search + Filters + ViewModeToggle */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
           {/* Search Input */}
@@ -251,20 +235,6 @@ export function DocumentsPage() {
               <SelectItem value="txt">Văn bản (.txt)</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* Filter Parse Status */}
-          <Select value={parseStatus} onValueChange={setParseStatus}>
-            <SelectTrigger className="w-[130px] h-9 text-xs">
-              <SelectValue placeholder="Trạng thái MD" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả trạng thái</SelectItem>
-              <SelectItem value="parsed">Đã bóc tách MD</SelectItem>
-              <SelectItem value="parsing">Đang bóc tách</SelectItem>
-              <SelectItem value="failed">Lỗi bóc tách</SelectItem>
-              <SelectItem value="pending">Chờ xử lý</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* View mode toggle */}
@@ -298,7 +268,6 @@ export function DocumentsPage() {
             search ||
             docTypeCode !== "all" ||
             fileType !== "all" ||
-            parseStatus !== "all" ||
             groupId !== "all"
               ? "Không có tài liệu nào khớp với các bộ lọc đã chọn. Hãy thử xóa bớt bộ lọc."
               : "Kho tài liệu tập trung đang trống. Hãy bắt đầu bằng cách tải lên các tài liệu quy chế, thông báo hoặc biểu mẫu."
@@ -316,7 +285,6 @@ export function DocumentsPage() {
               document={doc}
               selected={selectedIds.includes(doc.id)}
               onToggleSelect={handleToggleSelect}
-              onReparse={(d) => reparseMutation.mutate(d.id)}
               onDelete={(d) => setDeletingDoc(d)}
             />
           ))}
@@ -327,7 +295,6 @@ export function DocumentsPage() {
           selectedIds={selectedIds}
           onToggleSelect={handleToggleSelect}
           onToggleSelectAll={handleToggleSelectAll}
-          onReparse={(d) => reparseMutation.mutate(d.id)}
           onDelete={(d) => setDeletingDoc(d)}
         />
       )}
@@ -373,13 +340,7 @@ export function DocumentsPage() {
         open={Boolean(deletingDoc)}
         onOpenChange={(open) => !open && setDeletingDoc(null)}
         title="Xác nhận xóa tài liệu khỏi kho tập trung"
-        description={
-          deletingDoc
-            ? deletingDoc.attached_collections_count > 0
-              ? `Tài liệu "${deletingDoc.title || deletingDoc.file_name}" đang được liên kết trong ${deletingDoc.attached_collections_count} Kho Tri Thức. Bạn có chắc chắn muốn xóa không?`
-              : `Bạn có chắc chắn muốn xóa tài liệu "${deletingDoc.title || deletingDoc.file_name}" khỏi kho không?`
-            : ""
-        }
+        description={`Bạn có chắc chắn muốn xóa tài liệu "${deletingDoc?.title || deletingDoc?.file_name}" khỏi kho không? Hành động này sẽ xóa tệp gốc trên MinIO S3.`}
         confirmText="Xóa Tài Liệu"
         confirmVariant="destructive"
         onConfirm={() => deletingDoc && deleteMutation.mutate(deletingDoc.id)}

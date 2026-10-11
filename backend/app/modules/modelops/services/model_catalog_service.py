@@ -47,12 +47,20 @@ def _without_local_models(items: list[dict[str, Any]] | None) -> list[dict[str, 
 
 DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
     {
+        "provider_id": "prov_paddleocr_vl",
+        "provider_name": "PaddleOCR-VL On-Premise (RTX 5090)",
+        "model_name": "PaddleOCR-VL",
+        "provider_type": "paddleocr",
+        "is_active": True,
+        "description": "Ưu tiên 1 (On-Premise RTX 5090): PaddleOCR-VL Document Layout Parsing & High-Speed OCR On-Premise",
+    },
+    {
         "provider_id": "prov_gemini",
         "provider_name": "Google Gemini",
         "model_name": "gemini-3.1-flash-lite",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 1 (Cloud Primary): Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM (~1.5s)",
+        "description": "Ưu tiên 2 (Cloud Fallback 1): Google Gemini 2.5 Flash — Bóc tách bảng biểu Markdown GFM (~1.5s)",
     },
     {
         "provider_id": "prov_mistral",
@@ -60,7 +68,7 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "mistral-ocr-latest",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 2 (Cloud Fallback): Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
+        "description": "Ưu tiên 3 (Cloud Fallback 2): Mistral OCR Cloud Vision — Chuyên trị tài liệu scan tiếng Việt và con dấu",
     },
     {
         "provider_id": "prov_openrouter",
@@ -68,7 +76,7 @@ DEFAULT_QNU_OCR_COMBO_CHAIN: list[dict[str, Any]] = [
         "model_name": "qwen/qwen-2.5-vl-72b-instruct",
         "provider_type": "cloud",
         "is_active": True,
-        "description": "Ưu tiên 3: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng",
+        "description": "Ưu tiên 4: Qwen 2.5 VL 72B Instruct — Bóc tách Markdown & Bounding Boxes dự phòng",
     },
 ]
 
@@ -289,8 +297,8 @@ class ModelCatalogService:
             "default_reranker_combo_id": "combo_qnu_reranker_shield",
             "reranker_combo_chain": DEFAULT_QNU_RERANKER_COMBO_CHAIN,
 
-            "default_ocr_provider_id": "prov_gemini",
-            "default_ocr_model": "gemini-3.1-flash-lite",
+            "default_ocr_provider_id": "prov_paddleocr_vl",
+            "default_ocr_model": "PaddleOCR-VL",
             "default_ocr_mode": "combo",
             "default_ocr_combo_id": "combo_qnu_ocr_master",
             "ocr_combo_chain": DEFAULT_QNU_OCR_COMBO_CHAIN,

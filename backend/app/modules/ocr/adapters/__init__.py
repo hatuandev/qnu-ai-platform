@@ -8,6 +8,7 @@ from app.modules.ocr.adapters.openai_vision_adapter import (
     OpenAIVisionOCRAdapter,
     QwenOCRAdapter,
 )
+from app.modules.ocr.adapters.paddleocr_adapter import PaddleOCRVLAdapter
 from app.modules.ocr.adapters.pymupdf_adapter import PyMuPDFOCRAdapter
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "MistralOCRAdapter",
     "MockOCRAdapter",
     "OpenAIVisionOCRAdapter",
+    "PaddleOCRVLAdapter",
     "PyMuPDFOCRAdapter",
     "QwenOCRAdapter",
 ]

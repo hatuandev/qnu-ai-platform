@@ -675,6 +675,7 @@ export const KnowledgePage: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PyMuPDF">PyMuPDF (Nhanh)</SelectItem>
+                    <SelectItem value="PaddleOCR">PaddleOCR-VL (RTX 5090)</SelectItem>
                     <SelectItem value="Gemini">Gemini Vision</SelectItem>
                     <SelectItem value="Mistral">Mistral OCR</SelectItem>
                   </SelectContent>
