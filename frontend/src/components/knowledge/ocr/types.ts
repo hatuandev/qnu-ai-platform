@@ -131,6 +131,9 @@ export interface OcrToolbarProps {
 }
 
 export interface OcrInspectorProps {
+  citationMetadata?: Record<string, string | null>;
+  structuredArtifact?: import("@/types/knowledge").SourceArtifact;
+  layoutTextAlignment?: string;
   pageData: StudioOCRPage | null;
   allPages?: StudioOCRPage[];
   documentTitle?: string;

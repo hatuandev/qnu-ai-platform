@@ -5,6 +5,9 @@ export function mapVerificationDataToStudioDoc(
   data: DocumentVerificationData,
 ): StudioOCRDocument {
   return {
+    citationMetadata: data.citation_metadata,
+    structuredArtifact: data.structured_artifact,
+    layoutTextAlignment: data.layout_text_alignment,
     revisionId: data.revision_id,
     filename: data.filename,
     totalPages: data.total_pages,

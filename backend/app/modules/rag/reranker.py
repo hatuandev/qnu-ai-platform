@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 
 from app.core.database import AsyncSessionFactory
@@ -26,6 +27,11 @@ def _combine_rrf_and_ce_scores(
     ce_multiplier: float = 1.2,
 ) -> list[FusionCandidate]:
     """Fuse initial RRF ordering with Cross-Encoder (CE) relevance scores."""
+    if not ce_score_map or any(
+        not isinstance(idx, int) or idx < 0 or idx >= len(candidates)
+        or not math.isfinite(score) for idx, score in ce_score_map.items()
+    ):
+        raise ValueError("Reranker returned invalid relevance scores.")
     ce_ranked_indices = sorted(
         range(len(candidates)),
         key=lambda idx: ce_score_map.get(idx, -999.0),
@@ -35,6 +41,9 @@ def _combine_rrf_and_ce_scores(
 
     scored_candidates: list[FusionCandidate] = []
     for orig_idx, cand in enumerate(candidates):
+        if orig_idx not in ce_score_map:
+            continue  # top_n responses do not score every input candidate
+        cand.relevance_score = ce_score_map[orig_idx]
         rrf_rank = orig_idx + 1
         ce_rank = ce_rank_map.get(orig_idx, len(candidates))
         cand.rrf_score = (1.0 / (k + rrf_rank)) + (ce_multiplier / (k + ce_rank))
@@ -214,7 +223,7 @@ class RerankerClient:
                 if runtime.provider_type == "cloudflare" and runtime.api_key and runtime.account_id:
                     ranked = await self._rerank_cloudflare(query, candidates, runtime, top_k)
                     if score_threshold > 0.0:
-                        ranked = [c for c in ranked if getattr(c, "score", 0.0) >= score_threshold]
+                        ranked = [c for c in ranked if c.relevance_score is not None and c.relevance_score >= score_threshold]
                     await self._finish_runtime_key(runtime)
                     provider = "cloudflare"
                     logger.info(
@@ -232,7 +241,7 @@ class RerankerClient:
                 ):
                     ranked = await self._rerank_vllm_or_generic(query, candidates, runtime, top_k)
                     if score_threshold > 0.0:
-                        ranked = [c for c in ranked if getattr(c, "score", 0.0) >= score_threshold]
+                        ranked = [c for c in ranked if c.relevance_score is not None and c.relevance_score >= score_threshold]
                     await self._finish_runtime_key(runtime)
                     provider = runtime.provider_type or "vllm"
                     logger.info(
@@ -279,6 +288,7 @@ class RerankerClient:
                         scores = resp.json().get("scores", [])
                         score_map = {idx: float(score) for idx, score in enumerate(scores)}
                         scored_candidates = _combine_rrf_and_ce_scores(candidates, score_map)
+                        scored_candidates = [c for c in scored_candidates if c.relevance_score is not None and c.relevance_score >= score_threshold]
                         provider = "custom"
                         logger.info(
                             "Rerank provider=%s latency_ms=%.2f in=%d out=%d",

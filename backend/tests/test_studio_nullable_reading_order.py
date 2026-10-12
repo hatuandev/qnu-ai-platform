@@ -15,6 +15,7 @@ async def test_studio_accepts_nullable_reading_order(order, legacy_order, expect
         canonical_markdown="Nội dung trang",
         snapshot_metadata={},
         parse_provenance={},
+        citation_metadata={}, canonical_hash=None,
         page_manifest=[
             {
                 "page": 1,

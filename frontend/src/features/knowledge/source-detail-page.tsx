@@ -312,6 +312,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         </Select>
         <DeleteSourceButton
           sourceId={sourceId}
+          status={source.status}
           title={sourceId}
           onDeleted={() =>
             navigate({

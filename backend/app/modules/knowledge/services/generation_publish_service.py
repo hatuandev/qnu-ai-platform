@@ -44,6 +44,9 @@ async def publish_generation(
         selected[binding.id] = matches[0]
     if not selected:
         raise AppException("Kho chưa có nguồn sẵn sàng.", code="GENERATION_NOT_READY_FOR_ACTIVATION", status_code=409)
+    from app.modules.knowledge.services.generation_candidate import validate_candidate_artifacts
+
+    await validate_candidate_artifacts(db, list(selected.values()))
     expected_sources = {b.id: b.active_source_revision_id for b in bindings}
     old_generation = (col.collection_metadata or {}).get("active_vector_generation_id")
     # Release the read transaction before remote I/O. Extra retrievable staging

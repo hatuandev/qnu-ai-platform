@@ -31,6 +31,7 @@ class WorkflowContext:
     node_traces: list[NodeExecutionTrace] = field(default_factory=list)
     node_inputs: dict[str, dict[str, Any]] = field(default_factory=dict)
     node_input_sources: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    workspace_id: str = "workspace_qnu"
 
 
 @dataclass

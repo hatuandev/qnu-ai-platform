@@ -11,6 +11,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    WORKER_MAX_JOBS: int = Field(default=10, ge=1, le=100)
+    WORKER_JOB_TIMEOUT_SECONDS: int = Field(default=900, ge=300)
+    WORKER_MAX_TRIES: int = Field(default=3, ge=1, le=10)
+    OCR_MAX_CONCURRENT: int = Field(default=2, ge=1, le=100)
+    EMBEDDING_MAX_CONCURRENT: int = Field(default=4, ge=1, le=100)
+    PROVIDER_QUEUE_TIMEOUT_SECONDS: int = Field(default=120, ge=1)
+    INGESTION_MAX_PENDING_PER_TENANT: int = Field(default=1000, ge=1)
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
         env_file_encoding="utf-8",

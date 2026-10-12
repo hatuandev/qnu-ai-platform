@@ -25,6 +25,12 @@ from app.core.database import get_db
 from app.main import app
 from app.modules.auth.dependencies import get_current_actor
 from app.modules.auth.schemas import AuthActor
+
+
+@pytest.fixture(autouse=True)
+def isolate_admission_from_unit_session_stubs():
+    with patch("app.modules.jobs.ingestion_admission.check_ingestion_capacity", AsyncMock()):
+        yield
 from app.modules.documents.models import (
     DocumentGroup,
     RepositoryDocument,
@@ -398,6 +404,7 @@ async def test_import_batch_retry_and_cancellation() -> None:
 
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=_execute_result(scalar=batch))
+    mock_db.scalars = AsyncMock(return_value=MagicMock(all=list))
 
     # 1. Retry failed items
     retried_batch = await import_batch_service.retry_failed_items(

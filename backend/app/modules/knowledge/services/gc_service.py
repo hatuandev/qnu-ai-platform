@@ -84,7 +84,7 @@ class KnowledgeArtifactGCService:
         # 1. Fetch all bindings for this collection
         stmt_bindings = select(KnowledgeBinding).where(
             KnowledgeBinding.collection_id == collection_id,
-            KnowledgeBinding.status != "detached",
+            KnowledgeBinding.status.notin_(["detached", "paused"]),
         )
         res_bindings = await db.execute(stmt_bindings)
         bindings = list(res_bindings.scalars().all())

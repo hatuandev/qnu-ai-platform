@@ -23,9 +23,14 @@ import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 import { apiClient } from "@/services/modelops-api";
 import type { VectorLoadItem } from "@/types/knowledge";
 import {
+  getGenerationLabel,
+  getProviderOrigin,
+} from "../utils/vector-generation-label";
+import {
   canPublishSources,
   getSourceVectorState,
 } from "../utils/vector-workflow";
+import { CandidateRagPreview } from "./candidate-rag-preview";
 import { useVectorWorkflow } from "./use-vector-workflow";
 
 export function VectorLoadControls({
@@ -34,12 +39,16 @@ export function VectorLoadControls({
   disabledReason,
   compact = false,
   initialGenerationId,
+  actionLabel = "Nạp vector",
+  preferNewGeneration = false,
 }: {
   collectionId: string;
   targets: VectorLoadItem[];
   disabledReason?: string;
   compact?: boolean;
   initialGenerationId?: string;
+  actionLabel?: string;
+  preferNewGeneration?: boolean;
 }) {
   const client = useQueryClient();
   const { sources, generations, state } = useVectorWorkflow(collectionId);
@@ -53,14 +62,28 @@ export function VectorLoadControls({
     enabled: isOpen,
   });
   const options = models.data?.available_embeddings || [];
+  const collection = useQuery({
+    queryKey: ["knowledge-collection", collectionId],
+    queryFn: () => knowledgeApi.getCollection(collectionId),
+    enabled: isOpen,
+  });
+  const providers = useQuery({
+    queryKey: ["modelops-providers"],
+    queryFn: () => apiClient.getModelProviders(),
+    enabled: isOpen,
+    staleTime: 60000,
+  });
   const active = generations.data?.find(
     (generation) => generation.status === "active",
   );
   const defaultModel = options.find(
     (model) =>
       model.provider_id ===
-        models.data?.defaults.default_embedding_provider_id &&
-      model.model_name === models.data?.defaults.default_embedding_model,
+        (collection.data?.data_processing?.embedding_provider_id ||
+          models.data?.defaults.default_embedding_provider_id) &&
+      model.model_name ===
+        (collection.data?.data_processing?.embedding_model ||
+          models.data?.defaults.default_embedding_model),
   );
   const effectiveSelection =
     selection ||
@@ -69,7 +92,7 @@ export function VectorLoadControls({
       (item) => item.id === initialGenerationId && item.status !== "retired",
     )
       ? `gen:${initialGenerationId}`
-      : active
+      : active && !preferNewGeneration
         ? `gen:${active.id}`
         : defaultModel
           ? `model:${defaultModel.provider_id}:${defaultModel.model_name}`
@@ -77,6 +100,16 @@ export function VectorLoadControls({
   const publishId =
     loadedGenerationId ||
     (effectiveSelection.startsWith("gen:") ? effectiveSelection.slice(4) : "");
+  const selectedProviderId = effectiveSelection.startsWith("gen:")
+    ? generations.data?.find((item) => `gen:${item.id}` === effectiveSelection)
+        ?.provider_id
+    : options.find(
+        (item) =>
+          `model:${item.provider_id}:${item.model_name}` === effectiveSelection,
+      )?.provider_id;
+  const selectedProvider = providers.data?.find(
+    (item) => item.id === selectedProviderId,
+  );
   const invalidate = () => {
     for (const key of [
       "knowledge-vector-load",
@@ -91,6 +124,8 @@ export function VectorLoadControls({
   };
   const load = useMutation({
     mutationFn: async () => {
+      if (collection.isPending || collection.isError || !collection.data)
+        throw new Error("Chưa tải được cấu hình Embedding của kho.");
       if (!targets.length || disabledReason)
         throw new Error(
           disabledReason || "Hãy chọn nguồn có Markdown sẵn sàng.",
@@ -174,11 +209,20 @@ export function VectorLoadControls({
         size="sm"
         variant={compact ? "outline" : "default"}
         disabled={!!disabledReason || !targets.length}
-        title={disabledReason || "Nạp Markdown đã lưu vào Qdrant"}
-        onClick={() => setIsOpen(true)}
+        title={
+          disabledReason ||
+          (preferNewGeneration
+            ? "Tạo chỉ mục mới từ Markdown sạch; chỉ đổi chatbot sau khi xuất bản"
+            : "Nạp Markdown đã lưu vào Qdrant")
+        }
+        onClick={() => {
+          setSelection("");
+          setLoadedGenerationId("");
+          setIsOpen(true);
+        }}
       >
         <Upload className="size-3.5" />
-        Nạp vector
+        {actionLabel}
       </Button>
       <Dialog
         open={isOpen}
@@ -188,7 +232,11 @@ export function VectorLoadControls({
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Nạp Markdown vào vector</DialogTitle>
+            <DialogTitle>
+              {preferNewGeneration
+                ? "Đổi model · Chỉ mục mới"
+                : "Nạp Markdown vào vector"}
+            </DialogTitle>
             <DialogDescription>
               Dùng {targets.length} bản Markdown đã lưu và đủ điều kiện. Không
               bóc tách/OCR lại; chỉ mục đang phục vụ được giữ nguyên đến khi
@@ -203,33 +251,44 @@ export function VectorLoadControls({
             }}
             disabled={isBusy}
           >
-            <SelectTrigger aria-label="Mô hình embedding">
+            <SelectTrigger
+              aria-label="Mô hình embedding"
+              className="h-auto min-h-9 min-w-0 [&>span]:whitespace-normal [&>span]:text-left"
+            >
               <SelectValue placeholder="Chọn mô hình từ ModelOps" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)]">
               {generations.data
                 ?.filter((generation) => generation.status !== "retired")
                 .map((generation) => (
                   <SelectItem
                     key={generation.id}
                     value={`gen:${generation.id}`}
+                    className="whitespace-normal break-words"
                   >
-                    {generation.embedding_model} ·{" "}
-                    {generation.embedding_dimension}d · Bản{" "}
-                    {generation.generation_epoch}
-                    {generation.status === "active" ? " (Đang dùng)" : ""}
+                    {getGenerationLabel(generation, providers.data)}
                   </SelectItem>
                 ))}
               {options.map((model) => (
                 <SelectItem
                   key={`${model.provider_id}:${model.model_name}`}
                   value={`model:${model.provider_id}:${model.model_name}`}
+                  className="whitespace-normal break-words"
                 >
                   {model.model_name} · {model.provider_name} (Chỉ mục mới)
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground break-words">
+            Máy chủ embedding:{" "}
+            {providers.isPending
+              ? "Đang tải…"
+              : providers.isError
+                ? "Không tải được thông tin provider"
+                : getProviderOrigin(selectedProvider)}
+            . “Bản” là phiên bản chỉ mục, không phải nơi chạy model.
+          </p>
           {models.isSuccess && !options.length && !generations.data?.length && (
             <p className="text-sm text-muted-foreground">
               Chưa có mô hình embedding. Hãy cấu hình tại Mô hình &amp;
@@ -276,6 +335,13 @@ export function VectorLoadControls({
             Xuất bản áp dụng cho toàn chỉ mục của kho. Mọi nguồn đang hoạt động
             phải được nạp bản Markdown hiện hành trước khi xuất bản.
           </p>
+          {publishId && (
+            <CandidateRagPreview
+              key={publishId}
+              collectionId={collectionId}
+              generationId={publishId}
+            />
+          )}
           <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
@@ -298,6 +364,8 @@ export function VectorLoadControls({
                 isBusy ||
                 !!disabledReason ||
                 models.isError ||
+                collection.isPending ||
+                collection.isError ||
                 state.isError ||
                 sources.isError ||
                 generations.isError

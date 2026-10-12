@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException
-from app.modules.assistants.runtime import build_runtime_profile, prepare_user_message
+from app.modules.assistants.runtime import (
+    build_runtime_profile,
+    prepare_user_message,
+    resolve_runtime_scope,
+)
 from app.modules.assistants.schemas import (
     AssistantChatRequest,
     AssistantChatResponse,
@@ -100,7 +104,7 @@ def _workflow_failure_answer(error_message: str | None, execution_id: str | None
         f"\n\n- **Mã xử lý:** `{execution_id}`" if execution_id else ""
     )
     return (
-        "Hệ thống chưa thể hoàn tất yêu cầu soạn thảo do lỗi trong quy trình xử lý. "
+        "Hệ thống chưa thể hoàn tất yêu cầu do lỗi trong quy trình xử lý. "
         f"{detail}{execution_line}\n\n"
         "Vui lòng kiểm tra lịch sử thực thi hoặc thử lại sau khi cấu hình được cập nhật."
     )
@@ -155,6 +159,7 @@ class AssistantChatService:
                 details={"assistant_code": assistant.code},
             )
 
+        tenant_id, workspace_id = await resolve_runtime_scope(db, assistant)
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6)
 
@@ -178,6 +183,7 @@ class AssistantChatService:
             logger.warning("failed_to_record_user_message_in_chat: %s", conv_user_err)
 
         runtime_profile = build_runtime_profile(assistant)
+        runtime_profile = runtime_profile.model_copy(update={"tenant_id": tenant_id, "workspace_id": workspace_id})
         prepared_message = _format_message_with_attachments(request.message, request.attachments)
         sanitized_message = prepare_user_message(prepared_message, runtime_profile)
         reference_documents = _extract_reference_documents(request.attachments)
@@ -191,7 +197,8 @@ class AssistantChatService:
                 "conversation_history": recent_history,
                 "reference_documents": reference_documents,
             },
-            tenant_id=request.tenant_id,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             conversation_id=conversation_id,
         )
         workflow_response = await _get_workflow_service().execute(
@@ -299,7 +306,7 @@ class AssistantChatService:
                 prompt_tokens=prompt_toks,
                 completion_tokens=comp_toks,
                 latency_ms=workflow_response.latency_ms,
-                status="success" if output_status != "error" else "error",
+                status="error" if output_status in {"error", "failed"} else "success",
             )
         except Exception as u_err:
             logger.warning("failed_to_record_usage_in_chat: %s", u_err)
@@ -316,6 +323,7 @@ class AssistantChatService:
             assistant_name=assistant.name,
             answer=answer,
             status=output_status,
+            error_code=workflow_response.error_code,
             citations=citations if isinstance(citations, list) else [],
             suggested_questions=final_suggested_questions,
             latency_ms=workflow_response.latency_ms,
@@ -339,6 +347,7 @@ class AssistantChatService:
             yield f"event: error\ndata: {err_data}\n\n"
             return
 
+        tenant_id, workspace_id = await resolve_runtime_scope(db, assistant)
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6)
 
@@ -364,6 +373,7 @@ class AssistantChatService:
         yield f"event: status\ndata: {json.dumps({'stage': 'retrieving', 'message': 'Đang tìm kiếm tài liệu đối soát...', 'conversation_id': conversation_id}, ensure_ascii=False)}\n\n"
 
         runtime_profile = build_runtime_profile(assistant)
+        runtime_profile = runtime_profile.model_copy(update={"tenant_id": tenant_id, "workspace_id": workspace_id})
         prepared_message = _format_message_with_attachments(request.message, request.attachments)
         sanitized_message = prepare_user_message(prepared_message, runtime_profile)
         reference_documents = _extract_reference_documents(request.attachments)
@@ -377,7 +387,8 @@ class AssistantChatService:
                 "conversation_history": recent_history,
                 "reference_documents": reference_documents,
             },
-            tenant_id=request.tenant_id,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
             conversation_id=conversation_id,
         )
 
@@ -516,7 +527,7 @@ class AssistantChatService:
                 prompt_tokens=prompt_toks,
                 completion_tokens=comp_toks,
                 latency_ms=workflow_response.latency_ms,
-                status="success" if output_status != "error" else "error",
+                status="error" if output_status in {"error", "failed"} else "success",
             )
         except Exception as u_err:
             logger.warning("failed_to_record_usage_in_chat_stream: %s", u_err)
@@ -535,6 +546,7 @@ class AssistantChatService:
             "execution_id": workflow_response.execution_id,
             "status": output_status,
             "approval_id": approval_id,
+            "error_code": workflow_response.error_code,
         }
         yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 

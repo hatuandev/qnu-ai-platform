@@ -685,6 +685,8 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
         )
 
         req = LLMGenerateRequest(
+            tenant_id=context.tenant_id,
+            assistant_code=getattr(profile, "assistant_code", None),
             messages=[ChatMessage(role="user", content=prompt)],
             temperature=0.0,
             max_tokens=200,

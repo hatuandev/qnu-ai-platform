@@ -27,6 +27,8 @@ docker compose up -d
 > - Sử dụng PowerShell: `.\run.ps1 dev` (hoặc `.\run.ps1 be` / `.\run.ps1 fe`)
 > Lệnh này sẽ tự động mở 2 cửa sổ chạy song song cả Backend và Frontend!
 
+Runner PowerShell `.\make.ps1 dev` (cả `dev1`/`dev2`) mở cửa sổ Backend/Frontend hiển thị để theo dõi log. ARQ worker chạy nền, log tại `backend/storage/worker_logs`; nếu worker đã chạy thì runner dùng lại, không tự restart worker để nhận code mới. Thay đổi chế độ cửa sổ không hiện lại các cửa sổ đã được mở ẩn trước đó.
+
 **Hoặc chạy thủ công trong 2 Terminal riêng biệt:**
 
 **Terminal 1 — Backend FastAPI**:

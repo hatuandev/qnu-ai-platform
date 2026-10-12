@@ -6,6 +6,50 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-12** | Codex | Structured artifact/facts draft/Studio/candidate RAG; sửa reranker và facts API | Ruff/Biome/build đạt;932pass/11cũ/2skip, HTTPfacts81/preview4800; chưa full semantic/DAG E2E | [Nhật ký #382](./nhat_ky/2026-10-12_phien_382_artifact_facts_va_candidate_rag.md) |
+
+| **2026-10-12** | Codex | Rà đủ luồng Knowledge có cấu trúc | Đề xuất draftfacts/review/provenance/version/stagingQA/publish/lifecycle; code read-only | [Nhật ký #381](./nhat_ky/2026-10-12_phien_381_hoan_thien_luong_tri_thuc_co_cau_truc.md) |
+
+| **2026-10-12** | Codex | Rà nhánh cũ/current metadata, regions, entities và facts | DB81facts/API500 DTO; thiếustructuredtablefacts, đềxuấtcanonicalartifact/provenance; chưa sửa | [Nhật ký #380](./nhat_ky/2026-10-12_phien_380_ra_soat_metadata_regions_va_facts.md) |
+
+| **2026-10-12** | Codex | Test PDF đối chiếu RAG/DAG tuyển sinh sau publish | Live API/FE/AI rerank: P1 threshold lọc score thiếu, P2 citations/noanswer/audit; chưa fix | [Nhật ký #379](./nhat_ky/2026-10-12_phien_379_test_thuc_te_rag_dag_tuyen_sinh.md) |
+
+| **2026-10-12** | Codex | Bỏ tab Cấu hình; model dưới counter, tạo kho chọn Embedding, OCR auto | Biome/build-TypeScript đạt; browser read-only các dialog/header, không submit dữ liệu | [Nhật ký #378](./nhat_ky/2026-10-12_phien_378_tinh_gon_cau_hinh_kho_tri_thuc.md) |
+
+| **2026-10-12** | Codex | Làm rõ provider, máy chủ và bản chỉ mục trong Nạp vector/Cấu hình | Biome3file/build-TypeScript đạt; FE-only, chưa browserE2E | [Nhật ký #377](./nhat_ky/2026-10-12_phien_377_hien_ro_provider_va_chi_muc_vector.md) |
+
+| **2026-10-12** | Codex | Worker limiter/recovery/retry/backpressure và progress riêng từng file | 76targetedBE/2FE/Ruff/scopedBiome/compose đạt; full924/11cũ/2skip, chưa GPU/browser/crashE2E | [Nhật ký #376](./nhat_ky/2026-10-12_phien_376_worker_resilience_va_tien_do_tung_file.md) |
+
+| **2026-10-12** | Codex | Đánh giá tính ổn định worker khi nhiều người nạp | Queue đúng hướng; rủi ro global limiter/crash reclaim/retry config, chưa benchmark hoặc sửa runtime | [Nhật ký #375](./nhat_ky/2026-10-12_phien_375_danh_gia_tai_worker_nap_tai_lieu.md) |
+
+| **2026-10-12** | Codex | Bắt buộc Ngừng dùng trước Xóa, guard BE/FE | 30focused/Ruff/scopedBiome/build/typecheck đạt; không xóa dữ liệu user | [Nhật ký #374](./nhat_ky/2026-10-12_phien_374_chan_xoa_nguon_chua_ngung.md) |
+
+| **2026-10-12** | Codex | Thêm Ngừng dùng bên cạnh Xóa, loại nguồn khỏi RAG/cache mới, giữ artifacts | 41 focused BE/4 FE/Ruff/scoped Biome đạt; full912/11lỗi cũ/2skip, không thao tác nguồn user | [Nhật ký #373](./nhat_ky/2026-10-12_phien_373_bo_sung_ngung_dung_nguon.md) |
+
+| **2026-10-12** | Codex | Đánh giá ngừng/hoàn tác/thay văn bản đã xuất bản | Có detach/BE rollback, UI legacy còn rủi ro namespace; chỉ đề xuất, chưa thao tác dữ liệu | [Nhật ký #372](./nhat_ky/2026-10-12_phien_372_danh_gia_ngung_va_hoan_tac_xuat_ban.md) |
+
+| **2026-10-12** | Codex | Kiểm tra chỉ mục kho tuyển sinh | DB/Qdrant read-only: 4 Markdown ready, chưa chỉ mục/publish; hướng dẫn nạp vector, không sửa runtime | [Nhật ký #371](./nhat_ky/2026-10-12_phien_371_kiem_tra_chi_muc_kho_tuyen_sinh.md) |
+
+| **2026-10-12** | Codex | Tích hợp scope/policy/error/cache/ADR-012 RAG-DAG-ModelOps | 152focused/Ruff; full903/13nền/2skip; live Cloudflare/no-context đạt, chưa groundedbrowserE2E | [Nhật ký #370](./nhat_ky/2026-10-12_phien_370_tich_hop_rag_dag_modelops.md) |
+
+| **2026-10-12** | Codex | Rà lại RAG/DAG, scope/policy/error/cache/ADR-012 metadata | 83targeted đạt và probe cô lập; chưa code/inference/browser E2E/BM25 | [Nhật ký #369](./nhat_ky/2026-10-12_phien_369_ra_soat_lai_rag_dag.md) |
+
+| **2026-10-12** | Codex | Dừng dev3000/8001 và worker theo yêu cầu | Dọn process cây dev đã xác định; xác nhận cổng trống/worker dừng; không Docker/reset/restart | [Nhật ký #368](./nhat_ky/2026-10-12_phien_368_dung_dev_va_worker.md) |
+
+| **2026-10-12** | Codex | Khôi phục terminal BE/FE make.ps1 dev | Hai dòng Normal; parser/AST đạt, worker vẫn nền; chưa launch/restart dịch vụ | [Nhật ký #367](./nhat_ky/2026-10-12_phien_367_hien_terminal_make_dev.md) |
+
+| **2026-10-12** | Codex | Xác định make.ps1 dev dùng Hidden cho cả BE/FE | Ảnh khớp runner PS, đính chính #365; chỉ đề xuất Normal, chưa sửa/restart | [Nhật ký #366](./nhat_ky/2026-10-12_phien_366_xac_dinh_make_ps1_an_terminal.md) |
+
+| **2026-10-11** | Codex | Chẩn đoán terminal make dev | Worker Hidden/logs/reuse; BE/FE vẫn mở terminal, cần output nếu cảhai mất; chưa sửa/chạy dịch vụ | [Nhật ký #365](./nhat_ky/2026-10-11_phien_365_chan_doan_terminal_make_dev.md) |
+
+| **2026-10-11** | Codex | Fix EMPTY_OCR_PAGE cho scan trắng bằng raster components | 51focused/Ruff; Paddle thật48trang/680khối/71chunks đạt; full887/13nền/2skip; chưa retry user | [Nhật ký #364](./nhat_ky/2026-10-11_phien_364_fix_ocr_trang_scan_trang.md) |
+
+| **2026-10-11** | Codex | Chẩn đoán EMPTY_OCR_PAGE trên trang scan trắng | PDF48trang/hash khớp/log Paddle thật; guard #360 quá chặt; chưa fix/retry | [Nhật ký #363](./nhat_ky/2026-10-11_phien_363_chan_doan_ocr_trang_scan_trang.md) |
+
+| **2026-10-11** | Codex | Tạo tài liệu thuật toán nâng chất lượng và tối ưu RAG/DAG/OCR-worker | Chỉ Markdown; ưu tiên, rủi ro và benchmark; chưa triển khai runtime | [Nhật ký #362](./nhat_ky/2026-10-11_phien_362_tai_lieu_thuat_toan_toi_uu_qnu_ai.md) |
+
+| **2026-10-11** | Codex | Đánh giá BM25 cho RAG/DAG, lexical metadata ADR-012 và Qdrant 1.19 | 25 tests đạt; chỉ đề xuất sparse BM25 dùng chung, chưa runtime/A-B/E2E | [Nhật ký #361](./nhat_ky/2026-10-11_phien_361_danh_gia_bm25_cho_rag_dag.md) |
+
 | **2026-10-11** | Codex | Khung native, selective Paddle và Docling/Gotenberg preview độc lập | 53 BE/3 FE mapper/Ruff; live đạt; full871/14fail/2skip (13 nền+1Temp); chưa browser E2E/restart | [Nhật ký #360](./nhat_ky/2026-10-11_phien_360_layout_native_ocr_theo_trang_va_docx_preview.md) |
 
 | **2026-10-11** | Codex | Đánh giá Docling/Inspector/Paddle và khung Studio | Giữ hybrid theo trang/chất lượng; DOCX cần render nếu có bbox; chỉ tư vấn, chưa sửa/test mới | [Nhật ký #359](./nhat_ky/2026-10-11_phien_359_danh_gia_chien_luoc_parser_va_layout.md) |

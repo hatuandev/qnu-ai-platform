@@ -49,6 +49,16 @@ class PaddleOCRVLAdapter(BaseOCRAdapter):
         return bool(self._base_url and self._base_url.startswith("http"))
 
     async def extract(self, content: bytes, filename: str) -> dict[str, Any]:
+        from app.core.provider_capacity import provider_slot
+
+        if not content:
+            raise AppException("Tệp nguồn rỗng.", code="DOCUMENT_CONTENT_EMPTY", status_code=400)
+        if not self.is_available():
+            raise AppException("PaddleOCR chưa có địa chỉ server.", code="OCR_PROVIDER_UNAVAILABLE", status_code=503)
+        async with provider_slot("ocr", self._base_url.lower(), self._timeout):
+            return await self._extract_unlimited(content, filename)
+
+    async def _extract_unlimited(self, content: bytes, filename: str) -> dict[str, Any]:
         """Call PaddleOCR-VL /layout-parsing to extract structured markdown and layout structure.
 
         Args:

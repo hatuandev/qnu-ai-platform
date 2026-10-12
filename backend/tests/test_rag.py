@@ -409,8 +409,8 @@ async def test_rag_ask_dynamic_fallback_model():
     )
 
     async def side_effect_generate(db: object, req: LLMGenerateRequest):
-        if req.preferred_model_name == "gpt-4o-mini":
-            raise RuntimeError("Primary OpenAI service 503 Rate Limit")
+        assert req.preferred_model_name == "gpt-4o-mini"
+        assert req.fallback_model_name == "gemini-1.5-flash"
         return fallback_llm_res
 
     app.dependency_overrides[get_db] = override_get_db
@@ -433,8 +433,8 @@ async def test_rag_ask_dynamic_fallback_model():
     data = response.json()
     assert data["status"] == "answered"
     assert "16.500.000 VNĐ" in data["answer"]
-    # ModelOps was called twice: 1st for primary (failed), 2nd for fallback (succeeded)
-    assert mock_gen.await_count == 2
+    # ModelOps owns its internal primary/fallback cascade; RAG calls it only once.
+    assert mock_gen.await_count == 1
 
 
 @pytest.mark.asyncio

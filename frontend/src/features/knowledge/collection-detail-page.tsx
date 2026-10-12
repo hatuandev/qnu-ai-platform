@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, Cpu, FolderGit2, Table2 } from "lucide-react";
+import { Activity, FolderGit2, Table2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -11,17 +11,14 @@ import { CollectionExcelImportDialog } from "@/components/knowledge/dialogs/coll
 import { TaskLogDialog } from "@/components/knowledge/dialogs/task-log-dialog";
 import { CollectionBindingsTab } from "@/components/knowledge/tabs/collection-bindings-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
-import { CollectionModelsTab } from "@/components/knowledge/tabs/collection-models-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jobsApi } from "@/services/jobs-api";
 import { knowledgeApi } from "@/services/knowledge-api";
-import type {
-  CollectionDataProcessingConfig,
-  IngestionTask,
-} from "@/types/knowledge";
+import type { IngestionTask } from "@/types/knowledge";
+import { CollectionEditDialog } from "./components/collection-edit-dialog";
 
 export interface CollectionDetailPageProps {
   collectionId: string;
@@ -35,14 +32,16 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Active Tab: only 4 streamlined tabs
-  const [activeTab, setActiveTab] = useState<
-    "sources" | "facts" | "tasks" | "models"
-  >(initialTab || "sources");
+  // Preserve old ?tab=models links by opening the metadata editor.
+  const [activeTab, setActiveTab] = useState<"sources" | "facts" | "tasks">(
+    initialTab === "models" ? "sources" : initialTab || "sources",
+  );
+  const [isEditOpen, setIsEditOpen] = useState(initialTab === "models");
 
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      setActiveTab(initialTab === "models" ? "sources" : initialTab);
+      if (initialTab === "models") setIsEditOpen(true);
     }
   }, [initialTab]);
 
@@ -50,11 +49,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskStatusFilter, setTaskStatusFilter] = useState("all");
 
-  // Config States
-  const [configName, setConfigName] = useState("");
-  const [configDescription, setConfigDescription] = useState("");
-  const [configDataProcessing, setConfigDataProcessing] =
-    useState<CollectionDataProcessingConfig>({});
   const [selectedTaskLog, setSelectedTaskLog] = useState<IngestionTask | null>(
     null,
   );
@@ -83,24 +77,12 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
     enabled: !!collection,
   });
 
-  useEffect(() => {
-    if (collection) {
-      setConfigName(collection.name);
-      setConfigDescription(collection.description || "");
-      if (collection.data_processing) {
-        setConfigDataProcessing(collection.data_processing);
-      } else {
-        setConfigDataProcessing({});
-      }
-    }
-  }, [collection]);
-
   // 3. Fetch Facts
   const factsQuery = useQuery({
     queryKey: ["collection-facts", collection?.id],
     queryFn: () =>
       collection
-        ? knowledgeApi.getCollectionFacts(collection.id, 50)
+        ? knowledgeApi.getCollectionFacts(collection.id, 1000)
         : Promise.reject(new Error("No collection")),
     enabled: !!collection && activeTab === "facts",
   });
@@ -130,27 +112,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   }, [allTasks, taskSearchQuery, taskStatusFilter]);
 
   // Mutations
-  const updateCollectionMutation = useMutation({
-    mutationFn: () => {
-      if (!collection) throw new Error("Chưa tải được thông tin kho tri thức.");
-      return knowledgeApi.updateCollection(collection.id, {
-        name: configName,
-        description: configDescription,
-        data_processing: configDataProcessing,
-      });
-    },
-    onSuccess: () => {
-      toast.success("Cập nhật cấu hình Kho Tri Thức thành công.");
-      queryClient.invalidateQueries({ queryKey: ["collections"] });
-      queryClient.invalidateQueries({
-        queryKey: ["collection-summary-metrics", collection?.id],
-      });
-    },
-    onError: (err: Error) => {
-      toast.error(`Cập nhật thất bại: ${err.message}`);
-    },
-  });
-
   const importExcelMutation = useMutation({
     mutationFn: (file: File) => {
       if (!collection) throw new Error("Chưa tải được thông tin kho tri thức.");
@@ -258,15 +219,15 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         onAddSource={() =>
           navigate({ to: `/knowledge/${collection.id}/add-documents` })
         }
-        onOpenConfig={() => setActiveTab("models")}
+        onOpenConfig={() => setIsEditOpen(true)}
         onOpenExcelImport={() => setIsExcelImportOpen(true)}
       />
 
-      {/* 2. Streamlined Navigation Tabs (4 main tabs) */}
+      {/* 2. Streamlined Navigation Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={(val) =>
-          setActiveTab(val as "sources" | "facts" | "tasks" | "models")
+          setActiveTab(val as "sources" | "facts" | "tasks")
         }
         className="space-y-4"
       >
@@ -295,14 +256,6 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               <Activity className="size-3.5" />
               <span>Hoạt động</span>
             </TabsTrigger>
-
-            <TabsTrigger
-              value="models"
-              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
-            >
-              <Cpu className="size-3.5" />
-              <span>Cấu hình</span>
-            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -314,6 +267,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         {/* Tab 2: Dữ Liệu Số (Facts) */}
         <TabsContent value="facts" className="mt-0 focus-visible:ring-0">
           <CollectionFactsTab
+            errorMessage={factsQuery.error?.message}
             facts={factsQuery.data?.facts || []}
             totalCount={factsQuery.data?.total || 0}
             isLoading={factsQuery.isLoading}
@@ -343,24 +297,16 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onDeleteTask={(task) => setDeleteTaskTarget(task)}
           />
         </TabsContent>
-
-        {/* Tab 4: Cấu Hình Kho & Mô Hình */}
-        <TabsContent value="models" className="mt-0 focus-visible:ring-0">
-          <CollectionModelsTab
-            collection={collection}
-            configName={configName}
-            setConfigName={setConfigName}
-            configDescription={configDescription}
-            setConfigDescription={setConfigDescription}
-            dataProcessingConfig={configDataProcessing}
-            setDataProcessingConfig={setConfigDataProcessing}
-            isSaving={updateCollectionMutation.isPending}
-            onSave={() => updateCollectionMutation.mutate()}
-          />
-        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}
+      {isEditOpen && (
+        <CollectionEditDialog
+          key={collection.id}
+          collection={collection}
+          onClose={() => setIsEditOpen(false)}
+        />
+      )}
       <CollectionExcelImportDialog
         open={isExcelImportOpen}
         onOpenChange={setIsExcelImportOpen}

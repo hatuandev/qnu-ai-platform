@@ -484,13 +484,15 @@ export const DocumentStudioWorkspace: React.FC<
                 : []
             }
             disabledReason={
-              isApproving
-                ? "Đang lưu Markdown."
-                : hasEdits
-                  ? "Hãy lưu Markdown trước khi nạp vector."
-                  : doc.status !== "ready"
-                    ? "Hãy duyệt Markdown trước khi nạp vector."
-                    : undefined
+              doc.indexStatus === "paused"
+                ? "Nguồn đã ngừng dùng."
+                : isApproving
+                  ? "Đang lưu Markdown."
+                  : hasEdits
+                    ? "Hãy lưu Markdown trước khi nạp vector."
+                    : doc.status !== "ready"
+                      ? "Hãy duyệt Markdown trước khi nạp vector."
+                      : undefined
             }
           />
         </div>
@@ -577,6 +579,9 @@ export const DocumentStudioWorkspace: React.FC<
           {/* Right: Inspector Tabs */}
           <div className="flex flex-col min-h-0 overflow-hidden">
             <OcrInspector
+              citationMetadata={doc?.citationMetadata}
+              structuredArtifact={doc?.structuredArtifact}
+              layoutTextAlignment={doc?.layoutTextAlignment}
               pageData={currentPageData}
               allPages={doc?.pages || []}
               documentTitle={doc?.filename}

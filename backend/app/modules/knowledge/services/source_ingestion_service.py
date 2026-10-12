@@ -25,12 +25,17 @@ from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.documents.models import RepositoryDocument
 from app.modules.documents.quality_gate import evaluate_revision_quality
+from app.modules.jobs.ingestion_progress import report_progress
 from app.modules.knowledge.cleaner import extract_administrative_metadata
 from app.modules.knowledge.models import (
     KnowledgeBinding,
     KnowledgeImportBatch,
     KnowledgeImportItem,
     KnowledgeSourceRevision,
+)
+from app.modules.knowledge.services.source_artifact import (
+    build_source_artifact,
+    get_source_artifact,
 )
 from app.modules.knowledge.services.source_extraction import (
     EXTRACTION_VERSION,
@@ -164,13 +169,19 @@ class SourceIngestionService:
 
             # 5. Check artifact key reuse with tenant/workspace isolation ("parse once, embed many")
             parser_profile = batch.parser_profile or "standard"
-            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{EXTRACTION_VERSION}")
+            from app.modules.knowledge.services.parse_fingerprint import (
+                ocr_configuration_fingerprint,
+            )
+
+            ocr_config_hash = await ocr_configuration_fingerprint(db)
+            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{ocr_engine}:{ocr_config_hash}:{EXTRACTION_VERSION}")
 
             existing_artifact_res = await db.execute(
                 select(KnowledgeSourceRevision)
                 .join(KnowledgeBinding, KnowledgeSourceRevision.binding_id == KnowledgeBinding.id)
                 .where(
                     KnowledgeSourceRevision.artifact_key == artifact_key,
+                    KnowledgeSourceRevision.binding_id == binding.id,
                     KnowledgeSourceRevision.status == "ready",
                     KnowledgeBinding.tenant_id == batch.tenant_id,
                     KnowledgeBinding.workspace_id == batch.workspace_id,
@@ -191,6 +202,7 @@ class SourceIngestionService:
                 page_manifest = list(existing_artifact.page_manifest or [])
                 citation_metadata = dict(existing_artifact.citation_metadata or {})
                 quality_report = dict(existing_artifact.quality_report or {})
+                structured_artifact = get_source_artifact(existing_artifact)
                 reused_artifact = True
                 ocr_engine = (existing_artifact.parse_provenance or {}).get("ocr_engine") or "native"
                 preview_path = (existing_artifact.snapshot_metadata or {}).get("preview_pdf_path")
@@ -207,6 +219,7 @@ class SourceIngestionService:
                 # Phase: parse
                 item.phase = "parse"
                 await db.commit()
+                await report_progress("parse", 20)
 
                 extraction = await extract_source(db, file_bytes, item.origin_file_name,
                                                   item.origin_file_type, parser_profile, ocr_engine, batch.tenant_id)
@@ -227,6 +240,7 @@ class SourceIngestionService:
 
                 # Phase: normalize
                 item.phase = "normalize"
+                await report_progress("normalize", 65)
                 await db.flush()
                 clean_md, page_manifest = normalize_source_pages(raw_text, parsed_page_count, ocr_pages)
                 canonical_hash = compute_sha256(clean_md)
@@ -234,6 +248,7 @@ class SourceIngestionService:
 
                 # Phase: validate (Quality Gate)
                 item.phase = "validate"
+                await report_progress("validate", 75)
                 await db.flush()
                 quality_report = evaluate_revision_quality(
                     markdown=clean_md,
@@ -250,9 +265,21 @@ class SourceIngestionService:
                     else None,
                     "issuing_authority": admin_meta.get("issuing_authority") or doc.issuing_authority,
                     "document_type_code": admin_meta.get("document_type_code") or doc.document_type_code,
+                    "subject": admin_meta.get("title"),
+                    "signer_name": admin_meta.get("signer"),
                 }
+                structured_artifact = build_source_artifact(
+                    clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables,
+                )
+                if any(page.get("has_tables") for page in ocr_pages) and not structured_artifact["tables"]:
+                    structured_artifact["issues"].append({"code": "TABLES_NOT_MATERIALIZED"})
+                    structured_artifact["review"] = {"status": "required"}
+                if structured_artifact["issues"] and quality_report.get("overall_status") != "failed":
+                    quality_report = {**quality_report, "overall_status": "warning",
+                                      "structured_issues": structured_artifact["issues"]}
 
             # 6. Instantiate KnowledgeSourceRevision
+            await report_progress("chunk", 85)
             source_rev_id = f"ks_rev_{uuid.uuid4().hex[:12]}"
             source_rev = KnowledgeSourceRevision(
                 id=source_rev_id,
@@ -273,6 +300,8 @@ class SourceIngestionService:
                     "ocr_engine": ocr_engine or "native",
                     "reused_artifact": reused_artifact,
                     "ingested_at": datetime.now(UTC).isoformat(),
+                    "structured_artifact": structured_artifact,
+                    "ocr_config_hash": ocr_config_hash,
                 },
                 quality_report=quality_report,
                 parser_profile_hash=compute_sha256(parser_profile),
@@ -292,7 +321,8 @@ class SourceIngestionService:
             if overall_status == "passed":
                 source_rev.status = "ready"
                 binding.active_source_revision_id = source_rev.id
-                binding.status = "active"
+                if binding.status != "paused":
+                    binding.status = "active"
 
                 # 7a. Materialize Chunks via ChunkSetService
                 from app.modules.knowledge.services.chunk_set_service import chunk_set_service
@@ -311,6 +341,7 @@ class SourceIngestionService:
                     )
 
                     item.phase = "embed"
+                    await report_progress("embed", 90)
                     item.knowledge_source_revision_id = source_rev.id
                     await db.commit()
                     await vector_generation_service.build_generation_for_source(
@@ -323,6 +354,7 @@ class SourceIngestionService:
                     )
                 await self._check_cancelled(db, batch)
                 item.status = "succeeded"
+                await report_progress("completed", 99)
                 item.phase = "completed"
                 batch.succeeded_count += 1
             elif overall_status == "warning":
@@ -486,6 +518,22 @@ class SourceIngestionService:
         new_rev.page_manifest = merge_edited_manifest(list(rev.page_manifest or []), page_manifest)
         new_rev.normalizer_version = "v2"
         new_rev.canonical_hash = compute_sha256(clean_md)
+        new_rev.citation_metadata = {
+            **{key: value for key, value in (rev.snapshot_metadata or {}).items()
+               if key in {"document_number", "issued_date", "issuing_authority", "document_type_code"}},
+            **extract_administrative_metadata(clean_md),
+        }
+        new_rev.citation_metadata = {key: str(value) if value is not None else None
+                                    for key, value in new_rev.citation_metadata.items()}
+        new_rev.citation_metadata["subject"] = new_rev.citation_metadata.pop("title", None)
+        new_rev.citation_metadata["signer_name"] = new_rev.citation_metadata.pop("signer", None)
+        artifact = build_source_artifact(clean_md, manifest_page_count(new_rev.page_manifest), new_rev.citation_metadata)
+        quality_report = evaluate_revision_quality(markdown=clean_md, page_count=manifest_page_count(new_rev.page_manifest) or 1,
+                                                   tables_count=len(artifact["tables"]), file_size_bytes=len(clean_md.encode("utf-8")))
+        new_rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact,
+                                    "edited_from_revision_id": rev.id}
+        if artifact["issues"] and quality_report.get("overall_status") != "failed":
+            quality_report = {**quality_report, "overall_status": "warning", "structured_issues": artifact["issues"]}
         new_rev.quality_report = quality_report
         new_rev.updated_at = datetime.now(UTC)
 
@@ -506,7 +554,7 @@ class SourceIngestionService:
                 .where(KnowledgeBinding.id == binding.id)
                 .values(
                     active_source_revision_id=new_rev.id,
-                    status="active",
+                    status="paused" if binding.status == "paused" else "active",
                     updated_at=datetime.now(UTC),
                 )
             )
@@ -552,7 +600,8 @@ class SourceIngestionService:
             rev.failure_code = None
             rev.failure_detail = None
             binding.active_source_revision_id = rev.id
-            binding.status = "active"
+            if binding.status != "paused":
+                binding.status = "active"
         elif decision == "rejected":
             rev.status = "failed"
             rev.failure_code = "HUMAN_REVIEW_REJECTED"
@@ -565,6 +614,9 @@ class SourceIngestionService:
             )
 
         rev.updated_at = datetime.now(UTC)
+        artifact = get_source_artifact(rev)
+        artifact["review"] = {"status": decision, "comment": comment, "at": rev.updated_at.isoformat()}
+        rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact}
         await db.commit()
         await db.refresh(rev)
         return rev
@@ -706,6 +758,10 @@ class SourceIngestionService:
             total_pages=len(pages_views) or 1,
             file_size_bytes=len((rev.canonical_markdown or "").encode("utf-8")),
             total_chunks=0,
+            structured_artifact=get_source_artifact(rev),
+            source_metadata=rev.snapshot_metadata or {},
+            citation_metadata=rev.citation_metadata or {},
+            layout_text_alignment="stale" if any(p.get("layout_text_alignment") == "stale" for p in manifest) else "original",
             pages=pages_views,
         )
 
@@ -949,7 +1005,8 @@ class SourceIngestionService:
         elif overall_status == "passed":
             new_rev.status = "ready"
             binding.active_source_revision_id = new_rev.id
-            binding.status = "active"
+            if binding.status != "paused":
+                binding.status = "active"
         elif overall_status == "warning":
             new_rev.status = "review_required"
         else:

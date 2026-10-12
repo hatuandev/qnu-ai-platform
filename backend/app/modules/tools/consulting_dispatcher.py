@@ -20,9 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionFactory
-from app.modules.knowledge.models import KnowledgeFact
+from app.modules.knowledge.models import KnowledgeBinding, KnowledgeCollection, KnowledgeFact
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
+from app.modules.rag.schemas import RetrievalSnapshot
 from app.modules.tools.universal_report import (
     ReportTable,
     UniversalReportPayload,
@@ -30,6 +31,18 @@ from app.modules.tools.universal_report import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def published_fact_query(collection_id: str, snapshot: RetrievalSnapshot):
+    """Specialist guidance must use the same published source revisions as RAG."""
+    return (select(KnowledgeFact)
+            .join(KnowledgeCollection, KnowledgeFact.collection_id == KnowledgeCollection.id)
+            .join(KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id)
+            .where(KnowledgeFact.collection_id == collection_id,
+                   KnowledgeCollection.tenant_id == snapshot.tenant_id,
+                   KnowledgeCollection.workspace_id == snapshot.workspace_id,
+                   KnowledgeBinding.status == "active",
+                   KnowledgeFact.index_revision_id.in_(list(snapshot.binding_revisions.values()))))
 
 # Keywords indicating user wants to download or export files
 EXPORT_KEYWORDS = (
@@ -232,6 +245,8 @@ class AgenticConsultingDispatcher:
         db: AsyncSession | None = None,
         preferred_model_name: str | None = None,
         fallback_model: str | None = None,
+        tenant_id: str = "tenant_qnu",
+        preferred_provider_id: str | None = None,
     ) -> dict[str, Any]:
         """Use LLM to semantically understand if user wants a file export and which formats.
 
@@ -300,6 +315,8 @@ class AgenticConsultingDispatcher:
                     prompt_user = f'Ngữ cảnh tin nhắn trước: "{last_hist_text}"\n{prompt_user}'
 
                 llm_req = LLMGenerateRequest(
+                    tenant_id=tenant_id,
+                    preferred_provider_id=preferred_provider_id,
                     messages=[
                         ChatMessage(role="system", content=system_instruction),
                         ChatMessage(role="user", content=prompt_user),
@@ -496,9 +513,24 @@ class AgenticConsultingDispatcher:
         db: AsyncSession | None = None,
         preferred_model_name: str | None = None,
         fallback_model: str | None = None,
+        tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        preferred_provider_id: str | None = None,
+        retrieval_snapshot: RetrievalSnapshot | None = None,
     ) -> dict[str, Any]:
         """Dispatch agentic reasoning, facts augmentation, and artifact generation."""
         norm_msg = _norm(user_message)
+        target_col = collection_id or f"col_{module_code}"
+        from app.modules.rag.retriever import hybrid_retriever
+
+        if retrieval_snapshot is None:
+            if db is not None:
+                retrieval_snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+                    db, target_col, tenant_id=tenant_id, workspace_id=workspace_id)
+            else:
+                async with AsyncSessionFactory() as session:
+                    retrieval_snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+                        session, target_col, tenant_id=tenant_id, workspace_id=workspace_id)
 
         # 1. Semantic Intent & Format Analysis via LLM (with robust fallback)
         intent_res = await self.analyze_export_intent_with_llm(
@@ -507,6 +539,8 @@ class AgenticConsultingDispatcher:
             db=db,
             preferred_model_name=preferred_model_name,
             fallback_model=fallback_model,
+            tenant_id=tenant_id,
+            preferred_provider_id=preferred_provider_id,
         )
         is_export = intent_res.get("is_export", False)
         requested_formats = intent_res.get("formats") or ["xlsx", "docx", "pdf"]
@@ -520,7 +554,7 @@ class AgenticConsultingDispatcher:
             candidate_majors: list[str] = []
             try:
                 if db is not None:
-                    stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                    stmt = published_fact_query(target_col, retrieval_snapshot)
                     facts = (await db.execute(stmt)).scalars().all()
                     for f in facts:
                         if f.raw_data and f.raw_data.get("major_name"):
@@ -530,7 +564,7 @@ class AgenticConsultingDispatcher:
                             candidate_majors.append(clean_name)
                 else:
                     async with AsyncSessionFactory() as session:
-                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                        stmt = published_fact_query(target_col, retrieval_snapshot)
                         facts = (await session.execute(stmt)).scalars().all()
                         for f in facts:
                             if f.raw_data and f.raw_data.get("major_name"):
@@ -560,11 +594,11 @@ class AgenticConsultingDispatcher:
                 live_facts: list[KnowledgeFact] = []
                 try:
                     if db is not None:
-                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                        stmt = published_fact_query(target_col, retrieval_snapshot)
                         live_facts = list((await db.execute(stmt)).scalars().all())
                     else:
                         async with AsyncSessionFactory() as session:
-                            stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col)
+                            stmt = published_fact_query(target_col, retrieval_snapshot)
                             live_facts = list((await session.execute(stmt)).scalars().all())
                 except Exception as exc:
                     logger.warning("Failed to query live facts: %s", exc)
@@ -757,11 +791,11 @@ class AgenticConsultingDispatcher:
             # Query live regulations facts directly from database
             try:
                 if db is not None:
-                    stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                    stmt = published_fact_query(target_col, retrieval_snapshot).limit(20)
                     facts = (await db.execute(stmt)).scalars().all()
                 else:
                     async with AsyncSessionFactory() as session:
-                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                        stmt = published_fact_query(target_col, retrieval_snapshot).limit(20)
                         facts = (await session.execute(stmt)).scalars().all()
             except Exception:
                 facts = []
@@ -816,11 +850,11 @@ class AgenticConsultingDispatcher:
             # Query live library facts directly from database
             try:
                 if db is not None:
-                    stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                    stmt = published_fact_query(target_col, retrieval_snapshot).limit(20)
                     facts = (await db.execute(stmt)).scalars().all()
                 else:
                     async with AsyncSessionFactory() as session:
-                        stmt = select(KnowledgeFact).where(KnowledgeFact.collection_id == target_col).limit(20)
+                        stmt = published_fact_query(target_col, retrieval_snapshot).limit(20)
                         facts = (await session.execute(stmt)).scalars().all()
             except Exception:
                 facts = []

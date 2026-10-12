@@ -5,12 +5,15 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.exceptions import AppException
 from app.modules.assistants.schemas import (
     AssistantLifecycleConfig,
     AssistantResponse,
     AssistantRuntimeProfile,
 )
+from app.modules.knowledge.models import KnowledgeCollection
 
 _EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+?84|0)(?:[ .-]?\d){8,10}(?!\d)")
@@ -56,6 +59,14 @@ def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRun
         output_policy=config.output_policy,
         evaluation_policy=config.evaluation_policy,
     )
+
+
+async def resolve_runtime_scope(db: AsyncSession, assistant: object) -> tuple[str, str]:
+    """Public chat derives scope from persisted assistant/collection, never client hints."""
+    collection = await db.get(KnowledgeCollection, getattr(assistant, "collection_id", ""))
+    if collection is None or collection.tenant_id != getattr(assistant, "tenant_id", None):
+        raise AppException("Kho tri thức không thuộc trợ lý này.", code="ASSISTANT_SCOPE_MISMATCH", status_code=404)
+    return collection.tenant_id, collection.workspace_id
 
 
 

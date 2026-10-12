@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.core.exceptions import AppException
+from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.schemas import AskRequest
 from app.modules.rag.service import rag_service
 from app.modules.workflows.nodes.base import (
@@ -34,6 +35,8 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
     async def execute(
         self, node_spec: WorkflowNodeSpec, context: WorkflowContext
     ) -> NodeExecutionResult:
+        if context.db is None:
+            raise AppException("Node RAG cần kết nối dữ liệu.", code="WORKFLOW_DATABASE_REQUIRED", status_code=503)
         query = routed_text(
             context,
             node_spec.id,
@@ -109,6 +112,10 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             module_code=module_code,
             conversation_id=context.conversation_id,
             tenant_id=context.tenant_id or "tenant_qnu",
+            workspace_id=context.workspace_id,
+            assistant_code=getattr(profile, "assistant_code", None),
+            assistant_revision=getattr(profile, "assistant_revision", None),
+            runtime_policy=profile.model_dump(mode="json") if profile and hasattr(profile, "model_dump") else {},
             system_prompt=profile.system_prompt if profile else config.get("system_prompt"),
             temperature=model_policy.temperature
             if model_policy
@@ -127,6 +134,10 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
         # Universal Agentic Consulting & Artifact Generation
         from app.modules.tools.consulting_dispatcher import consulting_dispatcher
 
+        snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+            context.db, collection_id, tenant_id=context.tenant_id, workspace_id=context.workspace_id)
+        ask_req.retrieval_snapshot = snapshot
+
         dispatch_res = await consulting_dispatcher.dispatch(
             module_code=module_code,
             user_message=query,
@@ -135,6 +146,10 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             db=context.db,
             preferred_model_name=primary_model,
             fallback_model=fallback_model,
+            tenant_id=context.tenant_id,
+            workspace_id=context.workspace_id,
+            preferred_provider_id=preferred_provider_id,
+            retrieval_snapshot=snapshot,
         )
         guidance = ""
         if dispatch_res.get("has_agentic_guidance"):
@@ -176,17 +191,8 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                         val = getattr(item, "attribute_value", "")
                     fact_lines.append(f"| {ent} | {attr} | **{val}** |")
                 context.node_data["fact_markdown"] = "\n".join(fact_lines)
-            if status == "insufficient_context" and guidance:
-                # Structured specialist guidance remains grounded even when
-                # free-text retrieval has no additional chunks.
-                answer_text = guidance
-                status = "answered"
         else:
-            answer_text = f"Dựa trên tài liệu chính thức của ĐH Quy Nhơn cho câu hỏi: '{query}'."
-            citations = []
-            status = "answered"
-            suggested_questions = []
-            retrieved_contexts = []
+            raise AppException("Node RAG cần kết nối dữ liệu.", code="WORKFLOW_DATABASE_REQUIRED", status_code=503)
 
         context.node_data["rag_answer"] = answer_text
         context.node_data["citations"] = citations

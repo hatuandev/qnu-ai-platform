@@ -23,6 +23,8 @@ from app.modules.knowledge.service import knowledge_service
 
 logger = structlog.get_logger(__name__)
 
+from app.workers.leased_execution import leased_execution
+
 
 async def _load_job(db, job_id: str) -> JobRecord | None:
     res = await db.execute(
@@ -337,6 +339,7 @@ async def task_document_revision_parse(ctx: dict[str, Any], job_id: str) -> dict
             raise
 
 
+@leased_execution
 async def task_knowledge_index_build(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
     """Worker task to build a KnowledgeIndexRevision in staging, verify parity gate, and prepare for promotion."""
     from app.modules.knowledge.services.index_build_service import index_build_service
@@ -482,6 +485,7 @@ async def task_knowledge_garbage_collection(ctx: dict[str, Any], job_id: str) ->
             return {"status": "failed", "job_id": job_id, "error": str(exc)[:500]}
 
 
+@leased_execution
 async def task_knowledge_source_ingestion(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
     """Worker task to process a KnowledgeImportItem through Knowledge source ingestion pipeline."""
     from app.modules.knowledge.services.source_ingestion_service import source_ingestion_service
@@ -518,11 +522,12 @@ async def task_knowledge_source_ingestion(ctx: dict[str, Any], job_id: str) -> d
 
             final_status = "completed" if source_rev.status in ("ready", "review_required") else "failed"
             err = source_rev.failure_detail if source_rev.status == "failed" else None
+            await db.refresh(job, attribute_names=["progress"])
             await _set_job(
                 db,
                 job,
                 final_status,
-                progress=100.0,
+                progress=100.0 if source_rev.status == "ready" else job.progress,
                 result={
                     "source_revision_id": source_rev.id,
                     "status": source_rev.status,
@@ -608,6 +613,10 @@ async def task_reconcile_pending_jobs(ctx: dict[str, Any]) -> dict[str, int]:
     from app.modules.jobs.service import jobs_service
 
     async with AsyncSessionFactory() as db:
+        from app.modules.jobs.ingestion_recovery import recover_ingestion_jobs
+
+        if ctx.get("redis") is not None:
+            await recover_ingestion_jobs(db, ctx["redis"])
         dispatched = await jobs_service.reconcile_pending_dispatches(db)
     if dispatched:
         logger.info("pending_jobs_redispatched", dispatched=dispatched)

@@ -2,6 +2,22 @@
 
 Tài liệu này đặc tả cơ chế tìm kiếm hỗn hợp (Dense Vector + Sparse Lexical), thuật toán dung hợp thứ hạng Reciprocal Rank Fusion ($k=60$), tái xếp hạng Cross-Encoder và chốt chặn bảo vệ trích dẫn (Citation Guardrail).
 
+## Contract runtime — cập nhật #370
+
+- **#382**: Reranker threshold dùng raw `relevance_score`, không dùng RRF hoặc thuộc tínhscore thiếu. Malformed response không scored-success, giữ degradation RRF khi lỗi. Citation title ưu tiên tên nguồn. Facts API chỉ trả activeindex/binding và Excellegacy active, nhậnsourcefactdocument_idnull.
+- **Candidate QA #382**: endpoint Knowledge preview yêu cầu actorupdate/scopedcollection, backend dựng manifest readyindices đúngactive sourcerevision. RAG khôngcheckcandidate bằngservingpointer, dùnginternal flag cho stagingallowlist, pin cùngsnapshotdense/sparse/facts/neighbors, bỏsemanticcache, khôngswap/publish. UI dùngModelOpsmặc định, không tương đươngDAGpolicy trợ lý. Question test chưa làautomatedqualitygate; noanswer/citationrelevance/auditmodelthực chưa hoàn thiện.
+
+- **Ngừng nguồn (#373)**: binding paused bị loại khỏi snapshot mới bởi điều kiện active; tăng collection index_epoch và binding active_epoch làm cache/snapshot cũ mất hiệu lực cho yêu cầu mới. Không xóa/deactivate Qdrant khi pause, giữ artifact cho snapshot đã pin của câu trả lời đang xử lý. Không thu hồi được câu trả lời đã gửi hay đảm bảo hủy lượt inference đang chạy. Mọi nguồn đã ngừng vẫn bị loại khi xuất bản generation mới; facts/neighbors dùng cùng snapshot active. Không coi index pointer còn lưu là bằng chứng nguồn đang phục vụ.
+
+- API RAG search/ask/facts lấy tenant/workspace từ actor đã xác thực, không dùng phạm vi tùy ý trong body. Snapshot kiểm tra ownership kho và khóa index revisions; fact lookup trực tiếp cũng chỉ dùng revisions đã xuất bản.
+- Ask gửi đúng tenant/assistant code, model/provider/fallback và conversation vào ModelOps một lần. ModelOps tự xử lý failover/quota/keys. Lỗi `ALL_PROVIDERS_UNAVAILABLE`/quota được giữ nguyên, lỗi bất ngờ bọc `LLM_GENERATION_FAILED`, nội dung model rỗng bị từ chối. Không đổi outage thành trích đoạn answered/cache. Thiếu candidates/facts vẫn là `insufficient_context`, khác lỗi hạ tầng.
+- Cache v2 hash canonical request policy: prompt, provider/model/fallback, assistant revision, generation limits, reranker và runtime policy; vẫn kèm tenant/workspace/history/snapshot/epoch. Không reuse namespace v1. Fingerprint này không tự theo dõi mọi thay đổi nội bộ DB provider/defaults; cập nhật policy trợ lý/cấu hình request hoặc invalidate cache khi đổi defaults ngoài request.
+- Lexical hiện là weighted ILIKE + FTS/unaccent, chưa BM25. Tên/mã nguồn được khớp thêm từ chunk_metadata của snapshot. Neighbors dùng binding/index_revision/chunk_index hoặc page adjacency cho nguồn độc lập, không inner join legacy documents trên nhánh binding. Giữ active binding và scope snapshot; context neighbors chỉ làm nền, không tự thành citation.
+- Vector materialization mới lưu tên tệp, số văn bản và chunk_index vào metadata DB/Qdrant. Chỉ mục cũ không được tự ghi lại/publish; nếu metadata cũ thiếu cần build/publish có chủ đích. Không phụ thuộc object Repository.
+- Nhánh tư vấn chuyên biệt đọc facts cùng scope/published revision snapshot, không lấy facts của bản bóc tách chưa xuất bản; không tự nâng insufficient_context thành answered bằng guidance.
+
+Giữ fallback reranker sang RRF nếu reranker lỗi; không đồng nhất điều đó với fallback câu trả lời LLM. Không thay OCR/chunking/publication và chưa bổ sung BM25 trong đợt này.
+
 ---
 
 ## 1. Sơ Đồ Quy Trình Xử Lý Truy Vấn RAG

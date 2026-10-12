@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import type { FactItem } from "@/types";
 
 export interface CollectionFactsTabProps {
+  errorMessage?: string;
   facts: FactItem[];
   totalCount: number;
   isLoading: boolean;
@@ -63,6 +64,7 @@ type SortOption =
   | "confidence_desc";
 
 export function CollectionFactsTab({
+  errorMessage,
   facts,
   totalCount,
   isLoading,
@@ -92,6 +94,7 @@ export function CollectionFactsTab({
     const entities = new Set<string>();
     const attributes = new Set<string>();
     let totalConf = 0;
+    let measuredCount = 0;
 
     let scoreCount = 0;
     let quotaCount = 0;
@@ -102,7 +105,10 @@ export function CollectionFactsTab({
     for (const f of facts) {
       if (f.entity_name) entities.add(f.entity_name);
       if (f.attribute_name) attributes.add(f.attribute_name);
-      totalConf += f.confidence || 0;
+      if (f.raw_data.confidence_source !== "unavailable") {
+        totalConf += f.confidence || 0;
+        measuredCount++;
+      }
 
       const attrLower = (f.attribute_name || "").toLowerCase();
       if (attrLower.includes("điểm") || attrLower.includes("score")) {
@@ -130,7 +136,7 @@ export function CollectionFactsTab({
     }
 
     const avgConf =
-      facts.length > 0 ? Math.round((totalConf / facts.length) * 100) : 100;
+      measuredCount > 0 ? Math.round((totalConf / measuredCount) * 100) : null;
 
     return {
       entityCount: entities.size,
@@ -304,6 +310,17 @@ export function CollectionFactsTab({
 
   return (
     <div className="space-y-4">
+      {errorMessage && (
+        <p role="alert" className="text-sm text-destructive">
+          Không tải được dữ liệu số: {errorMessage}
+        </p>
+      )}
+      {totalCount > facts.length && (
+        <p className="text-xs text-muted-foreground">
+          Đang hiển thị {facts.length} / {totalCount} facts; thống kê và bộ lọc
+          chỉ áp dụng cho phần đã tải.
+        </p>
+      )}
       {/* 1. Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card p-3.5 sm:p-4 rounded-lg border border-border">
         <div>
@@ -315,9 +332,9 @@ export function CollectionFactsTab({
             </Badge>
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-            Các số liệu chính xác 100% dạng bảng (điểm chuẩn, chỉ tiêu, học phí)
-            được nạp trực tiếp từ bảng tính Excel/CSV để Trợ lý AI tra cứu đối
-            soát, chống bịa đặt (Zero Hallucination).
+            Số liệu dạng bảng từ các nguồn đang phục vụ chatbot. Đối chiếu bằng
+            chứng nguồn trước khi sử dụng; điểm trích xuất không phải cam kết độ
+            chính xác.
           </p>
         </div>
         <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto shrink-0">
@@ -394,7 +411,9 @@ export function CollectionFactsTab({
               Độ tin cậy TB
             </div>
             <div className="text-lg font-bold text-success font-mono mt-0.5">
-              {metrics.avgConfidence}%
+              {metrics.avgConfidence === null
+                ? "—"
+                : `${metrics.avgConfidence}%`}
             </div>
           </div>
           <div className="size-8 rounded-lg bg-success/10 text-success flex items-center justify-center">
@@ -738,7 +757,9 @@ export function CollectionFactsTab({
                         : "bg-muted text-muted-foreground",
                   )}
                 >
-                  {Math.round(fact.confidence * 100)}% tin cậy
+                  {fact.raw_data.confidence_source === "unavailable"
+                    ? "Chưa có điểm"
+                    : `${Math.round(fact.confidence * 100)}% tin cậy`}
                 </Badge>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono">
@@ -886,7 +907,9 @@ export function CollectionFactsTab({
                               : "bg-muted text-muted-foreground",
                         )}
                       >
-                        {Math.round(fact.confidence * 100)}%
+                        {fact.raw_data.confidence_source === "unavailable"
+                          ? "—"
+                          : `${Math.round(fact.confidence * 100)}%`}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-[11px]">
@@ -1091,7 +1114,9 @@ export function CollectionFactsTab({
                     Độ tin cậy Grounded
                   </span>
                   <span className="font-mono text-success font-semibold">
-                    {Math.round(inspectFact.confidence * 100)}%
+                    {inspectFact.raw_data.confidence_source === "unavailable"
+                      ? "Chưa được cung cấp"
+                      : `${Math.round(inspectFact.confidence * 100)}%`}
                   </span>
                 </div>
                 <div>

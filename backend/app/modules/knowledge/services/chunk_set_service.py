@@ -99,7 +99,10 @@ class ChunkSetService:
             return existing_set
 
         # 3. Check if another revision with identical canonical_hash already has this chunk_set_key
-        key_stmt = select(KnowledgeChunkSet).where(
+        key_stmt = select(KnowledgeChunkSet).join(
+            KnowledgeSourceRevision, KnowledgeChunkSet.source_revision_id == KnowledgeSourceRevision.id,
+        ).where(
+            KnowledgeSourceRevision.binding_id == source_rev.binding_id,
             KnowledgeChunkSet.chunk_set_key == set_key,
             KnowledgeChunkSet.status == "ready",
         )
@@ -175,6 +178,10 @@ class ChunkSetService:
 
         # Save chunk set record
         saved_config = {**clean_config, "_manifest": manifest_items}
+        from app.modules.knowledge.services.source_artifact import get_source_artifact
+
+        artifact = get_source_artifact(source_rev)
+        saved_config["_fact_set_hash"] = artifact["fact_set_hash"]
         chunk_set = KnowledgeChunkSet(
             source_revision_id=source_revision_id,
             chunk_strategy=chunk_strategy,
@@ -182,7 +189,7 @@ class ChunkSetService:
             config_hash=conf_hash,
             chunk_set_key=set_key,
             chunk_count=len(manifest_items),
-            fact_count=0,
+            fact_count=len(artifact["facts"]),
             manifest_hash=manifest_hash,
             status="ready",
         )

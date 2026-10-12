@@ -18,11 +18,12 @@ from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
+from app.modules.knowledge.services.blank_pages import inspect_empty_pdf_page
 from app.modules.knowledge.services.layout_text import reconstruct_layout_text
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v3"
+EXTRACTION_VERSION = "layout-v5-structured"
 
 
 @dataclass
@@ -33,6 +34,7 @@ class SourceExtraction:
     tables: list[Any] = field(default_factory=list)
     engine_used: str = "native"
     preview_pdf: bytes | None = None
+    canonical_tables: list[dict[str, Any]] = field(default_factory=list)
 
 
 def normalize_layout_block(block: dict[str, Any], page: int, index: int) -> dict[str, Any]:
@@ -109,7 +111,12 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
                 raise AppException("OCR trả số trang không hợp lệ.", code="OCR_PAGE_COUNT_MISMATCH", status_code=422)
             record = by_number[local].model_dump()
             if not record["extracted_text"].strip():
-                raise AppException(f"Không nhận dạng được trang {original}.", code="EMPTY_OCR_PAGE", status_code=422)
+                evidence = await asyncio.to_thread(inspect_empty_pdf_page, content, original)
+                if not evidence.is_blank:
+                    raise AppException(f"Không nhận dạng được trang {original} có dấu hiệu nội dung; cần kiểm tra OCR.",
+                                       code="EMPTY_OCR_PAGE", status_code=422)
+                record.update(extracted_text="", blocks=[], has_tables=False, content_status="blank",
+                              blank_detection=evidence.to_metadata(), dimensions=pages[original - 1]["dimensions"])
             record.update(page_number=original, engine_used=response.engine_used)
             record["blocks"] = [normalize_layout_block(b, original, i) for i, b in enumerate(record["blocks"])]
             pages[original - 1] = record
@@ -117,8 +124,14 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
         used = "+".join(engines)
     else:
         used = "native"
+    if not any(p["extracted_text"].strip() for p in pages):
+        raise AppException("Tài liệu không có nội dung văn bản để nạp tri thức.",
+                           code="EMPTY_EXTRACTED_TEXT", status_code=422)
     raw_text = "\n\n".join(f"<!-- Trang {p['page_number']} -->\n{p['extracted_text']}" for p in pages)
-    return SourceExtraction(raw_text, len(pages), pages, parsed.tables or [], used)
+    result = SourceExtraction(raw_text, len(pages), pages, parsed.tables or [], used)
+    if parsed.canonical_document:
+        result.canonical_tables = [t.model_dump(mode="json") for t in parsed.canonical_document.tables]
+    return result
 
 
 def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> None:
@@ -168,6 +181,8 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
         await asyncio.to_thread(align_office_markdown, parsed.raw_text, result.pages)
         result.raw_text = "\n\n".join(f"<!-- Trang {p['page_number']} -->\n{p['extracted_text']}" for p in result.pages)
         result.tables = parsed.tables or []
+        if parsed.canonical_document:
+            result.canonical_tables = [t.model_dump(mode="json") for t in parsed.canonical_document.tables]
         result.engine_used = f"{parsed.metadata.get('parser', 'docling')}+{result.engine_used}"
         result.preview_pdf = preview
         return result

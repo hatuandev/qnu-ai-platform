@@ -2,12 +2,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  Cpu,
   FileCheck2,
   FolderGit2,
   FolderPlus,
   Layers,
   MoreHorizontal,
+  Pencil,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CollectionModelStrip } from "@/features/knowledge/components/collection-model-strip";
 import { useVectorWorkflow } from "@/features/knowledge/components/use-vector-workflow";
 import type {
   CollectionSummaryMetrics,
@@ -77,10 +78,6 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
     !sources.isError &&
     !state.isError &&
     !generations.isError;
-  // Model embedding name without fake hardcoding
-  const configuredModel = activeGeneration?.embedding_model;
-  const embeddingModelDisplay = configuredModel || "Chưa xuất bản chỉ mục";
-
   // Business Status badge based on real metrics
   const status: CollectionSummaryMetrics["collection_status"] = !isKnown
     ? "pending"
@@ -197,6 +194,12 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
 
         {/* Action Button: ONLY ONE Primary CTA + Dropdown Menu */}
         <div className="flex items-center gap-2 w-full lg:w-auto shrink-0 justify-end">
+          {onOpenConfig && (
+            <Button variant="outline" size="sm" onClick={onOpenConfig}>
+              <Pencil className="size-3.5" />
+              Sửa
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={onAddSource}
@@ -222,11 +225,6 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
               {onOpenExcelImport && (
                 <DropdownMenuItem onClick={onOpenExcelImport}>
                   Nhập số liệu Excel
-                </DropdownMenuItem>
-              )}
-              {onOpenConfig && (
-                <DropdownMenuItem onClick={onOpenConfig}>
-                  Cấu hình Kho tri thức
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -289,14 +287,7 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
         </div>
       </div>
 
-      {/* Bottom Embedding Model Info Chip */}
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
-        <Cpu className="size-3 text-muted-foreground" />
-        <span>Mô hình Vector:</span>
-        <span className="font-medium text-foreground">
-          {embeddingModelDisplay}
-        </span>
-      </div>
+      <CollectionModelStrip collection={collection} />
     </div>
   );
 };

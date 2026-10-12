@@ -26,13 +26,15 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { SourceDraftFacts } from "./source-draft-facts";
 import type { OcrInspectorProps, OcrRightTab } from "./types";
 
 export const OcrInspector: React.FC<OcrInspectorProps> = ({
   pageData,
   allPages,
-  documentTitle,
-  documentFilename,
+  citationMetadata,
+  structuredArtifact,
+  layoutTextAlignment,
   rightTab,
   onTabChange,
   markdownViewMode,
@@ -70,180 +72,24 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
       .join("\n");
   }, [currentMarkdown]);
 
-  // Bóc tách động thông tin thực thể hành chính từ các trang OCR
+  // Read revision metadata from the backend; never invent entities from display geometry.
   const extractedEntities = useMemo(() => {
-    let agency = "";
-    let docNumber = "";
-    let docType = "";
-    let subject = "";
-    let locationAndDate = "";
-    let year = "";
-    let signerTitle = "";
-    let signerName = "";
-    let recipients = "";
-
-    const p1 = allPages?.[0] || pageData;
-    const p1Regions = p1?.regions || [];
-
-    for (const r of p1Regions) {
-      const clean = (r.text || "").trim();
-      const lines = clean
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean);
-
-      if (r.type === "header") {
-        if (r.left < 45) {
-          for (const l of lines) {
-            if (/^(?:BỘ|SỞ|TRƯỜNG|UBND|VIỆN|HỌC VIỆN)\b/i.test(l)) {
-              if (!agency || /ĐẠI HỌC/i.test(l)) {
-                agency = l;
-              }
-            }
-            const numMatch = l.match(/(?:Số|So)\s*[:/]\s*([^\n\r]+)/i);
-            if (numMatch) {
-              const rawNum = numMatch[1].trim();
-              docNumber = rawNum.startsWith("/") ? `...${rawNum}` : rawNum;
-            }
-          }
-        } else {
-          for (const l of lines) {
-            if (/ngày.*năm|năm\s*\d{4}/i.test(l)) {
-              locationAndDate = l;
-            }
-          }
-        }
-      } else if (r.type === "title" && !docType) {
-        if (lines.length > 0) {
-          const firstLine = lines[0];
-          const typeMatch = firstLine.match(
-            /\b(KẾ HOẠCH|QUYẾT ĐỊNH|THÔNG BÁO|PHƯƠNG ÁN|ĐỀ ÁN|TỜ TRÌNH|BÁO CÁO|HƯỚNG DẪN|QUY ĐỊNH|QUY CHẾ|CÔNG VĂN)\b/i,
-          );
-          if (typeMatch) {
-            docType = typeMatch[1].toUpperCase();
-            const rest = lines.slice(1);
-            if (rest.length > 0) {
-              subject = rest.join(" ");
-            } else {
-              subject = firstLine;
-            }
-          } else if (!subject) {
-            subject = lines.join(" ");
-          }
-        }
-      }
-    }
-
-    // Dự phòng nhận diện từ tiêu đề hoặc tên tệp
-    const titleSource =
-      documentTitle || documentFilename || pageData?.title || "";
-    if (!docType) {
-      const titleTypeMatch = titleSource.match(
-        /\b(KẾ HOẠCH|QUYẾT ĐỊNH|THÔNG BÁO|PHƯƠNG ÁN|ĐỀ ÁN|TỜ TRÌNH|BÁO CÁO|HƯỚNG DẪN|QUY ĐỊNH|QUY CHẾ)\b/i,
-      );
-      if (titleTypeMatch) {
-        docType = titleTypeMatch[1].toUpperCase();
-      } else {
-        docType = "VĂN BẢN";
-      }
-    }
-
-    if (!subject) {
-      const cleanName = titleSource
-        .replace(/^[0-9._\s-]+/, "")
-        .replace(/\.(docx?|pdf|xlsx?)$/i, "")
-        .trim();
-      subject = cleanName || "Văn bản hành chính";
-    }
-
-    if (!agency) {
-      if (
-        /đại học quy nhơn|đhqn/i.test(titleSource) ||
-        /đại học quy nhơn/i.test(p1?.rawText || "")
-      ) {
-        agency = "TRƯỜNG ĐẠI HỌC QUY NHƠN";
-      } else {
-        agency = "Đơn vị ban hành";
-      }
-    }
-
-    if (!docNumber) {
-      const numFromText = (p1?.rawText || "").match(
-        /(?:Số|So)\s*[:/]\s*([^\n\r,]+)/i,
-      );
-      if (numFromText) {
-        const rawNum = numFromText[1].trim();
-        docNumber = rawNum.startsWith("/") ? `...${rawNum}` : rawNum;
-      } else {
-        docNumber = "Đang cập nhật";
-      }
-    }
-
-    // Trích xuất năm
-    const yearMatch = locationAndDate.match(/\b\d{4}\b/);
-    if (yearMatch) {
-      year = yearMatch[0];
-    } else {
-      year = "Chưa xác định";
-    }
-
-    // Quét chữ ký và nơi nhận trên toàn bộ các trang
-    const pagesToCheck =
-      allPages && allPages.length > 0 ? allPages : pageData ? [pageData] : [];
-    for (const p of pagesToCheck) {
-      for (const r of p.regions || []) {
-        const clean = (r.text || "").trim();
-        if (r.type === "signature") {
-          const lines = clean
-            .split("\n")
-            .map((l) => l.trim())
-            .filter(Boolean);
-          for (const l of lines) {
-            if (
-              /^(?:HIỆU TRƯỞNG|KT\.\s*HIỆU TRƯỞNG|PHÓ HIỆU TRƯỞNG|GIÁM ĐỐC|CHỦ TỊCH|TRƯỞNG PHÒNG)\b/i.test(
-                l,
-              )
-            ) {
-              signerTitle = l;
-            } else if (
-              /(?:PGS\.|GS\.|TS\.|ThS\.|[A-ZÀ-ỸĐ][a-zà-ỹđ]+\s+[A-ZÀ-ỸĐ][a-zà-ỹđ]+)/.test(
-                l,
-              ) &&
-              l !== "Chữ ký xác thực"
-            ) {
-              signerName = l;
-            }
-          }
-        }
-        if (r.type === "list" && /nơi nhận\s*[:/]/i.test(clean)) {
-          recipients = clean;
-        }
-      }
-    }
-
-    const totalTables = pagesToCheck.reduce(
-      (acc, p) => acc + (p.hasTable ? 1 : 0),
-      0,
-    );
-    const totalRegions = pagesToCheck.reduce(
-      (acc, p) => acc + (p.regions?.length || 0),
-      0,
-    );
-
+    const value = (key: string) => citationMetadata?.[key] || "Chưa xác định";
+    const pages = allPages || (pageData ? [pageData] : []);
     return {
-      agency,
-      docNumber,
-      docType,
-      subject,
-      locationAndDate,
-      year,
-      signerTitle,
-      signerName,
-      recipients,
-      totalTables,
-      totalRegions,
+      agency: value("issuing_authority"),
+      docNumber: value("document_number"),
+      docType: value("document_type_code"),
+      subject: value("subject"),
+      locationAndDate: value("issued_date"),
+      year: citationMetadata?.issued_date?.slice(0, 4) || "Chưa xác định",
+      signerTitle: citationMetadata?.signer_title || "",
+      signerName: citationMetadata?.signer_name || "",
+      recipients: citationMetadata?.recipients || "",
+      totalTables: structuredArtifact?.tables.length || 0,
+      totalRegions: pages.reduce((sum, page) => sum + page.regions.length, 0),
     };
-  }, [allPages, pageData, documentTitle, documentFilename]);
+  }, [citationMetadata, structuredArtifact, allPages, pageData]);
 
   const handleCopyValue = (label: string, value: string) => {
     navigator.clipboard.writeText(value);
@@ -345,7 +191,13 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
         {/* TAB 1: EXTRACTED ENTITIES (Bóc tách dữ liệu động chuẩn Nghị định 30) */}
         {rightTab === "entities" && (
           <div className="flex-1 overflow-auto p-4 space-y-4 select-text">
+            {layoutTextAlignment === "stale" && (
+              <p className="text-xs text-warning">
+                Khung thuộc tệp gốc, chưa khớp lại với Markdown đã hiệu đính.
+              </p>
+            )}
             {/* Card 1: Metadata Hành Chính Động */}
+            <SourceDraftFacts artifact={structuredArtifact} />
             <Card className="rounded-lg border bg-card shadow-2xs">
               <CardHeader className="p-4 pb-2">
                 <div className="flex items-center justify-between">
@@ -358,12 +210,13 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
                         Thông Tin Văn Bản Hành Chính
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground">
-                        Các thuộc tính pháp quy đã được bóc tách tự động
+                        Metadata đã lưu theo bản nguồn; trường thiếu không được
+                        suy đoán
                       </CardDescription>
                     </div>
                   </div>
                   <Badge variant="success" className="text-[10px]">
-                    Đã chuẩn hóa
+                    Metadata nguồn
                   </Badge>
                 </div>
               </CardHeader>

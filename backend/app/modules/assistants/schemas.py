@@ -106,6 +106,7 @@ class AssistantRuntimeProfile(BaseModel):
     assistant_code: str
     assistant_revision: str
     tenant_id: str
+    workspace_id: str = "workspace_qnu"
     system_prompt: str
     collection_id: str
     persona_scope: AssistantPersonaScope
@@ -269,6 +270,7 @@ class AssistantChatResponse(BaseModel):
     assistant_name: str
     answer: str
     status: str
+    error_code: str | None = None
     citations: list[dict[str, Any]] = Field(default_factory=list)
     suggested_questions: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0

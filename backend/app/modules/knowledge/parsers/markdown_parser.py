@@ -60,9 +60,9 @@ def _split_gfm_row(line: str) -> list[str]:
     if escaped:
         current.append("\\")
     cells.append("".join(current).strip().replace("<br>", "\n"))
-    if cells and not cells[0]:
+    if cells and line.strip().startswith("|"):
         cells.pop(0)
-    if cells and not cells[-1]:
+    if cells and line.strip().endswith("|"):
         cells.pop()
     return cells
 

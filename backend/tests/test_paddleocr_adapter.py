@@ -1,5 +1,6 @@
 """Unit tests for PaddleOCRVLAdapter — Response mapping, error handling, and Unicode NFC normalization."""
 
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -7,6 +8,15 @@ import pytest
 
 from app.core.exceptions import AppException
 from app.modules.ocr.adapters.paddleocr_adapter import PaddleOCRVLAdapter
+
+
+@pytest.fixture(autouse=True)
+def isolate_capacity_from_adapter_mapping_tests():
+    @asynccontextmanager
+    async def slot(*args):
+        yield
+    with patch("app.core.provider_capacity.provider_slot", slot):
+        yield
 
 
 @pytest.mark.asyncio

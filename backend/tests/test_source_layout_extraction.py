@@ -36,6 +36,16 @@ def make_pdf(*types: str) -> bytes:
                     image_page = image_source.new_page()
                     image_page.insert_text((70, 80), "Scanned admission document.")
                     page.insert_image(page.rect, stream=image_page.get_pixmap().tobytes("png"))
+            elif kind in {"blank_scan", "faint_scan", "figure_scan"}:
+                with pymupdf.open() as image_source:
+                    image_page = image_source.new_page()
+                    if kind == "faint_scan":
+                        image_page.insert_text((70, 80), "Faint content must not disappear", color=(0.97, 0.97, 0.97))
+                    elif kind == "figure_scan":
+                        image_page.draw_rect((70, 80, 170, 180), color=(0.5, 0.5, 0.5))
+                    else:
+                        image_page.draw_rect((200, 200, 200.5, 200.5), color=(0.6, 0.6, 0.6), fill=(0.6, 0.6, 0.6))
+                    page.insert_image(page.rect, stream=image_page.get_pixmap(matrix=pymupdf.Matrix(2, 2)).tobytes("png"))
         return document.tobytes()
 
 
@@ -73,7 +83,7 @@ async def test_native_layout_reaches_studio_response_without_reparse():
     markdown, manifest = normalize_source_pages(extraction.raw_text, extraction.page_count, extraction.pages)
     revision = SimpleNamespace(id="revision", canonical_markdown=markdown, page_manifest=manifest,
                                snapshot_metadata={"file_name": "digital.pdf"}, parse_provenance={"ocr_engine": "native"},
-                               status="ready")
+                               status="ready", citation_metadata={}, canonical_hash=None)
     binding = SimpleNamespace(id="source", active_source_revision=revision, status="active")
     service = SourceIngestionService()
     with patch.object(service, "get_source", AsyncMock(return_value=binding)):
@@ -115,6 +125,48 @@ async def test_missing_ocr_pages_is_not_silently_successful():
                return_value=ocr_response(0)), pytest.raises(AppException) as error:
         await extract_source(AsyncMock(), make_pdf("scan"), "scan.pdf", "pdf", "standard", None, "tenant")
     assert error.value.code == "OCR_PAGE_COUNT_MISMATCH"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("profile", ["standard", "layout_analysis"])
+async def test_empty_ocr_on_blank_scan_keeps_page_and_no_chunks(profile):
+    from app.modules.knowledge.chunker import SemanticChunker
+    from app.modules.knowledge.services.source_pages import chunk_source_pages
+
+    response = ocr_response(3)
+    response.pages[1] = OCRPageResult(page_number=2, extracted_text="", confidence=0, word_count=0, line_count=0)
+    with patch("app.modules.knowledge.services.source_extraction.OCRService.extract_document",
+               AsyncMock(return_value=response)):
+        result = await extract_source(AsyncMock(), make_pdf("scan", "blank_scan", "scan"),
+                                      "scanned.pdf", "pdf", profile, None, "tenant")
+    markdown, manifest = normalize_source_pages(result.raw_text, result.page_count, result.pages)
+    assert result.page_count == 3
+    assert [entry["page"] for entry in manifest] == [1, 2, 3]
+    assert result.pages[1]["extracted_text"] == ""
+    assert manifest[1]["content_status"] == "blank"
+    assert manifest[1]["dimensions"]["width"] > 0
+    assert {chunk.page_number for chunk in chunk_source_pages(SemanticChunker(), markdown, 3)} == {1, 3}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["scan", "faint_scan", "figure_scan", "text"])
+async def test_empty_ocr_on_visible_content_still_fails(kind):
+    response = ocr_response()
+    response.pages[0] = OCRPageResult(page_number=1, extracted_text="", confidence=0, word_count=0, line_count=0)
+    with (patch("app.modules.knowledge.services.source_extraction.OCRService.extract_document",
+                AsyncMock(return_value=response)), pytest.raises(AppException) as error):
+        await extract_source(AsyncMock(), make_pdf(kind), "content.pdf", "pdf", "layout_analysis", None, "tenant")
+    assert error.value.code == "EMPTY_OCR_PAGE"
+
+
+@pytest.mark.asyncio
+async def test_all_blank_scan_document_is_not_usable_knowledge():
+    response = ocr_response()
+    response.pages[0] = OCRPageResult(page_number=1, extracted_text="", confidence=0, word_count=0, line_count=0)
+    with (patch("app.modules.knowledge.services.source_extraction.OCRService.extract_document",
+                AsyncMock(return_value=response)), pytest.raises(AppException) as error):
+        await extract_source(AsyncMock(), make_pdf("blank_scan"), "empty.pdf", "pdf", "standard", None, "tenant")
+    assert error.value.code == "EMPTY_EXTRACTED_TEXT"
 
 
 @pytest.mark.asyncio

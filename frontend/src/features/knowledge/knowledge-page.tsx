@@ -29,6 +29,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -62,6 +63,12 @@ import type {
   KnowledgeCollection,
   KnowledgeReconciliationReport,
 } from "@/types/knowledge";
+import {
+  EmbeddingModelSelect,
+  getEmbeddingConfig,
+  getEmbeddingKey,
+  useEmbeddingModels,
+} from "./components/embedding-model-select";
 
 export const KnowledgePage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -79,7 +86,27 @@ export const KnowledgePage: React.FC = () => {
   const [createCode, setCreateCode] = useState("");
   const [createDescription, setCreateDescription] = useState("");
   const [createStrategy, setCreateStrategy] = useState("SemanticChunker");
-  const [createOcr, setCreateOcr] = useState("PyMuPDF");
+  const [createEmbedding, setCreateEmbedding] = useState("");
+  const modelDefaults = useEmbeddingModels(isCreateOpen);
+  const embeddingOptions = modelDefaults.data?.available_embeddings || [];
+  const defaultEmbedding = embeddingOptions.find(
+    (item) =>
+      item.provider_id ===
+        modelDefaults.data?.defaults.default_embedding_provider_id &&
+      item.model_name === modelDefaults.data?.defaults.default_embedding_model,
+  );
+  const selectedEmbeddingKey =
+    createEmbedding ||
+    (defaultEmbedding ? getEmbeddingKey(defaultEmbedding) : "");
+  const selectedEmbedding = embeddingOptions.find(
+    (item) => getEmbeddingKey(item) === selectedEmbeddingKey,
+  );
+  const defaultOcr = modelDefaults.data?.available_ocrs.find(
+    (item) =>
+      item.provider_id ===
+        modelDefaults.data?.defaults.default_ocr_provider_id &&
+      item.model_name === modelDefaults.data?.defaults.default_ocr_model,
+  );
 
   // Upload Dialog State
   const [uploadTarget, setUploadTarget] = useState<KnowledgeCollection | null>(
@@ -145,14 +172,23 @@ export const KnowledgePage: React.FC = () => {
 
   // Create Collection Mutation
   const createMutation = useMutation({
-    mutationFn: () =>
-      knowledgeApi.createCollection({
+    mutationFn: () => {
+      if (!createName.trim() || !selectedEmbedding || modelDefaults.isError)
+        throw new Error(
+          "Hãy nhập tên kho và chọn Embedding hợp lệ từ ModelOps.",
+        );
+      return knowledgeApi.createCollection({
         name: createName.trim(),
         code: createCode.trim() || undefined,
         description: createDescription.trim() || undefined,
         chunking_strategy: createStrategy,
-        ocr_profile: createOcr,
-      }),
+        ocr_profile: "auto",
+        data_processing: {
+          ...getEmbeddingConfig(selectedEmbedding),
+          enable_ocr_rescue: true,
+        },
+      });
+    },
     onSuccess: (newCol) => {
       toast.success(`Đã tạo kho tri thức: ${newCol.name}`);
       queryClient.invalidateQueries({ queryKey: ["collections"] });
@@ -183,7 +219,7 @@ export const KnowledgePage: React.FC = () => {
     setCreateCode("");
     setCreateDescription("");
     setCreateStrategy("SemanticChunker");
-    setCreateOcr("PyMuPDF");
+    setCreateEmbedding("");
   };
 
   const handleOpenEdit = (col: KnowledgeCollection) => {
@@ -575,13 +611,24 @@ export const KnowledgePage: React.FC = () => {
       )}
 
       {/* 5. Dialog: Tạo Kho Tri Thức Mới */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          if (createMutation.isPending) return;
+          setIsCreateOpen(open);
+          if (!open) resetCreateForm();
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold">
               <Plus className="size-4 text-primary" />
               <span>Thêm kho tri thức mới</span>
             </DialogTitle>
+            <DialogDescription>
+              Chọn Embedding cho lần nạp vector đầu tiên. Bóc tách tự động theo
+              loại tài liệu.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3.5 py-2">
@@ -633,7 +680,47 @@ export const KnowledgePage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium">
+                Embedding <span className="text-destructive">*</span>
+              </span>
+              <EmbeddingModelSelect
+                models={embeddingOptions}
+                value={selectedEmbeddingKey}
+                onChange={setCreateEmbedding}
+                disabled={
+                  modelDefaults.isPending ||
+                  modelDefaults.isError ||
+                  createMutation.isPending
+                }
+              />
+              {modelDefaults.isPending ? (
+                <p className="text-xs text-muted-foreground">
+                  Đang tải ModelOps…
+                </p>
+              ) : modelDefaults.isError ? (
+                <div role="alert" className="text-sm text-destructive">
+                  Không tải được ModelOps.{" "}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => modelDefaults.refetch()}
+                  >
+                    Thử lại
+                  </Button>
+                </div>
+              ) : !embeddingOptions.length ? (
+                <p className="text-xs text-muted-foreground">
+                  Chưa có Embedding. Hãy thêm model tại Mô hình &amp; Provider.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Model chạy tại provider đã chọn, không mặc định chạy trên
+                  laptop.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label
                   htmlFor="create-col-strategy"
@@ -663,23 +750,17 @@ export const KnowledgePage: React.FC = () => {
               </div>
 
               <div className="space-y-1.5">
-                <label
-                  htmlFor="create-col-ocr"
-                  className="text-xs font-semibold text-foreground block"
-                >
-                  Bộ máy OCR Mặc Định
-                </label>
-                <Select value={createOcr} onValueChange={setCreateOcr}>
-                  <SelectTrigger id="create-col-ocr" className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PyMuPDF">PyMuPDF (Nhanh)</SelectItem>
-                    <SelectItem value="PaddleOCR">PaddleOCR-VL (RTX 5090)</SelectItem>
-                    <SelectItem value="Gemini">Gemini Vision</SelectItem>
-                    <SelectItem value="Mistral">Mistral OCR</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-sm font-medium">Bóc tách: Tự động</p>
+                <p className="text-xs text-muted-foreground">
+                  DOCX qua Docling, PDF có chữ qua native parser, trang scan
+                  dùng OCR từ ModelOps.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {defaultOcr
+                    ? `${defaultOcr.model_name} · ${defaultOcr.provider_name}`
+                    : "OCR theo cấu hình ModelOps"}
+                  . Có thể chọn chế độ nâng cao khi nạp tài liệu.
+                </p>
               </div>
             </div>
           </div>
@@ -688,7 +769,10 @@ export const KnowledgePage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsCreateOpen(false)}
+              onClick={() => {
+                setIsCreateOpen(false);
+                resetCreateForm();
+              }}
               disabled={createMutation.isPending}
               className="h-8 text-xs"
             >
@@ -697,7 +781,13 @@ export const KnowledgePage: React.FC = () => {
             <Button
               size="sm"
               onClick={() => createMutation.mutate()}
-              disabled={!createName.trim() || createMutation.isPending}
+              disabled={
+                !createName.trim() ||
+                !selectedEmbedding ||
+                modelDefaults.isPending ||
+                modelDefaults.isError ||
+                createMutation.isPending
+              }
               className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Plus className="size-3.5" />

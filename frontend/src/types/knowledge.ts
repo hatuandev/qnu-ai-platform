@@ -21,7 +21,7 @@ export interface KnowledgeCollection {
   document_count: number;
   chunk_count: number;
   chunking_strategy: "ClauseBasedChunker" | "SemanticChunker";
-  ocr_profile: "PyMuPDF" | "Gemini" | "Mistral";
+  ocr_profile: "auto" | "PyMuPDF" | "PaddleOCR" | "Gemini" | "Mistral";
   embedding_model?: string;
   status?: "ready" | "indexing" | "maintenance";
   updated_at: string;
@@ -152,6 +152,10 @@ export interface ApproveDocumentResult {
 }
 
 export interface DocumentVerificationData {
+  citation_metadata?: Record<string, string | null>;
+  source_metadata?: Record<string, unknown>;
+  structured_artifact?: SourceArtifact;
+  layout_text_alignment?: string;
   revision_id?: string;
   document_id: string;
   collection_id: string;
@@ -185,7 +189,9 @@ export interface DocumentVerificationData {
 export interface FactItem {
   id: string;
   collection_id: string;
-  document_id: string;
+  document_id: string | null;
+  binding_id?: string | null;
+  index_revision_id?: string | null;
   entity_name: string;
   entity_type: string;
   attribute_name: string;
@@ -193,6 +199,31 @@ export interface FactItem {
   confidence: number;
   raw_data: Record<string, unknown>;
   created_at: string;
+}
+
+export interface SourceArtifact {
+  version: string;
+  content_hash: string;
+  fact_set_hash: string;
+  metadata: Record<string, string | null>;
+  facts: Pick<
+    FactItem,
+    | "id"
+    | "entity_name"
+    | "entity_type"
+    | "attribute_name"
+    | "attribute_value"
+    | "confidence"
+    | "raw_data"
+  >[];
+  tables: {
+    id: string;
+    page_number: number | null;
+    headers: string[];
+    rows: string[][];
+  }[];
+  issues: { code: string; table_id?: string; row_index?: number }[];
+  review: { status: string };
 }
 
 export interface FactListResponse {
@@ -308,7 +339,7 @@ export interface KnowledgeBinding {
   active_epoch: number;
   chunk_strategy: string;
   sync_policy: string;
-  status: "active" | "detached" | "pending";
+  status: "active" | "detached" | "pending" | "paused";
   document_title?: string | null;
   document_code?: string | null;
   file_name?: string | null;
@@ -825,6 +856,9 @@ export interface KnowledgeImportBatchCreateRequest {
 }
 
 export interface KnowledgeImportItemResponse {
+  progress?: number;
+  progress_phase?: string | null;
+  progress_kind?: "milestone";
   id: string;
   batch_id: string;
   origin_document_id: string;
@@ -836,7 +870,13 @@ export interface KnowledgeImportItemResponse {
   knowledge_source_revision_id?: string | null;
   index_revision_id?: string | null;
   phase: string;
-  status: "queued" | "processing" | "succeeded" | "failed" | "skipped";
+  status:
+    | "queued"
+    | "processing"
+    | "succeeded"
+    | "failed"
+    | "skipped"
+    | "review_required";
   failure_code?: string | null;
   failure_detail?: string | null;
   retry_count: number;

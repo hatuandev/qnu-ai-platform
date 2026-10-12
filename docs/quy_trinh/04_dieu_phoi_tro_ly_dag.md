@@ -2,6 +2,16 @@
 
 Tài liệu này đặc tả toàn diện kiến trúc quản trị vòng đời đồ thị (**Workflow Control Plane**) và động cơ thực thi tuần tự có hướng (**Workflow DAG Runtime Engine**) phục vụ điều phối hoạt động của 05 Trợ lý AI chuyên trách chuẩn Đại học Quy Nhơn.
 
+## Scope và ModelOps runtime — cập nhật #370
+
+WorkflowExecuteRequest/Context có workspace. API execute dùng tenant/workspace của actor; chat public suy ra scope từ trợ lý và kho đã lưu, không tin tenant hint của client. Runtime profile và execution.runtime_profile JSONB giữ workspace để resume dùng scope đã pin (execution cũ thiếu workspace dùng workspace_qnu tương thích); không migration/reset.
+
+Node RAG gọi chung RagService, chuyển tenant/workspace, policy/revision, model/provider, pin snapshot và chuyển cùng snapshot sang dispatcher. Node LLM ưu tiên override node rồi provider/model trong profile; rewrite/router micro-LLM cũng chuyển tenant. RAG/LLM thiếu DB phải lỗi, không text/provider/tokens giả; fallback_text không thay outage thành completed.
+
+ModelOps errors làm DAG failed với error_code giữ ở outputs/response; node exception có trace failed kèm mã lỗi và latency. Chat response/SSE done truyền error_code, usage workflow failed được ghi error. Không coi failed là No-Answer. Scope/history/administrative RBAC của toàn bộ module ngoài entry points nói trên vẫn cần audit riêng; đây không phải nghiệm thu bảo mật toàn ứng dụng.
+
+Join/routed inputs/HITL scheduler #343 giữ nguyên. Fan-out vẫn thực thi tuần tự, SSE chat vẫn phát lại đáp án sau workflow; chưa triển khai token streaming thật hay parallel nodes. Chỉ kiểm thử chatbot trả lời có căn cứ sau khi kho có index đã xuất bản và chat provider hoạt động; không dùng nguồn ready/unpublished để né gate.
+
 ---
 
 ## 1. Kiến Trúc Vòng Đời Quản Trị Đồ Thị (Workflow Control Plane Lifecycle)

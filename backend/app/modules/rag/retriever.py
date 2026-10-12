@@ -293,6 +293,9 @@ class HybridRetriever:
                 doc_match = or_(
                     KnowledgeDocument.file_name.ilike(f"%{token}%"),
                     KnowledgeDocument.title.ilike(f"%{token}%"),
+                    KnowledgeChunk.chunk_metadata["document_title"].astext.ilike(f"%{token}%"),
+                    KnowledgeChunk.chunk_metadata["document_number"].astext.ilike(f"%{token}%"),
+                    KnowledgeChunk.chunk_metadata["file_name"].astext.ilike(f"%{token}%"),
                 )
                 term_match = or_(content_match, doc_match)
                 conditions.append(term_match)
@@ -431,6 +434,8 @@ class HybridRetriever:
                         u_doc = or_(
                             func.unaccent(KnowledgeDocument.file_name).ilike(f"%{token}%"),
                             func.unaccent(KnowledgeDocument.title).ilike(f"%{token}%"),
+                            func.unaccent(KnowledgeChunk.chunk_metadata["document_title"].astext).ilike(f"%{token}%"),
+                            func.unaccent(KnowledgeChunk.chunk_metadata["document_number"].astext).ilike(f"%{token}%"),
                         )
                         u_match = or_(u_content, u_doc)
                         uni_conds.append(u_match)
@@ -545,53 +550,38 @@ class HybridRetriever:
             return expansions
         try:
             for cand in candidates[:max_expansions]:
+                stmt = select(KnowledgeChunk).join(
+                    KnowledgeCollection, KnowledgeChunk.collection_id == KnowledgeCollection.id
+                ).where(KnowledgeChunk.collection_id == collection_id)
+                if snapshot:
+                    if cand.binding_id and snapshot.binding_revisions.get(cand.binding_id) != cand.index_revision_id:
+                        continue
+                    stmt = stmt.where(KnowledgeCollection.tenant_id == snapshot.tenant_id,
+                                      KnowledgeCollection.workspace_id == snapshot.workspace_id)
+                if cand.binding_id and cand.index_revision_id:
+                    stmt = stmt.join(KnowledgeBinding, KnowledgeChunk.binding_id == KnowledgeBinding.id).where(
+                        KnowledgeChunk.binding_id == cand.binding_id,
+                        KnowledgeChunk.index_revision_id == cand.index_revision_id,
+                        KnowledgeBinding.status == "active",
+                    )
+                else:
+                    stmt = stmt.join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id).where(
+                        KnowledgeChunk.document_id == cand.document_id,
+                        KnowledgeDocument.status.in_(["approved", "ready"]),
+                        KnowledgeDocument.is_active.is_(True),
+                    )
+                    if snapshot:
+                        stmt = stmt.where(KnowledgeChunk.index_revision_id.in_(list(snapshot.binding_revisions.values())))
                 neighbor_idx = [cand.metadata.get("chunk_index")] if cand.metadata else [None]
                 center = neighbor_idx[0] if neighbor_idx and isinstance(neighbor_idx[0], int) else None
                 if center is None:
                     # Fall back to page adjacency when chunk_index is missing
                     if cand.page_number is None:
                         continue
-                    stmt = (
-                        select(KnowledgeChunk)
-                        .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                        .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
-                        .where(
-                            KnowledgeChunk.collection_id == collection_id,
-                            KnowledgeChunk.document_id == cand.document_id,
-                            KnowledgeChunk.page_number.in_([cand.page_number - 1, cand.page_number + 1]),
-                            KnowledgeDocument.status.in_(["approved", "ready"]),
-                            KnowledgeDocument.is_active.is_(True),
-                        )
-                        .order_by(KnowledgeChunk.page_number)
-                        .limit(window * 2)
-                    )
+                    stmt = stmt.where(KnowledgeChunk.page_number.in_([cand.page_number - 1, cand.page_number + 1])).order_by(KnowledgeChunk.page_number).limit(window * 2)
                 else:
                     wanted = [center + d for d in range(-window, window + 1) if d != 0]
-                    stmt = (
-                        select(KnowledgeChunk)
-                        .join(KnowledgeDocument, KnowledgeChunk.document_id == KnowledgeDocument.id)
-                        .join(KnowledgeCollection, KnowledgeDocument.collection_id == KnowledgeCollection.id)
-                        .where(
-                            KnowledgeChunk.collection_id == collection_id,
-                            KnowledgeChunk.document_id == cand.document_id,
-                            KnowledgeChunk.chunk_index.in_(wanted),
-                            KnowledgeDocument.status.in_(["approved", "ready"]),
-                            KnowledgeDocument.is_active.is_(True),
-                        )
-                        .order_by(KnowledgeChunk.chunk_index)
-                        .limit(window * 2)
-                    )
-                if cand.binding_id and cand.index_revision_id:
-                    stmt = stmt.where(
-                        KnowledgeChunk.binding_id == cand.binding_id,
-                        KnowledgeChunk.index_revision_id == cand.index_revision_id,
-                    )
-                elif snapshot:
-                    stmt = stmt.where(
-                        KnowledgeChunk.index_revision_id.in_(
-                            list(snapshot.binding_revisions.values())
-                        )
-                    )
+                    stmt = stmt.where(KnowledgeChunk.chunk_index.in_(wanted)).order_by(KnowledgeChunk.chunk_index).limit(window * 2)
                 res = await db.execute(stmt)
                 scalars = res.scalars()
                 neighbors = list(scalars.all()) if hasattr(scalars, "all") else []
@@ -618,6 +608,7 @@ class HybridRetriever:
         snapshot: RetrievalSnapshot | None = None,
         pin_snapshot: bool = True,
         read_mode_override: str | None = None,
+        candidate_mode: bool = False,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker with Snapshot Isolation."""
         active_snapshot = snapshot
@@ -638,6 +629,7 @@ class HybridRetriever:
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
                     snapshot=active_snapshot,
+                    **({"candidate_mode": True} if candidate_mode else {}),
                 )
             except Exception as exc:
                 logger.warning("Dense search encountered error, falling back to sparse degraded: %s", exc)

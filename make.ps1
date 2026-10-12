@@ -99,11 +99,11 @@ switch ($Command) {
 
         & "$PSScriptRoot\scripts\start-worker.ps1"
         Write-Host "Dang khoi chay Backend (Port 8001)..." -ForegroundColor Green
-        Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoExit", "-Command", "cd backend; & '$PythonExe' -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
+        Start-Process powershell -WindowStyle Normal -ArgumentList "-NoExit", "-Command", "cd backend; & '$PythonExe' -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
         Write-Host "Doi Backend khoi dong trong 2 giay..." -ForegroundColor Gray
         Start-Sleep -Seconds 2
         Write-Host "Dang khoi chay Frontend Studio (Port 3000)..." -ForegroundColor Green
-        Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+        Start-Process powershell -WindowStyle Normal -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
     }
     "worker" {
         & "$PSScriptRoot\scripts\start-worker.ps1"

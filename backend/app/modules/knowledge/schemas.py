@@ -197,6 +197,10 @@ class ReparseSourceRequest(BaseModel):
 
 
 class StudioViewResponse(BaseModel):
+    source_metadata: dict[str, Any] = Field(default_factory=dict)
+    citation_metadata: dict[str, Any] = Field(default_factory=dict)
+    structured_artifact: dict[str, Any] = Field(default_factory=dict)
+    layout_text_alignment: str = "original"
     document_id: str
     revision_id: str | None = None
     collection_id: str
@@ -232,7 +236,9 @@ class ParsePreviewResponse(BaseModel):
 class FactItemResponse(BaseModel):
     id: str
     collection_id: str
-    document_id: str
+    document_id: str | None = None
+    binding_id: str | None = None
+    index_revision_id: str | None = None
     entity_name: str
     entity_type: str
     attribute_name: str
@@ -253,6 +259,11 @@ class FactExcelImportResponse(BaseModel):
     imported_count: int
     document_id: str
     message: str
+
+
+class CandidateQueryRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    module_code: str = "general"
 
 
 # ==============================================================================
@@ -1088,6 +1099,9 @@ class KnowledgeImportItemResponse(BaseModel):
     failure_code: str | None = None
     failure_detail: str | None = None
     retry_count: int = 0
+    progress: float = Field(default=0, ge=0, le=100)
+    progress_phase: str | None = None
+    progress_kind: str = "milestone"
     created_at: datetime
     updated_at: datetime
 

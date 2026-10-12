@@ -22,6 +22,7 @@ class FusionCandidate:
     binding_id: str | None = None
     index_revision_id: str | None = None
     document_revision: int | None = None
+    relevance_score: float | None = None
 
 
 def _merge_ranked_list(

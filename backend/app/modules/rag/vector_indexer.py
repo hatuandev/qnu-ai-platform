@@ -381,7 +381,10 @@ class VectorIndexer:
         provider = runtime.provider_type
         if provider in ("ollama", "ollama_local", "local", "vllm", "custom", "openai", "tei"):
             try:
-                vectors = await self._embed_texts_ollama(texts, runtime)
+                from app.core.provider_capacity import provider_slot
+
+                async with provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
+                    vectors = await self._embed_texts_ollama(texts, runtime)
                 if len(vectors) != len(texts):
                     raise RuntimeError(
                         f"Embedding provider '{provider}' returned {len(vectors)} vectors for {len(texts)} texts."
@@ -414,7 +417,10 @@ class VectorIndexer:
                         },
                     )
                 try:
-                    vectors = await self._embed_texts_cloudflare(texts, runtime)
+                    from app.core.provider_capacity import provider_slot
+
+                    async with provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
+                        vectors = await self._embed_texts_cloudflare(texts, runtime)
                     if len(vectors) != len(texts):
                         raise RuntimeError(
                             f"Cloudflare returned {len(vectors)} vectors for {len(texts)} texts."
@@ -1049,8 +1055,11 @@ class VectorIndexer:
         workspace_id: str | None = None,
         snapshot: Any | None = None,
         qdrant_collection_name: str | None = None,
+        candidate_mode: bool = False,
     ) -> list[dict[str, Any]]:
         """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, score threshold and snapshot isolation filtering."""
+        if candidate_mode and (snapshot is None or not snapshot.binding_revisions or not tenant_id or not workspace_id):
+            raise AppException("Candidate snapshot thiếu phạm vi.", code="INVALID_CANDIDATE_SNAPSHOT", status_code=403)
         cname = qdrant_collection_name or self._get_collection_name(collection_id)
         snapshot_generation = None
         if snapshot:
@@ -1100,6 +1109,10 @@ class VectorIndexer:
                     match=qmodels.MatchAny(any=["ready", "approved"]),
                 ),
             ]
+            if candidate_mode:
+                must_conditions = [must_conditions[0], qmodels.FieldCondition(
+                    key="document_status", match=qmodels.MatchAny(any=["staging", "ready", "approved"]),
+                )]
             if tenant_id:
                 must_conditions.append(
                     qmodels.FieldCondition(
@@ -1166,8 +1179,8 @@ class VectorIndexer:
                 payload = hit.payload or {}
                 if (
                     payload.get("is_active") is not True
-                    or payload.get("is_retrievable") is not True
-                    or payload.get("document_status") not in ("ready", "approved")
+                    or (not candidate_mode and payload.get("is_retrievable") is not True)
+                    or payload.get("document_status") not in (("staging", "ready", "approved") if candidate_mode else ("ready", "approved"))
                 ):
                     logger.warning("Qdrant returned a point outside the lifecycle allowlist: %s", hit.id)
                     continue

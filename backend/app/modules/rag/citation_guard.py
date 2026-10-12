@@ -116,7 +116,7 @@ class CitationGuard:
                 or meta.get("title")
                 or meta.get("collection_name")
             )
-            title = c.section or doc_name or f"Tài liệu tuyển sinh ({c.document_id[:8]})"
+            title = doc_name or c.section or f"Tài liệu tuyển sinh ({c.document_id[:8]})"
             if title.startswith("doc_"):
                 title = f"Tài liệu ({title})"
             quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")

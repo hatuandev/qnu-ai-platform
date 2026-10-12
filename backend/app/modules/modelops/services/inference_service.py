@@ -49,6 +49,8 @@ VALID_CHAT_PROVIDER_TYPES: set[str] = {
     "openrouter",
     "nvidia",
     "custom",
+    "vllm",
+    "openai_compatible",
 }
 NON_CHAT_MODEL_KEYWORDS: tuple[str, ...] = ("bge-", "embed", "rerank", "tableformer")
 
@@ -68,6 +70,8 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
 
     p_type = str(p.get("provider_type", "")).strip().lower()
     p_id = str(p.get("id", "")).strip().lower()
+    if p_type in {"openai_compatible", "vllm", "custom", "openrouter", "groq"}:
+        return True
 
     # 2. Family & provider type matching
     if any(k in m_lower for k in ("gemini", "gemma")):
@@ -88,7 +92,7 @@ def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None
         )
 
     # 3. Custom / OpenRouter / OpenAI compatible proxies allow arbitrary model names
-    return p_type in ("openai_compatible", "custom", "openrouter", "groq")
+    return p_type in ("openai_compatible", "vllm", "custom", "openrouter", "groq")
 
 
 def _provider_has_credentials(p: dict[str, Any]) -> bool:

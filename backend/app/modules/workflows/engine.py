@@ -120,6 +120,14 @@ class WorkflowDAGEngine:
                 result = await handler.execute(node_spec, context)
             except Exception as exc:
                 logger.exception("Node [%s] failed with an unexpected error", current_node_id)
+                error_code = exc.code if isinstance(exc, AppException) else "WORKFLOW_NODE_FAILED"
+                context.outputs["error_code"] = error_code
+                context.node_traces.append(NodeExecutionTrace(
+                    node_id=current_node_id, node_type=node_spec.type, status="failed",
+                    input_data={"ports": context.node_inputs.get(current_node_id, {})},
+                    output_data={"error_code": error_code},
+                    latency_ms=round((time.perf_counter() - node_start_time) * 1000, 2),
+                ))
                 return self._failed_response(
                     context,
                     start_time,
@@ -352,6 +360,7 @@ class WorkflowDAGEngine:
             executed_nodes=executed_nodes,
             latency_ms=round(elapsed, 2),
             error_message=error_message,
+            error_code=context.outputs.get("error_code"),
         )
 
 

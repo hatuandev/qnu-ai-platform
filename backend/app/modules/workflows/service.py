@@ -453,6 +453,9 @@ class WorkflowService:
         correlation_id: str | None = None,
     ) -> WorkflowExecuteResponse:
         """Run workflow DAG end-to-end and audit execution trace."""
+        if assistant_profile and (assistant_profile.tenant_id != req.tenant_id
+                                  or assistant_profile.workspace_id != req.workspace_id):
+            raise AppException("Phạm vi trợ lý không khớp phiên chạy.", code="WORKFLOW_SCOPE_MISMATCH", status_code=403)
         # Check if caller requested an exact immutable workflow version (e.g. pinned by assistant)
         target_version_id = req.workflow_version_id
         if not target_version_id:
@@ -467,7 +470,8 @@ class WorkflowService:
 
         # Exact-version resolution: read immutable dag_spec from published version if present
         if workflow_version_id:
-            version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == workflow_version_id)
+            version_stmt = select(WorkflowVersion.dag_spec).where(WorkflowVersion.id == workflow_version_id,
+                                                                 WorkflowVersion.workflow_id == req.workflow_id)
             v_spec = (await db.execute(version_stmt)).scalar_one_or_none()
             if not v_spec:
                 raise AppException(
@@ -487,6 +491,7 @@ class WorkflowService:
             db=db,
             assistant_profile=assistant_profile,
             correlation_id=correlation_id,
+            workspace_id=req.workspace_id,
         )
         execution_record = WorkflowExecution(
             workflow_id=req.workflow_id,
@@ -496,7 +501,8 @@ class WorkflowService:
             assistant_revision=assistant_profile.assistant_revision if assistant_profile else None,
             workflow_version_id=workflow_version_id,
             correlation_id=correlation_id,
-            runtime_profile=assistant_profile.model_dump(mode="json") if assistant_profile else None,
+            runtime_profile={**(assistant_profile.model_dump(mode="json") if assistant_profile else {}),
+                             "workspace_id": req.workspace_id},
             inputs=req.inputs,
         )
         db.add(execution_record)
@@ -731,7 +737,7 @@ class WorkflowService:
 
         runtime_profile = (
             AssistantRuntimeProfile.model_validate(execution_record.runtime_profile)
-            if execution_record.runtime_profile
+            if execution_record.runtime_profile and execution_record.runtime_profile.get("assistant_id")
             else None
         )
         resume_inputs = {
@@ -748,6 +754,7 @@ class WorkflowService:
             node_data=checkpoint.node_data,
             db=db,
             assistant_profile=runtime_profile,
+            workspace_id=(execution_record.runtime_profile or {}).get("workspace_id", "workspace_qnu"),
             execution_id=execution_record.id,
             correlation_id=execution_record.correlation_id,
         )

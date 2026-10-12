@@ -1,12 +1,14 @@
 """Unit & Integration Tests for Workflow DAG Engine, Nodes, Branching & Executions."""
 
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_db
 from app.main import app
+from app.modules.rag.schemas import RetrievalSnapshot
 from app.modules.workflows.compiler import workflow_compiler
 from app.modules.workflows.engine import dag_engine
 from app.modules.workflows.nodes.base import BaseNodeHandler, NodeExecutionResult, WorkflowContext
@@ -26,6 +28,16 @@ class _PassThroughNodeHandler(BaseNodeHandler):
     async def execute(self, node_spec: WorkflowNodeSpec, context: WorkflowContext) -> NodeExecutionResult:
         context.node_data.setdefault("execution_order", []).append(node_spec.id)
         return NodeExecutionResult(node_id=node_spec.id, output={"node_id": node_spec.id})
+
+
+@pytest.fixture(autouse=True)
+def scoped_rag_fixture():
+    async def resolve(db, collection_id, **kwargs):
+        return RetrievalSnapshot(snapshot_id="test", collection_id=collection_id,
+                                 tenant_id=kwargs.get("tenant_id"), workspace_id=kwargs.get("workspace_id"))
+    with (patch("app.modules.workflows.nodes.rag_answer_node.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(side_effect=resolve)),
+          patch("app.modules.tools.consulting_dispatcher.consulting_dispatcher.dispatch", AsyncMock(return_value={}))):
+        yield
 
 
 @pytest.mark.asyncio
@@ -268,8 +280,10 @@ async def test_api_execute_workflow_greeting():
             "inputs": {"message": "Xin chào QNU!"},
             "tenant_id": "tenant_qnu",
         }
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-            response = await ac.post("/platform/v1alpha1/workflows/execute", json=payload)
+        with patch("app.modules.workflows.nodes.llm_generate_node.modelops_service.generate",
+                   AsyncMock(return_value=SimpleNamespace(content="Chào bạn", provider="fixture", total_tokens=1))):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+                response = await ac.post("/platform/v1alpha1/workflows/execute", json=payload)
     finally:
         app.dependency_overrides.pop(get_db, None)
 

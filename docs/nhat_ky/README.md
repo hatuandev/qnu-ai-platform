@@ -7,6 +7,50 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-12** | [Phiên #382](./2026-10-12_phien_382_artifact_facts_va_candidate_rag.md) | Artifacts/facts dự thảo và candidate RAG | Hai P1 fixed, hash/evidence/review, facts parity, preview;932pass/11cũ/2skip, chưa full QA |
+
+| **2026-10-12** | [Phiên #381](./2026-10-12_phien_381_hoan_thien_luong_tri_thuc_co_cau_truc.md) | Hoàn thiện luồng tri thức có cấu trúc | Draftfacts trướcduyệt, staging/parity/QA, pinrevision vàlifecycle; chưaimplement |
+
+| **2026-10-12** | [Phiên #380](./2026-10-12_phien_380_ra_soat_metadata_regions_va_facts.md) | Metadata/regions/entities/facts | Backup comparison, factsAPI500/81rows, hướngartifact cóprovenance |
+
+| **2026-10-12** | [Phiên #379](./2026-10-12_phien_379_test_thuc_te_rag_dag_tuyen_sinh.md) | Test RAG/DAG tuyển sinh thật | Publish đúng, reranker threshold làm mấtcontext; P2 citations/noanswer/audit |
+
+| **2026-10-12** | [Phiên #378](./2026-10-12_phien_378_tinh_gon_cau_hinh_kho_tri_thuc.md) | Tinh gọn cấu hình kho tri thức | Model dưới counter, metadata Sửa, tạo kho chọn Embedding, OCR auto |
+
+| **2026-10-12** | [Phiên #377](./2026-10-12_phien_377_hien_ro_provider_va_chi_muc_vector.md) | Làm rõ provider và bản chỉ mục vector | Nạp vector/Cấu hình đồng nhất, máy chủ động, Biome/build đạt |
+
+| **2026-10-12** | [Phiên #376](./2026-10-12_phien_376_worker_resilience_va_tien_do_tung_file.md) | Worker resilience và % từng file | Shared limiter/lease/recovery/retry/backlog; 76BE/2FE đạt, chưa GPU/browserE2E |
+
+| **2026-10-12** | [Phiên #375](./2026-10-12_phien_375_danh_gia_tai_worker_nap_tai_lieu.md) | Đánh giá tải nhiều người nạp | Read-only: limiter/recovery/ARQ retry cần làm, chưa load test |
+
+| **2026-10-12** | [Phiên #374](./2026-10-12_phien_374_chan_xoa_nguon_chua_ngung.md) | Chặn xóa nguồn chưa ngừng | Guard BE + khóa FE list/detail, giữ retry; 30focused/build đạt |
+
+| **2026-10-12** | [Phiên #373](./2026-10-12_phien_373_bo_sung_ngung_dung_nguon.md) | Ngừng dùng từng nguồn Knowledge | paused/epoch/guard/giữ dữ liệu; 41BE/4FE đạt, full suite còn lỗi cũ |
+
+| **2026-10-12** | [Phiên #372](./2026-10-12_phien_372_danh_gia_ngung_va_hoan_tac_xuat_ban.md) | Ngừng và hoàn tác xuất bản | Đọc code: rollback cũ thiếu namespace; đề xuất pause/resume, chưa sửa dữ liệu |
+
+| **2026-10-12** | [Phiên #371](./2026-10-12_phien_371_kiem_tra_chi_muc_kho_tuyen_sinh.md) | Kiểm tra chỉ mục kho tuyển sinh | Live DB/Qdrant: 4 MD ready, chưa generation/index/publish; chỉ đọc |
+
+| **2026-10-12** | [Phiên #370](./2026-10-12_phien_370_tich_hop_rag_dag_modelops.md) | Tích hợp nhất quán RAG/DAG/ModelOps | 152focused/Ruff;full903/13nền/2skip;liveCloudflare/no-context;chưa groundedE2E |
+
+| **2026-10-12** | [Phiên #369](./2026-10-12_phien_369_ra_soat_lai_rag_dag.md) | Rà lại RAG/DAG | 83targeted/probe; scope/model/error trước, cache/metadata sau; chưa runtime |
+
+| **2026-10-12** | [Phiên #368](./2026-10-12_phien_368_dung_dev_va_worker.md) | Dừng dev và worker | Ports3000/8001 trống, worker dừng; user tự chạy lại |
+
+| **2026-10-12** | [Phiên #367](./2026-10-12_phien_367_hien_terminal_make_dev.md) | Hiện terminal make.ps1 dev | Hai launcher Normal, worker nền; parser/AST đạt; chưa launch |
+
+| **2026-10-12** | [Phiên #366](./2026-10-12_phien_366_xac_dinh_make_ps1_an_terminal.md) | Terminal BE/FE bị ẩn trong make.ps1 | Hidden dòng102/106; đính chính #365, chưa sửa runner |
+
+| **2026-10-11** | [Phiên #365](./2026-10-11_phien_365_chan_doan_terminal_make_dev.md) | Terminal make dev | Worker chạy ẩn; BE/FE vẫn cmd/start; chưa sửa/restart |
+
+| **2026-10-11** | [Phiên #364](./2026-10-11_phien_364_fix_ocr_trang_scan_trang.md) | Fix OCR trang scan trắng | 51focused/Ruff; live48trang/71chunks; full887/13nền/2skip; chưa restart/retry user |
+
+| **2026-10-11** | [Phiên #363](./2026-10-11_phien_363_chan_doan_ocr_trang_scan_trang.md) | OCR lỗi trang scan trắng | Trang48 trắng, per-page guard #360 gây fail; chỉ chẩn đoán, chưa fix |
+
+| **2026-10-11** | [Phiên #362](./2026-10-11_phien_362_tai_lieu_thuat_toan_toi_uu_qnu_ai.md) | Tài liệu thuật toán nâng chất lượng/tối ưu | File 13, thứ tự ưu tiên và gate benchmark; chưa đổi runtime |
+
+| **2026-10-11** | [Phiên #361](./2026-10-11_phien_361_danh_gia_bm25_cho_rag_dag.md) | Đánh giá BM25 cho RAG/DAG | ILIKE/FTS chưa BM25; Qdrant 1.19; 25 tests đạt; chưa triển khai/benchmark |
+
 | **2026-10-11** | [Phiên #360](./2026-10-11_phien_360_layout_native_ocr_theo_trang_va_docx_preview.md) | Khung native/Paddle per-page/Docling preview | 53 BE/3 FE mapper/Ruff; live đạt; full871/14fail/2skip; chưa browser E2E |
 
 | **2026-10-11** | [Phiên #359](./2026-10-11_phien_359_danh_gia_chien_luoc_parser_va_layout.md) | Đánh giá chiến lược parser và layout | Giữ ba engine, per-page routing/quality gate; không sửa runtime |

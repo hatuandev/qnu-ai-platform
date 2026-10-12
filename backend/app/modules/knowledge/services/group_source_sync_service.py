@@ -67,7 +67,8 @@ async def _adopt_active_binding(
     binding.chunk_strategy = chunk_strategy
     binding.sync_policy = sync_policy
     binding.source_revision_id = target_revision_id
-    binding.status = "active"
+    if binding.status != "paused":
+        binding.status = "active"
     await db.flush()
 
 
@@ -124,7 +125,8 @@ async def _promote_ready_revision(
         actor=actor,
     )
     binding.source_revision_id = target_revision_id
-    binding.status = "active"
+    if binding.status != "paused":
+        binding.status = "active"
     binding.active_index_revision_id = idx_rev.id
     await db.flush()
 
@@ -390,6 +392,8 @@ class GroupSourceSyncService:
                 KnowledgeBinding.repository_document_id == doc.id,
             )
             existing_bnd = (await db.execute(b_stmt)).scalar_one_or_none()
+            if existing_bnd and existing_bnd.status == "paused":
+                continue
             if existing_bnd:
                 if (
                     existing_bnd.group_source_id is not None

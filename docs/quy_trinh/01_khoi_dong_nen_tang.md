@@ -2,9 +2,19 @@
 
 Tài liệu này mô tả chi tiết thứ tự điều phối nạp các container, kiểm tra tính sẵn sàng (Healthcheck Probes) và khởi tạo kết nối hạ tầng khi nền tảng khởi động.
 
-## Local dev cần worker — cập nhật #349
+## Worker ingestion đa người — cập nhật #376
+
+- ARQ dùng `max_tries` đúng phiên bản thư viện, mặc định 3; `WORKER_MAX_JOBS=10`, `WORKER_JOB_TIMEOUT_SECONDS=900`. Docker worker có probe `arq --check` mỗi 30s thay vì disable healthcheck; cron điều phối mỗi 15s.
+- Job ingestion/index có Redis lease riêng và lease theo nguồn; renew/heartbeat 15s. Mất lease/heartbeat lỗi hủy execution để không tiếp tục ghi kết quả; timeout đi qua phục hồi DB, không retry trực tiếp mục còn processing.
+- Cron chỉ reclaim khi không có job/resource lease và heartbeat quá hạn (timeout +120s, mặc định 17,5 phút), hoặc job failed được đánh dấu lỗi tạm thời. Kiểm tra scope, giữ item thành công, không phục hồi batch đã hủy; reset trạng thái dưới lock và phát lại qua pending dispatch. Staging index bỏ lại đánh dấu failed, không chạm active index.
+- Giới hạn hạ tầng (không phải credentials LLM) cấu hình qua Settings: OCR_MAX_CONCURRENT=2, EMBEDDING_MAX_CONCURRENT=4, PROVIDER_QUEUE_TIMEOUT_SECONDS=120, INGESTION_MAX_PENDING_PER_TENANT=1000. Mọi replica cần cùng cấu hình. Đây là mặc định ban đầu, chưa phải sức chứa server GPU đã benchmark.
+- Để nhận thay đổi phải khởi động lại backend/worker. Khi triển khai nhiều replica, drain/stop worker cũ trước khi bật recovery mới để tránh trộn phiên bản không có lease; không reset DB hay tự giết tác vụ người dùng đang chạy.
+
+## Local dev cần worker — cập nhật #367
 
 Trên Windows, `make dev` / `.\make.ps1 dev` khởi động API, Frontend và ARQ worker. Nếu API/Frontend đã chạy, dùng `.\make.ps1 worker` để mở riêng worker; launcher dùng PID kèm thời điểm khởi động để tránh mở trùng khi gọi tuần tự. Đây là tiện ích local dev, không phải trình giám sát production hay khóa chống hai launcher chạy đồng thời.
+
+Nhánh PowerShell dev/dev1/dev2 mở Backend và Frontend bằng `WindowStyle Normal`/`NoExit` để hiển thị cửa sổ và theo dõi log. Worker vẫn chạy nền. Chạy dev khi worker đã tồn tại không restart/reload worker; cần chủ động restart đúng worker để nhận code mới. Thay đổi chế độ hiển thị chỉ áp dụng cửa sổ mới, không hiện lại process cũ đã mở ẩn; không cần reset DB.
 
 Worker chạy nền, nhật ký stdout/stderr và thông tin PID nằm tại `backend/storage/worker_logs/` (được gitignore). Worker phải truy cập được PostgreSQL, Redis, MinIO/Qdrant và server AI theo cấu hình ModelOps. Heartbeat cập nhật mỗi 15 giây; một health key cũ còn tồn tại không đủ chứng minh worker đang hoạt động. Cần đối chiếu timestamp, process và tiến trình job.
 

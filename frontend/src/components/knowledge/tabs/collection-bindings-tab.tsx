@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteSourceButton } from "@/features/knowledge/components/delete-source-button";
+import { PauseSourceButton } from "@/features/knowledge/components/pause-source-button";
 import { useVectorWorkflow } from "@/features/knowledge/components/use-vector-workflow";
 import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
 import { getSourceVectorState } from "@/features/knowledge/utils/vector-workflow";
@@ -66,12 +67,15 @@ export function CollectionBindingsTab({
   );
   const selectable = visible.filter(
     (source) =>
-      source.source_status === "ready" && !!source.active_source_revision_id,
+      source.status === "active" &&
+      source.source_status === "ready" &&
+      !!source.active_source_revision_id,
   );
   const targets = (sources.data || [])
     .filter(
       (source) =>
         selectedIds.includes(source.id) &&
+        source.status === "active" &&
         source.source_status === "ready" &&
         !!source.active_source_revision_id,
     )
@@ -245,6 +249,7 @@ export function CollectionBindingsTab({
                   state.data,
                 );
                 const canLoad =
+                  source.status === "active" &&
                   source.source_status === "ready" &&
                   !!source.active_source_revision_id;
                 return (
@@ -275,12 +280,14 @@ export function CollectionBindingsTab({
                       <Badge
                         variant="outline"
                         className={
-                          canLoad
+                          source.source_status === "ready"
                             ? "border-success/30 bg-success/10 text-success"
                             : "border-warning/30 bg-warning/10 text-warning"
                         }
                       >
-                        {canLoad ? "MD sẵn sàng" : "Chờ xử lý / duyệt"}
+                        {source.source_status === "ready"
+                          ? "MD sẵn sàng"
+                          : "Chờ xử lý / duyệt"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -357,8 +364,14 @@ export function CollectionBindingsTab({
                           <FileText className="size-3.5" />
                           Chi tiết
                         </Button>
+                        <PauseSourceButton
+                          sourceId={source.id}
+                          title={source.document_title || source.id}
+                          status={source.status}
+                        />
                         <DeleteSourceButton
                           sourceId={source.id}
+                          status={source.status}
                           title={source.document_title || source.id}
                           onDeleted={refresh}
                         />

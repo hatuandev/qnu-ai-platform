@@ -316,8 +316,9 @@ class KnowledgeService:
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
+        actor: Any | None = None,
     ) -> FactListResponse:
-        return await self._facts.get_collection_facts(db, collection_id, limit, offset)
+        return await self._facts.get_collection_facts(db, collection_id, limit, offset, actor=actor)
 
     # ==========================================================================
     # 4. Reconciliation & Indexing Audit (Delegated to reconciliation_service)

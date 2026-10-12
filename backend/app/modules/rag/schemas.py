@@ -120,6 +120,9 @@ class AskRequest(BaseModel):
     thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
     preferred_model_name: str | None = None
     preferred_provider_id: str | None = None
+    assistant_code: str | None = None
+    assistant_revision: str | None = None
+    runtime_policy: dict[str, Any] = Field(default_factory=dict)
     fallback_model: str | None = None
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
     workspace_id: str = Field("workspace_qnu", min_length=2, max_length=100)
@@ -135,6 +138,10 @@ class AskRequest(BaseModel):
     @property
     def snapshot(self) -> RetrievalSnapshot | None:
         return self.retrieval_snapshot
+
+    def policy_fingerprint(self) -> str:
+        payload = self.model_dump(exclude={"question", "conversation_id", "history", "snapshot_id", "retrieval_snapshot"})
+        return "v2-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")).hexdigest()
 
 
 class AskResponse(BaseModel):

@@ -2,6 +2,21 @@
 
 Tài liệu này đặc tả cơ chế chịu lỗi của hệ thống khi kết nối các nhà cung cấp LLM ngoại vi (OpenAI, Google Gemini, Local vLLM/Ollama), thuật toán ngắt mạch Circuit Breaker 3 trạng thái, định tuyến dự phòng nhiều tầng (Fallback Cascade) và quản trị chi phí FinOps.
 
+## Điều phối tải OCR/embedding — cập nhật #376
+
+- #382 parse cache fingerprint gồm OCR routing/provider/model/timeout/update time từ ModelOps DB; không lưu key vào fingerprint hoặc log. Re-embedding source mới dùng structured artifact/facts đã lưu, không gọi OCR để đổi vector space. Reranker giữ riêng raw provider score cho threshold; malformed/NaN/index ngoài phạm vi không được scored-success.
+
+- Paddle adapter (mọi đường gọi) và embedding vLLM/Ollama/OpenAI-compatible/Cloudflare dùng capacity lease Redis sorted-set với Lua atomic, thời gian Redis, renew và token release. Key theo endpoint đã hash, tránh cộng riêng capacity khi nhiều provider trỏ cùng endpoint; mỗi loại OCR/embedding có limit riêng.
+- Khi đầy, chờ slot tối đa cấu hình rồi trả PROVIDER_CAPACITY_TIMEOUT; Redis không khả dụng trả PROVIDER_CAPACITY_UNAVAILABLE, không gọi AI bằng fallback giả. Lease có TTL để không rò rỉ capacity khi process chết; renew mất lease hủy request phía ứng dụng.
+- Lỗi kết nối/timeout/429/5xx và các mã availability tạm thời được phân loại qua cause chain, ghi retry_after/backoff trong DB; cron retry có giới hạn. Nội dung rỗng, quality/parity/config sai không tự coi là lỗi mạng. Giữ cơ chế key rotation/fallback hiện hữu, không đổi model/credentials.
+- Chưa benchmark GPU thật; giới hạn đang là số request phía ứng dụng, không cam kết Paddle/vLLM server đã dừng inference khi client timeout. Endpoint alias/khác port và cùng GPU cần cấu hình/đo tải server, chưa có group budget chung cho mọi model trên một GPU.
+
+### Tích hợp RAG/DAG (#370)
+
+RAG không tự gọi lại fallback hoặc trả trích đoạn khi ModelOps hết provider. Request LLM giữ tenant/model/provider/fallback; node LLM kế thừa provider profile khi không có node override. Chat provider types có thêm vllm/openai_compatible; proxy này chấp nhận tên model động trước kiểm tra family, không ép tên Qwen/custom về model seed. Vẫn không gửi embedding/reranker-only model vào chat. vLLM có key được quản lý DB/Key Pool như trước, Paddle giữ keyless.
+
+Smoke thật #370: cấu hình trợ lý hiện tại được cascade sang Cloudflare và trả tokens thực; không chứng minh vLLM đang chạy chat vì preset vLLM chỉ embedding/reranker. Không sửa URL/model/keys hoặc tự publish kho người dùng để test. Các ca outage/quota/noDB được regression, chưa benchmark failover server thật/đổi key/failure concurrency.
+
 ---
 
 ## 1. Sơ Đồ Cơ Chế Ngắt Mạch & Chuyển Vùng Dự Phòng (Circuit Breaker & Fallback)

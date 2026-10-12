@@ -30,6 +30,7 @@ from app.modules.knowledge.schemas import (
     CanaryPolicyResponse,
     CandidateGroupListResponse,
     CandidateListResponse,
+    CandidateQueryRequest,
     CollectionCreateRequest,
     CollectionResponse,
     CollectionSummaryMetrics,
@@ -96,6 +97,7 @@ from app.modules.knowledge.services.vector_load_service import (
     get_vector_load_state,
     queue_vector_load,
 )
+from app.modules.rag.schemas import AskResponse
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge Bases"])
 
@@ -540,13 +542,26 @@ async def get_collection_facts(
     limit: int = Query(500, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> FactListResponse:
     return await knowledge_service.get_collection_facts(
         db=db,
         collection_id=collection_id,
         limit=limit,
         offset=offset,
+        actor=actor,
     )
+
+
+@router.post("/collections/{collection_id}/vector-generations/{generation_id}/preview", response_model=AskResponse)
+async def preview_vector_generation(
+    collection_id: str, generation_id: str, body: CandidateQueryRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> AskResponse:
+    from app.modules.knowledge.services.generation_candidate import ask_candidate
+
+    return await ask_candidate(db, collection_id, generation_id, body.question, body.module_code, actor)
 
 
 @router.post(
@@ -716,6 +731,15 @@ async def get_binding(
     actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> KnowledgeBindingResponse:
     return await knowledge_service.get_binding(db, binding_id=binding_id, actor=actor)
+
+
+@router.post("/bindings/{binding_id}/pause", response_model=KnowledgeBindingResponse,
+             summary="Ngừng dùng nguồn, giữ nguyên nội dung và chỉ mục")
+async def pause_source(binding_id: str, db: AsyncSession = Depends(get_db),
+                       actor: AuthActor = Depends(require_permission("ai.knowledge.delete"))) -> KnowledgeBindingResponse:
+    from app.modules.knowledge.services.source_pause import pause_source as pause
+
+    return await pause(db, binding_id, actor=actor)
 
 
 @router.delete(

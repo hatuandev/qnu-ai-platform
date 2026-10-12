@@ -39,14 +39,14 @@ async def purge_db():
     await engine.dispose()
 
 
-async def seed_source(db):
+async def seed_source(db, status="paused"):
     suffix = uuid.uuid4().hex[:12]
     col = KnowledgeCollection(id=f"purge_col_{suffix}", name="Purge test", module_code=suffix)
     doc = RepositoryDocument(id=f"purge_doc_{suffix}", title="Original", file_name="original.pdf",
                              file_type="pdf", storage_path=f"documents/{suffix}.pdf", file_hash=suffix)
     db.add_all([col, doc])
     await db.flush()
-    binding = KnowledgeBinding(collection_id=col.id, repository_document_id=doc.id, status="active")
+    binding = KnowledgeBinding(collection_id=col.id, repository_document_id=doc.id, status=status)
     db.add(binding)
     await db.flush()
     revision = KnowledgeSourceRevision(binding_id=binding.id, revision_no=1,
@@ -149,7 +149,7 @@ async def test_vector_failure_never_reports_success_or_deletes_snapshot(purge_db
 async def test_deleting_source_is_blocked_and_other_source_cache_survives(purge_db):
     db = purge_db
     _, _, binding, revision, _ = await seed_source(db)
-    _, _, other, other_revision, other_chunks = await seed_source(db)
+    _, _, other, other_revision, other_chunks = await seed_source(db, status="active")
     # Shared physical snapshot must remain for the other source.
     other_revision.snapshot_storage_path = revision.snapshot_storage_path
     preview_path = revision.snapshot_storage_path + ".shared.preview.pdf"
@@ -208,10 +208,49 @@ async def test_purge_rejects_another_tenant_and_cannot_be_cancelled(purge_db):
     actor = SimpleNamespace(tenant_id="unrelated-tenant", workspace_id=binding.workspace_id)
     with pytest.raises(EntityNotFoundError):
         await source_purge.request_purge(db, binding.id, actor=actor)
-    assert binding.status == "active"
+    assert binding.status == "paused"
     with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="test-no-dispatch")):
         job = await source_purge.request_purge(db, binding.id)
     with pytest.raises(AppException) as error:
         await source_purge.jobs_service.cancel_job(db, job.id)
     assert error.value.code == "PURGE_NOT_CANCELLABLE"
     assert job.status == "queued"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["active", "pending", "detached"])
+async def test_purge_requires_pause_and_never_reserves_or_dispatches(purge_db, status):
+    db = purge_db
+    col, doc, binding, revision, _ = await seed_source(db, status=status)
+    epoch = col.index_epoch
+    with (
+        patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value=None)) as enqueue,
+        pytest.raises(AppException) as error,
+    ):
+        await source_purge.request_purge(db, binding.id)
+    assert error.value.code == "SOURCE_NOT_PAUSED"
+    assert error.value.status_code == 409
+    assert binding.status == status
+    assert col.index_epoch == epoch
+    assert await db.scalar(select(JobRecord.id).where(JobRecord.collection_id == col.id)) is None
+    assert await db.get(RepositoryDocument, doc.id) is not None
+    assert await db.get(KnowledgeSourceRevision, revision.id) is not None
+    enqueue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pause_then_purge_and_retry_remain_available(purge_db):
+    from app.modules.knowledge.services.source_pause import pause_source
+
+    db = purge_db
+    _, _, binding, _, _ = await seed_source(db, status="active")
+    await pause_source(db, binding.id)
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="test-no-dispatch")):
+        job = await source_purge.request_purge(db, binding.id)
+    assert binding.status == "deleting"
+    assert job.status == "queued"
+    job.status = "failed"
+    await db.commit()
+    with patch.object(source_purge.jobs_service, "retry_job", AsyncMock(return_value=job)) as retry:
+        assert await source_purge.request_purge(db, binding.id) is job
+    retry.assert_awaited_once_with(db, job.id, actor=None)

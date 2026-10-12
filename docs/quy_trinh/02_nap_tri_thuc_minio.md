@@ -1,16 +1,50 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
-## Bóc tách và khung Studio ADR-012 — cập nhật #360
+## Chọn model và tổ chức UI — cập nhật #378
+
+### Artifact/facts trước duyệt — #382
+
+Nguồn mới persist artifact JSONB theo content/extractor version gồm Markdown, metadata, bảng/parser cells/spans và draft cell facts có evidence/hash. Studio Thực thể đọc metadata đã lưu, có bảng facts dự thảo; không suy đoán metadata từ overlay. Sửa Markdown tạo revision/facts mới, geometry tệp gốc có cảnh báo stale. Thiếu header/lệch cột/conflict/mất bảng cần duyệt toàn revision. Confidence unavailable không được hiển thị100%. Chưa có editor/approval từng fact riêng hoặc semantic unit/entity hoàn chỉnh.
+
+Build vector dùng facts của revision, pin hash trong parity report; publish kiểm nguồn/review/hash/count/nội dung facts. Legacy index không có manifest được compatibility, không tự backfill; build lại từ Markdown để nâng cấp. Thử RAG trong Nạp vector kiểm candidate snapshot, không publish hoặc OCR lại. Khởi động lại worker sau cập nhật, không cần resetDB/migration. Kho tài liệu vẫn không bị ghi ngược.
+
+- Tạo kho: nhập tên/mô tả, chọn Embedding + provider thật từ ModelOps (điền sẵn mặc định để xác nhận), lưu cấu hình lần nạp đầu; không tự tạo/publish vector. OCR mặc định Tự động, cấu hình provider runtime vẫn thuộc ModelOps. DOCX/native PDF/scan phân nhánh như mục bóc tách bên dưới.
+- Trang chi tiết chỉ còn Nguồn tài liệu, Dữ liệu số, Hoạt động. Dưới counter hiển thị model/provider/dimension/Bản chỉ mục đang dùng; origin máy chủ trong Máy chủ & xử lý. Sửa chỉ cập nhật tên/mô tả, không sửa model/pointer.
+- Đổi model khi chưa có generation: chọn cấu hình Embedding cho lần nạp đầu. Khi đã có generation: chọn Chỉ mục mới → Nạp vector từ Markdown sạch → chờ worker → Xuất bản sau đối soát. Chỉ mục phục vụ cũ không đổi khi chỉ chọn model hoặc mở dialog; không OCR lại để đổi embedding.
+- OCR nâng cao/chunking vẫn chọn tại màn hình Nạp tài liệu/Studio. Không dùng khối cảnh báo đỏ để diễn tả bất biến bình thường; không kết luận kho trống theo counter tài liệu legacy.
+
+## Tiến độ từng tài liệu và backpressure — cập nhật #376
+
+- Mỗi item trả `progress`, `progress_phase`, `progress_kind=milestone` từ job hiện hành. Progress ghi độc lập vào JobRecord, có attempt fence và không lùi trong một lượt; retry khởi động lại 0. Không thêm cột DB/migration.
+- Milestones ingestion: snapshot đã xong/start parse 20%, parse xong/start normalize 65%, normalize xong/start quality 75%, quality xong/start materialize 85%, chunks xong/start embedding 90%; chỉ item succeeded là 100%. Lỗi/chờ duyệt giữ mốc đã đạt, không coi job kết thúc là thành công.
+- Modal có thanh progress cho từng tài liệu; tài liệu xong 100% độc lập với tài liệu đang chạy. Tổng đợt là trung bình item progress, không còn lấy số item lỗi để làm thành công 100%. Chờ duyệt hiển thị badge riêng; bảng cuộn nội bộ.
+- PaddleOCR trả cả tệp trong một HTTP response, chưa có event từng trang. UI ghi rõ “Theo giai đoạn”; không tạo phần trăm theo thời gian hay giả số trang hoàn tất. Native/Docling cũng dùng milestone, chưa có telemetry theo trang/chunk.
+- Chặn admission khi số job ingestion queued/running của tenant cộng số file mới vượt giới hạn, trả 429 INGESTION_QUEUE_FULL. PostgreSQL advisory lock theo tenant tuần tự hóa kiểm tra giữa các collection. Idempotency replay không tạo lại job.
+- Redis/PostgreSQL lỗi phải thể hiện lỗi/chờ thật; limiter không bỏ qua Redis để gọi AI. API keys/model/provider vẫn phân giải ModelOps DB, không sửa tệp Kho tài liệu hoặc chỉ mục đang phục vụ.
+
+## Ngừng dùng nguồn trước khi xóa — cập nhật #373/#374
+
+- **Điều kiện xóa (#374)**: Chỉ tạo tác vụ xóa khi binding đã `paused`. Nút Xóa tại danh sách và chi tiết bị khóa nếu chưa ngừng; API kiểm tra sau khi lock, trả 409 `SOURCE_NOT_PAUSED`, không đổi pointer/epoch hay dispatch. Không suy đoán trạng thái ngừng từ việc chưa có vector. Binding `deleting` chỉ được tiếp tục/thử lại tác vụ xóa đã có; không tạo mới nếu thiếu tác vụ hợp lệ. Nguồn pending đã hết xử lý cũng được Ngừng dùng trước khi xóa, tránh kẹt tài liệu chưa xuất bản/bóc tách thất bại.
+
+- Tại danh sách nguồn, nút **Ngừng dùng** xác nhận rồi gọi `POST /knowledge/bindings/{binding_id}/pause`, dùng quyền `ai.knowledge.delete` và scope actor. Nguồn active/pending đã hết xử lý được chuyển sang paused; gọi lại không tăng epoch.
+- Nguồn paused vẫn hiện **Đã ngừng dùng**, giữ Markdown, snapshot, chỉ mục/vector và tệp Repository. Không nạp vector hoặc xuất bản lại nguồn này; các nguồn active khác vẫn có thể nạp/xuất bản. Lưu/duyệt Markdown, reparse hoặc sync nhóm không được tự bật nguồn paused.
+- Nếu nguồn còn bóc tách hoặc có chỉ mục/job đang xử lý, trả lỗi 409 và yêu cầu chờ; không giả báo ngừng thành công. Lock collection rồi binding để tuần tự với nạp/publish.
+- Quy trình thay thế: **Ngừng dùng → Xóa → chờ worker xóa hoàn tất → thêm tệp mới vào Kho tài liệu → nhập/bóc tách/kiểm tra Markdown trong Kho tri thức → Nạp vector → Xuất bản**. Xóa vĩnh viễn chỉ thuộc phạm vi Knowledge; tệp ở Repository vẫn giữ.
+- Chưa bổ sung Bật lại hoặc ngừng toàn kho trong phiên này. GC chỉ mục bỏ qua paused để bảo toàn artifacts đến khi người dùng chủ động xóa.
+
+## Bóc tách và khung Studio ADR-012 — cập nhật #364
 
 Luồng nguồn độc lập dùng chung `source_extraction` trong nạp mới và bóc tách lại. Kho tài liệu vẫn chỉ lưu tệp/metadata. Không đổi quy trình chunk → embedding → staging → xuất bản, không tự xuất bản sau OCR.
 
 - PDF có chữ: giữ parser PyMuPDF cùng metadata PDF Inspector; lưu blocks thật và kích thước từng trang trong manifest. Chuẩn hóa x/y thành left/top phần trăm, giữ nội dung, ID riêng từng trang; không gán confidence giả.
 - PDF scan/hỗn hợp: kiểm tra từng trang bằng lớp chữ, coverage ảnh và dấu lỗi mã hóa. Chỉ ghép các trang cần OCR thành PDF gửi PaddleOCR, lấy URL/model/timeout từ ModelOps và ánh xạ kết quả về số trang gốc. Trang trắng không bị dịch số trang. Không chấp nhận thiếu trang OCR hoặc âm thầm bỏ trang lỗi.
+- Nếu OCR trả text rỗng, kiểm tra raster **trang gốc** bằng grayscale và connected components trên worker thread. Chỉ chấp nhận blank khi nền gần trắng, lượng foreground và diện tích/kích thước từng thành phần đều trong ngân sách đốm nhiễu nhỏ. Lớp chữ native có nội dung, trang quá lớn cần giảm dưới 72 DPI, nền tối, chữ mờ/nét vẽ đủ bằng chứng hoặc nhiễu vượt ngưỡng không được coi là trắng: giữ lỗi `EMPTY_OCR_PAGE`. Không dựa vào trang cuối hay số trang cố định; không bỏ qua mọi kết quả OCR rỗng.
+- Trang trắng hợp lệ giữ nguyên ảnh/số trang/dimensions trong Studio, lưu `content_status=blank` và `blank_detection` trong manifest; text/blocks/tables rỗng, không sinh chunks/facts cho trang đó. Cả tài liệu không có text vẫn bị từ chối, không coi page markers là nội dung tri thức. Kiểm tra thành công/page count của OCR vẫn bắt buộc trước phân loại blank. Đây là heuristic bảo thủ, cần thêm corpus scan nhiễu/chữ cực mờ để hiệu chỉnh; không cam kết phân loại hoàn hảo dưới độ phân giải/độ tương phản kiểm tra.
 - `vision_ocr`/standard mặc định là hybrid. `layout_analysis` hoặc engine được chọn rõ ràng không đi qua native fast-path mà gọi OCR trên toàn bộ PDF; chế độ này có thể dùng cho bố cục phức tạp. Các ngưỡng route là heuristic, cần đánh giá thêm trên tập tài liệu thực tế, không bảo đảm mọi lớp chữ lỗi đều tự phát hiện.
 - DOCX: Docling đọc cấu trúc và Markdown; Gotenberg hiện có render PDF dẫn xuất. Ánh xạ ranh giới trang bằng sequence alignment token, chỉ chấp nhận coverage ít nhất 90%; không khớp báo `DOCX_LAYOUT_ALIGNMENT_FAILED`, converter lỗi báo rõ, không tạo số trang/khung giả. Trang ảnh-only nhận dạng được giữ lại. Layout lấy từ PDF render, không được coi là tọa độ Word gốc tuyệt đối; phụ thuộc font trong renderer.
 - Khi renderer dùng font fallback, ký tự được tái ghép theo baseline, thứ tự tọa độ x và khoảng cách tương đối với median độ rộng glyph. Bỏ khoảng trắng giả bị glyph chồng lên, chuẩn hóa NFC; dùng kết quả để đối chiếu Docling với trang và nội dung khung. Không dùng từ điển vá tiếng Việt, không hạ ngưỡng 90% khi mapping sai.
 - PDF dẫn xuất lưu theo hash nội dung bên cạnh snapshot trong namespace Knowledge, đường dẫn lưu trong snapshot_metadata. Studio stream ảnh từ bản dẫn xuất độc lập, không phụ thuộc tệp Repository. Purge dọn cả snapshot và preview, kiểm tra tham chiếu nguồn khác trước khi xóa; artifact reuse sao chép preview vào namespace của nguồn nhận.
-- Adapter OCR → DTO → manifest giữ dimensions/blocks. Artifact version `layout-v3` tránh reuse artifact cũ mất geometry; không migration/reset. Nguồn cũ cần thao tác Bóc tách lại sau khi backend/worker nhận code mới. Bản đang phục vụ không bị thay đổi nếu bóc tách mới thất bại.
+- Adapter OCR → DTO → manifest giữ dimensions/blocks. Artifact version `layout-v4` thêm evidence trang trắng và tránh reuse artifact cũ chưa phân biệt OCR rỗng/trang trắng; không migration/reset. Nguồn cũ cần thao tác Bóc tách lại sau khi backend/worker nhận code mới. Bản đang phục vụ không bị thay đổi nếu bóc tách mới thất bại.
 
 Các sơ đồ legacy bên dưới không thay thế luồng ADR-012 này. Studio hiện có được tái sử dụng, không dựng giao diện mới.
 

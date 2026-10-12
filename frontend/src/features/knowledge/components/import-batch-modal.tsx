@@ -39,6 +39,8 @@ interface ImportBatchModalProps {
   onComplete?: () => void;
 }
 
+import { getBatchProgress, getItemProgress } from "../utils/import-progress";
+
 export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
   open,
   onOpenChange,
@@ -105,12 +107,7 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
 
   if (!batchId) return null;
 
-  const total = batch?.total_count || 1;
-  const finished =
-    (batch?.succeeded_count || 0) +
-    (batch?.failed_count || 0) +
-    (batch?.skipped_count || 0);
-  const percent = Math.min(100, Math.round((finished / total) * 100));
+  const percent = getBatchProgress(batch?.items || []);
   const isFinished =
     batch?.status === "completed" ||
     batch?.status === "partial_failed" ||
@@ -154,7 +151,8 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                   )}
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Mã đợt: <span className="font-mono text-foreground">{batchId}</span>
+                  Mã đợt:{" "}
+                  <span className="font-mono text-foreground">{batchId}</span>
                 </DialogDescription>
               </div>
             </div>
@@ -239,13 +237,23 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                 <div className="p-3 bg-muted/40 border-b border-border text-xs font-semibold text-foreground">
                   Danh sách tài liệu trong đợt nạp ({batch.items.length})
                 </div>
-                <div className="max-h-60 overflow-y-auto">
+                <div className="max-h-60 w-full overflow-auto">
                   <Table>
                     <TableHeader className="bg-muted/20 sticky top-0">
                       <TableRow className="text-xs h-8">
                         <TableHead>Tên tài liệu</TableHead>
-                        <TableHead className="w-24 text-center">Giai đoạn</TableHead>
-                        <TableHead className="w-28 text-center">Trạng thái</TableHead>
+                        <TableHead className="w-24 text-center">
+                          Giai đoạn
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Tiến độ
+                          <span className="block text-[11px] font-normal text-muted-foreground">
+                            Theo giai đoạn
+                          </span>
+                        </TableHead>
+                        <TableHead className="w-28 text-center">
+                          Trạng thái
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -265,7 +273,21 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                             )}
                           </TableCell>
                           <TableCell className="text-center font-mono text-[11px]">
-                            {item.phase}
+                            {item.progress_phase || item.phase}
+                          </TableCell>
+                          <TableCell>
+                            <div
+                              className="space-y-1 min-w-24"
+                              title="Tiến độ theo các bước đã hoàn thành, không phải phần trăm trang OCR"
+                            >
+                              <span className="block text-center tabular-nums">
+                                {Math.round(getItemProgress(item))}%
+                              </span>
+                              <Progress
+                                value={getItemProgress(item)}
+                                aria-label={`Tiến độ ${item.origin_title || item.origin_file_name}`}
+                              />
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
                             {item.status === "succeeded" ? (
@@ -283,6 +305,13 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                               >
                                 <XCircle className="size-2.5" />
                                 Thất bại
+                              </Badge>
+                            ) : item.status === "review_required" ? (
+                              <Badge
+                                variant="outline"
+                                className="border-warning/30 bg-warning/10 text-warning"
+                              >
+                                Cần duyệt
                               </Badge>
                             ) : item.status === "processing" ? (
                               <Badge

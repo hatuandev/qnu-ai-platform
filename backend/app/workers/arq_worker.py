@@ -64,12 +64,12 @@ class WorkerSettings:
         task_knowledge_index_build,
         task_knowledge_garbage_collection,
     ]
-    cron_jobs = [cron(task_reconcile_pending_jobs, second=15)]
+    cron_jobs = [cron(task_reconcile_pending_jobs, second={0, 15, 30, 45})]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
-    max_jobs = 10
+    max_jobs = settings.WORKER_MAX_JOBS
     health_check_interval = 15
-    job_timeout = 300  # 5 minutes
+    job_timeout = settings.WORKER_JOB_TIMEOUT_SECONDS
     retry_jobs = True
-    max_retries = 3
+    max_tries = settings.WORKER_MAX_TRIES

@@ -42,6 +42,7 @@ class WorkflowExecuteRequest(BaseModel):
     )
     inputs: dict[str, Any] = Field(..., description="Dữ liệu đầu vào (ví dụ: {'message': '...'})")
     tenant_id: str = Field("tenant_qnu", description="Mã người thuê")
+    workspace_id: str = Field("workspace_qnu", min_length=2, max_length=100)
     conversation_id: str | None = Field(None, description="Mã phiên hội thoại")
 
 
@@ -53,6 +54,7 @@ class WorkflowExecuteResponse(BaseModel):
     executed_nodes: list[str] = Field(default_factory=list)
     latency_ms: float = 0.0
     error_message: str | None = None
+    error_code: str | None = None
     paused_node_id: str | None = None
 
 

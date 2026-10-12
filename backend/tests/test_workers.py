@@ -196,5 +196,5 @@ def test_worker_settings():
         "task_knowledge_source_purge",
     }
     assert len(WorkerSettings.cron_jobs) == 1
-    assert WorkerSettings.job_timeout == 300
-    assert WorkerSettings.max_retries == 3
+    assert WorkerSettings.job_timeout == 900
+    assert WorkerSettings.max_tries == 3

@@ -9,16 +9,19 @@ import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 export function DeleteSourceButton({
   sourceId,
   title,
+  status,
   onDeleted,
 }: {
   sourceId: string;
   title: string;
+  status: string;
   onDeleted?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const handled = useRef<string | null>(null);
   const client = useQueryClient();
+  const canDelete = status === "paused" || (status === "deleting" && !!jobId);
   const job = useQuery({
     queryKey: ["knowledge-source-purge", sourceId, jobId],
     queryFn: () => {
@@ -51,7 +54,10 @@ export function DeleteSourceButton({
     }
   }, [job.data, client, onDeleted]);
   const remove = useMutation({
-    mutationFn: () => knowledgeApi.purgeSource(sourceId),
+    mutationFn: () => {
+      if (!canDelete) throw new Error("Hãy ngừng dùng nguồn trước khi xóa.");
+      return knowledgeApi.purgeSource(sourceId);
+    },
     onSuccess: (data) => {
       handled.current = null;
       client.setQueryData(["knowledge-source-purge", sourceId, data.id], data);
@@ -69,6 +75,12 @@ export function DeleteSourceButton({
         size="sm"
         variant="outline"
         className="text-destructive"
+        disabled={!canDelete}
+        title={
+          canDelete
+            ? "Xóa nguồn đã ngừng dùng"
+            : "Hãy ngừng dùng nguồn trước khi xóa."
+        }
         onClick={() => setIsOpen(true)}
       >
         <Trash2 className="size-3.5" /> {isDeleting ? "Đang xóa" : "Xóa"}
@@ -104,7 +116,10 @@ export function DeleteSourceButton({
         }
         confirmText="Xóa"
         isPending={isDeleting}
-        onConfirm={() => remove.mutate()}
+        onConfirm={() => {
+          if (canDelete) remove.mutate();
+          else toast.error("Hãy ngừng dùng nguồn trước khi xóa.");
+        }}
       />
     </>
   );

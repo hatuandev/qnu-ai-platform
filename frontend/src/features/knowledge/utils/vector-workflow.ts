@@ -5,6 +5,8 @@ export function getSourceVectorState(
   generationId: string,
   state?: VectorLoadState,
 ) {
+  if (source.status === "paused")
+    return { label: "Đã ngừng dùng", isPending: false, isReady: false };
   const job = state?.jobs.find(
     (item) =>
       item.payload.binding_id === source.id &&
@@ -48,10 +50,11 @@ export function canPublishSources(
   generationId: string,
   state?: VectorLoadState,
 ) {
+  const activeSources = sources.filter((source) => source.status !== "paused");
   return (
-    sources.length > 0 &&
+    activeSources.length > 0 &&
     !!generationId &&
-    sources.every(
+    activeSources.every(
       (source) =>
         source.source_status === "ready" &&
         getSourceVectorState(source, generationId, state).isReady,

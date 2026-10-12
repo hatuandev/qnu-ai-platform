@@ -36,6 +36,9 @@ export interface StudioOCRPage {
 }
 
 export interface StudioOCRDocument {
+  citationMetadata?: Record<string, string | null>;
+  structuredArtifact?: import("./knowledge").SourceArtifact;
+  layoutTextAlignment?: string;
   revisionId?: string;
   filename: string;
   totalPages: number;

@@ -31,6 +31,8 @@ async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None) ->
     binding = await get_scoped_binding(db, binding_id, actor=actor, allow_deleting=True)
     collection = await get_scoped_collection(db, binding.collection_id, actor=actor, for_update=True)
     binding = await get_scoped_binding(db, binding_id, actor=actor, for_update=True, allow_deleting=True)
+    if binding.status not in ("paused", "deleting"):
+        raise AppException("Hãy ngừng dùng nguồn trước khi xóa.", code="SOURCE_NOT_PAUSED", status_code=409)
     existing = await db.scalar(select(JobRecord).where(
         JobRecord.job_type == PURGE_JOB, JobRecord.collection_id == collection.id,
         JobRecord.tenant_id == binding.tenant_id, JobRecord.workspace_id == binding.workspace_id,
@@ -40,6 +42,8 @@ async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None) ->
         return existing
     if existing and existing.status in ("failed", "cancelled"):
         return await jobs_service.retry_job(db, existing.id, actor=actor)
+    if binding.status != "paused":
+        raise AppException("Nguồn chưa có tác vụ xóa hợp lệ.", code="SOURCE_NOT_PAUSED", status_code=409)
     await ensure_source_idle(db, binding_id)
     busy = await db.scalar(select(KnowledgeImportItem.id).join(KnowledgeImportBatch).where(
         KnowledgeImportBatch.collection_id == collection.id,

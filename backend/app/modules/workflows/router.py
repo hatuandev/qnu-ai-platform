@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import get_current_actor
+from app.modules.auth.schemas import AuthActor
 from app.modules.workflows.schemas import (
     WorkflowApprovalDecisionRequest,
     WorkflowApprovalResponse,
@@ -35,10 +37,11 @@ async def execute_workflow(
     body: WorkflowExecuteRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_current_actor),
 ) -> WorkflowExecuteResponse:
     return await workflow_service.execute(
         db,
-        body,
+        body.model_copy(update={"tenant_id": actor.tenant_id, "workspace_id": actor.workspace_id}),
         correlation_id=getattr(request.state, "correlation_id", None),
     )
 

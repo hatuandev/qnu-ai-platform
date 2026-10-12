@@ -148,6 +148,7 @@ async def test_api_list_assistants_returns_persisted_rows():
 @pytest.mark.asyncio
 async def test_chat_uses_persisted_assistant_and_workflow_output():
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     found_result = MagicMock()
     found_result.scalar_one_or_none.return_value = _assistant_record()
@@ -230,6 +231,7 @@ async def test_chat_stream_sse_endpoint():
     """Verify POST /assistants/{ref}/chat with stream=True returns text/event-stream with token chunks."""
     record = _assistant_record()
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     mock_exec = MagicMock()
     mock_exec.scalar_one_or_none.return_value = record
@@ -285,6 +287,7 @@ async def test_chat_stream_sse_endpoint():
 async def test_chat_with_attachments_and_conversation_recording():
     """Verify chat incorporates attachments into workflow input and records thread messages."""
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     found_result = MagicMock()
     found_result.scalar_one_or_none.return_value = _assistant_record()
@@ -335,6 +338,7 @@ async def test_chat_with_attachments_and_conversation_recording():
 async def test_chat_records_primary_model_from_config():
     """Verify usage tracking logs config.model_policy.primary_model instead of non-existent attribute."""
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     found_result = MagicMock()
     record = _assistant_record()

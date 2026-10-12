@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -44,6 +45,7 @@ def _pin_rag_snapshot_for_unit_tests():
 async def test_chat_handles_workflow_paused_for_approval():
     """Verify chat() returns paused_for_approval status and informative message instead of falling back to no-answer."""
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     mock_exec = MagicMock()
     mock_exec.scalar.return_value = 0
@@ -104,6 +106,7 @@ async def test_chat_handles_workflow_paused_for_approval():
 async def test_chat_stream_yields_approval_required_event():
     """Verify chat_stream() yields event: approval_required with approval_id when paused_for_approval."""
     mock_db = AsyncMock()
+    mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
     mock_exec = MagicMock()
     mock_exec.scalar.return_value = 0

@@ -6,13 +6,13 @@ import hashlib
 import logging
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.knowledge.excel_parser import parse_excel_facts
-from app.modules.knowledge.models import KnowledgeDocument, KnowledgeFact
+from app.modules.knowledge.models import KnowledgeBinding, KnowledgeDocument, KnowledgeFact
 from app.modules.knowledge.schemas import (
     FactExcelImportResponse,
     FactItemResponse,
@@ -103,18 +103,30 @@ class FactsService:
         collection_id: str,
         limit: int = 100,
         offset: int = 0,
+        actor: object | None = None,
     ) -> FactListResponse:
         """Query structured facts belonging to a collection."""
-        await collection_service.get_collection(db, collection_id)
+        await collection_service.get_collection(db, collection_id, actor=actor)
+
+        visible = or_(
+            and_(KnowledgeFact.binding_id.is_not(None), KnowledgeBinding.status == "active",
+                 KnowledgeBinding.active_index_revision_id == KnowledgeFact.index_revision_id),
+            and_(KnowledgeFact.binding_id.is_(None), KnowledgeDocument.is_active.is_(True),
+                 KnowledgeDocument.status.in_(["ready", "approved"])),
+        )
+        base = select(KnowledgeFact).outerjoin(
+            KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id,
+        ).outerjoin(KnowledgeDocument, KnowledgeFact.document_id == KnowledgeDocument.id).where(
+            KnowledgeFact.collection_id == collection_id, visible,
+        )
 
         count_res = await db.execute(
-            select(func.count(KnowledgeFact.id)).where(KnowledgeFact.collection_id == collection_id)
+            select(func.count()).select_from(base.subquery())
         )
         total = count_res.scalar() or 0
 
         query = (
-            select(KnowledgeFact)
-            .where(KnowledgeFact.collection_id == collection_id)
+            base
             .order_by(KnowledgeFact.created_at.desc())
             .limit(limit)
             .offset(offset)
@@ -129,6 +141,8 @@ class FactsService:
                     id=f.id,
                     collection_id=f.collection_id,
                     document_id=f.document_id,
+                    binding_id=f.binding_id,
+                    index_revision_id=f.index_revision_id,
                     entity_name=f.entity_name,
                     entity_type=f.entity_type,
                     attribute_name=f.attribute_name,

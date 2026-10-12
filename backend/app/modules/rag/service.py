@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 import re
 import time
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AppException
 from app.core.guardrails import input_guardrail, output_guardrail
 from app.core.redis import semantic_cache
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
@@ -110,7 +112,7 @@ class RagService:
             execution_time_ms=exec_ms,
         )
 
-    async def ask(self, db: AsyncSession, req: AskRequest) -> AskResponse:
+    async def ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
         start_time = time.perf_counter()
 
         # 1. Input Guardrail safety check (Prompt Injection)
@@ -124,7 +126,7 @@ class RagService:
                 latency_ms=round((time.perf_counter() - start_time) * 1000, 2),
             )
 
-        snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
+        snapshot = candidate_snapshot or await hybrid_retriever.resolve_retrieval_snapshot(
             db,
             req.collection_id,
             pinned_snapshot=req.retrieval_snapshot or getattr(req, "snapshot", None),
@@ -132,13 +134,14 @@ class RagService:
             workspace_id=req.workspace_id,
         )
         snapshot_fingerprint = snapshot.cache_fingerprint()
+        policy_version = req.policy_fingerprint()
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
         history_list = req.history if isinstance(req.history, list) else []
         question_word_count = len(re.findall(r"\w+", req.question or ""))
         is_context_dependent = bool(history_list) and question_word_count < 8
         history_hash = semantic_cache.hash_history(history_list) if history_list else None
-        if is_context_dependent:
+        if is_context_dependent or candidate_snapshot is not None:
             logger.debug(
                 "Semantic cache skipped for context-dependent query='%s'",
                 req.question[:30],
@@ -154,6 +157,7 @@ class RagService:
                 history_hash=history_hash,
                 collection_epoch=snapshot.collection_epoch,
                 snapshot_fingerprint=snapshot_fingerprint,
+                policy_version=policy_version,
             )
         if cached:
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
@@ -233,6 +237,7 @@ class RagService:
             sparse_variants=sparse_variants,
             reranker_policy=req.reranker_policy,
             snapshot=snapshot,
+            **({"candidate_mode": True, "read_mode_override": "revisioned"} if candidate_snapshot is not None else {}),
         )
 
         # 5. No-Answer Policy if context is empty
@@ -376,7 +381,7 @@ class RagService:
         )
 
         # 9. Save to Semantic Cache (Only cache valid answered queries with citations)
-        if status == "answered" and final_citations and not is_context_dependent:
+        if status == "answered" and final_citations and not is_context_dependent and candidate_snapshot is None:
             await semantic_cache.set(
                 req.collection_id,
                 req.question,
@@ -387,6 +392,7 @@ class RagService:
                 history_hash=history_hash,
                 collection_epoch=snapshot.collection_epoch,
                 snapshot_fingerprint=snapshot_fingerprint,
+                policy_version=policy_version,
             )
 
         return resp
@@ -420,62 +426,23 @@ class RagService:
         fact_markdown: str | None,
         candidates: list[FusionCandidate],
     ) -> str:
-        """Call ModelOps LLM with primary model, fallback model, or grounded context synthesis."""
+        """ModelOps alone owns retries/failover; infrastructure errors must propagate."""
+        llm_req = LLMGenerateRequest(
+            messages=llm_messages, tenant_id=req.tenant_id, assistant_code=req.assistant_code,
+            temperature=temperature, max_tokens=req.max_tokens, thinking_budget=req.thinking_budget,
+            conversation_id=req.conversation_id, preferred_provider_id=req.preferred_provider_id,
+            preferred_model_name=req.preferred_model_name, fallback_model_name=req.fallback_model,
+        )
         try:
-            llm_req = LLMGenerateRequest(
-                messages=llm_messages,
-                temperature=temperature,
-                max_tokens=req.max_tokens,
-                thinking_budget=req.thinking_budget,
-                conversation_id=req.conversation_id,
-                preferred_provider_id=req.preferred_provider_id,
-                preferred_model_name=req.preferred_model_name,
-                fallback_model_name=req.fallback_model,
-            )
             llm_res = await modelops_service.generate(db, llm_req)
-            return llm_res.content.strip()
-        except Exception as e:
-            logger.warning(
-                "ModelOps primary model '%s' generation failed (%s). Checking fallback model...",
-                req.preferred_model_name,
-                e,
-            )
-
-        if req.fallback_model and req.fallback_model != req.preferred_model_name:
-            try:
-                fallback_llm_req = LLMGenerateRequest(
-                    messages=llm_messages,
-                    temperature=temperature,
-                    max_tokens=req.max_tokens,
-                    thinking_budget=req.thinking_budget,
-                    conversation_id=req.conversation_id,
-                    preferred_provider_id=req.preferred_provider_id,
-                    preferred_model_name=req.fallback_model,
-                )
-                llm_res = await modelops_service.generate(db, fallback_llm_req)
-                logger.info("Successfully recovered using fallback model '%s'", req.fallback_model)
-                return llm_res.content.strip()
-            except Exception as fb_err:
-                logger.warning(
-                    "ModelOps fallback model '%s' also failed (%s), using grounded context synthesis fallback",
-                    req.fallback_model,
-                    fb_err,
-                )
-
-        # Factual grounded synthesis fallback without hallucinating
-        if fact_markdown:
-            return (
-                "Dựa trên dữ liệu chính thức của Trường Đại học Quy Nhơn, mình xin gửi thông tin chi tiết đến bạn:\n\n"
-                f"{fact_markdown}\n\n"
-                f"**Thông tin bổ sung:**\n"
-                f"{candidates[0].content[:400] if candidates else ''}"
-            )
-        if candidates:
-            return (
-                "Chào bạn! Dựa trên tài liệu chính thức của Trường Đại học Quy Nhơn, mình xin giải đáp như sau:\n\n"
-                f"{candidates[0].content}"
-            )
-        return citation_guard.get_no_answer_response(req.module_code)
+        except AppException:
+            raise
+        except Exception as exc:
+            logger.exception("ModelOps generation failed")
+            raise AppException("Không thể sinh câu trả lời từ ModelOps.", code="LLM_GENERATION_FAILED", status_code=502) from exc
+        if not llm_res.content.strip():
+            raise AppException("Mô hình trả nội dung rỗng.", code="LLM_EMPTY_RESPONSE", status_code=502)
+        return llm_res.content.strip()
 
 
 rag_service = RagService()

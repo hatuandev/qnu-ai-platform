@@ -55,3 +55,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Kế hoạch tách Kho tài liệu thuần lưu trữ và pipeline nạp tri thức đa embedding.
    - **Mục tiêu**: Kho tài liệu chỉ quản lý tệp và metadata danh mục; Kho tri thức nhập snapshot, bóc tách/OCR, chuẩn hóa, Quality Gate, chunk/facts và tái sử dụng một chunk set cho nhiều vector generations.
    - **Trạng thái**: Đã thống nhất nghiệp vụ; kế hoạch 8 phiên và prompt tổng sẵn sàng triển khai. Kế hoạch này thay thế ranh giới domain cũ của Kế hoạch 11 nhưng giữ staging, parity gate, CAS, RetrievalSnapshot và rollback.
+
+11. [**`13_thuat_toan_nang_cao_chat_luong_va_toi_uu_qnu_ai.md`**](./13_thuat_toan_nang_cao_chat_luong_va_toi_uu_qnu_ai.md):
+   - **Tên tài liệu**: Các thuật toán nâng cao chất lượng và tối ưu QNU AI Platform.
+   - **Mục tiêu**: Chọn thuật toán RAG/DAG/OCR-worker theo lợi ích, chi phí và benchmark; phân biệt thành phần đã có với đề xuất BM25, parent-child, MMR và các hướng thử nghiệm nâng cao.
+   - **Trạng thái**: Tài liệu đề xuất; chưa triển khai runtime. Ưu tiên đúng scope/provenance và baseline trước tối ưu.

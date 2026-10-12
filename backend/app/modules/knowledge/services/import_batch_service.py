@@ -23,6 +23,7 @@ from app.modules.documents.models import (
     DocumentGroupMembership,
     RepositoryDocument,
 )
+from app.modules.jobs.ingestion_progress import item_progress
 from app.modules.jobs.models import JobRecord
 from app.modules.jobs.service import enqueue_arq_job
 from app.modules.knowledge.models import (
@@ -158,6 +159,9 @@ class ImportBatchService:
                 primary_group_map[d_id] = str(g_id)
 
         # 7. Create batch entity
+        from app.modules.jobs.ingestion_admission import check_ingestion_capacity
+
+        await check_ingestion_capacity(db, tenant_id, len(valid_docs))
         batch_id = f"imp_batch_{uuid.uuid4().hex[:12]}"
         batch = KnowledgeImportBatch(
             id=batch_id,
@@ -274,6 +278,19 @@ class ImportBatchService:
                 code="IMPORT_BATCH_NOT_FOUND",
                 detail=f"Không tìm thấy đợt nạp tài liệu {batch_id}",
             )
+        jobs = list((await db.scalars(select(JobRecord).where(
+            JobRecord.collection_id == collection_id,
+            JobRecord.tenant_id == tenant_id, JobRecord.workspace_id == workspace_id,
+            JobRecord.job_type == "knowledge_source_ingestion",
+            JobRecord.payload["batch_id"].astext == batch_id,
+        ).order_by(JobRecord.created_at.desc()))).all())
+        by_item: dict[str, JobRecord] = {}
+        for job in jobs:
+            by_item.setdefault(str((job.payload or {}).get("item_id")), job)
+        for item in batch.items:
+            job = by_item.get(item.id)
+            item.progress = item_progress(item.status, item.phase, job.progress if job else 0)
+            item.progress_phase = job.phase if job and job.phase != "queued" else item.phase
         return batch
 
     async def retry_failed_items(
@@ -300,6 +317,8 @@ class ImportBatchService:
         for it in failed_items:
             it.status = "queued"
             it.phase = "snapshot"
+            it.progress = 0
+            it.progress_phase = "snapshot"
             it.failure_code = None
             it.failure_detail = None
             it.retry_count += 1

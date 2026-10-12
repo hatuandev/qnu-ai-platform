@@ -5,6 +5,7 @@ import { canPublishSources, getSourceVectorState } from "./vector-workflow";
 
 const source = {
   id: "source",
+  status: "active",
   active_source_revision_id: "md",
   source_status: "ready",
 } as KnowledgeBinding;
@@ -21,6 +22,21 @@ const ready: VectorLoadState = {
     },
   ],
 };
+
+test("paused source is not serving and does not block publishing active sources", () => {
+  const paused = {
+    ...source,
+    id: "paused",
+    status: "paused",
+  } as KnowledgeBinding;
+  assert.equal(
+    getSourceVectorState(paused, "gen", ready).label,
+    "Đã ngừng dùng",
+  );
+  assert.equal(getSourceVectorState(paused, "gen", ready).isReady, false);
+  assert.equal(canPublishSources([paused], "gen", ready), false);
+  assert.equal(canPublishSources([source, paused], "gen", ready), true);
+});
 
 test("Markdown ready is not vector ready", () => {
   assert.equal(getSourceVectorState(source, "gen").isReady, false);

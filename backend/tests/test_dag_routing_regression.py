@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.modules.rag.schemas import AskResponse
+from app.modules.rag.schemas import AskResponse, RetrievalSnapshot
 from app.modules.workflows.engine import dag_engine
 from app.modules.workflows.nodes.base import BaseNodeHandler, NodeExecutionResult, WorkflowContext
 from app.modules.workflows.nodes.citation_guard_node import CitationGuardNodeHandler
@@ -184,6 +184,8 @@ async def test_rag_reads_wired_question():
     ctx.node_data["normalized_query"] = "wrong"
     ctx.node_inputs["rag"] = {"question": "correct"}
     with (
+        patch("app.modules.workflows.nodes.rag_answer_node.hybrid_retriever.resolve_retrieval_snapshot",
+              AsyncMock(return_value=RetrievalSnapshot(snapshot_id="s", collection_id="test"))),
         patch(
             "app.modules.tools.consulting_dispatcher.consulting_dispatcher.dispatch",
             AsyncMock(return_value={}),

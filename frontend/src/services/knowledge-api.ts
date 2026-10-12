@@ -886,6 +886,21 @@ export const knowledgeApi = {
   /**
    * Hủy liên kết tài liệu khỏi bộ sưu tập tri thức
    */
+  async pauseSource(bindingId: string): Promise<KnowledgeBinding> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/bindings/${bindingId}/pause`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+      },
+    );
+    if (!res.ok) {
+      const err: unknown = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, "Không ngừng dùng được nguồn."));
+    }
+    return res.json();
+  },
+
   async detachBinding(bindingId: string): Promise<KnowledgeBinding> {
     const res = await fetch(`${BASE_URL}/knowledge/bindings/${bindingId}`, {
       method: "DELETE",
@@ -1721,6 +1736,37 @@ export const knowledgeApi = {
     return res.json();
   },
 
+  async previewVectorGeneration(
+    collectionId: string,
+    generationId: string,
+    question: string,
+  ): Promise<{
+    status: string;
+    answer: string;
+    citations: {
+      title: string;
+      page_number?: number | null;
+      quote?: string | null;
+    }[];
+  }> {
+    const response = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/preview`,
+      {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      },
+    );
+    if (!response.ok)
+      throw new Error(
+        extractErrorMessage(
+          await response.json().catch(() => ({})),
+          "Không kiểm tra được chỉ mục dự thảo.",
+        ),
+      );
+    return response.json();
+  },
+
   async getSourceStudioView(
     collectionId: string,
     sourceId: string,
@@ -1740,6 +1786,9 @@ export const knowledgeApi = {
       );
     }
     const v = (await res.json()) as {
+      citation_metadata?: DocumentVerificationData["citation_metadata"];
+      structured_artifact?: DocumentVerificationData["structured_artifact"];
+      layout_text_alignment?: string;
       document_id: string;
       revision_id?: string;
       collection_id: string;
@@ -1772,6 +1821,9 @@ export const knowledgeApi = {
       typeof v.file_size_bytes === "number" ? v.file_size_bytes : 0;
     return {
       document_id: v.document_id,
+      citation_metadata: v.citation_metadata,
+      structured_artifact: v.structured_artifact,
+      layout_text_alignment: v.layout_text_alignment,
       revision_id: v.revision_id,
       collection_id: v.collection_id,
       title: v.title,

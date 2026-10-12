@@ -38,6 +38,8 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             ("message", "question", "text", "content", "response", "answer"),
             (context.node_data.get("user_message") or context.inputs.get("message", "")),
         )
+        if context.db is None:
+            raise AppException("Node LLM cần kết nối dữ liệu.", code="WORKFLOW_DATABASE_REQUIRED", status_code=503)
 
         messages = [ChatMessage(role="system", content=system_prompt)]
         conv_history = context.inputs.get("conversation_history")
@@ -61,7 +63,8 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             or config.get("fallback_model")
             or (getattr(model_policy, "fallback_model", None) if model_policy else None)
         )
-        preferred_provider_id = config.get("preferred_provider_id") or config.get("provider_id")
+        preferred_provider_id = (config.get("preferred_provider_id") or config.get("provider_id")
+                                 or getattr(model_policy, "preferred_provider_id", None))
 
         gen_req = LLMGenerateRequest(
             messages=messages,
@@ -75,35 +78,10 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             max_tokens=getattr(model_policy, "max_tokens", config.get("max_tokens", 2000)),
         )
 
-        if context.db:
-            try:
-                resp = await modelops_service.generate(context.db, gen_req)
-                content = resp.content
-                provider = resp.provider
-                tokens = resp.total_tokens
-            except Exception as exc:
-                fallback_text = config.get("fallback_text")
-                if fallback_text:
-                    logger.warning(
-                        "LLM node '%s' generation failed: %s, using fallback_text",
-                        node_spec.id,
-                        exc,
-                    )
-                    content = fallback_text
-                    provider = "fallback"
-                    tokens = 0
-                else:
-                    logger.warning("LLM node '%s' generation failed: %s", node_spec.id, exc)
-                    raise AppException(
-                        f"Node LLM '{node_spec.id}' không thể sinh nội dung: {exc}",
-                        code="llm_generation_failed",
-                        status_code=502,
-                        details={"node_id": node_spec.id, "workflow_id": context.workflow_id},
-                    ) from exc
-        else:
-            content = f"Văn bản sinh ra từ trợ lý QNU: '{user_message[:100]}'."
-            provider = "openai"
-            tokens = 100
+        resp = await modelops_service.generate(context.db, gen_req)
+        content, provider, tokens = resp.content, resp.provider, resp.total_tokens
+        if not content.strip():
+            raise AppException("Mô hình trả nội dung rỗng.", code="LLM_EMPTY_RESPONSE", status_code=502)
 
         context.node_data["llm_content"] = content
         context.node_data["provider"] = provider

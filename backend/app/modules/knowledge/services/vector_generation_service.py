@@ -36,7 +36,6 @@ from app.modules.knowledge.services.chunk_set_service import chunk_set_service
 from app.modules.knowledge.services.scope_helper import (
     get_scoped_collection,
 )
-from app.modules.knowledge.services.source_pages import canonical_pages, manifest_page_count
 from app.modules.modelops.services.model_catalog_service import model_catalog_service
 from app.modules.rag.vector_indexer import vector_indexer
 
@@ -205,6 +204,8 @@ class VectorGenerationService:
                 status_code=404,
             )
 
+        if binding.status == "paused":
+            raise AppException("Nguồn đã ngừng dùng.", code="SOURCE_PAUSED", status_code=409)
         if binding.status in ("detached", "deleting"):
             raise AppException("Nguồn đã gỡ hoặc đang xóa.", code="SOURCE_DELETING", status_code=409)
         gen_stmt = select(KnowledgeVectorGeneration).where(
@@ -311,6 +312,9 @@ class VectorGenerationService:
                     "chunk_set_id": chunk_set.id,
                     "title": (source_rev.snapshot_metadata or {}).get("title", binding.id),
                     "document_title": (source_rev.snapshot_metadata or {}).get("title", binding.id),
+                    "file_name": (source_rev.snapshot_metadata or {}).get("file_name"),
+                    "document_number": (source_rev.citation_metadata or {}).get("document_number"),
+                    "chunk_index": idx,
                 },
             ))
             payload_chunks.append(
@@ -333,6 +337,9 @@ class VectorGenerationService:
                     "vector_generation_id": gen.id,
                     "metadata": {
                         "document_title": (source_rev.snapshot_metadata or {}).get("title", binding.id),
+                        "file_name": (source_rev.snapshot_metadata or {}).get("file_name"),
+                        "document_number": (source_rev.citation_metadata or {}).get("document_number"),
+                        "chunk_index": idx,
                         "binding_id": binding.id,
                         "source_revision_id": source_rev.id,
                         "chunk_set_id": chunk_set.id,
@@ -343,16 +350,19 @@ class VectorGenerationService:
                 }
             )
 
-        from app.modules.knowledge.facts import FactExtractor
+        from app.modules.knowledge.services.source_artifact import get_source_artifact
 
-        facts = FactExtractor().extract_from_verified_markdown_pages(
-            canonical_pages(source_rev.canonical_markdown, manifest_page_count(source_rev.page_manifest)),
-            col.id, binding.id,
-        )
+        artifact = get_source_artifact(source_rev)
+        facts = [dict(fact) for fact in artifact["facts"]]
         for fact in facts:
+            fingerprint = hashlib.sha256(f"{idx_rev.id}:{fact['id']}".encode()).hexdigest()[:24]
+            fact["id"] = f"fct_{fingerprint}"
+            fact["collection_id"] = col.id
             fact["document_id"] = None
             fact["binding_id"] = binding.id
             fact["index_revision_id"] = idx_rev.id
+            fact["raw_data"] = {**fact["raw_data"], "source_revision_id": source_rev.id,
+                                "fact_set_hash": artifact["fact_set_hash"]}
             db.add(KnowledgeFact(**fact))
         idx_rev.fact_count = len(facts)
         chunk_set.fact_count = len(facts)
@@ -394,6 +404,8 @@ class VectorGenerationService:
             verified_count = indexed_count
 
         parity_report = {
+            "source_content_hash": source_rev.canonical_hash,
+            "fact_set_hash": artifact["fact_set_hash"],
             "parity_passed": parity_passed,
             "parity_reason": parity_reason,
             "verified_count": verified_count,
