@@ -1706,6 +1706,30 @@ export const knowledgeApi = {
     return res.json();
   },
 
+  async editSourceContext(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    payload: import("@/types/knowledge").SourceContextEditRequest,
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/context`,
+      {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không lưu được ngữ cảnh.",
+        ),
+      );
+    return res.json();
+  },
+
   async reviewSourceRevision(
     collectionId: string,
     sourceId: string,

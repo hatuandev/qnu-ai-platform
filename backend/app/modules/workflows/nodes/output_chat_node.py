@@ -73,6 +73,13 @@ class OutputChatNodeHandler(BaseNodeHandler):
             if has_wired_answer
             else (context.node_data.get("artifacts") or context.outputs.get("artifacts", []))
         )
+        decision = context.node_data.get("answer_decision")
+        if decision:
+            # A downstream template/model cannot replace a fact-bound decision.
+            final_answer = decision["answer"]
+            status = "answered" if decision["status"] == "supported" else "insufficient_context"
+            citations = context.node_data.get("citations", []) if status == "answered" else []
+            context.outputs["answer_decision"] = decision
         context.outputs["answer"] = final_answer
         context.outputs["citations"] = citations
         context.outputs["status"] = status
@@ -89,6 +96,7 @@ class OutputChatNodeHandler(BaseNodeHandler):
             status="completed",
             output={
                 "answer": final_answer,
+                "answer_decision": decision,
                 "citations": citations,
                 "status": status,
                 "artifacts": artifacts,

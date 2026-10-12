@@ -65,6 +65,25 @@ async def test_real_db_candidate_isolation_and_tampered_fact_rejected():
                     assert (await facts_service.get_collection_facts(db, collection.id, actor=actor)).total == 0
                     snapshot = await resolve_candidate_snapshot(db, collection.id, generation.id, actor)
                     assert snapshot.binding_revisions == {binding.id: index.id}
+                    from app.modules.rag.snapshot_fact_evidence import load_snapshot_table_evidence
+
+                    assert await load_snapshot_table_evidence(db, snapshot) == []  # Materialized manifests cannot be bypassed.
+                    saved_report = dict(index.parity_report)
+                    index.parity_report = {}
+                    await db.flush()
+                    assert len(await load_snapshot_table_evidence(db, snapshot)) == 1
+                    assert await load_snapshot_table_evidence(db, snapshot.model_copy(update={"tenant_id": "other"})) == []
+                    binding.status = "paused"
+                    await db.flush()
+                    assert await load_snapshot_table_evidence(db, snapshot) == []
+                    binding.status = "active"
+                    saved_hash = source.canonical_hash
+                    source.canonical_hash = "0" * 64
+                    await db.flush()
+                    assert await load_snapshot_table_evidence(db, snapshot) == []
+                    source.canonical_hash = saved_hash
+                    index.parity_report = saved_report
+                    await db.flush()
                     assert binding.active_index_revision_id is None  # preview never publishes
                     binding.active_index_revision_id = index.id
                     await db.flush()

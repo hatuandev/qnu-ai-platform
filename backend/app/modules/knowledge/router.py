@@ -71,6 +71,7 @@ from app.modules.knowledge.schemas import (
     RollbackIndexRevisionRequest,
     ShadowRetrievalReport,
     ShadowRetrievalRequest,
+    SourceContextEditRequest,
     StudioViewResponse,
     SyncGroupSourceRequest,
     SyncGroupSourceResponse,
@@ -1405,8 +1406,23 @@ async def review_source_revision(
         comment=payload.comment,
         tenant_id=actor.tenant_id,
         workspace_id=actor.workspace_id,
+        actor_id=actor.actor_id,
     )
     return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+@router.post(
+    "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/context",
+    response_model=KnowledgeSourceRevisionResponse,
+    summary="Tạo bản dự thảo nâng/hiệu đính ngữ cảnh, không OCR lại hoặc thay serving index",
+)
+async def edit_source_context(collection_id: str, source_id: str, revision_id: str, payload: SourceContextEditRequest,
+                              db: AsyncSession = Depends(get_db),
+                              actor: AuthActor = Depends(require_permission("ai.knowledge.update"))) -> KnowledgeSourceRevisionResponse:
+    from app.modules.knowledge.services.source_context import create_context_revision
+
+    revision = await create_context_revision(db, collection_id, source_id, revision_id, payload, actor)
+    return KnowledgeSourceRevisionResponse.model_validate(revision)
 
 
 @router.get(

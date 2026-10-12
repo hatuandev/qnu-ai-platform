@@ -60,3 +60,8 @@ Thư mục này lưu trữ các tài liệu kế hoạch, lộ trình kỹ thu�
    - **Tên tài liệu**: Các thuật toán nâng cao chất lượng và tối ưu QNU AI Platform.
    - **Mục tiêu**: Chọn thuật toán RAG/DAG/OCR-worker theo lợi ích, chi phí và benchmark; phân biệt thành phần đã có với đề xuất BM25, parent-child, MMR và các hướng thử nghiệm nâng cao.
    - **Trạng thái**: Tài liệu đề xuất; chưa triển khai runtime. Ưu tiên đúng scope/provenance và baseline trước tối ưu.
+
+12. [**`14_ke_hoach_ngu_canh_thoi_gian_facts_va_rag_dag.md`**](./14_ke_hoach_ngu_canh_thoi_gian_facts_va_rag_dag.md):
+   - **Tên kế hoạch**: Chuẩn hóa ngữ cảnh thời gian trong Facts và RAG DAG.
+   - **Mục tiêu**: Tách ngày/năm ban hành ở metadata nguồn; lưu năm áp dụng/phương thức/điều kiện/evidence trong từng fact, xử lý bảng nhiều tầng và chặn đáp án sai năm bằng quyết định dùng chung RAG/DAG.
+   - **Trạng thái**: Kế hoạch đề xuất, chưa sửa ứng dụng. Hạng mục A–F, migration không reset, nâng artifact ở draft và nghiệm thu FE/BE thực tế.

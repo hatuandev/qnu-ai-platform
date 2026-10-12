@@ -82,7 +82,10 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
       docType: value("document_type_code"),
       subject: value("subject"),
       locationAndDate: value("issued_date"),
-      year: citationMetadata?.issued_date?.slice(0, 4) || "Chưa xác định",
+      year:
+        structuredArtifact?.temporal_metadata?.issued_year.value?.toString() ||
+        citationMetadata?.issued_date?.slice(0, 4) ||
+        "Chưa xác định",
       signerTitle: citationMetadata?.signer_title || "",
       signerName: citationMetadata?.signer_name || "",
       recipients: citationMetadata?.recipients || "",

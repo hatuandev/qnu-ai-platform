@@ -10,6 +10,7 @@ from typing import Any
 
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
+from app.modules.rag.temporal_answer import is_temporal_table_question
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
     NodeExecutionResult,
@@ -79,7 +80,6 @@ _TYPO_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r"\1 ngành",
     ),
     (re.compile(r"\b(các|những|tất cả các|danh sách|tuyển)\s+ngày\b", re.IGNORECASE), r"\1 ngành"),
-    (re.compile(r"\bngày\s+(nào|gì|hot|mới)\b", re.IGNORECASE), r"ngành \1"),
     # "học bà" -> "học bạ"
     (re.compile(r"\bhọc\s+bà\b", re.IGNORECASE), "học bạ"),
     # "tín chì" -> "tín chỉ"
@@ -619,7 +619,9 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
 
         # Stage 2: Fast Contextual LLM Rewrite (optional, ~150ms)
         # Skip LLM if Stage 0 already produced a full multi-turn query
-        if use_llm and context.db and not multiturn_query:
+        module_code = (getattr(context.assistant_profile, "assistant_code", None) or config.get("module_code") or "general")
+        fact_query = is_temporal_table_question(query_to_normalize, module_code)
+        if use_llm and context.db and not multiturn_query and not fact_query:
             try:
                 llm_query = await self._rewrite_with_llm(
                     context, rule_normalized, config=config, history=effective_history
@@ -632,6 +634,13 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
                     type(exc).__name__,
                     exc,
                 )
+
+        # Explicit numerical constraints are immutable across rules and model rewriting.
+        original_numbers = re.findall(r"\b\d+(?:[.,]\d+)*\b", raw_query)
+        rewritten_numbers = re.findall(r"\b\d+(?:[.,]\d+)*\b", final_query)
+        if original_numbers and original_numbers != rewritten_numbers:
+            final_query = raw_query
+            context.node_data["rewrite_rejection_reason"] = "NUMERIC_CONSTRAINT_CHANGED"
 
         # Store in workflow context for downstream nodes (e.g. knowledge_answer)
         context.node_data["raw_query"] = raw_query

@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { FactItem } from "@/types";
+import { getFactContext } from "../fact-context";
 
 export interface CollectionFactsTabProps {
   errorMessage?: string;
@@ -79,6 +80,14 @@ export function CollectionFactsTab({
   const [entityTypeFilter, setEntityTypeFilter] = useState("all");
   const [attributeFilter, setAttributeFilter] = useState("all");
   const [confidenceFilter, setConfidenceFilter] = useState("all");
+  const [yearFilter, setYearFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const years = [
+    ...new Set(facts.map((f) => getFactContext(f.raw_data).year)),
+  ].sort();
+  const methods = [
+    ...new Set(facts.map((f) => getFactContext(f.raw_data).method)),
+  ].sort();
   const [sortBy, setSortBy] = useState<SortOption>("default");
 
   // Pagination State
@@ -170,6 +179,14 @@ export function CollectionFactsTab({
   // 2. Filter & Sort Logic
   const filteredFacts = useMemo(() => {
     let result = [...facts];
+    if (yearFilter !== "all")
+      result = result.filter(
+        (f) => getFactContext(f.raw_data).year === yearFilter,
+      );
+    if (methodFilter !== "all")
+      result = result.filter(
+        (f) => getFactContext(f.raw_data).method === methodFilter,
+      );
 
     // Quick Category Filter
     if (selectedQuickCategory !== "all") {
@@ -268,6 +285,8 @@ export function CollectionFactsTab({
     confidenceFilter,
     searchQuery,
     sortBy,
+    yearFilter,
+    methodFilter,
   ]);
 
   // 3. Pagination Slicing
@@ -284,6 +303,8 @@ export function CollectionFactsTab({
   // Check if any filter is active
   const hasActiveFilters =
     Boolean(searchQuery.trim()) ||
+    yearFilter !== "all" ||
+    methodFilter !== "all" ||
     selectedQuickCategory !== "all" ||
     entityTypeFilter !== "all" ||
     attributeFilter !== "all" ||
@@ -292,6 +313,8 @@ export function CollectionFactsTab({
 
   const resetAllFilters = () => {
     setSearchQuery("");
+    setYearFilter("all");
+    setMethodFilter("all");
     setSelectedQuickCategory("all");
     setEntityTypeFilter("all");
     setAttributeFilter("all");
@@ -566,7 +589,45 @@ export function CollectionFactsTab({
         </div>
 
         {/* Filter Dropdowns */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start sm:justify-end">
+          <Select
+            value={yearFilter}
+            onValueChange={(value) => {
+              setYearFilter(value);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-32" aria-label="Năm áp dụng">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Mọi năm</SelectItem>
+              {years.map((year) => (
+                <SelectItem key={year} value={year}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={methodFilter}
+            onValueChange={(value) => {
+              setMethodFilter(value);
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-40" aria-label="Phương thức">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Mọi phương thức</SelectItem>
+              {methods.map((method) => (
+                <SelectItem key={method} value={method}>
+                  {method}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {/* Phân loại thực thể */}
           {distinctEntityTypes.length > 1 && (
             <Select
@@ -793,6 +854,8 @@ export function CollectionFactsTab({
               <TableHead className="w-28">Phân loại</TableHead>
               <TableHead className="w-48">Thuộc tính (Attribute)</TableHead>
               <TableHead>Giá trị (Value)</TableHead>
+              <TableHead>Năm áp dụng</TableHead>
+              <TableHead>Phương thức</TableHead>
               <TableHead className="w-28 text-center">Độ tin cậy</TableHead>
               <TableHead className="w-36">Thời điểm số hóa</TableHead>
               <TableHead className="w-16 text-right">Chi tiết</TableHead>
@@ -802,7 +865,7 @@ export function CollectionFactsTab({
             {isLoading ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={10}
                   className="text-center py-12 text-xs text-muted-foreground"
                 >
                   Đang tải danh sách bảng biểu số liệu...
@@ -811,7 +874,7 @@ export function CollectionFactsTab({
             ) : paginatedFacts.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={10}
                   className="text-center py-12 text-muted-foreground"
                 >
                   <FileSpreadsheet className="size-8 mx-auto mb-2 opacity-30 text-primary" />
@@ -894,6 +957,10 @@ export function CollectionFactsTab({
                           )}
                         </button>
                       </div>
+                    </TableCell>
+                    <TableCell>{getFactContext(fact.raw_data).year}</TableCell>
+                    <TableCell>
+                      {getFactContext(fact.raw_data).method}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge

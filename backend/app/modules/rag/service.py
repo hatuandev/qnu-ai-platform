@@ -33,10 +33,12 @@ from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.schemas import (
     AskRequest,
     AskResponse,
+    Citation,
     SearchRequest,
     SearchResponse,
     SearchResultItem,
 )
+from app.modules.rag.temporal_answer import decide_table_answer, is_temporal_table_question
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +143,9 @@ class RagService:
         question_word_count = len(re.findall(r"\w+", req.question or ""))
         is_context_dependent = bool(history_list) and question_word_count < 8
         history_hash = semantic_cache.hash_history(history_list) if history_list else None
-        if is_context_dependent or candidate_snapshot is not None:
+        temporal_query = bool(re.search(r"\b(?:19|20)\d{2}\b", req.question))
+        typed_fact_query = is_temporal_table_question(req.question, req.module_code)
+        if is_context_dependent or candidate_snapshot is not None or temporal_query or typed_fact_query:
             logger.debug(
                 "Semantic cache skipped for context-dependent query='%s'",
                 req.question[:30],
@@ -167,7 +171,7 @@ class RagService:
 
         # 3. Query Intent Analysis & Fact-First Routing (module-aware, reusable)
         analysis = query_classifier.analyze(req.question, module_code=req.module_code)
-        lookup_limit = 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
+        lookup_limit = 1000 if typed_fact_query else 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
 
         facts = await fact_layer.lookup_facts(
             db,
@@ -181,7 +185,32 @@ class RagService:
             subject_names=analysis.subject_names if analysis.subject_names else None,
             target_entities=analysis.target_entities if analysis.target_entities else None,
             active_index_revision_ids=set(snapshot.binding_revisions.values()),
+            requested_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)],
         )
+        decision = decide_table_answer(req.question, facts, module_code=req.module_code)
+        if decision and decision["status"] == "missing" and not decision.get("claim_bindings"):
+            from app.modules.rag.snapshot_fact_evidence import load_snapshot_table_evidence
+
+            table_evidence = await load_snapshot_table_evidence(db, snapshot)
+            if table_evidence:
+                decision = decide_table_answer(req.question, table_evidence, module_code=req.module_code)
+        if decision is not None:
+            matched = decision.pop("facts", [])
+            if decision["status"] != "supported" and not matched:
+                decision["answer"] += "\n\n" + citation_guard.get_no_answer_response(req.module_code)
+            citations = [Citation(source_id=f.get("binding_id") or str(f["id"]),
+                                  title=f.get("source_title") or f["entity_name"] + " — " + f["attribute_name"],
+                                  page_number=f["raw_data"].get("page_number"),
+                                  quote=f"{f['entity_name']} · {f['raw_data'].get('header_path') or f['attribute_name']} = {f['attribute_value']}",
+                                  source_pages=sorted({p for p in (f["raw_data"].get("page_number"), f["raw_data"].get("header_page_number")) if isinstance(p, int)}),
+                                  binding_id=f.get("binding_id"), index_revision_id=f.get("index_revision_id"),
+                                  source_revision_id=f["raw_data"].get("source_revision_id")) for f in matched]
+            return AskResponse(status="answered" if decision["status"] == "supported" else "insufficient_context",
+                               answer=decision["answer"], answer_format="markdown_table" if matched else "paragraph",
+                               answer_decision=decision, citations=citations,
+                               facts_used=matched, contexts=[decision["answer"]] if matched else [],
+                               retrieval_snapshot=snapshot, snapshot=snapshot,
+                               latency_ms=round((time.perf_counter() - start_time) * 1000, 2))
         fact_markdown = fact_layer.format_facts_as_markdown(facts)
 
         # 4. Hybrid Retrieval with Intent-tailored Top-K and RRF weights.

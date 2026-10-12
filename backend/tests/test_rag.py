@@ -279,6 +279,9 @@ async def test_api_rag_ask_no_context():
     app.dependency_overrides[get_db] = override_get_db
     try:
         with (
+            patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
+                  AsyncMock(return_value=RetrievalSnapshot(snapshot_id="empty", collection_id="col_empty_test",
+                    tenant_id="tenant_qnu", workspace_id="workspace_qnu", binding_revisions={}))),
             patch(
                 "app.modules.rag.service.hybrid_retriever.retrieve", new_callable=AsyncMock
             ) as mock_ret,

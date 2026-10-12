@@ -97,6 +97,7 @@ class FactLayer:
         subject_names: list[str] | None = None,
         target_entities: list[str] | None = None,
         active_index_revision_ids: set[str] | None = None,
+        requested_years: list[int] | None = None,
     ) -> list[KnowledgeFact]:
         """Look up fact records matching identified keywords or entity codes, strictly bound to approved documents."""
         conditions = []
@@ -107,6 +108,8 @@ class FactLayer:
                 clean_code = code.strip()
                 if clean_code:
                     conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_code}%"))
+                    conditions.append(KnowledgeFact.raw_data["entity_code"].astext == clean_code)
+                    conditions.append(KnowledgeFact.entity_code == clean_code)
                     conditions.append(KnowledgeFact.attribute_value.ilike(f"%{clean_code}%"))
 
         # 2. Match target entity names if provided
@@ -169,6 +172,12 @@ class FactLayer:
         # 4. Optional attribute filter
         if fact_attributes:
             attr_conditions = [KnowledgeFact.attribute_name.ilike(f"%{attr}%") for attr in fact_attributes]
+            attr_conditions.extend(KnowledgeFact.raw_data["attribute_code"].astext == attr for attr in fact_attributes)
+            attr_conditions.append(KnowledgeFact.attribute_code.in_(fact_attributes))
+            # Legacy human-readable headers remain candidates, then the context gate
+            # checks their actual attribute/year. Do not relabel the stored record.
+            attr_conditions.extend(KnowledgeFact.attribute_name.ilike(f"%{kw}%") for kw in (keywords or [])
+                                   if len(kw.strip().split()) >= 2)
             query = query.where(or_(*attr_conditions))
 
         if tenant_id:
@@ -179,6 +188,8 @@ class FactLayer:
             query = query.where(
                 KnowledgeFact.index_revision_id.in_(active_index_revision_ids)
             )
+        if requested_years:
+            query = query.where(or_(KnowledgeFact.applicability_year.in_(requested_years), KnowledgeFact.applicability_year.is_(None)))
 
         # Over-fetch when ranking by subjects so the best AND-matches survive the cut.
         fetch_limit = limit * 3 if subject_names else limit
@@ -188,8 +199,10 @@ class FactLayer:
             scalars = res.scalars()
             rows = list(scalars.all()) if hasattr(scalars, "all") else []
         except Exception as e:
-            logger.debug("Fact lookup query skipped or failed: %s", e)
-            return []
+            from app.core.exceptions import AppException
+
+            logger.exception("Fact lookup failed")
+            raise AppException("Không thể tra cứu dữ liệu số.", code="FACT_LOOKUP_UNAVAILABLE", status_code=503) from e
 
         if subject_names:
             clean_subjs = [s.strip().lower() for s in subject_names if s and s.strip()]

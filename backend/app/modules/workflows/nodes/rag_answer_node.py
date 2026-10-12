@@ -8,6 +8,7 @@ from app.core.exceptions import AppException
 from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.schemas import AskRequest
 from app.modules.rag.service import rag_service
+from app.modules.rag.temporal_answer import is_temporal_table_question
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
     NodeExecutionResult,
@@ -138,7 +139,9 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             context.db, collection_id, tenant_id=context.tenant_id, workspace_id=context.workspace_id)
         ask_req.retrieval_snapshot = snapshot
 
-        dispatch_res = await consulting_dispatcher.dispatch(
+        # Numerical facts must pass the shared context gate before any agentic
+        # guidance can introduce values from a different applicability year.
+        dispatch_res = {"has_agentic_guidance": False, "artifacts": []} if is_temporal_table_question(query, module_code) else await consulting_dispatcher.dispatch(
             module_code=module_code,
             user_message=query,
             history=context.inputs.get("conversation_history"),
@@ -169,6 +172,8 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             answer_text = rag_res.answer
             citations = [c.model_dump() for c in rag_res.citations]
             status = rag_res.status
+            context.node_data["answer_decision"] = rag_res.answer_decision
+            context.outputs["answer_decision"] = rag_res.answer_decision
             suggested_questions = getattr(rag_res, "suggested_questions", [])
             retrieved_contexts = getattr(rag_res, "contexts", [])
             context.node_data["contexts"] = retrieved_contexts
@@ -210,5 +215,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
                 "suggested_questions": suggested_questions,
                 "artifacts": artifacts,
                 "contexts": retrieved_contexts,
+                "answer_decision": rag_res.answer_decision,
+                "facts_used": facts_used,
             },
         )

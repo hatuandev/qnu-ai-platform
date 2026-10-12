@@ -141,10 +141,11 @@ class AskRequest(BaseModel):
 
     def policy_fingerprint(self) -> str:
         payload = self.model_dump(exclude={"question", "conversation_id", "history", "snapshot_id", "retrieval_snapshot"})
-        return "v2-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")).hexdigest()
+        return "v3-temporal-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")).hexdigest()
 
 
 class AskResponse(BaseModel):
+    answer_decision: dict[str, Any] | None = None
     status: str = Field(..., description="Trạng thái: answered hoặc insufficient_context")
     answer: str = Field(..., description="Nội dung câu trả lời")
     answer_format: str = Field(

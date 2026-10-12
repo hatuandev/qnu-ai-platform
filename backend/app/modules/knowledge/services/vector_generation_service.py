@@ -363,7 +363,9 @@ class VectorGenerationService:
             fact["index_revision_id"] = idx_rev.id
             fact["raw_data"] = {**fact["raw_data"], "source_revision_id": source_rev.id,
                                 "fact_set_hash": artifact["fact_set_hash"]}
-            db.add(KnowledgeFact(**fact))
+            from app.modules.knowledge.services.source_context import query_projection
+
+            db.add(KnowledgeFact(**fact, **query_projection(fact["raw_data"])))
         idx_rev.fact_count = len(facts)
         chunk_set.fact_count = len(facts)
         await db.flush()

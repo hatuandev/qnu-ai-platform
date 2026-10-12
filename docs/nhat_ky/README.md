@@ -7,6 +7,16 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-12** | [Phiên #387](./2026-10-12_phien_387_context_review_va_legacy_table_rag.md) | Context review và bảng legacy RAG | Draftaudit/6nullablefields/xuyêntrang; RAG-DAG-SSE thật đạtcađiểm/IELTS,950pass/11baseline/2skip; planchưahoàntấttổngquát |
+
+| **2026-10-12** | [Phiên #386](./2026-10-12_phien_386_temporal_facts_va_common_answer_gate.md) | Đợt đầu temporal facts và common RAG/DAG gate | Ruff/build/37 focused đạt; metadata/year/method/UI; còn schema/editor/rollout/E2E, DB/Docker hiện không hoạt động |
+
+| **2026-10-12** | [Phiên #385](./2026-10-12_phien_385_ke_hoach_ngu_canh_thoi_gian_facts.md) | Kế hoạch ngữ cảnh thời gian trong Facts | Plan14 metadata/fact năm riêng, bảng nhiều tầng, RAG/DAG gate, A–F vàtestmatrix; chưa code |
+
+| **2026-10-12** | [Phiên #384](./2026-10-12_phien_384_de_xuat_chan_nham_nam_so_lieu_rag.md) | Đề xuất tối ưu chống nhầm năm | Exactfacts/answerability/claimgate/cache/rewrite; chưa triển khai |
+
+| **2026-10-12** | [Phiên #383](./2026-10-12_phien_383_test_rag_dag_hai_nguon_moi.md) | Test RAG/DAG hai nguồn mới | Quota/cutoff/lịchđúng, yearhallucination/guard/rewritechưađạt; workerchưarestart |
+
 | **2026-10-12** | [Phiên #382](./2026-10-12_phien_382_artifact_facts_va_candidate_rag.md) | Artifacts/facts dự thảo và candidate RAG | Hai P1 fixed, hash/evidence/review, facts parity, preview;932pass/11cũ/2skip, chưa full QA |
 
 | **2026-10-12** | [Phiên #381](./2026-10-12_phien_381_hoan_thien_luong_tri_thuc_co_cau_truc.md) | Hoàn thiện luồng tri thức có cấu trúc | Draftfacts trướcduyệt, staging/parity/QA, pinrevision vàlifecycle; chưaimplement |

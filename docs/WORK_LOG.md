@@ -6,6 +6,16 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-12** | Codex | Context review/migration và legacy table RAG | Xuyên trang/identity/numeric mapping; runtime RAG-DAG-SSE đúng2024/25,missing2026,IELTS9;950pass/11baseline/2skip; khôngreset/publish, plancònphầnnângcao | [Nhật ký #387](./nhat_ky/2026-10-12_phien_387_context_review_va_legacy_table_rag.md) |
+
+| **2026-10-12** | Codex | Triển khai đợt đầu Kế hoạch14 temporal facts/RAG-DAG gate | Metadata/header context, missing/partial decision, rewrite/cache/UI; Ruff/build/37 focused đạt; Docker/DB down chặn final E2E, plan còn việc | [Nhật ký #386](./nhat_ky/2026-10-12_phien_386_temporal_facts_va_common_answer_gate.md) |
+
+| **2026-10-12** | Codex | Viết Kế hoạch14 ngữ cảnh thời gian trong Facts vàRAG/DAG | Metadata ban hành khácnămfact; bảng2023/2024, claimgate/rewrite/cache/SSE, safe rollout/testmatrix; chỉdocs | [Nhật ký #385](./nhat_ky/2026-10-12_phien_385_ke_hoach_ngu_canh_thoi_gian_facts.md) |
+
+| **2026-10-12** | Codex | Đề xuất year-aware RAG/DAG chống nhầm điểmchuẩn | Phân tíchguard số/citation, tuplefacts/year/evidence, P0-P2 vàtestmatrix; chưa sửa | [Nhật ký #384](./nhat_ky/2026-10-12_phien_384_de_xuat_chan_nham_nam_so_lieu_rag.md) |
+
+| **2026-10-12** | Codex | Test7caseRAG/DAG, multitur/SSE hai nguồn mới | 23POST; cònyearhallucination/noanswer/rewrite/IELTS, workerlayout-v4; chưa sửa | [Nhật ký #383](./nhat_ky/2026-10-12_phien_383_test_rag_dag_hai_nguon_moi.md) |
+
 | **2026-10-12** | Codex | Structured artifact/facts draft/Studio/candidate RAG; sửa reranker và facts API | Ruff/Biome/build đạt;932pass/11cũ/2skip, HTTPfacts81/preview4800; chưa full semantic/DAG E2E | [Nhật ký #382](./nhat_ky/2026-10-12_phien_382_artifact_facts_va_candidate_rag.md) |
 
 | **2026-10-12** | Codex | Rà đủ luồng Knowledge có cấu trúc | Đề xuất draftfacts/review/provenance/version/stagingQA/publish/lifecycle; code read-only | [Nhật ký #381](./nhat_ky/2026-10-12_phien_381_hoan_thien_luong_tri_thuc_co_cau_truc.md) |

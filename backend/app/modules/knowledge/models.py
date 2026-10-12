@@ -273,6 +273,13 @@ class KnowledgeFact(Base):
     )  # e.g., "benchmark_score_2024", "quota"
     attribute_value: Mapped[str] = mapped_column(Text, nullable=False)  # e.g., "24.5", "180", full deliverables text
 
+    entity_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    attribute_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    applicability_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    temporal_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    admission_method: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
     confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     raw_data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

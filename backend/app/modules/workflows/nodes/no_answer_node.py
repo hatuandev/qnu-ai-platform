@@ -41,6 +41,11 @@ class OutputNoAnswerNodeHandler(BaseNodeHandler):
             or DEFAULT_NO_ANSWER_MESSAGE
         )
         status = config.get("status", "insufficient_context")
+        decision = context.node_data.get("answer_decision")
+        if decision and decision["status"] != "supported":
+            message = decision["answer"]
+            status = "insufficient_context"
+            context.outputs["answer_decision"] = decision
 
         context.outputs["answer"] = message
         context.outputs["status"] = status
@@ -57,6 +62,7 @@ class OutputNoAnswerNodeHandler(BaseNodeHandler):
             status="completed",
             output={
                 "answer": message,
+                "answer_decision": decision,
                 "status": status,
                 "citations": [],
             },

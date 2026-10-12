@@ -25,7 +25,7 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
             raise AppException("Nguồn chưa sẵn sàng để xuất bản.", code="SOURCE_NOT_READY", status_code=409)
         artifact = get_source_artifact(source)
         approved = artifact["review"]["status"] == "approved"
-        if artifact["issues"] and not approved:
+        if (artifact["issues"] or artifact["review"]["status"] == "required") and not approved:
             raise AppException("Cần duyệt dữ liệu có cấu trúc.", code="FACT_SET_REVIEW_REQUIRED", status_code=409)
         facts = list((await db.execute(select(KnowledgeFact).where(
             KnowledgeFact.index_revision_id == index.id,

@@ -61,6 +61,7 @@ import type {
   KnowledgeSourceDetailResponse,
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
+import { SourceContextEditor } from "./components/source-context-editor";
 
 interface SourceDetailPageProps {
   collectionId: string;
@@ -270,23 +271,43 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
   if (isStudioMode && collection) {
     return (
-      <DocumentStudioWorkspace
-        collection={collection}
-        documentId={sourceId}
-        revisionId={activeRev?.id}
-        onBack={() => onStudioModeChange(false)}
-        onApproveSuccess={(savedRevisionId) => {
-          if (savedRevisionId) setSelectedRevisionId(savedRevisionId);
-          refetchSource();
-          refetchChunkSets();
-        }}
-      />
+      <>
+        {activeRev && (
+          <div className="mb-3 flex justify-end">
+            <SourceContextEditor
+              collectionId={collectionId}
+              sourceId={sourceId}
+              revisionId={activeRev.id}
+              onSaved={setSelectedRevisionId}
+            />
+          </div>
+        )}
+        <DocumentStudioWorkspace
+          collection={collection}
+          documentId={sourceId}
+          revisionId={activeRev?.id}
+          onBack={() => onStudioModeChange(false)}
+          onApproveSuccess={(savedRevisionId) => {
+            if (savedRevisionId) setSelectedRevisionId(savedRevisionId);
+            refetchSource();
+            refetchChunkSets();
+          }}
+        />
+      </>
     );
   }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
       <div className="flex flex-wrap gap-3 items-center justify-between">
+        {activeRev && (
+          <SourceContextEditor
+            collectionId={collectionId}
+            sourceId={sourceId}
+            revisionId={activeRev.id}
+            onSaved={setSelectedRevisionId}
+          />
+        )}
         <Select
           value={activeRev?.id || ""}
           onValueChange={(id) => {

@@ -935,6 +935,36 @@ class KnowledgeSourceRevisionResponse(BaseModel):
     updated_at: datetime
 
 
+class FactContextEdit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fact_id: str = Field(min_length=1, max_length=64)
+    year: int | None = Field(None, ge=1900, le=2099)
+    method: str | None = Field(None, max_length=255)
+    unit: str | None = Field(None, max_length=128)
+
+
+class SourceContextEditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_fact_set_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    reason: str = Field(min_length=5, max_length=2000)
+    issued_date: date | None = None
+    issued_year: int | None = Field(None, ge=1900, le=2099)
+    subject_years: list[int] | None = Field(None, max_length=50)
+    facts: list[FactContextEdit] = Field(default_factory=list, max_length=1000)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def trim_reason(cls, value: Any) -> Any:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("subject_years")
+    @classmethod
+    def validate_subject_years(cls, value: list[int] | None) -> list[int] | None:
+        if value is not None and any(year < 1900 or year > 2099 for year in value):
+            raise ValueError("Năm chủ đề không hợp lệ")
+        return sorted(set(value)) if value is not None else None
+
+
 class UpdateSourceContentRequest(BaseModel):
     """Payload to update and re-evaluate canonical Markdown content."""
 

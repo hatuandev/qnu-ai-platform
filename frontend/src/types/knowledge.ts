@@ -202,6 +202,16 @@ export interface FactItem {
 }
 
 export interface SourceArtifact {
+  temporal_metadata?: {
+    issued_date: {
+      value: string | null;
+      status: string;
+      precision: string | null;
+    };
+    issued_year: { value: number | null; status: string };
+    subject_years: { values: number[]; status: string };
+    filename_years: { values: number[]; status: string };
+  };
   version: string;
   content_hash: string;
   fact_set_hash: string;
@@ -966,6 +976,20 @@ export interface KnowledgeSourceDetailResponse {
 
 export interface UpdateSourceContentRequest {
   canonical_markdown: string;
+}
+
+export interface SourceContextEditRequest {
+  expected_fact_set_hash: string;
+  reason: string;
+  issued_date?: string | null;
+  issued_year?: number | null;
+  subject_years?: number[];
+  facts?: {
+    fact_id: string;
+    year?: number | null;
+    method?: string | null;
+    unit?: string | null;
+  }[];
 }
 
 export interface ReviewSourceRevisionRequest {

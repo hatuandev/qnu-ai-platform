@@ -48,6 +48,7 @@ from app.modules.knowledge.services.source_pages import (
     merge_edited_manifest,
     normalize_source_pages,
 )
+from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +272,9 @@ class SourceIngestionService:
                 structured_artifact = build_source_artifact(
                     clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables,
                 )
+                temporal_metadata = extract_temporal_metadata(clean_md, item.origin_file_name)
+                structured_artifact["temporal_metadata"] = temporal_metadata
+                citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
                 if any(page.get("has_tables") for page in ocr_pages) and not structured_artifact["tables"]:
                     structured_artifact["issues"].append({"code": "TABLES_NOT_MATERIALIZED"})
                     structured_artifact["review"] = {"status": "required"}
@@ -471,6 +475,8 @@ class SourceIngestionService:
         new_markdown: str,
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
+        context_edits: Any | None = None,
+        actor_id: str | None = None,
     ) -> KnowledgeSourceRevision:
         """Update and re-evaluate canonical Markdown content for a source revision."""
         from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
@@ -491,6 +497,9 @@ class SourceIngestionService:
                 status_code=404,
             )
 
+        if context_edits is not None and get_source_artifact(rev)["fact_set_hash"] != context_edits.expected_fact_set_hash:
+            raise AppException("Facts đã thay đổi; hãy tải lại bản nguồn.", code="SOURCE_CONTEXT_CHANGED", status_code=409)
+
         clean_md, page_manifest = normalize_source_pages(new_markdown, manifest_page_count(rev.page_manifest))
         quality_report = evaluate_revision_quality(
             markdown=clean_md,
@@ -505,6 +514,8 @@ class SourceIngestionService:
             .where(KnowledgeSourceRevision.binding_id == binding.id)
             .order_by(KnowledgeSourceRevision.revision_no.desc())
         )).scalars().first() or rev.revision_no
+        if context_edits is not None and revision_no != rev.revision_no:
+            raise AppException("Đã có revision mới hơn; hãy mở bản mới nhất.", code="SOURCE_CONTEXT_CHANGED", status_code=409)
         values = {
             col.key: getattr(rev, col.key)
             for col in KnowledgeSourceRevision.__table__.columns
@@ -516,7 +527,7 @@ class SourceIngestionService:
         new_rev.artifact_key = compute_sha256(f"{new_rev.origin_file_hash}:edited:{compute_sha256(clean_md)}")
         new_rev.canonical_markdown = clean_md
         new_rev.page_manifest = merge_edited_manifest(list(rev.page_manifest or []), page_manifest)
-        new_rev.normalizer_version = "v2"
+        new_rev.normalizer_version = EXTRACTION_VERSION
         new_rev.canonical_hash = compute_sha256(clean_md)
         new_rev.citation_metadata = {
             **{key: value for key, value in (rev.snapshot_metadata or {}).items()
@@ -528,12 +539,24 @@ class SourceIngestionService:
         new_rev.citation_metadata["subject"] = new_rev.citation_metadata.pop("title", None)
         new_rev.citation_metadata["signer_name"] = new_rev.citation_metadata.pop("signer", None)
         artifact = build_source_artifact(clean_md, manifest_page_count(new_rev.page_manifest), new_rev.citation_metadata)
+        artifact["temporal_metadata"] = extract_temporal_metadata(clean_md, (new_rev.snapshot_metadata or {}).get("file_name", ""))
+        new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
+        if context_edits is not None:
+            from app.modules.knowledge.services.source_context import apply_context_edits
+
+            if not actor_id:
+                raise AppException("Hiệu đính thiếu định danh người sửa.", code="CONTEXT_ACTOR_REQUIRED", status_code=422)
+            artifact = apply_context_edits(artifact, context_edits, actor_id, base_artifact=get_source_artifact(rev))
+            new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
+            new_rev.artifact_key = compute_sha256(f"{new_rev.origin_file_hash}:context:{artifact['fact_set_hash']}:{new_rev.id}")
         quality_report = evaluate_revision_quality(markdown=clean_md, page_count=manifest_page_count(new_rev.page_manifest) or 1,
                                                    tables_count=len(artifact["tables"]), file_size_bytes=len(clean_md.encode("utf-8")))
         new_rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact,
                                     "edited_from_revision_id": rev.id}
         if artifact["issues"] and quality_report.get("overall_status") != "failed":
             quality_report = {**quality_report, "overall_status": "warning", "structured_issues": artifact["issues"]}
+        if context_edits is not None and quality_report.get("overall_status") != "failed":
+            quality_report = {**quality_report, "overall_status": "warning", "context_review_required": True}
         new_rev.quality_report = quality_report
         new_rev.updated_at = datetime.now(UTC)
 
@@ -572,6 +595,7 @@ class SourceIngestionService:
         comment: str | None = None,
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
+        actor_id: str | None = None,
     ) -> KnowledgeSourceRevision:
         """Approve or reject a review_required source revision."""
         from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
@@ -595,6 +619,10 @@ class SourceIngestionService:
         if rev.status != "review_required":
             raise AppException("Chỉ duyệt bản đang chờ kiểm duyệt.", code="SOURCE_NOT_REVIEWABLE", status_code=409)
 
+        artifact = get_source_artifact(rev)
+        if artifact.get("context_audit") and not actor_id:
+            raise AppException("Duyệt ngữ cảnh thiếu người duyệt.", code="CONTEXT_ACTOR_REQUIRED", status_code=422)
+
         if decision == "approved":
             rev.status = "ready"
             rev.failure_code = None
@@ -614,8 +642,11 @@ class SourceIngestionService:
             )
 
         rev.updated_at = datetime.now(UTC)
-        artifact = get_source_artifact(rev)
-        artifact["review"] = {"status": decision, "comment": comment, "at": rev.updated_at.isoformat()}
+        if artifact.get("context_audit"):
+            from app.modules.knowledge.services.source_context import review_context_artifact
+
+            artifact = review_context_artifact(artifact, decision, actor_id, comment)
+        artifact["review"] = {"status": decision, "comment": comment, "at": rev.updated_at.isoformat(), "actor_id": actor_id}
         rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact}
         await db.commit()
         await db.refresh(rev)
@@ -962,6 +993,15 @@ class SourceIngestionService:
             or (current_rev.citation_metadata or {}).get("document_type_code"),
         }
 
+        temporal_metadata = extract_temporal_metadata(clean_md, filename)
+        citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
+        citation_metadata["subject"] = admin_meta.get("title")
+        citation_metadata["signer_name"] = admin_meta.get("signer")
+        structured_artifact = build_source_artifact(clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables)
+        structured_artifact["temporal_metadata"] = temporal_metadata
+        if structured_artifact["issues"] and quality_report.get("overall_status") != "failed":
+            quality_report = {**quality_report, "overall_status": "warning", "structured_issues": structured_artifact["issues"]}
+
         new_rev_id = reserved_revision_id or f"ks_rev_{uuid.uuid4().hex[:12]}"
         new_rev = KnowledgeSourceRevision(
             id=new_rev_id,
@@ -979,6 +1019,7 @@ class SourceIngestionService:
                 "parser_profile": parser_profile,
                 "ocr_engine": ocr_engine or "auto",
                 "reparsed_at": datetime.now(UTC).isoformat(),
+                "structured_artifact": structured_artifact,
             },
             quality_report=quality_report,
             parser_profile_hash=compute_sha256(parser_profile),

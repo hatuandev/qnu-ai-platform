@@ -1,0 +1,349 @@
+{
+  "note": "Captured complete stdout records only; other observations and repeats documented in journal #383. Not the full raw run.",
+  "records": [
+    {
+      "kind": "result",
+      "case": "quota",
+      "route": "rag",
+      "http": 200,
+      "status": "answered",
+      "answer": "**TỔNG CHỈ TIÊU TUYỂN SINH ĐẠI HỌC NĂM 2026**\n\n| **Cột 1** | **Cột 2** |\n| :---: | :---: |\n| Tổng số | 4800 |\n\nLưu ý: Thông tin trên được trích từ tài liệu chính thức của Trường Đại học Quy Nhơn, cập nhật đến năm 2026.",
+      "contexts": 2,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 2,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 1,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 4117.6,
+      "execution_id": null,
+      "conversation_id": null,
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "quota",
+      "route": "dag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Cảm ơn bạn đã tin tưởng và lựa chọn Trường Đại học Quy Nhơn là điểm đến cho con đường học vấn của mình.\n\nĐể trả lời câu hỏi của bạn về tổng chỉ tiêu tuyển sinh đại học năm 2026, mình xin cung cấp thông tin dưới dạng bảng Markdown như sau:\n\n| **STT** | **Tên ngành, chương trình xét tuyển** | **Phương thức tuyển sinh** | **Số lượng tuyển sinh dự kiến** |\n| :---: | :--- | :--- | :--- |\n| 1 | Quản lý giáo dục | 1,2,3,4 |  |\n| 2 | Giáo dục Mầm non | 5 |  |\n| 3 | Giáo dục Tiểu học | 1,4 |  |\n| 4 | Giáo dục Chính trị | 1,4 |  |\n| :---: | :--- | :--- | :--- |\n| ... | ... | ... | ... |\n| 14 | Sư phạm Tiếng Anh | 1,4 |  |\n\nTổng số lượng chỉ tiêu dự kiến: **4800**\n\nMình hy vọng thông tin trên sẽ giúp bạn có cái nhìn tổng quan về tổng chỉ tiêu tuyển sinh đại học năm 2026 của Trường Đại học Quy Nhơn.",
+      "contexts": 0,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 2,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 1,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 5055.86,
+      "execution_id": "36364754-4c81-4c05-bd77-fe0132cf7ccd",
+      "conversation_id": "conv_dd286fa974bb",
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "missing",
+      "route": "rag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Dựa trên thông tin trong tài liệu, tôi không tìm thấy thông tin về điểm chuẩn chính thức ngành Công nghệ thông tin năm 2026. Tuy nhiên, tôi có thể cung cấp thông tin về điểm chuẩn của ngành Công nghệ thông tin năm 2025.\n\n| **STT** | **Mã ngành** | **Tên ngành** | **2025** |  |  | **Chỉ tiêu** | **Số trúng tuyển nhập học** | **Điểm trúng tuyển** |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n|  | 7480201 | Công nghệ thông tin |  |  |  | 172 | 171 | 21.5 |\n\nLưu ý rằng điểm chuẩn này chỉ áp dụng cho năm 2025 và có thể khác nhau cho năm 2026.",
+      "contexts": 5,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 12,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 13,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 6,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 2,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 11,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 1976.84,
+      "execution_id": null,
+      "conversation_id": null,
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "missing",
+      "route": "dag",
+      "http": 200,
+      "status": "answered",
+      "answer": "| **STT** | **Mã ngành** | **Tên ngành** | **2026** |  |  | **Phương thức xét tuyển** | **Tổng điểm** |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n|  |  |  | **Chỉ tiêu** | **Số trúng tuyển nhập học** | **Điểm trúng tuyển** | **Số lượng tuyển sinh dự kiến** |  |\n| 1 | 7480201 | Công nghệ thông tin | 304 | 349 | 16.5 |  | PT1 | 21.5 |\n\nĐiểm chuẩn chính thức ngành Công nghệ thông tin năm 2026 là 21.5 điểm.",
+      "contexts": 0,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 12,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 13,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 6,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 2,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 11,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 4069.65,
+      "execution_id": "6aeef52b-ac5b-4657-9006-6859800327ac",
+      "conversation_id": "conv_3f8d0dd066ea",
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "greeting",
+      "route": "rag",
+      "http": 200,
+      "status": "insufficient_context",
+      "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+      "contexts": 0,
+      "citations": [],
+      "latency_ms": 402.15,
+      "execution_id": null,
+      "conversation_id": null,
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "greeting",
+      "route": "dag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Chào bạn ạ! Mình là Trợ lý Tuyển sinh của Trường Đại học Quy Nhơn. Mình luôn sẵn sàng hỗ trợ bạn trong quá trình tìm hiểu về trường và các thông tin liên quan đến tuyển sinh.\n\nBạn đang quan tâm đến thông tin nào về Trường Đại học Quy Nhơn? Bạn muốn biết về phương thức xét tuyển, điểm chuẩn trúng tuyển, thông tin về các ngành học, học phí, học bổng hoặc đời sống sinh viên tại QNU?",
+      "contexts": 0,
+      "citations": [],
+      "latency_ms": 943.26,
+      "execution_id": "9145cf1e-be53-46d8-8be2-6ccd9dd99192",
+      "conversation_id": "conv_f18c6ed79e1f",
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "cutoffs",
+      "route": "dag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Dựa trên thông tin bạn cung cấp, mình sẽ giúp bạn tra cứu điểm chuẩn ngành Công nghệ thông tin theo kết quả xét tuyển năm 2024 và năm 2025.\n\n### BẢNG ĐIỂM CHUẨN NGÀNH CÔNG NGHỆ THÔNG TIN\n\n| Năm | Chỉ tiêu | Số trúng tuyển nhập học | Điểm trúng tuyển |\n| :--- | :--- | :--- | :--- |\n| 2024 | 304 | 349 | 16.5 |\n| 2025 | 172 | 171 | 21.5 |\n\n### LỊCH SỬ TRAO ĐỔI\n\nMình đã cung cấp thông tin về điểm chuẩn ngành Công nghệ thông tin theo kết quả xét tuyển năm 2024 và năm 2025.",
+      "contexts": 0,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 11,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 12,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 13,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 6,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 3,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 6346.64,
+      "execution_id": "16ae5e26-090d-485b-8d18-30123e04d08d",
+      "conversation_id": "conv_8bd11cd5c6d7",
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "registration",
+      "route": "rag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Câu trả lời của người trợ lý AI chính thức của Trường Đại học Quy Nhơn (QNU) như sau:\n\n- **Đợt 1:** \n  * Thí sinh nộp hồ sơ xét tuyển thẳng: từ ngày 20/5/2026 đến ngày 20/6/2026.\n  * Thi năng khiếu Giáo dục mầm non, Giáo dục thể chất: thi vào các ngày 19, 20, 21/6/2026.\n  * Xét tuyển đợt 1: Tất cả thí sinh, tất cả các phương thức phải đăng ký xét tuyển trên hệ thống của Bộ từ ngày 02/7/2026 đến ngày 14/7/2026.\n  * Công bố ngưỡng bảo đảm chất lượng đầu vào và quy tắc quy đổi điểm giữa các phương thức: theo quy định của Bộ.\n- **Đợt 2:** \n  * Xét tuyển các ngành còn chỉ tiêu sau khi thí sinh đăng ký nhập học đợt 1, thông báo từ ngày 22/8/2026.\n\n**THỂ LỆ THỂ BỊ**\n\n- Xét tuyển theo kế hoạch của Bộ GDĐT: 04/8/2026 – 10/8/2026.",
+      "contexts": 2,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 9,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 10,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 23.21,
+      "execution_id": null,
+      "conversation_id": null,
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "registration",
+      "route": "dag",
+      "http": 200,
+      "status": "answered",
+      "answer": "Cảm ơn bạn đã tin tưởng và đặt câu hỏi cho Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn. Để trả lời câu hỏi của bạn về thời gian đăng ký xét tuyển đại học năm 2026 là từ ngành nào đến ngành nào, mình xin cung cấp thông tin như sau:\n\n- **Đợt 1:**\n\n+ Thí sinh nộp hồ sơ xét tuyển thẳng từ ngày 20/5/2026 đến ngày 20/6/2026.\n+ Thi năng khiếu Giáo dục mầm non, Giáo dục thể chất vào các ngày 19, 20, 21/6/2026.\n+ Xét tuyển đợt 1: Tất cả thí sinh, tất cả các phương thức phải đăng ký xét tuyển trên hệ thống của Bộ từ ngày 02/7/2026 đến ngày 14/7/2026.\n\n- **Đợt 2:**\n\n+ Xét tuyển các ngành còn chỉ tiêu sau khi thí sinh đăng ký nhập học đợt 1, thông báo từ ngày 22/8/2026.\n\n- **Xét tuyển theo kế hoạch của Bộ GDĐT:**\n\n+ Từ ngày 04/8/2026 đến ngày 10/8/2026.\n\n- **Xét tuyển các ngành còn chỉ tiêu sau khi thí sinh đăng ký nhập học đợt 1, thông báo từ ngày 22/8/2026.**\n\n[**GỢI Ý**]: \n-",
+      "contexts": 0,
+      "citations": [
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 9,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 10,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 1,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        },
+        {
+          "title": "Thong tin tuyen sinh dai hoc 2026_Lan2-1 (1)",
+          "page_number": 2,
+          "binding_id": "bnd_420fb9869184",
+          "index_revision_id": "idx_rev_790c12a08c95",
+          "source_revision_id": "ks_rev_9f70aae2ead2"
+        }
+      ],
+      "latency_ms": 1493.42,
+      "execution_id": "c9fb5d55-71cb-4c60-a6d0-fa4338d0b370",
+      "conversation_id": "conv_e7cecf3aa83b",
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "training",
+      "route": "rag",
+      "http": 200,
+      "status": "answered",
+      "answer": "- **Điều kiện cảnh báo học tập mức 1**\n  - **Bước 1**: Xác định loại đào tạo (theo tín chỉ hoặc theo niên chế)\n  - **Bước 2**: Xác định điều kiện cảnh báo học tập mức 1 theo loại đào tạo:\n    - **Đào tạo theo tín chỉ**\n      - **Điểm trung bình chung học kỳ** đạt dưới 0,8 (đối với học kỳ đầu của khóa học)\n      - **Điểm trung bình chung học kỳ** đạt dưới 1,0 (đối với các học kỳ tiếp theo)\n      - **Điểm trung bình tích lũy** đạt dưới 1,2 (đối với sinh viên trình độ năm thứ nhất)\n      - **Điểm trung bình tích lũy** đạt dưới 1,4 (đối với sinh viên trình độ năm thứ hai)\n      - **Điểm trung bình tích lũy** đạt dưới 1,6 (đối với sinh viên trình độ năm thứ ba)\n      - **Điểm trung bình tích lũy** đạt dưới 1,8 (đối với sinh viên các năm tiếp theo)\n    - **Đào tạo theo niên chế**\n      - **Điểm trung bình năm học** đạt dưới 1,0 (đối với năm học thứ nhất)\n      - **Điểm trung bình năm học** đạt dưới 1,2 (đối với năm học thứ hai)\n      - **Điểm trung bình năm học** đạt dưới 1,4 (đối với năm học thứ ba trở đi)",
+      "contexts": 1,
+      "citations": [
+        {
+          "title": "2025 Quy che dao tao dai hoc (ap dung tu K48)",
+          "page_number": 17,
+          "binding_id": "bnd_6994713703dd",
+          "index_revision_id": "idx_rev_225b1211c9a2",
+          "source_revision_id": "ks_rev_40cf1aa53618"
+        }
+      ],
+      "latency_ms": 2611.51,
+      "execution_id": null,
+      "conversation_id": null,
+      "error": null
+    },
+    {
+      "kind": "result",
+      "case": "training",
+      "route": "dag",
+      "http": 200,
+      "status": "insufficient_context",
+      "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: 0256.3846.156 hoặc Email: tuyensinh@qnu.edu.vn nhé!",
+      "contexts": 0,
+      "citations": [],
+      "latency_ms": 3295.63,
+      "execution_id": "a6348396-896f-4c70-bd6c-caacd50d5440",
+      "conversation_id": "conv_28660d742311",
+      "error": null
+    }
+  ]
+}

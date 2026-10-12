@@ -23,7 +23,7 @@ from app.modules.knowledge.services.layout_text import reconstruct_layout_text
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v5-structured"
+EXTRACTION_VERSION = "layout-v7-context-relations"
 
 
 @dataclass
