@@ -1,0 +1,56 @@
+{
+  "id": "bkp_3a2730bc6d7b4a4aaed0c1290de1cb22",
+  "created_at": "2026-10-13T17:48:08.829528Z",
+  "updated_at": "2026-10-13T17:48:11.613895Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-launcher",
+  "operation": "verify",
+  "status": "completed",
+  "stage": "Đã kiểm tra toàn vẹn",
+  "progress": 100,
+  "size_bytes": 501,
+  "sha256": "978c41405b848042c00789112368a0384daeb460377ab09e1360fe78ffc0f16a",
+  "verified_at": "2026-10-13T17:48:11.605818Z",
+  "drill_at": null,
+  "error": null,
+  "pid": 17520,
+  "components": {
+    "archive": {
+      "format": "qnu-backup-v1",
+      "release": null,
+      "app_version": null,
+      "schema": null,
+      "note": "Toàn vẹn không chứng minh tương thích release hoặc chất lượng chatbot."
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-10-13T17:48:08.960741Z",
+      "operation": "verify",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-launcher",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T17:48:11.613895Z",
+      "operation": "verify",
+      "status": "completed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-launcher",
+      "error": null
+    }
+  ],
+  "pinned": false,
+  "origin": "manual",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-13T17:48:11.609606Z",
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

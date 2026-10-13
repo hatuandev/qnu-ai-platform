@@ -1,0 +1,957 @@
+[
+  {
+    "file": "FLYER TUYENSINH 2026-final2-16032026 (1).pdf",
+    "original_status": "succeeded",
+    "engine": "paddleocr_vl",
+    "pages": 2,
+    "chars": 12197,
+    "tables": 3,
+    "facts": 65,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 1,
+        "block_id": "page_1_block_0"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 1,
+        "block_id": "page_1_block_13"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 1,
+        "block_id": "page_1_block_32"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "tư vấn tuyển sinh 26.docx",
+    "original_status": "review_required",
+    "engine": "docling+native+paddleocr_vl",
+    "pages": 10,
+    "chars": 21648,
+    "tables": 1,
+    "facts": 1,
+    "issues": [
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 3
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 4
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 5
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 7
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 10
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "TB lịch xét tuyển ĐH.pdf",
+    "original_status": "review_required",
+    "engine": "native",
+    "pages": 4,
+    "chars": 5814,
+    "tables": 4,
+    "facts": 49,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "Quy chế tuyển sinh đại học 2026 - 363.pdf",
+    "original_status": "review_required",
+    "engine": "paddleocr_vl",
+    "pages": 32,
+    "chars": 64566,
+    "tables": 10,
+    "facts": 16,
+    "issues": [
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_6",
+        "row_index": 0
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_6",
+        "row_index": 0
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_6",
+        "row_index": 0
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_6",
+        "row_index": 0
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "TB học phí K49.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 3,
+    "chars": 8221,
+    "tables": 3,
+    "facts": 347,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "NQ57.2024_ Phương hướng tuyển sinh 2025.pdf",
+    "original_status": "review_required",
+    "engine": "paddleocr_vl",
+    "pages": 9,
+    "chars": 14628,
+    "tables": 9,
+    "facts": 178,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 2,
+        "block_id": "page_2_block_11"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "phu-luc-hd-tuyen-sinh-2025.signed.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 17,
+    "chars": 33432,
+    "tables": 7,
+    "facts": 11,
+    "issues": [
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 1
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 10
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "Thông tin TSĐH cập nhật.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 14,
+    "chars": 25047,
+    "tables": 12,
+    "facts": 525,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "2025_huong-dan-tuyen-sinh-dh-cd.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 4,
+    "chars": 7092,
+    "tables": 1,
+    "facts": 0,
+    "issues": [
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 1
+      },
+      {
+        "code": "TABLES_NOT_MATERIALIZED",
+        "page_number": 3
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "TB điểm sàn 26.pdf",
+    "original_status": "review_required",
+    "engine": "native",
+    "pages": 8,
+    "chars": 17030,
+    "tables": 7,
+    "facts": 284,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "Cac nganh Tuyen sinh 2025_moi.pdf",
+    "original_status": "review_required",
+    "engine": "paddleocr_vl",
+    "pages": 1,
+    "chars": 3068,
+    "tables": 1,
+    "facts": 1,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 1,
+        "block_id": "page_1_block_12"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "BC Kết quả khảo sát Tư vấn tuyển sinh 2022.pdf",
+    "original_status": "failed",
+    "engine": "paddleocr_vl",
+    "pages": 8,
+    "chars": 10313,
+    "tables": 7,
+    "facts": 161,
+    "issues": [
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_4",
+        "row_index": 13
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 3,
+        "block_id": "page_3_block_0"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 4,
+        "block_id": "page_4_block_1"
+      }
+    ],
+    "blank_pages": [
+      8
+    ]
+  },
+  {
+    "file": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao.docx",
+    "original_status": "succeeded",
+    "engine": "docling+native+paddleocr_vl",
+    "pages": 8,
+    "chars": 14965,
+    "tables": 13,
+    "facts": 141,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 4,
+        "block_id": "page_4_block_5"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_4"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "Phuong huong tuyen sinh 2024_DHQN_final.docx",
+    "original_status": "review_required",
+    "engine": "docling+native",
+    "pages": 7,
+    "chars": 11918,
+    "tables": 9,
+    "facts": 162,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "Hương dan thi Nang khieu GDTC 2026.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 3,
+    "chars": 4287,
+    "tables": 0,
+    "facts": 0,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "HD nhập học.pdf",
+    "original_status": "succeeded",
+    "engine": "native+paddleocr_vl",
+    "pages": 8,
+    "chars": 11411,
+    "tables": 2,
+    "facts": 8,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 6,
+        "block_id": "page_6_block_2"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_1"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_4"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_6"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_7"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_10"
+      },
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 7,
+        "block_id": "page_7_block_12"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 5,
+    "chars": 7802,
+    "tables": 3,
+    "facts": 226,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed.pdf",
+    "original_status": "succeeded",
+    "engine": "native",
+    "pages": 13,
+    "chars": 25087,
+    "tables": 11,
+    "facts": 578,
+    "issues": [],
+    "blank_pages": []
+  },
+  {
+    "file": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed.pdf",
+    "original_status": "succeeded",
+    "engine": "native+paddleocr_vl",
+    "pages": 7,
+    "chars": 9449,
+    "tables": 6,
+    "facts": 164,
+    "issues": [
+      {
+        "code": "VISUAL_CONTENT_REVIEW",
+        "page_number": 4,
+        "block_id": "page_4_block_1"
+      }
+    ],
+    "blank_pages": []
+  },
+  {
+    "file": "Muc hoc phi 2024.pdf",
+    "original_status": "review_required",
+    "engine": "paddleocr_vl",
+    "pages": 2,
+    "chars": 7456,
+    "tables": 3,
+    "facts": 384,
+    "issues": [
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 1
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 1
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 1
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 1
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 2
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 3
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 4
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 4
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 5
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 6
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 6
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 6
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 6
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 7
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 8
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 9
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 9
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 9
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 9
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 10
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 10
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 10
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 10
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 11
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 11
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 11
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 11
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 12
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 12
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 12
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 12
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 13
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 13
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 13
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 13
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 15
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 15
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 15
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 15
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 16
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 16
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 16
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 16
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 17
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 17
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 17
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 17
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 18
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 18
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 18
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 18
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 19
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 19
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 19
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 19
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 20
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 20
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 21
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 21
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 21
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 21
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 22
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 22
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 22
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 22
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 23
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 23
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 23
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 23
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 24
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 24
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 24
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 24
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 25
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 25
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 25
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 25
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 26
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 26
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 26
+      },
+      {
+        "code": "CONFLICTING_FACT_VALUES",
+        "table_id": "table_3",
+        "row_index": 26
+      }
+    ],
+    "blank_pages": []
+  }
+]

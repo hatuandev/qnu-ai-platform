@@ -118,7 +118,9 @@ class RagService:
         start_time = time.perf_counter()
 
         # 1. Input Guardrail safety check (Prompt Injection)
-        guard_res = input_guardrail.check(req.question)
+        guard_res = input_guardrail.check(req.original_question or req.question)
+        if guard_res.is_safe and req.original_question:
+            guard_res = input_guardrail.check(req.question)
         if not guard_res.is_safe:
             return AskResponse(
                 status="insufficient_context",
@@ -136,6 +138,13 @@ class RagService:
             workspace_id=req.workspace_id,
         )
         snapshot_fingerprint = snapshot.cache_fingerprint()
+        from app.modules.rag.evidence_pipeline import answer_with_evidence
+        from app.modules.rag.evidence_runtime import resolve_evidence_request
+
+        req, evidence_policy = await resolve_evidence_request(db, req)
+        if evidence_policy.enabled:
+            return await answer_with_evidence(db, req, snapshot, evidence_policy,
+                                              candidate_mode=candidate_snapshot is not None)
         policy_version = req.policy_fingerprint()
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
@@ -461,6 +470,7 @@ class RagService:
             temperature=temperature, max_tokens=req.max_tokens, thinking_budget=req.thinking_budget,
             conversation_id=req.conversation_id, preferred_provider_id=req.preferred_provider_id,
             preferred_model_name=req.preferred_model_name, fallback_model_name=req.fallback_model,
+            fallback_provider_id=req.fallback_provider_id,
         )
         try:
             llm_res = await modelops_service.generate(db, llm_req)

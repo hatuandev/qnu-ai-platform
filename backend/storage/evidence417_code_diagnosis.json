@@ -1,0 +1,288 @@
+[
+  {
+    "id": 1,
+    "plan": {
+      "query": "Mã trường của Trường Đại học Quy Nhơn là gì?",
+      "years": [
+        2026
+      ],
+      "requires_year": false,
+      "uses_history": false,
+      "coverage": "focused",
+      "entity": "Trường Đại học Quy Nhơn",
+      "attribute": "mã trường",
+      "method": null,
+      "round": null,
+      "event": null,
+      "search_queries": [
+        "mã trường Đại học Quy Nhơn",
+        "mã tuyển sinh QNU",
+        "mã đơn vị đào tạo Trường Đại học Quy Nhơn"
+      ]
+    },
+    "blocks": [
+      {
+        "id": "ks_rev_6280c8de7f46:2229:2320",
+        "binding_id": "bnd_b7be60e6ada9",
+        "index_revision_id": "idx_rev_33446987e9fc",
+        "source_revision_id": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "page_number": 2,
+        "section": "",
+        "header_context": "<!-- Trang 1 -->\nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\n1906\n\nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số\n1401/QĐ-ĐHQN ngày 18/5/2026 của Hiệu trưởng Trường Đại học Quy Nhơn;\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:\n\nI. THÔNG TIN CHUNG\n\n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn\n\n2. Mã cơ sở đào tạo trong tuyển sinh: DQN\n\n3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai\n\n4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn\n\n5",
+        "text": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+        "start": 2229,
+        "end": 2320,
+        "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_6280c8de7f46:179:237",
+        "binding_id": "bnd_b7be60e6ada9",
+        "index_revision_id": "idx_rev_33446987e9fc",
+        "source_revision_id": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "page_number": 1,
+        "section": "",
+        "header_context": "<!-- Trang 1 -->\nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\n1906\n\nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số\n1401/QĐ-ĐHQN ngày 18/5/2026 của Hiệu trưởng Trường Đại học Quy Nhơn;\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:\n\nI. THÔNG TIN CHUNG\n\n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn\n\n2. Mã cơ sở đào tạo trong tuyển sinh: DQN\n\n3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai\n\n4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn\n\n5",
+        "text": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+        "start": 179,
+        "end": 237,
+        "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_6280c8de7f46:2322:2468",
+        "binding_id": "bnd_b7be60e6ada9",
+        "index_revision_id": "idx_rev_33446987e9fc",
+        "source_revision_id": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "page_number": 2,
+        "section": "",
+        "header_context": "<!-- Trang 1 -->\nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\n1906\n\nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số\n1401/QĐ-ĐHQN ngày 18/5/2026 của Hiệu trưởng Trường Đại học Quy Nhơn;\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:\n\nI. THÔNG TIN CHUNG\n\n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn\n\n2. Mã cơ sở đào tạo trong tuyển sinh: DQN\n\n3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai\n\n4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn\n\n5",
+        "text": "+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp\nTHPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học\nQuy Nhơn.",
+        "start": 2322,
+        "end": 2468,
+        "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_6280c8de7f46:1037:1078",
+        "binding_id": "bnd_b7be60e6ada9",
+        "index_revision_id": "idx_rev_33446987e9fc",
+        "source_revision_id": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "page_number": 1,
+        "section": "",
+        "header_context": "<!-- Trang 1 -->\nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\n1906\n\nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)\n\nHình thức đào tạo: Chính quy\n\nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số\n1401/QĐ-ĐHQN ngày 18/5/2026 của Hiệu trưởng Trường Đại học Quy Nhơn;\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:\n\nI. THÔNG TIN CHUNG\n\n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn\n\n2. Mã cơ sở đào tạo trong tuyển sinh: DQN\n\n3. Địa chỉ: 170 An Dương Vương, P. Quy Nhơn Nam, tỉnh Gia Lai\n\n4. Địa chỉ trang thông tin điện tử: https://qnu.edu.vn\n\n5",
+        "text": "2. Mã cơ sở đào tạo trong tuyển sinh: DQN",
+        "start": 1037,
+        "end": 1078,
+        "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_a34cee5023eb:4324:4575",
+        "binding_id": "bnd_62ff83603eec",
+        "index_revision_id": "idx_rev_e0dc72a9102b",
+        "source_revision_id": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "page_number": 3,
+        "section": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc / QUY ĐỊNH CHUNG / Điều 2. Giải thích từ ngữ",
+        "header_context": "<!-- Trang 1 -->\n# CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc\n\nSố: 06 /2026/TT-BGDDT\n\nHà Nội, ngày 15 tháng 02 năm 2026\n\nTRƯỜNG ĐẠI HOC QUY NHỒN\n\n## THÔNG TỪ\n\nBan hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng\n\nĐỀN Số: 363 Ngày: 26102/2026\n\nChuyển: Căn cứ Luật Giáo dục số 43/2019/QH14, được sửa đổi bởi Luật Giáo dục Số và ký hiệu H5/2025/QH15;\n\nCăn cứ Luật Giáo dục đại học số 125/2025/QH15;\n\nCăn cứ Luật Giáo dục nghề nghiệp số 124/2025/QH15;\n\nCăn cứ Nghị định số 37/2025/NĐ-CP ngày 26 tháng 02 năm 2025 của Chính phủ quy định chức năng, nhiệm vụ, quyền hạn và cơ cấu tổ chức của Bộ Giáo dục và Đào tạo;\n\nTheo đề nghị của Vụ trưởng Vụ Giáo dục Đại học;\n\nBộ trưởng Bộ Giáo dục và Đào tạo ban hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng.\n\nĐiều 1. Ban hành kèm theo Thông tư này Quy chế tuyển sinh các ngành đạo tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng.\n\nĐiều 2. Thông tư này có hiệu lực thi hành kế từ ngày15 tháng02 năm 2026 và thay thế các Thông tư số 08/2022/TT-BGĐĐT ngày 06 tháng 6 năm 2022 ban hành kèm theo Quy chế tuyển sinh đại học",
+        "text": "4. Mã trường trong tuyền sinh là một mã quy ước gồm 03 ký tự chữ hoặc số thống nhất toàn quốc dùng để định danh tuyển sinh một cơ sở đào tạo; phân hiệu hoặc đơn vị đào tạo thuộc, trực thuộc cơ sở đào tạo có bộ máy quản lý được lập mã tuyển sinh riêng.",
+        "start": 4324,
+        "end": 4575,
+        "canonical_hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_a34cee5023eb:83:104",
+        "binding_id": "bnd_62ff83603eec",
+        "index_revision_id": "idx_rev_e0dc72a9102b",
+        "source_revision_id": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "page_number": 1,
+        "section": "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc",
+        "header_context": "<!-- Trang 1 -->\n# CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc\n\nSố: 06 /2026/TT-BGDDT\n\nHà Nội, ngày 15 tháng 02 năm 2026\n\nTRƯỜNG ĐẠI HOC QUY NHỒN\n\n## THÔNG TỪ\n\nBan hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng\n\nĐỀN Số: 363 Ngày: 26102/2026\n\nChuyển: Căn cứ Luật Giáo dục số 43/2019/QH14, được sửa đổi bởi Luật Giáo dục Số và ký hiệu H5/2025/QH15;\n\nCăn cứ Luật Giáo dục đại học số 125/2025/QH15;\n\nCăn cứ Luật Giáo dục nghề nghiệp số 124/2025/QH15;\n\nCăn cứ Nghị định số 37/2025/NĐ-CP ngày 26 tháng 02 năm 2025 của Chính phủ quy định chức năng, nhiệm vụ, quyền hạn và cơ cấu tổ chức của Bộ Giáo dục và Đào tạo;\n\nTheo đề nghị của Vụ trưởng Vụ Giáo dục Đại học;\n\nBộ trưởng Bộ Giáo dục và Đào tạo ban hành Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng.\n\nĐiều 1. Ban hành kèm theo Thông tư này Quy chế tuyển sinh các ngành đạo tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng.\n\nĐiều 2. Thông tư này có hiệu lực thi hành kế từ ngày15 tháng02 năm 2026 và thay thế các Thông tư số 08/2022/TT-BGĐĐT ngày 06 tháng 6 năm 2022 ban hành kèm theo Quy chế tuyển sinh đại học",
+        "text": "Số: 06 /2026/TT-BGDDT",
+        "start": 83,
+        "end": 104,
+        "canonical_hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_f122689af572:8213:8227",
+        "binding_id": "bnd_ed14ffc71bc0",
+        "index_revision_id": "idx_rev_46812c2c2247",
+        "source_revision_id": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "page_number": 2,
+        "section": "TUYÊN SINH DẠI HỌC 2026",
+        "header_context": "<!-- Trang 1 -->\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_4_0_493_405.jpg\" alt=\"Image\" width=\"29%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_113_441_217_544.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_299_439_406_545.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\nĐẶNG KÝ TUYỀN SINH\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_91_609_132_650.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n1800 55 88 49\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_659_130_697.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuvantuyensinh@qnu.edu.vn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_707_130_746.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuyensinh.qnu.edu.vn\n\nTuyển sinh Trường Đại học Quy Nhơn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_89_755_131_796.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_887_28_978_115.jpg\" alt=\"Image\" width=\"5%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_6_827_831_1127.jpg\" alt=\"Image\" width=\"48%\" /></div>\n\n",
+        "text": "Mã trưởng: DQN",
+        "start": 8213,
+        "end": 8227,
+        "canonical_hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_f122689af572:1248:1273",
+        "binding_id": "bnd_ed14ffc71bc0",
+        "index_revision_id": "idx_rev_46812c2c2247",
+        "source_revision_id": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "page_number": 1,
+        "section": "TUYÊN SINH DẠI HỌC 2026",
+        "header_context": "<!-- Trang 1 -->\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_4_0_493_405.jpg\" alt=\"Image\" width=\"29%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_113_441_217_544.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_299_439_406_545.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\nĐẶNG KÝ TUYỀN SINH\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_91_609_132_650.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n1800 55 88 49\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_659_130_697.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuvantuyensinh@qnu.edu.vn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_707_130_746.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuyensinh.qnu.edu.vn\n\nTuyển sinh Trường Đại học Quy Nhơn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_89_755_131_796.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_887_28_978_115.jpg\" alt=\"Image\" width=\"5%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_6_827_831_1127.jpg\" alt=\"Image\" width=\"48%\" /></div>\n\n",
+        "text": "# TUYÊN SINH DẠI HỌC 2026",
+        "start": 1248,
+        "end": 1273,
+        "canonical_hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "ks_rev_f122689af572:3278:3292",
+        "binding_id": "bnd_ed14ffc71bc0",
+        "index_revision_id": "idx_rev_46812c2c2247",
+        "source_revision_id": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "page_number": 2,
+        "section": "TUYÊN SINH DẠI HỌC 2026",
+        "header_context": "<!-- Trang 1 -->\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_4_0_493_405.jpg\" alt=\"Image\" width=\"29%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_113_441_217_544.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_299_439_406_545.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\nĐẶNG KÝ TUYỀN SINH\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_91_609_132_650.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n1800 55 88 49\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_659_130_697.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuvantuyensinh@qnu.edu.vn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_92_707_130_746.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\ntuyensinh.qnu.edu.vn\n\nTuyển sinh Trường Đại học Quy Nhơn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_89_755_131_796.jpg\" alt=\"Image\" width=\"2%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_887_28_978_115.jpg\" alt=\"Image\" width=\"5%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_6_827_831_1127.jpg\" alt=\"Image\" width=\"48%\" /></div>\n\n",
+        "text": "Mã trưởng: DQN",
+        "start": 3278,
+        "end": 3292,
+        "canonical_hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f",
+        "origin": "canonical",
+        "fact_id": null,
+        "fact_context": {},
+        "scope_years": [
+          2026
+        ]
+      },
+      {
+        "id": "facts:79e7d3259734e47881b7",
+        "binding_id": "bnd_db935aea6524",
+        "index_revision_id": "idx_rev_44d332b2f2e8",
+        "source_revision_id": "ks_rev_c9344b18c429",
+        "title": "TB lịch xét tuyển ĐH",
+        "page_number": 3,
+        "section": "",
+        "header_context": "<!-- Trang 1 -->\nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN\n\nSố: /TB-ĐHQN\n\nCỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nGia Lai, ngày tháng năm 2026\n\n2110\n\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;\n\nCăn cứ Công văn số 2304/BGDĐT-GDĐH ngày 04/5/2026 hướng dẫn\ntuyển sinh đại học, tuyển sinh cao đẳng 2026;\n\n| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 1. |  | Cập nhật kết quả tuyển thẳng, ưu tiên xét<br>tuyển; kết quả thi năng khiếu Giáo dục<br>mầm non, Giáo dục thể chất lên Hệ thống<br>của Bộ. |  |  |\n| 2. |  | Cập nhật ngưỡng đầu vào các CTĐT giáo<br>viên, CTĐT thuộc lĩnh vực pháp luật lên<br>Hệ thống |  |  |\n| 3. |  | Rà soát và cập nhật chính xác chỉ tiêu xét<br>tuyển giáo viên đã được Bộ GDĐT thông<br>báo lên Hệ thống báo cáo xác định số<br>lượng xét tuyển và trang Nghiệp vụ |  |  |\n| 4. | Trước 17:00 ngày 10/7/2026 | Xây dựng quy tắc quy đổi điểm học bạ THPT (điểm trung bình các môn) sang điểm thi tốt nghiệp THPT tương đương, căn cứ số liệu thống kê tương quan do Bộ GD",
+        "text": "Họp HĐTS Trường Đại học Quy Nhơn thống nhất số lượng trúng tuyển, điểm chuẩn dự kiến\nChủ trì thực hiện: HĐTS\nPhối hợp thực hiện: Tổ máy tính",
+        "start": -1,
+        "end": -1,
+        "canonical_hash": "f9ca20b7e4328551fb99f2bf59bb57c1462f7fe5cdb566364f9ce6aae265e5bc",
+        "origin": "reviewed_fact",
+        "fact_id": "fct_983d6d95ffc3bbcd9f8bf301",
+        "fact_context": {
+          "cells": [
+            {
+              "fact_id": "fct_983d6d95ffc3bbcd9f8bf301",
+              "attribute": "Chủ trì thực hiện",
+              "value": "HĐTS",
+              "temporal_context": {
+                "type": "unknown",
+                "year": null,
+                "years": [],
+                "status": "unknown",
+                "evidence": "column_header"
+              },
+              "qualifiers": {
+                "method": null
+              },
+              "attribute_code": null,
+              "relation": null
+            },
+            {
+              "fact_id": "fct_3f803f5b77386dbcd4d6580a",
+              "attribute": "Phối hợp thực hiện",
+              "value": "Tổ máy tính",
+              "temporal_context": {
+                "type": "unknown",
+                "year": null,
+                "years": [],
+                "status": "unknown",
+                "evidence": "column_header"
+              },
+              "qualifiers": {
+                "method": null
+              },
+              "attribute_code": null,
+              "relation": null
+            }
+          ]
+        },
+        "scope_years": []
+      }
+    ],
+    "proposal": {
+      "status": "supported",
+      "claims": [
+        {
+          "id": "c1",
+          "text": "Mã cơ sở đào tạo trong tuyển sinh: DQN.",
+          "references": [
+            {
+              "block_id": "ks_rev_6280c8de7f46:1037:1078",
+              "quote": "2. Mã cơ sở đào tạo trong tuyển sinh: DQN"
+            },
+            {
+              "block_id": "ks_rev_6280c8de7f46:179:237",
+              "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)"
+            }
+          ]
+        }
+      ],
+      "missing_constraints": []
+    },
+    "checks": [
+      {
+        "claim": "c1",
+        "same_source": true,
+        "numbers_supported": true
+      }
+    ]
+  }
+]

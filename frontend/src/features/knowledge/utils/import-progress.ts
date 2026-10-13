@@ -3,7 +3,12 @@ import type { KnowledgeImportItemResponse } from "@/types/knowledge";
 type ProgressItem = Pick<KnowledgeImportItemResponse, "status" | "progress">;
 
 export function getItemProgress(item: ProgressItem): number {
-  if (item.status === "succeeded") return 100;
+  if (
+    ["succeeded", "review_required", "failed", "skipped", "cancelled"].includes(
+      item.status,
+    )
+  )
+    return 100;
   if (item.status === "queued") return 0;
   const value = item.progress || 0;
   return Number.isFinite(value) ? Math.max(0, Math.min(99, value)) : 0;

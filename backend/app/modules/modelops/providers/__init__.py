@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.exceptions import AppException
+from app.modules.modelops.providers.anthropic_adapter import AnthropicAdapter
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.providers.cloudflare_adapter import CloudflareAdapter
 from app.modules.modelops.providers.gemini_adapter import GeminiAdapter
@@ -32,6 +34,10 @@ def get_llm_adapter(
 ) -> BaseLLMAdapter:
     """Factory method for creating LLM provider adapters."""
     pt = provider_type.lower().strip()
+    if pt == "claude":
+        return AnthropicAdapter(model_name, api_key, base_url or "https://api.anthropic.com/v1", timeout_seconds)
+    if pt in {"custom", "vllm", "tei"} and not base_url:
+        raise AppException("Provider tùy chỉnh cần Base URL rõ ràng.", code="MODEL_REQUEST_CONFIG_INVALID", status_code=422)
 
     if pt == "openai":
         return OpenAIAdapter(
@@ -39,6 +45,7 @@ def get_llm_adapter(
             api_key=api_key,
             base_url=base_url or "https://api.openai.com/v1",
             timeout_seconds=timeout_seconds,
+            request_capabilities=kwargs.get("request_capabilities"),
         )
 
     if pt == "gemini":
@@ -86,15 +93,17 @@ def get_llm_adapter(
         effective_base = base_url or default_urls.get(pt)
         if pt in ("ollama", "custom", "vllm", "tei") and effective_base:
             effective_base = resolve_ollama_network_url(effective_base)
-        if effective_base and not effective_base.endswith("/v1") and not effective_base.endswith("/v1/"):
+        from urllib.parse import urlsplit
+        if effective_base and urlsplit(effective_base).path.rstrip('/') == "":
             effective_base = f"{effective_base.rstrip('/')}/v1"
 
         return OpenAIAdapter(
             model_name=model_name,
-            api_key=api_key or ("vllm" if pt in ("vllm", "tei") else "ollama" if pt in ("ollama", "custom") else None),
+            api_key=api_key or ("vllm" if pt in ("vllm", "tei") else "ollama" if pt == "ollama" else None),
             base_url=effective_base,
             timeout_seconds=timeout_seconds,
             provider_type=pt,
+            request_capabilities=kwargs.get("request_capabilities"),
         )
 
     raise ValueError(f"Unsupported LLM provider type: '{provider_type}'")

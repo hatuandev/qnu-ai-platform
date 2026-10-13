@@ -27,6 +27,8 @@ from app.modules.knowledge.schemas import (
     BuildStagingIndexRequest,
     BuildVectorGenerationRequest,
     BuildVectorGenerationResponse,
+    BulkReviewSourceRevisionsRequest,
+    BulkReviewSourceRevisionsResponse,
     CanaryPolicyResponse,
     CandidateGroupListResponse,
     CandidateListResponse,
@@ -64,6 +66,7 @@ from app.modules.knowledge.schemas import (
     PreviewDocumentGroupResponse,
     PreviewGroupSourceDiffResponse,
     PublishGroupSourceResponse,
+    PublishSelectedVectorsRequest,
     ReconcileFixResponse,
     ReindexDocumentResponse,
     ReparseSourceRequest,
@@ -562,7 +565,7 @@ async def preview_vector_generation(
 ) -> AskResponse:
     from app.modules.knowledge.services.generation_candidate import ask_candidate
 
-    return await ask_candidate(db, collection_id, generation_id, body.question, body.module_code, actor)
+    return await ask_candidate(db, collection_id, generation_id, body.question, body.module_code, actor, body.items)
 
 
 @router.post(
@@ -1412,6 +1415,33 @@ async def review_source_revision(
 
 
 @router.post(
+    "/collections/{collection_id}/sources/reviews",
+    response_model=BulkReviewSourceRevisionsResponse,
+    summary="Duyệt hàng loạt các bản nguồn đang chờ kiểm tra",
+)
+async def review_source_revisions_bulk(
+    collection_id: str,
+    payload: BulkReviewSourceRevisionsRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> BulkReviewSourceRevisionsResponse:
+    revisions = await source_ingestion_service.review_source_revisions_bulk(
+        db=db,
+        collection_id=collection_id,
+        items=payload.items,
+        decision=payload.decision,
+        comment=payload.comment,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+        actor_id=actor.actor_id,
+    )
+    return BulkReviewSourceRevisionsResponse(
+        reviewed_count=len(revisions),
+        revisions=[KnowledgeSourceRevisionResponse.model_validate(item) for item in revisions],
+    )
+
+
+@router.post(
     "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/context",
     response_model=KnowledgeSourceRevisionResponse,
     summary="Tạo bản dự thảo nâng/hiệu đính ngữ cảnh, không OCR lại hoặc thay serving index",
@@ -1601,6 +1631,21 @@ async def activate_vector_generation(
         generation_id=generation_id,
         actor=actor,
     )
+
+
+@router.post(
+    "/collections/{collection_id}/vector-generations/{generation_id}/publish-selected",
+    response_model=ActivateVectorGenerationResponse,
+    summary="Xuất bản các nguồn đã chọn, giữ nguyên nguồn đang phục vụ khác",
+)
+async def publish_selected_source_vectors(
+    collection_id: str, generation_id: str, payload: PublishSelectedVectorsRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> ActivateVectorGenerationResponse:
+    from app.modules.knowledge.services.selected_vector_publish import publish_selected_vectors
+
+    return await publish_selected_vectors(db, collection_id, generation_id, payload.items, actor)
 
 
 @router.get(

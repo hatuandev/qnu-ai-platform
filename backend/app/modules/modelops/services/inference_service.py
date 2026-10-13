@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
@@ -19,7 +20,13 @@ from app.core.exceptions import AppException
 from app.modules.modelops.circuit_breaker import circuit_breaker_registry
 from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import get_llm_adapter
+from app.modules.modelops.providers.chat_contract import safe_error_message
 from app.modules.modelops.schemas import LLMGenerateRequest, LLMGenerateResponse
+from app.modules.modelops.services.chat_capabilities import (
+    load_chat_capabilities,
+    save_chat_capabilities,
+)
+from app.modules.modelops.services.chat_routes import VALID_CHAT_PROVIDER_TYPES, plan_chat_routes
 from app.modules.modelops.services.key_rotation import (
     classify_key_failure,
     describe_provider_failure,
@@ -38,74 +45,8 @@ from app.modules.modelops.services.usage_accounting_service import usage_account
 
 logger = logging.getLogger(__name__)
 
-VALID_CHAT_PROVIDER_TYPES: set[str] = {
-    "gemini",
-    "openai",
-    "cloudflare",
-    "deepseek",
-    "groq",
-    "claude",
-    "mistral",
-    "openrouter",
-    "nvidia",
-    "custom",
-    "vllm",
-    "openai_compatible",
-}
-NON_CHAT_MODEL_KEYWORDS: tuple[str, ...] = ("bge-", "embed", "rerank", "tableformer")
 
 
-def _is_model_compatible_with_provider(p: dict[str, Any], model_name: str | None) -> bool:
-    """Check if model name belongs to or is accepted by provider dynamically."""
-    if not model_name or not str(model_name).strip():
-        return False
-    m_clean = str(model_name).strip()
-    m_lower = m_clean.lower()
-    p_models = [str(x).strip().lower() for x in (p.get("models") or [])]
-    p_def_model = str(p.get("model_name", "")).strip().lower()
-
-    # 1. Exact match in provider models list or default model
-    if m_lower in p_models or m_lower == p_def_model:
-        return True
-
-    p_type = str(p.get("provider_type", "")).strip().lower()
-    p_id = str(p.get("id", "")).strip().lower()
-    if p_type in {"openai_compatible", "vllm", "custom", "openrouter", "groq"}:
-        return True
-
-    # 2. Family & provider type matching
-    if any(k in m_lower for k in ("gemini", "gemma")):
-        return p_type in ("gemini", "google") or "gemini" in p_id or "google" in p_id
-    if any(k in m_lower for k in ("gpt-", "chatgpt", "o1-", "o3-", "o1", "o3")):
-        return p_type in ("openai", "azure") or "openai" in p_id
-    if "claude" in m_lower:
-        return p_type in ("anthropic", "claude") or "claude" in p_id
-    if any(k in m_lower for k in ("mistral", "codestral", "ministral", "pixtral")):
-        return p_type in ("mistral",) or "mistral" in p_id
-    if any(k in m_lower for k in ("qwen", "deepseek", "llama", "phi-", "mixtral")):
-        return p_type in (
-            "groq",
-            "cloudflare",
-            "custom",
-            "openrouter",
-            "nvidia",
-        )
-
-    # 3. Custom / OpenRouter / OpenAI compatible proxies allow arbitrary model names
-    return p_type in ("openai_compatible", "vllm", "custom", "openrouter", "groq")
-
-
-def _provider_has_credentials(p: dict[str, Any]) -> bool:
-    """Check if a provider has at least one active API credential."""
-    if p.get("api_key") or p.get("api_key_masked"):
-        return True
-    keys = p.get("api_keys") or []
-    return any(
-        k.get("is_active", True)
-        and k.get("status") == "active"
-        and (k.get("api_key") or k.get("key_ciphertext"))
-        for k in keys
-    )
 
 
 class InferenceService:
@@ -273,7 +214,7 @@ class InferenceService:
         """Execute chat completion with Key Pool rotation, Circuit Breaker, Dynamic Fallback and Quota logging."""
         # 1. Quota Pre-check
         estimated_tokens = self._estimate_request_tokens(req)
-        quota = await self._call_check_quota_available(
+        await self._call_check_quota_available(
             db, req.tenant_id, estimated_tokens=estimated_tokens
         )
 
@@ -286,42 +227,17 @@ class InferenceService:
             and "routing" not in str(p.get("id", "")).lower()
         ]
 
-        # Filter out cloud providers that have no active keys configured when configured providers exist
-        configured_providers = [p for p in providers if _provider_has_credentials(p)]
-        if configured_providers:
-            providers = configured_providers
-
-        if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
-            def _match_score(p: dict[str, Any]) -> int:
-                score = 0
-                if _provider_has_credentials(p):
-                    score += 200
-                else:
-                    score -= 500
-                if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
-                    score += 100
-                p_models = p.get("models") or []
-                if req.preferred_model_name:
-                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
-                        score += 50
-                    elif _is_model_compatible_with_provider(p, req.preferred_model_name):
-                        score += 40
-                if req.fallback_model_name:
-                    if req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name:
-                        score += 25
-                    elif _is_model_compatible_with_provider(p, req.fallback_model_name):
-                        score += 20
-                return score
-
-            providers = sorted(providers, key=_match_score, reverse=True)
+        routes = plan_chat_routes(providers, req)
 
         # 3. Traverse Providers with Circuit Breaker and Key Pool Rotation
-        for idx, p in enumerate(providers):
+        fallback_reasons: list[str] = []
+        for idx, (p, chosen_model) in enumerate(routes):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
             provider_error: Exception | None = None
 
             if not cb.can_execute():
+                fallback_reasons.append(f"{p['id']}: circuit_breaker_open")
                 logger.warning("Circuit Breaker OPEN for [%s] — skipping to next fallback", p_name)
                 continue
 
@@ -361,6 +277,7 @@ class InferenceService:
                         {"id": "default", "name": "Default", "api_key": p["api_key"]}
                     ]
             if not available_keys:
+                fallback_reasons.append(f"{p['id']}: no_available_credentials")
                 logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
                 continue
 
@@ -374,44 +291,6 @@ class InferenceService:
                         await provider_key_rotation_service.release(db, lease)
                     logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
                     continue
-                p_models = p.get("models") or []
-                chat_candidates = [
-                    m
-                    for m in p_models
-                    if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
-                ]
-
-                # Resolve chosen_model dynamically respecting user's configuration
-                if (
-                    (req.preferred_provider_id and p.get("id") == req.preferred_provider_id and req.preferred_model_name)
-                    or (req.preferred_model_name and _is_model_compatible_with_provider(p, req.preferred_model_name))
-                ):
-                    chosen_model = req.preferred_model_name
-                elif req.fallback_model_name and _is_model_compatible_with_provider(p, req.fallback_model_name):
-                    chosen_model = req.fallback_model_name
-                else:
-                    if chat_candidates and any(
-                        x in str(p.get("model_name", "")).lower()
-                        for x in NON_CHAT_MODEL_KEYWORDS
-                    ):
-                        chosen_model = chat_candidates[0]
-                    else:
-                        chosen_model = p["model_name"]
-
-                # Hard safety check: never pass an embedding / reranker model to LLM chat generator
-                if any(x in str(chosen_model).lower() for x in NON_CHAT_MODEL_KEYWORDS):
-                    if chat_candidates:
-                        chosen_model = chat_candidates[0]
-                    else:
-                        lease = active_key_entry.get("_lease")
-                        if isinstance(lease, LeasedProviderKey):
-                            await provider_key_rotation_service.release(db, lease)
-                        logger.warning(
-                            "Provider '%s' has only non-chat model '%s', skipping provider",
-                            p["name"],
-                            chosen_model,
-                        )
-                        continue
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)
@@ -425,6 +304,8 @@ class InferenceService:
                         base_url=p["api_base_url"],
                         timeout_seconds=p["timeout_seconds"],
                         account_id=active_key_entry.get("account_id") or p.get("account_id"),
+                        request_capabilities=load_chat_capabilities(
+                            cfg_obj.extra_config if cfg_obj else {}, chosen_model, p['api_base_url']),
                     )
 
                     try:
@@ -460,6 +341,8 @@ class InferenceService:
 
                     # Record success for circuit breaker
                     cb.record_success()
+                    await save_chat_capabilities(db, p['id'], chosen_model, p['api_base_url'],
+                                                 getattr(adapter, 'request_capabilities', {}))
 
                     # Calculate monetary cost
                     cost_usd = cost_tracker.calculate_cost(
@@ -471,9 +354,6 @@ class InferenceService:
 
                     # Update Quota & Usage
                     try:
-                        quota.tokens_used += resp.total_tokens
-                        quota.cost_used_usd += cost_usd
-
                         await self._call_record_usage_log(
                             db,
                             tenant_id=req.tenant_id,
@@ -486,6 +366,7 @@ class InferenceService:
                             latency_ms=resp.latency_ms,
                             is_fallback=is_fallback_run,
                             status="success",
+                            error_message=('Fallback: ' + '; '.join(fallback_reasons))[:500] if fallback_reasons else None,
                         )
                     except Exception as db_err:
                         logger.warning("Failed to record usage in database: %s", db_err)
@@ -501,6 +382,9 @@ class InferenceService:
                         latency_ms=resp.latency_ms,
                         is_fallback=is_fallback_run,
                         active_key_id=active_key_entry.get("id"),
+                        requested_model=req.preferred_model_name,
+                        provider_id=p['id'],
+                        fallback_reason='; '.join(fallback_reasons) or None,
                     )
 
                 except asyncio.CancelledError:
@@ -510,6 +394,10 @@ class InferenceService:
                     raise
                 except Exception as exc:
                     provider_error = exc
+                    detail = safe_error_message(exc.response, used_api_key) if isinstance(exc, httpx.HTTPStatusError) else describe_provider_failure(exc)
+                    fallback_reasons.append(f"{p['id']}: {detail}")
+                    logger.warning('model_inference_failed provider_id=%s requested_model=%s detail=%s',
+                                   p['id'], chosen_model, detail)
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
                         failure = await provider_key_rotation_service.complete_failure(
@@ -572,7 +460,7 @@ class InferenceService:
         """Stream chat tokens with Key Pool rotation, Preferred Model priority, Quota tracking and Dynamic Fallback."""
         # 1. Quota Pre-check
         estimated_tokens = self._estimate_request_tokens(req)
-        quota = await self._call_check_quota_available(
+        await self._call_check_quota_available(
             db, req.tenant_id, estimated_tokens=estimated_tokens
         )
 
@@ -585,36 +473,9 @@ class InferenceService:
             and "routing" not in str(p.get("id", "")).lower()
         ]
 
-        # Filter out cloud providers that have no active keys configured when configured providers exist
-        configured_providers = [p for p in providers if _provider_has_credentials(p)]
-        if configured_providers:
-            providers = configured_providers
+        routes = plan_chat_routes(providers, req)
 
-        if req.preferred_provider_id or req.preferred_model_name or req.fallback_model_name:
-            def _match_score(p: dict[str, Any]) -> int:
-                score = 0
-                if _provider_has_credentials(p):
-                    score += 200
-                else:
-                    score -= 500
-                if req.preferred_provider_id and p.get("id") == req.preferred_provider_id:
-                    score += 100
-                p_models = p.get("models") or []
-                if req.preferred_model_name:
-                    if req.preferred_model_name in p_models or p.get("model_name") == req.preferred_model_name:
-                        score += 50
-                    elif _is_model_compatible_with_provider(p, req.preferred_model_name):
-                        score += 40
-                if req.fallback_model_name:
-                    if req.fallback_model_name in p_models or p.get("model_name") == req.fallback_model_name:
-                        score += 25
-                    elif _is_model_compatible_with_provider(p, req.fallback_model_name):
-                        score += 20
-                return score
-
-            providers = sorted(providers, key=_match_score, reverse=True)
-
-        for idx, p in enumerate(providers):
+        for idx, (p, chosen_model) in enumerate(routes):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
             provider_error: Exception | None = None
@@ -666,44 +527,6 @@ class InferenceService:
                         await provider_key_rotation_service.release(db, lease)
                     logger.debug("Provider [%s] key [%s] is empty, skipping key", p_name, active_key_entry.get("id"))
                     continue
-                p_models = p.get("models") or []
-                chat_candidates = [
-                    m
-                    for m in p_models
-                    if not any(x in m.lower() for x in NON_CHAT_MODEL_KEYWORDS)
-                ]
-
-                # Resolve chosen_model dynamically respecting user's configuration
-                if (
-                    (req.preferred_provider_id and p.get("id") == req.preferred_provider_id and req.preferred_model_name)
-                    or (req.preferred_model_name and _is_model_compatible_with_provider(p, req.preferred_model_name))
-                ):
-                    chosen_model = req.preferred_model_name
-                elif req.fallback_model_name and _is_model_compatible_with_provider(p, req.fallback_model_name):
-                    chosen_model = req.fallback_model_name
-                else:
-                    if chat_candidates and any(
-                        x in str(p.get("model_name", "")).lower()
-                        for x in NON_CHAT_MODEL_KEYWORDS
-                    ):
-                        chosen_model = chat_candidates[0]
-                    else:
-                        chosen_model = p["model_name"]
-
-                # Hard safety check: never pass an embedding / reranker model to LLM chat generator
-                if any(x in str(chosen_model).lower() for x in NON_CHAT_MODEL_KEYWORDS):
-                    if chat_candidates:
-                        chosen_model = chat_candidates[0]
-                    else:
-                        lease = active_key_entry.get("_lease")
-                        if isinstance(lease, LeasedProviderKey):
-                            await provider_key_rotation_service.release(db, lease)
-                        logger.warning(
-                            "Provider '%s' has only non-chat model '%s', skipping provider",
-                            p["name"],
-                            chosen_model,
-                        )
-                        continue
 
                 is_fallback_run = bool(
                     idx > 0 or (req.preferred_model_name and chosen_model != req.preferred_model_name)
@@ -722,6 +545,8 @@ class InferenceService:
                         base_url=p["api_base_url"],
                         timeout_seconds=p["timeout_seconds"],
                         account_id=active_key_entry.get("account_id") or p.get("account_id"),
+                        request_capabilities=load_chat_capabilities(
+                            cfg_obj.extra_config if cfg_obj else {}, chosen_model, p['api_base_url']),
                     )
                     try:
                         token_stream = adapter.stream(
@@ -753,17 +578,14 @@ class InferenceService:
 
                     elapsed_ms = round((time.perf_counter() - start_time) * 1000, 1)
                     full_content = "".join(streamed_chunks)
+                    reported_usage = getattr(adapter, 'stream_usage', {})
                     prompt_chars = sum(len(m.content) for m in req.messages)
-                    prompt_tokens = max(1, prompt_chars // 4)
-                    completion_tokens = max(1, len(full_content) // 4)
+                    prompt_tokens = reported_usage.get('prompt_tokens', max(1, prompt_chars // 4)) if isinstance(reported_usage, dict) else max(1, prompt_chars // 4)
+                    completion_tokens = reported_usage.get('completion_tokens', max(1, len(full_content) // 4)) if isinstance(reported_usage, dict) else max(1, len(full_content) // 4)
                     total_tokens = prompt_tokens + completion_tokens
-
-                    cost_usd = cost_tracker.calculate_cost(
-                        provider=p["provider_type"],
-                        model_name=chosen_model,
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
-                    )
+                    served_model = getattr(adapter, 'served_model', None)
+                    if not isinstance(served_model, str):
+                        served_model = chosen_model
 
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
@@ -781,17 +603,17 @@ class InferenceService:
 
                     cb.record_success()
 
-                    try:
-                        quota.tokens_used += total_tokens
-                        quota.cost_used_usd += cost_usd
+                    await save_chat_capabilities(db, p['id'], chosen_model, p['api_base_url'],
+                                                 getattr(adapter, 'request_capabilities', {}))
 
+                    try:
                         await self._call_record_usage_log(
                             db,
                             tenant_id=req.tenant_id,
                             assistant_id=req.assistant_code,
                             conversation_id=req.conversation_id,
                             provider=p["provider_type"],
-                            model_name=chosen_model,
+                            model_name=served_model,
                             prompt_tokens=prompt_tokens,
                             completion_tokens=completion_tokens,
                             latency_ms=elapsed_ms,

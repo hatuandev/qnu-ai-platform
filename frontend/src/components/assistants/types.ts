@@ -12,6 +12,8 @@ export interface AssistantEditForm {
   collection_id: string;
   sample_questions: SampleQuestionItem[];
   primary_model: string;
+  preferred_provider_id?: string;
+  fallback_provider_id?: string;
   fallback_model: string;
   temperature: number;
   max_tokens: number;
@@ -26,6 +28,7 @@ export interface AssistantEditForm {
   no_answer_message: string;
   reranker_enabled?: boolean;
   reranker_model?: string;
+  reranker_provider_id?: string;
   reranker_top_k?: number;
   reranker_score_threshold?: number;
 }

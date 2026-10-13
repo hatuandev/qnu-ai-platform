@@ -19,6 +19,7 @@ from app.core.crypto import decrypt_secret, encrypt_secret, is_encrypted
 from app.core.exceptions import AppException
 from app.modules.modelops.circuit_breaker import circuit_breaker_registry
 from app.modules.modelops.models import ModelProviderConfig, ProviderApiKey
+from app.modules.modelops.providers.chat_contract import safe_error_message
 from app.modules.modelops.schemas import (
     ProviderConfigCreate,
     ProviderConfigUpdate,
@@ -26,8 +27,17 @@ from app.modules.modelops.schemas import (
     ProviderKeyCreate,
     ProviderKeyUpdate,
 )
+from app.modules.modelops.services.capability_probe import probe_capability
+from app.modules.modelops.services.chat_capabilities import (
+    load_chat_capabilities,
+    save_chat_capabilities,
+    save_connection_observation,
+)
+from app.modules.modelops.services.chat_probe import probe_chat
+from app.modules.modelops.services.chat_routes import VALID_CHAT_PROVIDER_TYPES
 from app.modules.modelops.services.key_pool_persistence import key_pool_snapshot, sync_imported_keys
 from app.modules.modelops.services.key_status import normalize_provider_key_status
+from app.modules.modelops.services.probe_credentials import select_probe_credential
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +80,7 @@ def _init_default_keys() -> None:
                 "priority": 1,
                 "is_active": True,
                 "status": "active",
-                "quota_limit": 20_000_000,
+                "quota_limit": None,
                 "usage_tokens": 0,
                 "cooldown_until": None,
                 "last_used_at": None,
@@ -88,7 +98,7 @@ def _init_default_keys() -> None:
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
-                    "quota_limit": 10_000_000,
+                    "quota_limit": None,
                     "usage_tokens": 0,
                     "cooldown_until": None,
                     "last_used_at": None,
@@ -102,7 +112,7 @@ def _init_default_keys() -> None:
                     "priority": 2,
                     "is_active": True,
                     "status": "active",
-                    "quota_limit": 10_000_000,
+                    "quota_limit": None,
                     "usage_tokens": 0,
                     "cooldown_until": None,
                     "last_used_at": None,
@@ -253,7 +263,7 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
-                    "quota_limit": 20_000_000,
+                    "quota_limit": None,
                     "usage_tokens": 0,
                     "cooldown_until": None,
                     "last_used_at": None,
@@ -569,7 +579,7 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
-                    "quota_limit": 20_000_000,
+                    "quota_limit": None,
                     "usage_tokens": 0,
                     "cooldown_until": None,
                     "last_used_at": None,
@@ -661,7 +671,7 @@ STANDARD_QNU_PROVIDERS: list[dict[str, Any]] = [
                     "priority": 1,
                     "is_active": True,
                     "status": "active",
-                    "quota_limit": 20_000_000,
+                    "quota_limit": None,
                     "usage_tokens": 0,
                     "cooldown_until": None,
                     "last_used_at": None,
@@ -854,8 +864,11 @@ class ProviderService:
                             "provider_type": c.provider_type,
                             "model_name": c.model_name or (raw_models[0] if raw_models else None),
                             "models": raw_models,
+                            "model_specs": extra.get("model_specs", {}),
+                            "supports_chat": c.provider_type in VALID_CHAT_PROVIDER_TYPES,
                             "circuit_breaker_status": cb.state.value,
-                            "latency_ms": 110,
+                            "latency_ms": (extra.get("last_connection_test") or {}).get("latency_ms", 0),
+                            "model_capabilities": extra.get("model_capabilities", {}),
                             "failure_rate": 0.0,
                             "is_active": c.is_active,
                             "api_base_url": c.api_base_url,
@@ -872,19 +885,20 @@ class ProviderService:
             # Dữ liệu sạch hoàn toàn: Không tự động fallback hay seed ảo
             return []
         except Exception as e:
-            logger.debug("Database query for provider configs failed: %s", e)
-            return []
+            logger.error("Provider catalogue database read failed: %s", type(e).__name__)
+            raise AppException("Không đọc được danh sách provider từ CSDL.", code="PROVIDER_CATALOGUE_UNAVAILABLE", status_code=503) from e
 
     async def create_provider(
         self, db: AsyncSession, data: ProviderConfigCreate
     ) -> dict[str, Any]:
         """Create and persist a new AI Provider configuration with clean data."""
-        provider_id = f"prov_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+        provider_id = f"prov_{uuid.uuid4().hex[:30]}"
         models_list = list(data.models) if data.models else []
         main_model = data.model_name or (models_list[0] if models_list else None)
 
         extra = dict(data.extra_config)
         extra["models"] = models_list
+        extra["model_capabilities"] = {name: cap.model_dump() for name, cap in data.model_capabilities.items()}
         if data.account_id:
             extra["account_id"] = data.account_id
 
@@ -968,7 +982,8 @@ class ProviderService:
             "priority": config.priority,
             "timeout_seconds": config.timeout_seconds,
             "circuit_breaker_status": "CLOSED",
-            "latency_ms": 95,
+            "latency_ms": 0,
+            "model_capabilities": extra.get("model_capabilities", {}),
             "failure_rate": 0.0,
             "keys_count": len(keys_list),
             "api_keys": [_sanitize_key_for_output(k) for k in keys_list],
@@ -978,7 +993,7 @@ class ProviderService:
         self, db: AsyncSession, provider_id: str, data: ProviderConfigUpdate
     ) -> dict[str, Any]:
         """Update an existing AI Provider configuration."""
-        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
+        stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id).with_for_update().execution_options(populate_existing=True)
         res = await db.execute(stmt)
         config = res.scalar_one_or_none()
 
@@ -1007,9 +1022,15 @@ class ProviderService:
 
         extra = await key_pool_snapshot(db, config)
         if data.models is not None:
-            extra["models"] = data.models
-            if data.models and not config.model_name:
-                config.model_name = data.models[0]
+            extra["models"] = list(dict.fromkeys(m.strip() for m in data.models if m.strip()))
+            if config.model_name not in extra["models"]:
+                config.model_name = extra["models"][0] if extra["models"] else None
+            extra["model_capabilities"] = {name: cap for name, cap in extra.get("model_capabilities", {}).items() if name in extra["models"]}
+        if data.model_capabilities is not None:
+            extra.setdefault("model_capabilities", {}).update({name: cap.model_dump() for name, cap in data.model_capabilities.items() if name in extra.get("models", [])})
+        if data.provider_type is not None or data.api_base_url is not None:
+            extra.pop("last_connection_test", None)
+            extra.pop("chat_request_contracts", None)
         if data.account_id is not None:
             extra["account_id"] = data.account_id
 
@@ -1103,7 +1124,8 @@ class ProviderService:
             "priority": config.priority,
             "timeout_seconds": config.timeout_seconds,
             "circuit_breaker_status": "CLOSED",
-            "latency_ms": 105,
+            "latency_ms": (extra.get("last_connection_test") or {}).get("latency_ms", 0),
+            "model_capabilities": extra.get("model_capabilities", {}),
             "failure_rate": 0.0,
             "keys_count": len(keys_out),
             "api_keys": [_sanitize_key_for_output(k) for k in keys_out],
@@ -1162,93 +1184,41 @@ class ProviderService:
                 return False, latency, f"PaddleOCR health HTTP {response.status_code}."
             except httpx.RequestError:
                 return False, 0.0, "Không kết nối được PaddleOCR; kiểm tra URL, mạng hoặc timeout."
-        if not api_key:
-            return False, 0.0, "Thiếu khóa API Secret Key."
-
         clean_key = decrypt_secret(api_key.strip()) if api_key else ""
-        if provider_type not in {"vllm", "tei"} and (
-            settings.ENVIRONMENT in ("test", "testing")
-            or "mock" in clean_key.lower()
-            or "test" in clean_key.lower()
-            or clean_key in ("mock", "test", "demo", "placeholder", "sk-proj-mock-key-1")
-        ):
-            return True, 45.0, "Khóa kiểm thử (Mock/Test Key) hợp lệ trong môi trường thử nghiệm."
-
+        if not clean_key and provider_type != "ollama":
+            return False, 0.0, "Provider chưa có khóa sử dụng được."
         start = time.perf_counter()
-        timeout = 10.0
         try:
-            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
-                if provider_type == "mistral":
-                    url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/models"
-                    resp = await client.get(url, headers={"Authorization": f"Bearer {clean_key}"})
-                    elapsed = (time.perf_counter() - start) * 1000
-                    if resp.status_code == 200:
-                        return True, round(elapsed, 1), "Xác thực Mistral AI thành công (HTTP 200). Đã kiểm tra quyền truy cập mô hình & OCR."
-                    elif resp.status_code in (401, 403):
-                        return False, round(elapsed, 1), f"Khóa API Mistral không hợp lệ (HTTP {resp.status_code} Unauthorized)."
-                    else:
-                        return False, round(elapsed, 1), f"Mistral API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
-
-                elif provider_type == "cloudflare":
-                    if not account_id or not account_id.strip():
-                        return False, 0.0, "Cloudflare Workers AI bắt buộc phải có Cloudflare Account ID."
-                    acc = account_id.strip()
-                    url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/models/search"
-                    resp = await client.get(url, headers={"Authorization": f"Bearer {clean_key}"})
-                    elapsed = (time.perf_counter() - start) * 1000
-                    if resp.status_code == 200:
-                        return True, round(elapsed, 1), f"Xác thực Cloudflare Workers AI thành công (Account ID: {acc[:6]}...)."
-                    elif resp.status_code in (401, 403):
-                        return False, round(elapsed, 1), f"Cloudflare API Token hoặc Account ID không hợp lệ (HTTP {resp.status_code} Unauthorized)."
-                    else:
-                        return False, round(elapsed, 1), f"Cloudflare API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
-
-                elif provider_type == "gemini":
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
-                    resp = await client.get(url)
-                    elapsed = (time.perf_counter() - start) * 1000
-                    if resp.status_code == 200:
-                        return True, round(elapsed, 1), "Xác thực Google Gemini API thành công (HTTP 200)."
-                    elif resp.status_code in (400, 401, 403):
-                        return False, round(elapsed, 1), f"Khóa Google Gemini không hợp lệ (HTTP {resp.status_code})."
-                    else:
-                        return False, round(elapsed, 1), f"Gemini API phản hồi HTTP {resp.status_code}."
-
-                elif provider_type in (
-                    "openai", "deepseek", "groq", "openrouter", "nvidia",
-                    "ollama_cloud", "ollama", "claude", "custom", "vllm", "tei"
-                ):
-                    base = base_url or (
-                        "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
-                        else "http://tormemrtxproto.tail0924dd.ts.net:8000/v1" if provider_type in ("vllm", "tei")
-                        else "https://api.openai.com/v1"
-                    )
-                    target_url = base.rstrip("/") + "/models"
-                    headers = {}
-                    if clean_key and clean_key.lower() not in ("none", "null", "vllm", "ollama"):
-                        headers["Authorization"] = f"Bearer {clean_key}"
-                    elif provider_type in ("vllm", "tei"):
-                        headers["Authorization"] = "Bearer vllm"
-                    if provider_type == "openrouter":
-                        headers["HTTP-Referer"] = "https://qnu.edu.vn"
-                        headers["X-Title"] = "QNU AI Platform"
-                    resp = await client.get(target_url, headers=headers)
-                    elapsed = (time.perf_counter() - start) * 1000
-                    if resp.status_code == 200:
-                        return True, round(elapsed, 1), f"Kết nối và xác thực thành công tới {target_url}."
-                    elif resp.status_code in (401, 403):
-                        return False, round(elapsed, 1), f"Khóa API không hợp lệ (HTTP {resp.status_code} Unauthorized)."
-                    else:
-                        return False, round(elapsed, 1), f"API phản hồi HTTP {resp.status_code}: {resp.text[:100]}"
-
-                return False, 0.0, f"Loại nhà cung cấp '{provider_type}' chưa được cấu hình kiểm tra kết nối."
-
-        except httpx.ConnectError:
-            return False, 0.0, "Không thể kết nối tới máy chủ (Connect Error). Vui lòng kiểm tra lại URL hoặc mạng."
+            from app.modules.modelops.providers import get_llm_adapter
+            adapter = get_llm_adapter(provider_type, "", api_key=clean_key,
+                                      base_url=base_url, account_id=account_id)
+            base = (adapter.base_url or "").rstrip("/")
+            headers = {"Authorization": f"Bearer {clean_key}"} if clean_key else {}
+            target_url = base + "/models"
+            if provider_type == "gemini":
+                headers = {"x-goog-api-key": clean_key}
+            elif provider_type == "claude":
+                headers = adapter.headers()
+            elif provider_type == "cloudflare":
+                if not account_id:
+                    return False, 0.0, "Thiếu Cloudflare Account ID."
+                target_url = base.replace("{account_id}", account_id).removesuffix("/ai/run") + "/ai/models/search"
+            async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
+                resp = await client.get(target_url, headers=headers)
+            elapsed = round((time.perf_counter() - start) * 1000, 1)
+            if not resp.is_success:
+                return False, elapsed, f"Provider HTTP {resp.status_code}: {safe_error_message(resp, clean_key)}"
+            data = resp.json()
+            catalogue = data.get("data", data.get("models", data.get("result")))
+            if not isinstance(catalogue, list) or data.get("error") or data.get("errors") or data.get("success") is False:
+                return False, elapsed, "Provider trả HTTP200 nhưng danh mục không đúng giao thức."
+            return True, elapsed, "Đã kết nối và đọc danh mục; cần kiểm tra từng model để xác minh khả năng xử lý."
         except httpx.TimeoutException:
-            return False, 0.0, "Kết nối tới API bị quá thời gian (Timeout 10s). Vui lòng kiểm tra lại đường truyền mạng."
-        except Exception as exc:
-            return False, 0.0, f"Lỗi kiểm tra kết nối: {exc!s}"
+            return False, round((time.perf_counter() - start) * 1000, 1), "Hết thời gian đọc danh mục provider."
+        except httpx.RequestError:
+            return False, round((time.perf_counter() - start) * 1000, 1), "Không kết nối được provider."
+        except (ValueError, AttributeError, TypeError, httpx.InvalidURL):
+            return False, round((time.perf_counter() - start) * 1000, 1), "Provider hoặc danh mục không đúng giao thức đã cấu hình."
 
     async def test_provider(self, db: AsyncSession, provider_id: str) -> dict[str, Any]:
         """Ping and test connectivity to an AI Provider with real HTTP verification."""
@@ -1264,425 +1234,55 @@ class ProviderService:
                 code="PROVIDER_NOT_FOUND",
             )
 
-        extra = dict(config.extra_config or {})
-        keys = extra.get("api_keys", [])
-        active_key = None
-        for k in keys:
-            if k.get("is_active", True) and k.get("api_key"):
-                active_key = k.get("api_key")
-                break
-        if not active_key:
-            active_key = config.api_key_encrypted
+        active_key, account_id = await select_probe_credential(db, config)
+
+        configured_endpoint = config.api_base_url
 
         success, latency, msg = await self._ping_provider_api(
             provider_type=config.provider_type,
             base_url=config.api_base_url,
             api_key=active_key,
-            account_id=extra.get("account_id"),
+            account_id=account_id,
         )
-        return {
-            "success": success,
-            "latency_ms": latency,
-            "message": msg,
-        }
+        result = {"success": success, "latency_ms": latency, "message": msg}
+        await save_connection_observation(db, provider_id, configured_endpoint, result)
+        return result
 
     async def _ping_single_model(
-        self,
-        provider_type: str,
-        model_name: str,
-        base_url: str | None,
-        api_key: str | None,
-        account_id: str | None = None,
+        self, provider_type: str, model_name: str, base_url: str | None,
+        api_key: str | None, account_id: str | None = None,
+        request_capabilities: dict[str, Any] | None = None,
+        probe_role: str = "chat", timeout_seconds: int = 15,
     ) -> dict[str, Any]:
-        """Perform lightweight HTTP verification to test if a specific model is valid, active, and operational."""
-        start = time.perf_counter()
-        clean_key = decrypt_secret(api_key.strip()) if api_key else ""
+        """Probe the configured role; never infer a protocol from a model name."""
         clean_model = model_name.strip()
-        m_lower = clean_model.lower()
-
-        if provider_type.strip().lower() in {"paddleocr", "paddleocr_vl", "paddle"}:
+        provider_type = provider_type.strip().lower()
+        clean_key = decrypt_secret(api_key.strip()) if api_key else ""
+        if provider_type in {"paddleocr", "paddleocr_vl", "paddle"}:
             success, latency, message = await self._ping_provider_api(provider_type, base_url, None)
-            return {
-                "model_name": clean_model, "success": success,
-                "status": "available" if success else "unavailable",
-                "latency_ms": latency, "message": message,
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
-        if provider_type in {"vllm", "tei"} and not clean_key:
-            return {
-                "model_name": clean_model, "success": False, "status": "unavailable",
-                "latency_ms": 0.0, "message": "Thiếu khóa API; thêm khóa trong ModelOps trước khi kiểm tra.",
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
-
-        # Keyed vLLM must be checked over HTTP, never marked healthy by a test shortcut.
-        if provider_type not in {"vllm", "tei"} and (
-            settings.ENVIRONMENT in ("test", "testing")
-            or "mock" in clean_key.lower()
-            or "test" in clean_key.lower()
-            or clean_key in ("mock", "test", "demo", "placeholder", "sk-proj-mock-key-1")
-            or not clean_key
-        ):
-            if "invalid" in m_lower or "deprecated" in m_lower or "404" in m_lower:
-                return {
-                    "model_name": clean_model,
-                    "success": False,
-                    "status": "unavailable",
-                    "latency_ms": 40.0,
-                    "message": f"Mô hình '{clean_model}' không tồn tại hoặc đã hết hạn trên {provider_type} (HTTP 404).",
-                    "tested_at": datetime.now(UTC).isoformat(),
-                }
-            return {
-                "model_name": clean_model,
-                "success": True,
-                "status": "available",
-                "latency_ms": 35.0,
-                "message": f"Mô hình '{clean_model}' khả dụng trong môi trường thử nghiệm.",
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
-
-        timeout = 10.0
-        try:
-            async with httpx.AsyncClient(timeout=timeout, trust_env=False) as client:
-                if provider_type == "gemini":
-                    model_id = clean_model.replace("models/", "")
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={clean_key}"
-                    payload = {
-                        "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
-                        "generationConfig": {"maxOutputTokens": 1, "temperature": 0.0},
-                    }
-                    resp = await client.post(url, json=payload)
-                    elapsed = round((time.perf_counter() - start) * 1000, 1)
-                    if resp.status_code == 200:
-                        return {
-                            "model_name": clean_model,
-                            "success": True,
-                            "status": "available",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 404:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' không tồn tại hoặc đã bị Google gỡ bỏ (HTTP 404).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code in (401, 403):
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Khóa API không có quyền truy cập mô hình '{clean_model}' (HTTP {resp.status_code}).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 429:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "rate_limited",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' chạm hạn ngạch tốc độ (HTTP 429 Rate Limit).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    else:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": elapsed,
-                            "message": f"Gemini API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-
-                elif provider_type == "cloudflare":
-                    acc = (account_id or settings.CLOUDFLARE_ACCOUNT_ID or "").strip()
-                    if not acc:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": 0.0,
-                            "message": "Thiếu Cloudflare Account ID.",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    cf_model = clean_model if clean_model.startswith("@cf/") else f"@cf/{clean_model}"
-                    url = f"https://api.cloudflare.com/client/v4/accounts/{acc}/ai/run/{cf_model}"
-                    headers = {"Authorization": f"Bearer {clean_key}", "Content-Type": "application/json"}
-                    if "rerank" in m_lower:
-                        payload = {"query": "ping", "contexts": [{"text": "pong"}]}
-                    elif "embed" in m_lower or "bge" in m_lower:
-                        payload = {"text": "ping"}
-                    else:
-                        payload = {"prompt": "hi", "max_tokens": 1}
-                    resp = await client.post(url, headers=headers, json=payload)
-                    elapsed = round((time.perf_counter() - start) * 1000, 1)
-                    if resp.status_code == 200:
-                        return {
-                            "model_name": clean_model,
-                            "success": True,
-                            "status": "available",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' phản hồi tốt trên Cloudflare Workers AI.",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 404:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' không tồn tại trong danh mục Cloudflare Workers AI (HTTP 404).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 400:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": elapsed,
-                            "message": f"Cloudflare phản hồi lỗi tham số (HTTP 400): {resp.text[:120]}",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    else:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": elapsed,
-                            "message": f"Cloudflare phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-
-                elif provider_type == "mistral":
-                    target_url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/chat/completions"
-                    headers = {"Authorization": f"Bearer {clean_key}"}
-                    if "embed" in m_lower:
-                        target_url = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/embeddings"
-                        payload = {"model": clean_model, "input": ["ping"]}
-                    elif "ocr" in m_lower:
-                        url_m = f"{(base_url or 'https://api.mistral.ai/v1').rstrip('/')}/models/{clean_model}"
-                        resp = await client.get(url_m, headers=headers)
-                        elapsed = round((time.perf_counter() - start) * 1000, 1)
-                        if resp.status_code == 200:
-                            return {
-                                "model_name": clean_model,
-                                "success": True,
-                                "status": "available",
-                                "latency_ms": elapsed,
-                                "message": f"Mô hình OCR '{clean_model}' đã được kích hoạt trên tài khoản Mistral.",
-                                "tested_at": datetime.now(UTC).isoformat(),
-                            }
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình OCR '{clean_model}' không tìm thấy trên Mistral AI (HTTP {resp.status_code}).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    else:
-                        payload = {"model": clean_model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1}
-                    resp = await client.post(target_url, headers=headers, json=payload)
-                    elapsed = round((time.perf_counter() - start) * 1000, 1)
-                    if resp.status_code == 200:
-                        return {
-                            "model_name": clean_model,
-                            "success": True,
-                            "status": "available",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not found" in resp.text.lower()):
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' không tồn tại trên Mistral AI.",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    else:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": elapsed,
-                            "message": f"Mistral API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-
-                elif provider_type in (
-                    "openai", "deepseek", "groq", "openrouter", "nvidia",
-                    "ollama_cloud", "ollama", "claude", "custom", "vllm", "tei"
-                ):
-                    base = base_url or (
-                        "https://api.openai.com/v1" if provider_type == "openai"
-                        else "https://api.deepseek.com/v1" if provider_type == "deepseek"
-                        else "https://api.groq.com/openai/v1" if provider_type == "groq"
-                        else "https://openrouter.ai/api/v1" if provider_type == "openrouter"
-                        else "https://integrate.api.nvidia.com/v1" if provider_type == "nvidia"
-                        else "https://ollama.com/v1" if provider_type in ("ollama_cloud", "ollama")
-                        else "http://tormemrtxproto.tail0924dd.ts.net:8000/v1" if provider_type in ("vllm", "tei")
-                        else "https://api.openai.com/v1"
-                    )
-                    clean_base = base.rstrip("/")
-
-                    headers = {"Content-Type": "application/json"}
-                    if clean_key and clean_key.lower() not in ("none", "null", "vllm", "ollama"):
-                        headers["Authorization"] = f"Bearer {clean_key}"
-                    elif provider_type in ("vllm", "tei"):
-                        headers["Authorization"] = "Bearer vllm"
-                    if provider_type == "openrouter":
-                        headers["HTTP-Referer"] = "https://qnu.edu.vn"
-                        headers["X-Title"] = "QNU AI Platform"
-
-                    is_reasoning_or_thinking = any(
-                        kw in m_lower for kw in ("r1", "reason", "nemotron", "thinking", "o1", "o3", "qwq")
-                    )
-
-                    if "rerank" in m_lower:
-                        target_url = f"{clean_base}/rerank"
-                        payload = {
-                            "model": clean_model,
-                            "query": "ping",
-                            "documents": ["ping"],
-                            "top_n": 1,
-                        }
-                    elif "embed" in m_lower or "bge" in m_lower:
-                        target_url = f"{clean_base}/embeddings"
-                        payload = {"model": clean_model, "input": "ping"}
-                    else:
-                        target_url = f"{clean_base}/chat/completions"
-                        payload = {
-                            "model": clean_model,
-                            "messages": [{"role": "user", "content": "hi"}],
-                            "max_tokens": 10 if is_reasoning_or_thinking else 1,
-                        }
-                        if provider_type == "nvidia" and is_reasoning_or_thinking:
-                            payload["chat_template_kwargs"] = {"enable_thinking": True}
-
-                    resp = await client.post(target_url, headers=headers, json=payload)
-                    # Retry once if temporary upstream server overload (503/504/529)
-                    if resp.status_code in (503, 504, 529) or ("overloaded" in resp.text.lower() and resp.status_code != 200):
-                        await asyncio.sleep(1.0)
-                        try:
-                            resp = await client.post(target_url, headers=headers, json=payload)
-                        except Exception:
-                            pass
-
-                    elapsed = round((time.perf_counter() - start) * 1000, 1)
-                    if resp.status_code == 200:
-                        return {
-                            "model_name": clean_model,
-                            "success": True,
-                            "status": "available",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' phản hồi tốt (HTTP 200).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code in (503, 504, 529) or "overloaded" in resp.text.lower():
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "temporarily_overloaded",
-                            "latency_ms": elapsed,
-                            "message": f"Máy chủ {provider_type.upper()} đang quá tải tạm thời (HTTP {resp.status_code} - Service temporarily overloaded). Tên mô hình chính xác, bạn vẫn có thể thêm mô hình vào hệ thống.",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 410 or ("retired" in resp.text.lower() and resp.status_code != 200):
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "deprecated",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' đã hết hạn / ngừng cung cấp bởi nhà cung cấp (HTTP 410 Gone).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 402:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "payment_required",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' yêu cầu trả phí / nạp thêm credits (HTTP 402 Payment Required).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code in (404, 400) and ("model" in resp.text.lower() or "not exist" in resp.text.lower() or "not found" in resp.text.lower()):
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "unavailable",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' không tồn tại hoặc tài khoản không có quyền truy cập.",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    elif resp.status_code == 429:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "rate_limited",
-                            "latency_ms": elapsed,
-                            "message": f"Mô hình '{clean_model}' chạm giới hạn tốc độ (HTTP 429 Rate Limit).",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-                    else:
-                        return {
-                            "model_name": clean_model,
-                            "success": False,
-                            "status": "error",
-                            "latency_ms": elapsed,
-                            "message": f"API phản hồi HTTP {resp.status_code}: {resp.text[:120]}",
-                            "tested_at": datetime.now(UTC).isoformat(),
-                        }
-
-                return {
-                    "model_name": clean_model,
-                    "success": False,
-                    "status": "error",
-                    "latency_ms": 0.0,
-                    "message": f"Loại nhà cung cấp '{provider_type}' chưa được hỗ trợ kiểm tra mô hình.",
-                    "tested_at": datetime.now(UTC).isoformat(),
-                }
-
-        except httpx.ConnectError:
-            return {
-                "model_name": clean_model,
-                "success": False,
-                "status": "error",
-                "latency_ms": 0.0,
-                "message": "Không thể kết nối tới máy chủ API (Connect Error).",
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
-        except httpx.TimeoutException:
-            return {
-                "model_name": clean_model,
-                "success": False,
-                "status": "error",
-                "latency_ms": 10000.0,
-                "message": "Kết nối kiểm tra mô hình bị quá thời gian (Timeout 10s).",
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
-        except Exception as exc:
-            return {
-                "model_name": clean_model,
-                "success": False,
-                "status": "error",
-                "latency_ms": 0.0,
-                "message": f"Lỗi kiểm tra mô hình: {exc!s}",
-                "tested_at": datetime.now(UTC).isoformat(),
-            }
+            return {"model_name": clean_model, "success": success,
+                    "status": "available" if success else "error", "latency_ms": latency,
+                    "message": message, "verification_scope": "health", "probe_role": "ocr",
+                    "tested_at": datetime.now(UTC).isoformat()}
+        if not clean_key and provider_type != "ollama":
+            return {"model_name": clean_model, "success": False, "status": "error",
+                    "latency_ms": 0, "error_code": "PROVIDER_CREDENTIALS_MISSING",
+                    "message": "Provider chưa có khóa sử dụng được; kiểm tra nhóm khóa trong ModelOps.",
+                    "tested_at": datetime.now(UTC).isoformat()}
+        if probe_role != "chat":
+            return await probe_capability(provider_type, clean_model, base_url, clean_key,
+                                          probe_role, timeout_seconds, account_id)
+        result = await probe_chat(provider_type, clean_model, base_url, clean_key,
+                                  request_capabilities, timeout_seconds, account_id)
+        result.update(probe_role="chat", verification_scope="inference")
+        return result
 
     async def test_provider_models(
         self,
         db: AsyncSession,
         provider_id: str,
         model_name: str | None = None,
+        probe_role: str | None = None,
     ) -> dict[str, Any]:
         """Test whether configured models of a provider are valid, active, and operational."""
         stmt = select(ModelProviderConfig).where(ModelProviderConfig.id == provider_id)
@@ -1698,14 +1298,12 @@ class ProviderService:
             )
 
         extra = dict(config.extra_config or {})
-        keys = extra.get("api_keys", [])
-        active_key = None
-        for k in keys:
-            if k.get("is_active", True) and k.get("api_key"):
-                active_key = k.get("api_key")
-                break
-        if not active_key:
-            active_key = config.api_key_encrypted
+        active_key, account_id = await select_probe_credential(db, config)
+        configured_endpoint = config.api_base_url
+        provider_type = config.provider_type
+        timeout_seconds = config.timeout_seconds or 15
+        defaults_row = (await db.execute(select(ModelProviderConfig).where(ModelProviderConfig.id == "system_model_defaults"))).scalar_one_or_none()
+        defaults = ((defaults_row.extra_config or {}).get("defaults", {}) if defaults_row else {})
 
         configured_models = list(extra.get("models", []))
         if config.model_name and config.model_name not in configured_models:
@@ -1725,21 +1323,47 @@ class ProviderService:
                 "results": [],
             }
 
-        sem = asyncio.Semaphore(5)
+        targets = list(dict.fromkeys(targets))
+        sem = asyncio.Semaphore(2)
+
+        def role_for_model(m: str) -> str:
+            if model_name and probe_role:
+                return probe_role
+            configured = extra.get("model_capabilities", {}).get(m, {}).get("probe_role")
+            if configured:
+                return configured
+            declared = (extra.get("model_specs") or {}).get(m, {}).get("type")
+            if declared in {"chat", "embedding", "reranker", "ocr"}:
+                return declared
+            for role in ("embedding", "reranker", "ocr"):
+                if defaults.get(f"default_{role}_provider_id") == provider_id and defaults.get(f"default_{role}_model") == m:
+                    return role
+            return "chat"
 
         async def _bounded_ping(m: str) -> dict[str, Any]:
-            async with sem:
-                return await self._ping_single_model(
-                    provider_type=config.provider_type,
-                    model_name=m,
-                    base_url=config.api_base_url,
-                    api_key=active_key,
-                    account_id=extra.get("account_id"),
-                )
+            try:
+                # Includes queue time; a large batch cannot keep the HTTP request alive forever.
+                async with asyncio.timeout(120):
+                    async with sem:
+                        return await self._ping_single_model(
+                            provider_type=provider_type, model_name=m,
+                            base_url=configured_endpoint, api_key=active_key, account_id=account_id,
+                            request_capabilities=load_chat_capabilities(extra, m, configured_endpoint),
+                            probe_role=role_for_model(m), timeout_seconds=timeout_seconds,
+                        )
+            except TimeoutError:
+                return {"model_name": m, "success": False, "status": "error", "latency_ms": 120000,
+                        "error_code": "PROVIDER_TIMEOUT", "probe_role": role_for_model(m),
+                        "message": "Batch kiểm tra hết thời gian; chưa xác minh được model này.",
+                        "tested_at": datetime.now(UTC).isoformat()}
 
         results = await asyncio.gather(*[_bounded_ping(m) for m in targets])
+        for result in results:
+            if result.get('success') and result.get('request_capabilities'):
+                await save_chat_capabilities(db, provider_id, result['model_name'], configured_endpoint,
+                                             result['request_capabilities'])
         available_count = sum(1 for r in results if r["status"] == "available")
-        unavailable_count = sum(1 for r in results if r["status"] in ("unavailable", "error"))
+        unavailable_count = sum(1 for r in results if not r["success"])
 
         return {
             "provider_id": provider_id,

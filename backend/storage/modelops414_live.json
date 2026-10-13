@@ -1,0 +1,127 @@
+{
+  "conversation": "modelops414_723d3a30409b",
+  "generate_http": 200,
+  "generate": {
+    "content": "OK",
+    "provider": "custom",
+    "model": "gpt-5.4-mini",
+    "prompt_tokens": 2789,
+    "completion_tokens": 31,
+    "total_tokens": 2820,
+    "cost_usd": 0.000437,
+    "latency_ms": 1852.43,
+    "is_fallback": false,
+    "active_key_id": "key_662418fc",
+    "requested_model": "gh/gpt-5.4-mini",
+    "provider_id": "prov_20261013041934",
+    "fallback_reason": null
+  },
+  "chat_http": 200,
+  "chat": {
+    "assistant_code": "admissions",
+    "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+    "answer": "- Hotline tuyển sinh Trường Đại học Quy Nhơn: **1800.55.88.49**.\n- Nếu bạn cần, mình có thể tra thêm kênh liên hệ khác như email, fanpage hoặc hỗ trợ theo từng mảng.",
+    "status": "answered",
+    "error_code": null,
+    "citations": [
+      {
+        "source_id": "bnd_4d788e0c0ee2",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao",
+        "section": "| BỘ GIÁO DỤC VÀ ĐÀO TẠO **TRƯỜNG ĐẠI HỌC QUY NHƠN** **Số: /BC-ĐHQN** | **CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM** **Độc lập",
+        "page_number": 1,
+        "quote": "**Phần lớn thí sinh tương tác và liên hệ với Nhà trường thông qua số điện thoại hotline, trang fanpage, email và các nhóm Zalo do tư vấn viên phụ trách. Trong đó, Tổ Tư vấn tuyển sinh trực tuyến đã thực hiện tư vấn cho khoảng 20.000 lượt thí sinh qua tin nhắn fanpage, hơn 2.000 lượt qua email và trên 500 lượt thí sinh, phụ huynh trực tiếp tại Văn phòng Tuyển sinh.**\n\n**-",
+        "source_pages": [
+          1
+        ],
+        "entity_key": null,
+        "binding_id": "bnd_4d788e0c0ee2",
+        "index_revision_id": "idx_rev_00fbccf1d07e",
+        "source_revision_id": "ks_rev_2d628688cb78",
+        "revision_no": 1
+      },
+      {
+        "source_id": "bnd_e4492e8d7016",
+        "title": "HD nhập học",
+        "section": "Bước 4: Sau khi nhập học, sinh viên đăng nhập vào website",
+        "page_number": 3,
+        "quote": "Bước 4: Sau khi nhập học, sinh viên đăng nhập vào website\nhttps://tinchi.qnu.edu.vn bằng tài khoản và mật khẩu cá nhân (trong Bước 1) để\nxem chương trình đào tạo, thời khóa biểu. Sinh viên thường xuyên theo dõi thông\nbáo cập nhật trên website của Trường Đại học Quy Nhơn tại địa chỉ\nhttps://qnu.edu.vn\n\nLưu ý: Mọi thắc mắc trong quá trình nhập học, sinh viên liên hệ Bộ phận\nTư vấn tuyển sinh, số hotline 1800.55.88.49\n\nNơi nhận:\n- Hiệu trưởng (để b/c);\n- Các đơn vị liên quan;\n- Các thí sinh;\n- Lưu: VT, CTSV&HTDN.\n\nKT. HIỆU TRƯỞNG\nPHÓ HIỆU TRƯỞNG\n\nTS. Đinh Anh Tuấn",
+        "source_pages": [
+          3
+        ],
+        "entity_key": null,
+        "binding_id": "bnd_e4492e8d7016",
+        "index_revision_id": "idx_rev_42074c9dee55",
+        "source_revision_id": "ks_rev_3e699f33e06c",
+        "revision_no": 1
+      },
+      {
+        "source_id": "bnd_0dd3d2789954",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed",
+        "section": "BỘ GIÁO DỤC VÀ ĐẠO TẠO",
+        "page_number": 1,
+        "quote": "- Thí sinh chủ yếu tương tác, liên hệ thường xuyên, liên tục thông qua số\nđiện thoại hotline, trang fanpage, email và zalo nhóm mà các tư vấn viên phụ\ntrách. Trong đó, Ban Tư vấn tuyển sinh trực tuyến đã tư vấn 14.438 lượt thí sinh\nqua tin nhắn của fanpage, qua email là 1.551 lượt, tư vấn trực tiếp tại văn phòng\ntuyển sinh là hơn 700 lượt thí sinh và phụ huynh.\n\n- Phối hợp với Trung tâm giáo dục nghề nghiệp Bình Định tổ chức tư vấn\ntuyển sinh trực tiếp tại 29 trường THPT trên địa bàn tỉnh Bình Định.\n\n- Phối hợp với 08 trường THPT tại tỉnh Bình Định (THPT Quốc Học, THPT\nTrưng Vương, THPT Nguyễn Thái Học, THPT Bùi Thị Xuân), Gia Lai (THPT\nPhạm Văn Đồng, THPT A Sanh), Phú Yên (THPT Trần Phú), Quảng Ngãi\n(Trường Liên cấp Thành phố Giáo dục Quốc tế Quảng Ngãi) tổ chức cho 2.152\nhọc sinh tham gia hoạt động giáo dục hướng nghiệp, tham quan thực tế môi trường\ngiáo dục tại Trường Đại học Quy Nhơn.",
+        "source_pages": [
+          1
+        ],
+        "entity_key": null,
+        "binding_id": "bnd_0dd3d2789954",
+        "index_revision_id": "idx_rev_daf4d2e4f534",
+        "source_revision_id": "ks_rev_ad7e7e64bccf",
+        "revision_no": 1
+      },
+      {
+        "source_id": "bnd_e4492e8d7016",
+        "title": "HD nhập học",
+        "section": "3. Lưu ý:",
+        "page_number": 8,
+        "quote": "3. Lưu ý:\n\nSau khi nộp tiền thành công vui lòng đợi 2-3 phút để hệ thống gạch nợ, không thanh\n\ntoán lại lần 2.\n\nNếu cần hỗ trợ kỹ thuật khi nộp học phí phụ huynh/sinh viên liên hệ qua số điện thoại:\n\n02563.546.882 (P. Kế hoạch – Tài chính) trong giờ hành chính./.",
+        "source_pages": [
+          8
+        ],
+        "entity_key": null,
+        "binding_id": "bnd_e4492e8d7016",
+        "index_revision_id": "idx_rev_42074c9dee55",
+        "source_revision_id": "ks_rev_3e699f33e06c",
+        "revision_no": 1
+      },
+      {
+        "source_id": "bnd_bdb1f500cdbe",
+        "title": "Cac nganh Tuyen sinh 2025_moi",
+        "section": "<div style=\"text-align: center;\">CÁC NGÀNH TUYỀN SINH ĐẠI HỌC CHÍNH QUY NĂM 2025</div>",
+        "page_number": 1,
+        "quote": "<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_589_7522_1050_7973.jpg\" alt=\"Image\" width=\"14%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_73_8040_264_8228.jpg\" alt=\"Image\" width=\"5%\" /></div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_1203_7496_1718_7985.jpg\" alt=\"Image\" width=\"15%\" /></div>\n\n1800 - 55 - 88 - 49\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_57_8263_269_8894.jpg\" alt=\"Image\" width=\"6%\" /></div>\n\ntuyensinh.qnu.edu.vn\n\ntuvantuyensinh@qnu.edu.vn\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_1771_7417_3286_8868.jpg\" alt=\"Image\" width=\"46%\" /></div>\n\nTuyển sinh Trường Đại học Quy Nhơn\n\nCÁC NGÀNH TUYỂN SINH",
+        "source_pages": [
+          1
+        ],
+        "entity_key": null,
+        "binding_id": "bnd_bdb1f500cdbe",
+        "index_revision_id": "idx_rev_742b1ff6d265",
+        "source_revision_id": "ks_rev_dbdaf646862a",
+        "revision_no": 1
+      }
+    ],
+    "suggested_questions": [
+      "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+      "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+      "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+    ],
+    "latency_ms": 6386.28,
+    "execution_id": "d4160d38-9d9f-4234-a943-704a2eca22df",
+    "artifacts": [],
+    "conversation_id": "modelops414_723d3a30409b"
+  },
+  "usage": [
+    {
+      "provider": "custom",
+      "model": "gpt-5.4-mini",
+      "tokens": 2820,
+      "fallback": false
+    },
+    {
+      "provider": "custom",
+      "model": "gpt-5.4-mini",
+      "tokens": 8902,
+      "fallback": false
+    }
+  ]
+}

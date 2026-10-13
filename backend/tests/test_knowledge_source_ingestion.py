@@ -20,6 +20,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import inspect
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.database import get_db
 from app.core.exceptions import AppException
@@ -37,8 +39,10 @@ from app.modules.knowledge.models import (
     KnowledgeImportItem,
     KnowledgeSourceRevision,
 )
+from app.modules.knowledge.schemas import KnowledgeSourceRevisionResponse
 from app.modules.knowledge.services.source_extraction import EXTRACTION_VERSION, SourceExtraction
 from app.modules.knowledge.services.source_ingestion_service import (
+    _apply_structured_review_requirement,
     compute_sha256,
     source_ingestion_service,
 )
@@ -102,6 +106,23 @@ def _make_doc(
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
+
+
+def test_structured_review_requirement_overrides_reused_passed_quality() -> None:
+    """A reused artifact must not bypass structured-data human review."""
+    quality = _apply_structured_review_requirement(
+        {"overall_status": "passed"},
+        {
+            "issues": [{"code": "VISUAL_CONTENT_REVIEW", "page_number": 1}],
+            "review": {"status": "required"},
+        },
+    )
+
+    assert quality["overall_status"] == "warning"
+    assert quality["structured_review_required"] is True
+    assert quality["structured_issues"] == [
+        {"code": "VISUAL_CONTENT_REVIEW", "page_number": 1}
+    ]
 
 
 def _execute_result(scalar: Any = None, scalars_list: list[Any] | None = None, all_list: list[Any] | None = None):
@@ -446,6 +467,162 @@ async def test_source_content_editing_and_human_review() -> None:
     assert rejected_rev.failure_code == "HUMAN_REVIEW_REJECTED"
 
 
+@pytest.mark.asyncio
+async def test_review_accepts_legacy_ready_revision_with_structured_review_required() -> None:
+    """A legacy state mismatch remains reviewable without silently approving it."""
+    binding = KnowledgeBinding(id="bnd_legacy_review", collection_id="col_01")
+    markdown = "Nội dung có hình cần cán bộ đối soát"
+    source_rev = KnowledgeSourceRevision(
+        id="rev_legacy_ready",
+        binding_id=binding.id,
+        revision_no=1,
+        origin_document_id="doc_legacy",
+        origin_file_hash="hash_legacy",
+        canonical_markdown=markdown,
+        canonical_hash=compute_sha256(markdown),
+        parse_provenance={
+            "structured_artifact": {
+                "content_hash": compute_sha256(markdown),
+                "issues": [{"code": "VISUAL_CONTENT_REVIEW", "page_number": 1}],
+                "review": {"status": "required"},
+            }
+        },
+        status="ready",
+    )
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(
+        side_effect=[
+            _execute_result(),
+            _execute_result(),
+            _execute_result(scalar=binding),
+            _execute_result(scalar=source_rev),
+        ]
+    )
+
+    approved_rev = await source_ingestion_service.review_source_revision(
+        db=mock_db,
+        collection_id="col_01",
+        source_id=binding.id,
+        revision_id=source_rev.id,
+        decision="approved",
+        actor_id="officer_01",
+    )
+
+    assert approved_rev.status == "ready"
+    assert approved_rev.parse_provenance["structured_artifact"]["review"]["status"] == "approved"
+    assert binding.active_source_revision_id == source_rev.id
+
+    dto = KnowledgeSourceRevisionResponse.model_validate(source_rev)
+    assert dto.status == "ready"
+    assert dto.structured_review_status == "approved"
+    assert dto.requires_structured_review is False
+
+
+def test_review_marks_structured_artifact_json_as_dirty_for_database_update() -> None:
+    """Review must replace JSONB instead of mutating the committed value in place."""
+    markdown = "Nội dung có hình cần cán bộ đối soát"
+    provenance = {
+        "structured_artifact": {
+            "content_hash": compute_sha256(markdown),
+            "issues": [{"code": "VISUAL_CONTENT_REVIEW", "page_number": 1}],
+            "review": {"status": "required"},
+        }
+    }
+    revision = KnowledgeSourceRevision(
+        id="rev_jsonb_dirty_tracking",
+        binding_id="bnd_jsonb_dirty_tracking",
+        revision_no=1,
+        origin_document_id="doc_jsonb_dirty_tracking",
+        origin_file_hash="hash_jsonb_dirty_tracking",
+        canonical_markdown=markdown,
+        canonical_hash=compute_sha256(markdown),
+        status="ready",
+    )
+    set_committed_value(revision, "parse_provenance", provenance)
+    artifact = revision.parse_provenance["structured_artifact"]
+
+    source_ingestion_service._apply_review_decision(
+        KnowledgeBinding(
+            id="bnd_jsonb_dirty_tracking",
+            collection_id="col_01",
+        ),
+        revision,
+        artifact,
+        "approved",
+        "Đã đối soát",
+        "officer_01",
+    )
+
+    assert provenance["structured_artifact"]["review"]["status"] == "required"
+    assert revision.parse_provenance["structured_artifact"]["review"]["status"] == "approved"
+    assert inspect(revision).attrs.parse_provenance.history.has_changes()
+
+
+@pytest.mark.asyncio
+async def test_bulk_review_approves_exact_revisions_in_one_commit() -> None:
+    """Bulk review validates exact targets then records one atomic decision."""
+    bindings = [
+        KnowledgeBinding(id=f"bnd_bulk_{index}", collection_id="col_01")
+        for index in range(2)
+    ]
+    revisions = []
+    targets = []
+    for index, binding in enumerate(bindings):
+        markdown = f"Nguồn {index} có biểu đồ cần đối soát"
+        artifact = {
+            "content_hash": compute_sha256(markdown),
+            "issues": [{"code": "VISUAL_CONTENT_REVIEW", "page_number": 1}],
+            "review": {"status": "required"},
+        }
+        revision = KnowledgeSourceRevision(
+            id=f"rev_bulk_{index}",
+            binding_id=binding.id,
+            revision_no=1,
+            origin_document_id=f"doc_bulk_{index}",
+            origin_file_hash=f"hash_bulk_{index}",
+            canonical_markdown=markdown,
+            canonical_hash=compute_sha256(markdown),
+            parse_provenance={"structured_artifact": artifact},
+            status="ready",
+        )
+        revisions.append(revision)
+        targets.append((binding, revision, artifact))
+
+    items = [
+        MagicMock(source_id=binding.id, revision_id=revision.id)
+        for binding, revision in zip(bindings, revisions, strict=True)
+    ]
+    mock_db = AsyncMock()
+    with (
+        patch(
+            "app.modules.knowledge.services.source_reparse.lock_source",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.knowledge.services.source_reparse.ensure_source_idle",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            source_ingestion_service,
+            "_get_review_target",
+            new_callable=AsyncMock,
+            side_effect=targets,
+        ),
+    ):
+        result = await source_ingestion_service.review_source_revisions_bulk(
+            db=mock_db,
+            collection_id="col_01",
+            items=items,
+            decision="approved",
+            actor_id="officer_01",
+        )
+
+    assert result == revisions
+    assert all(revision.structured_review_status == "approved" for revision in result)
+    assert all(binding.active_source_revision_id == revision.id for binding, revision in zip(bindings, revisions, strict=True))
+    mock_db.commit.assert_awaited_once()
+
+
 # ==============================================================================
 # Worker Task ARQ Tests
 # ==============================================================================
@@ -567,5 +744,25 @@ async def test_http_routes_source_management() -> None:
             )
             assert res.status_code == 200
             assert res.json()["status"] == "ready"
+
+        # 5. POST /sources/reviews (bulk)
+        with patch.object(
+            source_ingestion_service,
+            "review_source_revisions_bulk",
+            new_callable=AsyncMock,
+            return_value=[source_rev],
+        ):
+            res = await client.post(
+                f"/platform/v1alpha1/knowledge/collections/{coll.id}/sources/reviews",
+                json={
+                    "items": [
+                        {"source_id": binding.id, "revision_id": source_rev.id}
+                    ],
+                    "decision": "approved",
+                    "comment": "Đã đối soát Studio OCR",
+                },
+            )
+            assert res.status_code == 200
+            assert res.json()["reviewed_count"] == 1
 
     app.dependency_overrides.clear()

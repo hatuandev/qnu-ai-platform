@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -89,8 +90,6 @@ class KnowledgeCollection(Base):
             self.created_at = utcnow()
         if getattr(self, "updated_at", None) is None:
             self.updated_at = utcnow()
-
-
 
 class KnowledgeDocument(Base):
     """Uploaded or ingested document item."""
@@ -262,9 +261,12 @@ class KnowledgeFact(Base):
     binding_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
-    entity_name: Mapped[str] = mapped_column(
-        String(512), nullable=False, index=True
-    )  # e.g., "Công nghệ thông tin"
+    # ``entity_name`` remains as the lossless compatibility projection. New code
+    # uses the explicit key/label/text contract below.
+    entity_name: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_label: Mapped[str] = mapped_column(String(512), nullable=False)
+    entity_text: Mapped[str] = mapped_column(Text, nullable=False)
     entity_type: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True
     )  # e.g., "major", "rule", "fee"
@@ -292,6 +294,40 @@ class KnowledgeFact(Base):
     )
     document: Mapped[KnowledgeDocument | None] = relationship(
         "KnowledgeDocument", back_populates="facts"
+    )
+
+    def __init__(self, **kwargs):
+        """Populate the long-text identity contract for legacy and new callers."""
+        from app.modules.knowledge.services.fact_identity import build_fact_identity
+
+        identity = build_fact_identity(
+            kwargs.get("entity_text", kwargs.get("entity_name", "")),
+            raw_data=kwargs.get("raw_data"),
+            entity_code=kwargs.get("entity_code"),
+        )
+        kwargs["entity_name"] = identity.entity_text
+        kwargs["entity_text"] = identity.entity_text
+        kwargs["entity_label"] = identity.entity_label
+        kwargs["entity_key"] = identity.entity_key
+        super().__init__(**kwargs)
+
+    __table_args__ = (
+        Index(
+            "ix_fact_snapshot_context",
+            "collection_id",
+            "index_revision_id",
+            "entity_code",
+            "attribute_code",
+            "applicability_year",
+        ),
+        Index(
+            "ix_knowledge_facts_search_text",
+            text(
+                "to_tsvector('simple', coalesce(entity_text, '') || ' ' || "
+                "coalesce(attribute_name, '') || ' ' || coalesce(attribute_value, ''))"
+            ),
+            postgresql_using="gin",
+        ),
     )
 
 
@@ -747,6 +783,24 @@ class KnowledgeSourceRevision(Base):
             self.created_at = utcnow()
         if getattr(self, "updated_at", None) is None:
             self.updated_at = utcnow()
+
+    @property
+    def structured_review_status(self) -> str:
+        from app.modules.knowledge.services.source_artifact import get_structured_review_state
+
+        return get_structured_review_state(self)[0]
+
+    @property
+    def requires_structured_review(self) -> bool:
+        from app.modules.knowledge.services.source_artifact import get_structured_review_state
+
+        return get_structured_review_state(self)[1]
+
+    @property
+    def structured_issue_count(self) -> int:
+        from app.modules.knowledge.services.source_artifact import get_structured_review_state
+
+        return get_structured_review_state(self)[2]
 
     __table_args__ = (
         Index("uq_knowledge_source_rev_binding_rev_no", "binding_id", "revision_no", unique=True),

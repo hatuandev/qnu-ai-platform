@@ -335,8 +335,8 @@ async def test_chat_with_attachments_and_conversation_recording():
 
 
 @pytest.mark.asyncio
-async def test_chat_records_primary_model_from_config():
-    """Verify usage tracking logs config.model_policy.primary_model instead of non-existent attribute."""
+async def test_chat_does_not_invent_inference_usage_from_config():
+    """A workflow result is not proof the configured primary model was called."""
     mock_db = AsyncMock()
     mock_db.get.return_value = SimpleNamespace(tenant_id="tenant_qnu", workspace_id="workspace_qnu")
     mock_db.add = MagicMock()
@@ -363,7 +363,5 @@ async def test_chat_records_primary_model_from_config():
             mock_db, "admissions", AssistantChatRequest(message="Chào bạn")
         )
 
-    assert mock_usage.await_count == 1
-    usage_kwargs = mock_usage.await_args.kwargs
-    assert usage_kwargs["model_name"] == "qwen2.5-7b-instruct"
+    mock_usage.assert_not_awaited()
 

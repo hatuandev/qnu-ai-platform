@@ -12,7 +12,7 @@ help:
 	@echo   make infra-logs     : Theo doi logs cua cum Docker
 	@echo.
 	@echo [Phat trien - Local Dev]
-	@echo   make dev            : Khoi chay Backend (8001), Frontend (3000) va ARQ worker
+	@echo   make dev            : Khoi dong lai Backend (8001), Frontend (3000) va ARQ worker
 	@echo   make worker         : Khoi chay worker nen, co log va tranh mo trung
 	@echo   make be             : Khoi chay rieng Backend API (Port 8001)
 	@echo   make fe             : Khoi chay rieng Frontend Studio (Port 3000)
@@ -80,10 +80,7 @@ reindex:
 
 # --- Phat trien (Dev Servers) ---
 dev:
-	cd backend && .\.venv\Scripts\python.exe -m app.cli db ensure-ready
-	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-worker.ps1
-	cmd /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-	cmd /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-dev.ps1
 
 dev1: dev
 dev2: dev

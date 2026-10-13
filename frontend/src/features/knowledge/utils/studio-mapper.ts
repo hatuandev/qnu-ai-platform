@@ -16,6 +16,9 @@ export function mapVerificationDataToStudioDoc(
     model: data.engine,
     latencyMs: 0,
     status: data.status,
+    structuredReviewStatus: data.structured_review_status,
+    requiresStructuredReview: data.requires_structured_review,
+    structuredIssueCount: data.structured_issue_count,
     indexStatus: data.index_status,
     pdfUrl: data.pdf_url,
     pages: data.pages.map((p) => ({

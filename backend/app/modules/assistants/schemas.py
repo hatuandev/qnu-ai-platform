@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.evidence_policy import EvidencePolicy
+
 
 class AssistantPersonaScope(BaseModel):
     persona: str = Field(
@@ -24,13 +26,14 @@ class AssistantPersonaScope(BaseModel):
 
 class AssistantRerankerPolicy(BaseModel):
     enabled: bool = True
-    provider_id: str | None = Field("prov_cloudflare", description="Provider ID của mô hình reranker")
-    model_name: str | None = Field("@cf/baai/bge-reranker-base", description="Tên mô hình reranker")
+    provider_id: str | None = Field(None, description="Provider reranker; bỏ trống dùng ModelOps")
+    model_name: str | None = Field(None, description="Model reranker; bỏ trống dùng ModelOps")
     top_k: int = Field(5, ge=1, le=20, description="Số lượng chunk sau khi tái xếp hạng")
     score_threshold: float = Field(0.4, ge=0.0, le=1.0, description="Ngưỡng điểm tin cậy tối thiểu")
 
 
 class AssistantKnowledgePolicy(BaseModel):
+    evidence_policy: EvidencePolicy = Field(default_factory=EvidencePolicy)
     chunking_strategy: Literal["ClauseBasedChunker", "SemanticChunker"] = "SemanticChunker"
     require_structured_facts: bool = False
     retrieval_limit: int = Field(10, ge=1, le=50)
@@ -38,13 +41,15 @@ class AssistantKnowledgePolicy(BaseModel):
 
 
 class AssistantModelPolicy(BaseModel):
+    preferred_provider_id: str | None = None
+    fallback_provider_id: str | None = None
     primary_model: str | None = Field(default=None, max_length=100)
     fallback_model: str | None = Field(default=None, max_length=100)
     temperature: float = Field(0.2, ge=0, le=2)
     max_tokens: int = Field(1200, ge=128, le=32000)
     thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
 
-    @field_validator("primary_model", "fallback_model", mode="before")
+    @field_validator("primary_model", "fallback_model", "preferred_provider_id", "fallback_provider_id", mode="before")
     @classmethod
     def normalize_model_names(cls, v: Any) -> str | None:
         if v is None:
@@ -266,6 +271,7 @@ class AssistantChatRequest(BaseModel):
 
 
 class AssistantChatResponse(BaseModel):
+    answer_decision: dict[str, Any] | None = None
     assistant_code: str
     assistant_name: str
     answer: str

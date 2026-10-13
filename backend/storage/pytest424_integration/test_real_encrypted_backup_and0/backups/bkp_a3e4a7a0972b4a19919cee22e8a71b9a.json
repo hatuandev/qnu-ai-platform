@@ -1,0 +1,48 @@
+{
+  "id": "bkp_a3e4a7a0972b4a19919cee22e8a71b9a",
+  "created_at": "2026-10-13T15:02:09.752557Z",
+  "updated_at": "2026-10-13T15:02:12.669576Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-418-pending",
+  "operation": "create",
+  "status": "failed",
+  "stage": "Thao tác thất bại",
+  "progress": 15,
+  "size_bytes": 0,
+  "sha256": null,
+  "verified_at": null,
+  "drill_at": null,
+  "error": "Còn job chờ/chạy/thử lại. Hãy để worker xử lý xong rồi sao lưu; không tự hủy hoặc phát lại job.",
+  "pid": 3380,
+  "components": {},
+  "history": [
+    {
+      "timestamp": "2026-10-13T15:02:09.752557Z",
+      "operation": "create",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-pending",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:02:12.669576Z",
+      "operation": "create",
+      "status": "failed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-pending",
+      "error": "Còn job chờ/chạy/thử lại. Hãy để worker xử lý xong rồi sao lưu; không tự hủy hoặc phát lại job."
+    }
+  ],
+  "pinned": false,
+  "origin": "manual",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": "BACKUP_JOBS_PENDING",
+  "stage_started_at": "2026-10-13T15:02:12.598735Z",
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

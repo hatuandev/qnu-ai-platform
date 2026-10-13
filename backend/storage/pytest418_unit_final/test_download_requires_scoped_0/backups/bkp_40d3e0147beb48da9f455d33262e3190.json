@@ -1,0 +1,18 @@
+{
+  "id": "bkp_40d3e0147beb48da9f455d33262e3190",
+  "created_at": "2026-10-13T11:54:44.434803Z",
+  "updated_at": "2026-10-13T11:54:44.434803Z",
+  "actor_id": "test-admin",
+  "correlation_id": "test-backup",
+  "operation": "create",
+  "status": "completed",
+  "stage": "Chờ tiến trình sao lưu",
+  "progress": 0,
+  "size_bytes": 0,
+  "sha256": "fixture-hash",
+  "verified_at": null,
+  "drill_at": null,
+  "error": null,
+  "pid": null,
+  "components": {}
+}

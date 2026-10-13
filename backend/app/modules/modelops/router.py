@@ -242,7 +242,7 @@ async def test_provider_models_endpoint(
     db: AsyncSession = Depends(get_db),
 ) -> ProviderModelsTestResponse:
     target_model = body.model_name if body else None
-    res = await modelops_service.test_provider_models(db, provider_id, target_model)
+    res = await modelops_service.test_provider_models(db, provider_id, target_model, probe_role=body.probe_role if body else None)
     return ProviderModelsTestResponse(**res)
 
 

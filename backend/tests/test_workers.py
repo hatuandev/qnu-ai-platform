@@ -195,6 +195,7 @@ def test_worker_settings():
         "task_knowledge_source_reparse", "task_knowledge_index_build", "task_knowledge_garbage_collection",
         "task_knowledge_source_purge",
     }
-    assert len(WorkerSettings.cron_jobs) == 1
+    assert {job.coroutine.__name__ for job in WorkerSettings.cron_jobs} == {
+            "task_reconcile_pending_jobs", "task_reconcile_workflow_executions", "task_backup_schedule"}
     assert WorkerSettings.job_timeout == 900
     assert WorkerSettings.max_tries == 3

@@ -2,6 +2,16 @@
 
 Tài liệu này đặc tả quy trình đánh giá chất lượng tự động của hệ thống RAG và các Trợ lý AI dựa trên 3 chỉ số Ragas cốt lõi đáp ứng yêu cầu kỹ thuật đề tài nghiên cứu cấp trường (**Mã tiêu chuẩn: QNU TM-08**).
 
+## Kiểm thử độc lập evidence — phiên #417
+
+`scripts/evaluate_evidence_417.py` gửi nguyên câu hỏi từ bộ 82 câu đã trích xuất, không đưa expected answers vào yêu cầu hoặc kho evidence. Chạy tuần tự để tránh tranh chấp khóa model; mỗi câu độc lập dùng conversation mới. Báo cáo lưu cấu hình, fingerprint, manifest source/hash/revisions, trace từng node, model/provider/fallback/tokens/latency/chi phí thực và kiểm tra cấu hình/publication không thay đổi cuối lượt.
+
+Phân biệt câu trả lời đúng, có sai, no-answer đúng vì thiếu nguồn, no-answer sai vì bỏ sót nguồn, và lỗi kỹ thuật. `answered`/`supported` là quyết định runtime, không phải nhãn accuracy độc lập. Quote khớp và số có trong quote chưa chứng minh đúng năm, thuộc tính hoặc điều kiện. Các ca 5/41/42/51/68/76–78 cần kiểm tra đặc biệt; ưu tiên nguồn phải được con người xác nhận trước, không suy từ đáp án benchmark.
+
+No-answer không tự nhận Faithfulness 1.0 và heuristic overlap không được công bố là Ragas TM-08. Chỉ công bố ba điểm Ragas khi thật sự chạy evaluator, có reference/corpus chuẩn và báo cáo lưu kết quả. Phiên này chưa chạy Ragas. Test PostgreSQL opt-in (`QNU_TEST_EVIDENCE_DB=1`) dùng transaction rollback để kiểm tra hash/revision/scope và ô đã hiệu đính, có ca DB/provider lỗi fail-closed. Nguồn bổ sung cần cán bộ đối soát/phê duyệt theo quy trình kho tri thức, không nạp FAQ đang chấm làm đáp án cho chính benchmark đó.
+
+Lượt test phải giữ nguyên mã/config/snapshot; không ghép các lượt dùng runtime khác thành một tỷ lệ accuracy. Script dừng khi mất kết nối dịch vụ, lưu `interruption_reason` và không gửi tiếp các câu còn lại. Phân biệt số ca đã thử, số phản hồi HTTP và số câu có đáp án; HTTP500/timeout/ConnectError không được chấm là lỗi dữ kiện. Báo cáo đối soát tham chiếu không tự coi FAQ là nguồn hiện hành: cần xét năm được người dùng hỏi/mặc định và văn bản cập nhật đã được cán bộ xác nhận ưu tiên. Trước chạy benchmark dài, chốt batch code để tránh dev hot-reload giữa lượt trả lời.
+
 ---
 
 ## 1. Sơ Đồ Quy Trình Đo Lường & Báo Động Lệch Chuẩn (Evaluation Flow)

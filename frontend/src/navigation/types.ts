@@ -52,6 +52,7 @@ export type AppPath =
   | "/settings"
   | "/settings/notifications"
   | "/settings/security"
+  | "/settings/backups"
   | "/profile"
   | "/design-system"
   | "/help";

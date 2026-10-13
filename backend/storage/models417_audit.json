@@ -1,0 +1,336 @@
+{
+  "providers": [
+    {
+      "id": "prov_gemini",
+      "name": "Google Gemini",
+      "timeout_seconds": 30
+    },
+    {
+      "id": "prov_20261013041934",
+      "name": "qnu-9router",
+      "timeout_seconds": 15
+    }
+  ],
+  "keys": [
+    {
+      "provider_id": "prov_gemini",
+      "status": "active",
+      "is_active": "True",
+      "consecutive_failures": "0",
+      "last_error_code": "None",
+      "last_error_at": "2026-10-13 09:27:24.629257+00:00",
+      "cooldown_until": "None",
+      "lease_until": "None",
+      "quota_limit": "None",
+      "usage_tokens": "122610"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "status": "active",
+      "is_active": "True",
+      "consecutive_failures": "0",
+      "last_error_code": "None",
+      "last_error_at": "2026-10-13 09:30:16.727672+00:00",
+      "cooldown_until": "None",
+      "lease_until": "None",
+      "quota_limit": "None",
+      "usage_tokens": "745197"
+    }
+  ],
+  "fallback": [
+    {
+      "conversation": "eval417_3de077f7fd8f46a0",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: ReadTimeout (provider_request_failed)",
+      "at": "2026-10-13 09:27:05.650783"
+    },
+    {
+      "conversation": "eval417_b6317882a5894370",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: ReadTimeout (provider_request_failed)",
+      "at": "2026-10-13 09:27:49.816165"
+    },
+    {
+      "conversation": "eval417_b6317882a5894370",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:27:57.795010"
+    },
+    {
+      "conversation": "eval417_3c0fecf73aa84531",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:28:08.650613"
+    },
+    {
+      "conversation": "eval417_3c0fecf73aa84531",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:28:17.924038"
+    },
+    {
+      "conversation": "eval417_ef43de97bbf54958",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: [github/gpt-6-luna] [502]: fetch failed (cause: UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (attempted address: api.githubcopilot.com:443, timeout: 10000ms)) (reset after 30s)",
+      "at": "2026-10-13 09:28:38.747430"
+    },
+    {
+      "conversation": "eval417_ef43de97bbf54958",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:28:46.058225"
+    },
+    {
+      "conversation": "eval417_ef43de97bbf54958",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:28:51.885024"
+    },
+    {
+      "conversation": "eval417_2d9382c5e6aa4376",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:29:11.405459"
+    },
+    {
+      "conversation": "eval417_2d9382c5e6aa4376",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: ReadTimeout (provider_request_failed)",
+      "at": "2026-10-13 09:29:36.433457"
+    },
+    {
+      "conversation": "eval417_2d9382c5e6aa4376",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:29:49.546498"
+    },
+    {
+      "conversation": "eval417_05674a56d93f442a",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:30:03.588207"
+    },
+    {
+      "conversation": "eval417_05674a56d93f442a",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: [github/gpt-6-luna] [502]: fetch failed (cause: UND_ERR_CONNECT_TIMEOUT: Connect Timeout Error (attempted address: api.githubcopilot.com:443, timeout: 10000ms)) (reset after 30s)",
+      "at": "2026-10-13 09:30:24.402234"
+    },
+    {
+      "conversation": "eval417_05674a56d93f442a",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:30:30.909046"
+    },
+    {
+      "conversation": "eval417_2a81fd5c5b7f4dd0",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:30:44.084820"
+    },
+    {
+      "conversation": "eval417_2a81fd5c5b7f4dd0",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-lite",
+      "fallback_reason": "Fallback: prov_20261013041934: circuit_breaker_open",
+      "at": "2026-10-13 09:30:55.084702"
+    }
+  ],
+  "events": [
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:31:06.582951+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:59.797856+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:59.224913+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:56.810293+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:55.272523+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:55.069666+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:46.464012+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:44.069680+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:35.934213+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:32.651459+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:31.123943+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:30.894928+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:24.438561+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:24.387471+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:16.782795+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "failed",
+      "reason": "provider_request_failed",
+      "created_at": "2026-10-13 09:30:16.729991+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:05.876831+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:30:03.572116+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:54.703780+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:51.257850+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:49.737360+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:49.519861+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:36.472471+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:36.418512+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:28.844906+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "failed",
+      "reason": "provider_request_failed",
+      "created_at": "2026-10-13 09:29:28.792283+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:13.472585+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 09:29:11.382422+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:28:56.786365+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 09:28:53.602561+00:00"
+    }
+  ]
+}

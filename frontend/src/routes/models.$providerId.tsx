@@ -7,5 +7,5 @@ export const Route = createFileRoute("/models/$providerId")({
 
 function ProviderDetailRoute() {
   const { providerId } = Route.useParams();
-  return <ProviderDetailPage providerId={providerId} />;
+  return <ProviderDetailPage key={providerId} providerId={providerId} />;
 }

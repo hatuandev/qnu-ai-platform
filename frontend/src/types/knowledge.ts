@@ -162,6 +162,9 @@ export interface DocumentVerificationData {
   title: string;
   filename: string;
   status?: string;
+  structured_review_status?: string;
+  requires_structured_review?: boolean;
+  structured_issue_count?: number;
   index_status?: string;
   file_size_mb: number;
   total_pages: number;
@@ -346,6 +349,9 @@ export interface KnowledgeBinding {
   active_index_revision_id?: string | null;
   active_source_revision_id?: string | null;
   source_status?: string | null;
+  structured_review_status?: string | null;
+  requires_structured_review?: boolean;
+  structured_issue_count?: number;
   active_epoch: number;
   chunk_strategy: string;
   sync_policy: string;
@@ -956,10 +962,18 @@ export interface KnowledgeSourceRevisionResponse {
     | "ready"
     | "failed"
     | "cancelled";
+  structured_review_status: string;
+  requires_structured_review: boolean;
+  structured_issue_count: number;
   failure_code?: string | null;
   failure_detail?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BulkReviewSourceRevisionsResponse {
+  reviewed_count: number;
+  revisions: KnowledgeSourceRevisionResponse[];
 }
 
 export interface KnowledgeSourceDetailResponse {
@@ -1051,9 +1065,14 @@ export interface VectorLoadItem {
   source_revision_id: string;
 }
 
+export interface PublishVectorItem extends VectorLoadItem {
+  index_revision_id: string;
+}
+
 export interface VectorLoadJob {
   id: string;
   status: string;
+  phase?: string | null;
   progress: number;
   error?: string | null;
   payload: {

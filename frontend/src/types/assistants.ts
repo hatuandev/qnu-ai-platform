@@ -13,13 +13,16 @@ export interface AssistantLifecycleConfig {
     retrieval_limit?: number;
     collection_id?: string;
     reranker_policy?: {
+      provider_id?: string | null;
       enabled?: boolean;
-      model_name?: string;
+      model_name?: string | null;
       top_k?: number;
       score_threshold?: number;
     };
   };
   model_policy: {
+    preferred_provider_id?: string | null;
+    fallback_provider_id?: string | null;
     primary_model?: string | null;
     fallback_model?: string | null;
     temperature: number;

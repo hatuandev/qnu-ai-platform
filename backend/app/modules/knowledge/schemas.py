@@ -84,6 +84,9 @@ class ChunkItem(BaseModel):
 class FactItem(BaseModel):
     id: str
     entity_name: str
+    entity_key: str | None = None
+    entity_label: str | None = None
+    entity_text: str | None = None
     entity_type: str
     attribute_name: str
     attribute_value: str
@@ -208,6 +211,9 @@ class StudioViewResponse(BaseModel):
     filename: str
     engine: str
     status: str = "pending"
+    structured_review_status: str = "auto_ready"
+    requires_structured_review: bool = False
+    structured_issue_count: int = 0
     index_status: str | None = None
     total_pages: int
     file_size_bytes: int = 0
@@ -240,6 +246,9 @@ class FactItemResponse(BaseModel):
     binding_id: str | None = None
     index_revision_id: str | None = None
     entity_name: str
+    entity_key: str | None = None
+    entity_label: str | None = None
+    entity_text: str | None = None
     entity_type: str
     attribute_name: str
     attribute_value: str
@@ -261,9 +270,24 @@ class FactExcelImportResponse(BaseModel):
     message: str
 
 
+class PublishVectorItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    binding_id: str = Field(min_length=1, max_length=64)
+    source_revision_id: str = Field(min_length=1, max_length=64)
+    index_revision_id: str = Field(min_length=1, max_length=64)
+
+
+class PublishSelectedVectorsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[PublishVectorItem] = Field(min_length=1, max_length=500)
+
+
 class CandidateQueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     module_code: str = "general"
+    items: list[PublishVectorItem] | None = Field(None, min_length=1, max_length=500)
 
 
 # ==============================================================================
@@ -365,6 +389,9 @@ class KnowledgeBindingResponse(BaseModel):
     active_index_revision_id: str | None = None
     active_source_revision_id: str | None = None
     source_status: str | None = None
+    structured_review_status: str | None = None
+    requires_structured_review: bool = False
+    structured_issue_count: int = 0
     active_epoch: int = 0
     chunk_strategy: str = "ClauseBasedChunker"
     sync_policy: str = "manual"
@@ -929,6 +956,9 @@ class KnowledgeSourceRevisionResponse(BaseModel):
     citation_metadata: dict[str, Any] = Field(default_factory=dict)
     quality_report: dict[str, Any] = Field(default_factory=dict)
     status: str
+    structured_review_status: str = "auto_ready"
+    requires_structured_review: bool = False
+    structured_issue_count: int = 0
     failure_code: str | None = None
     failure_detail: str | None = None
     created_at: datetime
@@ -976,6 +1006,26 @@ class ReviewSourceRevisionRequest(BaseModel):
 
     decision: str = Field(..., description="Quyết định duyệt: approved hoặc rejected")
     comment: str | None = Field(None, description="Ghi chú phản hồi duyệt")
+
+
+class BulkReviewSourceRevisionItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_id: str = Field(min_length=1, max_length=64)
+    revision_id: str = Field(min_length=1, max_length=64)
+
+
+class BulkReviewSourceRevisionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BulkReviewSourceRevisionItem] = Field(min_length=1, max_length=200)
+    decision: Literal["approved", "rejected"]
+    comment: str | None = Field(None, max_length=2000)
+
+
+class BulkReviewSourceRevisionsResponse(BaseModel):
+    reviewed_count: int
+    revisions: list[KnowledgeSourceRevisionResponse]
 
 
 class KnowledgeSourceDetailResponse(BaseModel):

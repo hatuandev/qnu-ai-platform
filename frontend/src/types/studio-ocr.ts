@@ -47,6 +47,9 @@ export interface StudioOCRDocument {
   model: string;
   latencyMs: number;
   status?: string;
+  structuredReviewStatus?: string;
+  requiresStructuredReview?: boolean;
+  structuredIssueCount?: number;
   indexStatus?: string;
   pdfUrl?: string;
   pages: StudioOCRPage[];

@@ -12,7 +12,7 @@ current_job: ContextVar[tuple[str, int] | None] = ContextVar("ingestion_job", de
 
 
 def item_progress(status: str, phase: str, progress: float = 0) -> float:
-    if status == "succeeded":
+    if status in {"succeeded", "review_required", "failed", "skipped", "cancelled"}:
         return 100
     if status == "queued":
         return 0

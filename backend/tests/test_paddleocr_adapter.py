@@ -87,6 +87,17 @@ async def test_paddleocr_adapter_extract_success_pdf_and_nfc():
 
 
 @pytest.mark.asyncio
+async def test_table_settings_are_not_table_evidence():
+    adapter = PaddleOCRVLAdapter(base_url="http://ocr.test")
+    response = AsyncMock(spec=httpx.Response)
+    response.status_code = 200
+    response.json.return_value = {"result": {"layoutParsingResults": [{"markdown": {"text": "Plain text"}, "prunedResult": {"model_settings": {"use_table_recognition": True}}}]}}
+    with patch("httpx.AsyncClient.post", return_value=response):
+        result = await adapter.extract(b"fixture", "test.pdf")
+    assert result["pages"][0]["has_tables"] is False
+
+
+@pytest.mark.asyncio
 async def test_paddleocr_adapter_extract_image_file_type():
     adapter = PaddleOCRVLAdapter(base_url="http://100.105.13.53:8080")
     mock_response_data = {

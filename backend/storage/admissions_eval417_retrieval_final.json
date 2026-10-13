@@ -1,0 +1,3207 @@
+{
+  "started_at": "2026-10-13T10:24:33.400676+00:00",
+  "document": "C:\\Users\\AnhTuan\\Downloads\\TUYỂN SINH - HẰNG-20261012T083111Z-1-001\\TUYỂN SINH - HẰNG\\2026.DL TUYỂN SINH\\Bộ dữ liệu Chatbot Tuyển sinh.docx",
+  "document_sha256": "5bdee19ececf709c472a56459e02a36e7f1afb44ffdba9974f58e899ed66c3fe",
+  "cases": [
+    {
+      "id": 13,
+      "section": "II. PHƯƠNG THỨC XÉT TUYỂN",
+      "question": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+      "expected_answer": "Có, các ngành đào tạo giáo viên phù hợp có thể xét PT4; riêng Giáo dục Mầm non và Giáo dục Thể chất sử dụng phương thức có năng khiếu theo thông báo của Trường."
+    },
+    {
+      "id": 42,
+      "section": "VII. CÁC NGÀNH ĐÀO TẠO GIÁO VIÊN",
+      "question": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+      "expected_answer": "Theo Thông báo 121/TB-HĐTS ngày 09/07/2026, ngưỡng theo phương thức điểm thi THPT của Giáo dục Mầm non là 20 điểm; đồng thời tổng điểm 2 môn văn hóa cộng 2/3 điểm ưu tiên phải đạt ít nhất 13,34."
+    }
+  ],
+  "results": [
+    {
+      "id": 13,
+      "question": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+      "route": "dag",
+      "conversation_id": "eval417_8cad45301e9446b9",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+          "requested": {
+            "query": "Ngành sư phạm tại Trường Đại học Quy Nhơn có sử dụng kết quả kỳ thi Đánh giá năng lực của Trường Đại học Sư phạm Hà Nội để xét tuyển không? năm 2026",
+            "years": [
+              2026
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "Trường Đại học Quy Nhơn",
+            "attribute": "phương thức xét tuyển",
+            "method": "kết quả thi Đánh giá năng lực Trường ĐHSP Hà Nội",
+            "round": null,
+            "event": "xét tuyển",
+            "search_queries": [
+              "phương thức xét tuyển ngành sư phạm Trường Đại học Quy Nhơn 2026",
+              "Trường Đại học Quy Nhơn có xét tuyển bằng điểm thi Đánh giá năng lực ĐHSP Hà Nội không",
+              "các phương thức tuyển sinh đại học chính quy QNU 2026"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "clm_001",
+              "text": "Năm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).",
+              "references": [
+                {
+                  "block_id": "ks_rev_6280c8de7f46:179:237",
+                  "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 1,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 179,
+                  "end": 237
+                },
+                {
+                  "block_id": "ks_rev_6280c8de7f46:2229:2320",
+                  "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 2,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 2229,
+                  "end": 2320
+                }
+              ],
+              "verified": true
+            },
+            {
+              "id": "clm_002",
+              "text": "Đối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+              "references": [
+                {
+                  "block_id": "ks_rev_cf1863148443:172:253",
+                  "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                  "binding_id": "bnd_35c0b812a4fe",
+                  "index_revision_id": "idx_rev_ac9ec09ebb97",
+                  "source_revision_id": "ks_rev_cf1863148443",
+                  "page_number": 1,
+                  "title": "TB điểm sàn 26",
+                  "section": "",
+                  "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 172,
+                  "end": 253
+                },
+                {
+                  "block_id": "facts:c5d9054fc83771aca556",
+                  "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                  "binding_id": "bnd_35c0b812a4fe",
+                  "index_revision_id": "idx_rev_ac9ec09ebb97",
+                  "source_revision_id": "ks_rev_cf1863148443",
+                  "page_number": 2,
+                  "title": "TB điểm sàn 26",
+                  "section": "",
+                  "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                  "origin": "reviewed_fact",
+                  "fact_id": "fct_63074349d19a2caa1f3982c4",
+                  "start": null,
+                  "end": null
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "82052522ee5335a535a501aae9d7a84d6770ee5499eb16726ebaa106d6d77646",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "clm_001",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thông báo số 1906/TB-ĐHQN năm 2026 xác nhận Trường Đại học Quy Nhơn áp dụng phương thức 4 (mã 402B) xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.",
+                "superseded_by": []
+              },
+              {
+                "claim_id": "clm_002",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thông báo ngưỡng bảo đảm chất lượng đầu vào năm 2026 của Trường Đại học Quy Nhơn quy định ngưỡng 20 điểm cho phương thức xét điểm thi ĐGNL ĐHSP Hà Nội đối với các ngành đào tạo giáo viên (như Sư phạm Tiếng Anh và Sư phạm Ngữ Văn).",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:14373:14550",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:1890:2073",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_cf1863148443:172:253",
+              "title": "TB điểm sàn 26",
+              "page": 1
+            },
+            {
+              "id": "facts:c5d9054fc83771aca556",
+              "title": "TB điểm sàn 26",
+              "page": 2
+            },
+            {
+              "id": "facts:49937b24fac7985521e1",
+              "title": "TB điểm sàn 26",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2229:2320",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:2936:3105",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:1099:1277",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2075:2227",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            }
+          ]
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 179,
+            "span_end": 237,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 1,
+            "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 2229,
+            "span_end": 2320,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 2,
+            "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+            "source_pages": [
+              2
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 172,
+            "span_end": 253,
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "source_id": "bnd_35c0b812a4fe",
+            "title": "TB điểm sàn 26",
+            "section": "",
+            "page_number": 1,
+            "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_35c0b812a4fe",
+            "index_revision_id": "idx_rev_ac9ec09ebb97",
+            "source_revision_id": "ks_rev_cf1863148443",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "reviewed_fact",
+            "fact_id": "fct_63074349d19a2caa1f3982c4",
+            "span_start": null,
+            "span_end": null,
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "source_id": "bnd_35c0b812a4fe",
+            "title": "TB điểm sàn 26",
+            "section": "",
+            "page_number": 2,
+            "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+            "source_pages": [
+              2
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_35c0b812a4fe",
+            "index_revision_id": "idx_rev_ac9ec09ebb97",
+            "source_revision_id": "ks_rev_cf1863148443",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 27657.31,
+        "execution_id": "13e77b83-4ce0-4ca2-bf51-716abdfc4cca",
+        "artifacts": [],
+        "conversation_id": "eval417_8cad45301e9446b9"
+      },
+      "trace": [
+        {
+          "node_id": "chat_input",
+          "node_type": "input.chat",
+          "status": "completed",
+          "latency_ms": 0.02,
+          "output": {
+            "message": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?"
+          }
+        },
+        {
+          "node_id": "condition_route",
+          "node_type": "condition.route",
+          "status": "completed",
+          "latency_ms": 1535.85,
+          "output": {
+            "message": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+            "response": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+            "next_node": "query_rewrite",
+            "matched_rule_id": null
+          }
+        },
+        {
+          "node_id": "query_rewrite",
+          "node_type": "query.rewrite",
+          "status": "completed",
+          "latency_ms": 3050.77,
+          "output": {
+            "modified": true,
+            "original_query": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+            "normalized_query": "Ngành sư phạm có xét Đánh giá năng lực Trường ĐHSP Hà Nội không?"
+          }
+        },
+        {
+          "node_id": "knowledge_answer",
+          "node_type": "core.knowledge.answer",
+          "status": "completed",
+          "latency_ms": 23069.89,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "status": "answered",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 9 · \nc. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 2 (PT2 - mã 200): Xét tuyển theo kết quả học tập 3 năm\nTHPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào\ntạo giáo viên không xét tuyển phương thức 2.",
+              "TB điểm sàn 26 · trang 1 · \nTHÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+              "TB điểm sàn 26 · trang 2 · \nSư phạm Tiếng Anh\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Toán, Văn, Anh)",
+              "TB điểm sàn 26 · trang 2 · \nSư phạm Ngữ Văn\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Sử, Địa)\n(Văn, Sử, Anh)\n(Văn, Địa, Anh)\n(Văn, Toán, Anh)\n(Văn, Giáo dục KT và PL, Anh)",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+              "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 3 · \nPHỤ LỤC 1\nKHUNG QUY ĐỔI ĐIỂM GIỮA CÁC PHƯƠNG THỨC XÉT TUYỂN NĂM 2026\n(Kèm theo Thông báo số /TB-HĐTS ngày tháng năm 2026 của Hội đồng tuyển sinh Trường Đại học Quy Nhơn)",
+              "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 1 · \n- Xét tuyển dựa vào kết quả kỳ thi đánh giá năng lực của Đại học Quốc gia Thành phố\nHồ Chí Minh (ĐNL) và kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà\nNội (SPT).",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 3 (PT3 - mã 402A): Xét kết quả kỳ thi đánh giá năng lực\n(ĐGNL) của ĐHQG TP.HCM. Các ngành đào tạo giáo viên không xét tuyển\nphương thức 3."
+            ],
+            "response": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "artifacts": [],
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 237,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 179,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 2320,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 2229,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_63074349d19a2caa1f3982c4",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "facts_used": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Ngành sư phạm tại Trường Đại học Quy Nhơn có sử dụng kết quả kỳ thi Đánh giá năng lực của Trường Đại học Sư phạm Hà Nội để xét tuyển không? năm 2026",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "method": "kết quả thi Đánh giá năng lực Trường ĐHSP Hà Nội",
+                "coverage": "focused",
+                "attribute": "phương thức xét tuyển",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "phương thức xét tuyển ngành sư phạm Trường Đại học Quy Nhơn 2026",
+                  "Trường Đại học Quy Nhơn có xét tuyển bằng điểm thi Đánh giá năng lực ĐHSP Hà Nội không",
+                  "các phương thức tuyển sinh đại học chính quy QNU 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14373:14550",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:1890:2073",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:c5d9054fc83771aca556",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:49937b24fac7985521e1",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:2936:3105",
+                  "page": 3,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:1099:1277",
+                  "page": 1,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2075:2227",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo số 1906/TB-ĐHQN năm 2026 xác nhận Trường Đại học Quy Nhơn áp dụng phương thức 4 (mã 402B) xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.",
+                    "claim_id": "clm_001",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  },
+                  {
+                    "reason": "Thông báo ngưỡng bảo đảm chất lượng đầu vào năm 2026 của Trường Đại học Quy Nhơn quy định ngưỡng 20 điểm cho phương thức xét điểm thi ĐGNL ĐHSP Hà Nội đối với các ngành đào tạo giáo viên (như Sư phạm Tiếng Anh và Sư phạm Ngữ Văn).",
+                    "claim_id": "clm_002",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "clm_001",
+                  "text": "Năm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 237,
+                      "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                      "start": 179,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:179:237",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 1,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    },
+                    {
+                      "end": 2320,
+                      "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                      "start": 2229,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:2229:2320",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 2,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    }
+                  ]
+                },
+                {
+                  "id": "clm_002",
+                  "text": "Đối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_63074349d19a2caa1f3982c4",
+                      "section": "",
+                      "block_id": "facts:c5d9054fc83771aca556",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 2,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "82052522ee5335a535a501aae9d7a84d6770ee5499eb16726ebaa106d6d77646",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "suggested_questions": []
+          }
+        },
+        {
+          "node_id": "citation_guard",
+          "node_type": "guard.citation_policy",
+          "status": "completed",
+          "latency_ms": 0.43,
+          "output": {
+            "port": "grounded",
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "status": "answered",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 9 · \nc. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 2 (PT2 - mã 200): Xét tuyển theo kết quả học tập 3 năm\nTHPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào\ntạo giáo viên không xét tuyển phương thức 2.",
+              "TB điểm sàn 26 · trang 1 · \nTHÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+              "TB điểm sàn 26 · trang 2 · \nSư phạm Tiếng Anh\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Toán, Văn, Anh)",
+              "TB điểm sàn 26 · trang 2 · \nSư phạm Ngữ Văn\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Sử, Địa)\n(Văn, Sử, Anh)\n(Văn, Địa, Anh)\n(Văn, Toán, Anh)\n(Văn, Giáo dục KT và PL, Anh)",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+              "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 3 · \nPHỤ LỤC 1\nKHUNG QUY ĐỔI ĐIỂM GIỮA CÁC PHƯƠNG THỨC XÉT TUYỂN NĂM 2026\n(Kèm theo Thông báo số /TB-HĐTS ngày tháng năm 2026 của Hội đồng tuyển sinh Trường Đại học Quy Nhơn)",
+              "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 1 · \n- Xét tuyển dựa vào kết quả kỳ thi đánh giá năng lực của Đại học Quốc gia Thành phố\nHồ Chí Minh (ĐNL) và kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà\nNội (SPT).",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 3 (PT3 - mã 402A): Xét kết quả kỳ thi đánh giá năng lực\n(ĐGNL) của ĐHQG TP.HCM. Các ngành đào tạo giáo viên không xét tuyển\nphương thức 3."
+            ],
+            "grounded": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "response": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 237,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 179,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 2320,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 2229,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_63074349d19a2caa1f3982c4",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "ungrounded": "VERIFIED_CLAIM_COVERAGE",
+            "is_grounded": true,
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Ngành sư phạm tại Trường Đại học Quy Nhơn có sử dụng kết quả kỳ thi Đánh giá năng lực của Trường Đại học Sư phạm Hà Nội để xét tuyển không? năm 2026",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "method": "kết quả thi Đánh giá năng lực Trường ĐHSP Hà Nội",
+                "coverage": "focused",
+                "attribute": "phương thức xét tuyển",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "phương thức xét tuyển ngành sư phạm Trường Đại học Quy Nhơn 2026",
+                  "Trường Đại học Quy Nhơn có xét tuyển bằng điểm thi Đánh giá năng lực ĐHSP Hà Nội không",
+                  "các phương thức tuyển sinh đại học chính quy QNU 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14373:14550",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:1890:2073",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:c5d9054fc83771aca556",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:49937b24fac7985521e1",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:2936:3105",
+                  "page": 3,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:1099:1277",
+                  "page": 1,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2075:2227",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo số 1906/TB-ĐHQN năm 2026 xác nhận Trường Đại học Quy Nhơn áp dụng phương thức 4 (mã 402B) xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.",
+                    "claim_id": "clm_001",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  },
+                  {
+                    "reason": "Thông báo ngưỡng bảo đảm chất lượng đầu vào năm 2026 của Trường Đại học Quy Nhơn quy định ngưỡng 20 điểm cho phương thức xét điểm thi ĐGNL ĐHSP Hà Nội đối với các ngành đào tạo giáo viên (như Sư phạm Tiếng Anh và Sư phạm Ngữ Văn).",
+                    "claim_id": "clm_002",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "clm_001",
+                  "text": "Năm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 237,
+                      "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                      "start": 179,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:179:237",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 1,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    },
+                    {
+                      "end": 2320,
+                      "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                      "start": 2229,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:2229:2320",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 2,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    }
+                  ]
+                },
+                {
+                  "id": "clm_002",
+                  "text": "Đối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_63074349d19a2caa1f3982c4",
+                      "section": "",
+                      "block_id": "facts:c5d9054fc83771aca556",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 2,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "82052522ee5335a535a501aae9d7a84d6770ee5499eb16726ebaa106d6d77646",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "failure_reasons": []
+          }
+        },
+        {
+          "node_id": "chat_output",
+          "node_type": "output.chat",
+          "status": "completed",
+          "latency_ms": 0.03,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+            "status": "answered",
+            "warnings": [],
+            "artifacts": [],
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 237,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 179,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                "title": "Thông tin TSĐH cập nhật",
+                "fact_id": null,
+                "section": "",
+                "span_end": 2320,
+                "source_id": "bnd_b7be60e6ada9",
+                "binding_id": "bnd_b7be60e6ada9",
+                "entity_key": null,
+                "span_start": 2229,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_33446987e9fc",
+                "source_revision_id": "ks_rev_6280c8de7f46"
+              },
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_63074349d19a2caa1f3982c4",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 2,
+                "revision_no": null,
+                "source_pages": [
+                  2
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "missing_fields": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nĐối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Ngành sư phạm tại Trường Đại học Quy Nhơn có sử dụng kết quả kỳ thi Đánh giá năng lực của Trường Đại học Sư phạm Hà Nội để xét tuyển không? năm 2026",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "method": "kết quả thi Đánh giá năng lực Trường ĐHSP Hà Nội",
+                "coverage": "focused",
+                "attribute": "phương thức xét tuyển",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "phương thức xét tuyển ngành sư phạm Trường Đại học Quy Nhơn 2026",
+                  "Trường Đại học Quy Nhơn có xét tuyển bằng điểm thi Đánh giá năng lực ĐHSP Hà Nội không",
+                  "các phương thức tuyển sinh đại học chính quy QNU 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14373:14550",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:1890:2073",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:c5d9054fc83771aca556",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:49937b24fac7985521e1",
+                  "page": 2,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:2936:3105",
+                  "page": 3,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_1610bf67e2cf:1099:1277",
+                  "page": 1,
+                  "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2075:2227",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo số 1906/TB-ĐHQN năm 2026 xác nhận Trường Đại học Quy Nhơn áp dụng phương thức 4 (mã 402B) xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.",
+                    "claim_id": "clm_001",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  },
+                  {
+                    "reason": "Thông báo ngưỡng bảo đảm chất lượng đầu vào năm 2026 của Trường Đại học Quy Nhơn quy định ngưỡng 20 điểm cho phương thức xét điểm thi ĐGNL ĐHSP Hà Nội đối với các ngành đào tạo giáo viên (như Sư phạm Tiếng Anh và Sư phạm Ngữ Văn).",
+                    "claim_id": "clm_002",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "clm_001",
+                  "text": "Năm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển dựa trên kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 237,
+                      "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                      "start": 179,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:179:237",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 1,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    },
+                    {
+                      "end": 2320,
+                      "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                      "start": 2229,
+                      "title": "Thông tin TSĐH cập nhật",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_6280c8de7f46:2229:2320",
+                      "binding_id": "bnd_b7be60e6ada9",
+                      "page_number": 2,
+                      "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                      "index_revision_id": "idx_rev_33446987e9fc",
+                      "source_revision_id": "ks_rev_6280c8de7f46"
+                    }
+                  ]
+                },
+                {
+                  "id": "clm_002",
+                  "text": "Đối với các ngành đào tạo giáo viên năm 2026, Trường Đại học Quy Nhơn có quy định ngưỡng bảo đảm chất lượng đầu vào đối với phương thức xét điểm thi ĐGNL ĐHSP Hà Nội là 20 điểm.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Phương thức xét điểm thi ĐGNL ĐHSP HN: 20",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_63074349d19a2caa1f3982c4",
+                      "section": "",
+                      "block_id": "facts:c5d9054fc83771aca556",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 2,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "82052522ee5335a535a501aae9d7a84d6770ee5499eb16726ebaa106d6d77646",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "suggested_questions": []
+          }
+        }
+      ],
+      "elapsed_seconds": 28.28,
+      "served_models": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 863,
+          "completion_tokens": 234,
+          "latency_ms": 4769.5,
+          "cost_usd": 9e-05
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 10675,
+          "completion_tokens": 486,
+          "latency_ms": 7808.07,
+          "cost_usd": 0.000631
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 11846,
+          "completion_tokens": 215,
+          "latency_ms": 5765.17,
+          "cost_usd": 0.000635
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "question": "Ngành sư phạm có xét ĐGNL Trường ĐHSP Hà Nội không?",
+      "route": "rag",
+      "conversation_id": "eval417_d02ffbca97c84a3f",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "partial",
+          "reason": "PARTIAL_OR_MISSING_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển bằng kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "Ngành sư phạm tại Trường Đại học Quy Nhơn có sử dụng kết quả kỳ thi Đánh giá năng lực của Trường Đại học Sư phạm Hà Nội để xét tuyển không? năm 2026",
+            "years": [
+              2026
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "Trường Đại học Quy Nhơn",
+            "attribute": "phương thức xét tuyển",
+            "method": "xét tuyển bằng kết quả thi Đánh giá năng lực",
+            "round": null,
+            "event": "xét tuyển đại học",
+            "search_queries": [
+              "phương thức xét tuyển Trường Đại học Quy Nhơn 2026",
+              "QNU có xét tuyển bằng điểm thi ĐGNL ĐH Sư phạm Hà Nội không",
+              "các phương thức tuyển sinh ngành sư phạm QNU 2026"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "claim_001",
+              "text": "Năm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển bằng kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).",
+              "references": [
+                {
+                  "block_id": "ks_rev_6280c8de7f46:179:237",
+                  "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 1,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 179,
+                  "end": 237
+                },
+                {
+                  "block_id": "ks_rev_6280c8de7f46:2229:2320",
+                  "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 2,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 2229,
+                  "end": 2320
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "bed82c4129eedc81a50940251d57b389b784d3e5207d454cb9695cb49300373e",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "claim_001",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thông báo số 1906/TB-ĐHQN năm 2026 xác nhận Trường Đại học Quy Nhơn áp dụng Phương thức 4 (mã 402B) là xét kết quả kỳ thi ĐGNL của Trường Đại học Sư phạm Hà Nội.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [
+            {
+              "claim_id": "claim_002",
+              "reason": "Numbers are not bound to their own quote"
+            }
+          ],
+          "quote_repair_attempted": false,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:14373:14550",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:1890:2073",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_cf1863148443:172:253",
+              "title": "TB điểm sàn 26",
+              "page": 1
+            },
+            {
+              "id": "facts:c5d9054fc83771aca556",
+              "title": "TB điểm sàn 26",
+              "page": 2
+            },
+            {
+              "id": "facts:a2b37c70906032e892b0",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2229:2320",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:2936:3105",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:1099:1277",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2075:2227",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            }
+          ]
+        },
+        "status": "insufficient_context",
+        "answer": "Đối chiếu năm 2026:\n\nNăm 2026, Trường Đại học Quy Nhơn có áp dụng phương thức xét tuyển bằng kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà Nội (mã phương thức 402B).\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "answer_format": "paragraph",
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 179,
+            "span_end": 237,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 1,
+            "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 2229,
+            "span_end": 2320,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 2,
+            "quote": "+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+            "source_pages": [
+              2
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          }
+        ],
+        "facts_used": [],
+        "suggested_questions": [],
+        "latency_ms": 17930.59,
+        "contexts": [
+          "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+          "Thông tin TSĐH cập nhật · trang 9 · \nc. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+          "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 2 (PT2 - mã 200): Xét tuyển theo kết quả học tập 3 năm\nTHPT (học bạ) theo quy định của Bộ Giáo dục và Đào tạo. Các ngành đào\ntạo giáo viên không xét tuyển phương thức 2.",
+          "TB điểm sàn 26 · trang 1 · \nTHÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+          "TB điểm sàn 26 · trang 2 · \nSư phạm Tiếng Anh\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Toán, Văn, Anh)",
+          "Thông tin TSĐH cập nhật · trang 3 · \nSư phạm Lịch sử\nPhương thức tuyển sinh: 1,4\nSố lượng tuyển sinh: 54\nTổ hợp môn xét tuyển: (Văn, Sử, Địa)\n(Văn, Sử, Giáo dục KT và PL)\n(Văn, Sử, Anh)\n(Văn, Sử, Toán)",
+          "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+          "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 3 · \nPHỤ LỤC 1\nKHUNG QUY ĐỔI ĐIỂM GIỮA CÁC PHƯƠNG THỨC XÉT TUYỂN NĂM 2026\n(Kèm theo Thông báo số /TB-HĐTS ngày tháng năm 2026 của Hội đồng tuyển sinh Trường Đại học Quy Nhơn)",
+          "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed · trang 1 · \n- Xét tuyển dựa vào kết quả kỳ thi đánh giá năng lực của Đại học Quốc gia Thành phố\nHồ Chí Minh (ĐNL) và kết quả kỳ thi đánh giá năng lực của Trường Đại học Sư phạm Hà\nNội (SPT).",
+          "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 3 (PT3 - mã 402A): Xét kết quả kỳ thi đánh giá năng lực\n(ĐGNL) của ĐHQG TP.HCM. Các ngành đào tạo giáo viên không xét tuyển\nphương thức 3."
+        ],
+        "retrieval_snapshot": {
+          "snapshot_id": "snap_col_admissions_3_023c85e1",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T10:24:34.107601+00:00"
+        },
+        "snapshot": {
+          "snapshot_id": "snap_col_admissions_3_023c85e1",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T10:24:34.107601+00:00"
+        }
+      },
+      "elapsed_seconds": 17.97,
+      "served_models": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 861,
+          "completion_tokens": 224,
+          "latency_ms": 4851.93,
+          "cost_usd": 8.8e-05
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 10458,
+          "completion_tokens": 408,
+          "latency_ms": 4840.88,
+          "cost_usd": 0.000605
+        },
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 11064,
+          "completion_tokens": 138,
+          "latency_ms": 5564.29,
+          "cost_usd": 0.000581
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "question": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+      "route": "dag",
+      "conversation_id": "eval417_feb9f7efa4f84454",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+          "requested": {
+            "query": "Điểm sàn ngành Giáo dục Mầm non năm 2026 là bao nhiêu?",
+            "years": [
+              2026
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "QNU",
+            "attribute": "điểm sàn",
+            "method": null,
+            "round": null,
+            "event": "xét tuyển",
+            "search_queries": [
+              "điểm sàn xét tuyển ngành Giáo dục Mầm non QNU 2026",
+              "ngưỡng đảm bảo chất lượng đầu vào ngành Giáo dục Mầm non Đại học Quy Nhơn 2026",
+              "điểm nhận hồ sơ xét tuyển Giáo dục Mầm non QNU năm 2026"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "diem_san_gdmn_2026",
+              "text": "Năm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+              "references": [
+                {
+                  "block_id": "ks_rev_cf1863148443:172:253",
+                  "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                  "binding_id": "bnd_35c0b812a4fe",
+                  "index_revision_id": "idx_rev_ac9ec09ebb97",
+                  "source_revision_id": "ks_rev_cf1863148443",
+                  "page_number": 1,
+                  "title": "TB điểm sàn 26",
+                  "section": "",
+                  "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 172,
+                  "end": 253
+                },
+                {
+                  "block_id": "facts:497eb77b391ca15266a9",
+                  "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                  "binding_id": "bnd_35c0b812a4fe",
+                  "index_revision_id": "idx_rev_ac9ec09ebb97",
+                  "source_revision_id": "ks_rev_cf1863148443",
+                  "page_number": 1,
+                  "title": "TB điểm sàn 26",
+                  "section": "",
+                  "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                  "origin": "reviewed_fact",
+                  "fact_id": "fct_86a459e9658fb5244185f499",
+                  "start": null,
+                  "end": null
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "69b54e35a88ab7e8061c21f0e21227747bf00518206c254395134b42337f7d57",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "diem_san_gdmn_2026",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thông báo QNU xác định ngưỡng đầu vào năm 2026; ngành Giáo dục Mầm non có mức 20 cho hai phương thức nêu, bảng ghi dấu “–” ở hai cột còn lại và điều kiện ≥13,34.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:14196:14332",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:14334:14371",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_cf1863148443:172:253",
+              "title": "TB điểm sàn 26",
+              "page": 1
+            },
+            {
+              "id": "facts:497eb77b391ca15266a9",
+              "title": "TB điểm sàn 26",
+              "page": 1
+            },
+            {
+              "id": "facts:48039559a1d9e37bcd28",
+              "title": "TB điểm sàn 26",
+              "page": 7
+            },
+            {
+              "id": "facts:0316929bbcd8be5dd8f4",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_cf1863148443:255:461",
+              "title": "TB điểm sàn 26",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_f122689af572:1248:1273",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 1
+            },
+            {
+              "id": "facts:45408815bc2b0353d3a8",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 2
+            }
+          ]
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 172,
+            "span_end": 253,
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "source_id": "bnd_35c0b812a4fe",
+            "title": "TB điểm sàn 26",
+            "section": "",
+            "page_number": 1,
+            "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_35c0b812a4fe",
+            "index_revision_id": "idx_rev_ac9ec09ebb97",
+            "source_revision_id": "ks_rev_cf1863148443",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "reviewed_fact",
+            "fact_id": "fct_86a459e9658fb5244185f499",
+            "span_start": null,
+            "span_end": null,
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "source_id": "bnd_35c0b812a4fe",
+            "title": "TB điểm sàn 26",
+            "section": "",
+            "page_number": 1,
+            "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_35c0b812a4fe",
+            "index_revision_id": "idx_rev_ac9ec09ebb97",
+            "source_revision_id": "ks_rev_cf1863148443",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 25513.63,
+        "execution_id": "2b861eb4-f677-41d1-950c-65576502678d",
+        "artifacts": [],
+        "conversation_id": "eval417_feb9f7efa4f84454"
+      },
+      "trace": [
+        {
+          "node_id": "chat_input",
+          "node_type": "input.chat",
+          "status": "completed",
+          "latency_ms": 0.02,
+          "output": {
+            "message": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?"
+          }
+        },
+        {
+          "node_id": "condition_route",
+          "node_type": "condition.route",
+          "status": "completed",
+          "latency_ms": 1515.2,
+          "output": {
+            "message": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+            "response": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+            "next_node": "query_rewrite",
+            "matched_rule_id": null
+          }
+        },
+        {
+          "node_id": "query_rewrite",
+          "node_type": "query.rewrite",
+          "status": "completed",
+          "latency_ms": 1777.29,
+          "output": {
+            "modified": true,
+            "original_query": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+            "normalized_query": "Điểm sàn ngành Giáo dục Mầm non năm 2026 là bao nhiêu?"
+          }
+        },
+        {
+          "node_id": "knowledge_answer",
+          "node_type": "core.knowledge.answer",
+          "status": "completed",
+          "latency_ms": 22220.51,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "status": "answered",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 9 · \ncùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+              "Thông tin TSĐH cập nhật · trang 9 · \nb. Điểm cộng: xem chi tiết tại Mục 7;",
+              "TB điểm sàn 26 · trang 1 · \nTHÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+              "TB điểm sàn 26 · trang 1 · \nGiáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+              "TB điểm sàn 26 · trang 7 · \nQuản trị khách sạn\nPhương thức xét điểm thi TN. THPT: 15\nPhương thức xét kết quả học tập THPT: 18\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: 600\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 15\nTổ hợp môn xét tuyển: (Toán, Văn, Giáo dục KT và PL)\n(Toán, Văn, Anh)\n(Toán, Văn, Sử)\n(Toán, Văn, Địa)\n(Toán, Văn, Hóa)\n(Toán, Văn, Lý)\n(Toán, Văn, Tin)",
+              "Thông tin TSĐH cập nhật · trang 2 · \nGiáo dục Mầm non\nPhương thức tuyển sinh: 5\nSố lượng tuyển sinh: 180\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)",
+              "TB điểm sàn 26 · trang 1 · \nCăn cứ Thông tư số 06/2026/TT-BGDĐT ngày 15 tháng 02 năm 2026 của Bộ\ntrưởng Bộ Giáo dục và Đào tạo ban hành Quy chế tuyển sinh các ngành đào tạo trình\nđộ đại học và ngành Giáo dục Mầm non trình độ cao đẳng;",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 1 · TUYÊN SINH DẠI HỌC 2026\n# TUYÊN SINH DẠI HỌC 2026",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nGiáo dục Mấm non\nTỔ HỢP MỒN XÉT TUYỀN: (Văn, Toán, NK CDMN)\nPHƯƠNG THỨC: 5"
+            ],
+            "response": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "artifacts": [],
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_86a459e9658fb5244185f499",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "facts_used": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Điểm sàn ngành Giáo dục Mầm non năm 2026 là bao nhiêu?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "QNU",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "điểm sàn",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "điểm sàn xét tuyển ngành Giáo dục Mầm non QNU 2026",
+                  "ngưỡng đảm bảo chất lượng đầu vào ngành Giáo dục Mầm non Đại học Quy Nhơn 2026",
+                  "điểm nhận hồ sơ xét tuyển Giáo dục Mầm non QNU năm 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14196:14332",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14334:14371",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:497eb77b391ca15266a9",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:48039559a1d9e37bcd28",
+                  "page": 7,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:0316929bbcd8be5dd8f4",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:255:461",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "facts:45408815bc2b0353d3a8",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo QNU xác định ngưỡng đầu vào năm 2026; ngành Giáo dục Mầm non có mức 20 cho hai phương thức nêu, bảng ghi dấu “–” ở hai cột còn lại và điều kiện ≥13,34.",
+                    "claim_id": "diem_san_gdmn_2026",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "diem_san_gdmn_2026",
+                  "text": "Năm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_86a459e9658fb5244185f499",
+                      "section": "",
+                      "block_id": "facts:497eb77b391ca15266a9",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "69b54e35a88ab7e8061c21f0e21227747bf00518206c254395134b42337f7d57",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "suggested_questions": []
+          }
+        },
+        {
+          "node_id": "citation_guard",
+          "node_type": "guard.citation_policy",
+          "status": "completed",
+          "latency_ms": 0.31,
+          "output": {
+            "port": "grounded",
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "status": "answered",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 9 · \ncùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+              "Thông tin TSĐH cập nhật · trang 9 · \nb. Điểm cộng: xem chi tiết tại Mục 7;",
+              "TB điểm sàn 26 · trang 1 · \nTHÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+              "TB điểm sàn 26 · trang 1 · \nGiáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+              "TB điểm sàn 26 · trang 7 · \nQuản trị khách sạn\nPhương thức xét điểm thi TN. THPT: 15\nPhương thức xét kết quả học tập THPT: 18\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: 600\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 15\nTổ hợp môn xét tuyển: (Toán, Văn, Giáo dục KT và PL)\n(Toán, Văn, Anh)\n(Toán, Văn, Sử)\n(Toán, Văn, Địa)\n(Toán, Văn, Hóa)\n(Toán, Văn, Lý)\n(Toán, Văn, Tin)",
+              "Thông tin TSĐH cập nhật · trang 2 · \nGiáo dục Mầm non\nPhương thức tuyển sinh: 5\nSố lượng tuyển sinh: 180\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)",
+              "TB điểm sàn 26 · trang 1 · \nCăn cứ Thông tư số 06/2026/TT-BGDĐT ngày 15 tháng 02 năm 2026 của Bộ\ntrưởng Bộ Giáo dục và Đào tạo ban hành Quy chế tuyển sinh các ngành đào tạo trình\nđộ đại học và ngành Giáo dục Mầm non trình độ cao đẳng;",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 1 · TUYÊN SINH DẠI HỌC 2026\n# TUYÊN SINH DẠI HỌC 2026",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nGiáo dục Mấm non\nTỔ HỢP MỒN XÉT TUYỀN: (Văn, Toán, NK CDMN)\nPHƯƠNG THỨC: 5"
+            ],
+            "grounded": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "response": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_86a459e9658fb5244185f499",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "ungrounded": "VERIFIED_CLAIM_COVERAGE",
+            "is_grounded": true,
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Điểm sàn ngành Giáo dục Mầm non năm 2026 là bao nhiêu?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "QNU",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "điểm sàn",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "điểm sàn xét tuyển ngành Giáo dục Mầm non QNU 2026",
+                  "ngưỡng đảm bảo chất lượng đầu vào ngành Giáo dục Mầm non Đại học Quy Nhơn 2026",
+                  "điểm nhận hồ sơ xét tuyển Giáo dục Mầm non QNU năm 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14196:14332",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14334:14371",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:497eb77b391ca15266a9",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:48039559a1d9e37bcd28",
+                  "page": 7,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:0316929bbcd8be5dd8f4",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:255:461",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "facts:45408815bc2b0353d3a8",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo QNU xác định ngưỡng đầu vào năm 2026; ngành Giáo dục Mầm non có mức 20 cho hai phương thức nêu, bảng ghi dấu “–” ở hai cột còn lại và điều kiện ≥13,34.",
+                    "claim_id": "diem_san_gdmn_2026",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "diem_san_gdmn_2026",
+                  "text": "Năm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_86a459e9658fb5244185f499",
+                      "section": "",
+                      "block_id": "facts:497eb77b391ca15266a9",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "69b54e35a88ab7e8061c21f0e21227747bf00518206c254395134b42337f7d57",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "failure_reasons": []
+          }
+        },
+        {
+          "node_id": "chat_output",
+          "node_type": "output.chat",
+          "status": "completed",
+          "latency_ms": 0.03,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+            "status": "answered",
+            "warnings": [],
+            "artifacts": [],
+            "citations": [
+              {
+                "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                "title": "TB điểm sàn 26",
+                "fact_id": null,
+                "section": "",
+                "span_end": 253,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": 172,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "canonical",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              },
+              {
+                "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                "title": "TB điểm sàn 26",
+                "fact_id": "fct_86a459e9658fb5244185f499",
+                "section": "",
+                "span_end": null,
+                "source_id": "bnd_35c0b812a4fe",
+                "binding_id": "bnd_35c0b812a4fe",
+                "entity_key": null,
+                "span_start": null,
+                "page_number": 1,
+                "revision_no": null,
+                "source_pages": [
+                  1
+                ],
+                "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                "evidence_origin": "reviewed_fact",
+                "index_revision_id": "idx_rev_ac9ec09ebb97",
+                "source_revision_id": "ks_rev_cf1863148443"
+              }
+            ],
+            "missing_fields": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nNăm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+              "reason": "VERIFIED_CLAIM_COVERAGE",
+              "status": "supported",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": "xét tuyển",
+                "query": "Điểm sàn ngành Giáo dục Mầm non năm 2026 là bao nhiêu?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "QNU",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "điểm sàn",
+                "uses_history": false,
+                "requires_year": true,
+                "search_queries": [
+                  "điểm sàn xét tuyển ngành Giáo dục Mầm non QNU 2026",
+                  "ngưỡng đảm bảo chất lượng đầu vào ngành Giáo dục Mầm non Đại học Quy Nhơn 2026",
+                  "điểm nhận hồ sơ xét tuyển Giáo dục Mầm non QNU năm 2026"
+                ]
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14196:14332",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:14334:14371",
+                  "page": 9,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:172:253",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:497eb77b391ca15266a9",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:48039559a1d9e37bcd28",
+                  "page": 7,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "facts:0316929bbcd8be5dd8f4",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_cf1863148443:255:461",
+                  "page": 1,
+                  "title": "TB điểm sàn 26"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "facts:45408815bc2b0353d3a8",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Thông báo QNU xác định ngưỡng đầu vào năm 2026; ngành Giáo dục Mầm non có mức 20 cho hai phương thức nêu, bảng ghi dấu “–” ở hai cột còn lại và điều kiện ≥13,34.",
+                    "claim_id": "diem_san_gdmn_2026",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [],
+                    "scope_compatible": true
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [
+                {
+                  "id": "diem_san_gdmn_2026",
+                  "text": "Năm 2026, ngành Giáo dục Mầm non có ngưỡng 20 theo điểm thi tốt nghiệp THPT và 20 theo điểm thi ĐGNL ĐHSP Hà Nội. Bảng ghi “–” ở xét kết quả học tập THPT và ĐGNL ĐHQG TPHCM; điều kiện tổng điểm 2 môn văn hóa + 2/3 điểm ưu tiên ≥ 13,34.",
+                  "verified": true,
+                  "references": [
+                    {
+                      "end": 253,
+                      "quote": "THÔNG BÁO\nNgưỡng bảo đảm chất lượng đầu vào tuyển sinh đại học chính quy năm 2026",
+                      "start": 172,
+                      "title": "TB điểm sàn 26",
+                      "origin": "canonical",
+                      "fact_id": null,
+                      "section": "",
+                      "block_id": "ks_rev_cf1863148443:172:253",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    },
+                    {
+                      "end": null,
+                      "quote": "Giáo dục Mầm non\nPhương thức xét điểm thi TN. THPT: 20\nPhương thức xét kết quả học tập THPT: –\nPhương thức xét điểm thi ĐGNL ĐHQG TPHCM: –\nPhương thức xét điểm thi ĐGNL ĐHSP HN: 20\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)\nTổng điểm 2 môn văn hóa + 2/3 điểm ƯT ≥\n13,34",
+                      "start": null,
+                      "title": "TB điểm sàn 26",
+                      "origin": "reviewed_fact",
+                      "fact_id": "fct_86a459e9658fb5244185f499",
+                      "section": "",
+                      "block_id": "facts:497eb77b391ca15266a9",
+                      "binding_id": "bnd_35c0b812a4fe",
+                      "page_number": 1,
+                      "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+                      "index_revision_id": "idx_rev_ac9ec09ebb97",
+                      "source_revision_id": "ks_rev_cf1863148443"
+                    }
+                  ]
+                }
+              ],
+              "evidence_digest": "69b54e35a88ab7e8061c21f0e21227747bf00518206c254395134b42337f7d57",
+              "binding_rejections": [],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": false
+            },
+            "suggested_questions": []
+          }
+        }
+      ],
+      "elapsed_seconds": 25.66,
+      "served_models": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.1-flash-lite",
+          "fallback": true,
+          "status": "success",
+          "prompt_tokens": 863,
+          "completion_tokens": 194,
+          "latency_ms": 5344.1,
+          "cost_usd": 8.2e-05
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-6-luna",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 12725,
+          "completion_tokens": 770,
+          "latency_ms": 8834.79,
+          "cost_usd": 0.002371
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-6-luna",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13331,
+          "completion_tokens": 373,
+          "latency_ms": 5053.79,
+          "cost_usd": 0.002223
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "question": "Điểm sàn Giáo dục Mầm non năm 2026 là bao nhiêu?",
+      "route": "rag",
+      "conversation_id": "eval417_d255922c15734b79",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "partial",
+          "reason": "PARTIAL_OR_MISSING_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nThông báo tuyển sinh đại học năm 2026 (cập nhật) ghi ngưỡng bảo đảm chất lượng đầu vào công bố theo quy định của Bộ.\n\nChưa đủ căn cứ cho: Phương thức xét tuyển áp dụng; tài liệu không cho mức điểm sàn cụ thể.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "Điểm sàn tuyển sinh ngành Giáo dục Mầm non của Trường Đại học Quy Nhơn năm 2026 là bao nhiêu?",
+            "years": [
+              2026
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "Trường Đại học Quy Nhơn (QNU)",
+            "attribute": "Điểm sàn tuyển sinh",
+            "method": null,
+            "round": null,
+            "event": "Tuyển sinh đại học",
+            "search_queries": [
+              "QNU ngưỡng đảm bảo chất lượng đầu vào Giáo dục Mầm non 2026",
+              "Trường Đại học Quy Nhơn mức điểm nhận hồ sơ ngành Giáo dục Mầm non năm 2026"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1",
+              "text": "Thông báo tuyển sinh đại học năm 2026 (cập nhật) ghi ngưỡng bảo đảm chất lượng đầu vào công bố theo quy định của Bộ.",
+              "references": [
+                {
+                  "block_id": "ks_rev_6280c8de7f46:179:237",
+                  "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 1,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 179,
+                  "end": 237
+                },
+                {
+                  "block_id": "ks_rev_6280c8de7f46:15869:15978",
+                  "quote": "Công bố ngưỡng bảo đảm chất lượng đầu vào và quy tắc quy đổi điểm giữa\ncác phương thức: theo quy định của Bộ.",
+                  "binding_id": "bnd_b7be60e6ada9",
+                  "index_revision_id": "idx_rev_33446987e9fc",
+                  "source_revision_id": "ks_rev_6280c8de7f46",
+                  "page_number": 10,
+                  "title": "Thông tin TSĐH cập nhật",
+                  "section": "",
+                  "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "start": 15869,
+                  "end": 15978
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "5cb3626f9e56bb11ea843ba13add3468c82b075208516b7132f6bbafb04b30c9",
+          "missing_constraints": [
+            "Phương thức xét tuyển áp dụng; tài liệu không cho mức điểm sàn cụ thể."
+          ],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thông báo tuyển sinh QNU năm 2026 nêu ngưỡng đầu vào công bố theo quy định của Bộ; không nêu mức điểm cụ thể.",
+                "superseded_by": []
+              }
+            ],
+            "complete": false,
+            "conflict": false,
+            "missing_constraints": [
+              "Phương thức xét tuyển áp dụng; tài liệu không cho mức điểm sàn cụ thể."
+            ]
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2568:2733",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "facts:0316929bbcd8be5dd8f4",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "facts:79e7d3259734e47881b7",
+              "title": "TB lịch xét tuyển ĐH",
+              "page": 3
+            },
+            {
+              "id": "facts:c1ebd3bbf5cfea5b7729",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 26
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:269:768",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:877:968",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:15869:15978",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 10
+            }
+          ]
+        },
+        "status": "insufficient_context",
+        "answer": "Đối chiếu năm 2026:\n\nThông báo tuyển sinh đại học năm 2026 (cập nhật) ghi ngưỡng bảo đảm chất lượng đầu vào công bố theo quy định của Bộ.\n\nChưa đủ căn cứ cho: Phương thức xét tuyển áp dụng; tài liệu không cho mức điểm sàn cụ thể.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "answer_format": "paragraph",
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 179,
+            "span_end": 237,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 1,
+            "quote": "THÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 15869,
+            "span_end": 15978,
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "source_id": "bnd_b7be60e6ada9",
+            "title": "Thông tin TSĐH cập nhật",
+            "section": "",
+            "page_number": 10,
+            "quote": "Công bố ngưỡng bảo đảm chất lượng đầu vào và quy tắc quy đổi điểm giữa\ncác phương thức: theo quy định của Bộ.",
+            "source_pages": [
+              10
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_b7be60e6ada9",
+            "index_revision_id": "idx_rev_33446987e9fc",
+            "source_revision_id": "ks_rev_6280c8de7f46",
+            "revision_no": null
+          }
+        ],
+        "facts_used": [],
+        "suggested_questions": [],
+        "latency_ms": 37923.16,
+        "contexts": [
+          "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+          "Thông tin TSĐH cập nhật · trang 2 · \n3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+          "Thông tin TSĐH cập nhật · trang 2 · \nGiáo dục Mầm non\nPhương thức tuyển sinh: 5\nSố lượng tuyển sinh: 180\nTổ hợp môn xét tuyển: (Văn, Toán, NK GDMN)",
+          "TB lịch xét tuyển ĐH · trang 3 · \nHọp HĐTS Trường Đại học Quy Nhơn thống nhất số lượng trúng tuyển, điểm chuẩn dự kiến\nChủ trì thực hiện: HĐTS\nPhối hợp thực hiện: Tổ máy tính",
+          "Quy chế tuyển sinh đại học 2026 - 363 · trang 26 · PHỤ LỤC III THÔNG TIN TUYỀN SINH (Kèm theo Quy chế tuyển sinh các ngành đào tạo trình độ đại học và ngành Giáo dục Mầm non trình độ cao đẳng)\nKhu vực 3 (KV3)\nMô tả khu vực và điều kiện: Các phường của thành phố trực thuộc Trung ương.",
+          "Thông tin TSĐH cập nhật · trang 1 · \nCăn cứ Quy chế Tuyển sinh các ngành đào tạo trình độ đại học và ngành\nGiáo dục mầm non trình độ cao đẳng ban hành kèm theo Thông tư số\n06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ trưởng Bộ Giáo dục và Đào tạo;\nCăn cứ Quy chế tuyển sinh đại học ban hành kèm theo Quyết định số\n1401/QĐ-ĐHQN ngày 18/5/2026 của Hiệu trưởng Trường Đại học Quy Nhơn;\nCăn cứ Kế hoạch triển khai công tác tuyển sinh đại học, cao đẳng năm\n2026 ban hành theo Quyết định số 3037/QĐ-BGDĐT ngày 3/11/2025 của Bộ\nGiáo dục và Đào tạo;",
+          "Thông tin TSĐH cập nhật · trang 1 · \nTrường Đại học Quy Nhơn thông báo Thông tin tuyển sinh đại học năm\n2026 (cập nhật) như sau:",
+          "Thông tin TSĐH cập nhật · trang 10 · \nCông bố ngưỡng bảo đảm chất lượng đầu vào và quy tắc quy đổi điểm giữa\ncác phương thức: theo quy định của Bộ."
+        ],
+        "retrieval_snapshot": {
+          "snapshot_id": "snap_col_admissions_3_023c85e1",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T10:24:34.107601+00:00"
+        },
+        "snapshot": {
+          "snapshot_id": "snap_col_admissions_3_023c85e1",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T10:24:34.107601+00:00"
+        }
+      },
+      "elapsed_seconds": 37.95,
+      "served_models": [
+        {
+          "provider": "custom",
+          "model": "gpt-6-luna",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3610,
+          "completion_tokens": 292,
+          "latency_ms": 3863.8,
+          "cost_usd": 0.000717
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-6-luna",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 10557,
+          "completion_tokens": 542,
+          "latency_ms": 10751.4,
+          "cost_usd": 0.001909
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-6-luna",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11043,
+          "completion_tokens": 411,
+          "latency_ms": 5313.08,
+          "cost_usd": 0.001903
+        }
+      ]
+    }
+  ],
+  "method": "Original independent questions; expected answers never included in requests; statuses are not accuracy.",
+  "code_fingerprint": "af4c3079ea3bfebfdb4bdc92b32c3554ba5bea86580066e66b5b9a65d951b465",
+  "assistant": {
+    "id": "ast_admissions",
+    "code": "admissions",
+    "name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+    "description": "Giải đáp đề án tuyển sinh, điểm chuẩn, phương thức xét tuyển, học phí, học bổng và ký túc xá từ nguồn chính thức.",
+    "avatar_url": "/static/avatars/assistant_admissions.png",
+    "category": "admissions",
+    "system_prompt": "Bạn là Trợ lý ảo Tư vấn Tuyển sinh chính thức và chuyên nghiệp của Trường Đại học Quy Nhơn (QNU.AI).\nVai trò: Đồng hành cùng thí sinh và phụ huynh như một Cán bộ Tư vấn Tuyển sinh tận tâm: giải đáp đề án tuyển sinh, tra cứu điểm chuẩn, tính toán điểm xét tuyển theo đúng quy chế Bộ GD&ĐT, phân loại cơ hội trúng tuyển và tư vấn chiến lược xếp nguyện vọng.\nQuy tắc trả lời:\n- Luôn xưng 'mình' và gọi người dùng là 'bạn'. Giọng văn nhiệt tình, thân thiện, rõ ràng, ngắn gọn và đi thẳng vào trọng tâm.\n- GIAO TIẾP TỰ NHIÊN & KHÔNG LẶP LỜI CHÀO RẬP KHUÔN: Tuyệt đối KHÔNG lặp lại câu chào giới thiệu bản thân máy móc (như 'Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn. Mình rất vui được hỗ trợ...') ở mỗi lượt trả lời. Hãy đi thẳng vào nội dung câu trả lời một cách tự nhiên, thân thiện và mạch lạc như trong cuộc đối thoại liên tục.\n- BÁM SÁT TRỌNG TÂM: Chỉ trả lời đúng và đủ khía cạnh người dùng hỏi. Tuyệt đối KHÔNG tự ý đưa thêm học phí, điểm chuẩn, lệ phí nếu câu hỏi không yêu cầu.\n- MINH BẠCH NĂM & PHƯƠNG THỨC XÉT TUYỂN (CHỐNG MÂU THUẪN ĐIỂM CHUẨN): Mỗi khi trích dẫn hoặc so sánh điểm chuẩn, BẮT BUỘC phải ghi rõ NĂM và PHƯƠNG THỨC XÉT TUYỂN tương ứng (ví dụ: 'Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 24.50 điểm', 'Phương thức xét học bạ',...). Tuyệt đối không trích dẫn một con số trần trụi khiến thí sinh nhầm lẫn giữa các phương thức xét tuyển khác nhau.\n- BẢO ĐẢM MẠCH HỘI THOẠI & KHÔNG SUY ĐOÁN NGÀNH HỌC VÔ CĂN CỨ: Khi người dùng dùng đại từ chỉ định như 'ngành này', 'ngành đó', 'ngành trên', hãy kiểm tra kỹ các câu hỏi trước đó trong phiên hội thoại. Nếu người dùng chưa từng nhắc tới ngành nào, hãy lịch sự hỏi lại thí sinh đang quan tâm đến ngành học nào của trường; tuyệt đối KHÔNG tự ý gán ghép hoặc đoán mò ngành học (như tự ý đoán ngành Giáo dục Tiểu học).\n- CÁ NHÂN HÓA KẾ HOẠCH NGUYỆN VỌNG THEO HỘI THOẠI: Khi thí sinh yêu cầu 'lập bảng kế hoạch nguyện vọng' hoặc xuất file nguyện vọng, BẮT BUỘC phải ưu tiên các ngành học thí sinh đã hỏi hoặc quan tâm trong các lượt chat trước đó (ví dụ nếu vừa so sánh CNTT và Kỹ thuật phần mềm thì kế hoạch phải lấy 2 ngành này làm trọng tâm, kèm theo các ngành gần nếu cần). Tuyệt đối không chọn danh sách các ngành ngẫu nhiên không liên quan.\n- SO SÁNH CHUYÊN SÂU & TRÁNH SAO CHÉP TRÙNG LẶP: Khi so sánh giữa hai hoặc nhiều ngành (ví dụ CNTT vs Kỹ thuật phần mềm), hãy chỉ ra sự khác biệt thực tế về định hướng đào tạo và cơ hội nghề nghiệp đặc thù của từng ngành (ví dụ KTPM chuyên sâu về quy trình công nghệ phần mềm, kiểm thử QA/QC, kiến trúc hệ thống; CNTT thiên về hạ tầng mạng, an toàn thông tin, AI và dữ liệu). Tuyệt đối không sao chép cùng một đoạn văn giống hệt nhau vào các cột so sánh.\n- TƯ VẤN ĐIỂM SỐ & NGUYỆN VỌNG: Khi thí sinh cung cấp điểm số hoặc tổ hợp môn, hãy bóc tách rõ ràng: Điểm thi 3 môn gốc, Điểm ưu tiên khu vực/đối tượng (áp dụng chuẩn quy chế giảm trừ của Bộ khi tổng điểm >= 22.5), và Tổng điểm xét tuyển chính thức.\n- PHÂN NHÓM CƠ HỘI TRÚNG TUYỂN: So sánh điểm của bạn với điểm chuẩn chính thức các năm gần nhất của Trường ĐH Quy Nhơn và phân loại theo 3 tầng rõ ràng: 1. Vùng thử thách (Reach - điểm thấp hơn 0.5 - 1.5 đ, đặt NV1 nếu đam mê); 2. Vùng mục tiêu (Target - điểm chênh lệch trong khoảng -0.5 đến +1.0 đ, vừa sức nhất); 3. Vùng an toàn (Safe - điểm cao hơn >= 1.5 đ, bảo đảm chắc chắn trúng tuyển).\n- XUẤT TỆP BÁO CÁO TỰ ĐỘNG: Khi thí sinh yêu cầu xuất tệp hoặc hỏi về kế hoạch nguyện vọng chi tiết, hệ thống sẽ tạo tệp tải về theo đúng định dạng thí sinh cần (Excel .xlsx nếu muốn tính toán/lập bảng, Word .docx nếu muốn soạn thảo văn bản, PDF .pdf nếu muốn in ấn/xem nhanh) và đính kèm ngay dưới tin nhắn. Hãy thông báo thân thiện và chính xác về định dạng tệp đã được tạo để thí sinh nhấp tải về.\n- Mọi số liệu (điểm chuẩn, chỉ tiêu, học phí) phải bám sát 100% dữ liệu chính thức của Trường, tuyệt đối không suy diễn, bịa đặt số liệu.\n- GỢI Ý CÂU HỎI TIẾP THEO (TƯƠNG TÁC 1-CLICK): Ở cuối câu trả lời, hãy đề xuất đúng 2 câu hỏi gợi ý cụ thể từ góc độ người dùng tra cứu tiếp, định dạng theo khối: [GỢI Ý]: kèm 2 câu hỏi cụ thể đặt trong ngoặc kép.",
+    "workflow_id": "admissions-assistant",
+    "published_workflow_version_id": null,
+    "workflow_ownership": "private",
+    "collection_id": "col_admissions",
+    "is_active": true,
+    "tenant_id": "tenant_qnu",
+    "sample_questions": [
+      "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+      "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+      "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
+      "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?"
+    ],
+    "config": {
+      "sample_questions": [
+        "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+        "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+        "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
+        "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?"
+      ],
+      "persona_scope": {
+        "persona": "Trợ lý ảo Tư vấn Tuyển sinh chính thức, thân thiện và chính xác của QNU.",
+        "allowed_topics": [
+          "đề án tuyển sinh",
+          "điểm chuẩn",
+          "học phí",
+          "học bổng",
+          "ký túc xá",
+          "sư phạm",
+          "Nghị định 116"
+        ],
+        "out_of_scope_policy": "Từ chối lịch sự nội dung ngoài phạm vi và hướng dẫn người dùng đến đơn vị phụ trách."
+      },
+      "knowledge_policy": {
+        "evidence_policy": {
+          "enabled": true,
+          "reference_year_mode": "current_year",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "default_reference_year": null,
+          "candidate_limit": 24,
+          "context_limit": 10,
+          "max_context_chars": 36000,
+          "timeout_seconds": 90,
+          "retrieval_timeout_seconds": 10.0,
+          "rerank_timeout_seconds": 3.0,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ]
+        },
+        "chunking_strategy": "SemanticChunker",
+        "require_structured_facts": true,
+        "retrieval_limit": 10,
+        "reranker_policy": {
+          "enabled": true,
+          "provider_id": "prov_rtx5090_vllm",
+          "model_name": "bge-reranker-v2-m3",
+          "top_k": 5,
+          "score_threshold": 0.4
+        }
+      },
+      "model_policy": {
+        "preferred_provider_id": "prov_20261013041934",
+        "fallback_provider_id": "prov_gemini",
+        "primary_model": "gh/gpt-6-luna[1m]",
+        "fallback_model": "gemini-3.1-flash-lite",
+        "temperature": 0.2,
+        "max_tokens": 4000,
+        "thinking_budget": 0
+      },
+      "guardrails": {
+        "block_prompt_injection": true,
+        "mask_pii": true,
+        "require_grounded_answer": true,
+        "protect_system_prompt": true,
+        "no_answer_message": "Trong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận."
+      },
+      "tools": {
+        "enabled_tools": [
+          "export_universal_report",
+          "lookup_fact_layer",
+          "lookup_admission_score"
+        ],
+        "human_approval_required": true
+      },
+      "output_policy": {
+        "formats": [
+          "markdown",
+          "table",
+          "checklist"
+        ],
+        "require_citations": true,
+        "citation_format": "Tên văn bản, Điều/Khoản, Trang"
+      },
+      "evaluation_policy": {
+        "faithfulness_threshold": 0.9,
+        "answer_relevance_threshold": 0.85,
+        "context_precision_threshold": 0.8
+      }
+    },
+    "created_at": "2026-10-13T03:48:01.978960",
+    "updated_at": "2026-10-13T09:08:32.772453"
+  },
+  "publication": {
+    "snapshot": {
+      "snapshot_id": "snap_col_admissions_3_023c85e1",
+      "collection_id": "col_admissions",
+      "collection_epoch": 3,
+      "binding_revisions": {
+        "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+        "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+        "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+        "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+        "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+        "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+        "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+        "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+        "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+        "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+        "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+        "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+        "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+        "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+        "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+        "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+        "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+        "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+        "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+      },
+      "vector_generations": {
+        "bnd_0798d6ebb09d": "vg_21324678abcf",
+        "bnd_0a0fefc849ab": "vg_21324678abcf",
+        "bnd_0dd3d2789954": "vg_21324678abcf",
+        "bnd_18c9c944ee36": "vg_21324678abcf",
+        "bnd_35c0b812a4fe": "vg_21324678abcf",
+        "bnd_4bd40bc6a972": "vg_21324678abcf",
+        "bnd_4d788e0c0ee2": "vg_21324678abcf",
+        "bnd_574bfd4e5288": "vg_21324678abcf",
+        "bnd_5fe00fd59740": "vg_21324678abcf",
+        "bnd_60019f7e73d6": "vg_21324678abcf",
+        "bnd_62ff83603eec": "vg_21324678abcf",
+        "bnd_887623d8d318": "vg_21324678abcf",
+        "bnd_8dc32a78128f": "vg_21324678abcf",
+        "bnd_b7be60e6ada9": "vg_21324678abcf",
+        "bnd_bdb1f500cdbe": "vg_21324678abcf",
+        "bnd_c6d3848722ab": "vg_21324678abcf",
+        "bnd_db935aea6524": "vg_21324678abcf",
+        "bnd_e4492e8d7016": "vg_21324678abcf",
+        "bnd_ed14ffc71bc0": "vg_21324678abcf"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-13T10:24:34.107601+00:00"
+    },
+    "fingerprint": "4f4726e6fb8b7c697deb",
+    "sources": [
+      {
+        "binding": "bnd_b7be60e6ada9",
+        "index": "idx_rev_33446987e9fc",
+        "source": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74"
+      },
+      {
+        "binding": "bnd_4bd40bc6a972",
+        "index": "idx_rev_57e15196704d",
+        "source": "ks_rev_2764521a96a3",
+        "title": "TB học phí K49",
+        "hash": "57afdb9f55f0910dac916a8806168e15c0466434740bede12db2f035dfc7072a"
+      },
+      {
+        "binding": "bnd_5fe00fd59740",
+        "index": "idx_rev_c0a54bf73b18",
+        "source": "ks_rev_26248a79ce32",
+        "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+        "hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e"
+      },
+      {
+        "binding": "bnd_ed14ffc71bc0",
+        "index": "idx_rev_46812c2c2247",
+        "source": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f"
+      },
+      {
+        "binding": "bnd_18c9c944ee36",
+        "index": "idx_rev_2b7b7ec56f95",
+        "source": "ks_rev_2d6dd82b25ce",
+        "title": "Muc hoc phi 2024",
+        "hash": "5a3f338fc0865418cd191e10f490e9acc4cee23dcf757d2889232e2038595fbd"
+      },
+      {
+        "binding": "bnd_db935aea6524",
+        "index": "idx_rev_44d332b2f2e8",
+        "source": "ks_rev_c9344b18c429",
+        "title": "TB lịch xét tuyển ĐH",
+        "hash": "f9ca20b7e4328551fb99f2bf59bb57c1462f7fe5cdb566364f9ce6aae265e5bc"
+      },
+      {
+        "binding": "bnd_4d788e0c0ee2",
+        "index": "idx_rev_00fbccf1d07e",
+        "source": "ks_rev_2d628688cb78",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao",
+        "hash": "726942e56640e65aee7d906d422b6e717185c6379e6e3866f20b9875a52bb28e"
+      },
+      {
+        "binding": "bnd_60019f7e73d6",
+        "index": "idx_rev_575e4b49149a",
+        "source": "ks_rev_0aea050f89c4",
+        "title": "BC Kết quả khảo sát Tư vấn tuyển sinh 2022",
+        "hash": "94d8f0904a6740b6d7c026865b7153ad35aa88e4479598cb1b6e5801f22db169"
+      },
+      {
+        "binding": "bnd_887623d8d318",
+        "index": "idx_rev_d39d623aef4e",
+        "source": "ks_rev_403157cd7511",
+        "title": "Phuong huong tuyen sinh 2024_DHQN_final",
+        "hash": "340e133e1e0f99042d6c893a701aa23ed071cbcb667c4b1dd0026994ae81148a"
+      },
+      {
+        "binding": "bnd_0dd3d2789954",
+        "index": "idx_rev_daf4d2e4f534",
+        "source": "ks_rev_ad7e7e64bccf",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed",
+        "hash": "eb991fad090fea44b9152f8e18428ba7be059a66176d17939871ca1aee3e053f"
+      },
+      {
+        "binding": "bnd_e4492e8d7016",
+        "index": "idx_rev_42074c9dee55",
+        "source": "ks_rev_3e699f33e06c",
+        "title": "HD nhập học",
+        "hash": "411182a446724cd9594b58b09f38f68dfb5bcef19f0e673015238526e6fb9a2c"
+      },
+      {
+        "binding": "bnd_bdb1f500cdbe",
+        "index": "idx_rev_742b1ff6d265",
+        "source": "ks_rev_dbdaf646862a",
+        "title": "Cac nganh Tuyen sinh 2025_moi",
+        "hash": "f096720b0d414129b5270933f2cdc3df176be224f65b34d1531b4b2edd81f7c2"
+      },
+      {
+        "binding": "bnd_574bfd4e5288",
+        "index": "idx_rev_76cae24bd0dd",
+        "source": "ks_rev_a12f0f3f4a99",
+        "title": "Hương dan thi Nang khieu GDTC 2026",
+        "hash": "bd6919a94a93945d2e7923cced6b3a1548c55eba917b1d9464721805366fb52a"
+      },
+      {
+        "binding": "bnd_8dc32a78128f",
+        "index": "idx_rev_97f860b2edbf",
+        "source": "ks_rev_b62147adc5ac",
+        "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+        "hash": "e73f91a10deac0250e482ca9f21bb5f78523e8585368e7ac8ace8d4d6bcb39a5"
+      },
+      {
+        "binding": "bnd_0a0fefc849ab",
+        "index": "idx_rev_a90d85902c4f",
+        "source": "ks_rev_672bd2a13d44",
+        "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+        "hash": "f4f3c8ce3546b36f092175aa6cefa5a61a98c24f7f88c5355810f374f2d08d7b"
+      },
+      {
+        "binding": "bnd_35c0b812a4fe",
+        "index": "idx_rev_ac9ec09ebb97",
+        "source": "ks_rev_cf1863148443",
+        "title": "TB điểm sàn 26",
+        "hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c"
+      },
+      {
+        "binding": "bnd_0798d6ebb09d",
+        "index": "idx_rev_d64d0baf0c06",
+        "source": "ks_rev_4be16227642e",
+        "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+        "hash": "bf379846754a4821d262767505d60f0dbe5cc7268adfdb726c89b9776d926075"
+      },
+      {
+        "binding": "bnd_c6d3848722ab",
+        "index": "idx_rev_d7b434305a6c",
+        "source": "ks_rev_1610bf67e2cf",
+        "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+        "hash": "53e4ec625751a196322a2f616ab73a1310f1e527a1293b7b7c5ae29b1d29798d"
+      },
+      {
+        "binding": "bnd_62ff83603eec",
+        "index": "idx_rev_e0dc72a9102b",
+        "source": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1"
+      }
+    ]
+  },
+  "configuration_fingerprint": "1086e9bad267e238fca523ccde3b3d2340001e2890f07bc8ee28ae2cb32be20b",
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "finished_at": "2026-10-13T10:26:24.288570+00:00",
+  "code_unchanged": true
+}

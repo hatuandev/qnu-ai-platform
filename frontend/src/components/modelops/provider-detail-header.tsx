@@ -137,11 +137,13 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
                 <span className="text-border hidden sm:inline">|</span>
 
                 <div className="flex items-center gap-1 text-[11px]">
-                  <Zap className="size-3 text-sky-500" />
+                  <Zap className="size-3 text-primary" />
                   <strong className="text-foreground font-mono font-medium">
-                    {selectedProvider.latency_ms || 0}
+                    {selectedProvider.latency_ms > 0
+                      ? `${selectedProvider.latency_ms} ms`
+                      : "Chưa đo"}
                   </strong>{" "}
-                  ms
+                  <span className="sr-only">Lần kiểm tra kết nối gần nhất</span>
                 </div>
               </div>
             </div>

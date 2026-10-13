@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Cpu, KeyRound } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyState } from "@/components/admin/empty-state";
 import { AddCustomModelDialog } from "@/components/modelops/add-custom-model-dialog";
@@ -19,6 +20,7 @@ import {
   type ProviderModelsTestResponse,
   type SingleModelTestResult,
 } from "@/services/api-client";
+import type { ModelProbeRole } from "@/types/modelops";
 
 export interface ProviderDetailPageProps {
   providerId: string;
@@ -29,10 +31,12 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const configurationVersion = useRef(0);
 
   // Dialog & Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModelModalOpen, setIsAddModelModalOpen] = useState(false);
+  const [editingModelId, setEditingModelId] = useState<string | undefined>();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Active Tab in Detail View
@@ -123,6 +127,10 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
   // MUTATIONS
   // -------------------------------------------------------------
   const updateMutation = useMutation({
+    onMutate: () => {
+      configurationVersion.current += 1;
+    },
+    onError: (error) => toast.error(error.message),
     mutationFn: ({
       id,
       payload,
@@ -130,9 +138,12 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
       id: string;
       payload: Parameters<typeof apiClient.updateModelProvider>[1];
     }) => apiClient.updateModelProvider(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["model-providers"] });
       setIsEditModalOpen(false);
+      setModelTestResults({});
+      setModelTestSummary(null);
+      setTestResult(null);
     },
   });
 
@@ -274,34 +285,45 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
   };
 
   const handleTestAllModels = async (pId: string) => {
+    if (isTestingAllModels || testingModelName || updateMutation.isPending)
+      return;
+    const version = configurationVersion.current;
     setIsTestingAllModels(true);
     setModelTestSummary(null);
     try {
       const res = await apiClient.testProviderModels(pId);
+      if (version !== configurationVersion.current) return;
       setModelTestSummary(res);
       const mapped: Record<string, SingleModelTestResult> = {};
       for (const item of res.results || []) {
         mapped[item.model_name] = item;
       }
       setModelTestResults(mapped);
-    } catch {
-      alert("Lỗi khi kiểm tra tất cả mô hình.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không kiểm tra được model.",
+      );
     } finally {
       setIsTestingAllModels(false);
     }
   };
 
   const handleTestSingleModel = async (pId: string, modelName: string) => {
+    if (isTestingAllModels || testingModelName || updateMutation.isPending)
+      return;
+    const version = configurationVersion.current;
     setTestingModelName(modelName);
     try {
       const res = await apiClient.testProviderModels(pId, modelName);
+      if (version !== configurationVersion.current) return;
       if (res.results && res.results.length > 0) {
         setModelTestResults((prev) => ({
           ...prev,
           [modelName]: res.results[0],
         }));
       }
-    } catch {
+    } catch (error) {
+      if (version !== configurationVersion.current) return;
       setModelTestResults((prev) => ({
         ...prev,
         [modelName]: {
@@ -309,7 +331,10 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
           success: false,
           status: "error",
           latency_ms: 0,
-          message: "Lỗi mạng hoặc không thể gửi request kiểm tra",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Không gửi được yêu cầu kiểm tra.",
           tested_at: new Date().toISOString(),
         },
       }));
@@ -373,33 +398,49 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
     }
   };
 
-  const handleConfirmAddCustomModel = (
+  const handleConfirmAddCustomModel = async (
     modelId: string,
-    _isVision: boolean,
-    _isReasoning: boolean,
+    isVision: boolean,
+    isReasoning: boolean,
     defaultRole: "none" | "embedding" | "reranker" | "ocr",
     tResult: SingleModelTestResult | null,
+    probeRole: ModelProbeRole,
   ) => {
-    if (!selectedProvider) return;
-    const currentModels = selectedProvider.models || [];
-    if (!currentModels.includes(modelId)) {
-      const updated = [...currentModels, modelId];
-      updateMutation.mutate({
-        id: selectedProvider.id,
-        payload: { models: updated },
-      });
-      if (tResult) {
-        setModelTestResults((prev) => ({
-          ...prev,
-          [modelId]: tResult,
-        }));
-      }
-      if (defaultRole !== "none") {
-        setDefaultMutation.mutate({
+    if (!selectedProvider) throw new Error("Không tìm thấy provider.");
+    const updated = [...new Set([...(selectedProvider.models || []), modelId])];
+    await updateMutation.mutateAsync({
+      id: selectedProvider.id,
+      payload: {
+        models: updated,
+        model_capabilities: {
+          [modelId]: {
+            probe_role: probeRole,
+            vision: isVision,
+            reasoning: isReasoning,
+            embedding_dimension:
+              probeRole === "embedding"
+                ? tResult?.success
+                  ? tResult.embedding_dimension
+                  : selectedProvider.model_capabilities?.[modelId]
+                      ?.embedding_dimension
+                : null,
+          },
+        },
+      },
+    });
+    if (tResult && tResult.model_name === modelId)
+      setModelTestResults((prev) => ({ ...prev, [modelId]: tResult }));
+    if (defaultRole !== "none") {
+      try {
+        await setDefaultMutation.mutateAsync({
           pId: selectedProvider.id,
           role: defaultRole,
           modelName: modelId,
         });
+      } catch (error) {
+        throw new Error(
+          `Model đã lưu, nhưng chưa đặt được mặc định: ${error instanceof Error ? error.message : "Lỗi máy chủ"}`,
+        );
       }
     }
   };
@@ -477,8 +518,16 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
           </Button>
         </div>
         <EmptyState
-          title="Không tìm thấy Provider"
-          description={`Không tìm thấy cấu hình Nhà cung cấp với mã định danh "${providerId}". Có thể Provider này đã bị xóa hoặc đường dẫn chưa chính xác.`}
+          title={
+            providersQuery.isError
+              ? "Không tải được provider"
+              : "Không tìm thấy Provider"
+          }
+          description={
+            providersQuery.isError
+              ? providersQuery.error.message
+              : `Không tìm thấy cấu hình Nhà cung cấp với mã định danh "${providerId}".`
+          }
           action={{
             label: "Quay Về Danh Sách Provider",
             onClick: handleBackToList,
@@ -557,7 +606,14 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
           unavailableModelsCount={unavailableModelsCount}
           isTestingAllModels={isTestingAllModels}
           testingModelName={testingModelName}
-          onOpenAddModelModal={() => setIsAddModelModalOpen(true)}
+          onOpenAddModelModal={() => {
+            setEditingModelId(undefined);
+            setIsAddModelModalOpen(true);
+          }}
+          onEditModel={(modelName) => {
+            setEditingModelId(modelName);
+            setIsAddModelModalOpen(true);
+          }}
           onTestAllModels={handleTestAllModels}
           onTestSingleModel={handleTestSingleModel}
           onRemoveModel={handleRemoveModel}
@@ -605,13 +661,16 @@ export const ProviderDetailPage: React.FC<ProviderDetailPageProps> = ({
       )}
 
       {/* 5. Add Custom Model Dialog */}
-      <AddCustomModelDialog
-        isOpen={isAddModelModalOpen}
-        onClose={() => setIsAddModelModalOpen(false)}
-        selectedProvider={selectedProvider}
-        presets={presets}
-        onConfirmAdd={handleConfirmAddCustomModel}
-      />
+      {isAddModelModalOpen && (
+        <AddCustomModelDialog
+          initialModelId={editingModelId}
+          isOpen={isAddModelModalOpen}
+          onClose={() => setIsAddModelModalOpen(false)}
+          selectedProvider={selectedProvider}
+          presets={presets}
+          onConfirmAdd={handleConfirmAddCustomModel}
+        />
+      )}
 
       {/* 6. Edit Provider Modal */}
       <ProviderModal

@@ -703,6 +703,7 @@ class QueryRewriteNodeHandler(BaseNodeHandler):
             preferred_provider_id=preferred_provider_id,
             preferred_model_name=primary_model,
             fallback_model_name=fallback_model,
+            fallback_provider_id=getattr(getattr(profile, "model_policy", None), "fallback_provider_id", None),
         )
 
         # Enforce 3.0s timeout to never stall chat pipeline

@@ -1,0 +1,223 @@
+{
+  "providers": [
+    {
+      "id": "prov_gemini",
+      "name": "Google Gemini",
+      "timeout_seconds": 30
+    },
+    {
+      "id": "prov_20261013041934",
+      "name": "qnu-9router",
+      "timeout_seconds": 15
+    }
+  ],
+  "keys": [
+    {
+      "provider_id": "prov_20261013041934",
+      "status": "active",
+      "is_active": "True",
+      "consecutive_failures": "0",
+      "last_error_code": "None",
+      "last_error_at": "2026-10-13 09:55:28.833906+00:00",
+      "cooldown_until": "None",
+      "lease_until": "None",
+      "quota_limit": "None",
+      "usage_tokens": "1523896"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "status": "active",
+      "is_active": "True",
+      "consecutive_failures": "0",
+      "last_error_code": "None",
+      "last_error_at": "2026-10-13 09:27:24.629257+00:00",
+      "cooldown_until": "None",
+      "lease_until": "None",
+      "quota_limit": "None",
+      "usage_tokens": "235051"
+    }
+  ],
+  "fallback": [],
+  "events": [
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:52.084101+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:43.511330+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:43.457165+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:38.684444+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:36.646539+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:33.148611+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:30.981210+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:25.813004+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:25.744584+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:20.848779+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:18.708932+00:00"
+    },
+    {
+      "provider_id": "prov_gemini",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:07:14.267844+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:44.480202+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:41.211272+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:39.144020+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:35.516241+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:35.337089+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:26.394757+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:26.313420+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:16.848770+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:14.770709+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:10.319088+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:10.090582+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:08.090293+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:06.565588+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:05:06.405219+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:04:58.808484+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:04:58.725903+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "selected",
+      "reason": "None",
+      "created_at": "2026-10-13 10:04:50.614704+00:00"
+    },
+    {
+      "provider_id": "prov_20261013041934",
+      "event_type": "success",
+      "reason": "None",
+      "created_at": "2026-10-13 10:04:39.469147+00:00"
+    }
+  ]
+}

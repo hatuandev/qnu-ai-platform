@@ -7,6 +7,9 @@
 # Stage 1: Fast & Reliable UV Binary Extraction
 FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 
+# Match the PostgreSQL 16 infrastructure; no Docker socket is needed for dumps.
+FROM postgres:16-bookworm AS pg_tools
+
 # Stage 2: Final Production Runtime Image
 FROM python:3.12-slim
 
@@ -32,11 +35,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     libgl1 \
     libglib2.0-0 \
+    libpq5 \
+    liblz4-1 \
+    libzstd1 \
  && rm -rf /var/lib/apt/lists/* \
  && fc-cache -f > /dev/null || true
 
 # 2. Copy UV package manager binary from official Astral image
 COPY --from=uv_bin /uv /uvx /bin/
+COPY --from=pg_tools /usr/lib/postgresql/16/bin/pg_dump /usr/local/bin/pg_dump
+COPY --from=pg_tools /usr/lib/postgresql/16/bin/pg_restore /usr/local/bin/pg_restore
 
 # 3. Create non-privileged system user for hardened container security
 RUN groupadd -g 10001 qnu \

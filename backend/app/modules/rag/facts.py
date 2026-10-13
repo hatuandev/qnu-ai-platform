@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.knowledge.models import (
@@ -16,6 +16,37 @@ from app.modules.knowledge.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _fact_entity_text(fact: KnowledgeFact | object) -> str:
+    return (
+        getattr(fact, "entity_text", None)
+        or getattr(fact, "entity_name", None)
+        or ""
+    )
+
+
+def _fact_entity_label(fact: KnowledgeFact | object) -> str:
+    return getattr(fact, "entity_label", None) or _fact_entity_text(fact)
+
+
+def _fact_search_query(value: str):
+    empty = literal_column("''")
+    separator = literal_column("' '")
+    search_text = (
+        func.coalesce(KnowledgeFact.entity_text, empty)
+        + separator
+        + func.coalesce(KnowledgeFact.attribute_name, empty)
+        + separator
+        + func.coalesce(KnowledgeFact.attribute_value, empty)
+    )
+    document = func.to_tsvector(
+        literal_column("'simple'::regconfig"),
+        search_text,
+    )
+    return document.op("@@")(
+        func.plainto_tsquery(literal_column("'simple'::regconfig"), value)
+    )
 
 
 def count_subject_matches(attribute_value: str | None, subject_names: list[str] | None) -> int:
@@ -68,7 +99,7 @@ def _is_major_specific_fact(fact: KnowledgeFact | object) -> bool:
     if entity_type in ("major", "admissions_major"):
         return True
 
-    entity_name = getattr(fact, "entity_name", "") or ""
+    entity_name = _fact_entity_text(fact)
     if re.search(r"\b(?:mã\s*ngành|\d{7})\b", entity_name, re.IGNORECASE):
         return True
     if re.search(r"\bngành\s+[A-ZÀ-Ỹa-zà-ỹ]", entity_name):
@@ -107,7 +138,7 @@ class FactLayer:
             for code in entity_codes:
                 clean_code = code.strip()
                 if clean_code:
-                    conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_code}%"))
+                    conditions.append(KnowledgeFact.entity_text.ilike(f"%{clean_code}%"))
                     conditions.append(KnowledgeFact.raw_data["entity_code"].astext == clean_code)
                     conditions.append(KnowledgeFact.entity_code == clean_code)
                     conditions.append(KnowledgeFact.attribute_value.ilike(f"%{clean_code}%"))
@@ -117,7 +148,7 @@ class FactLayer:
             for te in target_entities:
                 clean_te = te.strip()
                 if clean_te:
-                    conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_te}%"))
+                    conditions.append(_fact_search_query(clean_te))
 
         # 3. Match keywords
         if keywords:
@@ -131,7 +162,7 @@ class FactLayer:
                     # (e.g., 'giải' matching 'Toán giải tích').
                     words = clean_kw.split()
                     if len(words) >= 2 and len(clean_kw) >= 4:
-                        conditions.append(KnowledgeFact.entity_name.ilike(f"%{clean_kw}%"))
+                        conditions.append(_fact_search_query(clean_kw))
 
         if not conditions:
             return []
@@ -237,7 +268,7 @@ class FactLayer:
                 def matches_entity(f: KnowledgeFact | object) -> bool:
                     if not _is_major_specific_fact(f):
                         return True
-                    ent_name = (getattr(f, "entity_name", "") or "").lower()
+                    ent_name = _fact_entity_text(f).lower()
                     attr_val = (getattr(f, "attribute_value", "") or "").lower()
                     raw = getattr(f, "raw_data", {}) or {}
                     raw_str = str(raw).lower() if isinstance(raw, dict) else ""
@@ -268,7 +299,7 @@ class FactLayer:
             "| " + " | ".join(["---"] * len(headers)) + " |",
         ]
         for f in facts:
-            lines.append(f"| {f.entity_name} | {f.attribute_name} | **{f.attribute_value}** |")
+            lines.append(f"| {_fact_entity_label(f)} | {f.attribute_name} | **{f.attribute_value}** |")
 
         return "\n".join(lines)
 

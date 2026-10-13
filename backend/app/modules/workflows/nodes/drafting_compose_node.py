@@ -78,7 +78,8 @@ def build_model_request(
         conversation_id=context.conversation_id,
         preferred_model_name=policy_primary_model or config.get("preferred_model_name"),
         fallback_model_name=policy_fallback_model or config.get("fallback_model_name"),
-        preferred_provider_id=config.get("preferred_provider_id"),
+        preferred_provider_id=getattr(model_policy, "preferred_provider_id", None) if model_policy else config.get("preferred_provider_id"),
+        fallback_provider_id=getattr(model_policy, "fallback_provider_id", None) if model_policy else config.get("fallback_provider_id"),
         temperature=float(
             policy_temperature
             if policy_temperature is not None

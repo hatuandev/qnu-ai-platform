@@ -16,6 +16,19 @@ def clean_cell(value: str) -> str:
     return re.sub(r"[*_`]", "", value).strip()
 
 
+def _boundary_noise(lines: list[str]) -> bool:
+    return all(not line.strip() or re.fullmatch(r"\s*\d{1,3}\s*", line) for line in lines)
+
+
+def _year_subheader(row: list[str]) -> bool:
+    cells = [clean_cell(cell) for cell in row]
+    years = [cell for cell in cells if YEAR.fullmatch(cell)]
+    return len(set(years)) >= 2 and not cells[0].isdigit() and all(
+        not cell or YEAR.fullmatch(cell) or (len(cell) <= 45 and not re.search(r"\d", cell))
+        for cell in cells
+    )
+
+
 def header_paths(rows: list[list[str]]) -> list[list[str]]:
     width = len(rows[0])
     grid = [[clean_cell(cell) for cell in row] for row in rows]
@@ -37,18 +50,25 @@ def header_paths(rows: list[list[str]]) -> list[list[str]]:
 
 
 def _successor(previous: list[str] | None, row: list[str]) -> bool:
+    row = [clean_cell(cell) for cell in row]
+    previous = [clean_cell(cell) for cell in previous] if previous else None
     return bool(previous and len(row) == len(previous) and row[0].strip().isdigit()
                 and previous[0].strip().isdigit() and int(row[0]) == int(previous[0]) + 1
                 and any(any(char.isalpha() for char in cell) for cell in row[1:])
                 and any(re.fullmatch(r"\d{3,}", cell.strip()) for cell in row[1:]))
 
 
-def _body_rows(lines: list[str], start: int, previous: list[str] | None = None) -> tuple[list[list[str]], int]:
+def _coded_data_row(row: list[str]) -> bool:
+    return bool(row and re.fullmatch(r"\d+[.)]?", clean_cell(row[0]))
+                and any(re.fullmatch(r"\d{3,}[A-Za-z]*", clean_cell(cell)) for cell in row[1:]))
+
+
+def _body_rows(lines: list[str], start: int, previous: list[str] | None = None, declared: bool = False) -> tuple[list[list[str]], int]:
     rows, i = [], start
     while i < len(lines) and "|" in lines[i] and not SEPARATOR.fullmatch(lines[i]):
         row = _split_gfm_row(lines[i])
         if i + 1 < len(lines) and SEPARATOR.fullmatch(lines[i + 1]):
-            if not _successor(rows[-1] if rows else previous, row):
+            if not _successor(rows[-1] if rows else previous, row) and not (declared and not rows and _coded_data_row(row)):
                 break
             rows.append(row)
             i += 2
@@ -65,14 +85,18 @@ def extract_context_tables(markdown: str, page_count: int) -> list[dict[str, Any
         i = 0
         while i < len(lines):
             preceding = tables[-1] if tables else None
-            if (preceding and preceding.get("ends_page") and preceding["page_number"] == page["page_number"] - 1
-                    and not any(line.strip() for line in lines[:i]) and "|" in lines[i]
-                    and preceding["rows"] and _successor(preceding["rows"][-1], _split_gfm_row(lines[i]))):
-                rows, i = _body_rows(lines, i, preceding["rows"][-1])
+            adjacent = preceding and preceding.get("ends_page") and preceding["page_number"] == page["page_number"] - 1 and _boundary_noise(lines[:i])
+            same_page = preceding and preceding["page_number"] == page["page_number"] and _boundary_noise(lines[preceding.get("end_line_number", 0):i])
+            if (preceding and (adjacent or same_page) and "|" in lines[i]
+                    and (preceding["rows"] and _successor(preceding["rows"][-1], _split_gfm_row(lines[i]))
+                         or same_page and not preceding["rows"] and len(preceding["headers"]) == len(_split_gfm_row(lines[i]))
+                         and not _coded_data_row(preceding["headers"]) and _coded_data_row(_split_gfm_row(lines[i])))):
+                rows, i = _body_rows(lines, i, preceding["rows"][-1] if preceding["rows"] else None, declared=True)
                 tables.append({**preceding, "id": f"table_{len(tables) + 1}", "page_number": page["page_number"],
                                "rows": rows, "continuation_of": preceding["id"],
                                "header_page_number": preceding.get("header_page_number", preceding["page_number"]),
-                               "ends_page": not any(line.strip() for line in lines[i:])})
+                               "end_line_number": i,
+                               "ends_page": _boundary_noise(lines[i:])})
                 continue
             if i + 1 >= len(lines) or "|" not in lines[i] or not SEPARATOR.fullmatch(lines[i + 1]):
                 i += 1
@@ -80,18 +104,27 @@ def extract_context_tables(markdown: str, page_count: int) -> list[dict[str, Any
             start = i
             headers = [_split_gfm_row(lines[i])]
             i += 2
-            rows, i = _body_rows(lines, i)
-            while rows and len(rows[0]) == len(headers[0]) and (
-                not rows[0][0].strip() and any(rows[0])
+            rows, i = _body_rows(lines, i, declared=not _coded_data_row(headers[0]))
+            while rows and len(rows[0]) == len(headers[0]) and (_year_subheader(rows[0]) or (
+                (not rows[0][0].strip() or (
+                    clean_cell(rows[0][0]) == clean_cell(headers[0][0])
+                    and (any(YEAR.fullmatch(clean_cell(value)) for value in headers[0])
+                         or sum(bool(clean_cell(value)) and clean_cell(value) == clean_cell(rows[0][col])
+                                for col, value in enumerate(headers[0])) >= len(headers[0]) / 2)
+                )) and any(rows[0])
                 and all(not cell.strip() or any(c.isalpha() for c in cell) or YEAR.fullmatch(clean_cell(cell)) for cell in rows[0])
-            ):
-                headers.append(rows.pop(0))
+            )):
+                child = rows.pop(0)
+                if _year_subheader(child):
+                    child = [clean_cell(cell) if YEAR.fullmatch(clean_cell(cell)) else "" for cell in child]
+                headers.append(child)
             paths = header_paths(headers)
             tables.append({"id": f"table_{len(tables) + 1}", "page_number": page["page_number"],
                            "line_number": start + 1, "headers": [" / ".join(path) for path in paths],
+                           "end_line_number": i,
                            "header_paths": paths, "header_rows": headers, "rows": rows,
                            "header_page_number": page["page_number"],
-                           "ends_page": not any(line.strip() for line in lines[i:]),
+                           "ends_page": _boundary_noise(lines[i:]),
                            "evidence": "canonical_markdown"})
     return tables
 
@@ -109,7 +142,12 @@ def row_identities(row: list[str], table: dict[str, Any]) -> list[tuple[int, int
         code_cols = [col for col in range(first, end) if detect_column_role(" / ".join(paths[col]))[0] == "code"
                      and re.fullmatch(r"\d{3,}[A-Za-z]*", clean_cell(row[col]))]
         text_cols = [col for col in range(first, end) if any(char.isalpha() for char in row[col])]
-        identity = min(text_cols, key=lambda col: min(abs(col - c) for c in code_cols)) if text_cols and code_cols else text_cols[0] if text_cols else first
+        descriptive = [col for col in text_cols if sum(char.isalpha() for char in row[col]) / max(len(row[col]), 1) > 0.5]
+        def diversity(column: int) -> float:
+            values = [clean_cell(value[column]).casefold() for value in table["rows"] if len(value) > column and any(char.isalpha() for char in value[column])]
+            return len(set(values)) / max(len(table["rows"]), 1)
+
+        identity = min(text_cols, key=lambda col: min(abs(col - c) for c in code_cols)) if text_cols and code_cols else max(descriptive or text_cols or [first], key=diversity)
         code = clean_cell(row[code_cols[0]]) if len(code_cols) == 1 else None
         name = clean_cell(row[identity]) if text_cols else " ".join([*paths[identity], clean_cell(row[identity])])
         identities.append((identity, end, name, code))

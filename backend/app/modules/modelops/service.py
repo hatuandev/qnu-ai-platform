@@ -152,8 +152,9 @@ class ModelOpsService:
         db: AsyncSession,
         provider_id: str,
         model_name: str | None = None,
+        probe_role: str | None = None,
     ) -> dict[str, Any]:
-        return await self._provider.test_provider_models(db, provider_id, model_name=model_name)
+        return await self._provider.test_provider_models(db, provider_id, model_name=model_name, probe_role=probe_role)
 
     async def get_provider_keys(self, db: AsyncSession, provider_id: str) -> list[dict[str, Any]]:
         return await self._provider.get_provider_keys(db, provider_id)

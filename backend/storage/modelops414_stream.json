@@ -1,0 +1,12 @@
+{
+  "answer": "OK",
+  "requested_model": "gh/gpt-6-luna[1m]",
+  "usage": [
+    {
+      "provider": "custom",
+      "model": "gpt-6-luna",
+      "tokens": 2794,
+      "fallback": false
+    }
+  ]
+}

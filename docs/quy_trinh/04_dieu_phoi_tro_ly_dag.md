@@ -2,6 +2,18 @@
 
 Tài liệu này đặc tả toàn diện kiến trúc quản trị vòng đời đồ thị (**Workflow Control Plane**) và động cơ thực thi tuần tự có hướng (**Workflow DAG Runtime Engine**) phục vụ điều phối hoạt động của 05 Trợ lý AI chuyên trách chuẩn Đại học Quy Nhơn.
 
+## AnswerDecision chung — phiên #417
+
+Node `core.knowledge.answer` chuyển evidence policy/model/provider/reranker và snapshot vào RagService chung. Citation guard nhận contract `evidence-claims-v1`, kiểm tra digest, text quyết định, claim đã verified, số riêng của claim và identity/quote citations; không chạy heuristic lexical cũ để ghi đè quyết định mới. Quyết định không hợp lệ bị thay bằng missing và bỏ citations, không được output node phục hồi lại claims bị loại.
+
+`output.no_answer` và `output.chat` giữ nguyên answer và status của quyết định. Partial vẫn giữ citations của phần đủ căn cứ; missing/conflict/clarify không bị nâng thành answered bởi output template. Chat JSON và sự kiện SSE done truyền `answer_decision` để audit thống nhất. Đây chưa phải token streaming thực hoặc giao diện diagnostics mới.
+
+Lỗi ModelOps/DB/hợp đồng JSON/đối soát timeout làm workflow failed có mã lỗi, khác insufficient_context. Boundary/deadline và worker recovery của đợt 1 giữ nguyên. Chạy test tạo conversations/executions/usage bình thường; không tự xuất bản workflow hoặc replay hành động.
+
+Phạm vi persona từ profile được chuyển vào planner/proposer/verifier giống direct RAG; chỉ là định danh, không thay nguồn chứng cứ. Sửa trích đoạn tối đa một lượt trong deadline chung; binding repair thành công chưa phải semantic verification thành công. Audit giữ reasons để phân biệt nguồn thật sự thiếu, quote bị loại, coverage còn thiếu và lỗi nhà cung cấp.
+
+Finalize dùng executionID chốt trướcengine, không đọcPK từORM đãexpired saurollback trongnode/ModelOps. ĐọcPKngầm từng gâyMissingGreenlet sauLLMsuccess; regressionPGthật phủcompleted/failed/paused vàtracepersisted,outerrollbackgiữ sạchfixture. Lỗi cũ giữfailedaudit, khôngreplay hoặc tựsửa thànhcompleted.
+
 ## Scope và ModelOps runtime — cập nhật #370
 
 WorkflowExecuteRequest/Context có workspace. API execute dùng tenant/workspace của actor; chat public suy ra scope từ trợ lý và kho đã lưu, không tin tenant hint của client. Runtime profile và execution.runtime_profile JSONB giữ workspace để resume dùng scope đã pin (execution cũ thiếu workspace dùng workspace_qnu tương thích); không migration/reset.

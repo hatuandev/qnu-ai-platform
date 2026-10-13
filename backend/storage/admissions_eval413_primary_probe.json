@@ -1,0 +1,13 @@
+{
+  "variant": "omit_temperature_explicit_nonstream",
+  "http": 200,
+  "content_type": "application/json",
+  "model": "gpt-5.4-mini",
+  "answer": "OK",
+  "error": null,
+  "usage": {
+    "prompt_tokens": 2012,
+    "completion_tokens": 36,
+    "total_tokens": 2048
+  }
+}

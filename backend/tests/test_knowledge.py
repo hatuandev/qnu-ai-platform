@@ -344,13 +344,18 @@ async def test_render_page_image_docx_via_gotenberg():
 @pytest.mark.asyncio
 async def test_office_convert_failure_raises_422():
     """Gotenberg errors must surface as honest 422, never fake images."""
+    from io import BytesIO
     from types import SimpleNamespace
     from unittest.mock import AsyncMock, patch
 
     import pytest
+    from docx import Document
 
     from app.core.exceptions import AppException
     from app.modules.knowledge.service import knowledge_service
+
+    source = BytesIO()
+    Document().save(source)
 
     fake_resp = SimpleNamespace(status_code=500, content=b"convert error")
     fake_client = AsyncMock()
@@ -360,7 +365,7 @@ async def test_office_convert_failure_raises_422():
         patch("httpx.AsyncClient", return_value=fake_client),
         pytest.raises(AppException) as exc_info,
     ):
-        await knowledge_service._convert_office_to_pdf(b"xx", "bao_cao.docx")
+        await knowledge_service._convert_office_to_pdf(source.getvalue(), "bao_cao.docx")
     assert exc_info.value.code == "office_convert_failed"
     assert exc_info.value.status_code == 422
 

@@ -1,0 +1,16 @@
+{
+  "blocks": 58,
+  "queries": 14,
+  "rankings_identical": true,
+  "median_ms_per_rank": {
+    "previous_rebuild": 7.95,
+    "cached_postings": 2.638
+  },
+  "cache": {
+    "hits": 433,
+    "misses": 1,
+    "maxsize": 4,
+    "currsize": 1
+  },
+  "scope": "Frozen diagnostic corpus; warm BM25 scoring only, not end-to-end chatbot latency."
+}

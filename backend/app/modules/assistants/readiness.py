@@ -13,9 +13,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.assistants.knowledge_readiness import count_ready_sources
+from app.modules.assistants.model_readiness import check_model_routes
 from app.modules.assistants.models import AssistantModel
 from app.modules.assistants.schemas import (
     AssistantLifecycleConfig,
@@ -23,7 +25,7 @@ from app.modules.assistants.schemas import (
     ReadinessCheckItem,
 )
 from app.modules.evaluation.models import EvaluationRun
-from app.modules.knowledge.models import KnowledgeCollection, KnowledgeDocument
+from app.modules.knowledge.models import KnowledgeCollection
 from app.modules.tools.registry import tool_registry
 
 logger = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ class AssistantReadinessEngine:
         warnings: list[str] = []
 
         # 1. Knowledge Base Readiness Check
-        k_check, k_blocker, k_warn = await self._check_knowledge(session, assistant.collection_id)
+        k_check, k_blocker, k_warn = await self._check_knowledge(session, assistant.collection_id, assistant.tenant_id)
         checks.append(k_check)
         if k_blocker:
             blockers.append(k_blocker)
@@ -55,6 +57,17 @@ class AssistantReadinessEngine:
 
         # 2. ModelOps & Redundancy Check
         m_check, m_blocker, m_warn = self._check_model_policy(config.model_policy)
+        try:
+            route_errors = await check_model_routes(session, config)
+        except Exception as exc:
+            logger.warning("model_readiness_failed error_type=%s", type(exc).__name__)
+            route_errors = ["Không thể xác nhận cấu hình ModelOps."]
+        if route_errors:
+            m_check.status = "failed"
+            m_check.score = 0
+            m_check.message = " ".join(route_errors)
+            m_check.details["route_errors"] = route_errors
+            m_blocker = m_check.message
         checks.append(m_check)
         if m_blocker:
             blockers.append(m_blocker)
@@ -101,102 +114,29 @@ class AssistantReadinessEngine:
         )
 
     async def _check_knowledge(
-        self,
-        session: AsyncSession,
-        collection_id: str | None,
+        self, session: AsyncSession, collection_id: str | None,
+        tenant_id: str | None = None,
     ) -> tuple[ReadinessCheckItem, str | None, str | None]:
-        """Check if assistant has an active knowledge collection with ready documents."""
-        if not collection_id:
-            return (
-                ReadinessCheckItem(
-                    category="knowledge",
-                    name="Kho tri thức chuyên biệt",
-                    status="failed",
-                    score=0,
-                    message="Trợ lý chưa được liên kết với bất kỳ Kho tri thức nào.",
-                    details={"collection_id": None, "ready_documents": 0},
-                ),
-                "Chưa liên kết Kho tri thức chuyên biệt.",
-                None,
-            )
-
+        details = {"collection_id": collection_id, "ready_documents": 0}
         try:
-            # Check collection existence
-            col_stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
-            col_res = await session.execute(col_stmt)
-            collection = col_res.scalar_one_or_none()
-
-            # Count processed/approved/ready/completed/indexed documents
-            doc_stmt = (
-                select(func.count(KnowledgeDocument.id))
-                .where(
-                    KnowledgeDocument.collection_id == collection_id,
-                    or_(
-                        KnowledgeDocument.status.in_(["processed", "approved", "ready", "completed"]),
-                        KnowledgeDocument.index_status == "indexed",
-                    ),
-                    KnowledgeDocument.is_active.is_(True),
-                )
-            )
-            doc_res = await session.execute(doc_stmt)
-            ready_doc_count = doc_res.scalar_one() or 0
-
-            if not collection and ready_doc_count == 0:
-                # If collection record does not exist in DB yet, give baseline score for standard seed assistants
-                return (
-                    ReadinessCheckItem(
-                        category="knowledge",
-                        name="Kho tri thức chuyên biệt",
-                        status="warning",
-                        score=60,
-                        message=f"Bộ sưu tập '{collection_id}' đang dùng cấu hình khởi tạo; chưa nạp thêm tài liệu bổ sung.",
-                        details={"collection_id": collection_id, "ready_documents": 0},
-                    ),
-                    None,
-                    f"Kho tri thức '{collection_id}' nên được bổ sung thêm tài liệu chính thức.",
-                )
-
-            if ready_doc_count > 0:
-                return (
-                    ReadinessCheckItem(
-                        category="knowledge",
-                        name="Kho tri thức chuyên biệt",
-                        status="passed",
-                        score=100,
-                        message=f"Kho tri thức '{collection_id}' có {ready_doc_count} tài liệu đã lập chỉ mục và sẵn sàng đối soát.",
-                        details={"collection_id": collection_id, "ready_documents": ready_doc_count},
-                    ),
-                    None,
-                    None,
-                )
-
-            return (
-                ReadinessCheckItem(
-                    category="knowledge",
-                    name="Kho tri thức chuyên biệt",
-                    status="failed",
-                    score=25,
-                    message=f"Kho tri thức '{collection_id}' đã tạo nhưng chưa có văn bản nào ở trạng thái sẵn sàng (processed/approved).",
-                    details={"collection_id": collection_id, "ready_documents": 0},
-                ),
-                f"Kho tri thức '{collection_id}' chưa có tài liệu đối soát sẵn sàng.",
-                None,
-            )
-
+            collection = await session.get(KnowledgeCollection, collection_id) if collection_id else None
+            if not collection or (tenant_id and collection.tenant_id != tenant_id):
+                raise ValueError("Kho tri thức chưa tồn tại hoặc không thuộc trợ lý.")
+            count = await count_ready_sources(session, collection)
+            details["ready_documents"] = count
+            details["collection_epoch"] = collection.index_epoch
+            if count:
+                return (ReadinessCheckItem(
+                    category="knowledge", name="Kho tri thức chuyên biệt", status="passed", score=100,
+                    message=f"Kho tri thức có {count} nguồn đã xuất bản và sẵn sàng truy xuất.",
+                    details=details), None, None)
+            message = "Kho tri thức chưa có nguồn đã xuất bản đủ điều kiện truy xuất."
         except Exception as exc:
-            logger.warning("failed_to_check_knowledge_readiness: %s", exc)
-            return (
-                ReadinessCheckItem(
-                    category="knowledge",
-                    name="Kho tri thức chuyên biệt",
-                    status="warning",
-                    score=50,
-                    message=f"Không thể kiểm tra dữ liệu kho tri thức: {exc}",
-                    details={"collection_id": collection_id, "error": str(exc)},
-                ),
-                None,
-                "Không thể kết nối cơ sở dữ liệu Kho tri thức.",
-            )
+            logger.warning("failed_to_check_knowledge_readiness: %s", type(exc).__name__)
+            message = "Không thể xác nhận Kho tri thức sẵn sàng. Kiểm tra nguồn đã xuất bản và phạm vi trợ lý."
+        return (ReadinessCheckItem(
+            category="knowledge", name="Kho tri thức chuyên biệt", status="failed", score=0,
+            message=message, details=details), message, None)
 
     def _check_model_policy(
         self,

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -34,10 +36,42 @@ class KeyAcquireResult:
 
     managed: bool
     lease: LeasedProviderKey | None
+    busy: bool = False
 
 
 class ProviderKeyRotationService:
     """Select and update keys atomically across all API workers."""
+
+    async def acquire_wait(
+        self, db: AsyncSession, provider_id: str, *, timeout_seconds: float,
+        progress_phase: str = "waiting_embedding", **kwargs: Any,
+    ) -> KeyAcquireResult:
+        """Wait for occupied credentials, never for invalid or exhausted keys."""
+        from app.core.exceptions import AppException
+        from app.modules.jobs.ingestion_progress import report_progress
+
+        deadline = time.monotonic() + timeout_seconds
+        waiting = False
+        while True:
+            result = await self.acquire(db, provider_id, **kwargs)
+            if not result.busy:
+                if waiting and result.lease is not None:
+                    try:
+                        await report_progress("embed", 0)
+                    except BaseException:
+                        await self.release(db, result.lease)
+                        raise
+                return result
+            if time.monotonic() >= deadline:
+                raise AppException(
+                    "Khóa embedding đang bận; tác vụ sẽ chờ và thử lại.",
+                    code="MODEL_PROVIDER_KEY_BUSY", status_code=503,
+                    details={"provider_id": provider_id},
+                )
+            if not waiting:
+                await report_progress(progress_phase, 0)
+                waiting = True
+            await asyncio.sleep(min(0.5, max(0, deadline - time.monotonic())))
 
     async def acquire(
         self,
@@ -88,16 +122,15 @@ class ProviderKeyRotationService:
                     (ProviderApiKey.usage_tokens < ProviderApiKey.quota_limit)
                     & (ProviderApiKey.usage_tokens + max(0, estimated_tokens) <= ProviderApiKey.quota_limit),
                 ),
-                or_(
-                    ProviderApiKey.lease_until.is_(None),
-                    ProviderApiKey.lease_until <= now,
-                ),
             ]
             if excluded:
                 conditions.append(ProviderApiKey.id.not_in(excluded))
             result = await db.execute(
                 select(ProviderApiKey)
-                .where(*conditions)
+                .where(*conditions, or_(
+                    ProviderApiKey.lease_until.is_(None),
+                    ProviderApiKey.lease_until <= now,
+                ))
                 .order_by(
                     ProviderApiKey.priority.asc(),
                     ProviderApiKey.usage_tokens.asc(),
@@ -109,8 +142,12 @@ class ProviderKeyRotationService:
             )
             key = result.scalar_one_or_none()
             if key is None:
+                eligible = await db.execute(
+                    select(func.count(ProviderApiKey.id)).where(*conditions)
+                )
+                busy = eligible.scalar_one() > 0
                 await db.commit()
-                return KeyAcquireResult(managed=True, lease=None)
+                return KeyAcquireResult(managed=True, lease=None, busy=busy)
 
             plain_key = decrypt_secret(key.api_key_encrypted)
             if not plain_key:

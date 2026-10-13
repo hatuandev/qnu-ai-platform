@@ -137,6 +137,18 @@ class Settings(BaseSettings):
     # --- Storage Abstraction ---
     STORAGE_DRIVER: str = "s3"  # 's3' (MinIO S3 Object Storage) hoặc 'local'
     LOCAL_STORAGE_PATH: str = "./storage"
+    # Backups are installation-wide; secrets stay inside password-encrypted archives.
+    BACKUP_DIRECTORY: str = "./storage/backups"
+    BACKUP_PG_CONTAINER: str = "qnu_postgres"  # Local fallback when pg_dump is not installed.
+    BACKUP_LOCAL_PREFIXES: list[str] = ["documents", "uploads", "snapshots", "ocr_cache", "artifacts"]
+    BACKUP_TIMEOUT_SECONDS: int = Field(default=3600, ge=60, le=86400)
+    BACKUP_DRAIN_SECONDS: int = Field(default=120, ge=5, le=900)
+    BACKUP_MIN_FREE_BYTES: int = Field(default=1073741824, ge=0)
+    BACKUP_DRILL_ENABLED: bool = False  # Explicit opt-in: creates disposable Docker containers.
+    BACKUP_IMPORT_MAX_BYTES: int = Field(default=21474836480, ge=1024)
+    BACKUP_SCHEDULE_SECRET_FILE: str = ""  # External secret mount; never copied into a backup.
+    BACKUP_REMOTE_CREDENTIALS_FILE: str = ""  # External JSON: access_key, secret_key, session_token.
+    BACKUP_DRILL_RELAY_IMAGE: str = ""  # Pinned image ID for an operator-built, secret-free TCP relay.
 
     # S3 / MinIO Settings (Hỗ trợ cả chuẩn S3_* và chuẩn Dokploy MINIO_* / FILE_STORAGE_*)
     S3_ENDPOINT: str = Field(
@@ -258,8 +270,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("OPENROUTER_BASE_URL", "OPENROUTER_API_BASE", "OPENROUTER_URL"),
     )
 
-    DEFAULT_MONTHLY_TOKEN_QUOTA: int = 5_000_000
-    DEFAULT_MONTHLY_COST_QUOTA_USD: float = 100.0
+    # Zero means unlimited; usage accounting still records every inference.
+    DEFAULT_MONTHLY_TOKEN_QUOTA: int = Field(default=0, ge=0)
+    DEFAULT_MONTHLY_COST_QUOTA_USD: float = Field(default=0, ge=0)
 
     # --- ADR-011 Knowledge Publishing V2 & Cutover ---
     RAG_REVISION_READ_MODE: str = "revisioned"  # "legacy" | "shadow" | "revisioned"

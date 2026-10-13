@@ -288,6 +288,9 @@ class PyMuPdfParser(BaseDocumentParser):
                 table_rects.append(t_rect)
 
                 title_text, headers, data_rows = _normalize_raw_table_rows(item.rows)
+                from app.modules.knowledge.parsers.table_continuation import inherit_table_header
+
+                headers, data_rows = inherit_table_header(headers, data_rows, raw_canonical_tables, page_num, item.bbox)
                 if title_text:
                     canonical_blocks.append(
                         CanonicalBlock(
@@ -472,9 +475,9 @@ class PyMuPdfParser(BaseDocumentParser):
             )
 
         # 7. Run Firecrawl Rust-based PDF Inspector for smart classification and OCR routing
-        from app.modules.knowledge.parsers.pdf_inspector import PDFInspector
+        from app.modules.knowledge.parsers.inspector_process import inspect_pdf_safely
 
-        inspection = PDFInspector.inspect_bytes(file_bytes)
+        inspection = await inspect_pdf_safely(file_bytes)
 
         # If native canonical markdown is empty but inspector recovered text, use it as fallback
         final_markdown = clean_markdown

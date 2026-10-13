@@ -86,24 +86,8 @@ switch ($Command) {
 
     # --- Phat trien (Dev Servers) ---
     { $_ -in "dev", "dev1", "dev2" } {
-        Write-Host "Kiem tra CSDL va du lieu mau (PostgreSQL, Schema, Seed data)..." -ForegroundColor Cyan
-        Set-Location $BackendDir
-        & $PythonExe -m app.cli db ensure-ready
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "[CANH BAO] CSDL chua san sang hoac gap loi khi khoi tao." -ForegroundColor Red
-            Write-Host "Neu PostgreSQL chua chay, vui long chay: .\make.ps1 infra-up" -ForegroundColor Yellow
-            Set-Location $PSScriptRoot
-            return
-        }
-        Set-Location $PSScriptRoot
-
-        & "$PSScriptRoot\scripts\start-worker.ps1"
-        Write-Host "Dang khoi chay Backend (Port 8001)..." -ForegroundColor Green
-        Start-Process powershell -WindowStyle Normal -ArgumentList "-NoExit", "-Command", "cd backend; & '$PythonExe' -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-        Write-Host "Doi Backend khoi dong trong 2 giay..." -ForegroundColor Gray
-        Start-Sleep -Seconds 2
-        Write-Host "Dang khoi chay Frontend Studio (Port 3000)..." -ForegroundColor Green
-        Start-Process powershell -WindowStyle Normal -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+        try { & "$PSScriptRoot\scripts\start-dev.ps1" }
+        catch { Write-Error $_ -ErrorAction Continue; exit 1 }
     }
     "worker" {
         & "$PSScriptRoot\scripts\start-worker.ps1"
@@ -188,7 +172,7 @@ switch ($Command) {
         Write-Host "  .\make.ps1 infra-logs   : Theo doi logs cua cum Docker"
         Write-Host ""
         Write-Host "[Phat trien - Local Dev]" -ForegroundColor Yellow
-        Write-Host "  .\make.ps1 dev          : Khoi chay Backend (8001), Frontend (3000) va ARQ worker"
+        Write-Host "  .\make.ps1 dev          : Khoi dong lai Backend (8001), Frontend (3000) va ARQ worker"
         Write-Host "  .\make.ps1 worker       : Khoi chay worker nen, co log va tranh mo trung"
         Write-Host "  .\make.ps1 be           : Khoi chay rieng Backend API (Port 8001)"
         Write-Host "  .\make.ps1 fe           : Khoi chay rieng Frontend Studio (Port 3000)"

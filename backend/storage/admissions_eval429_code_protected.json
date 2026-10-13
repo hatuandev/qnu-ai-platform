@@ -1,0 +1,1310 @@
+{
+  "started_at": "2026-10-13T17:42:50.210045+00:00",
+  "document": "C:\\Users\\AnhTuan\\Downloads\\TUYỂN SINH - HẰNG-20261012T083111Z-1-001\\TUYỂN SINH - HẰNG\\2026.DL TUYỂN SINH\\Bộ dữ liệu Chatbot Tuyển sinh.docx",
+  "document_sha256": "5bdee19ececf709c472a56459e02a36e7f1afb44ffdba9974f58e899ed66c3fe",
+  "cases": [
+    {
+      "id": 1,
+      "section": "I. THÔNG TIN CHUNG VỀ TRƯỜNG VÀ TUYỂN SINH 2026",
+      "question": "Trường Đại học Quy Nhơn có mã trường là gì?",
+      "expected_answer": "Mã cơ sở đào tạo của Trường Đại học Quy Nhơn trong tuyển sinh là DQN."
+    }
+  ],
+  "results": [
+    {
+      "id": 1,
+      "question": "Trường Đại học Quy Nhơn có mã trường là gì?",
+      "route": "dag",
+      "conversation_id": "eval417_220d851665fd4bd1",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "missing",
+          "reason": "PARTIAL_OR_MISSING_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "Mã trường Trường Đại học Quy Nhơn là gì?",
+            "years": [
+              2026
+            ],
+            "requires_year": false,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "Trường Đại học Quy Nhơn",
+            "target_institution": "Trường Đại học Quy Nhơn",
+            "exam_organizer": null,
+            "intent": "retrieve school code",
+            "attribute": "mã trường",
+            "method": null,
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "mã trường Đại học Quy Nhơn",
+              "mã trường QNU",
+              "mã trường Trường Đại học Quy Nhơn"
+            ]
+          },
+          "claim_bindings": [],
+          "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "claim1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": false,
+                "reason": "Evidence shows school code DQN for Trường Đại học Quy Nhơn; matches claim.",
+                "superseded_by": [
+                  {
+                    "block_id": "ks_rev_6280c8de7f46:179:237",
+                    "quote": "Mã cơ sở đào tạo trong tuyển sinh: DQN"
+                  }
+                ]
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [
+            {
+              "claim_id": "claim1",
+              "reason": "INVALID_PRECEDENCE_PROOF"
+            }
+          ],
+          "quote_repair_attempted": true,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2229:2320",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2322:2468",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "facts:c75a59f3773624dfc060",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:990:1035",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "facts:54c70a8a17669a4f0ec6",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_f122689af572:1248:1273",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_f122689af572:8213:8227",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_f122689af572:3278:3292",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:4324:4575",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 3
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 3172.95,
+            "retrieval_ms": 2527.8,
+            "proposal_ms": 14324.41,
+            "verification_ms": 3969.67
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "status": "insufficient_context",
+        "error_code": null,
+        "citations": [],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 29030.06,
+        "execution_id": "38cc5f1c-d247-40bf-adcf-9f14ff28e7fc",
+        "artifacts": [],
+        "conversation_id": "eval417_220d851665fd4bd1"
+      },
+      "trace": [
+        {
+          "node_id": "chat_input",
+          "node_type": "input.chat",
+          "status": "completed",
+          "latency_ms": 0.01,
+          "output": {
+            "message": "Trường Đại học Quy Nhơn có mã trường là gì?"
+          }
+        },
+        {
+          "node_id": "condition_route",
+          "node_type": "condition.route",
+          "status": "completed",
+          "latency_ms": 1533.48,
+          "output": {
+            "message": "Trường Đại học Quy Nhơn có mã trường là gì?",
+            "response": "Trường Đại học Quy Nhơn có mã trường là gì?",
+            "next_node": "query_rewrite",
+            "matched_rule_id": null
+          }
+        },
+        {
+          "node_id": "query_rewrite",
+          "node_type": "query.rewrite",
+          "status": "completed",
+          "latency_ms": 3029.0,
+          "output": {
+            "modified": false,
+            "original_query": "Trường Đại học Quy Nhơn có mã trường là gì?",
+            "normalized_query": "Trường Đại học Quy Nhơn có mã trường là gì?"
+          }
+        },
+        {
+          "node_id": "knowledge_answer",
+          "node_type": "core.knowledge.answer",
+          "status": "completed",
+          "latency_ms": 24466.59,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "status": "insufficient_context",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp\nTHPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học\nQuy Nhơn.",
+              "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+              "Thông tin TSĐH cập nhật · trang 1 · \n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn",
+              "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 1 · TUYÊN SINH DẠI HỌC 2026\n# TUYÊN SINH DẠI HỌC 2026",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nMã trưởng: DQN",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nMã trưởng: DQN",
+              "Quy chế tuyển sinh đại học 2026 - 363 · trang 3 · CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc / QUY ĐỊNH CHUNG / Điều 2. Giải thích từ ngữ\n4. Mã trường trong tuyền sinh là một mã quy ước gồm 03 ký tự chữ hoặc số thống nhất toàn quốc dùng để định danh tuyển sinh một cơ sở đào tạo; phân hiệu hoặc đơn vị đào tạo thuộc, trực thuộc cơ sở đào tạo có bộ máy quản lý được lập mã tuyển sinh riêng."
+            ],
+            "response": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "artifacts": [],
+            "citations": [],
+            "facts_used": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+              "reason": "PARTIAL_OR_MISSING_COVERAGE",
+              "status": "missing",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": null,
+                "query": "Mã trường Trường Đại học Quy Nhơn là gì?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "intent": "retrieve school code",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "mã trường",
+                "uses_history": false,
+                "requires_year": false,
+                "exam_organizer": null,
+                "search_queries": [
+                  "mã trường Đại học Quy Nhơn",
+                  "mã trường QNU",
+                  "mã trường Trường Đại học Quy Nhơn"
+                ],
+                "target_institution": "Trường Đại học Quy Nhơn"
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2322:2468",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:c75a59f3773624dfc060",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:990:1035",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:54c70a8a17669a4f0ec6",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:8213:8227",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:3278:3292",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_a34cee5023eb:4324:4575",
+                  "page": 3,
+                  "title": "Quy chế tuyển sinh đại học 2026 - 363"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Evidence shows school code DQN for Trường Đại học Quy Nhơn; matches claim.",
+                    "claim_id": "claim1",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [
+                      {
+                        "quote": "Mã cơ sở đào tạo trong tuyển sinh: DQN",
+                        "block_id": "ks_rev_6280c8de7f46:179:237"
+                      }
+                    ],
+                    "scope_compatible": false
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [],
+              "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "stage_timings_ms": {
+                "planning_ms": 3172.95,
+                "proposal_ms": 14324.41,
+                "retrieval_ms": 2527.8,
+                "verification_ms": 3969.67
+              },
+              "binding_rejections": [
+                {
+                  "reason": "INVALID_PRECEDENCE_PROOF",
+                  "claim_id": "claim1"
+                }
+              ],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": true,
+              "uncovered_list_members": []
+            },
+            "suggested_questions": []
+          }
+        },
+        {
+          "node_id": "citation_guard",
+          "node_type": "guard.citation_policy",
+          "status": "completed",
+          "latency_ms": 0.16,
+          "output": {
+            "port": "ungrounded",
+            "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "status": "insufficient_context",
+            "contexts": [
+              "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+              "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp\nTHPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học\nQuy Nhơn.",
+              "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+              "Thông tin TSĐH cập nhật · trang 1 · \n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn",
+              "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 1 · TUYÊN SINH DẠI HỌC 2026\n# TUYÊN SINH DẠI HỌC 2026",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nMã trưởng: DQN",
+              "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nMã trưởng: DQN",
+              "Quy chế tuyển sinh đại học 2026 - 363 · trang 3 · CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM Độc lập - Tự do - Hạnh phúc / QUY ĐỊNH CHUNG / Điều 2. Giải thích từ ngữ\n4. Mã trường trong tuyền sinh là một mã quy ước gồm 03 ký tự chữ hoặc số thống nhất toàn quốc dùng để định danh tuyển sinh một cơ sở đào tạo; phân hiệu hoặc đơn vị đào tạo thuộc, trực thuộc cơ sở đào tạo có bộ máy quản lý được lập mã tuyển sinh riêng."
+            ],
+            "grounded": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "response": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "citations": [],
+            "ungrounded": "PARTIAL_OR_MISSING_COVERAGE",
+            "is_grounded": false,
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+              "reason": "PARTIAL_OR_MISSING_COVERAGE",
+              "status": "missing",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": null,
+                "query": "Mã trường Trường Đại học Quy Nhơn là gì?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "intent": "retrieve school code",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "mã trường",
+                "uses_history": false,
+                "requires_year": false,
+                "exam_organizer": null,
+                "search_queries": [
+                  "mã trường Đại học Quy Nhơn",
+                  "mã trường QNU",
+                  "mã trường Trường Đại học Quy Nhơn"
+                ],
+                "target_institution": "Trường Đại học Quy Nhơn"
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2322:2468",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:c75a59f3773624dfc060",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:990:1035",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:54c70a8a17669a4f0ec6",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:8213:8227",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:3278:3292",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_a34cee5023eb:4324:4575",
+                  "page": 3,
+                  "title": "Quy chế tuyển sinh đại học 2026 - 363"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Evidence shows school code DQN for Trường Đại học Quy Nhơn; matches claim.",
+                    "claim_id": "claim1",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [
+                      {
+                        "quote": "Mã cơ sở đào tạo trong tuyển sinh: DQN",
+                        "block_id": "ks_rev_6280c8de7f46:179:237"
+                      }
+                    ],
+                    "scope_compatible": false
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [],
+              "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "stage_timings_ms": {
+                "planning_ms": 3172.95,
+                "proposal_ms": 14324.41,
+                "retrieval_ms": 2527.8,
+                "verification_ms": 3969.67
+              },
+              "binding_rejections": [
+                {
+                  "reason": "INVALID_PRECEDENCE_PROOF",
+                  "claim_id": "claim1"
+                }
+              ],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": true,
+              "uncovered_list_members": []
+            },
+            "failure_reasons": [
+              "PARTIAL_OR_MISSING_COVERAGE"
+            ]
+          }
+        },
+        {
+          "node_id": "no_answer_output",
+          "node_type": "output.no_answer",
+          "status": "completed",
+          "latency_ms": 0.5,
+          "output": {
+            "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+            "status": "insufficient_context",
+            "citations": [],
+            "answer_decision": {
+              "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+              "reason": "PARTIAL_OR_MISSING_COVERAGE",
+              "status": "missing",
+              "version": "evidence-claims-v1",
+              "requested": {
+                "event": null,
+                "query": "Mã trường Trường Đại học Quy Nhơn là gì?",
+                "round": null,
+                "years": [
+                  2026
+                ],
+                "entity": "Trường Đại học Quy Nhơn",
+                "intent": "retrieve school code",
+                "method": null,
+                "coverage": "focused",
+                "attribute": "mã trường",
+                "uses_history": false,
+                "requires_year": false,
+                "exam_organizer": null,
+                "search_queries": [
+                  "mã trường Đại học Quy Nhơn",
+                  "mã trường QNU",
+                  "mã trường Trường Đại học Quy Nhơn"
+                ],
+                "target_institution": "Trường Đại học Quy Nhơn"
+              },
+              "selection": [
+                {
+                  "id": "ks_rev_6280c8de7f46:179:237",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2229:2320",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:2322:2468",
+                  "page": 2,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:c75a59f3773624dfc060",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_6280c8de7f46:990:1035",
+                  "page": 1,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "facts:54c70a8a17669a4f0ec6",
+                  "page": 13,
+                  "title": "Thông tin TSĐH cập nhật"
+                },
+                {
+                  "id": "ks_rev_f122689af572:1248:1273",
+                  "page": 1,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:8213:8227",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_f122689af572:3278:3292",
+                  "page": 2,
+                  "title": "FLYER TUYENSINH 2026-final2-16032026 (1)"
+                },
+                {
+                  "id": "ks_rev_a34cee5023eb:4324:4575",
+                  "page": 3,
+                  "title": "Quy chế tuyển sinh đại học 2026 - 363"
+                }
+              ],
+              "verification": {
+                "complete": true,
+                "conflict": false,
+                "verdicts": [
+                  {
+                    "reason": "Evidence shows school code DQN for Trường Đại học Quy Nhơn; matches claim.",
+                    "claim_id": "claim1",
+                    "entailed": true,
+                    "relevant": true,
+                    "superseded_by": [
+                      {
+                        "quote": "Mã cơ sở đào tạo trong tuyển sinh: DQN",
+                        "block_id": "ks_rev_6280c8de7f46:179:237"
+                      }
+                    ],
+                    "scope_compatible": false
+                  }
+                ],
+                "missing_constraints": []
+              },
+              "claim_bindings": [],
+              "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "stage_timings_ms": {
+                "planning_ms": 3172.95,
+                "proposal_ms": 14324.41,
+                "retrieval_ms": 2527.8,
+                "verification_ms": 3969.67
+              },
+              "binding_rejections": [
+                {
+                  "reason": "INVALID_PRECEDENCE_PROOF",
+                  "claim_id": "claim1"
+                }
+              ],
+              "source_preferences": [
+                {
+                  "years": [
+                    2026
+                  ],
+                  "same_context_only": true,
+                  "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin.",
+                  "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+                  "superseded_source_revision_ids": [
+                    "ks_rev_f122689af572"
+                  ]
+                }
+              ],
+              "missing_constraints": [],
+              "quote_repair_attempted": true,
+              "uncovered_list_members": []
+            }
+          }
+        }
+      ],
+      "elapsed_seconds": 30.61,
+      "served_models": [
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3838,
+          "completion_tokens": 460,
+          "latency_ms": 3003.0,
+          "cost_usd": 0.000852
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11415,
+          "completion_tokens": 516,
+          "latency_ms": 3623.97,
+          "cost_usd": 0.002022
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11587,
+          "completion_tokens": 2902,
+          "latency_ms": 10504.72,
+          "cost_usd": 0.003479
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11655,
+          "completion_tokens": 609,
+          "latency_ms": 3845.57,
+          "cost_usd": 0.002114
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "question": "Trường Đại học Quy Nhơn có mã trường là gì?",
+      "route": "rag",
+      "conversation_id": "eval417_51bddc6553eb46ea",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "missing",
+          "reason": "PARTIAL_OR_MISSING_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "Mã trường Trường Đại học Quy Nhơn",
+            "years": [
+              2026
+            ],
+            "requires_year": false,
+            "uses_history": false,
+            "coverage": "focused",
+            "entity": "Trường Đại học Quy Nhơn",
+            "target_institution": "Trường Đại học Quy Nhơn",
+            "exam_organizer": null,
+            "intent": "tìm mã trường",
+            "attribute": "mã trường",
+            "method": null,
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "mã trường Trường Đại học Quy Nhơn",
+              "mã trường Đại học Quy Nhơn",
+              "mã trường QNU"
+            ]
+          },
+          "claim_bindings": [],
+          "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "claim1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": false,
+                "reason": "Thông tin đúng, nhưng nguồn flyer cũ, ưu tiên nguồn cập nhật TB 1906.",
+                "superseded_by": [
+                  {
+                    "block_id": "ks_rev_6280c8de7f46:179:237",
+                    "quote": "Mã cơ sở đào tạo trong tuyển sinh: DQN"
+                  }
+                ]
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [
+            {
+              "claim_id": "claim1",
+              "reason": "INVALID_PRECEDENCE_PROOF"
+            }
+          ],
+          "quote_repair_attempted": false,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2229:2320",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2322:2468",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "facts:c75a59f3773624dfc060",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:990:1035",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "facts:54c70a8a17669a4f0ec6",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_3e699f33e06c:182:256",
+              "title": "HD nhập học",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_3e699f33e06c:17:63",
+              "title": "HD nhập học",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_f122689af572:1248:1273",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_f122689af572:8213:8227",
+              "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+              "page": 2
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 3095.29,
+            "retrieval_ms": 2358.06,
+            "proposal_ms": 9223.19,
+            "verification_ms": 5697.57
+          }
+        },
+        "status": "insufficient_context",
+        "answer": "Đối chiếu năm 2026:\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "answer_format": "paragraph",
+        "citations": [],
+        "facts_used": [],
+        "suggested_questions": [],
+        "latency_ms": 20375.48,
+        "contexts": [
+          "Thông tin TSĐH cập nhật · trang 1 · \nTHÔNG BÁO\nTHÔNG TIN TUYỂN SINH ĐẠI HỌC NĂM 2026 (CẬP NHẬT)",
+          "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 4 (PT4 - mã 402B): Xét kết quả kỳ thi ĐGNL của Trường\nĐại học Sư phạm Hà Nội.",
+          "Thông tin TSĐH cập nhật · trang 2 · \n+ Phương thức 5 (PT5 - mã 405): Xét tuyển theo kết quả thi tốt nghiệp\nTHPT năm 2026 với điểm thi năng khiếu GDMN/GDTC của Trường Đại học\nQuy Nhơn.",
+          "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+          "Thông tin TSĐH cập nhật · trang 1 · \n1. Tên cơ sở đào tạo: Trường Đại học Quy Nhơn",
+          "Thông tin TSĐH cập nhật · trang 13 · \nLuật\nMã ngành: 7380101",
+          "HD nhập học · trang 1 · \nHƯỚNG DẪN\nNhập học đối với thí sinh trúng tuyển đại học chính quy năm 2026",
+          "HD nhập học · trang 1 · \nBỘ GIÁO DỤC VÀ ĐÀO TẠO\nTRƯỜNG ĐẠI HỌC QUY NHƠN",
+          "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 1 · TUYÊN SINH DẠI HỌC 2026\n# TUYÊN SINH DẠI HỌC 2026",
+          "FLYER TUYENSINH 2026-final2-16032026 (1) · trang 2 · TUYÊN SINH DẠI HỌC 2026\nMã trưởng: DQN"
+        ],
+        "retrieval_snapshot": {
+          "snapshot_id": "snap_col_admissions_3_1c954057",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T17:42:59.753275+00:00"
+        },
+        "snapshot": {
+          "snapshot_id": "snap_col_admissions_3_1c954057",
+          "collection_id": "col_admissions",
+          "collection_epoch": 3,
+          "binding_revisions": {
+            "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+            "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+            "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+            "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+            "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+            "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+            "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+            "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+            "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+            "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+            "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+            "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+            "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+            "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+            "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+            "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+            "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+            "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+            "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+          },
+          "vector_generations": {
+            "bnd_0798d6ebb09d": "vg_21324678abcf",
+            "bnd_0a0fefc849ab": "vg_21324678abcf",
+            "bnd_0dd3d2789954": "vg_21324678abcf",
+            "bnd_18c9c944ee36": "vg_21324678abcf",
+            "bnd_35c0b812a4fe": "vg_21324678abcf",
+            "bnd_4bd40bc6a972": "vg_21324678abcf",
+            "bnd_4d788e0c0ee2": "vg_21324678abcf",
+            "bnd_574bfd4e5288": "vg_21324678abcf",
+            "bnd_5fe00fd59740": "vg_21324678abcf",
+            "bnd_60019f7e73d6": "vg_21324678abcf",
+            "bnd_62ff83603eec": "vg_21324678abcf",
+            "bnd_887623d8d318": "vg_21324678abcf",
+            "bnd_8dc32a78128f": "vg_21324678abcf",
+            "bnd_b7be60e6ada9": "vg_21324678abcf",
+            "bnd_bdb1f500cdbe": "vg_21324678abcf",
+            "bnd_c6d3848722ab": "vg_21324678abcf",
+            "bnd_db935aea6524": "vg_21324678abcf",
+            "bnd_e4492e8d7016": "vg_21324678abcf",
+            "bnd_ed14ffc71bc0": "vg_21324678abcf"
+          },
+          "tenant_id": "tenant_qnu",
+          "workspace_id": "workspace_qnu",
+          "created_at": "2026-10-13T17:42:59.753275+00:00"
+        }
+      },
+      "elapsed_seconds": 40.81,
+      "served_models": [
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3838,
+          "completion_tokens": 425,
+          "latency_ms": 2954.85,
+          "cost_usd": 0.000831
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11320,
+          "completion_tokens": 2163,
+          "latency_ms": 9131.98,
+          "cost_usd": 0.002996
+        },
+        {
+          "provider": "custom",
+          "model": "gpt-oss:120b",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11559,
+          "completion_tokens": 984,
+          "latency_ms": 5598.0,
+          "cost_usd": 0.002324
+        }
+      ]
+    }
+  ],
+  "method": "Original independent questions; expected answers never included in requests; statuses are not accuracy.",
+  "code_fingerprint": "385f8ceb7aa3c1af9ab56ee688c8a9aa3c25d824757bc8c344d9d6dea916e155",
+  "assistant": {
+    "id": "ast_admissions",
+    "code": "admissions",
+    "name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+    "description": "Giải đáp đề án tuyển sinh, điểm chuẩn, phương thức xét tuyển, học phí, học bổng và ký túc xá từ nguồn chính thức.",
+    "avatar_url": "/static/avatars/assistant_admissions.png",
+    "category": "admissions",
+    "system_prompt": "Bạn là Trợ lý ảo Tư vấn Tuyển sinh chính thức và chuyên nghiệp của Trường Đại học Quy Nhơn (QNU.AI).\nVai trò: Đồng hành cùng thí sinh và phụ huynh như một Cán bộ Tư vấn Tuyển sinh tận tâm: giải đáp đề án tuyển sinh, tra cứu điểm chuẩn, tính toán điểm xét tuyển theo đúng quy chế Bộ GD&ĐT, phân loại cơ hội trúng tuyển và tư vấn chiến lược xếp nguyện vọng.\nQuy tắc trả lời:\n- Luôn xưng 'mình' và gọi người dùng là 'bạn'. Giọng văn nhiệt tình, thân thiện, rõ ràng, ngắn gọn và đi thẳng vào trọng tâm.\n- GIAO TIẾP TỰ NHIÊN & KHÔNG LẶP LỜI CHÀO RẬP KHUÔN: Tuyệt đối KHÔNG lặp lại câu chào giới thiệu bản thân máy móc (như 'Chào bạn! Mình là Trợ lý ảo Tư vấn Tuyển sinh của Trường Đại học Quy Nhơn. Mình rất vui được hỗ trợ...') ở mỗi lượt trả lời. Hãy đi thẳng vào nội dung câu trả lời một cách tự nhiên, thân thiện và mạch lạc như trong cuộc đối thoại liên tục.\n- BÁM SÁT TRỌNG TÂM: Chỉ trả lời đúng và đủ khía cạnh người dùng hỏi. Tuyệt đối KHÔNG tự ý đưa thêm học phí, điểm chuẩn, lệ phí nếu câu hỏi không yêu cầu.\n- MINH BẠCH NĂM & PHƯƠNG THỨC XÉT TUYỂN (CHỐNG MÂU THUẪN ĐIỂM CHUẨN): Mỗi khi trích dẫn hoặc so sánh điểm chuẩn, BẮT BUỘC phải ghi rõ NĂM và PHƯƠNG THỨC XÉT TUYỂN tương ứng (ví dụ: 'Phương thức 1: Xét kết quả thi tốt nghiệp THPT năm 2024 là 24.50 điểm', 'Phương thức xét học bạ',...). Tuyệt đối không trích dẫn một con số trần trụi khiến thí sinh nhầm lẫn giữa các phương thức xét tuyển khác nhau.\n- BẢO ĐẢM MẠCH HỘI THOẠI & KHÔNG SUY ĐOÁN NGÀNH HỌC VÔ CĂN CỨ: Khi người dùng dùng đại từ chỉ định như 'ngành này', 'ngành đó', 'ngành trên', hãy kiểm tra kỹ các câu hỏi trước đó trong phiên hội thoại. Nếu người dùng chưa từng nhắc tới ngành nào, hãy lịch sự hỏi lại thí sinh đang quan tâm đến ngành học nào của trường; tuyệt đối KHÔNG tự ý gán ghép hoặc đoán mò ngành học (như tự ý đoán ngành Giáo dục Tiểu học).\n- CÁ NHÂN HÓA KẾ HOẠCH NGUYỆN VỌNG THEO HỘI THOẠI: Khi thí sinh yêu cầu 'lập bảng kế hoạch nguyện vọng' hoặc xuất file nguyện vọng, BẮT BUỘC phải ưu tiên các ngành học thí sinh đã hỏi hoặc quan tâm trong các lượt chat trước đó (ví dụ nếu vừa so sánh CNTT và Kỹ thuật phần mềm thì kế hoạch phải lấy 2 ngành này làm trọng tâm, kèm theo các ngành gần nếu cần). Tuyệt đối không chọn danh sách các ngành ngẫu nhiên không liên quan.\n- SO SÁNH CHUYÊN SÂU & TRÁNH SAO CHÉP TRÙNG LẶP: Khi so sánh giữa hai hoặc nhiều ngành (ví dụ CNTT vs Kỹ thuật phần mềm), hãy chỉ ra sự khác biệt thực tế về định hướng đào tạo và cơ hội nghề nghiệp đặc thù của từng ngành (ví dụ KTPM chuyên sâu về quy trình công nghệ phần mềm, kiểm thử QA/QC, kiến trúc hệ thống; CNTT thiên về hạ tầng mạng, an toàn thông tin, AI và dữ liệu). Tuyệt đối không sao chép cùng một đoạn văn giống hệt nhau vào các cột so sánh.\n- TƯ VẤN ĐIỂM SỐ & NGUYỆN VỌNG: Khi thí sinh cung cấp điểm số hoặc tổ hợp môn, hãy bóc tách rõ ràng: Điểm thi 3 môn gốc, Điểm ưu tiên khu vực/đối tượng (áp dụng chuẩn quy chế giảm trừ của Bộ khi tổng điểm >= 22.5), và Tổng điểm xét tuyển chính thức.\n- PHÂN NHÓM CƠ HỘI TRÚNG TUYỂN: So sánh điểm của bạn với điểm chuẩn chính thức các năm gần nhất của Trường ĐH Quy Nhơn và phân loại theo 3 tầng rõ ràng: 1. Vùng thử thách (Reach - điểm thấp hơn 0.5 - 1.5 đ, đặt NV1 nếu đam mê); 2. Vùng mục tiêu (Target - điểm chênh lệch trong khoảng -0.5 đến +1.0 đ, vừa sức nhất); 3. Vùng an toàn (Safe - điểm cao hơn >= 1.5 đ, bảo đảm chắc chắn trúng tuyển).\n- XUẤT TỆP BÁO CÁO TỰ ĐỘNG: Khi thí sinh yêu cầu xuất tệp hoặc hỏi về kế hoạch nguyện vọng chi tiết, hệ thống sẽ tạo tệp tải về theo đúng định dạng thí sinh cần (Excel .xlsx nếu muốn tính toán/lập bảng, Word .docx nếu muốn soạn thảo văn bản, PDF .pdf nếu muốn in ấn/xem nhanh) và đính kèm ngay dưới tin nhắn. Hãy thông báo thân thiện và chính xác về định dạng tệp đã được tạo để thí sinh nhấp tải về.\n- Mọi số liệu (điểm chuẩn, chỉ tiêu, học phí) phải bám sát 100% dữ liệu chính thức của Trường, tuyệt đối không suy diễn, bịa đặt số liệu.\n- GỢI Ý CÂU HỎI TIẾP THEO (TƯƠNG TÁC 1-CLICK): Ở cuối câu trả lời, hãy đề xuất đúng 2 câu hỏi gợi ý cụ thể từ góc độ người dùng tra cứu tiếp, định dạng theo khối: [GỢI Ý]: kèm 2 câu hỏi cụ thể đặt trong ngoặc kép.",
+    "workflow_id": "admissions-assistant",
+    "published_workflow_version_id": null,
+    "workflow_ownership": "private",
+    "collection_id": "col_admissions",
+    "is_active": true,
+    "tenant_id": "tenant_qnu",
+    "sample_questions": [
+      "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+      "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+      "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
+      "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?"
+    ],
+    "config": {
+      "sample_questions": [
+        "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+        "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+        "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?",
+        "Thủ tục và chi phí đăng ký ở Ký túc xá QNU gồm những gì?"
+      ],
+      "persona_scope": {
+        "persona": "Trợ lý ảo Tư vấn Tuyển sinh chính thức, thân thiện và chính xác của QNU.",
+        "allowed_topics": [
+          "đề án tuyển sinh",
+          "điểm chuẩn",
+          "học phí",
+          "học bổng",
+          "ký túc xá",
+          "sư phạm",
+          "Nghị định 116"
+        ],
+        "out_of_scope_policy": "Từ chối lịch sự nội dung ngoài phạm vi và hướng dẫn người dùng đến đơn vị phụ trách."
+      },
+      "knowledge_policy": {
+        "evidence_policy": {
+          "enabled": true,
+          "reference_year_mode": "current_year",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "default_reference_year": null,
+          "candidate_limit": 24,
+          "context_limit": 10,
+          "max_context_chars": 36000,
+          "timeout_seconds": 90,
+          "retrieval_timeout_seconds": 10.0,
+          "rerank_timeout_seconds": 3.0,
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ]
+        },
+        "chunking_strategy": "SemanticChunker",
+        "require_structured_facts": true,
+        "retrieval_limit": 10,
+        "reranker_policy": {
+          "enabled": true,
+          "provider_id": "prov_rtx5090_vllm",
+          "model_name": "bge-reranker-v2-m3",
+          "top_k": 5,
+          "score_threshold": 0.4
+        }
+      },
+      "model_policy": {
+        "preferred_provider_id": "prov_20261013041934",
+        "fallback_provider_id": "prov_20261013041934",
+        "primary_model": "ollama/gpt-oss:120b",
+        "fallback_model": "ollama/gemma4:31b",
+        "temperature": 0.2,
+        "max_tokens": 5000,
+        "thinking_budget": 0
+      },
+      "guardrails": {
+        "block_prompt_injection": true,
+        "mask_pii": true,
+        "require_grounded_answer": true,
+        "protect_system_prompt": true,
+        "no_answer_message": "Trong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận."
+      },
+      "tools": {
+        "enabled_tools": [
+          "export_universal_report",
+          "lookup_fact_layer",
+          "lookup_admission_score"
+        ],
+        "human_approval_required": true
+      },
+      "output_policy": {
+        "formats": [
+          "markdown",
+          "table",
+          "checklist"
+        ],
+        "require_citations": true,
+        "citation_format": "Tên văn bản, Điều/Khoản, Trang"
+      },
+      "evaluation_policy": {
+        "faithfulness_threshold": 0.9,
+        "answer_relevance_threshold": 0.85,
+        "context_precision_threshold": 0.8
+      }
+    },
+    "created_at": "2026-10-13T03:48:01.978960",
+    "updated_at": "2026-10-13T16:44:40.925985"
+  },
+  "publication": {
+    "snapshot": {
+      "snapshot_id": "snap_col_admissions_3_1c954057",
+      "collection_id": "col_admissions",
+      "collection_epoch": 3,
+      "binding_revisions": {
+        "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+        "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+        "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+        "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+        "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+        "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+        "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+        "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+        "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+        "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+        "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+        "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+        "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+        "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+        "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+        "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+        "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+        "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+        "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+      },
+      "vector_generations": {
+        "bnd_0798d6ebb09d": "vg_21324678abcf",
+        "bnd_0a0fefc849ab": "vg_21324678abcf",
+        "bnd_0dd3d2789954": "vg_21324678abcf",
+        "bnd_18c9c944ee36": "vg_21324678abcf",
+        "bnd_35c0b812a4fe": "vg_21324678abcf",
+        "bnd_4bd40bc6a972": "vg_21324678abcf",
+        "bnd_4d788e0c0ee2": "vg_21324678abcf",
+        "bnd_574bfd4e5288": "vg_21324678abcf",
+        "bnd_5fe00fd59740": "vg_21324678abcf",
+        "bnd_60019f7e73d6": "vg_21324678abcf",
+        "bnd_62ff83603eec": "vg_21324678abcf",
+        "bnd_887623d8d318": "vg_21324678abcf",
+        "bnd_8dc32a78128f": "vg_21324678abcf",
+        "bnd_b7be60e6ada9": "vg_21324678abcf",
+        "bnd_bdb1f500cdbe": "vg_21324678abcf",
+        "bnd_c6d3848722ab": "vg_21324678abcf",
+        "bnd_db935aea6524": "vg_21324678abcf",
+        "bnd_e4492e8d7016": "vg_21324678abcf",
+        "bnd_ed14ffc71bc0": "vg_21324678abcf"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-13T17:42:59.753275+00:00"
+    },
+    "fingerprint": "4f4726e6fb8b7c697deb",
+    "sources": [
+      {
+        "binding": "bnd_b7be60e6ada9",
+        "index": "idx_rev_33446987e9fc",
+        "source": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74"
+      },
+      {
+        "binding": "bnd_4bd40bc6a972",
+        "index": "idx_rev_57e15196704d",
+        "source": "ks_rev_2764521a96a3",
+        "title": "TB học phí K49",
+        "hash": "57afdb9f55f0910dac916a8806168e15c0466434740bede12db2f035dfc7072a"
+      },
+      {
+        "binding": "bnd_5fe00fd59740",
+        "index": "idx_rev_c0a54bf73b18",
+        "source": "ks_rev_26248a79ce32",
+        "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+        "hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e"
+      },
+      {
+        "binding": "bnd_ed14ffc71bc0",
+        "index": "idx_rev_46812c2c2247",
+        "source": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f"
+      },
+      {
+        "binding": "bnd_18c9c944ee36",
+        "index": "idx_rev_2b7b7ec56f95",
+        "source": "ks_rev_2d6dd82b25ce",
+        "title": "Muc hoc phi 2024",
+        "hash": "5a3f338fc0865418cd191e10f490e9acc4cee23dcf757d2889232e2038595fbd"
+      },
+      {
+        "binding": "bnd_db935aea6524",
+        "index": "idx_rev_44d332b2f2e8",
+        "source": "ks_rev_c9344b18c429",
+        "title": "TB lịch xét tuyển ĐH",
+        "hash": "f9ca20b7e4328551fb99f2bf59bb57c1462f7fe5cdb566364f9ce6aae265e5bc"
+      },
+      {
+        "binding": "bnd_4d788e0c0ee2",
+        "index": "idx_rev_00fbccf1d07e",
+        "source": "ks_rev_2d628688cb78",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao",
+        "hash": "726942e56640e65aee7d906d422b6e717185c6379e6e3866f20b9875a52bb28e"
+      },
+      {
+        "binding": "bnd_60019f7e73d6",
+        "index": "idx_rev_575e4b49149a",
+        "source": "ks_rev_0aea050f89c4",
+        "title": "BC Kết quả khảo sát Tư vấn tuyển sinh 2022",
+        "hash": "94d8f0904a6740b6d7c026865b7153ad35aa88e4479598cb1b6e5801f22db169"
+      },
+      {
+        "binding": "bnd_887623d8d318",
+        "index": "idx_rev_d39d623aef4e",
+        "source": "ks_rev_403157cd7511",
+        "title": "Phuong huong tuyen sinh 2024_DHQN_final",
+        "hash": "340e133e1e0f99042d6c893a701aa23ed071cbcb667c4b1dd0026994ae81148a"
+      },
+      {
+        "binding": "bnd_0dd3d2789954",
+        "index": "idx_rev_daf4d2e4f534",
+        "source": "ks_rev_ad7e7e64bccf",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed",
+        "hash": "eb991fad090fea44b9152f8e18428ba7be059a66176d17939871ca1aee3e053f"
+      },
+      {
+        "binding": "bnd_e4492e8d7016",
+        "index": "idx_rev_42074c9dee55",
+        "source": "ks_rev_3e699f33e06c",
+        "title": "HD nhập học",
+        "hash": "411182a446724cd9594b58b09f38f68dfb5bcef19f0e673015238526e6fb9a2c"
+      },
+      {
+        "binding": "bnd_bdb1f500cdbe",
+        "index": "idx_rev_742b1ff6d265",
+        "source": "ks_rev_dbdaf646862a",
+        "title": "Cac nganh Tuyen sinh 2025_moi",
+        "hash": "f096720b0d414129b5270933f2cdc3df176be224f65b34d1531b4b2edd81f7c2"
+      },
+      {
+        "binding": "bnd_574bfd4e5288",
+        "index": "idx_rev_76cae24bd0dd",
+        "source": "ks_rev_a12f0f3f4a99",
+        "title": "Hương dan thi Nang khieu GDTC 2026",
+        "hash": "bd6919a94a93945d2e7923cced6b3a1548c55eba917b1d9464721805366fb52a"
+      },
+      {
+        "binding": "bnd_8dc32a78128f",
+        "index": "idx_rev_97f860b2edbf",
+        "source": "ks_rev_b62147adc5ac",
+        "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+        "hash": "e73f91a10deac0250e482ca9f21bb5f78523e8585368e7ac8ace8d4d6bcb39a5"
+      },
+      {
+        "binding": "bnd_0a0fefc849ab",
+        "index": "idx_rev_a90d85902c4f",
+        "source": "ks_rev_672bd2a13d44",
+        "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+        "hash": "f4f3c8ce3546b36f092175aa6cefa5a61a98c24f7f88c5355810f374f2d08d7b"
+      },
+      {
+        "binding": "bnd_35c0b812a4fe",
+        "index": "idx_rev_ac9ec09ebb97",
+        "source": "ks_rev_cf1863148443",
+        "title": "TB điểm sàn 26",
+        "hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c"
+      },
+      {
+        "binding": "bnd_0798d6ebb09d",
+        "index": "idx_rev_d64d0baf0c06",
+        "source": "ks_rev_4be16227642e",
+        "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+        "hash": "bf379846754a4821d262767505d60f0dbe5cc7268adfdb726c89b9776d926075"
+      },
+      {
+        "binding": "bnd_c6d3848722ab",
+        "index": "idx_rev_d7b434305a6c",
+        "source": "ks_rev_1610bf67e2cf",
+        "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+        "hash": "53e4ec625751a196322a2f616ab73a1310f1e527a1293b7b7c5ae29b1d29798d"
+      },
+      {
+        "binding": "bnd_62ff83603eec",
+        "index": "idx_rev_e0dc72a9102b",
+        "source": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1"
+      }
+    ]
+  },
+  "configuration_fingerprint": "34a3d934778128d9735a75021c5954694cc579517dbdec2a502f7d03f7cb0712",
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "finished_at": "2026-10-13T17:44:11.849676+00:00",
+  "code_unchanged": true
+}

@@ -49,7 +49,8 @@ class OutputNoAnswerNodeHandler(BaseNodeHandler):
 
         context.outputs["answer"] = message
         context.outputs["status"] = status
-        context.outputs["citations"] = []
+        citations = context.node_data.get("citations", []) if decision and decision.get("status") == "partial" else []
+        context.outputs["citations"] = citations
 
         logger.info(
             "OutputNoAnswer [%s]: dispatched no-answer policy fallback (status=%s)",
@@ -64,6 +65,6 @@ class OutputNoAnswerNodeHandler(BaseNodeHandler):
                 "answer": message,
                 "answer_decision": decision,
                 "status": status,
-                "citations": [],
+                "citations": citations,
             },
         )

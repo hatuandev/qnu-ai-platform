@@ -58,13 +58,8 @@ case "$CMD" in
 
   # --- Phat trien (Dev Servers) ---
   dev|dev1|dev2)
-    echo "[QNU AI Platform] Kiem tra CSDL va du lieu mau..."
-    (cd backend && $PYTHON -m app.cli db ensure-ready)
-    echo "[QNU AI Platform] Khoi chay Backend (Port 8001) va Frontend Studio (Port 3000)..."
     if command -v cmd.exe >/dev/null 2>&1; then
-      powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-worker.ps1 || exit 1
-      cmd.exe /c start "QNU Backend API (Port 8001)" cmd /k "cd backend && .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-      cmd.exe /c start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
+      powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-dev.ps1 || exit 1
     else
       echo "He dieu hanh khong phai Windows, vui long chay rieng: ./make be, ./make fe va ./make worker"
     fi
@@ -143,7 +138,7 @@ case "$CMD" in
     echo "  ./make infra-logs   : Theo doi logs cua cum Docker"
     echo ""
     echo "[Phat trien - Local Dev]"
-    echo "  ./make dev          : Khoi chay Backend (8001), Frontend (3000) va ARQ worker"
+    echo "  ./make dev          : Khoi dong lai Backend (8001), Frontend (3000) va ARQ worker (Windows)"
     echo "  ./make worker       : Khoi chay worker, co log tren Windows"
     echo "  ./make be           : Khoi chay rieng Backend API (Port 8001)"
     echo "  ./make fe           : Khoi chay rieng Frontend Studio (Port 3000)"

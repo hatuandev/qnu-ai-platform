@@ -95,6 +95,20 @@ async def test_get_usage_statistics_aggregation():
 
 
 @pytest.mark.asyncio
+async def test_usage_statistics_exclude_old_workflow_estimates():
+    from types import SimpleNamespace
+
+    from app.modules.modelops.services.usage_accounting_service import usage_accounting_service
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = [SimpleNamespace(provider='qnu_workflow')]
+    db.execute.return_value = result
+    stats = await usage_accounting_service.get_usage_statistics(db)
+    assert stats.total_requests == 0
+    assert stats.total_tokens == 0
+
+
+@pytest.mark.asyncio
 async def test_api_usage_stats_endpoint():
     from app.core.database import get_db
 

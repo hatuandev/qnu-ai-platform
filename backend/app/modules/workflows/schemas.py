@@ -26,6 +26,7 @@ class WorkflowEdgeSpec(BaseModel):
 
 
 class WorkflowDagSpec(BaseModel):
+    timeout_seconds: int = Field(300, ge=1, le=3600, description="Deadline toàn workflow")
     execution_mode: str = "conversational"
     entry_node_id: str = Field(..., description="Node bắt đầu thực thi của DAG")
     input_schema: dict[str, Any] = Field(default_factory=dict)

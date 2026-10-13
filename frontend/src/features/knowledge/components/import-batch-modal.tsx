@@ -181,7 +181,7 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-foreground">
-                    Tiến độ hoàn thành
+                    Tiến độ xử lý
                   </span>
                   <span className="font-semibold text-primary">{percent}%</span>
                 </div>
@@ -248,7 +248,7 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                         <TableHead className="text-center">
                           Tiến độ
                           <span className="block text-[11px] font-normal text-muted-foreground">
-                            Theo giai đoạn
+                            Độc lập kết quả
                           </span>
                         </TableHead>
                         <TableHead className="w-28 text-center">
@@ -278,7 +278,7 @@ export const ImportBatchModal: React.FC<ImportBatchModalProps> = ({
                           <TableCell>
                             <div
                               className="space-y-1 min-w-24"
-                              title="Tiến độ theo các bước đã hoàn thành, không phải phần trăm trang OCR"
+                              title="100% nghĩa là đã kết thúc xử lý; kết quả thành công, lỗi hoặc cần duyệt hiển thị riêng"
                             >
                               <span className="block text-center tabular-nums">
                                 {Math.round(getItemProgress(item))}%

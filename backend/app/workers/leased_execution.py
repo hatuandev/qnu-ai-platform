@@ -37,6 +37,7 @@ def is_retryable_failure(error: BaseException) -> bool:
             "OCR_SERVICE_TIMEOUT", "OCR_SERVICE_UNAVAILABLE",
             "PROVIDER_CAPACITY_TIMEOUT", "PROVIDER_CAPACITY_UNAVAILABLE",
             "EMBEDDING_PROVIDER_UNAVAILABLE",
+            "MODEL_PROVIDER_KEY_BUSY",
         }:
             return True
         error = error.__cause__ or error.__context__

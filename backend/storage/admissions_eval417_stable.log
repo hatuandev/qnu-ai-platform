@@ -1,0 +1,158 @@
+{"id": 1, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 34.36}
+{"id": 2, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 33.88}
+{"id": 3, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 32.31}
+{"id": 4, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 50.8}
+{"id": 5, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 16.58}
+{"id": 6, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 12.09}
+{"id": 7, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 21.62}
+{"id": 8, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 24.38}
+{"id": 9, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 27.69}
+{"id": 10, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 28.3}
+{"id": 11, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 19.39}
+{"id": 12, "route": "dag", "http": 500, "status": 500, "error": null, "seconds": 1.59}
+{"id": 13, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 16.64}
+{"id": 14, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 39.14}
+{"id": 15, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 15.91}
+{"id": 16, "route": "dag", "http": null, "status": null, "error": "ReadError: ", "seconds": 16.72}
+{"id": 17, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 18, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 19, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 20, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 21, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 22, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 23, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.34}
+{"id": 24, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 25, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.33}
+{"id": 26, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 27, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 28, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 29, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 30, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 31, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 32, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 33, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 34, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 35, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 36, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 37, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 38, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.26}
+{"id": 39, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 40, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 41, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 42, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.26}
+{"id": 43, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 44, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 45, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 46, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 47, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 48, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 49, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 50, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 51, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 52, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 53, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 54, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 55, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 56, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 57, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 58, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 59, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 60, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 61, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 62, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 63, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 64, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 65, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 66, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 67, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 68, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 69, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.27}
+{"id": 70, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 71, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 72, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 73, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 74, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 75, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.31}
+{"id": 76, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 77, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 78, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 79, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 80, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+{"id": 81, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.3}
+{"id": 82, "route": "dag", "http": null, "status": null, "error": "ConnectError: All connection attempts failed", "seconds": 2.28}
+Traceback (most recent call last):
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_async\connection.py", line 101, in handle_async_request
+    raise exc
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_async\connection.py", line 78, in handle_async_request
+    stream = await self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_async\connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_backends\auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 113, in connect_tcp
+    with map_exceptions(exc_map):
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpcore\_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+httpcore.ConnectError: All connection attempts failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\scripts\evaluate_evidence_417.py", line 109, in <module>
+    asyncio.run(evaluate(parser.parse_args()))
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\scripts\evaluate_evidence_417.py", line 90, in evaluate
+    final = await client.get(args.base + "/assistants/admissions")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1768, in get
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ConnectError: All connection attempts failed

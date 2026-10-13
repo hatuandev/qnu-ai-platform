@@ -20,10 +20,12 @@ from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.services.blank_pages import inspect_empty_pdf_page
 from app.modules.knowledge.services.layout_text import reconstruct_layout_text
+from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v7-context-relations"
+EXTRACTION_VERSION = "layout-v9-cached-docx-formulas"
+_native_pdf_lock = asyncio.Lock()
 
 
 @dataclass
@@ -35,6 +37,19 @@ class SourceExtraction:
     engine_used: str = "native"
     preview_pdf: bytes | None = None
     canonical_tables: list[dict[str, Any]] = field(default_factory=list)
+
+
+def merge_evidenced_text(primary: str, secondary: str) -> str:
+    """Keep unmatched extracted lines, never generate a visual description."""
+    compact = lambda value: "".join(char.casefold() for char in value if char.isalnum())
+    known = compact(primary)
+    extra = []
+    for line in secondary.splitlines():
+        token = compact(line)
+        if len(token) >= 12 and token not in known and "\ufffd" not in line:
+            extra.append(line)
+            known += token
+    return "\n\n".join([primary.strip(), "\n".join(extra)]).strip()
 
 
 def normalize_layout_block(block: dict[str, Any], page: int, index: int) -> dict[str, Any]:
@@ -65,12 +80,11 @@ def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict
         for index, page in enumerate(document):
             number = index + 1
             text = page.get_text().strip()
-            image_area = sum((pymupdf.Rect(b["bbox"]) & page.rect).get_area() for b in page.get_image_info())
-            image_coverage = image_area / max(page.rect.get_area(), 1)
+            image_coverage, uncovered_visual = visual_coverage(page)
             broken = text.count("\ufffd") / max(len(text), 1) > 0.01
             encoding_issue = bool(parsed.metadata.get("has_encoding_issues")) and number in parsed.metadata.get("pages_needing_ocr", [])
-            needs_ocr = (broken or (image_coverage > 0.5 and len(text) < 80)
-                         or encoding_issue or (not text and (image_area > 0 or len(page.get_drawings()) > 50)))
+            needs_ocr = (broken or uncovered_visual > 0.08
+                         or encoding_issue or (not text and (image_coverage > 0 or len(page.get_drawings()) > 50)))
             blocks = [normalize_layout_block(b, number, i) for i, b in enumerate(parsed.blocks or [])
                       if b.get("page_number") == number]
             glyph_blocks = page.get_text("rawdict", flags=pymupdf.TEXTFLAGS_RAWDICT & ~pymupdf.TEXT_PRESERVE_IMAGES)["blocks"]
@@ -81,11 +95,12 @@ def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict
                     clip = (left, top, left + coords["width"] / 100 * page.rect.width,
                             top + coords["height"] / 100 * page.rect.height)
                     block["text"] = reconstruct_layout_text(glyph_blocks, clip) or block["text"]
-            records.append({"page_number": number, "extracted_text": texts.get(number, ""),
+            records.append({"page_number": number, "extracted_text": texts.get(number, "") or reconstruct_layout_text(glyph_blocks),
                             "alignment_text": reconstruct_layout_text(glyph_blocks),
                             "dimensions": {"width": page.rect.width, "height": page.rect.height},
                             "blocks": blocks, "has_tables": any(b.get("type") == "table" for b in blocks),
-                            "engine_used": "native"})
+                            "engine_used": "native", "visual_coverage": image_coverage,
+                            "uncovered_visual_coverage": uncovered_visual})
             if needs_ocr:
                 selected.append(number)
                 scan.insert_pdf(document, from_page=index, to_page=index)
@@ -95,8 +110,10 @@ def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict
 
 async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: str,
                       engine: str | None, tenant_id: str) -> SourceExtraction:
-    parsed = await get_document_parser("pdf").parse(content, filename)
-    pages, selected, scan_bytes = await asyncio.to_thread(build_native_pages, content, parsed)
+    # MuPDF is not thread-safe: serialize native work, not remote OCR requests.
+    async with _native_pdf_lock:
+        parsed = await get_document_parser("pdf").parse(content, filename)
+        pages, selected, scan_bytes = await asyncio.to_thread(build_native_pages, content, parsed)
     explicit = engine and engine not in {"auto", "native", "pymupdf_ocr"}
     if profile == "layout_analysis" or explicit:
         selected, scan_bytes = list(range(1, len(pages) + 1)), content
@@ -111,13 +128,16 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
                 raise AppException("OCR trả số trang không hợp lệ.", code="OCR_PAGE_COUNT_MISMATCH", status_code=422)
             record = by_number[local].model_dump()
             if not record["extracted_text"].strip():
-                evidence = await asyncio.to_thread(inspect_empty_pdf_page, content, original)
+                async with _native_pdf_lock:
+                    evidence = await asyncio.to_thread(inspect_empty_pdf_page, content, original)
                 if not evidence.is_blank:
                     raise AppException(f"Không nhận dạng được trang {original} có dấu hiệu nội dung; cần kiểm tra OCR.",
                                        code="EMPTY_OCR_PAGE", status_code=422)
                 record.update(extracted_text="", blocks=[], has_tables=False, content_status="blank",
                               blank_detection=evidence.to_metadata(), dimensions=pages[original - 1]["dimensions"])
             record.update(page_number=original, engine_used=response.engine_used)
+            if record.get("content_status") != "blank":
+                record["extracted_text"] = merge_evidenced_text(record["extracted_text"], pages[original - 1]["extracted_text"])
             record["blocks"] = [normalize_layout_block(b, original, i) for i, b in enumerate(record["blocks"])]
             pages[original - 1] = record
         engines = sorted({p["engine_used"] for p in pages})
@@ -160,6 +180,8 @@ def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> None:
         end = ordered[index + 1][1] if index + 1 < len(ordered) else len(markdown)
         pages[number - 1]["extracted_text"] = markdown[start:end].strip()
     for page in pages:
+        if page.get("engine_used") != "native" and page["page_number"] in matched_pages:
+            page["extracted_text"] = merge_evidenced_text(page["extracted_text"], originals[page["page_number"]])
         if page.get("engine_used") != "native" and page["page_number"] not in matched_pages:
             page["extracted_text"] = originals[page["page_number"]]
         if page["page_number"] not in starts and page.get("engine_used") == "native":

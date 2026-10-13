@@ -174,12 +174,14 @@ def test_published_specialist_facts_share_scope_and_revision_filter():
 def test_vllm_chat_provider_accepts_arbitrary_model_names():
     from app.modules.modelops.services.inference_service import (
         VALID_CHAT_PROVIDER_TYPES,
-        _is_model_compatible_with_provider,
     )
 
     assert "vllm" in VALID_CHAT_PROVIDER_TYPES
-    assert _is_model_compatible_with_provider({"provider_type": "vllm"}, "my-chat-model")
-    assert _is_model_compatible_with_provider({"provider_type": "vllm"}, "Qwen/future-chat")
+    from app.modules.modelops.schemas import LLMGenerateRequest
+    from app.modules.modelops.services.chat_routes import plan_chat_routes
+    req = LLMGenerateRequest(messages=[{"role": "user", "content": "test"}],
+                             preferred_provider_id="local", preferred_model_name="Qwen/future-chat")
+    assert plan_chat_routes([{"id": "local", "provider_type": "vllm"}], req)[0][1] == "Qwen/future-chat"
 
 
 @pytest.mark.asyncio

@@ -247,6 +247,7 @@ class AgenticConsultingDispatcher:
         fallback_model: str | None = None,
         tenant_id: str = "tenant_qnu",
         preferred_provider_id: str | None = None,
+        fallback_provider_id: str | None = None,
     ) -> dict[str, Any]:
         """Use LLM to semantically understand if user wants a file export and which formats.
 
@@ -326,6 +327,7 @@ class AgenticConsultingDispatcher:
                     thinking_budget=0,
                     preferred_model_name=preferred_model_name,
                     fallback_model_name=fallback_model,
+                    fallback_provider_id=fallback_provider_id,
                 )
 
                 llm_res = await asyncio.wait_for(
@@ -516,6 +518,7 @@ class AgenticConsultingDispatcher:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         preferred_provider_id: str | None = None,
+        fallback_provider_id: str | None = None,
         retrieval_snapshot: RetrievalSnapshot | None = None,
     ) -> dict[str, Any]:
         """Dispatch agentic reasoning, facts augmentation, and artifact generation."""
@@ -541,6 +544,7 @@ class AgenticConsultingDispatcher:
             fallback_model=fallback_model,
             tenant_id=tenant_id,
             preferred_provider_id=preferred_provider_id,
+            fallback_provider_id=fallback_provider_id,
         )
         is_export = intent_res.get("is_export", False)
         requested_formats = intent_res.get("formats") or ["xlsx", "docx", "pdf"]

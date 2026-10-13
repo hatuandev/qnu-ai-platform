@@ -78,7 +78,7 @@ class OutputChatNodeHandler(BaseNodeHandler):
             # A downstream template/model cannot replace a fact-bound decision.
             final_answer = decision["answer"]
             status = "answered" if decision["status"] == "supported" else "insufficient_context"
-            citations = context.node_data.get("citations", []) if status == "answered" else []
+            citations = context.node_data.get("citations", []) if decision["status"] in {"supported", "partial"} else []
             context.outputs["answer_decision"] = decision
         context.outputs["answer"] = final_answer
         context.outputs["citations"] = citations

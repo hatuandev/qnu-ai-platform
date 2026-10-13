@@ -109,6 +109,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
 
         ask_req = AskRequest(
             question=query,
+            original_question=context.inputs.get("message") or context.node_data.get("raw_query") or None,
             collection_id=collection_id,
             module_code=module_code,
             conversation_id=context.conversation_id,
@@ -128,6 +129,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             preferred_model_name=primary_model,
             preferred_provider_id=preferred_provider_id,
             fallback_model=fallback_model,
+            fallback_provider_id=getattr(model_policy, "fallback_provider_id", None) if model_policy else config.get("fallback_provider_id"),
             history=context.inputs.get("conversation_history") or context.inputs.get("history"),
             reranker_policy=reranker_policy,
         )
@@ -153,6 +155,7 @@ class RAGAnswerNodeHandler(BaseNodeHandler):
             workspace_id=context.workspace_id,
             preferred_provider_id=preferred_provider_id,
             retrieval_snapshot=snapshot,
+            fallback_provider_id=getattr(model_policy, "fallback_provider_id", None) if model_policy else config.get("fallback_provider_id"),
         )
         guidance = ""
         if dispatch_res.get("has_agentic_guidance"):

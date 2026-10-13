@@ -1,0 +1,292 @@
+[
+  {
+    "id": 51,
+    "http": 200,
+    "response": {
+      "assistant_code": "admissions",
+      "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+      "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: 0256.3846.156 hoặc Email: tuyensinh@qnu.edu.vn nhé!",
+      "status": "insufficient_context",
+      "error_code": null,
+      "citations": [],
+      "suggested_questions": [
+        "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+        "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+        "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+      ],
+      "latency_ms": 6602.88,
+      "execution_id": "b8bf0ab5-d56d-431f-9ca0-47299e9d4321",
+      "artifacts": [],
+      "conversation_id": "diagnostic415_48a70cc7550c"
+    },
+    "trace": [
+      {
+        "node_id": "chat_input",
+        "node_type": "input.chat",
+        "status": "completed",
+        "latency_ms": 0.02,
+        "output": {
+          "message": "Thời gian đăng ký nguyện vọng năm 2026 là khi nào?"
+        }
+      },
+      {
+        "node_id": "condition_route",
+        "node_type": "condition.route",
+        "status": "completed",
+        "latency_ms": 1535.5,
+        "output": {
+          "message": "Thời gian đăng ký nguyện vọng năm 2026 là khi nào?",
+          "response": "Thời gian đăng ký nguyện vọng năm 2026 là khi nào?",
+          "next_node": "query_rewrite",
+          "matched_rule_id": null
+        }
+      },
+      {
+        "node_id": "query_rewrite",
+        "node_type": "query.rewrite",
+        "status": "completed",
+        "latency_ms": 3034.58,
+        "output": {
+          "modified": false,
+          "original_query": "Thời gian đăng ký nguyện vọng năm 2026 là khi nào?",
+          "normalized_query": "Thời gian đăng ký nguyện vọng năm 2026 là khi nào?"
+        }
+      },
+      {
+        "node_id": "knowledge_answer",
+        "node_type": "core.knowledge.answer",
+        "status": "completed",
+        "latency_ms": 2031.54,
+        "output": {
+          "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+          "status": "insufficient_context",
+          "contexts": [],
+          "response": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+          "artifacts": [],
+          "citations": [],
+          "facts_used": [],
+          "answer_decision": null,
+          "suggested_questions": []
+        }
+      },
+      {
+        "node_id": "citation_guard",
+        "node_type": "guard.citation_policy",
+        "status": "completed",
+        "latency_ms": 0.58,
+        "output": {
+          "port": "ungrounded",
+          "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+          "status": "insufficient_context",
+          "contexts": [],
+          "grounded": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+          "response": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!",
+          "citations": [],
+          "ungrounded": "rag_status 'insufficient_context' not in accepted require_grounded_answer set and status != answered citations list is empty answer self-declares lack of context",
+          "is_grounded": false,
+          "grounded_ratio": 1.0,
+          "citations_count": 0,
+          "failure_reasons": [
+            "rag_status 'insufficient_context' not in accepted",
+            "require_grounded_answer set and status != answered",
+            "citations list is empty",
+            "answer self-declares lack of context"
+          ],
+          "unsupported_numbers": []
+        }
+      },
+      {
+        "node_id": "no_answer_output",
+        "node_type": "output.no_answer",
+        "status": "completed",
+        "latency_ms": 0.38,
+        "output": {
+          "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: 0256.3846.156 hoặc Email: tuyensinh@qnu.edu.vn nhé!",
+          "status": "insufficient_context",
+          "citations": [],
+          "answer_decision": null
+        }
+      }
+    ]
+  },
+  {
+    "id": 68,
+    "http": 200,
+    "response": {
+      "assistant_code": "admissions",
+      "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+      "answer": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+      "status": "answered",
+      "error_code": null,
+      "citations": [
+        {
+          "source_id": "bnd_db935aea6524",
+          "title": "TB lịch xét tuyển ĐH",
+          "section": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |",
+          "page_number": 4,
+          "quote": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng",
+          "source_pages": [
+            4
+          ],
+          "entity_key": null,
+          "binding_id": "bnd_db935aea6524",
+          "index_revision_id": "idx_rev_44d332b2f2e8",
+          "source_revision_id": "ks_rev_c9344b18c429",
+          "revision_no": 1
+        }
+      ],
+      "suggested_questions": [
+        "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+        "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+        "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+      ],
+      "latency_ms": 25598.31,
+      "execution_id": "8369284c-db39-4c60-8480-478d6a6e3eea",
+      "artifacts": [],
+      "conversation_id": "diagnostic415_b32533ca9ded"
+    },
+    "trace": [
+      {
+        "node_id": "chat_input",
+        "node_type": "input.chat",
+        "status": "completed",
+        "latency_ms": 0.01,
+        "output": {
+          "message": "Thời gian xác nhận nhập học năm 2026?"
+        }
+      },
+      {
+        "node_id": "condition_route",
+        "node_type": "condition.route",
+        "status": "completed",
+        "latency_ms": 1541.4,
+        "output": {
+          "message": "Thời gian xác nhận nhập học năm 2026?",
+          "response": "Thời gian xác nhận nhập học năm 2026?",
+          "next_node": "query_rewrite",
+          "matched_rule_id": null
+        }
+      },
+      {
+        "node_id": "query_rewrite",
+        "node_type": "query.rewrite",
+        "status": "completed",
+        "latency_ms": 3030.74,
+        "output": {
+          "modified": false,
+          "original_query": "Thời gian xác nhận nhập học năm 2026?",
+          "normalized_query": "Thời gian xác nhận nhập học năm 2026?"
+        }
+      },
+      {
+        "node_id": "knowledge_answer",
+        "node_type": "core.knowledge.answer",
+        "status": "completed",
+        "latency_ms": 21024.98,
+        "output": {
+          "answer": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "status": "answered",
+          "contexts": [
+            "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng"
+          ],
+          "response": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "artifacts": [],
+          "citations": [
+            {
+              "quote": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng",
+              "title": "TB lịch xét tuyển ĐH",
+              "section": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |",
+              "source_id": "bnd_db935aea6524",
+              "binding_id": "bnd_db935aea6524",
+              "entity_key": null,
+              "page_number": 4,
+              "revision_no": 1,
+              "source_pages": [
+                4
+              ],
+              "index_revision_id": "idx_rev_44d332b2f2e8",
+              "source_revision_id": "ks_rev_c9344b18c429"
+            }
+          ],
+          "facts_used": [],
+          "answer_decision": null,
+          "suggested_questions": [
+            "Hồ sơ cần chuẩn bị khi làm thủ tục nhập học chính thức gồm những gì?",
+            "Lịch học tập trung cho sinh viên khóa mới (K49) bắt đầu từ khi nào?"
+          ]
+        }
+      },
+      {
+        "node_id": "citation_guard",
+        "node_type": "guard.citation_policy",
+        "status": "completed",
+        "latency_ms": 0.83,
+        "output": {
+          "port": "grounded",
+          "answer": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "status": "answered",
+          "contexts": [
+            "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng"
+          ],
+          "grounded": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "response": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "citations": [
+            {
+              "quote": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng",
+              "title": "TB lịch xét tuyển ĐH",
+              "section": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |",
+              "source_id": "bnd_db935aea6524",
+              "binding_id": "bnd_db935aea6524",
+              "entity_key": null,
+              "page_number": 4,
+              "revision_no": 1,
+              "source_pages": [
+                4
+              ],
+              "index_revision_id": "idx_rev_44d332b2f2e8",
+              "source_revision_id": "ks_rev_c9344b18c429"
+            }
+          ],
+          "ungrounded": "Thiếu căn cứ dữ liệu chính thức.",
+          "is_grounded": true,
+          "grounded_ratio": 1.0,
+          "citations_count": 1,
+          "failure_reasons": [],
+          "unsupported_numbers": []
+        }
+      },
+      {
+        "node_id": "chat_output",
+        "node_type": "output.chat",
+        "status": "completed",
+        "latency_ms": 0.08,
+        "output": {
+          "answer": "Thời gian xác nhận nhập học trực tuyến năm 2026 tại Trường Đại học Quy Nhơn được quy định cụ thể như sau:\n\n*   **Thời gian xác nhận:** Từ ngày **13/8/2026** đến trước **17:00 ngày 21/8/2026**.\n*   **Hình thức:** Thí sinh thực hiện xác nhận nhập học trực tuyến trên Hệ thống của Bộ Giáo dục và Đào tạo.\n\n**Lưu ý quan trọng:**\n*   Nhà trường không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026.\n*   Sau khi hoàn tất xác nhận trực tuyến, từ ngày **24/8/2026 đến ngày 28/8/2026**, bạn sẽ thực hiện thủ tục nhập học chính thức tại trường.\n*   Lịch trình này tuân thủ theo kế hoạch chung của Bộ GD&ĐT. Trong trường hợp có điều chỉnh từ Bộ, nhà trường sẽ cập nhật thông báo mới nhất đến bạn.",
+          "status": "answered",
+          "warnings": [],
+          "artifacts": [],
+          "citations": [
+            {
+              "quote": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |\n| :---: | :--- | :--- | :--- | :--- |\n| 28. | Từ 13/8 đến 17:00 ngày 21/8/2026 | Theo dõi, hỗ trợ thí sinh xác nhận nhập học trực tuyến; không yêu cầu thí sinh xác nhận nhập học hoặc nhập học trước ngày 13/8/2026 | Tổ TVTS | Các khoa |\n| 29. |  | Tổng hợp danh sách thí sinh đã xác nhận<br>nhập học trực tuyến trên Hệ thống; không<br>kết thúc xác nhận nhập học trước 17:00<br>ngày 21/8/2026 |  |  |\n| 30. |  | Tổ chức xét tuyển bổ sung (nếu chưa đủ<br>chỉ tiêu đợt 1); công bố thông tin xét<br>tuyển bổ sung trên trang TTĐT của<br>Trường theo quy định |  |  |\n| 31. | Từ ngày 24/8/2026 đến ngày 28/8/2026 | Tổ chức nhập học chính thức cho thí sinh trúng tuyển đợt 1 đã xác nhận nhập học và đợt 2 (nếu có); kiểm tra hồ sơ nhập học của thí sinh. | Phòng CTSV&HTDN | HĐTS, các khoa, các đơn vị liên quan |\n| 32. | Ngày 3/9/2026 | Sinh viên khóa mới (K49) bắt đầu học tập | Phòng ĐT | Các khoa |\n\nCác mốc thời gian trong kế hoạch này được triển khai theo Kế hoạch chung của Bộ\nGDĐT; trường hợp Bộ GDĐT có điều chỉnh lịch chính thức, các đơn vị cập nhật và\nthực hiện theo thông báo mới nhất.\n\nNơi nhận:\n\n- Các Khoa;\n- Tổ máy tính;\n\nHIỆU TRƯỞNG\n- Phòng CTSV&HTDN;\n- Phòng ĐT;\n- Lưu: VT, HĐTS.\n\nPGS.TS. Đoàn Đức Tùng",
+              "title": "TB lịch xét tuyển ĐH",
+              "section": "| TT | Các mốc thời gian | Nội dung | Chủ trì thực hiện | Phối hợp thực hiện |",
+              "source_id": "bnd_db935aea6524",
+              "binding_id": "bnd_db935aea6524",
+              "entity_key": null,
+              "page_number": 4,
+              "revision_no": 1,
+              "source_pages": [
+                4
+              ],
+              "index_revision_id": "idx_rev_44d332b2f2e8",
+              "source_revision_id": "ks_rev_c9344b18c429"
+            }
+          ],
+          "missing_fields": [],
+          "answer_decision": null,
+          "suggested_questions": []
+        }
+      }
+    ]
+  }
+]

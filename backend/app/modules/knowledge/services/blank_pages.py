@@ -17,13 +17,27 @@ MAX_TOTAL_SPECK_PIXELS = 128
 MAX_SPECK_DENSITY = 0.00006
 
 
+def _isolated_scan_noise(stats: np.ndarray, centers: np.ndarray, pixels: int, size: int) -> bool:
+    """Sparse specks may be larger than one pixel; aligned glyphs/rules are not noise."""
+    if pixels > min(400, size * 0.0002) or len(stats) > 80:
+        return False
+    if np.any(stats[:, cv2.CC_STAT_AREA] > 40) or np.any(stats[:, 2:4] > 12):
+        return False
+    glyphs = centers[(stats[:, cv2.CC_STAT_HEIGHT] >= 5) & (stats[:, cv2.CC_STAT_WIDTH] >= 2)]
+    for center in glyphs:
+        aligned = (np.abs(glyphs[:, 1] - center[1]) <= 5) & (np.abs(glyphs[:, 0] - center[0]) <= 60)
+        if np.count_nonzero(aligned) >= 2:
+            return False
+    return True
+
+
 @dataclass(frozen=True)
 class BlankPageEvidence:
     is_blank: bool
     background_level: float
     foreground_pixels: int
     largest_component: int
-    method: str = "raster-components-v1"
+    method: str = "raster-components-v2"
 
     def to_metadata(self) -> dict[str, bool | float | int | str]:
         return asdict(self)
@@ -48,11 +62,13 @@ def inspect_empty_pdf_page(content: bytes, page_number: int) -> BlankPageEvidenc
     local_background = cv2.GaussianBlur(image.astype(np.float32), (0, 0), 5)
     mask = ((image < background - MIN_INK_CONTRAST)
             | (image < local_background - MIN_INK_CONTRAST)).astype(np.uint8)
-    _, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    _, _, stats, centers = cv2.connectedComponentsWithStats(mask, connectivity=8)
     largest = int(stats[1:, cv2.CC_STAT_AREA].max(initial=0))
     longest = int(stats[1:, cv2.CC_STAT_WIDTH:cv2.CC_STAT_HEIGHT + 1].max(initial=0))
     foreground = int(np.count_nonzero(mask))
     speck_budget = min(MAX_TOTAL_SPECK_PIXELS, image.size * MAX_SPECK_DENSITY)
-    is_blank = (background >= MIN_PAPER_LEVEL and foreground <= speck_budget
-                and largest <= MAX_SPECK_AREA and longest <= MAX_SPECK_EDGE)
+    tiny_noise = foreground <= speck_budget and largest <= MAX_SPECK_AREA and longest <= MAX_SPECK_EDGE
+    is_blank = background >= MIN_PAPER_LEVEL and (
+        tiny_noise or _isolated_scan_noise(stats[1:], centers[1:], foreground, image.size)
+    )
     return BlankPageEvidence(is_blank, background, foreground, largest)

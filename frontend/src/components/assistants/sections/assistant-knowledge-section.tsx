@@ -18,40 +18,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  type AssistantModelOption,
+  selectedModelValue,
+} from "@/features/assistants/model-options";
 import type { KnowledgeCollection } from "@/types";
 
 interface AssistantKnowledgeSectionProps {
+  availableModels?: AssistantModelOption[];
   form: AssistantEditForm;
   onChange: (updated: AssistantEditForm) => void;
   collections: KnowledgeCollection[];
   onNavigate: (path: string) => void;
 }
 
-const AVAILABLE_RERANKER_MODELS = [
-  {
-    value: "bge-reranker-base",
-    label: "BGE Reranker Base (BAAI On-Premise / Cloud) - Khuyến nghị",
-    description: "Cân bằng hoàn hảo giữa độ chính xác tiếng Việt và tốc độ",
-  },
-  {
-    value: "bge-reranker-large",
-    label: "BGE Reranker Large (BAAI Cross-Encoder)",
-    description:
-      "Độ chính xác cao nhất cho văn bản học thuật / quy chế phức tạp",
-  },
-  {
-    value: "ms-marco-MiniLM-L-6-v2",
-    label: "MS-MARCO MiniLM L6 v2 (Tốc độ siêu nhanh)",
-    description: "Tối ưu hóa độ trễ thấp, phù hợp hỏi đáp thông thường",
-  },
-  {
-    value: "cohere-rerank-v3",
-    label: "Cohere Rerank v3 (Cloud API)",
-    description: "Mô hình thương mại điện toán đám mây của Cohere",
-  },
-];
-
 export function AssistantKnowledgeSection({
+  availableModels = [],
   form,
   onChange,
   collections,
@@ -153,23 +135,33 @@ export function AssistantKnowledgeSection({
             <div className="space-y-4 pt-1">
               <Field htmlFor="detail-reranker-model" label="Mô hình Reranker">
                 <Select
-                  value={form.reranker_model || "bge-reranker-base"}
+                  value={selectedModelValue(
+                    availableModels,
+                    form.reranker_model,
+                    form.reranker_provider_id,
+                  )}
                   onValueChange={(val) =>
-                    onChange({ ...form, reranker_model: val })
+                    onChange({
+                      ...form,
+                      reranker_model:
+                        availableModels.find((m) => m.value === val)?.model ??
+                        "",
+                      reranker_provider_id:
+                        availableModels.find((m) => m.value === val)
+                          ?.providerId ?? "",
+                    })
                   }
                 >
                   <SelectTrigger id="detail-reranker-model">
                     <SelectValue placeholder="Chọn mô hình Cross-Encoder" />
                   </SelectTrigger>
                   <SelectContent>
-                    {AVAILABLE_RERANKER_MODELS.map((item) => (
+                    <SelectItem value="__none__">Mặc định ModelOps</SelectItem>
+                    {availableModels.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
                         <div className="flex flex-col text-left py-0.5">
                           <span className="font-medium text-xs text-foreground">
                             {item.label}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {item.description}
                           </span>
                         </div>
                       </SelectItem>
@@ -216,8 +208,11 @@ export function AssistantKnowledgeSection({
                     onChange={(e) =>
                       onChange({
                         ...form,
-                        reranker_score_threshold:
-                          Number.parseFloat(e.target.value) || 0.4,
+                        reranker_score_threshold: Number.isFinite(
+                          Number(e.target.value),
+                        )
+                          ? Number(e.target.value)
+                          : 0.4,
                       })
                     }
                     className="h-9 text-xs font-mono"

@@ -37,7 +37,7 @@ def test_uncertain_or_structured_pages_are_not_blank(kind):
 def test_clean_scan_and_isolated_noise_have_blank_evidence(kind):
     evidence = inspect_empty_pdf_page(raster_pdf(kind), 1)
     assert evidence.is_blank
-    assert evidence.to_metadata()["method"] == "raster-components-v1"
+    assert evidence.to_metadata()["method"] == "raster-components-v2"
 
 
 def test_native_text_cannot_be_discarded_even_when_invisible():

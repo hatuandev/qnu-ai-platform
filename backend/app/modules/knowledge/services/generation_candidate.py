@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.knowledge.models import KnowledgeFact, KnowledgeSourceRevision
-from app.modules.knowledge.services.source_artifact import get_source_artifact
+from app.modules.knowledge.schemas import PublishVectorItem
+from app.modules.knowledge.services.source_artifact import (
+    get_source_artifact,
+    get_structured_review_state,
+)
 
 
 async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -> None:
@@ -24,8 +28,8 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
         if not source or source.status != "ready":
             raise AppException("Nguồn chưa sẵn sàng để xuất bản.", code="SOURCE_NOT_READY", status_code=409)
         artifact = get_source_artifact(source)
-        approved = artifact["review"]["status"] == "approved"
-        if (artifact["issues"] or artifact["review"]["status"] == "required") and not approved:
+        _, requires_structured_review, _ = get_structured_review_state(source)
+        if requires_structured_review:
             raise AppException("Cần duyệt dữ liệu có cấu trúc.", code="FACT_SET_REVIEW_REQUIRED", status_code=409)
         facts = list((await db.execute(select(KnowledgeFact).where(
             KnowledgeFact.index_revision_id == index.id,
@@ -37,6 +41,9 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
                 or actual_count != len(artifact["facts"]) or actual_count != index.fact_count):
             raise AppException("Facts và vector không khớp bản nguồn.", code="FACT_SET_PARITY_FAILED", status_code=409)
         fields = ("entity_name", "entity_type", "attribute_name", "attribute_value", "confidence")
+        identity_fields = ("entity_key", "entity_label", "entity_text")
+        if all(all(field in fact for field in identity_fields) for fact in artifact["facts"]):
+            fields += identity_fields
         expected = {tuple(f[field] for field in fields) + (json.dumps(f["raw_data"], sort_keys=True),) for f in artifact["facts"]}
         actual = {tuple(getattr(f, field) for field in fields) + (json.dumps({key: value for key, value in f.raw_data.items()
                   if key not in {"source_revision_id", "fact_set_hash"}}, sort_keys=True),) for f in facts}
@@ -45,7 +52,7 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
 
 
 async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, generation_id: str,
-                                     actor: Any) -> Any:
+                                     actor: Any, items: list[PublishVectorItem] | None = None) -> Any:
     from app.modules.knowledge.models import (
         KnowledgeBinding,
         KnowledgeIndexRevision,
@@ -53,6 +60,22 @@ async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, gener
     )
     from app.modules.knowledge.services.scope_helper import get_scoped_collection
     from app.modules.rag.schemas import RetrievalSnapshot
+
+    if items is not None:
+        from app.modules.knowledge.services.selected_vector_publish import (
+            resolve_selected_publication,
+        )
+
+        plan = await resolve_selected_publication(db, collection_id, generation_id, items, actor)
+        serving = {binding.id: binding.active_index_revision_id for binding in plan.bindings
+                   if binding.active_index_revision_id}
+        serving.update({binding_id: index.id for binding_id, index in plan.indexes.items()})
+        return RetrievalSnapshot(
+            snapshot_id=f"candidate_{generation_id}", collection_id=plan.collection.id,
+            collection_epoch=plan.collection.index_epoch, tenant_id=plan.collection.tenant_id,
+            workspace_id=plan.collection.workspace_id, binding_revisions=serving,
+            vector_generations={binding_id: generation_id for binding_id in serving},
+        )
 
     collection = await get_scoped_collection(db, collection_id, actor=actor)
     generation = await db.get(KnowledgeVectorGeneration, generation_id)
@@ -86,11 +109,12 @@ async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, gener
 
 
 async def ask_candidate(db: AsyncSession, collection_id: str, generation_id: str,
-                        question: str, module_code: str, actor: Any) -> Any:
+                        question: str, module_code: str, actor: Any,
+                        items: list[PublishVectorItem] | None = None) -> Any:
     from app.modules.rag.schemas import AskRequest
     from app.modules.rag.service import rag_service
 
-    snapshot = await resolve_candidate_snapshot(db, collection_id, generation_id, actor)
+    snapshot = await resolve_candidate_snapshot(db, collection_id, generation_id, actor, items)
     return await rag_service.ask(db, AskRequest(question=question, collection_id=collection_id,
                                                module_code=module_code, tenant_id=snapshot.tenant_id,
                                                workspace_id=snapshot.workspace_id), candidate_snapshot=snapshot)

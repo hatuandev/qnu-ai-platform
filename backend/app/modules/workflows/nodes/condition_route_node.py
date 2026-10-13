@@ -166,6 +166,7 @@ async def _classify_intent_with_llm(
         preferred_provider_id=preferred_provider_id,
         preferred_model_name=primary_model,
         fallback_model_name=fallback_model,
+        fallback_provider_id=getattr(getattr(profile, "model_policy", None), "fallback_provider_id", None),
     )
 
     try:

@@ -12,6 +12,7 @@ const settingsItems = [
   { to: "/settings", label: "Chung" },
   { to: "/settings/notifications", label: "Thông báo" },
   { to: "/settings/security", label: "Bảo mật" },
+  { to: "/settings/backups", label: "Sao lưu" },
 ] as const;
 
 export function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,11 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
   });
   const router = useRouter();
   const current =
-    settingsItems.find((item) => item.to === pathname)?.to ?? "/settings";
+    settingsItems.find(
+      (item) =>
+        item.to === pathname ||
+        (item.to !== "/settings" && pathname.startsWith(`${item.to}/`)),
+    )?.to ?? "/settings";
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 border-b pb-3 lg:hidden">
@@ -32,7 +37,8 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
               to: value as
                 | "/settings"
                 | "/settings/notifications"
-                | "/settings/security",
+                | "/settings/security"
+                | "/settings/backups",
             })
           }
         >

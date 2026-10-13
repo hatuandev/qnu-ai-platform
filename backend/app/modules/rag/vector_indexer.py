@@ -382,8 +382,9 @@ class VectorIndexer:
         if provider in ("ollama", "ollama_local", "local", "vllm", "custom", "openai", "tei"):
             try:
                 from app.core.provider_capacity import provider_slot
+                from app.modules.modelops.services.runtime_key_lease import renew_runtime_key
 
-                async with provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
+                async with renew_runtime_key(runtime), provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
                     vectors = await self._embed_texts_ollama(texts, runtime)
                 if len(vectors) != len(texts):
                     raise RuntimeError(
@@ -393,6 +394,11 @@ class VectorIndexer:
                     runtime, total_tokens=estimated_tokens
                 )
                 return [self._fit_dim(v, target_dim=target_dim) for v in vectors]
+            except asyncio.CancelledError:
+                if runtime.key_lease() is not None:
+                    async with AsyncSessionFactory() as db:
+                        await provider_key_rotation_service.release(db, runtime.key_lease())
+                raise
             except Exception as exc:
                 await self._finish_runtime_key(runtime, error=exc)
                 logger.error("Embedding provider '%s' unavailable: %s", provider, exc)
@@ -418,8 +424,9 @@ class VectorIndexer:
                     )
                 try:
                     from app.core.provider_capacity import provider_slot
+                    from app.modules.modelops.services.runtime_key_lease import renew_runtime_key
 
-                    async with provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
+                    async with renew_runtime_key(runtime), provider_slot("embedding", (runtime.api_base_url or runtime.provider_id).rstrip("/"), runtime.timeout_seconds):
                         vectors = await self._embed_texts_cloudflare(texts, runtime)
                     if len(vectors) != len(texts):
                         raise RuntimeError(

@@ -11,6 +11,7 @@ Responsible for:
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import logging
 import uuid
@@ -34,8 +35,10 @@ from app.modules.knowledge.models import (
     KnowledgeSourceRevision,
 )
 from app.modules.knowledge.services.source_artifact import (
+    add_layout_issues,
     build_source_artifact,
     get_source_artifact,
+    get_structured_review_state,
 )
 from app.modules.knowledge.services.source_extraction import (
     EXTRACTION_VERSION,
@@ -57,6 +60,24 @@ def compute_sha256(content: str | bytes) -> str:
     if isinstance(content, str):
         content = content.encode("utf-8")
     return hashlib.sha256(content).hexdigest()
+
+
+def _apply_structured_review_requirement(
+    quality_report: dict[str, Any],
+    structured_artifact: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep the source Quality Gate aligned with the structured artifact review state."""
+    review_status = (structured_artifact.get("review") or {}).get("status")
+    issues = list(structured_artifact.get("issues") or [])
+    requires_review = review_status == "required" or bool(issues)
+    if not requires_review or quality_report.get("overall_status") == "failed":
+        return quality_report
+    return {
+        **quality_report,
+        "overall_status": "warning",
+        "structured_issues": issues,
+        "structured_review_required": True,
+    }
 
 
 class SourceIngestionService:
@@ -275,12 +296,9 @@ class SourceIngestionService:
                 temporal_metadata = extract_temporal_metadata(clean_md, item.origin_file_name)
                 structured_artifact["temporal_metadata"] = temporal_metadata
                 citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
-                if any(page.get("has_tables") for page in ocr_pages) and not structured_artifact["tables"]:
-                    structured_artifact["issues"].append({"code": "TABLES_NOT_MATERIALIZED"})
-                    structured_artifact["review"] = {"status": "required"}
-                if structured_artifact["issues"] and quality_report.get("overall_status") != "failed":
-                    quality_report = {**quality_report, "overall_status": "warning",
-                                      "structured_issues": structured_artifact["issues"]}
+                add_layout_issues(structured_artifact, ocr_pages)
+
+            quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
             # 6. Instantiate KnowledgeSourceRevision
             await report_progress("chunk", 85)
@@ -539,6 +557,7 @@ class SourceIngestionService:
         new_rev.citation_metadata["subject"] = new_rev.citation_metadata.pop("title", None)
         new_rev.citation_metadata["signer_name"] = new_rev.citation_metadata.pop("signer", None)
         artifact = build_source_artifact(clean_md, manifest_page_count(new_rev.page_manifest), new_rev.citation_metadata)
+        add_layout_issues(artifact, new_rev.page_manifest)
         artifact["temporal_metadata"] = extract_temporal_metadata(clean_md, (new_rev.snapshot_metadata or {}).get("file_name", ""))
         new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
         if context_edits is not None:
@@ -585,22 +604,16 @@ class SourceIngestionService:
         await db.refresh(new_rev)
         return new_rev
 
-    async def review_source_revision(
+    async def _get_review_target(
         self,
         db: AsyncSession,
         collection_id: str,
         source_id: str,
         revision_id: str,
-        decision: str,
-        comment: str | None = None,
-        tenant_id: str = "tenant_qnu",
-        workspace_id: str = "workspace_qnu",
-        actor_id: str | None = None,
-    ) -> KnowledgeSourceRevision:
-        """Approve or reject a review_required source revision."""
-        from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
-        await lock_source(db, source_id)
-        await ensure_source_idle(db, source_id)
+        tenant_id: str,
+        workspace_id: str,
+        actor_id: str | None,
+    ) -> tuple[KnowledgeBinding, KnowledgeSourceRevision, dict[str, Any]]:
         binding = await self.get_source(db, collection_id, source_id, tenant_id, workspace_id)
         rev_res = await db.execute(
             select(KnowledgeSourceRevision).where(
@@ -616,13 +629,35 @@ class SourceIngestionService:
                 status_code=404,
             )
 
-        if rev.status != "review_required":
-            raise AppException("Chỉ duyệt bản đang chờ kiểm duyệt.", code="SOURCE_NOT_REVIEWABLE", status_code=409)
-
         artifact = get_source_artifact(rev)
+        _, artifact_requires_review, _ = get_structured_review_state(rev)
+        if rev.status != "review_required" and not (
+            rev.status == "ready" and artifact_requires_review
+        ):
+            raise AppException(
+                "Chỉ duyệt bản đang chờ kiểm duyệt.",
+                code="SOURCE_NOT_REVIEWABLE",
+                status_code=409,
+            )
         if artifact.get("context_audit") and not actor_id:
-            raise AppException("Duyệt ngữ cảnh thiếu người duyệt.", code="CONTEXT_ACTOR_REQUIRED", status_code=422)
+            raise AppException(
+                "Duyệt ngữ cảnh thiếu người duyệt.",
+                code="CONTEXT_ACTOR_REQUIRED",
+                status_code=422,
+            )
+        return binding, rev, artifact
 
+    @staticmethod
+    def _apply_review_decision(
+        binding: KnowledgeBinding,
+        rev: KnowledgeSourceRevision,
+        artifact: dict[str, Any],
+        decision: str,
+        comment: str | None,
+        actor_id: str | None,
+    ) -> None:
+        artifact = copy.deepcopy(artifact)
+        reviewed_at = datetime.now(UTC)
         if decision == "approved":
             rev.status = "ready"
             rev.failure_code = None
@@ -641,16 +676,96 @@ class SourceIngestionService:
                 status_code=400,
             )
 
-        rev.updated_at = datetime.now(UTC)
+        rev.updated_at = reviewed_at
         if artifact.get("context_audit"):
             from app.modules.knowledge.services.source_context import review_context_artifact
 
             artifact = review_context_artifact(artifact, decision, actor_id, comment)
-        artifact["review"] = {"status": decision, "comment": comment, "at": rev.updated_at.isoformat(), "actor_id": actor_id}
-        rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact}
+        artifact["review"] = {
+            "status": decision,
+            "comment": comment,
+            "at": reviewed_at.isoformat(),
+            "actor_id": actor_id,
+        }
+        rev.parse_provenance = {
+            **(rev.parse_provenance or {}),
+            "structured_artifact": artifact,
+        }
+
+    async def review_source_revision(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        source_id: str,
+        revision_id: str,
+        decision: str,
+        comment: str | None = None,
+        tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        actor_id: str | None = None,
+    ) -> KnowledgeSourceRevision:
+        """Approve or reject a review_required source revision."""
+        from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
+        await lock_source(db, source_id)
+        await ensure_source_idle(db, source_id)
+        binding, rev, artifact = await self._get_review_target(
+            db, collection_id, source_id, revision_id, tenant_id, workspace_id, actor_id
+        )
+        self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id)
         await db.commit()
         await db.refresh(rev)
         return rev
+
+    async def review_source_revisions_bulk(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        items: list[Any],
+        decision: str,
+        comment: str | None = None,
+        tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+        actor_id: str | None = None,
+    ) -> list[KnowledgeSourceRevision]:
+        """Review several exact source revisions atomically after validating all targets."""
+        from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
+
+        pairs = [(item.source_id, item.revision_id) for item in items]
+        if len(set(pairs)) != len(pairs):
+            raise AppException(
+                "Danh sách duyệt có nguồn bị lặp.",
+                code="DUPLICATE_REVIEW_TARGET",
+                status_code=422,
+            )
+
+        for source_id in sorted({source_id for source_id, _ in pairs}):
+            await lock_source(db, source_id)
+            await ensure_source_idle(db, source_id)
+
+        targets = []
+        for source_id, revision_id in pairs:
+            targets.append(
+                await self._get_review_target(
+                    db,
+                    collection_id,
+                    source_id,
+                    revision_id,
+                    tenant_id,
+                    workspace_id,
+                    actor_id,
+                )
+            )
+
+        revisions = []
+        for binding, revision, artifact in targets:
+            self._apply_review_decision(
+                binding, revision, artifact, decision, comment, actor_id
+            )
+            revisions.append(revision)
+        await db.commit()
+        for revision in revisions:
+            await db.refresh(revision)
+        return revisions
 
     async def get_source_studio_data(
         self,
@@ -754,7 +869,7 @@ class SourceIngestionService:
                 f"/sources/{source_id}/pages/{page_num}/image?revision_id={rev.id}"
             )
             words = len(content.split())
-            lines = len([l for l in content.split("\n") if l.strip()])
+            lines = len([line for line in content.split("\n") if line.strip()])
             pages_views.append(
                 StudioPageView(
                     page_number=page_num,
@@ -776,6 +891,7 @@ class SourceIngestionService:
             or "Tài liệu"
         )
         filename = (rev.snapshot_metadata or {}).get("file_name") or f"{title}.pdf"
+        review_status, requires_review, issue_count = get_structured_review_state(rev)
 
         return StudioViewResponse(
             document_id=source_id,
@@ -785,6 +901,9 @@ class SourceIngestionService:
             filename=filename,
             engine=str((rev.parse_provenance or {}).get("ocr_engine", "native")),
             status=rev.status,
+            structured_review_status=review_status,
+            requires_structured_review=requires_review,
+            structured_issue_count=issue_count,
             index_status=binding.status,
             total_pages=len(pages_views) or 1,
             file_size_bytes=len((rev.canonical_markdown or "").encode("utf-8")),
@@ -998,9 +1117,9 @@ class SourceIngestionService:
         citation_metadata["subject"] = admin_meta.get("title")
         citation_metadata["signer_name"] = admin_meta.get("signer")
         structured_artifact = build_source_artifact(clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables)
+        add_layout_issues(structured_artifact, extraction.pages)
         structured_artifact["temporal_metadata"] = temporal_metadata
-        if structured_artifact["issues"] and quality_report.get("overall_status") != "failed":
-            quality_report = {**quality_report, "overall_status": "warning", "structured_issues": structured_artifact["issues"]}
+        quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
         new_rev_id = reserved_revision_id or f"ks_rev_{uuid.uuid4().hex[:12]}"
         new_rev = KnowledgeSourceRevision(

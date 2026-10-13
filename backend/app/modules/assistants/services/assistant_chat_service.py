@@ -11,7 +11,6 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.assistants.runtime import (
     build_runtime_profile,
@@ -45,26 +44,6 @@ def _get_assistant_service():
     if mod and hasattr(mod, "assistant_service"):
         return mod.assistant_service
     return assistant_lifecycle_service
-
-
-def _extract_primary_model(assistant: Any) -> str:
-    fallback_default = settings.DEFAULT_LLM_MODEL
-    config = getattr(assistant, "config", None)
-    if not config:
-        return fallback_default
-    if hasattr(config, "model_policy"):
-        mp = config.model_policy
-        if hasattr(mp, "primary_model") and mp.primary_model:
-            return mp.primary_model
-        if isinstance(mp, dict) and mp.get("primary_model"):
-            return mp["primary_model"]
-    elif isinstance(config, dict):
-        mp = config.get("model_policy", {})
-        if isinstance(mp, dict) and mp.get("primary_model"):
-            return mp["primary_model"]
-        if hasattr(mp, "primary_model") and mp.primary_model:
-            return mp.primary_model
-    return fallback_default
 
 
 def _format_message_with_attachments(message: str, attachments: list[dict[str, Any]]) -> str:
@@ -289,27 +268,9 @@ class AssistantChatService:
             except Exception as gap_err:
                 logger.warning("failed_to_record_knowledge_gap_in_chat: %s", gap_err)
 
-        # Record LLM Usage
-        try:
-            from app.modules.modelops.service import modelops_service
-
-            model_name = _extract_primary_model(assistant)
-            prompt_toks = max(1, len(request.message) // 4 + 80)
-            comp_toks = max(1, len(answer) // 4)
-            await modelops_service.record_usage_log(
-                db,
-                tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
-                assistant_id=assistant.code,
-                conversation_id=conversation_id,
-                provider="qnu_workflow",
-                model_name=model_name,
-                prompt_tokens=prompt_toks,
-                completion_tokens=comp_toks,
-                latency_ms=workflow_response.latency_ms,
-                status="error" if output_status in {"error", "failed"} else "success",
-            )
-        except Exception as u_err:
-            logger.warning("failed_to_record_usage_in_chat: %s", u_err)
+        # Inference owns token/cost records; workflow timing is not an LLM call.
+        logger.info('assistant_workflow_completed assistant=%s execution_id=%s status=%s latency_ms=%s',
+                    assistant.code, workflow_response.execution_id, output_status, workflow_response.latency_ms)
 
         dynamic_suggestions = workflow_response.outputs.get("suggested_questions")
         final_suggested_questions = (
@@ -319,6 +280,7 @@ class AssistantChatService:
         )
 
         return AssistantChatResponse(
+            answer_decision=workflow_response.outputs.get("answer_decision"),
             assistant_code=assistant.code,
             assistant_name=assistant.name,
             answer=answer,
@@ -510,27 +472,8 @@ class AssistantChatService:
             except Exception as gap_err:
                 logger.warning("failed_to_record_knowledge_gap_in_chat_stream: %s", gap_err)
 
-        # Record LLM Usage
-        try:
-            from app.modules.modelops.service import modelops_service
-
-            model_name = _extract_primary_model(assistant)
-            prompt_toks = max(1, len(request.message) // 4 + 80)
-            comp_toks = max(1, len(answer) // 4)
-            await modelops_service.record_usage_log(
-                db,
-                tenant_id=getattr(assistant, "tenant_id", "tenant_qnu"),
-                assistant_id=assistant.code,
-                conversation_id=conversation_id,
-                provider="qnu_workflow",
-                model_name=model_name,
-                prompt_tokens=prompt_toks,
-                completion_tokens=comp_toks,
-                latency_ms=workflow_response.latency_ms,
-                status="error" if output_status in {"error", "failed"} else "success",
-            )
-        except Exception as u_err:
-            logger.warning("failed_to_record_usage_in_chat_stream: %s", u_err)
+        logger.info('assistant_stream_workflow_completed assistant=%s execution_id=%s status=%s latency_ms=%s',
+                    assistant.code, workflow_response.execution_id, output_status, workflow_response.latency_ms)
 
         dynamic_suggestions = workflow_response.outputs.get("suggested_questions")
         final_suggested_questions = (
@@ -540,6 +483,7 @@ class AssistantChatService:
         )
 
         done_payload = {
+            "answer_decision": workflow_response.outputs.get("answer_decision"),
             "conversation_id": conversation_id,
             "latency_ms": workflow_response.latency_ms,
             "suggested_questions": final_suggested_questions,

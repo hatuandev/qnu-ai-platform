@@ -7,6 +7,94 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-14** | [Phiên #430](./2026-10-14_phien_430_review_van_ban_thuyet_minh_tuyen_sinh.md) | Review văn bản tổng hợp tuyển sinh | Đọc56đoạn/16nhóm; cần provenance/năm từngđoạn/gaps và test độc lập; không upload/code/config; batch429 cuối40HTTP200 chưa accuracy |
+
+| **2026-10-14** | [Phiên #429](./2026-10-14_phien_429_sua_evidence_va_toi_uu_bm25.md) | Sửa evidence RAG/DAG và tối ưu BM25 | Atomic list/row/source-year/intent;82focused/1175fullpass11baselinefail; batch40 iteration trước đạt HTTP200, fresh final còn chạy; chờ văn bản tổng hợp, corpus chưa đủ82 |
+
+| **2026-10-14** | [Phiên #428](./2026-10-14_phien_428_bo_quota_noi_bo_va_test_20_cau.md) | Bỏ quota nội bộ, giữ usage và test20 | Live40 khôngquota;DAG10/RAG8answered khônglàaccuracy;PT5coverage/quote/intent lỗi;full1158pass11baselinefail,PGrollback đạt |
+
+| **2026-10-13** | [Phiên #427](./2026-10-13_phien_427_test_20_cau_rag_dag.md) | Test 20 câu đầu GPT-OSS/Gemma | Câu1 lỗi precedence/câu2 đúng/câu3–20 quota;40 lượt chưa accuracy20, chờ nâng quota; giữ config/snapshot, backup paused |
+
+| **2026-10-13** | [Phiên #426](./2026-10-13_phien_426_on_dinh_modelops_da_provider.md) | Ổn định ModelOps đa provider | Role-based probes/native contracts/bounded retry/UI stale guards; live6/focus118/PG1/FE5 đạt; full1148pass11baselinefail12skip; backup vẫn paused |
+
+| **2026-10-13** | [Phiên #425](./2026-10-13_phien_425_chan_doan_custom_gateway_probe.md) | Custom Gateway probe thiếu ngân sách | Model có catalogue;32tokens empty+length,256OK; FE nhãn404 sai, chưa sửa/config/reset; backup paused |
+
+| **2026-10-13** | [Phiên #424](./2026-10-13_phien_424_sao_luu_dot_2.md) | Backup đợt2: import/S3/schedule/soft removal | Windows42(+worker49)/Ubuntu38+4skip/internal relay/integration/FEbuild đạt; full1113pass11baselinefail11skip; automation thật tắt |
+
+| **2026-10-13** | [Phiên #423](./2026-10-13_phien_423_go_nam_backup_that_bai.md) | Gỡ 5 backup thất bại cũ | Exact files/locks/checksums; catalogue0, metadata phục hồi ở .removed-423; không xóa dữ liệu app/DB/backup hợp lệ |
+
+| **2026-10-13** | [Phiên #422](./2026-10-13_phien_422_doi_soat_ba_workflow_legacy.md) | Đối soát 3 workflow legacy theo ủy quyền | Exact IDs/atomic/audit; 3 running→failed, giữ dữ liệu; readback running0/jobs0; không reset/replay/backup mới |
+
+| **2026-10-13** | [Phiên #422](./2026-10-13_phien_422_doi_soat_ba_workflow_legacy.md) | Đối soát 3 workflow legacy theo ủy quyền | Exact IDs/atomic/audit; 3 running→failed, giữ dữ liệu; readback running0/jobs0; không reset/replay/backup mới |
+
+| **2026-10-13** | [Phiên #421](./2026-10-13_phien_421_chan_doan_backup_workflow_cu.md) | Backup bị chặn bởi workflow lỗi cũ | Runner thật chạy/progress15; 3 legacy running thiếu deadline đối chiếu HTTP500 test413/415; chờ xác nhận reconciliation, không reset/ghi DB |
+
+| **2026-10-13** | [Phiên #420](./2026-10-13_phien_420_fix_backup_windows_ubuntu.md) | Sửa backup Windows reload và Ubuntu | Portable launcher/UTF-8 stdin; Windows30, Ubuntu27+3skip, integration thật đạt; full1101pass/11baselinefail; không backup/reset thật |
+
+| **2026-10-13** | [Phiên #419](./2026-10-13_phien_419_chan_doan_backup_windows_reload.md) | Chẩn đoán backup503 Windows reload | Uvicorn reload+Selector không hỗ trợ asyncio subprocess; probe Selector fail/Proactor pass; chưa sửa/reset/backup |
+
+| **2026-10-13** | [Phiên #418](./2026-10-13_phien_418_sao_luu_dot_1.md) | Sao lưu thủ công mã hóa và khôi phục thử | Unit24/real PG+MinIO+Qdrant37.20s/Ruff/FEbuild đạt; full1095pass11baselinefail10skip; không backup/restore thật |
+
+| **2026-10-13** | [Phiên #417](./2026-10-13_phien_417_dot_2_evidence_va_chatbot.md) | Đợt 2 chứng cứ RAG/DAG và finalize | Ruff/full1071pass11baselinefail9skip;45focused/31PGcorpus/3PGexpired;fix500retry5OK;testdở1–43,44–82chưa/khôngRagas |
+
+| **2026-10-13** | [Phiên #416](./2026-10-13_phien_416_dot_1_readiness_reranker_va_workflow.md) | Đợt 1 chatbot: readiness/reranker/workflow | Snapshot19/ready93; AI rerank/chatLuna thật; provider pin/audit/deadline; Ruff/FE3/build/PG đạt; full1041pass11baselinefail5skip |
+
+| **2026-10-13** | [Phiên #415](./2026-10-13_phien_415_de_xuat_xu_ly_chatbot_sau_doi_model.md) | Đề xuất chatbot sau đổi model | Test14Luna/Gemini thật; readinesslegacy/rerankerpair/evidence/500running; đềxuất2đợt, chưa sửa |
+
+| **2026-10-13** | [Phiên #414](./2026-10-13_phien_414_fix_modelops_9router_request_contract.md) | Fix ModelOps 9router | Shared request/capability/JSON-SSE;2model localOK/runtime-noFallback;92focused/Ruff,full1028pass11baselinefail |
+
+| **2026-10-13** | [Phiên #413](./2026-10-13_phien_413_chan_doan_modelops_9router_va_de_xuat.md) | Chẩn đoán ModelOps 9router | Test1token lỗi400/min16; direct32/nonstream/omittemp cả2modelOK; runtimefallback/readinesslegacy/policy mấtfield, chỉđềxuất |
+
+| **2026-10-13** | [Phiên #412](./2026-10-13_phien_412_test_bo_cau_hoi_chatbot_tuyen_sinh.md) | Kiểm thử FAQ tuyển sinh | 82DAG+82RAG/164HTTP200; chất lượng chưa đạt, model thực Llama fallback; báo cáo từng câu, không sửa/reset |
+
+| **2026-10-13** | [Phiên #411](./2026-10-13_phien_411_xuat_ban_nguon_da_chon.md) | Xuất bản nguồn đã chọn | Partial exact-target/CAS/audit + candidate hợp nhất serving;12unit/DBroundtrip/FE8/Ruff/Biome/build đạt |
+
+| **2026-10-13** | [Phiên #410](./2026-10-13_phien_410_de_xuat_xuat_ban_nguon_da_chon.md) | Đề xuất xuất bản nguồn đã chọn | FE/BE đang gate toàn kho; đề xuất partial same-generation giữ serving pointers, đổi model vẫn toàn kho; chưa triển khai |
+
+| **2026-10-13** | [Phiên #409](./2026-10-13_phien_409_nap_vector_va_xuat_ban_tuyen_sinh.md) | Nạp vector và xuất bản tuyển sinh | 19/19 jobs/parity,227chunks/3428facts,epoch2/Qdrant227/RAG thật; fix summary source/model,35focused/Ruff đạt |
+
+| **2026-10-13** | [Phiên #408](./2026-10-13_phien_408_cap_nhat_trang_thai_sau_duyet_studio.md) | Cập nhật trạng thái sau duyệt Studio | Refetch cả cache inactive của list/summary/vector; regression QueryClient, Biome và build đạt |
+
+| **2026-10-13** | [Phiên #407](./2026-10-13_phien_407_fix_persist_duyet_va_pham_vi_nguon.md) | Fix lưu duyệt và phạm vi nguồn | JSONB copy-on-write persist review; chọn 1 chỉ hiện 1; BE10/FE52/Ruff/Biome/build đạt |
+
+| **2026-10-13** | [Phiên #406](./2026-10-13_phien_406_fix_hop_thoai_duyet_nhieu_nguon.md) | Fix hộp thoại duyệt nhiều nguồn | Không reset DB; tách xác nhận khỏi modal cha, bulk mutation chạy đúng tầng; Biome/build đạt |
+
+| **2026-10-13** | [Phiên #405](./2026-10-13_phien_405_fix_duyet_studio_va_duyet_nhieu_nguon.md) | Fix duyệt Studio và duyệt nhiều nguồn | Artifact là nguồn chuẩn; bulk review atomic có xác nhận; publish UI chặn đúng; backend9/FE9/build/Ruff/Biome đạt |
+
+| **2026-10-13** | [Phiên #404](./2026-10-13_phien_404_chan_doan_publish_409_sau_khoi_dong_lai.md) | Publish 409 sau khởi động lại | 8 source ready nhưng artifact review required; UI/backend lệch contract, Redis không giữ upload job; chỉ chẩn đoán |
+
+| **2026-10-13** | [Phiên #403](./2026-10-13_phien_403_kiem_tra_redis_job_loi_cu.md) | Kiểm tra Redis và lỗi upload cũ | Redis không có ARQ job/result/lock; retry dùng ID mới; lỗi lặp thường do worker cũ hoặc artifact reuse DB |
+
+| **2026-10-13** | [Phiên #402](./2026-10-13_phien_402_fix_dong_bo_structured_review.md) | Fix đồng bộ structured review | Invariant dùng chung + migration; 8 nguồn hiện đúng chờ duyệt, 11 ready; không tự duyệt/publish |
+
+| **2026-10-12** | [Phiên #401](./2026-10-12_phien_401_chan_doan_xuat_ban_bi_chan_va_worker.md) | Xuất bản bị chặn và log worker | Worker/19 index/parity đều ổn; 8 artifact cần review nhưng revision bị lệch thành ready; chỉ chẩn đoán |
+
+| **2026-10-12** | [Phiên #400](./2026-10-12_phien_400_trien_khai_fact_noi_dung_dai.md) | Triển khai Fact nội dung dài | key/label/full TEXT + GIN FTS, migration/backfill và rollback job; 4/4 regression DB thật đạt |
+
+| **2026-10-12** | [Phiên #399](./2026-10-12_phien_399_de_xuat_fact_noi_dung_dai.md) | Fact cho nội dung dài | Tách key/label/text/provenance, TEXT+FTS và parent-child chunks; đề xuất, chưa triển khai |
+
+| **2026-10-12** | [Phiên #398](./2026-10-12_phien_398_chan_doan_hai_job_nap_vector_treo.md) | Hai job nạp vector treo | Fact entity_name vượt 512; thiếu rollback làm job kẹt running 10%; chỉ chẩn đoán, chưa retry/sửa |
+
+| **2026-10-12** | [Phiên #397](./2026-10-12_phien_397_docx_preview_giu_ket_qua_cong_thuc.md) | PDF xem trước giữ công thức DOCX | Materialize bản sao, PDF thật đúng tổng1070/451/402/351, SHA gốc giữ nguyên; Ruff/regression đạt |
+
+| **2026-10-12** | [Phiên #396](./2026-10-12_phien_396_docx_formula_preview_sai_cot.md) | DOCX formula preview sai cột | SUM(ABOVE)/ô gộp bị LibreOffice tính lại; cached totals đúng; review do header5–6; chưa sửa |
+
+| **2026-10-12** | [Phiên #395](./2026-10-12_phien_395_hang_doi_khoa_embedding.md) | Chờ khóa embedding | Busy queue/retry/heartbeat/cancel; PostgreSQL20jobs1key đạt,32focused/FEbuild đạt; publish giữCAS |
+
+| **2026-10-12** | [Phiên #394](./2026-10-12_phien_394_chan_doan_tranh_chap_khoa_embedding.md) | Tranh chấp khóa embedding | Một khóa active, lease độc quyền trước capacity; fail ngay và thiếu transient retry; chỉ chẩn đoán |
+
+| **2026-10-12** | [Phiên #393](./2026-10-12_phien_393_ten_nguon_cho_duyet.md) | Tên nguồn chờ duyệt | List/detaillatestmetadata;8nguồnthậtđúngtên;6focused/Ruffđạt,full13ngoàiscope |
+
+| **2026-10-12** | [Phiên #392](./2026-10-12_phien_392_fix_dev_child_shutdown_race.md) | Fix dev child shutdown race | Guardskipdescendantkhôngkill;18assert/AST,2restartliveđạt,BE/FE/workerhiệnchạy |
+
+| **2026-10-12** | [Phiên #391](./2026-10-12_phien_391_make_dev_restart_be_fe_worker.md) | Dev restart BE/FE/worker | Chung4entrypoints, ownership/port/PID/mutex;16assert/AST/WhatIf đạt; chưa restartlive |
+
+| **2026-10-12** | [Phiên #390](./2026-10-12_phien_390_worker_cu_giu_blank_guard.md) | Worker giữ code blank guard cũ | PID10008 start19:41 trước sửa20:07; SHA khớp, classifier mới blank; chưa restart/retry |
+
+| **2026-10-12** | [Phiên #389](./2026-10-12_phien_389_mixed_visual_ingestion_va_progress.md) | PDF/DOCX hỗn hợp và tiến độ | OCR ảnh chữ, blank noise, header/spans/identity; 20 extraction không lỗi, 8 còn review; Ruff/build đạt, full có lỗi ngoài scope |
+
+| **2026-10-12** | [Phiên #388](./2026-10-12_phien_388_chan_doan_batch_20_tai_lieu.md) | Chẩn đoán batch20 tài liệu | DB read-only; blank nhiễu, OCR routing, bảng/header/identity; chưa sửa hoặc retry |
+
 | **2026-10-12** | [Phiên #387](./2026-10-12_phien_387_context_review_va_legacy_table_rag.md) | Context review và bảng legacy RAG | Draftaudit/6nullablefields/xuyêntrang; RAG-DAG-SSE thật đạtcađiểm/IELTS,950pass/11baseline/2skip; planchưahoàntấttổngquát |
 
 | **2026-10-12** | [Phiên #386](./2026-10-12_phien_386_temporal_facts_va_common_answer_gate.md) | Đợt đầu temporal facts và common RAG/DAG gate | Ruff/build/37 focused đạt; metadata/year/method/UI; còn schema/editor/rollout/E2E, DB/Docker hiện không hoạt động |

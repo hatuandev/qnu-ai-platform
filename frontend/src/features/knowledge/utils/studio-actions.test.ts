@@ -70,3 +70,31 @@ test("failed quality result cannot be approved", async () => {
     /Chỉ duyệt/,
   );
 });
+
+test("legacy ready revision with pending structured review can be approved", async () => {
+  let reviewed = false;
+  await saveStudioRevision(
+    {
+      updateSourceRevisionContent: async () => {
+        throw new Error("unexpected");
+      },
+      reviewSourceRevision: async () => {
+        reviewed = true;
+        return {
+          id: "legacy",
+          status: "ready",
+        } as KnowledgeSourceRevisionResponse;
+      },
+    },
+    "col",
+    "source",
+    {
+      id: "legacy",
+      status: "ready",
+      requires_structured_review: true,
+    },
+    undefined,
+    true,
+  );
+  assert.equal(reviewed, true);
+});

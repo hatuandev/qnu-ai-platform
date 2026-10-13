@@ -1,5 +1,7 @@
 # An Toàn Dữ Liệu, Sao Lưu & Xử Lý Sự Cố Vận Hành
 
+> **Cập nhật 13/10/2026:** Chức năng backup toàn app và khôi phục thử đợt 1 được mô tả tại [Sao lưu và khôi phục thử](./04_sao_luu_va_khoi_phuc_dot_1.md). Các lệnh DB/mirror bên dưới là hướng dẫn cũ, chưa tạo bộ backup đồng nhất; volume chỉ là persistence, không bảo đảm an toàn dữ liệu 100% và không thay thế bản sao lưu độc lập đã kiểm chứng. ModelOps hiện quản lý khóa LLM qua DB, không làm theo mục GEMINI_API_KEY trong runbook cũ.
+
 Tài liệu này cung cấp các nguyên tắc an toàn dữ liệu, phương án sao lưu dự phòng và hướng dẫn xử lý các sự cố kỹ thuật phổ biến khi vận hành hệ thống **QNU AI Platform** trên nền tảng Dokploy.
 
 ---

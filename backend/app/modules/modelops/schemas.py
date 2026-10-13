@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, Literal
+from urllib.parse import urlsplit
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatMessage(BaseModel):
@@ -33,6 +34,7 @@ class LLMGenerateRequest(BaseModel):
     preferred_model_name: str | None = Field(
         None, description="Tên mô hình chính (primary model) được Trợ lý AI chỉ định"
     )
+    fallback_provider_id: str | None = None
     fallback_model_name: str | None = Field(
         None, description="Tên mô hình dự phòng (fallback model) được Trợ lý AI chỉ định"
     )
@@ -51,6 +53,9 @@ class LLMGenerateResponse(BaseModel):
         False, description="True nếu phải chuyển sang nhà cung cấp dự phòng"
     )
     active_key_id: str | None = Field(None, description="ID của API Key đã phục vụ yêu cầu")
+    requested_model: str | None = None
+    provider_id: str | None = None
+    fallback_reason: str | None = None
 
 
 # ---------------- Key Pool Schemas ----------------
@@ -125,7 +130,39 @@ class ProviderKeyTestResponse(BaseModel):
 # ---------------- Provider Config Schemas ----------------
 
 
-class ProviderConfigCreate(BaseModel):
+class ModelCapabilityConfig(BaseModel):
+    probe_role: Literal["chat", "embedding", "reranker", "ocr"] = "chat"
+    vision: bool = False
+    reasoning: bool = False
+    embedding_dimension: int | None = Field(None, gt=0)
+
+
+class ProviderConfigValidation(BaseModel):
+    @field_validator("api_base_url", check_fields=False)
+    @classmethod
+    def validate_base_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        parsed = urlsplit(value)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+                or parsed.username or parsed.password or parsed.query or parsed.fragment):
+            raise ValueError("Base URL cần HTTP/HTTPS, không chứa khóa, query hoặc fragment.")
+        _ = parsed.port  # Reject malformed ports before HTTP requests.
+        return value.rstrip("/")
+
+    @field_validator("models", check_fields=False)
+    @classmethod
+    def validate_model_ids(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        models = list(dict.fromkeys(model.strip() for model in value))
+        if any(not model or len(model) > 100 for model in models):
+            raise ValueError("Model ID cần từ 1 đến 100 ký tự, giữ nguyên prefix/alias của provider.")
+        return models
+
+
+class ProviderConfigCreate(ProviderConfigValidation):
     name: str = Field(..., min_length=2, max_length=100)
     provider_type: str = Field(
         ..., description="openai, gemini, claude, deepseek, groq, openrouter, mistral, cloudflare, nvidia, custom"
@@ -139,9 +176,10 @@ class ProviderConfigCreate(BaseModel):
     timeout_seconds: int = Field(15, ge=5, le=120)
     is_active: bool = True
     extra_config: dict[str, Any] = Field(default_factory=dict)
+    model_capabilities: dict[str, ModelCapabilityConfig] = Field(default_factory=dict)
 
 
-class ProviderConfigUpdate(BaseModel):
+class ProviderConfigUpdate(ProviderConfigValidation):
     name: str | None = None
     provider_type: str | None = None
     model_name: str | None = None
@@ -151,8 +189,9 @@ class ProviderConfigUpdate(BaseModel):
     account_id: str | None = None
     priority: int | None = None
     is_active: bool | None = None
-    timeout_seconds: int | None = None
+    timeout_seconds: int | None = Field(None, ge=5, le=120)
     extra_config: dict[str, Any] | None = None
+    model_capabilities: dict[str, ModelCapabilityConfig] | None = None
 
 
 class ProviderConfigResponse(BaseModel):
@@ -162,6 +201,7 @@ class ProviderConfigResponse(BaseModel):
     provider_type: str
     model_name: str | None = None
     models: list[str] = Field(default_factory=list)
+    model_capabilities: dict[str, ModelCapabilityConfig] = Field(default_factory=dict)
     api_base_url: str | None = None
     api_key_masked: str | None = None
     account_id: str | None = None
@@ -186,8 +226,8 @@ class ProviderTestResponse(BaseModel):
 class TenantQuotaResponse(BaseModel):
     tenant_id: str
     month_period: str
-    monthly_token_limit: int
-    monthly_cost_limit_usd: float
+    monthly_token_limit: int = Field(ge=0, description="0 = không giới hạn; token đã dùng vẫn được ghi nhận")
+    monthly_cost_limit_usd: float = Field(ge=0, description="0 = không giới hạn")
     tokens_used: int
     cost_used_usd: float
     is_blocked: bool
@@ -467,10 +507,18 @@ class SingleModelTestResult(BaseModel):
     ]
     latency_ms: float = 0.0
     message: str
+    served_model: str | None = None
+    error_code: str | None = None
+    http_status: int | None = None
+    probe_role: Literal["chat", "embedding", "reranker", "ocr"] = "chat"
+    verification_scope: Literal["inference", "catalogue", "health"] = "inference"
+    embedding_dimension: int | None = Field(None, gt=0)
+    request_capabilities: dict[str, Any] = Field(default_factory=dict)
     tested_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class ProviderModelsTestRequest(BaseModel):
+    probe_role: Literal["chat", "embedding", "reranker", "ocr"] | None = None
     model_name: str | None = Field(
         default=None,
         description="Tên mô hình cụ thể cần kiểm tra. Nếu để trống, hệ thống sẽ kiểm tra tất cả mô hình của Provider.",

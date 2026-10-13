@@ -1,35 +1,40 @@
 import {
   AlertTriangle,
   Brain,
-  CheckCircle2,
-  Clock,
-  Cpu,
   Eye,
   FlaskConical,
   RotateCw,
   Sparkles,
 } from "lucide-react";
-import type React from "react";
-import { useState } from "react";
-import { Button } from "../../components/ui/button";
+import { useRef, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../components/ui/dialog";
-import { Input } from "../../components/ui/input";
-import { Switch } from "../../components/ui/switch";
+  ResponsiveDialog as Dialog,
+  ResponsiveDialogContent as DialogContent,
+  ResponsiveDialogDescription as DialogDescription,
+  ResponsiveDialogHeader as DialogHeader,
+  ResponsiveDialogTitle as DialogTitle,
+} from "@/components/admin/responsive-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   apiClient,
   type ModelProvider,
   type ProviderPreset,
   type SingleModelTestResult,
-} from "../../services/api-client";
-import { PRESET_SUGGESTED_MODELS } from "./modelops-helpers";
+} from "@/services/api-client";
+import type { ModelProbeRole } from "@/types/modelops";
+import { formatProbeDetail } from "./probe-result";
 
 export interface AddCustomModelDialogProps {
+  initialModelId?: string;
   isOpen: boolean;
   onClose: () => void;
   selectedProvider: ModelProvider | null;
@@ -40,387 +45,270 @@ export interface AddCustomModelDialogProps {
     isReasoning: boolean,
     defaultRole: "none" | "embedding" | "reranker" | "ocr",
     testResult: SingleModelTestResult | null,
-  ) => void;
+    probeRole: ModelProbeRole,
+  ) => Promise<void>;
 }
 
-export const AddCustomModelDialog: React.FC<AddCustomModelDialogProps> = ({
+export function AddCustomModelDialog({
+  initialModelId = "",
   isOpen,
   onClose,
   selectedProvider,
-  presets,
   onConfirmAdd,
-}) => {
-  const [newCustomModelId, setNewCustomModelId] = useState("");
-  const [isVisionCapable, setIsVisionCapable] = useState(false);
-  const [isReasoningCapable, setIsReasoningCapable] = useState(false);
-  const [isEmbeddingCapable, setIsEmbeddingCapable] = useState(false);
-  const [testingNewModel, setTestingNewModel] = useState(false);
-  const [newModelTestResult, setNewModelTestResult] =
-    useState<SingleModelTestResult | null>(null);
-  const [modelRoleDefault, setModelRoleDefault] = useState<
-    "none" | "embedding" | "reranker" | "ocr"
-  >("none");
+}: AddCustomModelDialogProps) {
+  const initialConfig = selectedProvider?.model_capabilities?.[initialModelId];
+  const declared = selectedProvider?.model_specs?.[initialModelId]?.type;
+  const initialRole =
+    declared === "embedding" || declared === "reranker" || declared === "ocr"
+      ? declared
+      : "chat";
+  const [modelId, setModelId] = useState(initialModelId);
+  const [probeRole, setProbeRole] = useState<ModelProbeRole>(
+    initialConfig?.probe_role ?? initialRole,
+  );
+  const [hasVision, setHasVision] = useState(initialConfig?.vision ?? false);
+  const [hasReasoning, setHasReasoning] = useState(
+    initialConfig?.reasoning ?? false,
+  );
+  const [isDefault, setIsDefault] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [result, setResult] = useState<SingleModelTestResult | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const attempt = useRef(0);
 
-  const detectCapabilities = (modelName: string) => {
-    const lower = modelName.toLowerCase();
-    const isEmbed =
-      lower.includes("embed") ||
-      lower.includes("bge") ||
-      lower.includes("gte") ||
-      lower.includes("e5") ||
-      lower.includes("minilm") ||
-      lower.includes("instructor") ||
-      lower.includes("text-embedding");
-
-    const isVis =
-      !isEmbed &&
-      (lower.includes("flash") ||
-        lower.includes("vision") ||
-        lower.includes("4o") ||
-        lower.includes("sonnet") ||
-        lower.includes("ocr") ||
-        lower.includes("neva") ||
-        lower.includes("-vl") ||
-        lower.includes("_vl") ||
-        lower.includes("pixtral"));
-
-    const isReas =
-      !isEmbed &&
-      (lower.includes("o1") ||
-        lower.includes("o3") ||
-        lower.includes("reason") ||
-        lower.includes("r1") ||
-        lower.includes("thinking") ||
-        lower.includes("nemotron"));
-
-    return { isEmbed, isVis, isReas };
+  const invalidateTest = () => {
+    attempt.current += 1;
+    setResult(null);
+    setIsTesting(false);
   };
-
   const handleClose = () => {
-    setNewCustomModelId("");
-    setIsVisionCapable(false);
-    setIsReasoningCapable(false);
-    setIsEmbeddingCapable(false);
-    setNewModelTestResult(null);
-    setTestingNewModel(false);
-    setModelRoleDefault("none");
+    if (isSaving) return;
+    invalidateTest();
+    setModelId("");
+    setProbeRole("chat");
+    setHasVision(false);
+    setHasReasoning(false);
+    setIsDefault(false);
+    setSaveError(null);
     onClose();
   };
-
-  const handleTestNewModel = async () => {
-    if (!selectedProvider || !newCustomModelId.trim()) return;
-    setTestingNewModel(true);
-    setNewModelTestResult(null);
+  const handleTest = async () => {
+    if (!selectedProvider || !modelId.trim() || isTesting) return;
+    const requestId = ++attempt.current;
+    const target = modelId.trim();
+    setIsTesting(true);
+    setResult(null);
     try {
-      const res = await apiClient.testProviderModels(
+      const response = await apiClient.testProviderModels(
         selectedProvider.id,
-        newCustomModelId.trim(),
+        target,
+        probeRole,
       );
-      if (res.results && res.results.length > 0) {
-        setNewModelTestResult(res.results[0]);
-      }
-    } catch {
-      setNewModelTestResult({
-        model_name: newCustomModelId.trim(),
-        success: false,
-        status: "error",
-        latency_ms: 0,
-        message: "Không thể kết nối hoặc gửi request kiểm tra tới Provider.",
-        tested_at: new Date().toISOString(),
-      });
+      if (requestId === attempt.current) setResult(response.results[0] ?? null);
+    } catch (error) {
+      if (requestId === attempt.current)
+        setResult({
+          model_name: target,
+          success: false,
+          status: "error",
+          latency_ms: 0,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Không gửi được yêu cầu kiểm tra.",
+          tested_at: new Date().toISOString(),
+        });
     } finally {
-      setTestingNewModel(false);
+      if (requestId === attempt.current) setIsTesting(false);
     }
   };
-
-  const handleConfirm = () => {
-    const trimmed = newCustomModelId.trim();
-    if (!trimmed) return;
-    onConfirmAdd(
-      trimmed,
-      isVisionCapable,
-      isReasoningCapable,
-      modelRoleDefault,
-      newModelTestResult,
-    );
-    handleClose();
+  const handleSave = async () => {
+    if (!modelId.trim() || isSaving || isTesting) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onConfirmAdd(
+        modelId.trim(),
+        hasVision,
+        hasReasoning,
+        isDefault && probeRole !== "chat" ? probeRole : "none",
+        result,
+        probeRole,
+      );
+      invalidateTest();
+      setModelId("");
+      setIsDefault(false);
+      setHasVision(false);
+      setHasReasoning(false);
+      onClose();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Không lưu được model.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
-
   if (!selectedProvider) return null;
-
-  const currentPreset = presets.find((pr) => pr.code === selectedProvider.type);
-  const suggestedList =
-    currentPreset?.suggested_models ||
-    PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
-    [];
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-lg p-6 space-y-4 border-border shadow-xl">
-        {/* Mac-style Window Controls Header */}
-        <div className="flex items-center gap-1.5 pb-1">
-          <span className="h-3 w-3 rounded-full bg-red-500/80 inline-block" />
-          <span className="h-3 w-3 rounded-full bg-yellow-500/80 inline-block" />
-          <span className="h-3 w-3 rounded-full bg-green-500/80 inline-block" />
-        </div>
-
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Thêm Mô Hình Tùy Chỉnh
+      <DialogContent className="sm:max-w-lg max-h-[min(820px,calc(100vh-2rem))] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="border-b bg-muted/20 p-5 shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="size-4 text-primary" />
+            {initialModelId ? "Sửa model" : "Thêm model"}
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Cấu hình ID mô hình tương thích với Provider {selectedProvider.name}{" "}
-            và kiểm tra tính khả dụng trực tiếp trước khi kích hoạt.
+          <DialogDescription>
+            Giữ nguyên Model ID của {selectedProvider.name}. Chọn đúng vai trò
+            để kiểm tra đúng giao thức.
           </DialogDescription>
         </DialogHeader>
-
-        {/* Model ID Input with inline test button */}
-        <div className="space-y-2 pt-1">
-          <span className="text-xs font-semibold text-foreground block">
-            Mã định danh mô hình (Model ID) *
-          </span>
-          <div className="flex gap-2">
-            <Input
-              required
-              placeholder="VD: gpt-4o, bge-m3, qwen3-embedding, mistral-ocr..."
-              value={newCustomModelId}
-              onChange={(e) => {
-                const val = e.target.value;
-                setNewCustomModelId(val);
-                setNewModelTestResult(null);
-                if (val.trim()) {
-                  const { isEmbed, isVis, isReas } = detectCapabilities(val);
-                  setIsEmbeddingCapable(isEmbed);
-                  if (isEmbed) {
-                    setIsVisionCapable(false);
-                  } else {
-                    if (isVis) setIsVisionCapable(true);
-                    if (isReas) setIsReasoningCapable(true);
-                  }
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  if (newCustomModelId.trim()) handleConfirm();
-                }
-              }}
-              className="font-mono text-xs h-9 flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!newCustomModelId.trim() || testingNewModel}
-              onClick={handleTestNewModel}
-              className="h-9 px-3 text-xs gap-1.5 text-primary border-primary/30 hover:bg-primary/10 shrink-0 cursor-pointer"
-              title="Gửi ping kiểm tra xem Model ID này có phản hồi từ Provider không"
-            >
-              {testingNewModel ? (
-                <RotateCw className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <FlaskConical className="h-3.5 w-3.5" />
-              )}
-              <span>{testingNewModel ? "Đang test..." : "Test"}</span>
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground font-mono">
-            Gửi tới nhà cung cấp dưới dạng:{" "}
-            {newCustomModelId.trim() || "model-id"}
-          </p>
-
-          {/* Test result status badge */}
-          {newModelTestResult && (
-            <div
-              className={`p-2.5 rounded-md text-xs flex items-center gap-2 ${
-                newModelTestResult.status === "available"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                  : newModelTestResult.status === "rate_limited" ||
-                      newModelTestResult.status === "temporarily_overloaded" ||
-                      newModelTestResult.message?.includes("503") ||
-                      newModelTestResult.message?.includes("quá tải")
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                    : "bg-destructive/10 text-destructive border border-destructive/30"
-              }`}
-            >
-              {newModelTestResult.status === "available" ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-              ) : newModelTestResult.status === "rate_limited" ||
-                newModelTestResult.status === "temporarily_overloaded" ||
-                newModelTestResult.message?.includes("503") ||
-                newModelTestResult.message?.includes("quá tải") ? (
-                <Clock className="h-4 w-4 shrink-0 text-amber-500" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-              )}
-              <div className="flex-1 font-medium">
-                {newModelTestResult.status === "available" ? (
-                  <span>
-                    Khả dụng! Độ trễ phản hồi:{" "}
-                    <strong>{newModelTestResult.latency_ms}ms</strong> (
-                    {newModelTestResult.message})
-                  </span>
-                ) : newModelTestResult.status === "rate_limited" ? (
-                  <span>
-                    Chạm Rate Limit (429): {newModelTestResult.message}
-                  </span>
-                ) : newModelTestResult.status === "temporarily_overloaded" ||
-                  newModelTestResult.message?.includes("503") ||
-                  newModelTestResult.message?.includes("quá tải") ? (
-                  <div className="space-y-0.5">
-                    <span className="font-semibold block">
-                      Máy chủ quá tải tạm thời (HTTP 503):
-                    </span>
-                    <span className="text-[11px] opacity-90 block">
-                      {newModelTestResult.message}
-                    </span>
-                    <span className="text-[10px] text-amber-600 dark:text-amber-300 block font-normal mt-0.5">
-                      Tên mô hình hợp lệ. Bạn vẫn có thể nhấn &ldquo;Thêm Mô
-                      Hình&rdquo; bên dưới để kích hoạt.
-                    </span>
-                  </div>
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 p-5">
+          <div className="space-y-2">
+            <label htmlFor="gateway-model-id" className="text-sm font-medium">
+              Model ID
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="gateway-model-id"
+                value={modelId}
+                disabled={isSaving || !!initialModelId}
+                className="min-w-0 font-mono"
+                placeholder="Model ID từ nhà cung cấp"
+                onChange={(event) => {
+                  setModelId(event.target.value);
+                  invalidateTest();
+                  setSaveError(null);
+                }}
+              />
+              <Button
+                variant="outline"
+                disabled={!modelId.trim() || isTesting || isSaving}
+                onClick={handleTest}
+              >
+                {isTesting ? (
+                  <RotateCw className="size-4 animate-spin" />
                 ) : (
-                  <span>
-                    Không khả dụng (
-                    {newModelTestResult.status === "deprecated"
-                      ? "410 Hết hạn"
-                      : "404/Error"}
-                    ): {newModelTestResult.message}
-                  </span>
+                  <FlaskConical className="size-4" />
                 )}
+                Kiểm tra
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground break-all">
+              Gửi nguyên ID: {modelId.trim() || "—"}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="gateway-model-role" className="text-sm font-medium">
+              Vai trò kiểm tra
+            </label>
+            <Select
+              value={probeRole}
+              disabled={isSaving}
+              onValueChange={(value) => {
+                setProbeRole(value as ModelProbeRole);
+                setIsDefault(false);
+                invalidateTest();
+              }}
+            >
+              <SelectTrigger id="gateway-model-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="chat">Chat</SelectItem>
+                <SelectItem value="embedding">Embedding</SelectItem>
+                <SelectItem value="reranker">Reranker</SelectItem>
+                <SelectItem value="ocr">
+                  OCR · kiểm tra danh mục/dịch vụ
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {result && (
+            <div
+              role="status"
+              className={`rounded-md border p-3 text-sm break-words ${result.success ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-foreground"}`}
+            >
+              {formatProbeDetail(result)}
+              {result.served_model && (
+                <p className="mt-1 text-xs">
+                  Model phục vụ: {result.served_model} · {result.latency_ms} ms
+                </p>
+              )}
+              {result.embedding_dimension && (
+                <p className="mt-1 text-xs">
+                  Vector: {result.embedding_dimension} chiều
+                </p>
+              )}
+            </div>
+          )}
+          {probeRole === "chat" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <span className="flex items-center gap-2 text-sm">
+                  <Eye className="size-4" />
+                  Vision
+                </span>
+                <Switch
+                  checked={hasVision}
+                  disabled={isSaving}
+                  onCheckedChange={setHasVision}
+                  aria-label="Vision"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+                <span className="flex items-center gap-2 text-sm">
+                  <Brain className="size-4" />
+                  Reasoning
+                </span>
+                <Switch
+                  checked={hasReasoning}
+                  disabled={isSaving}
+                  onCheckedChange={setHasReasoning}
+                  aria-label="Reasoning"
+                />
               </div>
             </div>
           )}
+          {probeRole !== "chat" && (
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span>Đặt làm mặc định cho vai trò này</span>
+              <Switch
+                checked={isDefault}
+                disabled={isSaving}
+                onCheckedChange={setIsDefault}
+                aria-label="Đặt làm mặc định"
+              />
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Bạn có thể lưu cấu hình khi chưa kiểm chứng. Lưu không chứng minh
+            model hoạt động; OCR chỉ kiểm tra danh mục/dịch vụ, chưa bóc tách
+            tài liệu.
+          </p>
+          {saveError && (
+            <p
+              role="alert"
+              className="flex items-start gap-2 text-sm text-destructive"
+            >
+              <AlertTriangle className="size-4 shrink-0" />
+              {saveError}
+            </p>
+          )}
         </div>
-
-        {/* Capabilities switches */}
-        <div className="space-y-2 pt-2 border-t border-border/70">
-          <span className="text-xs font-semibold text-foreground block">
-            Khả Năng Hỗ Trợ (Capabilities)
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
-              <div className="space-y-0.5">
-                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Eye className="h-3.5 w-3.5 text-primary" />
-                  Vision
-                </span>
-                <p className="text-[10px] text-muted-foreground">
-                  Hỗ trợ ảnh & OCR
-                </p>
-              </div>
-              <Switch
-                checked={isVisionCapable}
-                onCheckedChange={setIsVisionCapable}
-                aria-label="Bật tính năng Vision"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
-              <div className="space-y-0.5">
-                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Brain className="h-3.5 w-3.5 text-primary" />
-                  Reasoning
-                </span>
-                <p className="text-[10px] text-muted-foreground">
-                  Suy luận tư duy
-                </p>
-              </div>
-              <Switch
-                checked={isReasoningCapable}
-                onCheckedChange={setIsReasoningCapable}
-                aria-label="Bật tính năng Reasoning"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-md border border-border/70 bg-muted/20">
-              <div className="space-y-0.5">
-                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Cpu className="h-3.5 w-3.5 text-indigo-500" />
-                  Embedding
-                </span>
-                <p className="text-[10px] text-muted-foreground">
-                  Nhúng vector ngữ nghĩa
-                </p>
-              </div>
-              <Switch
-                checked={isEmbeddingCapable}
-                onCheckedChange={(checked) => {
-                  setIsEmbeddingCapable(checked);
-                  if (checked) {
-                    setIsVisionCapable(false);
-                  }
-                }}
-                aria-label="Bật tính năng Embedding"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick suggestions from provider preset */}
-        {suggestedList.length > 0 && (
-          <div className="space-y-1.5 pt-2 border-t border-border/60">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
-              Gợi ý nhanh từ {selectedProvider.name}:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {suggestedList.map((sm) => {
-                const isAlreadyAdded = (selectedProvider.models || []).includes(
-                  sm,
-                );
-                return (
-                  <button
-                    type="button"
-                    key={sm}
-                    disabled={isAlreadyAdded}
-                    onClick={() => {
-                      setNewCustomModelId(sm);
-                      const { isEmbed, isVis, isReas } = detectCapabilities(sm);
-                      setIsEmbeddingCapable(isEmbed);
-                      setIsVisionCapable(isVis);
-                      setIsReasoningCapable(isReas);
-                      setNewModelTestResult(null);
-                    }}
-                    className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${
-                      isAlreadyAdded
-                        ? "bg-muted/40 text-muted-foreground/50 border-transparent cursor-not-allowed"
-                        : "bg-muted/20 hover:bg-primary/10 hover:text-primary hover:border-primary/40 text-muted-foreground border-border cursor-pointer"
-                    }`}
-                  >
-                    + {sm}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Dialog Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="h-9 px-4 text-xs cursor-pointer"
-          >
+        <div className="grid grid-cols-2 sm:flex sm:justify-end gap-2 border-t bg-card p-4 shrink-0">
+          <Button variant="outline" disabled={isSaving} onClick={handleClose}>
             Hủy
           </Button>
           <Button
-            type="button"
-            size="sm"
-            disabled={
-              !newCustomModelId.trim() ||
-              (selectedProvider.models || []).includes(newCustomModelId.trim())
-            }
-            onClick={handleConfirm}
-            className="h-9 px-4 text-xs cursor-pointer"
+            disabled={!modelId.trim() || isSaving || isTesting}
+            onClick={handleSave}
           >
-            Thêm Mô Hình
+            {isSaving ? "Đang lưu…" : "Lưu"}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-};
+}

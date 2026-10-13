@@ -6,13 +6,16 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { knowledgeApi } from "@/services/knowledge-api";
+import type { PublishVectorItem } from "@/types/knowledge";
 
 export function CandidateRagPreview({
   collectionId,
   generationId,
+  items,
 }: {
   collectionId: string;
   generationId: string;
+  items?: PublishVectorItem[];
 }) {
   const [question, setQuestion] = useState("");
   const preview = useMutation({
@@ -21,6 +24,7 @@ export function CandidateRagPreview({
         collectionId,
         generationId,
         question,
+        items,
       ),
   });
   return (

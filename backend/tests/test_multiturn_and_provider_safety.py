@@ -6,7 +6,6 @@ import pytest
 
 from app.modules.modelops.providers import get_llm_adapter
 from app.modules.modelops.services.inference_service import (
-    NON_CHAT_MODEL_KEYWORDS,
     VALID_CHAT_PROVIDER_TYPES,
 )
 from app.modules.workflows.nodes.base import WorkflowContext
@@ -108,9 +107,8 @@ def test_provider_safety_valid_chat_types() -> None:
     assert "system_routing" not in VALID_CHAT_PROVIDER_TYPES
     assert "sentence_transformers" not in VALID_CHAT_PROVIDER_TYPES
     assert "docling" not in VALID_CHAT_PROVIDER_TYPES
-    assert "bge-" in NON_CHAT_MODEL_KEYWORDS
-    assert "embed" in NON_CHAT_MODEL_KEYWORDS
-    assert "rerank" in NON_CHAT_MODEL_KEYWORDS
+    from app.modules.modelops.services.chat_routes import is_chat_model
+    assert not is_chat_model({"model_specs": {"opaque": {"type": "embedding"}}}, "opaque")
 
 
 def test_get_llm_adapter_rejects_unsupported_provider() -> None:

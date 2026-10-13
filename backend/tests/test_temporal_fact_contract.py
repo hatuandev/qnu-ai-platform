@@ -70,11 +70,13 @@ async def test_rag_runtime_missing_year_blocks_model_and_retrieval():
     fact = SimpleNamespace(id="fact", entity_name="Công nghệ thông tin", attribute_name="Điểm chuẩn 2025",
                            attribute_value="21.5", raw_data={"entity_code": "7480201"}, binding_id="binding", index_revision_id="index")
     snapshot = RetrievalSnapshot(snapshot_id="snapshot", collection_id="collection", binding_revisions={"binding": "index"})
+    db = AsyncMock()
+    db.get.return_value = SimpleNamespace(collection_metadata={})  # Legacy policy explicitly disabled.
     with patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot)), \
          patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[fact])), \
          patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock()) as retrieval, \
          patch("app.modules.rag.service.modelops_service.generate", AsyncMock()) as model:
-        result = await RagService().ask(None, AskRequest(question="Điểm chuẩn Công nghệ thông tin năm 2026?", collection_id="collection", module_code="admissions"))
+        result = await RagService().ask(db, AskRequest(question="Điểm chuẩn Công nghệ thông tin năm 2026?", collection_id="collection", module_code="admissions"))
     assert result.status == "insufficient_context"
     assert result.answer_decision["status"] == "missing"
     assert "21.5" not in result.answer

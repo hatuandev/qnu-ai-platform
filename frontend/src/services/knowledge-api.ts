@@ -11,6 +11,7 @@ import type {
   BuildStagingIndexRequest,
   BuildVectorGenerationRequest,
   BuildVectorGenerationResponse,
+  BulkReviewSourceRevisionsResponse,
   CanaryPolicyResponse,
   CandidateGroupListResponse,
   CandidateListResponse,
@@ -45,6 +46,7 @@ import type {
   PreviewDocumentGroupResponse,
   PreviewGroupSourceDiffResponse,
   PublishGroupSourceResponse,
+  PublishVectorItem,
   ReconcileFixResponse,
   ReindexDocumentResponse,
   RollbackIndexRevisionRequest,
@@ -1760,10 +1762,37 @@ export const knowledgeApi = {
     return res.json();
   },
 
+  async reviewSourceRevisionsBulk(
+    collectionId: string,
+    items: Array<{ source_id: string; revision_id: string }>,
+    decision: "approved" | "rejected",
+    comment?: string,
+  ): Promise<BulkReviewSourceRevisionsResponse> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/reviews`,
+      {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items, decision, comment }),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(err, `Lỗi duyệt nhiều nguồn (HTTP ${res.status}).`),
+      );
+    }
+    return res.json();
+  },
+
   async previewVectorGeneration(
     collectionId: string,
     generationId: string,
     question: string,
+    items?: PublishVectorItem[],
   ): Promise<{
     status: string;
     answer: string;
@@ -1778,7 +1807,7 @@ export const knowledgeApi = {
       {
         method: "POST",
         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, items }),
       },
     );
     if (!response.ok)
@@ -1982,12 +2011,14 @@ export const knowledgeApi = {
   async activateVectorGeneration(
     collectionId: string,
     generationId: string,
+    items?: PublishVectorItem[],
   ): Promise<ActivateVectorGenerationResponse> {
     const res = await fetch(
-      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/activate`,
+      `${BASE_URL}/knowledge/collections/${collectionId}/vector-generations/${generationId}/${items ? "publish-selected" : "activate"}`,
       {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: items ? JSON.stringify({ items }) : undefined,
       },
     );
     if (!res.ok) {

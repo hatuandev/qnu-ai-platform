@@ -52,6 +52,7 @@ class UsageAccountingService:
                 tenant_id=tenant_id,
                 month_period=period,
                 monthly_token_limit=settings.DEFAULT_MONTHLY_TOKEN_QUOTA,
+                monthly_cost_limit_usd=settings.DEFAULT_MONTHLY_COST_QUOTA_USD,
                 tokens_used=0,
                 cost_used_usd=0.0,
                 is_blocked=False,
@@ -65,7 +66,7 @@ class UsageAccountingService:
     async def check_quota_available(
         self, db: AsyncSession, tenant_id: str, estimated_tokens: int = 500
     ) -> TenantQuota:
-        """Verify tenant has remaining tokens before making expensive LLM calls."""
+        """Respect account blocks; a zero monthly token budget is unlimited."""
         quota = await self._call_get_or_create_quota(db, tenant_id)
         if quota.is_blocked:
             raise AppException(
@@ -75,7 +76,10 @@ class UsageAccountingService:
                 code="TENANT_BLOCKED",
             )
 
-        if quota.tokens_used + estimated_tokens > quota.monthly_token_limit:
+        if (
+            quota.monthly_token_limit > 0
+            and quota.tokens_used + estimated_tokens > quota.monthly_token_limit
+        ):
             raise AppException(
                 status_code=429,
                 title="Hạn ngạch Token đã cạn",
@@ -155,7 +159,8 @@ class UsageAccountingService:
         stmt = stmt.order_by(LLMUsageLog.created_at.desc())
 
         res = await db.execute(stmt)
-        logs = res.scalars().all()
+        # Legacy workflow estimates are not inference calls and double-count costs.
+        logs = [log for log in res.scalars().all() if log.provider != 'qnu_workflow']
 
         total_requests = len(logs)
         total_tokens = sum(log.total_tokens for log in logs)

@@ -39,7 +39,8 @@ async def ask_question(
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(get_current_actor),
 ) -> AskResponse:
-    return await rag_service.ask(db, body.model_copy(update={"tenant_id": actor.tenant_id, "workspace_id": actor.workspace_id}))
+    return await rag_service.ask(db, body.model_copy(update={"tenant_id": actor.tenant_id, "workspace_id": actor.workspace_id,
+                                                          "runtime_policy": {}, "assistant_revision": None}))
 
 
 @router.post(

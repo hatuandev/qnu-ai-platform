@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { KnowledgeBinding, VectorLoadState } from "@/types/knowledge";
-import { canPublishSources, getSourceVectorState } from "./vector-workflow";
+import {
+  canPublishSelectedSources,
+  canPublishSources,
+  getSelectedPublishItems,
+  getSelectedReviewBlockers,
+  getSourceVectorState,
+} from "./vector-workflow";
 
 const source = {
   id: "source",
@@ -22,6 +28,115 @@ const ready: VectorLoadState = {
     },
   ],
 };
+
+test("selected publication ignores unindexed/unreviewed unselected sources", () => {
+  const unselected = {
+    ...source,
+    id: "other",
+    source_status: "review_required",
+    requires_structured_review: true,
+  };
+  const targets = [{ binding_id: source.id, source_revision_id: "md" }];
+  assert.equal(
+    canPublishSelectedSources(
+      [source, unselected],
+      targets,
+      "gen",
+      undefined,
+      ready,
+    ),
+    true,
+  );
+  assert.deepEqual(getSelectedPublishItems([source], targets, "gen", ready), [
+    { ...targets[0], index_revision_id: "index" },
+  ]);
+  assert.equal(
+    canPublishSelectedSources(
+      [source],
+      [{ ...targets[0], source_revision_id: "changed" }],
+      "gen",
+      "gen",
+      ready,
+    ),
+    false,
+  );
+  assert.equal(
+    canPublishSelectedSources(
+      [{ ...source, requires_structured_review: true }],
+      targets,
+      "gen",
+      "gen",
+      ready,
+    ),
+    false,
+  );
+});
+
+test("selected publication preserves serving sources but generation switch must cover them", () => {
+  const other = {
+    ...source,
+    id: "other",
+    active_index_revision_id: "old-index",
+  };
+  const targets = [{ binding_id: source.id, source_revision_id: "md" }];
+  assert.equal(
+    canPublishSelectedSources([source, other], targets, "gen", "gen", ready),
+    true,
+  );
+  assert.equal(
+    canPublishSelectedSources(
+      [source, other],
+      targets,
+      "gen",
+      "old-gen",
+      ready,
+    ),
+    false,
+  );
+  assert.equal(
+    canPublishSelectedSources([source], [], "gen", "gen", ready),
+    false,
+  );
+});
+
+test("review blockers are limited to the selected vector targets", () => {
+  const blockers = Array.from({ length: 8 }, (_, index) => ({
+    ...source,
+    id: `source-${index + 1}`,
+    active_source_revision_id: `revision-${index + 1}`,
+    requires_structured_review: true,
+  })) as KnowledgeBinding[];
+
+  assert.deepEqual(
+    getSelectedReviewBlockers(blockers, ["source-1"]).map((item) => item.id),
+    ["source-1"],
+  );
+});
+
+test("busy embedding stays pending and cannot publish", () => {
+  const waiting: VectorLoadState = {
+    indexes: [],
+    jobs: [
+      {
+        id: "job",
+        status: "running",
+        phase: "waiting_embedding",
+        progress: 35,
+        payload: {
+          binding_id: "source",
+          generation_id: "gen",
+          source_revision_id: "md",
+        },
+      },
+    ],
+  };
+  assert.equal(
+    getSourceVectorState(source, "gen", waiting).label,
+    "Chờ embedding",
+  );
+  assert.equal(getSourceVectorState(source, "gen", waiting).isPending, true);
+  assert.equal(canPublishSources([source], "gen", waiting), false);
+});
 
 test("paused source is not serving and does not block publishing active sources", () => {
   const paused = {
@@ -57,6 +172,14 @@ test("only the same Markdown revision and embedding generation can publish", () 
   assert.equal(
     canPublishSources(
       [{ ...source, source_status: "review_required" }],
+      "gen",
+      ready,
+    ),
+    false,
+  );
+  assert.equal(
+    canPublishSources(
+      [{ ...source, requires_structured_review: true }],
       "gen",
       ready,
     ),

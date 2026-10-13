@@ -48,19 +48,54 @@ logger = logging.getLogger("reset_and_reseed")
 
 
 async def reset_sql_tables() -> None:
-    """Truncate all public tables except alembic_version."""
+    """Truncate all public tables except alembic_version with connection termination and deadlock retry."""
     logger.info("=== STEP 1: TRUNCATING POSTGRESQL TABLES ===")
-    async with engine.begin() as conn:
-        tables = await conn.run_sync(
-            lambda sync_conn: inspect(sync_conn).get_table_names(schema="public")
-        )
-        data_tables = [t for t in tables if t != "alembic_version"]
-        logger.info("Found %d data tables to truncate: %s", len(data_tables), data_tables)
 
-        if data_tables:
-            quoted_tables = ", ".join(f'"{t}"' for t in data_tables)
-            await conn.execute(text(f"TRUNCATE TABLE {quoted_tables} CASCADE;"))
-            logger.info("Successfully truncated %d tables.", len(data_tables))
+    # 1. Terminate other active client connections (e.g. lingering Uvicorn/ARQ workers) to prevent lock deadlocks
+    try:
+        async with engine.connect() as term_conn:
+            res = await term_conn.execute(
+                text("""
+                    SELECT pg_terminate_backend(pid)
+                    FROM pg_stat_activity
+                    WHERE datname = current_database()
+                      AND pid <> pg_backend_pid()
+                      AND backend_type = 'client backend';
+                """)
+            )
+            terminated = sum(1 for row in res if row[0] is True)
+            if terminated > 0:
+                logger.info("Terminated %d active client connection(s) to prevent lock contention.", terminated)
+    except Exception as exc:
+        logger.warning("Could not terminate active connections (proceeding): %s", exc)
+
+    # 2. Truncate tables with automatic retry if lock contention/deadlock occurs
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with engine.begin() as conn:
+                tables = await conn.run_sync(
+                    lambda sync_conn: inspect(sync_conn).get_table_names(schema="public")
+                )
+                data_tables = [t for t in tables if t != "alembic_version"]
+                logger.info("Found %d data tables to truncate: %s", len(data_tables), data_tables)
+
+                if data_tables:
+                    quoted_tables = ", ".join(f'"{t}"' for t in data_tables)
+                    await conn.execute(text(f"TRUNCATE TABLE {quoted_tables} CASCADE;"))
+                    logger.info("Successfully truncated %d tables.", len(data_tables))
+            break
+        except Exception as exc:
+            if attempt < max_retries and ("deadlock" in str(exc).lower() or "lock" in str(exc).lower()):
+                logger.warning(
+                    "Lock contention/deadlock on attempt %d/%d (%s). Retrying in 1s...",
+                    attempt,
+                    max_retries,
+                    exc,
+                )
+                await asyncio.sleep(1)
+            else:
+                raise
 
 
 async def reset_qdrant() -> None:

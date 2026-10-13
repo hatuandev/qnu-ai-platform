@@ -257,7 +257,7 @@ class GroupSourceService:
         """Calculate real business status and metrics from sources and active index revisions."""
         col = await get_scoped_collection(db, collection_id, actor=actor)
 
-        # 1. Total sources
+        # Group links retain synchronization policy; bindings are document sources.
         src_stmt = select(KnowledgeGroupSource).where(
             KnowledgeGroupSource.collection_id == col.id,
             KnowledgeGroupSource.status != "detached",
@@ -267,7 +267,16 @@ class GroupSourceService:
             src_stmt = src_stmt.where(KnowledgeGroupSource.workspace_id == col.workspace_id)
 
         sources = (await db.execute(src_stmt)).scalars().all()
-        total_sources = len(sources)
+        binding_count_stmt = select(func.count(KnowledgeBinding.id)).where(
+            KnowledgeBinding.collection_id == col.id,
+            KnowledgeBinding.tenant_id == col.tenant_id,
+            KnowledgeBinding.status.notin_(["detached", "deleting"]),
+        )
+        if col.workspace_id:
+            binding_count_stmt = binding_count_stmt.where(
+                KnowledgeBinding.workspace_id == col.workspace_id
+            )
+        total_sources = (await db.execute(binding_count_stmt)).scalar() or 0
 
         # 2. Published documents count & active chunks count
         pub_stmt = (
@@ -316,7 +325,7 @@ class GroupSourceService:
                 )
 
         # 4. Collection status calculation
-        if total_sources == 0 and published_docs_count == 0:
+        if total_sources == 0 and published_docs_count == 0 and not sources:
             col_status = "empty"
         elif any_syncing:
             col_status = "syncing"
@@ -333,7 +342,9 @@ class GroupSourceService:
 
         meta = col.collection_metadata or {}
         dp = meta.get("data_processing") or {}
-        model_name = dp.get("embedding_model")
+        model_name = (
+            meta.get("embedding_model") if meta.get("active_vector_generation_id") else None
+        ) or dp.get("embedding_model")
 
         return CollectionSummaryMetrics(
             collection_id=col.id,

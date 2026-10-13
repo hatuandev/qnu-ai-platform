@@ -2,6 +2,30 @@
 
 Tài liệu này đặc tả cơ chế tìm kiếm hỗn hợp (Dense Vector + Sparse Lexical), thuật toán dung hợp thứ hạng Reciprocal Rank Fusion ($k=60$), tái xếp hạng Cross-Encoder và chốt chặn bảo vệ trích dẫn (Citation Guardrail).
 
+## Nhánh chứng cứ opt-in — phiên #417
+
+Trợ lý bật `knowledge_policy.evidence_policy.enabled` dùng luồng: planner → published manifest → hybrid anchors + BM25/RRF đoạn nguyên bản và hàng facts đã duyệt → reranker ModelOps → đề xuất claims/quotes → kiểm chứng độc lập → AnswerDecision. Không tái OCR, ghi facts suy đoán, nạp lại embedding hoặc tự xuất bản. Nhánh legacy giữ nguyên cho trợ lý không bật chính sách này. Nhánh mới bỏ qua cache câu trả lời cũ; namespace policy fingerprint v4.
+
+- Planner giữ entity/attribute/year/method/round/event; năm không ghi rõ dùng năm hiện tại theo múi giờ Việt Nam khi quản trị chọn `current_year`, nêu rõ trong câu trả lời. Câu độc lập không lấy năm từ lịch sử không liên quan. Năm của tên tệp/ngày ban hành không chứng minh năm của ô dữ liệu.
+- Đọc đúng tenant/workspace, binding/index/source revision đã pin, active/ready, parity/review/hash hợp lệ. Đoạn giữ page và offset nguyên bản. Hàng bảng được nhóm theo revision/table/row/year, dùng giá trị authoritative trong `knowledge_facts`, không lấy ô raw cũ đè ô đã hiệu đính. Raw table bị loại khi chỉ mục có manifest facts. Không truy vấn entity bằng unigram hay từ điển vá câu hỏi.
+- Ngân sách hiện tại: nguồn canonical tối đa 2 triệu ký tự; facts tối đa 5.000 ô; shortlist mặc định 24, context 10 khối/36.000 ký tự. Quá ngân sách báo lỗi rõ, không trả chứng cứ giả. Chỉ khối được chọn được gửi vào mô hình; đọc corpus cho ranking không đồng nghĩa đưa toàn kho vào prompt.
+- Mỗi claim có quote liên tục khớp chính xác với khối định danh; mọi số phải xuất hiện trong quotes của chính claim. Tất cả references của một claim cùng source revision; so sánh nhiều nguồn dùng nhiều claims. Kiểm chứng riêng entailment, relevance, scope và coverage; Decimal chỉ xác minh số, không tự chứng minh thuộc tính/đơn vị/phương thức.
+- `source_preferences` lưu quan hệ ưu tiên do con người xác nhận theo immutable source IDs và năm, chỉ áp dụng khi cùng applicability tuple. Phiên này quản trị xác nhận TB 1906 cập nhật ưu tiên flyer đầu mùa cho cùng thông tin năm 2026. Flyer vẫn giữ thông tin riêng và lịch sử. Preferred evidence phải nằm trong snapshot/context; không có bằng chứng cùng tuple thì báo mâu thuẫn/thiếu, không dùng tên file để phân xử.
+- `supported/partial/missing/conflict/clarify` quyết định cả text và citations. Thiếu ngữ cảnh không đồng nghĩa Trường chưa công bố. Partial chỉ hiển thị claims đủ căn cứ và nêu phần thiếu; lỗi DB/provider/JSON/timeout giữ mã lỗi hạ tầng, không đổi thành no-answer. JSON sai được sửa định dạng tối đa một lần; deadline đối soát mặc định 90 giây.
+- API direct RAG không tin `runtime_policy` do client gửi; tải policy trợ lý từ DB của cùng kho/tenant khi collection bật evidence. Reranker dùng provider/model được quản trị chọn qua ModelOps, không tải reranker về laptop.
+
+Bổ sung cuối phiên #417: phân giải policy dựa trên collection đã lưu, kể cả khi `module_code` trống hoặc mặc định `general`; không cho né guard bằng bỏ mã phân hệ. DB lỗi, khác tenant/workspace hoặc policy trợ lý chưa bật khi kho yêu cầu evidence đều fail-closed. `persona_scope` lấy từ cấu hình quản trị, chỉ xác định trường đang tư vấn/phạm vi chủ đề, không làm chứng cứ cho số liệu; trường tổ chức kỳ thi không tự thay thế trường đích.
+
+Khớp quote cho phép duy nhất reflow khoảng trắng và phải trả lại span nguyên bản không mơ hồ; không sửa từ/số để ép khớp. Truy hồi danh sách mở rộng các đoạn liền kề theo cú pháp đánh số/bullet và dừng khi gặp văn xuôi/heading, không dùng từ điển nghiệp vụ. Nếu toàn bộ claims bị loại vì binding, cho một lần đề xuất sửa từ cùng evidence; kiểm tra quote/same-source/số và verifier độc lập vẫn bắt buộc, deadline tổng không được gia hạn. Lý do loại và `quote_repair_attempted` được lưu trong AnswerDecision; sửa thất bại vẫn missing, không giả thành supported.
+
+Đây là chốt chặn và contract kiểm chứng, không phải chứng nhận mọi câu trả lời đúng ngữ nghĩa. Cần đối soát chất lượng độc lập và bổ sung nguồn chuyên đề còn thiếu; không tự tắt guard để tăng tỷ lệ answered.
+
+Sửa thêm khi chạy test #417: đóng gói body + heading cùng nguồn như cặp nguyên tử, tính cả JSON metadata trong ngân sách và ưu tiên slot cho reviewed rows thay vì cắt phần đuôi sau khi thêm headings. Tên trường/ngày ban hành dạng mixed-case label không được chọn làm season-heading chỉ vì tỷ lệ chữ hoa cao. Facts có shortlist riêng từ câu gốc, plan/entity/attribute/variants và được rerank ngữ nghĩa riêng qua chính AI server ModelOps, không chỉ append top BM25.
+
+Ngân sách tương tác `retrieval_timeout_seconds` mặc định10s và `rerank_timeout_seconds`3s, cấu hình được trong evidence policy; không đổi timeout chung của provider/OCR/worker. Hybrid anchors dùng session read-only riêng để cancellation không phá transaction đọc canonical/facts. Hết thời gian chỉ giữ corpus rank trên nguồn đã pin và facts thật; không fake CE score, embedding hay catalog seed. Verifier vẫn bắt buộc; DB nguồn/facts lỗi vẫn lỗi dịch vụ, không nhận no-answer thay lỗi. Timeout tổng90s ghi substage planning/retrieval/proposal/verification trong log/lỗi để phân biệt nguyên nhân.
+
+Rowidentity là chốt bổ sung: `entity_name` lấy từ rowfacts đãduyệt, khôngphải entitydoLLMđoán. Quote và claim dùng reviewed row phải giữ tênthựcthể đó (NFC/case/whitespace normalization). Không được chỉquote ô20 rồi viếtcho toàn nhóm. CommonDAGintegrity cũngkiểmtra; semantically broad/negation/condition vẫnphải qua verifier và đốisoát độc lập, rowguardkhôngbảođảm mọi suy luận đúng.
+
 ## Contract runtime — cập nhật #370
 
 - **#382**: Reranker threshold dùng raw `relevance_score`, không dùng RRF hoặc thuộc tínhscore thiếu. Malformed response không scored-success, giữ degradation RRF khi lỗi. Citation title ưu tiên tên nguồn. Facts API chỉ trả activeindex/binding và Excellegacy active, nhậnsourcefactdocument_idnull.

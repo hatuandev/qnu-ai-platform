@@ -1,0 +1,6 @@
+{
+  "variant": "omit_temperature_stream_unspecified",
+  "http": 200,
+  "content_type": "text/event-stream",
+  "response_excerpt": "data: {\"id\":\"chatcmpl-1791865959045\",\"object\":\"chat.completion.chunk\",\"created\":1791865959,\"model\":\"gpt-5.4-mini\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-1791865959045\",\"object\":\"chat.completion.chunk\",\"created\":1791865959,\"model\":\"gpt-5.4-mini\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2012,\"completion_tokens\":29,\"total_tokens\":2041}}\n\ndata: [DONE]\n\n"
+}

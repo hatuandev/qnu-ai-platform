@@ -6,6 +6,11 @@ import logging
 import re
 from typing import Any
 
+from app.modules.rag.evidence_validation import (
+    VERSION,
+    evidence_digest,
+    validate_decision_integrity,
+)
 from app.modules.workflows.nodes.base import (
     BaseNodeHandler,
     NodeExecutionResult,
@@ -185,6 +190,10 @@ class CitationGuardNodeHandler(BaseNodeHandler):
             citations = payload.get("citations", [])
             rag_status = payload.get("status", "answered")
 
+        decision = context.node_data.get("answer_decision")
+        if isinstance(decision, dict) and decision.get("version") == VERSION:
+            return self._evidence_result(node_spec, context, decision, answer_text, citations, invalid_route)
+
         is_grounded = True
         failure_reasons: list[str] = []
 
@@ -295,3 +304,29 @@ class CitationGuardNodeHandler(BaseNodeHandler):
             },
             selected_port=selected_port,
         )
+
+    @staticmethod
+    def _evidence_result(node_spec, context, decision, answer, citations, invalid_route):
+        status = decision.get("status")
+        valid = validate_decision_integrity(decision, answer, citations) if status in {"supported", "partial"} else (
+            decision.get("answer") == answer and decision.get("evidence_digest") == evidence_digest([])
+            and not decision.get("claim_bindings"))
+        if not valid:
+            message = "Không đủ chứng cứ hợp lệ để kết luận. Vui lòng liên hệ đơn vị phụ trách của Trường để được xác nhận."
+            decision = {"version": VERSION, "status": "missing", "answer": message,
+                        "reason": "DECISION_INTEGRITY_FAILED", "claim_bindings": [], "evidence_digest": evidence_digest([])}
+            answer, citations = message, []
+            context.node_data["answer_decision"] = decision
+            context.node_data["citations"] = []
+            context.outputs["answer_decision"] = decision
+        grounded = valid and status == "supported"
+        port = "grounded" if grounded else invalid_route
+        context.node_data["is_grounded"] = grounded
+        context.node_data["evidence_decision_validated"] = valid
+        return NodeExecutionResult(node_id=node_spec.id, selected_port=port, output={
+            "is_grounded": grounded, "port": port, "answer": answer, "response": answer,
+            "grounded": answer, "ungrounded": decision.get("reason", "EVIDENCE_MISSING"),
+            "answer_decision": decision, "status": "answered" if grounded else "insufficient_context",
+            "citations": citations, "contexts": context.node_data.get("contexts", []),
+            "failure_reasons": [] if grounded else [decision.get("reason", "EVIDENCE_MISSING")],
+        })

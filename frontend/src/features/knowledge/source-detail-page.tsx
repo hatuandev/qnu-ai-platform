@@ -62,6 +62,7 @@ import type {
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
 import { SourceContextEditor } from "./components/source-context-editor";
+import { refreshSourceQueries } from "./utils/source-query-cache";
 
 interface SourceDetailPageProps {
   collectionId: string;
@@ -186,7 +187,8 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         reviewComment.trim() || undefined,
       );
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refreshSourceQueries(queryClient, collectionId, sourceId);
       toast.success(
         reviewDecision === "approved"
           ? "Đã phê duyệt bản sửa đổi thành công."
@@ -194,10 +196,6 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       );
       setIsReviewDialogOpen(false);
       setReviewComment("");
-      refetchSource();
-      queryClient.invalidateQueries({
-        queryKey: ["knowledge-source", collectionId, sourceId],
-      });
     },
     onError: (err: unknown) => {
       toast.error(extractErrorMessage(err, "Phê duyệt thất bại."));
@@ -289,8 +287,6 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
           onBack={() => onStudioModeChange(false)}
           onApproveSuccess={(savedRevisionId) => {
             if (savedRevisionId) setSelectedRevisionId(savedRevisionId);
-            refetchSource();
-            refetchChunkSets();
           }}
         />
       </>
@@ -494,7 +490,8 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       </Card>
 
       {/* 3. Review Required Alert Action Banner */}
-      {activeRev?.status === "review_required" && (
+      {(activeRev?.status === "review_required" ||
+        activeRev?.requires_structured_review) && (
         <Card className="border border-warning/40 bg-warning/5 shadow-xs">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">

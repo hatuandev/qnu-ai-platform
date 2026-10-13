@@ -1,0 +1,118 @@
+{
+  "id": "bkp_18a723c167884c4293a5cd6c4d96a37b",
+  "created_at": "2026-10-13T15:01:30.145685Z",
+  "updated_at": "2026-10-13T15:02:09.550801Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-418-drill",
+  "operation": "drill",
+  "status": "completed",
+  "stage": "Khôi phục thử đạt",
+  "progress": 100,
+  "size_bytes": 34282,
+  "sha256": "99b7950087e05039f818053de06bdecbddd5430bbaebf6d2b9426519df316e16",
+  "verified_at": "2026-10-13T15:01:59.581470Z",
+  "drill_at": "2026-10-13T15:02:09.519804Z",
+  "error": null,
+  "pid": 14248,
+  "components": {
+    "tables": 6,
+    "objects": 1,
+    "local_files": 1,
+    "vector_collections": 1,
+    "archive": {
+      "format": "qnu-backup-v1",
+      "release": "development",
+      "app_version": "0.1.0",
+      "schema": [
+        "fixture_418"
+      ],
+      "note": "Toàn vẹn không chứng minh tương thích release hoặc chất lượng chatbot."
+    },
+    "drill": {
+      "tables": 6,
+      "provider_keys_checked": 2,
+      "vector_collections": 1,
+      "files_verified": 37,
+      "rag_chat_tested": false,
+      "live_restore": false
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-10-13T15:01:30.145685Z",
+      "operation": "create",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:01:35.064805Z",
+      "operation": "create",
+      "status": "completed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:01:35.188019Z",
+      "operation": "copy",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-424-copy",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:01:38.683435Z",
+      "operation": "copy",
+      "status": "completed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-424-copy",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:01:53.978430Z",
+      "operation": "verify",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-wrong",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:01:56.781206Z",
+      "operation": "verify",
+      "status": "failed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-wrong",
+      "error": "Mật khẩu không đúng hoặc bản sao lưu bị thay đổi."
+    },
+    {
+      "timestamp": "2026-10-13T15:01:57.006230Z",
+      "operation": "drill",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-drill",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:02:09.550801Z",
+      "operation": "drill",
+      "status": "completed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-418-drill",
+      "error": null
+    }
+  ],
+  "pinned": false,
+  "origin": "manual",
+  "remote_status": "verified",
+  "remote_error": null,
+  "remote_verified_at": "2026-10-13T15:01:38.668573Z",
+  "remote_location": "fixture-backups/qnu-backups/bkp_18a723c167884c4293a5cd6c4d96a37b-99b7950087e05039f818053de06bdecbddd5430bbaebf6d2b9426519df316e16.qnubak",
+  "remote_sha256": "99b7950087e05039f818053de06bdecbddd5430bbaebf6d2b9426519df316e16",
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-13T15:02:09.545427Z",
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

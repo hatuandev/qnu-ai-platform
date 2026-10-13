@@ -8,6 +8,9 @@ import re
 from typing import Any
 
 from app.modules.knowledge.facts import detect_column_role
+from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
+from app.modules.knowledge.services.fact_identity import build_fact_identity
+from app.modules.knowledge.services.html_tables import normalize_html_tables
 from app.modules.knowledge.services.table_context import (
     clean_cell,
     extract_context_tables,
@@ -15,7 +18,7 @@ from app.modules.knowledge.services.table_context import (
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 
-ARTIFACT_VERSION = "structured-source-v3-context-relations"
+ARTIFACT_VERSION = "structured-source-v5-long-fact-identity"
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _ATTRIBUTE_CODES = {"benchmark": "cutoff_score", "quota": "expected_quota", "combos": "subject_combinations",
                     "tuition": "tuition_fee", "code": "entity_code", "method": "admission_method"}
@@ -45,17 +48,26 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
     content_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
     tables = _tables(markdown, page_count)
     facts, issues = [], []
-    if parser_tables and not tables:
+    data_tables = [table for table in (parser_tables or []) if len(table.get("headers", [])) >= 2]
+    if data_tables and not tables:
         issues.append({"code": "TABLES_NOT_MATERIALIZED"})
-    values: dict[tuple[str, str, str], str] = {}
+    values: dict[tuple[Any, ...], str] = {}
     for table in tables:
         headers = table["headers"]
+        if headers and re.fullmatch(r"\d+[.)]?", headers[0].strip()) and any(re.fullmatch(r"\d{3,}", h.strip()) for h in headers[1:]):
+            issues.append({"code": "TABLE_HEADER_UNRESOLVED", "table_id": table["id"], "page_number": table["page_number"]})
+            continue
         for row_index, row in enumerate(table["rows"]):
             if len(row) != len(headers):
                 issues.append({"code": "TABLE_WIDTH_MISMATCH", "table_id": table["id"], "row_index": row_index})
                 continue
             for identity, end, entity, code in row_identities(row, table):
-                for col in range(identity + 1, end):
+                row_context = tuple((headers[col], clean_cell(row[col])) for col in range(identity)
+                                    if clean_cell(row[col]) and clean_cell(row[col]) != code
+                                    and not (col == 0 and re.fullmatch(r"\d+[.)]?", clean_cell(row[col]))))
+                code_columns = [col for col in range(identity) if identity + 1 == end and code and clean_cell(row[col]) == code
+                                and detect_column_role(headers[col])[0] == "code"]
+                for col in [*code_columns, *range(identity + 1, end)]:
                     cell = clean_cell(row[col])
                     if not cell:
                         continue
@@ -63,7 +75,7 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                         issues.append({"code": "MISSING_COLUMN_HEADER", "table_id": table["id"], "column_index": col})
                         continue
                     attribute = headers[col].strip()
-                    key = (code or "", entity.casefold(), attribute.casefold())
+                    key = (code or "", entity.casefold(), attribute.casefold(), row_context)
                     if key in values and values[key] != cell:
                         issues.append({"code": "CONFLICTING_FACT_VALUES", "table_id": table["id"], "row_index": row_index})
                     values[key] = cell
@@ -75,6 +87,7 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                             "confidence_source": "unavailable",
                             "year": (match.group() if (match := _YEAR.search(attribute)) else None),
                             "entity_code": code, "header_segments": table["header_paths"][col], **cell_context(attribute)}
+                    evidence["row_context"] = list(row_context)
                     evidence["header_page_number"] = table.get("header_page_number", table["page_number"])
                     if table.get("continuation_of"):
                         evidence["continuation_of"] = table["continuation_of"]
@@ -82,7 +95,10 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                     if re.fullmatch(r"\d+(?:[.,]\d+)?", identity_value) and not re.fullmatch(r"(?:19|20)\d{2}", identity_value):
                         evidence["relation"] = {"type": "numeric_mapping", "input_label": " / ".join(table["header_paths"][identity]), "input_value": identity_value}
                     fact_id = hashlib.sha256(json.dumps(evidence, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
-                    facts.append({"id": f"draft_{fact_id}", "entity_name": entity, "entity_type": "table_row",
+                    fact_identity = build_fact_identity(entity, raw_data=evidence, entity_code=code)
+                    facts.append({"id": f"draft_{fact_id}", "entity_name": fact_identity.entity_text,
+                              "entity_key": fact_identity.entity_key, "entity_label": fact_identity.entity_label,
+                              "entity_text": fact_identity.entity_text, "entity_type": "table_row",
                               "attribute_name": attribute, "attribute_value": cell.strip(),
                               "confidence": 0.0, "raw_data": evidence})
     return {"version": ARTIFACT_VERSION, "content_hash": content_hash, "metadata": metadata,
@@ -103,3 +119,51 @@ def get_source_artifact(revision: Any) -> dict[str, Any]:
                                      revision.citation_metadata or {})
     artifact["review"] = {"status": "legacy_preview"}
     return artifact
+
+
+def get_structured_review_state(revision: Any) -> tuple[str, bool, int]:
+    """Derive the effective review state from the revision-bound artifact.
+
+    ``revision.status`` is the parsing lifecycle state and can be stale for
+    revisions created before structured review was introduced. Publication and
+    UI decisions must therefore use this artifact state as their source of
+    truth.
+    """
+    artifact = get_source_artifact(revision)
+    issues = list(artifact.get("issues") or [])
+    review_status = str((artifact.get("review") or {}).get("status") or "auto_ready")
+    approved = review_status == "approved"
+    requires_review = not approved and (review_status == "required" or bool(issues))
+    effective_status = "required" if requires_review else review_status
+    return effective_status, requires_review, len(issues)
+
+
+def add_layout_issues(artifact: dict[str, Any], pages: list[dict[str, Any]]) -> None:
+    """Retain visual uncertainty instead of making chart numbers into facts."""
+    for page in pages:
+        number = page.get("page_number", page.get("page"))
+        blocks = page.get("blocks", [])
+        data_regions = [b for b in blocks if b.get("type") == "table" and _is_data_region(b.get("text", ""))]
+        if data_regions and not any(t.get("page_number") == number for t in artifact["tables"]):
+            artifact["issues"].append({"code": "TABLES_NOT_MATERIALIZED", "page_number": number})
+        for block in blocks:
+            coordinates = block.get("coordinates") or {}
+            area = coordinates.get("width", 0) * coordinates.get("height", 0)
+            if block.get("type") in {"chart", "figure", "image"} and area >= 200:
+                artifact["issues"].append({"code": "VISUAL_CONTENT_REVIEW", "page_number": number, "block_id": block.get("id")})
+    if artifact["issues"]:
+        artifact["review"] = {"status": "required"}
+
+
+def _is_data_region(text: str) -> bool:
+    """Whitespace-aligned prose is not evidence of a missing structured table."""
+    grid = [_split_gfm_row(line) for line in normalize_html_tables(text).splitlines()
+            if line.strip().startswith("|") and not re.fullmatch(r"[\s|:\-]+", line)]
+    if not grid:
+        return False
+    headers = [clean_cell(cell) for cell in grid[0] if clean_cell(cell)]
+    if len(headers) >= 2 and all(any(char.isalpha() for char in h) and len(h) <= 120 for h in headers):
+        return True
+    return sum(bool(row and re.fullmatch(r"\d+[.)]?", clean_cell(row[0]))
+                    and any(re.fullmatch(r"\d{3,}[A-Za-z]*", clean_cell(cell)) for cell in row[1:]))
+               for row in grid) >= 2

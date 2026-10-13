@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -18,6 +18,13 @@ from app.modules.assistants.schemas import (
 )
 from app.modules.assistants.seeder import STANDARD_ASSISTANTS
 from app.modules.assistants.service import assistant_service
+
+
+@pytest.fixture(autouse=True)
+def readiness_model_contract():
+    # These unit tests exercise aggregation. Role/key failures have dedicated tests.
+    with patch("app.modules.assistants.readiness.check_model_routes", AsyncMock(return_value=[])):
+        yield
 
 
 def _sample_assistant(code: str = "admissions", is_active: bool = False) -> AssistantModel:
@@ -55,9 +62,11 @@ async def test_readiness_engine_evaluates_standard_assistant():
     eval_run_res.scalar_one_or_none.return_value = None
 
     mock_db.execute.side_effect = [col_exec_res, doc_count_res, eval_run_res]
+    mock_db.get.return_value = MagicMock(tenant_id="tenant_qnu", index_epoch=1)
 
     assistant = _sample_assistant("admissions")
-    readiness = await readiness_engine.evaluate_readiness(mock_db, assistant)
+    with patch("app.modules.assistants.readiness.count_ready_sources", AsyncMock(return_value=5)):
+        readiness = await readiness_engine.evaluate_readiness(mock_db, assistant)
 
     assert readiness.assistant_code == "admissions"
     assert len(readiness.checks) == 5

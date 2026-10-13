@@ -1420,12 +1420,20 @@ class IngestionService:
 
     async def _convert_office_to_pdf(self, file_bytes: bytes, file_name: str) -> bytes:
         """Convert an office document to PDF bytes via Gotenberg LibreOffice."""
+        import asyncio
+
         import httpx
 
         from app.core.config import get_settings
 
         app_settings = get_settings()
         gotenberg_url = app_settings.clean_gotenberg_url
+        if file_name.lower().endswith(".docx"):
+            from app.modules.knowledge.services.docx_preview_fields import (
+                preserve_table_formula_results,
+            )
+
+            file_bytes = await asyncio.to_thread(preserve_table_formula_results, file_bytes)
         try:
             async with httpx.AsyncClient(timeout=120.0, auth=app_settings.gotenberg_auth) as client:
                 response = await client.post(

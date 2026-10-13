@@ -1,0 +1,20 @@
+{
+  "schedule_enabled": true,
+  "frequency": "daily",
+  "weekday": 6,
+  "hour": 2,
+  "minute": 0,
+  "utc_offset_minutes": 420,
+  "next_run_at": "2026-10-13T19:00:00Z",
+  "last_backup_id": "bkp_9d2d138059ab48799a388a6d9dcf5743",
+  "notice": "Đã gửi tác vụ theo lịch; theo dõi kết quả trong lịch sử.",
+  "remote_enabled": true,
+  "endpoint": "http://127.0.0.1:62838",
+  "bucket": "fixture-backups",
+  "prefix": "qnu-backups",
+  "region": "us-east-1",
+  "retention_enabled": false,
+  "keep_daily": 7,
+  "keep_weekly": 4,
+  "keep_monthly": 12
+}

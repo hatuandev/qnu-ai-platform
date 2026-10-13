@@ -1,0 +1,19 @@
+{
+  "result": {
+    "assistant_code": "admissions",
+    "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+    "answer": "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\nBạn có thể thử hỏi mình các chủ đề phổ biến như:\n- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\nNếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: 0256.3846.156 hoặc Email: tuyensinh@qnu.edu.vn nhé!",
+    "status": "insufficient_context",
+    "error_code": null,
+    "citations": [],
+    "suggested_questions": [
+      "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+      "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+      "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+    ],
+    "latency_ms": 8282.69,
+    "execution_id": "4af18b0c-25a0-46a8-8ec8-476ac45f1ea1",
+    "artifacts": [],
+    "conversation_id": "diagnostic415_schedule"
+  }
+}

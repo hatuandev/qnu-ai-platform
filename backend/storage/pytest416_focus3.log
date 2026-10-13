@@ -1,0 +1,12 @@
+........................................................................ [ 75%]
+........................                                                 [100%]
+============================== warnings summary ===============================
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+  D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+96 passed, 4 warnings in 8.11s

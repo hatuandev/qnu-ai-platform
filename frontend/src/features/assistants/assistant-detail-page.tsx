@@ -39,6 +39,8 @@ import { workflowsApi } from "@/services/workflows-api";
 import type { AssistantItem } from "@/types/assistants";
 import { AssistantPlaygroundTab } from "./assistant-playground-tab";
 import { AssistantWorkflowTab } from "./assistant-workflow-tab";
+import { buildAssistantModelOptions } from "./model-options";
+import { buildAssistantPolicyUpdate } from "./policy-update";
 
 interface AssistantDetailPageProps {
   assistantId: string;
@@ -65,6 +67,8 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
       text: q,
     })),
     primary_model: cfg?.model_policy?.primary_model ?? "",
+    preferred_provider_id: cfg?.model_policy?.preferred_provider_id ?? "",
+    fallback_provider_id: cfg?.model_policy?.fallback_provider_id ?? "",
     fallback_model: cfg?.model_policy?.fallback_model ?? "",
     temperature: cfg?.model_policy?.temperature ?? 0.2,
     max_tokens: cfg?.model_policy?.max_tokens ?? 1200,
@@ -82,36 +86,13 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
     no_answer_message:
       cfg?.guardrails?.no_answer_message ||
       "Thông tin này chưa có trong nguồn văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ đơn vị phụ trách.",
-    reranker_enabled: (cfg as unknown as Record<string, unknown>)
-      ?.knowledge_policy
-      ? ((
-          cfg as unknown as Record<
-            string,
-            { reranker_policy?: { enabled?: boolean } }
-          >
-        ).knowledge_policy?.reranker_policy?.enabled ?? true)
-      : true,
-    reranker_model:
-      (
-        cfg as unknown as Record<
-          string,
-          { reranker_policy?: { model_name?: string } }
-        >
-      )?.knowledge_policy?.reranker_policy?.model_name || "bge-reranker-base",
-    reranker_top_k:
-      (
-        cfg as unknown as Record<
-          string,
-          { reranker_policy?: { top_k?: number } }
-        >
-      )?.knowledge_policy?.reranker_policy?.top_k ?? 5,
+    reranker_enabled: cfg?.knowledge_policy?.reranker_policy?.enabled ?? true,
+    reranker_provider_id:
+      cfg?.knowledge_policy?.reranker_policy?.provider_id ?? "",
+    reranker_model: cfg?.knowledge_policy?.reranker_policy?.model_name ?? "",
+    reranker_top_k: cfg?.knowledge_policy?.reranker_policy?.top_k ?? 5,
     reranker_score_threshold:
-      (
-        cfg as unknown as Record<
-          string,
-          { reranker_policy?: { score_threshold?: number } }
-        >
-      )?.knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
+      cfg?.knowledge_policy?.reranker_policy?.score_threshold ?? 0.4,
   };
 }
 
@@ -190,45 +171,27 @@ export function AssistantDetailPage({
     }
   }, [assistantQuery.data]);
 
-  // Available Models calculation
-  const availableModels = useMemo(() => {
-    const providers = providersQuery.data ?? [];
-    const list: { value: string; label: string; providerName: string }[] = [];
-    const seen = new Set<string>();
-
-    for (const prov of providers) {
-      for (const m of prov.models ?? []) {
-        if (!seen.has(m)) {
-          seen.add(m);
-          list.push({
-            value: m,
-            label: `${m} (${prov.name})`,
-            providerName: prov.name,
-          });
-        }
-      }
-    }
-
-    // Always ensure current form models are present in options so dropdown is never blank
-    if (form?.primary_model && !seen.has(form.primary_model)) {
-      seen.add(form.primary_model);
-      list.unshift({
-        value: form.primary_model,
-        label: form.primary_model,
-        providerName: "Cấu hình hiện tại",
-      });
-    }
-    if (form?.fallback_model && !seen.has(form.fallback_model)) {
-      seen.add(form.fallback_model);
-      list.push({
-        value: form.fallback_model,
-        label: form.fallback_model,
-        providerName: "Cấu hình hiện tại",
-      });
-    }
-
-    return list;
-  }, [providersQuery.data, form?.primary_model, form?.fallback_model]);
+  const availableModels = useMemo(
+    () =>
+      buildAssistantModelOptions(providersQuery.data ?? [], "chat", [
+        { model: form?.primary_model, providerId: form?.preferred_provider_id },
+        { model: form?.fallback_model, providerId: form?.fallback_provider_id },
+      ]),
+    [
+      providersQuery.data,
+      form?.primary_model,
+      form?.preferred_provider_id,
+      form?.fallback_model,
+      form?.fallback_provider_id,
+    ],
+  );
+  const rerankerModels = useMemo(
+    () =>
+      buildAssistantModelOptions(providersQuery.data ?? [], "reranker", [
+        { model: form?.reranker_model, providerId: form?.reranker_provider_id },
+      ]),
+    [providersQuery.data, form?.reranker_model, form?.reranker_provider_id],
+  );
 
   // Mutations
   const updateMutation = useMutation({
@@ -247,14 +210,7 @@ export function AssistantDetailPage({
           sample_questions: value.sample_questions
             .map((q) => q.text.trim())
             .filter((t) => t.length > 0),
-          model_policy: {
-            ...current.config?.model_policy,
-            primary_model: value.primary_model ? value.primary_model : null,
-            fallback_model: value.fallback_model ? value.fallback_model : null,
-            temperature: value.temperature,
-            max_tokens: value.max_tokens,
-            thinking_budget: value.thinking_budget ?? 0,
-          },
+          ...buildAssistantPolicyUpdate(current.config, value, availableModels),
           guardrails: {
             ...current.config?.guardrails,
             block_prompt_injection: value.block_prompt_injection,
@@ -271,17 +227,6 @@ export function AssistantDetailPage({
           output_policy: {
             ...current.config?.output_policy,
             require_citations: value.require_citations,
-          },
-          knowledge_policy: {
-            ...(((current.config as unknown as Record<string, unknown>)
-              ?.knowledge_policy as Record<string, unknown>) || {}),
-            collection_id: value.collection_id,
-            reranker_policy: {
-              enabled: value.reranker_enabled ?? true,
-              model_name: value.reranker_model || "bge-reranker-base",
-              top_k: value.reranker_top_k ?? 5,
-              score_threshold: value.reranker_score_threshold ?? 0.4,
-            },
           },
         },
       });
@@ -570,6 +515,7 @@ export function AssistantDetailPage({
             />
 
             <AssistantKnowledgeSection
+              availableModels={rerankerModels}
               form={form}
               onChange={setForm}
               collections={collections}

@@ -13,11 +13,11 @@ test("one finished document is 100 while its neighbor keeps its own progress", (
     75,
   );
 });
-test("failure or review is not success; queued retries restart at zero", () => {
-  assert.equal(getItemProgress({ status: "failed", progress: 75 }), 75);
+test("terminal processing is complete without changing failure or review status", () => {
+  assert.equal(getItemProgress({ status: "failed", progress: 75 }), 100);
   assert.equal(
     getItemProgress({ status: "review_required", progress: 75 }),
-    75,
+    100,
   );
   assert.equal(getItemProgress({ status: "queued", progress: 75 }), 0);
   assert.equal(getBatchProgress([]), 0);

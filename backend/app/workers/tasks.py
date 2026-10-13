@@ -418,6 +418,12 @@ async def task_knowledge_index_build(ctx: dict[str, Any], job_id: str) -> dict[s
                 "index_revision_status": index_rev.status,
             }
         except Exception as exc:
+            # A failed flush leaves AsyncSession unusable until rollback. Reload
+            # durable state before checking cancellation or marking the job failed.
+            await db.rollback()
+            job = await _load_job(db, job_id)
+            if job is None:
+                raise
             if await _is_cancelled(db, job_id):
                 return {"status": "cancelled", "job_id": job_id}
             logger.exception("task_knowledge_index_build_failed", job_id=job_id, error=str(exc))

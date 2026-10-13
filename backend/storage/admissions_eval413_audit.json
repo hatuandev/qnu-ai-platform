@@ -1,0 +1,129 @@
+{
+  "usage": [
+    {
+      "id": 25,
+      "provider": "cloudflare",
+      "model": "@cf/meta/llama-3.1-8b-instruct",
+      "status": "success",
+      "fallback": true,
+      "error": null
+    },
+    {
+      "id": 78,
+      "provider": "cloudflare",
+      "model": "@cf/meta/llama-3.1-8b-instruct",
+      "status": "success",
+      "fallback": true,
+      "error": null
+    },
+    {
+      "id": 25,
+      "provider": "qnu_workflow",
+      "model": "gh/gpt-5.4-mini",
+      "status": "success",
+      "fallback": false,
+      "error": null
+    },
+    {
+      "id": 78,
+      "provider": "qnu_workflow",
+      "model": "gh/gpt-5.4-mini",
+      "status": "success",
+      "fallback": false,
+      "error": null
+    }
+  ],
+  "providers": [
+    {
+      "id": "prov_rtx5090_vllm",
+      "name": "QNU AI Server (RTX 5090 - vLLM)",
+      "type": "vllm",
+      "model": "bge-m3",
+      "active": true
+    },
+    {
+      "id": "prov_paddleocr_vl",
+      "name": "PaddleOCR-VL On-Premise (RTX 5090)",
+      "type": "paddleocr",
+      "model": "PaddleOCR-VL",
+      "active": true
+    },
+    {
+      "id": "prov_openai",
+      "name": "OpenAI",
+      "type": "openai",
+      "model": "gpt-4o-mini",
+      "active": false
+    },
+    {
+      "id": "prov_mistral",
+      "name": "Mistral AI",
+      "type": "mistral",
+      "model": "mistral-ocr-latest",
+      "active": false
+    },
+    {
+      "id": "prov_deepseek",
+      "name": "DeepSeek AI",
+      "type": "deepseek",
+      "model": "deepseek-chat",
+      "active": false
+    },
+    {
+      "id": "prov_groq",
+      "name": "Groq Cloud (LPU)",
+      "type": "groq",
+      "model": "llama-3.3-70b-versatile",
+      "active": false
+    },
+    {
+      "id": "prov_claude",
+      "name": "Anthropic Claude",
+      "type": "claude",
+      "model": "claude-3-5-sonnet-20241022",
+      "active": false
+    },
+    {
+      "id": "prov_nvidia",
+      "name": "NVIDIA NIM",
+      "type": "nvidia",
+      "model": "meta/llama-3.3-70b-instruct",
+      "active": false
+    },
+    {
+      "id": "prov_openrouter",
+      "name": "OpenRouter AI Gateway",
+      "type": "openrouter",
+      "model": "google/gemini-2.5-flash",
+      "active": false
+    },
+    {
+      "id": "system_model_defaults",
+      "name": "Cấu Hình Mặc Định Hệ Thống",
+      "type": "system_routing",
+      "model": "bge-m3",
+      "active": true
+    },
+    {
+      "id": "prov_gemini",
+      "name": "Google Gemini",
+      "type": "gemini",
+      "model": "gemini-2.5-flash",
+      "active": true
+    },
+    {
+      "id": "prov_20261013041934",
+      "name": "qnu-9router",
+      "type": "custom",
+      "model": "gh/gpt-5.4-mini",
+      "active": true
+    },
+    {
+      "id": "prov_cloudflare",
+      "name": "Cloudflare Workers AI",
+      "type": "cloudflare",
+      "model": "@cf/meta/llama-3.1-8b-instruct",
+      "active": true
+    }
+  ]
+}

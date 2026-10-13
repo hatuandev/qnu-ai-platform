@@ -1,0 +1,23 @@
+{
+  "id": "bkp_7b4cfd5013fd4251af3d9b282087c05f",
+  "created_at": "2026-10-13T12:06:54.750036Z",
+  "updated_at": "2026-10-13T12:07:07.597547Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-418-drill",
+  "operation": "drill",
+  "status": "failed",
+  "stage": "Thao tác thất bại",
+  "progress": 40,
+  "size_bytes": 24023,
+  "sha256": "db7d54ae85f8dd2fab4ebe52fa7e51b6a68dee4bca921528cd1c192430847f25",
+  "verified_at": "2026-10-13T12:07:04.308541Z",
+  "drill_at": null,
+  "error": "Lỗi CannotConnectNowError; kiểm tra quyền công cụ/kết nối/dung lượng máy chủ.",
+  "pid": 1636,
+  "components": {
+    "tables": 6,
+    "objects": 1,
+    "local_files": 1,
+    "vector_collections": 1
+  }
+}

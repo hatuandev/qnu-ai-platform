@@ -6,6 +6,9 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
+import traceback
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -20,6 +23,7 @@ if TYPE_CHECKING:
     from app.modules.assistants.schemas import AssistantRuntimeProfile
 from app.modules.workflows.compiler import workflow_compiler
 from app.modules.workflows.engine import dag_engine
+from app.modules.workflows.execution_audit import persist_boundary_failure
 from app.modules.workflows.models import (
     WorkflowApprovalRequest,
     WorkflowCheckpoint,
@@ -108,6 +112,7 @@ class WorkflowService:
         edges = parsed_edges
 
         return WorkflowDagSpec(
+            timeout_seconds=spec_data.get("timeout_seconds", 300),
             execution_mode=spec_data.get("execution_mode", "conversational"),
             entry_node_id=spec_data.get("entry_node_id", nodes[0].id if nodes else "chat_input"),
             input_schema=spec_data.get("input_schema", {}),
@@ -494,6 +499,7 @@ class WorkflowService:
             workspace_id=req.workspace_id,
         )
         execution_record = WorkflowExecution(
+            id=str(uuid.uuid4()),
             workflow_id=req.workflow_id,
             tenant_id=req.tenant_id,
             conversation_id=req.conversation_id,
@@ -502,35 +508,75 @@ class WorkflowService:
             workflow_version_id=workflow_version_id,
             correlation_id=correlation_id,
             runtime_profile={**(assistant_profile.model_dump(mode="json") if assistant_profile else {}),
-                             "workspace_id": req.workspace_id},
+                             "workspace_id": req.workspace_id,
+                             "execution_deadline": datetime.now(UTC).timestamp() + dag_spec.timeout_seconds},
             inputs=req.inputs,
         )
+        identity = {key: getattr(execution_record, key) for key in (
+            "id", "workflow_id", "tenant_id", "conversation_id", "assistant_id",
+            "assistant_revision", "workflow_version_id", "correlation_id", "runtime_profile", "inputs")}
+        started = time.perf_counter()
+        stage = "setup"
         db.add(execution_record)
-        await db.flush()
-        context.execution_id = execution_record.id
-        resp = await dag_engine.execute(dag_spec, context)
-        execution_record.status = resp.status
-        execution_record.outputs = resp.outputs
-        execution_record.error_message = resp.error_message
-        execution_record.latency_ms = resp.latency_ms
-        execution_record.node_execution_count = len(resp.executed_nodes)
-        if resp.status != "paused_for_approval":
-            execution_record.completed_at = datetime.now(UTC).replace(tzinfo=None)
-
-        self._add_node_execution_records(execution_record.id, context, db)
-        if resp.status == "paused_for_approval" and resp.paused_node_id:
-            approval = await self._create_approval_checkpoint(
-                db,
-                execution_record.id,
-                context,
-                resp,
-            )
-            resp.outputs["approval_id"] = approval.id
+        try:
+            await db.flush()
+            await db.commit()
+            context.execution_id = identity["id"]
+            stage = "engine"
+            async with asyncio.timeout(dag_spec.timeout_seconds):
+                resp = await dag_engine.execute(dag_spec, context)
+            stage = "finalize"
+            execution_record.status = resp.status
             execution_record.outputs = resp.outputs
+            execution_record.error_message = (resp.error_message or "")[:1000] or None
+            execution_record.latency_ms = resp.latency_ms
+            execution_record.node_execution_count = len(resp.executed_nodes)
+            if resp.status != "paused_for_approval":
+                execution_record.completed_at = datetime.now(UTC).replace(tzinfo=None)
 
-        await db.commit()
-        resp.execution_id = execution_record.id
-        return resp
+            # Node/ModelOps rollbacks may expire this ORM instance, including its
+            # primary key. Use the captured immutable identity; never lazy-load it.
+            self._add_node_execution_records(identity["id"], context, db)
+            if resp.status == "paused_for_approval" and resp.paused_node_id:
+                approval = await self._create_approval_checkpoint(
+                    db,
+                    identity["id"],
+                    context,
+                    resp,
+                )
+                resp.outputs["approval_id"] = approval.id
+                execution_record.outputs = resp.outputs
+
+            await db.commit()
+            resp.execution_id = identity["id"]
+            return resp
+        except (Exception, asyncio.CancelledError) as exc:
+            status = "cancelled" if isinstance(exc, asyncio.CancelledError) else "failed"
+            code = ("WORKFLOW_CANCELLED" if status == "cancelled" else
+                    "WORKFLOW_TIMEOUT" if isinstance(exc, TimeoutError) else
+                    exc.code if isinstance(exc, AppException) else "WORKFLOW_EXECUTION_FAILED")
+            logger.error("workflow_boundary_failed execution_id=%s correlation_id=%s stage=%s code=%s error_type=%s",
+                         identity["id"], correlation_id, stage, code, type(exc).__name__)
+            logger.error("workflow_boundary_stack execution_id=%s stack=%s", identity["id"],
+                         "".join(traceback.format_tb(exc.__traceback__)))
+            async def finish_failure():
+                try:
+                    async with asyncio.timeout(5):
+                        await db.rollback()
+                except Exception:
+                    logger.exception("workflow_rollback_failed execution_id=%s", identity["id"])
+                try:
+                    async with asyncio.timeout(5):
+                        await persist_boundary_failure(identity, status, code, stage,
+                                                       (time.perf_counter() - started) * 1000)
+                except Exception:
+                    logger.exception("workflow_terminal_audit_failed execution_id=%s", identity["id"])
+            cleanup = asyncio.create_task(finish_failure())
+            try:
+                await asyncio.shield(cleanup)
+            except asyncio.CancelledError:
+                await cleanup
+            raise
 
     @staticmethod
     def _add_node_execution_records(

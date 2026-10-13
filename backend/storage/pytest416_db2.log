@@ -1,0 +1,77 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+____________ test_serving_sources_and_durable_failure_use_real_db _____________
+
+    async def test_serving_sources_and_durable_failure_use_real_db():
+        engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+        tag = uuid.uuid4().hex[:10]
+        try:
+            async with engine.connect() as conn:
+                outer = await conn.begin()
+                try:
+                    def session_factory():
+                        return AsyncSession(bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint")
+                    async with session_factory() as db:
+                        collection = KnowledgeCollection(id=f"test_ready_{tag}", name="TEST readiness", module_code="general")
+                        bindings = [KnowledgeBinding(id=f"test_b{i}_{tag}", collection_id=collection.id, status="active") for i in range(2)]
+                        db.add_all([collection, *bindings])
+                        await db.flush()
+                        generation = KnowledgeVectorGeneration(id=f"test_g_{tag}", collection_id=collection.id,
+                            embedding_model="test_encoder", provider_id="test_provider", embedding_dimension=8,
+                            config_hash=tag, qdrant_collection_name=f"test_vectors_{tag}", status="active")
+                        db.add(generation)
+                        await db.flush()
+                        source = KnowledgeSourceRevision(id=f"test_s_{tag}", binding_id=bindings[0].id,
+                            revision_no=1, origin_document_id=f"test_doc_{tag}", origin_file_hash=tag,
+                            snapshot_storage_path=f"test/{tag}", canonical_hash=tag, canonical_markdown="TEST evidence",
+                            status="ready", parse_provenance={"structured_artifact": {"content_hash": tag,
+                                "issues": [], "review": {"status": "approved"}}})
+                        index = KnowledgeIndexRevision(id=f"test_i_{tag}", binding_id=bindings[0].id,
+                            vector_generation_id=generation.id,
+                            source_revision_v2_id=source.id, revision_no=1, status="active", chunk_count=1,
+                            parity_report={"parity_passed": True})
+                        db.add(source)
+                        await db.flush()
+                        db.add(index)
+                        await db.flush()
+                        bindings[0].active_index_revision_id = index.id
+                        await db.flush()
+                        # Only one published source; the second draft does not block or count.
+                        assert await count_ready_sources(db, collection) == 1
+                        index.parity_report = {"parity_passed": False}
+                        await db.flush()
+                        with pytest.raises(Exception, match="\u0111\u1ed1i so\xe1t"):
+                            await count_ready_sources(db, collection)
+                        await db.commit()
+                        spec = WorkflowDagSpec(entry_node_id="in", nodes=[])
+                        with (patch.object(workflow_service, "get_workflow_spec", AsyncMock(return_value=spec)),
+                              patch("app.modules.workflows.service.dag_engine.execute", AsyncMock(side_effect=RuntimeError("fixture failure"))),
+                              patch("app.modules.workflows.execution_audit.AsyncSessionFactory", session_factory),
+                              pytest.raises(RuntimeError, match="fixture failure")):
+                            await workflow_service.execute(db, WorkflowExecuteRequest(workflow_id=f"test_wf_{tag}", inputs={}))
+                        record = (await db.execute(select(WorkflowExecution).where(
+                            WorkflowExecution.workflow_id == f"test_wf_{tag}"))).scalar_one()
+>                       assert record.status == "failed" and record.completed_at
+E                       AssertionError: assert ('running' == 'failed'
+E                         
+E                         - failed
+E                         + running)
+
+tests\test_phase1_postgres.py:78: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    app.modules.workflows.service:service.py:556 workflow_boundary_failed execution_id=50a9b9ab-fb2a-41b7-8f7d-3d7b6563067a correlation_id=None stage=engine code=WORKFLOW_EXECUTION_FAILED error_type=RuntimeError
+ERROR    app.modules.workflows.service:service.py:558 workflow_boundary_stack execution_id=50a9b9ab-fb2a-41b7-8f7d-3d7b6563067a stack=  File "D:\DuAnPhanMem\qnu-ai-platform\backend\app\modules\workflows\service.py", line 527, in execute
+    resp = await dag_engine.execute(dag_spec, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\AnhTuan\AppData\Roaming\uv\python\cpython-3.12-windows-x86_64-none\Lib\unittest\mock.py", line 2291, in _execute_mock_call
+    raise effect
+============================== warnings summary ===============================
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+  D:\DuAnPhanMem\qnu-ai-platform\backend\.venv\Lib\site-packages\sqlalchemy\sql\schema.py:3627: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_phase1_postgres.py::test_serving_sources_and_durable_failure_use_real_db
+1 failed, 2 warnings in 3.61s

@@ -29,6 +29,15 @@ export interface ProviderKeyEvent {
   created_at: string;
 }
 
+export type ModelProbeRole = "chat" | "embedding" | "reranker" | "ocr";
+
+export interface ModelCapabilityConfig {
+  probe_role: ModelProbeRole;
+  vision: boolean;
+  reasoning: boolean;
+  embedding_dimension?: number | null;
+}
+
 export interface SingleModelTestResult {
   model_name: string;
   success: boolean;
@@ -43,6 +52,13 @@ export interface SingleModelTestResult {
   latency_ms: number;
   message: string;
   tested_at: string;
+  http_status?: number | null;
+  error_code?: string | null;
+  served_model?: string | null;
+  probe_role?: ModelProbeRole;
+  verification_scope?: "inference" | "catalogue" | "health";
+  request_capabilities?: Record<string, unknown>;
+  embedding_dimension?: number | null;
 }
 
 export interface ProviderModelsTestResponse {
@@ -85,10 +101,15 @@ export interface ModelProvider {
     | "paddleocr_vl"
     | "paddle"
     | "ollama"
+    | "ollama_cloud"
+    | "tei"
     | "custom";
   is_active: boolean;
   circuit_breaker_status: "CLOSED" | "OPEN" | "HALF_OPEN";
   models: string[];
+  model_capabilities?: Record<string, ModelCapabilityConfig>;
+  model_specs?: Record<string, { type?: string }>;
+  supports_chat?: boolean;
   model_name?: string;
   api_base_url?: string;
   api_key_masked?: string;

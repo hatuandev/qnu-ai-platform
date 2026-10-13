@@ -100,16 +100,8 @@ cd ..
 goto end
 
 :do_dev
-echo [QNU AI Platform] Kiem tra CSDL va du lieu mau...
-cd backend && %PYTHON_EXE% -m app.cli db ensure-ready
-cd ..
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-worker.ps1"
-if errorlevel 1 goto end
-echo [QNU AI Platform] Dang khoi chay Backend (Port 8001) va Frontend Studio (Port 3000)...
-start "QNU Backend API (Port 8001)" cmd /k "cd backend && %PYTHON_EXE% -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload"
-timeout /t 2 /nobreak >nul
-start "QNU Frontend Studio (Port 3000)" cmd /k "cd frontend && npm run dev"
-goto end
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-dev.ps1"
+exit /b %errorlevel%
 
 :do_worker
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-worker.ps1"
@@ -188,7 +180,7 @@ echo   make infra-status   : Kiem tra trang thai cac container Docker
 echo   make infra-logs     : Theo doi logs cua cum Docker
 echo.
 echo [Phat trien - Local Dev]
-echo   make dev            : Khoi chay Backend (8001), Frontend (3000) va ARQ worker
+echo   make dev            : Khoi dong lai Backend (8001), Frontend (3000) va ARQ worker
 echo   make worker         : Khoi chay worker nen, co log va tranh mo trung
 echo   make be             : Khoi chay rieng Backend API (Port 8001)
 echo   make fe             : Khoi chay rieng Frontend Studio (Port 3000)

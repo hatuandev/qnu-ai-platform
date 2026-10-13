@@ -1,0 +1,31 @@
+{
+  "id": "bkp_bb01db4844d246f2b38d697438c423a1",
+  "created_at": "2026-10-13T12:17:17.582562Z",
+  "updated_at": "2026-10-13T12:17:36.205864Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-418-drill",
+  "operation": "drill",
+  "status": "completed",
+  "stage": "Khôi phục thử đạt",
+  "progress": 100,
+  "size_bytes": 24013,
+  "sha256": "76f29af7ff622c529c2634b326db1bfa594f054c45f7a090c7ab7c29d68a2b51",
+  "verified_at": "2026-10-13T12:17:27.229622Z",
+  "drill_at": "2026-10-13T12:17:36.199301Z",
+  "error": null,
+  "pid": 8440,
+  "components": {
+    "tables": 6,
+    "objects": 1,
+    "local_files": 1,
+    "vector_collections": 1,
+    "drill": {
+      "tables": 6,
+      "provider_keys_checked": 2,
+      "vector_collections": 1,
+      "files_verified": 30,
+      "rag_chat_tested": false,
+      "live_restore": false
+    }
+  }
+}

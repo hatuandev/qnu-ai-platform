@@ -40,6 +40,10 @@ from app.modules.knowledge.schemas import (
     PreviewDocumentGroupRequest,
     PreviewDocumentGroupResponse,
 )
+from app.modules.knowledge.services.binding_display import (
+    load_binding_display_metadata,
+    resolve_binding_display_metadata,
+)
 from app.modules.knowledge.services.scope_helper import (
     get_scoped_binding,
     get_scoped_collection,
@@ -319,9 +323,10 @@ class BindingService:
         stmt = stmt.offset(offset).limit(page_size)
 
         rows = (await db.execute(stmt)).all()
+        display_metadata = await load_binding_display_metadata(db, [binding for binding, _ in rows])
         items: list[KnowledgeBindingResponse] = []
         for bnd, source_rev in rows:
-            metadata = source_rev.snapshot_metadata if source_rev else {}
+            metadata = resolve_binding_display_metadata(source_rev.snapshot_metadata if source_rev else {}, display_metadata.get(bnd.id))
             items.append(
                 KnowledgeBindingResponse(
                     id=bnd.id,
@@ -331,6 +336,9 @@ class BindingService:
                     active_index_revision_id=bnd.active_index_revision_id,
                     active_source_revision_id=bnd.active_source_revision_id,
                     source_status=source_rev.status if source_rev else None,
+                    structured_review_status=source_rev.structured_review_status if source_rev else None,
+                    requires_structured_review=source_rev.requires_structured_review if source_rev else False,
+                    structured_issue_count=source_rev.structured_issue_count if source_rev else 0,
                     active_epoch=bnd.active_epoch,
                     chunk_strategy=bnd.chunk_strategy,
                     sync_policy=bnd.sync_policy,
@@ -353,7 +361,8 @@ class BindingService:
         """Get detail of a single knowledge binding."""
         bnd = await get_scoped_binding(db, binding_id, actor=actor)
         source_rev = await db.get(KnowledgeSourceRevision, bnd.active_source_revision_id) if bnd.active_source_revision_id else None
-        metadata = source_rev.snapshot_metadata if source_rev else {}
+        display_metadata = await load_binding_display_metadata(db, [bnd])
+        metadata = resolve_binding_display_metadata(source_rev.snapshot_metadata if source_rev else {}, display_metadata.get(bnd.id))
 
         return KnowledgeBindingResponse(
             id=bnd.id,
@@ -363,6 +372,9 @@ class BindingService:
             active_index_revision_id=bnd.active_index_revision_id,
             active_source_revision_id=bnd.active_source_revision_id,
             source_status=source_rev.status if source_rev else None,
+            structured_review_status=source_rev.structured_review_status if source_rev else None,
+            requires_structured_review=source_rev.requires_structured_review if source_rev else False,
+            structured_issue_count=source_rev.structured_issue_count if source_rev else 0,
             active_epoch=bnd.active_epoch,
             chunk_strategy=bnd.chunk_strategy,
             sync_policy=bnd.sync_policy,

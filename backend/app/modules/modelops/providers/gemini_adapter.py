@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -13,8 +12,6 @@ from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
-
-logger = logging.getLogger(__name__)
 
 
 class GeminiAdapter(BaseLLMAdapter):
@@ -42,9 +39,15 @@ class GeminiAdapter(BaseLLMAdapter):
             )
 
         # Isolated test mock mode strictly for unit test environments
-        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
+        if (
+            settings.ENVIRONMENT in ("test", "testing")
+            and self.api_key in ("mock", "test")
+            and not kwargs.get("probe")
+        ):
             elapsed = (time.perf_counter() - start_time) * 1000
-            mock_text = f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}."
+            mock_text = (
+                f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}."
+            )
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
             comp_toks = len(mock_text.split()) * 2
             return LLMResponse(
@@ -57,10 +60,12 @@ class GeminiAdapter(BaseLLMAdapter):
                 latency_ms=round(elapsed, 2),
             )
 
-        endpoint = (
-            f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
-            f"?key={self.api_key}"
+        resource = (
+            self.model_name
+            if self.model_name.startswith("models/")
+            else f"models/{self.model_name}"
         )
+        endpoint = f"{(self.base_url or 'https://generativelanguage.googleapis.com/v1beta').rstrip('/')}/{resource}:generateContent"
 
         contents = []
         for m in messages:
@@ -71,15 +76,9 @@ class GeminiAdapter(BaseLLMAdapter):
         gen_config: dict[str, Any] = {
             "temperature": temperature,
         }
-        if "2.5" in self.model_name or thinking_budget > 0:
-            if thinking_budget > 0:
-                gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
-                gen_config["maxOutputTokens"] = max(max_tokens, thinking_budget + 1024)
-            else:
-                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
-                gen_config["maxOutputTokens"] = max(max_tokens, 2048)
-        else:
-            gen_config["maxOutputTokens"] = max_tokens
+        if thinking_budget > 0:
+            gen_config["thinkingConfig"] = {"thinkingBudget": thinking_budget}
+        gen_config["maxOutputTokens"] = max_tokens
 
         payload = {
             "contents": contents,
@@ -88,27 +87,36 @@ class GeminiAdapter(BaseLLMAdapter):
 
         actual_model = self.model_name
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-            resp = await client.post(endpoint, json=payload)
-            if resp.status_code == 404 and self.model_name != "gemini-flash-latest":
-                logger.warning(
-                    "Model [%s] returned 404 from Google Gemini API. Auto-retrying with 'gemini-flash-latest'...",
-                    self.model_name,
-                )
-                fallback_endpoint = (
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
-                    f"?key={self.api_key}"
-                )
-                resp = await client.post(fallback_endpoint, json=payload)
-                if resp.status_code == 200:
-                    actual_model = "gemini-flash-latest"
+            headers = {"x-goog-api-key": self.api_key}
+            resp = await client.post(endpoint, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+            if (
+                kwargs.get("probe")
+                and (data.get("candidates") or [{}])[0].get("finishReason") == "MAX_TOKENS"
+                and max_tokens < 256
+            ):
+                gen_config["maxOutputTokens"] = 256
+                resp = await client.post(endpoint, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
 
         candidates = data.get("candidates", [])
         content = ""
         if candidates:
             parts = candidates[0].get("content", {}).get("parts", [])
-            content = "".join(p.get("text", "") for p in parts)
+            content = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+        if not content.strip():
+            limited = candidates and candidates[0].get("finishReason") == "MAX_TOKENS"
+            raise AppException(
+                "Model hết ngân sách token trước khi trả lời."
+                if limited
+                else "Gemini không trả nội dung trả lời hợp lệ.",
+                code="MODEL_OUTPUT_BUDGET_EXHAUSTED"
+                if limited
+                else "MODEL_RESPONSE_PROTOCOL_ERROR",
+                status_code=502,
+            )
 
         usage = data.get("usageMetadata", {})
         prompt_tokens = usage.get("promptTokenCount", 0)

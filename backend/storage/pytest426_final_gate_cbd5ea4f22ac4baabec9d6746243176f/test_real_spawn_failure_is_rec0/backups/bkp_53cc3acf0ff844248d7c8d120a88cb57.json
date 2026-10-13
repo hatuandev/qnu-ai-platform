@@ -1,0 +1,48 @@
+{
+  "id": "bkp_53cc3acf0ff844248d7c8d120a88cb57",
+  "created_at": "2026-10-13T16:32:00.862150Z",
+  "updated_at": "2026-10-13T16:32:00.980709Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-launcher",
+  "operation": "verify",
+  "status": "failed",
+  "stage": "Chờ tiến trình sao lưu",
+  "progress": 0,
+  "size_bytes": 501,
+  "sha256": "5cebf75582aa7f3b135c703e90fd66bc9e02e9bc1ccfc7f6838401c875720766",
+  "verified_at": null,
+  "drill_at": null,
+  "error": "Không thể khởi động tiến trình sao lưu độc lập. (FileNotFoundError)",
+  "pid": null,
+  "components": {},
+  "history": [
+    {
+      "timestamp": "2026-10-13T16:32:00.975725Z",
+      "operation": "verify",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-launcher",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T16:32:00.980709Z",
+      "operation": "verify",
+      "status": "failed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-launcher",
+      "error": "Không thể khởi động tiến trình sao lưu độc lập. (FileNotFoundError)"
+    }
+  ],
+  "pinned": false,
+  "origin": "manual",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": null,
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

@@ -21,15 +21,18 @@ import {
 } from "@/components/ui/select";
 import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 import { apiClient } from "@/services/modelops-api";
-import type { VectorLoadItem } from "@/types/knowledge";
+import type { KnowledgeBinding, VectorLoadItem } from "@/types/knowledge";
 import {
   getGenerationLabel,
   getProviderOrigin,
 } from "../utils/vector-generation-label";
 import {
-  canPublishSources,
+  canPublishSelectedSources,
+  getSelectedPublishItems,
+  getSelectedReviewBlockers,
   getSourceVectorState,
 } from "../utils/vector-workflow";
+import { BulkSourceReview } from "./bulk-source-review";
 import { CandidateRagPreview } from "./candidate-rag-preview";
 import { useVectorWorkflow } from "./use-vector-workflow";
 
@@ -54,6 +57,9 @@ export function VectorLoadControls({
   const { sources, generations, state } = useVectorWorkflow(collectionId);
   const [isOpen, setIsOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
+  const [reviewSelection, setReviewSelection] = useState<KnowledgeBinding[]>(
+    [],
+  );
   const [selection, setSelection] = useState("");
   const [loadedGenerationId, setLoadedGenerationId] = useState("");
   const models = useQuery({
@@ -170,14 +176,39 @@ export function VectorLoadControls({
   });
   const publish = useMutation({
     mutationFn: () =>
-      knowledgeApi.activateVectorGeneration(collectionId, publishId),
+      knowledgeApi.activateVectorGeneration(
+        collectionId,
+        publishId,
+        publishItems,
+      ),
     onSuccess: () => {
-      toast.success("Đã xuất bản chỉ mục cho chatbot.");
+      toast.success(`Đã xuất bản ${publishItems.length} nguồn cho chatbot.`);
       setIsPublishOpen(false);
       invalidate();
     },
     onError: (error) => {
       toast.error(extractErrorMessage(error, "Xuất bản thất bại."));
+      invalidate();
+    },
+  });
+  const reviewSources = useMutation({
+    mutationFn: () =>
+      knowledgeApi.reviewSourceRevisionsBulk(
+        collectionId,
+        reviewSelection.map((source) => ({
+          source_id: source.id,
+          revision_id: source.active_source_revision_id || "",
+        })),
+        "approved",
+        "Phê duyệt hàng loạt sau khi đối soát Studio OCR",
+      ),
+    onSuccess: (result) => {
+      toast.success(`Đã duyệt ${result.reviewed_count} nguồn.`);
+      setReviewSelection([]);
+      invalidate();
+    },
+    onError: (error) => {
+      toast.error(extractErrorMessage(error, "Duyệt nhiều nguồn thất bại."));
       invalidate();
     },
   });
@@ -191,8 +222,19 @@ export function VectorLoadControls({
         : undefined,
     };
   });
+  const reviewBlockers = getSelectedReviewBlockers(
+    sources.data || [],
+    targets.map((target) => target.binding_id),
+  );
   const isBusy =
     load.isPending || targetStates.some((item) => item.status?.isPending);
+  const publishItems = getSelectedPublishItems(
+    sources.data || [],
+    targets,
+    publishId,
+    state.data,
+  );
+  const isGenerationSwitch = !!active && active.id !== publishId;
   const canPublish =
     !disabledReason &&
     !state.isError &&
@@ -202,7 +244,13 @@ export function VectorLoadControls({
       ({ source, target }) =>
         source?.active_source_revision_id === target.source_revision_id,
     ) &&
-    canPublishSources(sources.data || [], publishId, state.data);
+    canPublishSelectedSources(
+      sources.data || [],
+      targets,
+      publishId,
+      active?.id,
+      state.data,
+    );
   return (
     <>
       <Button
@@ -227,7 +275,13 @@ export function VectorLoadControls({
       <Dialog
         open={isOpen}
         onOpenChange={(value) => {
-          if (!load.isPending && !publish.isPending) setIsOpen(value);
+          if (
+            !load.isPending &&
+            !publish.isPending &&
+            !reviewSources.isPending
+          ) {
+            setIsOpen(value);
+          }
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
@@ -320,7 +374,9 @@ export function VectorLoadControls({
                     {source?.document_title || target.binding_id}
                   </span>
                   <span className="shrink-0 text-muted-foreground">
-                    {status?.label || "Chưa nạp vector"}
+                    {source?.requires_structured_review
+                      ? "Cần duyệt"
+                      : status?.label || "Chưa nạp vector"}
                   </span>
                 </div>
                 {status?.error && (
@@ -331,28 +387,44 @@ export function VectorLoadControls({
               </div>
             ))}
           </div>
+          {reviewBlockers.length > 0 && (
+            <BulkSourceReview
+              sources={reviewBlockers}
+              isPending={reviewSources.isPending}
+              onReview={setReviewSelection}
+            />
+          )}
           <p className="text-xs text-muted-foreground">
-            Xuất bản áp dụng cho toàn chỉ mục của kho. Mọi nguồn đang hoạt động
-            phải được nạp bản Markdown hiện hành trước khi xuất bản.
+            Xuất bản chỉ áp dụng cho {targets.length} nguồn đã chọn. Các nguồn
+            khác đang phục vụ chatbot được giữ nguyên. Khi đổi chỉ mục, hãy nạp
+            và chọn đủ các nguồn đang phục vụ.
           </p>
-          {publishId && (
+          {publishId && canPublish && (
             <CandidateRagPreview
-              key={publishId}
+              key={`${publishId}:${publishItems.map((item) => item.index_revision_id).join(",")}`}
               collectionId={collectionId}
               generationId={publishId}
+              items={publishItems}
             />
           )}
           <DialogFooter className="flex-wrap gap-2">
             <Button
               variant="outline"
-              disabled={load.isPending || publish.isPending}
+              disabled={
+                load.isPending || publish.isPending || reviewSources.isPending
+              }
               onClick={() => setIsOpen(false)}
             >
               Đóng
             </Button>
             <Button
               variant="outline"
-              disabled={!canPublish || isBusy || publish.isPending}
+              disabled={
+                !canPublish ||
+                isBusy ||
+                publish.isPending ||
+                reviewSources.isPending
+              }
               onClick={() => setIsPublishOpen(true)}
             >
               <Layers className="size-3.5" />
@@ -362,6 +434,7 @@ export function VectorLoadControls({
               disabled={
                 !effectiveSelection ||
                 isBusy ||
+                reviewSources.isPending ||
                 !!disabledReason ||
                 models.isError ||
                 collection.isPending ||
@@ -383,10 +456,26 @@ export function VectorLoadControls({
         </DialogContent>
       </Dialog>
       <ConfirmDialog
+        open={reviewSelection.length > 0}
+        onOpenChange={(open) => {
+          if (!open && !reviewSources.isPending) setReviewSelection([]);
+        }}
+        title="Duyệt các nguồn đã chọn?"
+        description={`Xác nhận bạn đã đối soát ${reviewSelection.length} nguồn trong Studio OCR. Thao tác này ghi nhận người duyệt và cho phép xuất bản nếu vector đã sẵn sàng.`}
+        confirmText="Duyệt nguồn"
+        variant="default"
+        isPending={reviewSources.isPending}
+        onConfirm={() => reviewSources.mutate()}
+      />
+      <ConfirmDialog
         open={isPublishOpen}
         onOpenChange={setIsPublishOpen}
-        title="Xuất bản chỉ mục?"
-        description="Chatbot sẽ sử dụng chỉ mục này cho toàn bộ kho. Backend sẽ đối soát và chỉ chuyển sang chỉ mục mới khi mọi nguồn hợp lệ."
+        title={`Xuất bản ${targets.length} nguồn đã chọn?`}
+        description={
+          isGenerationSwitch
+            ? "Chuyển các nguồn đang phục vụ sang chỉ mục mới. Nguồn chưa xuất bản không được chọn vẫn để sau."
+            : "Chatbot sẽ sử dụng bản đã chọn sau khi đối soát thành công. Các nguồn khác đang phục vụ được giữ nguyên."
+        }
         confirmText="Xuất bản"
         variant="default"
         isPending={publish.isPending}

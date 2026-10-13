@@ -39,6 +39,7 @@ import {
   type ProviderModelsTestResponse,
   type SingleModelTestResult,
 } from "@/services/api-client";
+import type { ModelProbeRole } from "@/types/modelops";
 
 export {
   getModelCapabilities,
@@ -277,8 +278,8 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
       id: string;
       payload: Parameters<typeof apiClient.updateModelProvider>[1];
     }) => apiClient.updateModelProvider(id, payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["model-providers"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["model-providers"] });
       setIsModalOpen(false);
       setEditingProvider(null);
     },
@@ -520,26 +521,50 @@ export const ModelOpsPage: React.FC<ModelOpsPageProps> = ({
     }
   };
 
-  const handleConfirmAddCustomModel = (
+  const handleConfirmAddCustomModel = async (
     modelId: string,
-    _isVision: boolean,
-    _isReasoning: boolean,
-    _defaultRole: "none" | "embedding" | "reranker" | "ocr",
+    isVision: boolean,
+    isReasoning: boolean,
+    defaultRole: "none" | "embedding" | "reranker" | "ocr",
     testResult: SingleModelTestResult | null,
+    probeRole: ModelProbeRole,
   ) => {
-    if (!selectedProvider) return;
+    if (!selectedProvider) throw new Error("Không tìm thấy provider.");
     const currentModels = selectedProvider.models || [];
     if (!currentModels.includes(modelId)) {
       const updated = [...currentModels, modelId];
-      updateMutation.mutate({
+      await updateMutation.mutateAsync({
         id: selectedProvider.id,
-        payload: { models: updated },
+        payload: {
+          models: updated,
+          model_capabilities: {
+            [modelId]: {
+              probe_role: probeRole,
+              vision: isVision,
+              reasoning: isReasoning,
+              embedding_dimension:
+                probeRole === "embedding" && testResult?.success
+                  ? testResult.embedding_dimension
+                  : null,
+            },
+          },
+        },
       });
       if (testResult) {
         setModelTestResults((prev) => ({
           ...prev,
           [modelId]: testResult,
         }));
+      }
+      if (defaultRole !== "none") {
+        await apiClient.setProviderModelAsDefault(
+          selectedProvider.id,
+          defaultRole,
+          modelId,
+        );
+        await queryClient.invalidateQueries({
+          queryKey: ["system-model-defaults"],
+        });
       }
     }
   };

@@ -245,6 +245,8 @@ class ModelCatalogService:
         model_spec = model_specs.get(model_name) or {}
         raw_dimension = model_spec.get("dimension") or model_spec.get("dims")
         if raw_dimension is None:
+            raw_dimension = (extra_config.get("model_capabilities") or {}).get(model_name, {}).get("embedding_dimension")
+        if raw_dimension is None:
             raw_dimension = legacy_dimensions.get(model_name)
         if raw_dimension is None:
             raw_dimension = extra_config.get("embedding_dimension")
@@ -398,12 +400,14 @@ class ModelCatalogService:
             for m in models_list:
                 m_lower = m.lower()
                 m_spec = p_specs.get(m) or {}
+                capability = (p_extra.get("model_capabilities") or {}).get(m)
                 m_dim_raw = m_spec.get("dimension") or m_spec.get("dims")
+                if m_dim_raw is None and capability:
+                    m_dim_raw = capability.get("embedding_dimension")
                 m_dim = int(m_dim_raw) if m_dim_raw is not None else None
 
-                if (
-                    "bge" in m_lower or "embed" in m_lower
-                ) and "rerank" not in m_lower:
+                is_embedding = capability.get("probe_role") == "embedding" if capability else ("bge" in m_lower or "embed" in m_lower) and "rerank" not in m_lower
+                if is_embedding:
                     desc = (
                         f"Nhúng vector {m_dim} chiều qua {p.name}"
                         if m_dim
@@ -420,7 +424,7 @@ class ModelCatalogService:
                             dimension=m_dim,
                         )
                     )
-                if "rerank" in m_lower:
+                if (capability.get("probe_role") == "reranker" if capability else "rerank" in m_lower):
                     available_rerankers.append(
                         ModelOption(
                             provider_id=p.id,
@@ -433,7 +437,9 @@ class ModelCatalogService:
                     )
 
                 is_ocr_candidate = False
-                if "can_ocr" in m_spec:
+                if capability:
+                    is_ocr_candidate = capability.get("probe_role") == "ocr" or bool(capability.get("vision"))
+                elif "can_ocr" in m_spec:
                     is_ocr_candidate = bool(m_spec.get("can_ocr"))
                 else:
                     is_ocr_candidate = (

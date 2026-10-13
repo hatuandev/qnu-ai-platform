@@ -1,0 +1,74 @@
+{
+  "id": "bkp_1119193a9bff47fba10b2ec65672b565",
+  "created_at": "2026-10-13T15:05:11.157519Z",
+  "updated_at": "2026-10-13T15:05:28.653490Z",
+  "actor_id": "fixture-admin",
+  "correlation_id": "fixture-424-import-drill",
+  "operation": "drill",
+  "status": "completed",
+  "stage": "Khôi phục thử đạt",
+  "progress": 100,
+  "size_bytes": 34252,
+  "sha256": "85cb0e6c2c67c1db65391fbe2ec036bee09b9ca831d8611cfa355abdf3805969",
+  "verified_at": "2026-10-13T15:05:16.177689Z",
+  "drill_at": "2026-10-13T15:05:28.609069Z",
+  "error": null,
+  "pid": 14896,
+  "components": {
+    "archive": {
+      "format": "qnu-backup-v1",
+      "release": "development",
+      "app_version": "0.1.0",
+      "schema": [
+        "fixture_418"
+      ],
+      "note": "Toàn vẹn không chứng minh tương thích release hoặc chất lượng chatbot."
+    },
+    "drill": {
+      "tables": 6,
+      "provider_keys_checked": 2,
+      "vector_collections": 1,
+      "files_verified": 37,
+      "rag_chat_tested": false,
+      "live_restore": false
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-10-13T15:05:11.210540Z",
+      "operation": "import",
+      "status": "unverified",
+      "actor_id": "act_admin_qnu",
+      "correlation_id": "unknown",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:05:11.278406Z",
+      "operation": "drill",
+      "status": "queued",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-424-import-drill",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-13T15:05:28.653490Z",
+      "operation": "drill",
+      "status": "completed",
+      "actor_id": "fixture-admin",
+      "correlation_id": "fixture-424-import-drill",
+      "error": null
+    }
+  ],
+  "pinned": true,
+  "origin": "import",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-13T15:05:28.644048Z",
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

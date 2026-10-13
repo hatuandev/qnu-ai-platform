@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
 from app.modules.modelops.schemas import ChatMessage
 
@@ -45,33 +46,18 @@ class CloudflareAdapter(BaseLLMAdapter):
     ) -> LLMResponse:
         start_time = time.perf_counter()
 
-        # Safe offline mock mode when token or account_id is not set or mock
-        if (
-            not self.api_key
-            or self.api_key in ("mock", "test", "demo", "placeholder")
-            or not self.account_id
-            or self.account_id in ("mock", "test", "demo", "placeholder")
-        ):
-            user_msg = messages[-1].content if messages else ""
-            mock_text = (
-                f"[Cloudflare Workers AI ({self.model_name})] Phản hồi từ mạng lưới Edge toàn cầu của Cloudflare:\n"
-                f"Yêu cầu về Trường ĐH Quy Nhơn đã được giải quyết: '{user_msg[:100]}'."
-            )
-            elapsed = (time.perf_counter() - start_time) * 1000
-            prompt_toks = sum(len(m.content.split()) for m in messages) * 2
-            comp_toks = len(mock_text.split()) * 2
-            return LLMResponse(
-                content=mock_text,
-                provider=self.provider_type,
-                model=self.model_name,
-                prompt_tokens=prompt_toks,
-                completion_tokens=comp_toks,
-                total_tokens=prompt_toks + comp_toks,
-                latency_ms=round(elapsed, 2),
+        # Missing credentials must reach ModelOps fallback, never fabricate success.
+        if not self.api_key or not self.account_id:
+            raise AppException(
+                "Cloudflare chưa có khóa API và Account ID hợp lệ.",
+                code="provider_key_missing",
+                status_code=401,
             )
 
         # Build endpoint with account_id
-        raw_base = self.base_url or "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run"
+        raw_base = (
+            self.base_url or "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run"
+        )
         formatted_base = raw_base.replace("{account_id}", self.account_id)
 
         # Decide whether using REST AI Run (/ai/run/{model}) or OpenAI compat (/ai/v1/chat/completions)
@@ -82,6 +68,7 @@ class CloudflareAdapter(BaseLLMAdapter):
                 "messages": [{"role": m.role, "content": m.content} for m in messages],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "stream": False,
             }
         else:
             # REST run format: /accounts/{account_id}/ai/run/{model_name}
@@ -100,10 +87,16 @@ class CloudflareAdapter(BaseLLMAdapter):
             resp = await client.post(endpoint, json=payload, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+        if data.get("success") is False or data.get("errors") or data.get("error"):
+            raise AppException(
+                "Cloudflare trả lỗi trong phản hồi.",
+                code="MODEL_RESPONSE_PROTOCOL_ERROR",
+                status_code=502,
+            )
 
         # Parse response flexibly: REST format or OpenAI format
         content = ""
-        prompt_tokens = sum(len(m.content.split()) for m in messages) * 2
+        prompt_tokens = 0
         completion_tokens = 0
 
         if "result" in data and isinstance(data["result"], dict):
@@ -113,6 +106,9 @@ class CloudflareAdapter(BaseLLMAdapter):
                 content = str(raw_resp.get("text") or raw_resp.get("content") or "")
             else:
                 content = str(raw_resp or "")
+            usage = data["result"].get("usage") or {}
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
         elif "choices" in data and isinstance(data["choices"], list):
             # OpenAI compatible format: {"choices": [{"message": {"content": "..."}}]}
             content = str(data["choices"][0].get("message", {}).get("content", ""))
@@ -120,9 +116,12 @@ class CloudflareAdapter(BaseLLMAdapter):
                 prompt_tokens = data["usage"].get("prompt_tokens", prompt_tokens)
                 completion_tokens = data["usage"].get("completion_tokens", 0)
 
-        if not completion_tokens:
-            completion_tokens = len(content.split()) * 2 if content else 0
-
+        if not content.strip():
+            raise AppException(
+                "Cloudflare không trả nội dung trả lời hợp lệ.",
+                code="MODEL_RESPONSE_PROTOCOL_ERROR",
+                status_code=502,
+            )
         elapsed = (time.perf_counter() - start_time) * 1000
 
         return LLMResponse(

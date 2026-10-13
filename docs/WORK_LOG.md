@@ -6,6 +6,92 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-14** | Codex | Review văn bản thuyết minh tuyển sinh2026 | 56đoạn/16nhóm; gaps/provenance/year2025 trongfile2026/testFAQ không độc lập; khôngcode/upload; batch429completed40HTTP200 chưa accuracy | [Nhật ký #430](./nhat_ky/2026-10-14_phien_430_review_van_ban_thuyet_minh_tuyen_sinh.md) |
+
+| **2026-10-14** | Codex | Sửa chứng cứ RAG/DAG và tối ưu BM25 | Atomic list/row/year/intent; focus82/Ruff/full1175pass11baselinefail; final live batch còn chạy, corpus thiếu một số82câu, chờ văn bản tổng hợp để đối soát | [Nhật ký #429](./nhat_ky/2026-10-14_phien_429_sua_evidence_va_toi_uu_bm25.md) |
+
+| **2026-10-14** | Codex | Bỏ quota nội bộ và test lại20 RAG/DAG | Defaults0/presetnull/currentDB0 giữcounter;focus55/unit10+PG1/Ruff/full1158pass11baselinefail;40live0quota nhưng còncoverage/quote/intent errors, chưa accuracy | [Nhật ký #428](./nhat_ky/2026-10-14_phien_428_bo_quota_noi_bo_va_test_20_cau.md) |
+
+| **2026-10-13** | Codex | Test 20 câu đầu RAG/DAG với GPT-OSS/Gemma | 40 lượt:2 answered đúng địa chỉ/2 precedence errors/36 quota;5.002.480/5M token,16 GPT-OSS calls; cần quyền quota, chưa accuracy20; không runtime/reset | [Nhật ký #427](./nhat_ky/2026-10-13_phien_427_test_20_cau_rag_dag.md) |
+
+| **2026-10-13** | Codex | Ổn định /models đa provider và capability probes | Retry/status/roles/credentials/native adapters/UI save; live6 đạt, focus118/PG1/FE5/build/Ruff; full1148pass11baselinefail12skip; không reset/config thật | [Nhật ký #426](./nhat_ky/2026-10-13_phien_426_on_dinh_modelops_da_provider.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán Custom Gateway test model lỗi giả404 | Live32tokens HTTP200/length/trống;256tokens OK; đề xuất bounded probe/đúng mã UI; chỉ diagnosis, backup tạm dừng | [Nhật ký #425](./nhat_ky/2026-10-13_phien_425_chan_doan_custom_gateway_probe.md) |
+
+| **2026-10-13** | Codex | Sao lưu đợt2 theo secret mount ngoài và S3/MinIO | Import+internal relay drill/S3 readback/schedule/soft removal; Windows/Ubuntu/integration/FE đạt; full1113pass11baselinefail11skip; không bật thật | [Nhật ký #424](./nhat_ky/2026-10-13_phien_424_sao_luu_dot_2.md) |
+
+| **2026-10-13** | Codex | Gỡ 5 bản sao lưu thất bại theo yêu cầu | Chuyển metadata vào .removed-423 có thể phục hồi; locks/checksums đạt, catalogue0; không reset DB/tạo backup mới | [Nhật ký #423](./nhat_ky/2026-10-13_phien_423_go_nam_backup_that_bai.md) |
+
+| **2026-10-13** | Codex | Gỡ blocker backup bằng đối soát 3 workflow legacy | User cho phép; exact-ID conditional transaction/audit, giữ input/output/nodes; commit3/readback running0/jobs0; không reset hay replay | [Nhật ký #422](./nhat_ky/2026-10-13_phien_422_doi_soat_ba_workflow_legacy.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán backup thất bại sau sửa launcher | Lần mới đã chạy, bị chặn bởi 3 workflow HTTP500 cũ thiếu deadline; read-only đối chiếu; đề xuất sửa đúng 3 trạng thái, chưa ghi DB | [Nhật ký #421](./nhat_ky/2026-10-13_phien_421_chan_doan_backup_workflow_cu.md) |
+
+| **2026-10-13** | Codex | Sửa backup tương thích Windows và Ubuntu | Launcher offload/Popen, mật khẩu UTF-8; Windows30/Ubuntu27+3skip/integration đạt; full1101pass11baselinefail; không reset hay backup thật | [Nhật ký #420](./nhat_ky/2026-10-13_phien_420_fix_backup_windows_ubuntu.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán backup503 trên Windows reload | Xác nhận request loop Selector/subprocess NotImplemented; test418 thiếu chế độ này; đề xuất launcher offload; chưa fix/reset/backup | [Nhật ký #419](./nhat_ky/2026-10-13_phien_419_chan_doan_backup_windows_reload.md) |
+
+| **2026-10-13** | Codex | Backup đợt1: whole-installation encrypted + isolated drill | Unit24/realstores/Ruff/FEbuild đạt;full1095pass11baselinefail10skip;không backup/restore/reset thật;chưa schedule/remote | [Nhật ký #418](./nhat_ky/2026-10-13_phien_418_sao_luu_dot_1.md) |
+
+| **2026-10-13** | Codex | Đợt 2 chatbot: chứng cứ RAG/DAG và finalize | Ruff/full1071pass11baselinefail9skip;45focused/31PGcorpus/3PGexpired;fix500retry5OK;đãthử1–43/2build,44–82chưa/helperdừngmấtkếtnối/chưanghiệmthu | [Nhật ký #417](./nhat_ky/2026-10-13_phien_417_dot_2_evidence_va_chatbot.md) |
+
+| **2026-10-13** | Codex | Đợt 1 chatbot: readiness, reranker AI server, workflow | Readiness19/93; rerank AI +chatLuna completed6; provider pin/audit/deadline; Ruff/FE3/build/PG đạt, full1041pass11baselinefail5skip; chưa đợt2/khôngreset/publish | [Nhật ký #416](./nhat_ky/2026-10-13_phien_416_dot_1_readiness_reranker_va_workflow.md) |
+
+| **2026-10-13** | Codex | Đánh giá trợ lý sau đổi model và đề xuất | 14criticalDAG/10Luna+1Gemini; evidence missing/readinessfalseblock/rerankerpair/500orphan; chỉdiagnosis+plan, khôngreset/fix/publish | [Nhật ký #415](./nhat_ky/2026-10-13_phien_415_de_xuat_xu_ly_chatbot_sau_doi_model.md) |
+
+| **2026-10-13** | Codex | Sửa test/runtime ModelOps 9router | Request contract chung/probe hợp lệ/temp negotiation/servedmodel/usage thật;live2model+chat+streamOK;92focused/Ruff/full1028pass11baselinefail | [Nhật ký #414](./nhat_ky/2026-10-13_phien_414_fix_modelops_9router_request_contract.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán /models và model chatbot mới | 9routerlocal2modelOK với32tokens; QNUtest1token400; runtimeunsupportedtemp/SSE, fallbackLlama; đềxuấtcapabilitycontract/readiness/RAG, chưafix | [Nhật ký #413](./nhat_ky/2026-10-13_phien_413_chan_doan_modelops_9router_va_de_xuat.md) |
+
+| **2026-10-13** | Codex | Test bộ 82 câu hỏi tuyển sinh | 164API200/82traces; DAG48answered/34noanswer nhưng có sai nghiêm trọng; CloudflareLlama fallback; diagnostic/report, không runtime/reset/publish | [Nhật ký #412](./nhat_ky/2026-10-13_phien_412_test_bo_cau_hoi_chatbot_tuyen_sinh.md) |
+
+| **2026-10-13** | Codex | Triển khai xuất bản tài liệu được chọn | Exact revisions/partial preserve/CAS/audit + candidate/FEtargets;12unit/DBroundtrip/FE8/Ruff/Biome/build đạt | [Nhật ký #411](./nhat_ky/2026-10-13_phien_411_xuat_ban_nguon_da_chon.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán và đề xuất xuất bản nguồn được chọn | FE/BE gate toàn kho; selected same-generation giữ tài liệu đang serving, đổi model vẫn full; chưa triển khai | [Nhật ký #410](./nhat_ky/2026-10-13_phien_410_de_xuat_xuat_ban_nguon_da_chon.md) |
+
+| **2026-10-13** | Codex | Nạp vector và xuất bản kho tuyển sinh | 19/19 nguồn active,227chunks/3428facts,parity/Qdrant/RAG thật đạt; fix thống kê source/model;35focused/Ruff đạt | [Nhật ký #409](./nhat_ky/2026-10-13_phien_409_nap_vector_va_xuat_ban_tuyen_sinh.md) |
+
+| **2026-10-13** | Codex | Cập nhật trạng thái khi quay lại sau duyệt Studio | Invalidation/refetch inactive list/summary/vector theo nguồn; QueryClient regression, Biome và build đạt | [Nhật ký #408](./nhat_ky/2026-10-13_phien_408_cap_nhat_trang_thai_sau_duyet_studio.md) |
+
+| **2026-10-13** | Codex | Fix persist duyệt và phạm vi nguồn | JSONB copy-on-write để persist review; blocker giao đúng targets; BE10/FE52/Ruff/Biome/build đạt | [Nhật ký #407](./nhat_ky/2026-10-13_phien_407_fix_persist_duyet_va_pham_vi_nguon.md) |
+
+| **2026-10-13** | Codex | Fix hộp thoại xác nhận duyệt nhiều nguồn | Không reset DB; đưa confirm/mutation ra khỏi modal cha, khóa action cạnh tranh; Biome và frontend build đạt | [Nhật ký #406](./nhat_ky/2026-10-13_phien_406_fix_hop_thoai_duyet_nhieu_nguon.md) |
+
+| **2026-10-13** | Codex | Fix duyệt Studio OCR và duyệt nhiều nguồn | Artifact-derived review contract; bulk atomic + UI xác nhận/chọn nguồn; publish gate đúng; backend/FE regression và build đạt | [Nhật ký #405](./nhat_ky/2026-10-13_phien_405_fix_duyet_studio_va_duyet_nhieu_nguon.md) |
+
+| **2026-10-13** | Codex | Chẩn đoán publish 409 sau khởi động lại | 19 index đạt nhưng 8 source ready/artifact required; FE/backend lệch state contract, Redis queue0; chỉ read-only | [Nhật ký #404](./nhat_ky/2026-10-13_phien_404_chan_doan_publish_409_sau_khoi_dong_lai.md) |
+
+| **2026-10-13** | Codex | Kiểm tra Redis có giữ lỗi upload cũ | Live không ARQ keys; retry dùng job/attempt ID mới; xác định worker cũ/artifact DB là rủi ro chính, không mutation | [Nhật ký #403](./nhat_ky/2026-10-13_phien_403_kiem_tra_redis_job_loi_cu.md) |
+
+| **2026-10-13** | Codex | Fix đồng bộ trạng thái duyệt dữ liệu cấu trúc | Invariant reuse/reparse + legacy review + migration; live 8 chờ duyệt/11 ready, focused 8/8 đạt; không tự duyệt/publish | [Nhật ký #402](./nhat_ky/2026-10-13_phien_402_fix_dong_bo_structured_review.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán xuất bản bị chặn và log worker | 19/19 index/parity đạt; 8 artifact review-required nhưng revision ready do reuse lệch trạng thái; chưa sửa/duyệt/publish | [Nhật ký #401](./nhat_ky/2026-10-12_phien_401_chan_doan_xuat_ban_bi_chan_va_worker.md) |
+
+| **2026-10-12** | Codex | Triển khai Fact nội dung dài và rollback job index | key/label/full TEXT, artifact v5, GIN FTS, migration/backfill; PostgreSQL >512 và rollback regression đạt | [Nhật ký #400](./nhat_ky/2026-10-12_phien_400_trien_khai_fact_noi_dung_dai.md) |
+
+| **2026-10-12** | Codex | Đề xuất Fact cho nội dung dài | Tách deterministic key/UI label/full TEXT/provenance; hash+FTS, parent-child chunks và migration an toàn; chưa triển khai | [Nhật ký #399](./nhat_ky/2026-10-12_phien_399_de_xuat_fact_noi_dung_dai.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán hai job nạp vector treo | Fact entity_name vượt512 + thiếu rollback làm kẹt running10%; runtime sau đó bị reset ngoài phiên; chưa sửa/retry/publish | [Nhật ký #398](./nhat_ky/2026-10-12_phien_398_chan_doan_hai_job_nap_vector_treo.md) |
+
+| **2026-10-12** | Codex | Giữ kết quả công thức DOCX khi tạo preview | PDF Gotenberg thật đúng tổng, gốc không đổi; field safety/version/Ruff/tests đạt; chưa reparse dữ liệu | [Nhật ký #397](./nhat_ky/2026-10-12_phien_397_docx_preview_giu_ket_qua_cong_thuc.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán DOCX tổng thạc sĩ lệch PDF | OOXML SUM/cached totals đúng, preview tính lại sai cột ô gộp; review header5–6; chưa sửa | [Nhật ký #396](./nhat_ky/2026-10-12_phien_396_docx_formula_preview_sai_cot.md) |
+
+| **2026-10-12** | Codex | Hàng đợi khóa embedding | Busy wait/retry/heartbeat/UI;20jobs1key PostgreSQL/32focused/FEbuild đạt; publish giữCAS, chưa restart/retry dữ liệu | [Nhật ký #395](./nhat_ky/2026-10-12_phien_395_hang_doi_khoa_embedding.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán tranh chấp khóa embedding | DB một khóa active; lease trước capacity, busy bị báo hết khóa, thiếu retry; chưa sửa runtime/data | [Nhật ký #394](./nhat_ky/2026-10-12_phien_394_chan_doan_tranh_chap_khoa_embedding.md) |
+
+| **2026-10-12** | Codex | Sửa tên nguồn đang chờ duyệt | Latest/import snapshot bulk riêngservingpointer;8nguồnthậtđúngtên,6focused/Ruffđạt;full968/13/2 | [Nhật ký #393](./nhat_ky/2026-10-12_phien_393_ten_nguon_cho_duyet.md) |
+
+| **2026-10-12** | Codex | Fix PID changed identity khi devrestart | Rootstrict/childskiprace;18regression/AST và2restartliveđạt,worker11896/ports3000-8001hoạtđộng | [Nhật ký #392](./nhat_ky/2026-10-12_phien_392_fix_dev_child_shutdown_race.md) |
+
+| **2026-10-12** | Codex | make dev restart cả BE/FE/worker | Launcher chung4entrypoints, fail-closed ownership/cổng,16regression/AST/WhatIf đạt; user chạydev áp dụng, chưa stoplive | [Nhật ký #391](./nhat_ky/2026-10-12_phien_391_make_dev_restart_be_fe_worker.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán restart BE vẫn lỗi OCR trang8 | Worker10008 giữ code cũ, launcher reuse PID; classifier mới nhận đúng blank trên cùngSHA; chưa stop/start/retry | [Nhật ký #390](./nhat_ky/2026-10-12_phien_390_worker_cu_giu_blank_guard.md) |
+
+| **2026-10-12** | Codex | Mixed visual ingestion và tiến độ xử lý | 20/20 extraction thật không exception; blank trang8/52 mã ngành/header/nối trang; progress độc lập status; còn8 review/full13 lỗi ngoài scope | [Nhật ký #389](./nhat_ky/2026-10-12_phien_389_mixed_visual_ingestion_va_progress.md) |
+
+| **2026-10-12** | Codex | Chẩn đoán batch20 tài liệu tuyển sinh | 11 thành công/8 cần duyệt/1 blank scan lỗi; phát hiện OCR routing và bảng/header/identity; chỉ read-only/đề xuất | [Nhật ký #388](./nhat_ky/2026-10-12_phien_388_chan_doan_batch_20_tai_lieu.md) |
+
 | **2026-10-12** | Codex | Context review/migration và legacy table RAG | Xuyên trang/identity/numeric mapping; runtime RAG-DAG-SSE đúng2024/25,missing2026,IELTS9;950pass/11baseline/2skip; khôngreset/publish, plancònphầnnângcao | [Nhật ký #387](./nhat_ky/2026-10-12_phien_387_context_review_va_legacy_table_rag.md) |
 
 | **2026-10-12** | Codex | Triển khai đợt đầu Kế hoạch14 temporal facts/RAG-DAG gate | Metadata/header context, missing/partial decision, rewrite/cache/UI; Ruff/build/37 focused đạt; Docker/DB down chặn final E2E, plan còn việc | [Nhật ký #386](./nhat_ky/2026-10-12_phien_386_temporal_facts_va_common_answer_gate.md) |

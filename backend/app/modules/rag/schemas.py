@@ -94,6 +94,11 @@ class SearchResponse(BaseModel):
 
 
 class Citation(BaseModel):
+    evidence_origin: str | None = None
+    fact_id: str | None = None
+    span_start: int | None = None
+    span_end: int | None = None
+    canonical_hash: str | None = None
     source_id: str
     title: str
     section: str | None = None
@@ -108,6 +113,8 @@ class Citation(BaseModel):
 
 
 class AskRequest(BaseModel):
+    original_question: str | None = Field(None, min_length=1, max_length=4000,
+        description="Câu hỏi gốc được DAG giữ lại trước bước viết lại truy vấn")
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")
     collection_id: str = Field(..., description="Mã bộ sưu tập tri thức")
     module_code: str = Field(
@@ -120,6 +127,7 @@ class AskRequest(BaseModel):
     thinking_budget: int = Field(0, ge=0, le=4096, description="Ngân sách token suy nghĩ ngầm (0 = tắt)")
     preferred_model_name: str | None = None
     preferred_provider_id: str | None = None
+    fallback_provider_id: str | None = None
     assistant_code: str | None = None
     assistant_revision: str | None = None
     runtime_policy: dict[str, Any] = Field(default_factory=dict)
@@ -141,7 +149,7 @@ class AskRequest(BaseModel):
 
     def policy_fingerprint(self) -> str:
         payload = self.model_dump(exclude={"question", "conversation_id", "history", "snapshot_id", "retrieval_snapshot"})
-        return "v3-temporal-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")).hexdigest()
+        return "v4-evidence-" + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")).hexdigest()
 
 
 class AskResponse(BaseModel):

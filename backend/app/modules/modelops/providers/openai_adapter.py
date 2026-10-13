@@ -1,21 +1,28 @@
-"""OpenAI Provider Adapter for GPT-4o, GPT-4o-mini."""
+"""OpenAI-compatible chat transport with explicit JSON/SSE contracts."""
 
 from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
+from app.modules.modelops.providers.chat_contract import (
+    MAX_NEGOTIATIONS,
+    adapt_rejected_payload,
+    build_chat_payload,
+    decode_completion,
+    decode_stream_event,
+    post_chat,
+)
 from app.modules.modelops.schemas import ChatMessage
 
 
 class OpenAIAdapter(BaseLLMAdapter):
-    """Adapter for OpenAI API and OpenAI-compatible providers (Ollama, OpenRouter, vLLM)."""
-
     def __init__(
         self,
         model_name: str,
@@ -23,110 +30,92 @@ class OpenAIAdapter(BaseLLMAdapter):
         base_url: str | None = None,
         timeout_seconds: int = 15,
         provider_type: str = "openai",
-        **kwargs,
+        request_capabilities: dict[str, Any] | None = None,
+        **kwargs: Any,
     ):
-        super().__init__(model_name, api_key, base_url, timeout_seconds, **kwargs)
+        super().__init__(model_name, api_key, base_url, timeout_seconds)
         self._provider_type_override = provider_type
+        self.request_capabilities = dict(request_capabilities or {})
+        self.served_model = model_name
+        self.stream_usage: dict[str, int] = {}
 
     @property
     def provider_type(self) -> str:
-        return self._provider_type_override or "openai"
+        return self._provider_type_override
+
+    def _headers(self) -> dict[str, str]:
+        effective_key = self.api_key
+        if not effective_key and self.provider_type in ("ollama", "local", "vllm", "tei"):
+            effective_key = self.provider_type
+        if not effective_key:
+            raise AppException(
+                f"Chưa cấu hình API Key cho provider '{self.provider_type}'.",
+                code="provider_key_missing",
+                status_code=401,
+            )
+        headers = {"Authorization": f"Bearer {effective_key}", "Content-Type": "application/json"}
+        if self.provider_type == "openrouter":
+            headers.update({"HTTP-Referer": "https://qnu.edu.vn", "X-Title": "QNU AI Platform"})
+        return headers
+
+    def _payload(
+        self,
+        messages: list[ChatMessage],
+        temperature: float,
+        max_tokens: int,
+        stream: bool,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        payload = build_chat_payload(
+            self.model_name,
+            [m.model_dump() for m in messages],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=stream,
+            capabilities=self.request_capabilities,
+        )
+        if kwargs.get("enable_thinking") or kwargs.get("thinking_budget"):
+            payload["chat_template_kwargs"] = {"enable_thinking": True}
+        return payload
 
     async def generate(
         self,
         messages: list[ChatMessage],
         temperature: float = 0.2,
         max_tokens: int = 2000,
-        **kwargs,
+        **kwargs: Any,
     ) -> LLMResponse:
-        start_time = time.perf_counter()
-        base_url = self.base_url or "https://api.openai.com/v1"
-        endpoint = f"{base_url.rstrip('/')}/chat/completions"
-
-        # Check API key configuration: local/on-premise providers like Ollama do not require an API key
-        effective_key = self.api_key
-        is_local_or_ollama = (
-            self.provider_type in ("ollama", "local", "custom")
-            or "11434" in (self.base_url or "")
-            or "localhost" in (self.base_url or "")
-            or "100." in (self.base_url or "")
-        )
-        if not effective_key and is_local_or_ollama:
-            effective_key = "ollama"
-
-        if not effective_key:
-            raise AppException(
-                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
-                code="provider_key_missing",
-                status_code=401,
-            )
-
-        # Isolated test mock mode strictly for unit test environments
-        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
-            elapsed = (time.perf_counter() - start_time) * 1000
-            mock_text = f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}."
-            prompt_toks = sum(len(m.content.split()) for m in messages) * 2
-            comp_toks = len(mock_text.split()) * 2
+        started = time.perf_counter()
+        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test") and not kwargs.get("probe"):
             return LLMResponse(
-                content=mock_text,
-                provider=self.provider_type,
-                model=self.model_name,
-                prompt_tokens=prompt_toks,
-                completion_tokens=comp_toks,
-                total_tokens=prompt_toks + comp_toks,
-                latency_ms=round(elapsed, 2),
+                f"[Test Mock {self.provider_type}] Phản hồi thử nghiệm cho {self.model_name}.",
+                self.provider_type,
+                self.model_name,
+                1,
+                1,
+                2,
             )
-
-        headers = {
-            "Authorization": f"Bearer {effective_key}",
-            "Content-Type": "application/json",
-        }
-        if "openrouter" in (self.base_url or "").lower():
-            headers["HTTP-Referer"] = "https://qnu.edu.vn"
-            headers["X-Title"] = "QNU AI Platform"
-        payload = {
-            "model": self.model_name,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        lower_m = self.model_name.lower()
-        if (
-            "nemotron" in lower_m
-            or "r1" in lower_m
-            or "thinking" in lower_m
-            or "qwq" in lower_m
-            or kwargs.get("enable_thinking")
-            or kwargs.get("thinking_budget")
-        ):
-            payload["chat_template_kwargs"] = {"enable_thinking": True}
-
+        payload = self._payload(messages, temperature, max_tokens, False, **kwargs)
+        endpoint = f"{(self.base_url or 'https://api.openai.com/v1').rstrip('/')}/chat/completions"
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-            resp = await client.post(endpoint, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-
-        choice = data.get("choices", [{}])[0]
-        msg = choice.get("message", {})
-        content = msg.get("content") or ""
-        reasoning_content = msg.get("reasoning_content") or ""
-        if not content and reasoning_content:
-            content = reasoning_content
-
-        usage = data.get("usage", {})
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        completion_tokens = usage.get("completion_tokens", 0)
-        total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
-        elapsed = (time.perf_counter() - start_time) * 1000
-
+            response = await post_chat(
+                client,
+                endpoint,
+                self._headers(),
+                payload,
+                self.request_capabilities,
+                probe=kwargs.get("probe", False),
+            )
+            content, usage, served_model = decode_completion(response)
+        self.served_model = served_model or self.model_name
         return LLMResponse(
             content=content,
             provider=self.provider_type,
-            model=self.model_name,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            latency_ms=round(elapsed, 2),
+            model=self.served_model,
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
         )
 
     async def stream(
@@ -134,91 +123,56 @@ class OpenAIAdapter(BaseLLMAdapter):
         messages: list[ChatMessage],
         temperature: float = 0.2,
         max_tokens: int = 2000,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[str]:
-        # Check API key configuration: local/on-premise providers like Ollama do not require an API key
-        effective_key = self.api_key
-        is_local_or_ollama = (
-            self.provider_type in ("ollama", "local", "custom")
-            or "11434" in (self.base_url or "")
-            or "localhost" in (self.base_url or "")
-            or "100." in (self.base_url or "")
-        )
-        if not effective_key and is_local_or_ollama:
-            effective_key = "ollama"
-
-        if not effective_key:
-            raise AppException(
-                f"Chưa cấu hình API Key cho nhà cung cấp '{self.provider_type}' (mô hình: {self.model_name}).",
-                code="provider_key_missing",
-                status_code=401,
-            )
-
-        # Isolated test mock mode strictly for unit test environments
         if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
-            response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
-            for word in response.content.split(" "):
-                yield word + " "
+            yield (await self.generate(messages, temperature, max_tokens, **kwargs)).content
             return
-
-        base_url = self.base_url or "https://api.openai.com/v1"
-        endpoint = f"{base_url.rstrip('/')}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {effective_key}",
-            "Content-Type": "application/json",
-        }
-        if "openrouter" in (self.base_url or "").lower():
-            headers["HTTP-Referer"] = "https://qnu.edu.vn"
-            headers["X-Title"] = "QNU AI Platform"
-        payload = {
-            "model": self.model_name,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True,
-        }
-        lower_m = self.model_name.lower()
-        if (
-            "nemotron" in lower_m
-            or "r1" in lower_m
-            or "thinking" in lower_m
-            or "qwq" in lower_m
-            or kwargs.get("enable_thinking")
-            or kwargs.get("thinking_budget")
-        ):
-            payload["chat_template_kwargs"] = {"enable_thinking": True}
-
-        try:
-            import json
-            async with (
-                httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client,
-                client.stream("POST", endpoint, json=payload, headers=headers) as resp,
-            ):
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if not line or not line.startswith("data:"):
-                        continue
-                    chunk_str = line[5:].strip()
-                    if chunk_str == "[DONE]":
-                        break
-                    try:
-                        chunk_data = json.loads(chunk_str)
-                        choices = chunk_data.get("choices", [])
-                        if not choices:
+        payload = self._payload(messages, temperature, max_tokens, True, **kwargs)
+        endpoint = f"{(self.base_url or 'https://api.openai.com/v1').rstrip('/')}/chat/completions"
+        self.stream_usage = {}
+        async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
+            for attempt in range(MAX_NEGOTIATIONS + 1):
+                async with client.stream(
+                    "POST", endpoint, headers=self._headers(), json=payload
+                ) as response:
+                    if response.status_code >= 400:
+                        await response.aread()
+                        if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
+                            response, payload, self.request_capabilities
+                        ):
                             continue
-                        delta = choices[0].get("delta", {})
-                        token = delta.get("content")
-                        if token:
-                            yield token
-                        else:
-                            reasoning = delta.get("reasoning_content")
-                            if reasoning:
-                                yield reasoning
-                    except json.JSONDecodeError:
-                        continue
-        except Exception:
-            # Fallback to standard generate if streaming fails
-            response = await self.generate(messages, temperature=temperature, max_tokens=max_tokens, **kwargs)
-            words = response.content.split(" ")
-            for word in words:
-                yield word + " "
+                        response.raise_for_status()
+                    if "text/event-stream" not in response.headers.get("content-type", ""):
+                        raise AppException(
+                            "Provider không trả SSE cho stream=true.",
+                            code="MODEL_RESPONSE_PROTOCOL_ERROR",
+                            status_code=502,
+                        )
+                    has_content = False
+                    has_finish = False
+                    async for line in response.aiter_lines():
+                        event = decode_stream_event(line)
+                        if event is None:
+                            continue
+                        if event.get("done"):
+                            has_finish = True
+                            break
+                        self.served_model = event.get("model") or self.served_model
+                        if event.get("usage"):
+                            self.stream_usage = event["usage"]
+                        choices = event.get("choices", [])
+                        if choices:
+                            choice = choices[0]
+                            has_finish = has_finish or choice.get("finish_reason") is not None
+                            content = choice.get("delta", {}).get("content")
+                            if content:
+                                has_content = True
+                                yield content
+                    if not has_content or not has_finish:
+                        raise AppException(
+                            "Provider trả SSE rỗng hoặc bị ngắt.",
+                            code="MODEL_RESPONSE_PROTOCOL_ERROR",
+                            status_code=502,
+                        )
+                    return

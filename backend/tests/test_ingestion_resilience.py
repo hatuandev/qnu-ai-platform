@@ -23,7 +23,7 @@ def test_success_is_independent_of_other_items_and_failure_is_not_100():
 
     assert item_progress("succeeded", "completed", 90) == 100
     assert item_progress("processing", "parse", 20) == 20
-    assert item_progress("failed", "failed", 70) == 70
+    assert item_progress("failed", "failed", 70) == 100
     assert item_progress("queued", "snapshot", 90) == 0
 
 

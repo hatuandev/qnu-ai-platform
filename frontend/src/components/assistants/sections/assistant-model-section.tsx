@@ -15,11 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  type AssistantModelOption,
+  selectedModelValue,
+} from "@/features/assistants/model-options";
 
 interface AssistantModelSectionProps {
   form: AssistantEditForm;
   onChange: (updated: AssistantEditForm) => void;
-  availableModels: { value: string; label: string; providerName: string }[];
+  availableModels: AssistantModelOption[];
 }
 
 export function AssistantModelSection({
@@ -47,11 +51,19 @@ export function AssistantModelSection({
         )}
         <Field htmlFor="detail-primary-model" label="Mô hình chính (Primary)">
           <Select
-            value={form.primary_model || "__none__"}
+            value={selectedModelValue(
+              availableModels,
+              form.primary_model,
+              form.preferred_provider_id,
+            )}
             onValueChange={(val) =>
               onChange({
                 ...form,
-                primary_model: val === "__none__" ? "" : val,
+                primary_model:
+                  availableModels.find((m) => m.value === val)?.model ?? "",
+                preferred_provider_id:
+                  availableModels.find((m) => m.value === val)?.providerId ??
+                  "",
               })
             }
           >
@@ -74,11 +86,19 @@ export function AssistantModelSection({
           label="Mô hình dự phòng (Fallback)"
         >
           <Select
-            value={form.fallback_model || "__none__"}
+            value={selectedModelValue(
+              availableModels,
+              form.fallback_model,
+              form.fallback_provider_id,
+            )}
             onValueChange={(val) =>
               onChange({
                 ...form,
-                fallback_model: val === "__none__" ? "" : val,
+                fallback_model:
+                  availableModels.find((m) => m.value === val)?.model ?? "",
+                fallback_provider_id:
+                  availableModels.find((m) => m.value === val)?.providerId ??
+                  "",
               })
             }
           >

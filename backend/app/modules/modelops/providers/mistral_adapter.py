@@ -10,6 +10,7 @@ import httpx
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.base import BaseLLMAdapter, LLMResponse
+from app.modules.modelops.providers.chat_contract import decode_completion, post_chat
 from app.modules.modelops.schemas import ChatMessage
 
 
@@ -40,7 +41,11 @@ class MistralAdapter(BaseLLMAdapter):
             )
 
         # Isolated test mock mode strictly for unit test environments
-        if settings.ENVIRONMENT in ("test", "testing") and self.api_key in ("mock", "test"):
+        if (
+            settings.ENVIRONMENT in ("test", "testing")
+            and self.api_key in ("mock", "test")
+            and not kwargs.get("probe")
+        ):
             elapsed = (time.perf_counter() - start_time) * 1000
             mock_text = f"[Mistral AI {self.model_name}] Phản hồi thử nghiệm."
             prompt_toks = sum(len(m.content.split()) for m in messages) * 2
@@ -64,16 +69,14 @@ class MistralAdapter(BaseLLMAdapter):
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "temperature": temperature,
             "max_tokens": max_tokens,
+            "stream": False,
         }
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-            resp = await client.post(endpoint, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-
-        choice = data.get("choices", [{}])[0]
-        content = choice.get("message", {}).get("content", "")
-        usage = data.get("usage", {})
+            resp = await post_chat(
+                client, endpoint, headers, payload, {}, probe=kwargs.get("probe", False)
+            )
+            content, usage, served_model = decode_completion(resp)
         prompt_tokens = usage.get("prompt_tokens", 0)
         completion_tokens = usage.get("completion_tokens", 0)
         total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
@@ -82,7 +85,7 @@ class MistralAdapter(BaseLLMAdapter):
         return LLMResponse(
             content=content,
             provider=self.provider_type,
-            model=self.model_name,
+            model=served_model or self.model_name,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,

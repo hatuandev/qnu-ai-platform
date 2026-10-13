@@ -142,8 +142,8 @@ class TenantQuota(Base):
     month_period: Mapped[str] = mapped_column(
         String(7), nullable=False, index=True
     )  # Format: "2026-09"
-    monthly_token_limit: Mapped[int] = mapped_column(Integer, default=5_000_000)
-    monthly_cost_limit_usd: Mapped[float] = mapped_column(Float, default=100.0)
+    monthly_token_limit: Mapped[int] = mapped_column(Integer, default=0)  # 0 = unlimited
+    monthly_cost_limit_usd: Mapped[float] = mapped_column(Float, default=0.0)
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     cost_used_usd: Mapped[float] = mapped_column(Float, default=0.0)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)

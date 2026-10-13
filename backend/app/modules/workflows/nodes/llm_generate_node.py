@@ -53,18 +53,15 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
 
         model_policy = getattr(profile, "model_policy", None) if profile else None
         preferred_model = (
-            config.get("preferred_model_name")
-            or config.get("primary_model")
-            or config.get("model_name")
-            or (getattr(model_policy, "primary_model", None) if model_policy else None)
+            model_policy.primary_model if model_policy else
+            config.get("preferred_model_name") or config.get("primary_model") or config.get("model_name")
         )
         fallback_model = (
-            config.get("fallback_model_name")
-            or config.get("fallback_model")
-            or (getattr(model_policy, "fallback_model", None) if model_policy else None)
+            model_policy.fallback_model if model_policy else
+            config.get("fallback_model_name") or config.get("fallback_model")
         )
-        preferred_provider_id = (config.get("preferred_provider_id") or config.get("provider_id")
-                                 or getattr(model_policy, "preferred_provider_id", None))
+        preferred_provider_id = (model_policy.preferred_provider_id if model_policy else
+                                 config.get("preferred_provider_id") or config.get("provider_id"))
 
         gen_req = LLMGenerateRequest(
             messages=messages,
@@ -73,6 +70,7 @@ class LLMGenerateNodeHandler(BaseNodeHandler):
             conversation_id=context.conversation_id,
             preferred_model_name=preferred_model,
             fallback_model_name=fallback_model,
+            fallback_provider_id=getattr(model_policy, "fallback_provider_id", None) if model_policy else config.get("fallback_provider_id"),
             preferred_provider_id=preferred_provider_id,
             temperature=getattr(model_policy, "temperature", config.get("temperature", 0.2)),
             max_tokens=getattr(model_policy, "max_tokens", config.get("max_tokens", 2000)),

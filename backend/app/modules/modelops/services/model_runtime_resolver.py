@@ -8,6 +8,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.crypto import decrypt_secret
 from app.core.exceptions import AppException
 from app.modules.modelops.models import ModelProviderConfig
@@ -113,8 +114,10 @@ class ModelRuntimeResolver:
         account_id: str | None = extra.get("account_id")
         key_id: str | None = None
         lease_token: str | None = None
-        acquired = await provider_key_rotation_service.acquire(
+        acquired = await provider_key_rotation_service.acquire_wait(
             db, provider.id, estimated_tokens=estimated_tokens,
+            timeout_seconds=settings.PROVIDER_QUEUE_TIMEOUT_SECONDS,
+            progress_phase=f"waiting_{role}",
             excluded_key_ids=excluded_key_ids,
             lease_seconds=max(120, provider.timeout_seconds + 30),
         )

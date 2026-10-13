@@ -5,12 +5,14 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import re
 import unicodedata
 from typing import Any
 
 import httpx
 
 from app.core.exceptions import AppException
+from app.modules.knowledge.services.html_tables import normalize_html_tables
 from app.modules.ocr.adapters.base import BaseOCRAdapter
 
 logger = logging.getLogger(__name__)
@@ -162,11 +164,16 @@ class PaddleOCRVLAdapter(BaseOCRAdapter):
             if not isinstance(page_text, str):
                 raise AppException("Nội dung trang OCR không hợp lệ.", code="OCR_RESPONSE_INVALID", status_code=502)
             # Enforce Unicode NFC Canonical Normalization
-            normalized_text = unicodedata.normalize("NFC", page_text).strip()
+            normalized_text = normalize_html_tables(unicodedata.normalize("NFC", page_text)).strip()
 
             pruned = item.get("prunedResult") or {}
             # Detect tables from Markdown or pruned result keys
-            has_tables = "|" in normalized_text or "table" in str(pruned).lower()
+            has_tables = bool(re.search(r"(?m)^\s*\|.*\|\s*$", normalized_text)) or bool(
+                re.search(r"<table\b", normalized_text, re.IGNORECASE)
+            ) or any(
+                isinstance(block, dict) and block.get("block_label") == "table"
+                for block in pruned.get("parsing_res_list", [])
+            )
 
             words = len(normalized_text.split())
             lines = len(normalized_text.splitlines()) if normalized_text else 0

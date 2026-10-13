@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -19,6 +20,20 @@ from app.modules.modelops.providers import (
 )
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
+
+
+def install_probe_http(monkeypatch):
+    """Deterministic upstream protocol fixture, never a production mock success path."""
+    original = httpx.AsyncClient
+    def upstream(request):
+        if "gemini-deprecated-404" in request.url.path:
+            return httpx.Response(404, json={"error": {"message": "Unknown model"}})
+        if request.method == "GET":
+            return httpx.Response(200, json={"data": [{"id": "fixture"}]})
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "OK"}]}}],
+                                        "success": True, "result": {"response": "OK", "usage": {"prompt_tokens": 1, "completion_tokens": 1}},
+                                        "usageMetadata": {"totalTokenCount": 2}})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: original(transport=httpx.MockTransport(upstream)))
 
 
 def test_circuit_breaker_lifecycle():
@@ -104,8 +119,9 @@ async def test_mistral_adapter_mock_generation():
 
 
 @pytest.mark.asyncio
-async def test_cloudflare_adapter_mock_generation():
-    """Verify Cloudflare Workers AI adapter returns valid LLMResponse in mock mode."""
+async def test_cloudflare_adapter_http_generation(monkeypatch):
+    """Verify Cloudflare HTTP response is decoded, without production fake content."""
+    install_probe_http(monkeypatch)
     adapter = CloudflareAdapter(
         model_name="@cf/meta/llama-3.3-70b-instruct", api_key="mock", account_id="acc-qnu-test"
     )
@@ -115,7 +131,7 @@ async def test_cloudflare_adapter_mock_generation():
     resp = await adapter.generate(messages)
     assert resp.provider == "cloudflare"
     assert resp.model == "@cf/meta/llama-3.3-70b-instruct"
-    assert "Cloudflare Workers AI" in resp.content
+    assert resp.content == "OK"
     assert resp.total_tokens > 0
 
 
@@ -432,8 +448,9 @@ async def test_api_get_provider_presets():
 
 
 @pytest.mark.asyncio
-async def test_api_key_pool_crud_and_rotation():
+async def test_api_key_pool_crud_and_rotation(monkeypatch):
     """Verify Key Pool management: list, add, update, test, and simulate 429 rotation."""
+    install_probe_http(monkeypatch)
     mock_db = AsyncMock()
     mock_res = MagicMock()
     mock_res.scalar_one.return_value = 0
@@ -580,19 +597,22 @@ async def test_system_model_defaults_api():
 
 
 @pytest.mark.asyncio
-async def test_provider_models_test_all_success():
+async def test_provider_models_test_all_success(monkeypatch):
     """Verify endpoint tests all configured models of a provider and returns status."""
+    install_probe_http(monkeypatch)
     mock_db = AsyncMock()
     cfg_record = ModelProviderConfig(
         id="prov_gemini",
         name="Google Gemini",
         provider_type="gemini",
         is_active=True,
-        api_key_encrypted="mock_key",
+        api_key_encrypted="fixture-key",
+        timeout_seconds=15,
         extra_config={"models": ["gemini-1.5-flash", "gemini-1.5-pro"]},
     )
     mock_res = MagicMock()
     mock_res.scalar_one.return_value = 0
+    mock_res.scalars.return_value.all.return_value = []
     mock_res.scalar_one_or_none.return_value = cfg_record
     mock_db.execute.return_value = mock_res
 
@@ -617,8 +637,9 @@ async def test_provider_models_test_all_success():
 
 
 @pytest.mark.asyncio
-async def test_provider_models_test_single_model_and_invalid():
+async def test_provider_models_test_single_model_and_invalid(monkeypatch):
     """Verify endpoint tests a single model and correctly flags invalid/deprecated models."""
+    install_probe_http(monkeypatch)
     mock_db = AsyncMock()
     cfg_record = ModelProviderConfig(
         id="prov_gemini",
@@ -630,6 +651,7 @@ async def test_provider_models_test_single_model_and_invalid():
     )
     mock_res = MagicMock()
     mock_res.scalar_one.return_value = 0
+    mock_res.scalars.return_value.all.return_value = []
     mock_res.scalar_one_or_none.return_value = cfg_record
     mock_db.execute.return_value = mock_res
 
@@ -746,11 +768,13 @@ async def test_generate_stream_records_usage_and_deducts_quota():
         patch.object(modelops_service, "check_quota_available", new_callable=AsyncMock) as mock_chk,
         patch.object(modelops_service, "get_active_providers", new_callable=AsyncMock) as mock_prov,
         patch("app.modules.modelops.service.get_llm_adapter", return_value=FakeAdapter()),
+        patch.object(modelops_service, "get_or_create_quota", new_callable=AsyncMock) as mock_get_quota,
     ):
         mock_chk.return_value = mock_quota
         mock_prov.return_value = [mock_provider]
 
         chunks = []
+        mock_get_quota.return_value = mock_quota
         async for chunk in modelops_service.generate_stream(mock_db, req):
             chunks.append(chunk)
 
@@ -766,6 +790,7 @@ async def test_generate_stream_records_usage_and_deducts_quota():
         assert usage_logs[0].tenant_id == "tenant_qnu"
         assert usage_logs[0].status == "success"
         assert usage_logs[0].total_tokens > 0
+        assert mock_quota.tokens_used == 1000 + usage_logs[0].total_tokens
 
 
 @pytest.mark.asyncio
@@ -1045,6 +1070,7 @@ async def test_dynamic_model_resolution_respects_custom_and_future_models():
         req = LLMGenerateRequest(
             messages=[ChatMessage(role="user", content="Thử nghiệm mô hình 3.5 mới")],
             preferred_model_name="gemini-3.5-flash",
+            preferred_provider_id="prov_gemini",
         )
         resp = await modelops_service.generate(mock_db, req)
 

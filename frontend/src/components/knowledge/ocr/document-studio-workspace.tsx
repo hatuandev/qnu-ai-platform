@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowLeft,
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
+import { refreshSourceQueries } from "@/features/knowledge/utils/source-query-cache";
 import { saveStudioRevision } from "@/features/knowledge/utils/studio-actions";
 import { mapVerificationDataToStudioDoc } from "@/features/knowledge/utils/studio-mapper";
 import {
@@ -39,6 +41,7 @@ export interface DocumentStudioWorkspaceProps {
 export const DocumentStudioWorkspace: React.FC<
   DocumentStudioWorkspaceProps
 > = ({ collection, documentId, revisionId, onBack, onApproveSuccess }) => {
+  const queryClient = useQueryClient();
   // Document state
   const [doc, setDoc] = useState<StudioOCRDocument | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -250,10 +253,15 @@ export const DocumentStudioWorkspace: React.FC<
           knowledgeApi,
           collection.id,
           documentId,
-          { id: doc.revisionId, status: doc.status },
+          {
+            id: doc.revisionId,
+            status: doc.status,
+            requires_structured_review: doc.requiresStructuredReview,
+          },
           markdown,
           approve,
         );
+        await refreshSourceQueries(queryClient, collection.id, documentId);
         const verified = await knowledgeApi.getSourceStudioView(
           collection.id,
           documentId,
@@ -466,7 +474,10 @@ export const DocumentStudioWorkspace: React.FC<
             variant="outline"
             onClick={() => handleSaveRevision(true)}
             disabled={
-              isApproving || hasEdits || doc?.status !== "review_required"
+              isApproving ||
+              hasEdits ||
+              (doc?.status !== "review_required" &&
+                !doc?.requiresStructuredReview)
             }
           >
             <ShieldCheck className="size-3.5" /> Duyệt
@@ -490,7 +501,7 @@ export const DocumentStudioWorkspace: React.FC<
                   ? "Đang lưu Markdown."
                   : hasEdits
                     ? "Hãy lưu Markdown trước khi nạp vector."
-                    : doc.status !== "ready"
+                    : doc.status !== "ready" || doc.requiresStructuredReview
                       ? "Hãy duyệt Markdown trước khi nạp vector."
                       : undefined
             }
@@ -502,7 +513,7 @@ export const DocumentStudioWorkspace: React.FC<
         <Badge variant="outline">
           {hasEdits
             ? "Markdown chưa lưu"
-            : doc.status === "ready"
+            : doc.status === "ready" && !doc.requiresStructuredReview
               ? "MD sẵn sàng"
               : "Chờ duyệt / xử lý"}
         </Badge>

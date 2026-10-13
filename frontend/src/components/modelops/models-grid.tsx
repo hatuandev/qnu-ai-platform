@@ -9,6 +9,7 @@ import {
   Eye,
   FlaskConical,
   Loader2,
+  Pencil,
   Plus,
   RotateCw,
   ScanText,
@@ -38,10 +39,14 @@ import type {
   SystemModelDefaults,
 } from "../../services/api-client";
 import {
-  getModelCapabilities,
   getModelDisplayName,
   PRESET_SUGGESTED_MODELS,
 } from "./modelops-helpers";
+import {
+  formatProbeDetail,
+  formatProbeStatus,
+  getConfiguredCapabilities,
+} from "./probe-result";
 
 export interface ModelsGridProps {
   selectedProvider: ModelProvider;
@@ -53,6 +58,7 @@ export interface ModelsGridProps {
   isTestingAllModels: boolean;
   testingModelName: string | null;
   onOpenAddModelModal: () => void;
+  onEditModel?: (modelName: string) => void;
   onTestAllModels: (providerId: string) => void;
   onTestSingleModel: (providerId: string, modelName: string) => void;
   onRemoveModel: (provider: ModelProvider, modelName: string) => void;
@@ -70,6 +76,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
   isTestingAllModels,
   testingModelName,
   onOpenAddModelModal,
+  onEditModel,
   onTestAllModels,
   onTestSingleModel,
   onRemoveModel,
@@ -91,19 +98,38 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
     const allM = selectedProvider.models || [];
     if (modelFilter === "all") return allM;
     if (modelFilter === "embedding") {
-      return allM.filter((m) => getModelCapabilities(m).isEmbedding);
+      return allM.filter(
+        (m) =>
+          getConfiguredCapabilities(selectedProvider, m, systemDefaults)
+            .isEmbedding,
+      );
     }
     if (modelFilter === "ocr") {
-      return allM.filter((m) => getModelCapabilities(m).isOcr);
+      return allM.filter(
+        (m) =>
+          getConfiguredCapabilities(selectedProvider, m, systemDefaults).isOcr,
+      );
     }
     if (modelFilter === "vision") {
-      return allM.filter((m) => getModelCapabilities(m).hasVision);
+      return allM.filter(
+        (m) =>
+          getConfiguredCapabilities(selectedProvider, m, systemDefaults)
+            .hasVision,
+      );
     }
     if (modelFilter === "reasoning") {
-      return allM.filter((m) => getModelCapabilities(m).hasReasoning);
+      return allM.filter(
+        (m) =>
+          getConfiguredCapabilities(selectedProvider, m, systemDefaults)
+            .hasReasoning,
+      );
     }
     if (modelFilter === "reranker") {
-      return allM.filter((m) => getModelCapabilities(m).isReranker);
+      return allM.filter(
+        (m) =>
+          getConfiguredCapabilities(selectedProvider, m, systemDefaults)
+            .isReranker,
+      );
     }
     if (modelFilter === "default") {
       return allM.filter(
@@ -130,10 +156,13 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
   };
 
   const currentPreset = presets.find((pr) => pr.code === selectedProvider.type);
-  const suggestedList =
-    currentPreset?.suggested_models ||
-    PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
-    [];
+  const suggestedList = ["custom", "vllm", "tei"].includes(
+    selectedProvider.type,
+  )
+    ? []
+    : currentPreset?.suggested_models ||
+      PRESET_SUGGESTED_MODELS[selectedProvider.type] ||
+      [];
 
   return (
     <Card className="p-6 space-y-5 border-border shadow-xs bg-card">
@@ -142,7 +171,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
         <div className="flex items-center gap-2.5">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
             <Bot className="h-4 w-4 text-primary" />
-            Mô Hình Khả Dụng
+            Mô hình đã cấu hình
           </h2>
           <Badge
             variant="outline"
@@ -209,7 +238,9 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
             variant="outline"
             size="sm"
             disabled={
-              isTestingAllModels || (selectedProvider.models || []).length === 0
+              isTestingAllModels ||
+              testingModelName !== null ||
+              (selectedProvider.models || []).length === 0
             }
             onClick={() => onTestAllModels(selectedProvider.id)}
             className="h-8 px-3 text-xs text-primary border-primary/30 hover:bg-primary/10 gap-1.5 cursor-pointer"
@@ -250,7 +281,11 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
 
           const testRes = modelTestResults[m];
           const isTestingThis = testingModelName === m || isTestingAllModels;
-          const capabilities = getModelCapabilities(m);
+          const capabilities = getConfiguredCapabilities(
+            selectedProvider,
+            m,
+            systemDefaults,
+          );
           const displayName = getModelDisplayName(m);
 
           return (
@@ -465,79 +500,40 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                     <RotateCw className="h-2.5 w-2.5 animate-spin" />
                   </span>
                 ) : testRes ? (
-                  testRes.status === "available" ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-sans border border-emerald-500/20"
-                      title={`Khả dụng (${testRes.latency_ms}ms) - ${testRes.message}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span>{testRes.latency_ms}ms</span>
-                    </span>
-                  ) : testRes.status === "temporarily_overloaded" ||
-                    testRes.message?.includes("503") ||
-                    testRes.message?.includes("quá tải") ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
-                      title={`Máy chủ quá tải tạm thời: ${testRes.message}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                      <span>503 Tạm bận</span>
-                    </span>
-                  ) : testRes.status === "deprecated" ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
-                      title={`Đã hết hạn (410 Gone): ${testRes.message}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
-                      <span>410 Hết hạn</span>
-                    </span>
-                  ) : testRes.status === "payment_required" ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
-                      title={`Yêu cầu nạp credits (HTTP 402): ${testRes.message}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                      <span>402 Credits</span>
-                    </span>
-                  ) : testRes.status === "unavailable" ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
-                      title={`Không tìm thấy (404): ${testRes.message}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
-                      <span>404</span>
-                    </span>
-                  ) : testRes.status === "rate_limited" ? (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded font-sans border border-amber-500/30"
-                      title={testRes.message}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                      <span>429</span>
-                    </span>
-                  ) : (
-                    <span
-                      className="inline-flex items-center gap-1 text-[10px] text-destructive bg-destructive/10 px-1.5 py-0.5 rounded font-sans border border-destructive/30"
-                      title={testRes.message}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-destructive shrink-0" />
-                      <span>Lỗi</span>
-                    </span>
-                  )
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${testRes.success ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-foreground"}`}
+                    title={formatProbeDetail(testRes)}
+                  >
+                    {formatProbeStatus(testRes)}
+                  </span>
                 ) : null}
 
                 {/* Quick Action Buttons */}
-                <button
+                {onEditModel && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => onEditModel(m)}
+                    title="Sửa vai trò model"
+                    aria-label={`Sửa ${m}`}
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
                   type="button"
-                  disabled={isTestingThis}
+                  disabled={isTestingAllModels || testingModelName !== null}
                   onClick={() => onTestSingleModel(selectedProvider.id, m)}
                   className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-muted/70 transition-colors cursor-pointer"
                   title={`Test hiệu lực model '${m}'`}
                 >
                   <FlaskConical className="h-3.5 w-3.5" />
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => handleCopyModelId(m)}
                   className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
@@ -548,23 +544,25 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => onRemoveModel(selectedProvider, m)}
                   className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                   title={`Xóa model '${m}'`}
                 >
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
           );
         })}
 
         {/* Dashed "+ Add Model" Card Button */}
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={onOpenAddModelModal}
           className="border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 rounded-lg p-3.5 flex items-center justify-center gap-2 text-primary font-medium text-xs transition-all cursor-pointer min-h-[58px]"
@@ -572,7 +570,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
         >
           <Plus className="h-4 w-4" />
           <span>Thêm model</span>
-        </button>
+        </Button>
       </div>
 
       {/* Dead Models Cleanup Alert */}
@@ -582,7 +580,8 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
               Phát hiện <strong>{unavailableModelsCount}</strong> model không
-              còn hiệu lực do nhà cung cấp ngừng cung cấp (HTTP 404).
+              không truy cập được ở lần kiểm tra gần nhất. Kiểm tra lại trước
+              khi xóa cấu hình.
             </span>
           </div>
           <Button
@@ -622,7 +621,8 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                 sm,
               );
               return (
-                <button
+                <Button
+                  variant="ghost"
                   type="button"
                   key={sm}
                   disabled={isAlreadyAdded}
@@ -634,7 +634,7 @@ export const ModelsGrid: React.FC<ModelsGridProps> = ({
                   }`}
                 >
                   + {sm}
-                </button>
+                </Button>
               );
             })}
           </div>

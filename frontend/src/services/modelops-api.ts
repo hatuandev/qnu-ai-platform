@@ -1,5 +1,8 @@
+import { ApiError } from "@/app/api/client";
 import type {
   ConflictStrategy,
+  ModelCapabilityConfig,
+  ModelProbeRole,
   ModelProvider,
   ProviderApiKey,
   ProviderBulkExportResponse,
@@ -14,6 +17,24 @@ import type {
   UsageStatsResponse,
 } from "@/types/modelops";
 import { BASE_URL, getAuthHeaders } from "./http-client";
+
+async function modelopsResponse<T>(
+  res: Response,
+  fallback: string,
+): Promise<T> {
+  if (!res.ok) {
+    const detail: unknown = await res.json().catch(() => null);
+    const message =
+      detail &&
+      typeof detail === "object" &&
+      "detail" in detail &&
+      typeof detail.detail === "string"
+        ? detail.detail
+        : fallback;
+    throw new ApiError(res.status, `${message} (HTTP ${res.status})`);
+  }
+  return res.json();
+}
 
 export const modelopsApi = {
   async getProviderKeyHistory(providerId: string): Promise<ProviderKeyEvent[]> {
@@ -46,7 +67,7 @@ export const modelopsApi = {
     }
     const data = await res.json();
     if (!Array.isArray(data)) {
-      return [];
+      throw new Error("Danh sách provider không đúng cấu trúc.");
     }
     return data.map((item, idx) => {
       const d = item as Record<string, unknown>;
@@ -67,6 +88,10 @@ export const modelopsApi = {
           (d.circuit_breaker_status as "CLOSED" | "OPEN" | "HALF_OPEN") ||
           "CLOSED",
         models: rawModels,
+        model_capabilities: (d.model_capabilities ||
+          {}) as ModelProvider["model_capabilities"],
+        model_specs: d.model_specs as ModelProvider["model_specs"],
+        supports_chat: d.supports_chat as boolean | undefined,
         model_name: (d.model_name as string) || undefined,
         api_base_url: (d.api_base_url as string) || undefined,
         api_key_masked: (d.api_key_masked as string) || undefined,
@@ -141,6 +166,7 @@ export const modelopsApi = {
       provider_type: string;
       model_name?: string;
       models?: string[];
+      model_capabilities?: Record<string, ModelCapabilityConfig>;
       api_base_url?: string;
       api_key?: string;
       account_id?: string;
@@ -154,8 +180,7 @@ export const modelopsApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) throw new Error("Cập nhật Provider thất bại");
-    return await res.json();
+    return modelopsResponse<ModelProvider>(res, "Cập nhật Provider thất bại");
   },
 
   async deleteModelProvider(id: string): Promise<{ deleted: boolean }> {
@@ -182,24 +207,28 @@ export const modelopsApi = {
     const res = await fetch(`${BASE_URL}/modelops/providers/${id}/test`, {
       method: "POST",
     });
-    if (!res.ok) throw new Error("Kiểm tra kết nối thất bại");
-    return await res.json();
+    return modelopsResponse(res, "Kiểm tra kết nối thất bại");
   },
 
   async testProviderModels(
     providerId: string,
     modelName?: string,
+    probeRole?: ModelProbeRole,
   ): Promise<ProviderModelsTestResponse> {
     const res = await fetch(
       `${BASE_URL}/modelops/providers/${providerId}/models/test`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(modelName ? { model_name: modelName } : {}),
+        body: JSON.stringify(
+          modelName ? { model_name: modelName, probe_role: probeRole } : {},
+        ),
       },
     );
-    if (!res.ok) throw new Error("Kiểm tra mô hình của Provider thất bại");
-    return await res.json();
+    return modelopsResponse<ProviderModelsTestResponse>(
+      res,
+      "Kiểm tra mô hình của Provider thất bại",
+    );
   },
 
   async getProviderKeys(providerId: string): Promise<ProviderApiKey[]> {

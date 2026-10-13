@@ -1,0 +1,54 @@
+{
+  "catalog_http": 200,
+  "catalog_count": 552,
+  "configured_models_present": {
+    "gh/gpt-5.4-mini": true,
+    "gh/gpt-6-luna[1m]": true
+  },
+  "matching_models": [
+    "gh/gpt-5.4-mini",
+    "gh/gpt-5.6-luna",
+    "gh/gpt-6-luna",
+    "gh/gpt-6-luna[1m]",
+    "kr/gpt-5.6-luna",
+    "kr/gpt-5.6-luna-thinking",
+    "kr/gpt-5.6-luna-agentic",
+    "kr/gpt-5.6-luna-thinking-agentic",
+    "nara/gpt-5.6-luna",
+    "nara/gpt-6-luna",
+    "bzl/gpt-5.4-mini",
+    "oca/gpt-5.6-luna",
+    "oca/openai/gpt-5.4-mini",
+    "oca/openai/gpt-5.4-mini-2026-03-17",
+    "oca/openai/gpt-5.6-luna",
+    "oca/openai/gpt-6-luna",
+    "kira/gpt-6-luna",
+    "kira/gpt-5.6-luna",
+    "cx/gpt-6-luna[1m]"
+  ],
+  "models_test_http": 200,
+  "models_test": {
+    "provider_id": "prov_20261013041934",
+    "total_models": 2,
+    "available_models": 0,
+    "unavailable_models": 2,
+    "results": [
+      {
+        "model_name": "gh/gpt-5.4-mini",
+        "success": false,
+        "status": "error",
+        "latency_ms": 2143.5,
+        "message": "API phản hồi HTTP 400: {\"error\":{\"message\":\"[400]: {\\\"error\\\":{\\\"message\\\":\\\"Invalid 'max_output_tokens': integer below minimum value. Expected",
+        "tested_at": "2026-10-13T04:37:26.278670+00:00"
+      },
+      {
+        "model_name": "gh/gpt-6-luna[1m]",
+        "success": false,
+        "status": "error",
+        "latency_ms": 1256.1,
+        "message": "API phản hồi HTTP 400: {\"error\":{\"message\":\"[400]: {\\\"error\\\":{\\\"message\\\":\\\"Invalid 'max_output_tokens': integer below minimum value. Expected",
+        "tested_at": "2026-10-13T04:37:25.411591+00:00"
+      }
+    ]
+  }
+}

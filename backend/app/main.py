@@ -200,6 +200,8 @@ def create_app() -> FastAPI:
     from app.modules.assistants import assistant_chat_router, assistants_router
     from app.modules.auth import auth_router
     from app.modules.auth.dependencies import get_current_actor
+    from app.modules.backups.coordination import BackupMaintenanceMiddleware
+    from app.modules.backups.router import router as backups_router
     from app.modules.conversations.router import router as conversations_router
     from app.modules.document_types.router import router as document_types_router
     from app.modules.documents import documents_router
@@ -221,6 +223,8 @@ def create_app() -> FastAPI:
 
     # Secured Admin Routes (Protected by Dev Access Gate)
     auth_guard = [Depends(get_current_actor)]
+    app.add_middleware(BackupMaintenanceMiddleware)
+    app.include_router(backups_router, prefix=settings.API_PREFIX)
     app.include_router(jobs_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(document_types_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
     app.include_router(documents_router, prefix=settings.API_PREFIX, dependencies=auth_guard)
