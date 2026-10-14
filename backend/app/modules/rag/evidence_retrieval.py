@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 async def retrieve_anchors(req: AskRequest, snapshot: RetrievalSnapshot, query: str,
-                           policy: EvidencePolicy, candidate_mode: bool) -> list[FusionCandidate]:
+                           policy: EvidencePolicy, candidate_mode: bool,
+                           data_years: list[int] | None = None) -> list[FusionCandidate]:
     try:
         async with asyncio.timeout(policy.retrieval_timeout_seconds):
             # Cancelling slow dense/FTS anchors must not invalidate the parent
@@ -23,6 +24,7 @@ async def retrieve_anchors(req: AskRequest, snapshot: RetrievalSnapshot, query: 
                 return await hybrid_retriever.retrieve(db=anchor_db, collection_id=req.collection_id,
                     query=query, top_k=12, rerank_top_k=5, tenant_id=req.tenant_id, workspace_id=req.workspace_id,
                     snapshot=snapshot, reranker_policy={**(req.reranker_policy or {}), "enabled": False},
+                    data_years=data_years,
                     **({"candidate_mode": True, "read_mode_override": "revisioned"} if candidate_mode else {}))
     except TimeoutError:
         logger.warning("evidence_anchors_timeout snapshot=%s; using published canonical/facts ranking", snapshot.snapshot_id)

@@ -6,6 +6,10 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-14** | Codex | Cấu trúc nguồn và scope thời gian cho ingestion/RAG | Manifest/raw span/parent/header; model đề xuất cần duyệt; focus95/Ruff/real2 đạt, full1198pass11baselinefail15skip; chưa cutover kho thật | [Nhật ký #432](./nhat_ky/2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md) |
+
+| **2026-10-14** | Codex | Đề xuất cấu trúc tri thức đa lĩnh vực | Tận dụngtemporal/canonical, táchyearroles/tree/provenance/parentchild chunks/metadatafilters; đọccode vàofficialdocs, chưa runtime/reindex | [Nhật ký #431](./nhat_ky/2026-10-14_phien_431_de_xuat_cau_truc_tri_thuc_chung.md) |
+
 | **2026-10-14** | Codex | Review văn bản thuyết minh tuyển sinh2026 | 56đoạn/16nhóm; gaps/provenance/year2025 trongfile2026/testFAQ không độc lập; khôngcode/upload; batch429completed40HTTP200 chưa accuracy | [Nhật ký #430](./nhat_ky/2026-10-14_phien_430_review_van_ban_thuyet_minh_tuyen_sinh.md) |
 
 | **2026-10-14** | Codex | Sửa chứng cứ RAG/DAG và tối ưu BM25 | Atomic list/row/year/intent; focus82/Ruff/full1175pass11baselinefail; final live batch còn chạy, corpus thiếu một số82câu, chờ văn bản tổng hợp để đối soát | [Nhật ký #429](./nhat_ky/2026-10-14_phien_429_sua_evidence_va_toi_uu_bm25.md) |

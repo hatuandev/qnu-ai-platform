@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -34,6 +35,7 @@ from app.modules.knowledge.models import (
     KnowledgeImportItem,
     KnowledgeSourceRevision,
 )
+from app.modules.knowledge.normalization.retrieval_units import refresh_unit_metadata
 from app.modules.knowledge.services.source_artifact import (
     add_layout_issues,
     build_source_artifact,
@@ -52,6 +54,7 @@ from app.modules.knowledge.services.source_pages import (
     normalize_source_pages,
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
+from app.modules.knowledge.services.unit_annotation import enrich_source_units
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +199,9 @@ class SourceIngestionService:
             )
 
             ocr_config_hash = await ocr_configuration_fingerprint(db)
-            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{ocr_engine}:{ocr_config_hash}:{EXTRACTION_VERSION}")
+            annotation_policy = (batch.chunk_config or {}).get("unit_temporal_annotation")
+            annotation_hash = compute_sha256(json.dumps(annotation_policy or {}, sort_keys=True, ensure_ascii=False))
+            artifact_key = compute_sha256(f"{item.origin_file_hash}:{parser_profile}:{ocr_engine}:{ocr_config_hash}:{EXTRACTION_VERSION}:source-units-v1:{annotation_hash}")
 
             existing_artifact_res = await db.execute(
                 select(KnowledgeSourceRevision)
@@ -295,6 +300,8 @@ class SourceIngestionService:
                 )
                 temporal_metadata = extract_temporal_metadata(clean_md, item.origin_file_name)
                 structured_artifact["temporal_metadata"] = temporal_metadata
+                refresh_unit_metadata(clean_md, structured_artifact)
+                await enrich_source_units(clean_md, structured_artifact, batch.tenant_id, annotation_policy)
                 citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
                 add_layout_issues(structured_artifact, ocr_pages)
 
@@ -311,6 +318,7 @@ class SourceIngestionService:
                 origin_file_hash=item.origin_file_hash,
                 snapshot_storage_path=snapshot_path,
                 snapshot_metadata={**dict(item.origin_metadata or {}), "title": item.origin_title,
+                                   "unit_temporal_annotation": annotation_policy,
                                    "file_name": item.origin_file_name, "file_type": item.origin_file_type,
                                    "preview_pdf_path": preview_path},
                 canonical_markdown=clean_md,
@@ -559,6 +567,7 @@ class SourceIngestionService:
         artifact = build_source_artifact(clean_md, manifest_page_count(new_rev.page_manifest), new_rev.citation_metadata)
         add_layout_issues(artifact, new_rev.page_manifest)
         artifact["temporal_metadata"] = extract_temporal_metadata(clean_md, (new_rev.snapshot_metadata or {}).get("file_name", ""))
+        refresh_unit_metadata(clean_md, artifact)
         new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
         if context_edits is not None:
             from app.modules.knowledge.services.source_context import apply_context_edits
@@ -566,6 +575,7 @@ class SourceIngestionService:
             if not actor_id:
                 raise AppException("Hiệu đính thiếu định danh người sửa.", code="CONTEXT_ACTOR_REQUIRED", status_code=422)
             artifact = apply_context_edits(artifact, context_edits, actor_id, base_artifact=get_source_artifact(rev))
+            refresh_unit_metadata(clean_md, artifact)
             new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
             new_rev.artifact_key = compute_sha256(f"{new_rev.origin_file_hash}:context:{artifact['fact_set_hash']}:{new_rev.id}")
         quality_report = evaluate_revision_quality(markdown=clean_md, page_count=manifest_page_count(new_rev.page_manifest) or 1,
@@ -687,6 +697,10 @@ class SourceIngestionService:
             "at": reviewed_at.isoformat(),
             "actor_id": actor_id,
         }
+        if decision == "approved":
+            from app.modules.knowledge.services.unit_annotation import approve_unit_annotations
+
+            approve_unit_annotations(artifact)
         rev.parse_provenance = {
             **(rev.parse_provenance or {}),
             "structured_artifact": artifact,
@@ -1119,6 +1133,9 @@ class SourceIngestionService:
         structured_artifact = build_source_artifact(clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables)
         add_layout_issues(structured_artifact, extraction.pages)
         structured_artifact["temporal_metadata"] = temporal_metadata
+        refresh_unit_metadata(clean_md, structured_artifact)
+        await enrich_source_units(clean_md, structured_artifact, tenant_id,
+            (current_rev.snapshot_metadata or {}).get("unit_temporal_annotation"))
         quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
         new_rev_id = reserved_revision_id or f"ks_rev_{uuid.uuid4().hex[:12]}"

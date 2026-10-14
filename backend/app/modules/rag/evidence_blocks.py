@@ -14,7 +14,14 @@ from app.modules.knowledge.models import (
     KnowledgeIndexRevision,
     KnowledgeSourceRevision,
 )
-from app.modules.knowledge.services.source_artifact import get_structured_review_state
+from app.modules.knowledge.normalization.retrieval_units import (
+    manifest_digest,
+    resolve_unit_manifest,
+)
+from app.modules.knowledge.services.source_artifact import (
+    get_source_artifact,
+    get_structured_review_state,
+)
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens  # noqa: F401
 from app.modules.rag.evidence_lists import list_groups
 from app.modules.rag.evidence_schemas import EvidenceBlock
@@ -108,11 +115,24 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
         total_chars += len(markdown)
         if total_chars > 2_000_000:
             raise AppException("Kho vượt ngân sách đối soát; cần phân vùng nguồn.", code="EVIDENCE_SOURCE_BUDGET", status_code=422)
-        source_blocks = split_source_blocks(markdown, binding_id=binding.id, index_id=index.id, source_id=source.id,
-            title=(source.snapshot_metadata or {}).get("title") or binding.id, canonical_hash=source.canonical_hash)
-        heading_years = source_heading_years(source_blocks)
-        for block in source_blocks:
-            block.scope_years = heading_years
+        try:
+            manifest = resolve_unit_manifest(markdown, get_source_artifact(source))
+            digest = manifest_digest(manifest)
+            pinned_hash = (index.parity_report or {}).get("unit_manifest_hash")
+            if pinned_hash and pinned_hash != digest:
+                raise ValueError("Index and source have different unit manifests")
+        except ValueError as exc:
+            raise AppException("Đơn vị nguồn không khớp chứng cứ hoặc bản chỉ mục.",
+                code="EVIDENCE_UNIT_INVALID", status_code=503) from exc
+        source_blocks = [EvidenceBlock(id=f"{source.id}:{unit.start}:{unit.end}", binding_id=binding.id,
+            index_revision_id=index.id, source_revision_id=source.id,
+            title=(source.snapshot_metadata or {}).get("title") or binding.id,
+            page_number=unit.page_number, section=" / ".join(unit.heading_path), text=unit.text,
+            header_context="\n".join([*unit.heading_path, unit.header_context]), start=unit.start, end=unit.end,
+            canonical_hash=source.canonical_hash, temporal_scope=unit.temporal,
+            scope_years=unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else [],
+            unit_id=unit.id, parent_id=unit.parent_id, unit_manifest_hash=digest,
+            is_container=unit.is_container) for unit in manifest.units]
         if (index.parity_report or {}).get("fact_set_hash"):
             # Materialized reviewed facts take precedence over original table cells.
             source_blocks = [b for b in source_blocks if not (
@@ -150,7 +170,8 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
     for body in ordered:
         header = headers.get(body.source_revision_id)
         bodies = groups.get(body.id, [body])
-        pair = list({b.id: b for b in [header, *bodies] if b is not None and b.id not in seen}.values())
+        parents = structural_context(blocks, body)
+        pair = list({b.id: b for b in [header, *parents, *bodies] if b is not None and b.id not in seen}.values())
         size = sum(len(json.dumps(b.model_dump(), ensure_ascii=False)) + 1 for b in pair)
         if len(selected) + len(pair) > limit or used + size > max_chars:
             continue
@@ -158,3 +179,22 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         seen.update(b.id for b in pair)
         used += size
     return selected
+
+
+def structural_context(blocks: list[EvidenceBlock], body: EvidenceBlock) -> list[EvidenceBlock]:
+    """Attach evidenced ancestors/table headers, never nearby unrelated prose."""
+    identity = (body.binding_id, body.index_revision_id, body.source_revision_id)
+    same = [block for block in blocks if (block.binding_id, block.index_revision_id, block.source_revision_id) == identity]
+    by_unit = {block.unit_id: block for block in same if block.unit_id}
+    result = []
+    parent = by_unit.get(body.parent_id)
+    for _ in range(6):
+        if not parent:
+            break
+        if not parent.is_container:
+            result.append(parent)
+        else:
+            result.extend(block for block in same if block.parent_id == parent.unit_id
+                          and block.id != body.id and block.text in body.header_context)
+        parent = by_unit.get(parent.parent_id)
+    return list({block.id: block for block in reversed(result)}.values())

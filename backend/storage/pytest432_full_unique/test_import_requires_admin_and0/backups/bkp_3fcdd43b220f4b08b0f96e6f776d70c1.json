@@ -1,0 +1,40 @@
+{
+  "id": "bkp_3fcdd43b220f4b08b0f96e6f776d70c1",
+  "created_at": "2026-10-14T01:58:00.580305Z",
+  "updated_at": "2026-10-14T01:58:00.590783Z",
+  "actor_id": "act_admin_qnu",
+  "correlation_id": "unknown",
+  "operation": "import",
+  "status": "failed",
+  "stage": "Nhập file thất bại",
+  "progress": 0,
+  "size_bytes": 0,
+  "sha256": null,
+  "verified_at": null,
+  "drill_at": null,
+  "error": "File không hợp lệ, thiếu dung lượng hoặc tải bị gián đoạn; chưa khôi phục dữ liệu.",
+  "pid": null,
+  "components": {},
+  "history": [
+    {
+      "timestamp": "2026-10-14T01:58:00.590783Z",
+      "operation": "import",
+      "status": "failed",
+      "actor_id": "act_admin_qnu",
+      "correlation_id": "unknown",
+      "error": "File không hợp lệ, thiếu dung lượng hoặc tải bị gián đoạn; chưa khôi phục dữ liệu."
+    }
+  ],
+  "pinned": true,
+  "origin": "import",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-14T01:58:00.580305Z",
+  "processed_bytes": 14,
+  "total_bytes": 14
+}

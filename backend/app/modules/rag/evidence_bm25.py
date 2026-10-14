@@ -45,11 +45,13 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
     ranked = []
     for index, score in scores.items():
         block = blocks[index]
+        if block.is_container:
+            continue
         fact_year = (block.fact_context.get("temporal_context") or {}).get("year")
         if wanted and ((fact_year and fact_year not in wanted)
                        or (block.scope_years and not wanted.intersection(block.scope_years))):
             continue
-        observed = {int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", block.header_context + "\n" + block.text)}
+        observed = set(block.temporal_scope.mentioned_years) or {int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", block.text)}
         if wanted and observed and not observed.intersection(wanted):
             score *= 0.1  # Hint only; semantic verification establishes applicability.
         ranked.append((score, index))

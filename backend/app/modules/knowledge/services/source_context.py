@@ -11,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.modules.auth.schemas import AuthActor
 from app.modules.knowledge.models import KnowledgeSourceRevision
+from app.modules.knowledge.normalization.retrieval_models import UnitManifest
+from app.modules.knowledge.normalization.retrieval_units import (
+    manifest_digest,
+)
 from app.modules.knowledge.schemas import SourceContextEditRequest
+from app.modules.knowledge.services.temporal_metadata import YEAR
+from app.modules.knowledge.services.unit_annotation import approve_unit_annotations
 
 
 async def create_context_revision(db: AsyncSession, collection_id: str, source_id: str, revision_id: str,
@@ -32,6 +38,12 @@ def review_context_artifact(artifact: dict[str, Any], decision: str, actor_id: s
     review = {"decision": decision, "actor_id": actor_id, "comment": comment, "at": datetime.now(UTC).isoformat()}
     revised["context_audit"]["review"] = review
     if decision == "approved":
+        manifest = revised.get("retrieval_units")
+        for unit in (manifest or {}).get("units", []):
+            if unit["id"] in revised["context_audit"].get("unit_ids", []):
+                unit["temporal"]["status"] = "verified"
+        if manifest:
+            revised["unit_manifest_hash"] = manifest_digest(UnitManifest.model_validate(manifest))
         for fact in revised["facts"]:
             raw = fact["raw_data"]
             if raw.get("context_review"):
@@ -42,6 +54,8 @@ def review_context_artifact(artifact: dict[str, Any], decision: str, actor_id: s
             if isinstance(evidence, dict) and evidence.get("actor_id"):
                 revised["temporal_metadata"][field]["status"] = "verified"
     revised["fact_set_hash"] = fact_set_hash(revised["facts"])
+    if decision == "approved":
+        approve_unit_annotations(revised)
     return revised
 
 
@@ -59,6 +73,8 @@ def query_projection(raw: dict[str, Any]) -> dict[str, Any]:
 
 def apply_context_edits(artifact: dict[str, Any], request: SourceContextEditRequest, actor_id: str,
                         base_artifact: dict[str, Any] | None = None) -> dict[str, Any]:
+    if request.expected_unit_manifest_hash and (base_artifact or artifact).get("unit_manifest_hash") != request.expected_unit_manifest_hash:
+        raise AppException("Bộ đơn vị nguồn đã thay đổi; hãy tải lại trước khi hiệu đính.", code="SOURCE_UNITS_CHANGED", status_code=409)
     revised = copy.deepcopy(artifact)
     audit = {"actor_id": actor_id, "reason": request.reason, "at": datetime.now(UTC).isoformat(),
              "base_fact_set_hash": request.expected_fact_set_hash, "status": "proposed"}
@@ -89,6 +105,8 @@ def apply_context_edits(artifact: dict[str, Any], request: SourceContextEditRequ
         raw["qualifiers"] = {**raw.get("qualifiers", {}),
                              **{key: changes[key] for key in ("method", "unit") if key in changes}}
         raw["context_review"] = {**audit, "original_fact_id": edit.fact_id}
+        if raw.get("context_ambiguous") and edit.method:
+            raw["context_ambiguous"] = False
     temporal = revised["temporal_metadata"]
     revised["extracted_temporal_metadata"] = copy.deepcopy(artifact.get("extracted_temporal_metadata") or temporal)
     changes = request.model_dump(exclude_unset=True)
@@ -107,7 +125,39 @@ def apply_context_edits(artifact: dict[str, Any], request: SourceContextEditRequ
         raise AppException("Ngày và năm ban hành mâu thuẫn; hãy sửa hoặc xóa ngày đầy đủ.", code="DOCUMENT_DATE_YEAR_CONFLICT", status_code=422)
     if "subject_years" in changes:
         temporal["subject_years"] = {"values": request.subject_years or [], "status": "proposed", "evidence": audit}
+    manifest = resolve_unit_manifest_from_revision(revised)
+    previous_units = {unit["id"]: unit for unit in (base_artifact or {}).get("retrieval_units", {}).get("units", [])}
+    for unit in manifest.units:
+        previous = previous_units.get(unit.id)
+        if previous and previous["text"] == unit.text:
+            from app.modules.knowledge.normalization.retrieval_models import TemporalScope
+
+            unit.temporal = TemporalScope.model_validate(previous["temporal"])
+    if request.units:
+        by_id = {unit.id: unit for unit in manifest.units}
+        if len({edit.unit_id for edit in request.units}) != len(request.units):
+            raise AppException("Một đơn vị nguồn bị sửa nhiều lần.", code="DUPLICATE_UNIT_CONTEXT", status_code=422)
+        for edit in request.units:
+            unit = by_id.get(edit.unit_id)
+            if not unit or edit.evidence_quote not in unit.text or not set(edit.data_years).issubset(
+                    {int(year) for year in YEAR.findall(edit.evidence_quote)}):
+                raise AppException("Ngữ cảnh phải có trích đoạn khớp đúng đơn vị nguồn.", code="UNIT_CONTEXT_INVALID", status_code=422)
+            unit.temporal.data_years = edit.data_years
+            unit.temporal.role = edit.role
+            unit.temporal.evidence_quote = edit.evidence_quote
+            unit.temporal.status = "proposed"
+        audit["unit_ids"] = [edit.unit_id for edit in request.units]
+    revised["retrieval_units"] = manifest.model_dump()
+    revised["unit_manifest_hash"] = manifest_digest(manifest)
     revised["context_audit"] = audit
     revised["review"] = {"status": "required"}
     revised["fact_set_hash"] = fact_set_hash(revised["facts"])
     return revised
+
+
+def resolve_unit_manifest_from_revision(artifact: dict[str, Any]) -> UnitManifest:
+    """Stored units are already bound to the artifact content hash."""
+    # Legacy artifacts can have no units; callers materialize the new revision
+    # before corrections. Do not reconstruct lost source spans from prose here.
+    return UnitManifest.model_validate(artifact["retrieval_units"]) if artifact.get("retrieval_units") else UnitManifest(
+        canonical_hash=artifact.get("content_hash", ""))

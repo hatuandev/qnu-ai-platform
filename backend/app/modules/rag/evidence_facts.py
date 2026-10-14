@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.knowledge.models import KnowledgeBinding, KnowledgeCollection, KnowledgeFact
+from app.modules.knowledge.normalization.retrieval_models import TemporalScope
 from app.modules.rag.evidence_blocks import rank_blocks
 from app.modules.rag.evidence_schemas import EvidenceBlock, QueryPlan
 from app.modules.rag.evidence_validation import evidence_digest
@@ -37,7 +38,7 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
         fact_year = fact.applicability_year or (raw.get("temporal_context") or {}).get("year")
         if fact_year and plan.years and fact_year not in plan.years:
             continue
-        if (not source or snapshot.binding_revisions.get(fact.binding_id) != fact.index_revision_id
+        if (not source or raw.get("context_ambiguous") or snapshot.binding_revisions.get(fact.binding_id) != fact.index_revision_id
                 or (raw.get("context_review") and raw["context_review"].get("status") != "verified")):
             continue
         key = (fact.index_revision_id, raw.get("table_id"), raw.get("row_index"), fact_year)
@@ -56,7 +57,11 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
             index_revision_id=source.index_revision_id, source_revision_id=source.source_revision_id,
             title=source.title, page_number=raw.get("page_number"), section=source.section,
             header_context=source.header_context, text=text, start=-1, end=-1,
-            scope_years=source.scope_years, canonical_hash=source.canonical_hash,
+            scope_years=[fact_year] if (fact_year := first.applicability_year or (raw.get("temporal_context") or {}).get("year")) else [],
+            temporal_scope=TemporalScope(issued_date=source.temporal_scope.issued_date,
+                mentioned_years=[fact_year] if fact_year else [], data_years=[fact_year] if fact_year else [],
+                role="data" if fact_year else "unknown", status="verified" if fact_year else "unknown",
+                evidence_quote=text if fact_year else None), canonical_hash=source.canonical_hash,
             origin="reviewed_fact", fact_id=first.id,
             fact_context={"entity_name": first.entity_name, "cells": [{"fact_id": f.id, "attribute": f.attribute_name, "value": f.attribute_value,
                 **{k: (f.raw_data or {}).get(k) for k in ("temporal_context", "qualifiers", "attribute_code", "relation")}}

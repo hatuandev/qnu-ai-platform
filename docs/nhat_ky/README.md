@@ -7,6 +7,10 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-14** | [Phiên #432](./2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md) | Đơn vị nguồn và năm dữ liệu | Scope từng unit/fact, header nhiều tầng, manifest chung; focus95/real2/Ruff đạt, full1198pass11baselinefail; chưa publish corpus thật |
+
+| **2026-10-14** | [Phiên #431](./2026-10-14_phien_431_de_xuat_cau_truc_tri_thuc_chung.md) | Đề xuất cấu trúc tri thức chung | Ngày ban hành khác kỳ dữ liệu/hiệu lực; tree/chunk/provenance/metadata role; nối temporal có sẵn thay global headingyear; chỉ đề xuất, chưa runtime/reindex |
+
 | **2026-10-14** | [Phiên #430](./2026-10-14_phien_430_review_van_ban_thuyet_minh_tuyen_sinh.md) | Review văn bản tổng hợp tuyển sinh | Đọc56đoạn/16nhóm; cần provenance/năm từngđoạn/gaps và test độc lập; không upload/code/config; batch429 cuối40HTTP200 chưa accuracy |
 
 | **2026-10-14** | [Phiên #429](./2026-10-14_phien_429_sua_evidence_va_toi_uu_bm25.md) | Sửa evidence RAG/DAG và tối ưu BM25 | Atomic list/row/source-year/intent;82focused/1175fullpass11baselinefail; batch40 iteration trước đạt HTTP200, fresh final còn chạy; chờ văn bản tổng hợp, corpus chưa đủ82 |

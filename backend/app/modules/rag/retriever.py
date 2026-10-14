@@ -24,6 +24,7 @@ from app.modules.knowledge.models import (
     KnowledgeDocument,
     KnowledgeIndexRevision,
 )
+from app.modules.knowledge.normalization.retrieval_models import SourceUnit, temporal_is_compatible
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 from app.modules.rag.reranker import reranker_client
 from app.modules.rag.schemas import RetrievalSnapshot
@@ -35,6 +36,16 @@ logger = logging.getLogger(__name__)
 # Stripped so distinctive tokens (subjects, majors, codes) drive matching instead of
 # ultra-common functional words and administrative boilerplate (phiên #184).
 ILIKE_STOP_SYLLABLES: frozenset[str] = get_vietnamese_stopwords()
+
+
+def filter_unit_years(hits: list[dict[str, Any]], years: list[int]) -> list[dict[str, Any]]:
+    """Apply the same unit contract to dense/lexical hits; unknown remains searchable."""
+    result = []
+    for hit in hits:
+        raw = (hit.get("metadata") or {}).get("source_unit")
+        if raw is None or temporal_is_compatible(SourceUnit.model_validate(raw).temporal, years):
+            result.append(hit)
+    return result
 
 RE_ALPHANUMERIC: re.Pattern[str] = re.compile(
     r"^(?=.*[a-zà-ỹ])(?=.*\d)[a-zà-ỹ0-9]+$", re.IGNORECASE
@@ -609,6 +620,7 @@ class HybridRetriever:
         pin_snapshot: bool = True,
         read_mode_override: str | None = None,
         candidate_mode: bool = False,
+        data_years: list[int] | None = None,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker with Snapshot Isolation."""
         active_snapshot = snapshot
@@ -669,7 +681,9 @@ class HybridRetriever:
         )
 
         # 2. Reciprocal Rank Fusion (RRF) with discounted variant lists
-        extra_lists = [(hits, 0.5) for hits in variant_hits if hits]
+        dense_hits = filter_unit_years(dense_hits, data_years or [])
+        sparse_hits = filter_unit_years(sparse_hits, data_years or [])
+        extra_lists = [(filter_unit_years(hits, data_years or []), 0.5) for hits in variant_hits if hits]
         fused = reciprocal_rank_fusion(
             dense_results=dense_hits,
             sparse_results=sparse_hits,

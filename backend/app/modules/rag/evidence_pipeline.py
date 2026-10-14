@@ -41,6 +41,7 @@ from app.modules.rag.evidence_validation import (
     VERSION,
     YEAR,
     evidence_digest,
+    temporal_references_supported,
     validate_plan_years,
 )
 from app.modules.rag.fusion import FusionCandidate
@@ -98,7 +99,7 @@ def decision_response(req: AskRequest, snapshot: RetrievalSnapshot, status: str,
 async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot, plan: QueryPlan,
                          policy: EvidencePolicy, *, candidate_mode: bool) -> list[EvidenceBlock]:
     # First retrieval establishes semantic page anchors. Supplement is read-only and bounded.
-    candidates = await retrieve_anchors(req, snapshot, plan.query, policy, candidate_mode)
+    candidates = await retrieve_anchors(req, snapshot, plan.query, policy, candidate_mode, data_years=plan.years)
     blocks = await load_published_blocks(db, snapshot, candidate_mode=candidate_mode)
     blocks += await reviewed_fact_blocks(db, req, snapshot, plan, blocks)
     rules = active_preferences(policy, plan, blocks)
@@ -167,16 +168,17 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         {"question": req.question, "history": req.history or [], "configured_reference_year": default_year,
          "assistant_scope": scope}, max_tokens=1000)
     progress["planning_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
-    if not plan.years and default_year:
+    if not plan.years and not plan.document_years and not plan.event_years and default_year:
         plan.years = [default_year]
     try:
         validate_plan_years(plan, req.question, req.history or [], default_year)
     except ValueError as exc:
         raise AppException("Bộ lập kế hoạch thay đổi ngữ cảnh năm được hỏi.", code="EVIDENCE_PLAN_SCOPE_INVALID", status_code=502) from exc
-    if plan.requires_year and not plan.years:
+    requested_years = sorted(set(plan.years + plan.document_years + plan.event_years))
+    if plan.requires_year and not requested_years:
         return decision_response(req, snapshot, "clarify", "YEAR_REQUIRED", plan, started=started)
     if plan.requires_year and not YEAR.search(plan.query):
-        plan.query += " năm " + ", ".join(map(str, plan.years))
+        plan.query += " năm " + ", ".join(map(str, requested_years))
     progress["stage"] = "retrieval"
     stage_started = time.perf_counter()
     blocks = await select_context(db, req, snapshot, plan, policy, candidate_mode=candidate_mode)
@@ -212,7 +214,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     precedence_rejections = apply_precedence(verifier, claims, rules, by_id)
     rejected += precedence_rejections
     accepted = [{**c, "verified": True} for c in claims if all((verdicts[c["id"]].entailed,
-                verdicts[c["id"]].relevant, verdicts[c["id"]].scope_compatible))]
+                verdicts[c["id"]].relevant, verdicts[c["id"]].scope_compatible))
+                and temporal_references_supported(c, plan.years)]
     if verifier.conflict or proposal.status == "conflict":
         return decision_response(req, snapshot, "conflict", "CONFLICTING_EVIDENCE", plan, started=started, blocks=blocks)
     uncovered = uncovered_list_members(blocks, accepted, plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []

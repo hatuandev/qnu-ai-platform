@@ -50,6 +50,12 @@ async def structured_call(db: AsyncSession, req: AskRequest, contract: type[Cont
 
 
 PLAN_INSTRUCTION = """Plan a QNU document-grounded query, WITHOUT answering it.
+years means the requested DATA applicability years. Keep document publication
+years in document_years and event years in event_years, not in data years merely
+because they appear in the question. Account for every explicit year in its role.
+A compact year range denotes all years in that interval. A question asking which
+historical years are reported in a dated document need not constrain DATA to that
+document's publication year. Preserve uncertainty; do not invent a year role.
 The original question is the semantic authority. Do not convert choosing between
 methods into combining their scores. A request for an applicant's eligibility is
 not a request about whether the institution offers multiple methods.
@@ -80,6 +86,12 @@ not just repeated versions of the same question; this is retrieval, not answer g
 Do not derive facts or values from the question. Do not include an expected answer."""
 
 PROPOSE_INSTRUCTION = """Answer only using identified official evidence blocks.
+Document issue dates and heading years are NOT the applicability year of every
+paragraph or table cell. Historical data inside a newer document keeps its own
+year. Read temporal_scope roles and exact quotes; proposed/unknown metadata is a
+retrieval hint, not verified evidence. Never substitute old data for a missing
+requested year. Date ranges, event dates and cited regulation years have different
+roles. An effective policy may span years; require actual applicability proof.
 For an enumeration, inspect ALL members of the same syntactic list, including
 the last item and any following additional pathway. Produce separate claims per
 item; never state a total merely by taking the largest number in selected quotes.
@@ -119,6 +131,10 @@ Only supported if every requested subquestion/constraint is directly covered."""
 
 VERIFY_INSTRUCTION = """Independently audit each proposed claim against its attached
 quotes and source context. This is not a request to justify the proposal.
+Verify the year of the DATA, not merely the document date or heading. A document
+issued in a newer year can contain historical figures. Reject transplanting those
+figures into the newer year, including when a year heading was added to references.
+Temporal metadata with proposed/unknown status is not proof of applicability.
 Set superseded_by ONLY for a claim sourced from a rule's explicit
 superseded_source_revision_ids, never for a claim from the preferred source itself
 or to repeat its own references. Leave it empty when there is no replacement.

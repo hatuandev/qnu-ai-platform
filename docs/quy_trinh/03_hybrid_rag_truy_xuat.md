@@ -2,6 +2,16 @@
 
 Tài liệu này đặc tả cơ chế tìm kiếm hỗn hợp (Dense Vector + Sparse Lexical), thuật toán dung hợp thứ hạng Reciprocal Rank Fusion ($k=60$), tái xếp hạng Cross-Encoder và chốt chặn bảo vệ trích dẫn (Citation Guardrail).
 
+## Ngữ cảnh thời gian và cấu trúc dùng chung — phiên 432
+
+QueryPlan tách `years` (kỳ dữ liệu), `document_years` và `event_years`. Ví dụ hỏi số liệu 2023 trong báo cáo 2026: năm dữ liệu lọc là 2023, không phải cả 2023/2026. Không ghi vai trò năm nào thì tiếp tục chính sách năm hiện tại của trợ lý; năm rõ trong câu hỏi phải được giữ. Kế hoạch tự đổi/bịa năm trả lỗi `EVIDENCE_PLAN_SCOPE_INVALID`.
+
+Dense/FTS và BM25 chỉ lọc scope data verified theo manifest chung. Năm được nhắc, năm tiêu đề hoặc ngày ban hành không đủ để loại cứng. Fact lịch sử có scope riêng, không bị scope năm văn bản thay thế. Unknown/proposed vẫn cần verifier; không mặc nhiên được xác nhận. Retrieval lọc sau khi lấy ứng viên nên corpus lớn có thể cần tăng độ phủ hoặc bổ sung pushdown filter sau đo lường.
+
+Evidence đọc raw span với ID/hash revision và manifest pin từ index, không lấy projection embedding làm quote. Context bổ sung các cha/header có chứng cứ trong cùng nguồn, không lấy đoạn lân cận không liên quan. Digest không khớp trả `EVIDENCE_UNIT_INVALID`; dữ liệu verified trái năm yêu cầu không được xác nhận chỉ vì verifier trả supported. Header/cell lặp mơ hồ tiếp tục yêu cầu đối soát.
+
+Chưa chuyển chỉ mục thật sang cấu trúc mới. Dùng candidate snapshot của staging đã build để test trước khi publish; không reset nguồn hoặc tự suy ra scope verified cho tài liệu cũ. Kiểm thử kỹ thuật riêng không thay thế đối soát câu trả lời với corpus thực tế. Xem [nhật ký phiên 432](../nhat_ky/2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md).
+
 ## Nhánh chứng cứ opt-in — phiên #417
 
 Trợ lý bật `knowledge_policy.evidence_policy.enabled` dùng luồng: planner → published manifest → hybrid anchors + BM25/RRF đoạn nguyên bản và hàng facts đã duyệt → reranker ModelOps → đề xuất claims/quotes → kiểm chứng độc lập → AnswerDecision. Không tái OCR, ghi facts suy đoán, nạp lại embedding hoặc tự xuất bản. Nhánh legacy giữ nguyên cho trợ lý không bật chính sách này. Nhánh mới bỏ qua cache câu trả lời cũ; namespace policy fingerprint v4.

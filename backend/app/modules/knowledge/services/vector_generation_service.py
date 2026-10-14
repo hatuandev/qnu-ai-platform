@@ -308,6 +308,7 @@ class VectorGenerationService:
                 token_count=item.get("token_count", 0),
                 section=c_section, page_number=c_page,
                 chunk_metadata={
+                    **(item.get("metadata") or {}),
                     "source_revision_id": source_rev.id,
                     "chunk_set_id": chunk_set.id,
                     "title": (source_rev.snapshot_metadata or {}).get("title", binding.id),
@@ -336,6 +337,7 @@ class VectorGenerationService:
                     "index_revision_id": idx_rev.id,
                     "vector_generation_id": gen.id,
                     "metadata": {
+                        **(item.get("metadata") or {}),
                         "document_title": (source_rev.snapshot_metadata or {}).get("title", binding.id),
                         "file_name": (source_rev.snapshot_metadata or {}).get("file_name"),
                         "document_number": (source_rev.citation_metadata or {}).get("document_number"),
@@ -406,6 +408,7 @@ class VectorGenerationService:
             verified_count = indexed_count
 
         parity_report = {
+            "unit_manifest_hash": chunk_set.chunk_config.get("_unit_manifest_hash"),
             "source_content_hash": source_rev.canonical_hash,
             "fact_set_hash": artifact["fact_set_hash"],
             "parity_passed": parity_passed,

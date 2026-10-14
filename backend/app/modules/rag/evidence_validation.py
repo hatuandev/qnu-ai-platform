@@ -73,6 +73,7 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
             "title": block.title, "section": block.section,
             "canonical_hash": block.canonical_hash,
             "origin": block.origin, "fact_id": block.fact_id,
+            "temporal_scope": block.temporal_scope.model_dump(),
             "entity_name": block.fact_context.get("entity_name") if block.origin == "reviewed_fact" else None,
             "start": block.start + local if block.origin == "canonical" else None,
             "end": block.start + local + len(quote) if block.origin == "canonical" else None}
@@ -80,20 +81,35 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
 
 def validate_plan_years(plan: QueryPlan, question: str, history: list, default_year: int | None) -> None:
     explicit = {int(y) for y in YEAR.findall(question)}
+    for match in re.finditer(r"\b((?:19|20)\d{2})\s*[-–]\s*((?:19|20)\d{2})\b", question):
+        start, end = map(int, match.groups())
+        if 0 <= end - start < 10:
+            explicit.update(range(start, end + 1))
     allowed = set(explicit)
     if not explicit and plan.uses_history:
         allowed |= {int(y) for h in history[-4:] for y in YEAR.findall(str(h.get("content", "")))}
     if not explicit and default_year:
         allowed.add(default_year)
-    if set(plan.years) - allowed or (explicit and not explicit.issubset(plan.years)):
+    planned = set(plan.years + plan.document_years + plan.event_years)
+    if planned - allowed or (explicit and not explicit.issubset(planned)):
         raise ValueError("Planner changed the requested temporal scope")
     query_years = {int(y) for text in [plan.query, *plan.search_queries] for y in YEAR.findall(text)}
-    if query_years - set(plan.years):
+    if query_years - planned:
         raise ValueError("Search variant invented a year")
 
 
 def evidence_digest(bindings: list[dict]) -> str:
     return hashlib.sha256(json.dumps(bindings, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def temporal_references_supported(claim: dict, years: list[int]) -> bool:
+    from app.modules.knowledge.normalization.retrieval_models import (
+        TemporalScope,
+        temporal_is_compatible,
+    )
+
+    return all(temporal_is_compatible(TemporalScope.model_validate(ref.get("temporal_scope") or {}), years)
+               for ref in claim["references"])
 
 
 def validate_decision_integrity(decision: dict, answer: str, citations: list[dict]) -> bool:
@@ -107,6 +123,7 @@ def validate_decision_integrity(decision: dict, answer: str, citations: list[dic
     for claim in bindings:
         refs = claim.get("references") or []
         if (not refs or not same_source(refs) or not claim.get("verified")
+                or not temporal_references_supported(claim, decision.get("requested", {}).get("years") or [])
                 or not numbers_supported(claim["text"], [r["quote"] for r in refs])
                 or not row_entities_supported(claim["text"], refs)):
             return False

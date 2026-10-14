@@ -1,10 +1,20 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
+## Đơn vị nguồn và năm dữ liệu — cập nhật phiên 432
+
+Markdown chuẩn được chia theo cấu trúc thành tiêu đề, đoạn, mục danh sách và hàng bảng có header. Manifest `source-units-v1` giữ ID, cha, đường dẫn tiêu đề, raw span, trang có chứng cứ và scope thời gian. Ngày ban hành không gán năm dữ liệu cho toàn văn bản. Năm dữ liệu đã duyệt tại từng đơn vị/fact mới là điều kiện lọc cứng; ngữ cảnh chưa rõ không bị tự loại khỏi truy hồi.
+
+API import cho phép bật đề xuất vai trò năm bằng `chunk_config.unit_temporal_annotation` với `enabled`, `model_name`, `provider_id`. Mặc định tắt; bỏ model thì đọc mặc định chat của ModelOps DB. Không gửi API key trong cấu hình. Phiên bản này chỉ đề xuất cho đoạn văn có nhắc năm; quote khớp nguồn và kết quả proposed cần duyệt, không tự sửa nội dung. Lỗi đề xuất lưu `unit_annotation.status=unavailable`, không tạo scope giả.
+
+API hiệu đính ngữ cảnh nhận `units` gồm `unit_id`, `data_years`, `role`, `evidence_quote` cùng `expected_unit_manifest_hash`. Hiệu đính tạo revision cần duyệt và có audit; chưa có editor unit mới trên UI. Header năm lặp không có nhãn phân biệt phải đối soát, không tự sửa giá trị năm. Header nhiều tầng của bảng được giữ trong projection tìm kiếm và vẫn có span riêng để trích dẫn.
+
+Build V3 pin manifest hash trong chunk set/index, lưu metadata giống nhau ở PostgreSQL/Qdrant. Đoạn quá dài không chia được theo chiến lược đã chọn trả `SOURCE_UNIT_TOO_LARGE`, không cắt bỏ nội dung. Nguồn legacy được đọc tương thích nhưng không tự backfill. Sau khi khởi động lại BE/worker, build staging từ revision đã đối soát, thử RAG rồi mới xuất bản; không cần reset DB. Xem [nhật ký phiên 432](../nhat_ky/2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md).
+
 ## Chọn model và tổ chức UI — cập nhật #378
 
 ### Artifact/facts trước duyệt — #382
 
-Nguồn mới persist artifact JSONB theo content/extractor version gồm Markdown, metadata, bảng/parser cells/spans và draft cell facts có evidence/hash. Studio Thực thể đọc metadata đã lưu, có bảng facts dự thảo; không suy đoán metadata từ overlay. Sửa Markdown tạo revision/facts mới, geometry tệp gốc có cảnh báo stale. Thiếu header/lệch cột/conflict/mất bảng cần duyệt toàn revision. Confidence unavailable không được hiển thị100%. Chưa có editor/approval từng fact riêng hoặc semantic unit/entity hoàn chỉnh.
+Nguồn mới persist artifact JSONB theo content/extractor version gồm Markdown, metadata, bảng/parser cells/spans và draft cell facts có evidence/hash. Studio Thực thể đọc metadata đã lưu, có bảng facts dự thảo; không suy đoán metadata từ overlay. Sửa Markdown tạo revision/facts mới, geometry tệp gốc có cảnh báo stale. Thiếu header/lệch cột/conflict/mất bảng cần duyệt toàn revision. Confidence unavailable không được hiển thị100%. Chưa có editor/approval từng fact riêng; đơn vị nguồn chuẩn được bổ sung theo phiên 432 ở trên.
 
 Build vector dùng facts của revision, pin hash trong parity report; publish kiểm nguồn/review/hash/count/nội dung facts. Legacy index không có manifest được compatibility, không tự backfill; build lại từ Markdown để nâng cấp. Thử RAG trong Nạp vector kiểm candidate snapshot, không publish hoặc OCR lại. Khởi động lại worker sau cập nhật, không cần resetDB/migration. Kho tài liệu vẫn không bị ghi ngược.
 

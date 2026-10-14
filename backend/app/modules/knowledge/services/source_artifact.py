@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from app.modules.knowledge.facts import detect_column_role
+from app.modules.knowledge.normalization.retrieval_units import build_unit_manifest, manifest_digest
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.fact_identity import build_fact_identity
 from app.modules.knowledge.services.html_tables import normalize_html_tables
@@ -18,7 +19,7 @@ from app.modules.knowledge.services.table_context import (
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 
-ARTIFACT_VERSION = "structured-source-v5-long-fact-identity"
+ARTIFACT_VERSION = "structured-source-v6-source-units"
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _ATTRIBUTE_CODES = {"benchmark": "cutoff_score", "quota": "expected_quota", "combos": "subject_combinations",
                     "tuition": "tuition_fee", "code": "entity_code", "method": "admission_method"}
@@ -54,6 +55,11 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
     values: dict[tuple[Any, ...], str] = {}
     for table in tables:
         headers = table["headers"]
+        duplicate_columns = {col for col, header in enumerate(headers) if header.strip()
+                             and sum(other.casefold() == header.casefold() for other in headers) > 1}
+        if duplicate_columns:
+            issues.append({"code": "AMBIGUOUS_COLUMN_CONTEXT", "table_id": table["id"],
+                           "column_indexes": sorted(duplicate_columns)})
         if headers and re.fullmatch(r"\d+[.)]?", headers[0].strip()) and any(re.fullmatch(r"\d{3,}", h.strip()) for h in headers[1:]):
             issues.append({"code": "TABLE_HEADER_UNRESOLVED", "table_id": table["id"], "page_number": table["page_number"]})
             continue
@@ -88,6 +94,9 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                             "year": (match.group() if (match := _YEAR.search(attribute)) else None),
                             "entity_code": code, "header_segments": table["header_paths"][col], **cell_context(attribute)}
                     evidence["row_context"] = list(row_context)
+                    if col in duplicate_columns:
+                        evidence["temporal_context"]["status"] = "ambiguous"
+                        evidence["context_ambiguous"] = True
                     evidence["header_page_number"] = table.get("header_page_number", table["page_number"])
                     if table.get("continuation_of"):
                         evidence["continuation_of"] = table["continuation_of"]
@@ -101,8 +110,11 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                               "entity_text": fact_identity.entity_text, "entity_type": "table_row",
                               "attribute_name": attribute, "attribute_value": cell.strip(),
                               "confidence": 0.0, "raw_data": evidence})
+    temporal_metadata = extract_temporal_metadata(markdown, str(metadata.get("filename") or ""))
+    units = build_unit_manifest(markdown, temporal_metadata)
     return {"version": ARTIFACT_VERSION, "content_hash": content_hash, "metadata": metadata,
-            "temporal_metadata": extract_temporal_metadata(markdown, str(metadata.get("filename") or "")),
+            "temporal_metadata": temporal_metadata,
+            "retrieval_units": units.model_dump(), "unit_manifest_hash": manifest_digest(units),
             "tables": tables, "parser_tables": parser_tables or [], "facts": facts, "issues": issues,
             "fact_set_hash": hashlib.sha256(json.dumps(facts, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
             "review": {"status": "required" if issues else "auto_ready"}}

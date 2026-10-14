@@ -581,7 +581,9 @@ class VectorIndexer:
                 payload["index_revision_id"] = str(c["index_revision_id"])
 
             if "metadata" in c and isinstance(c["metadata"], dict):
-                payload.update(c["metadata"])
+                # Metadata may enrich search, never override the scope/hash/content
+                # validated above. Projection callers supply immutable identities.
+                payload = {**c["metadata"], **payload}
 
             points.append(
                 qmodels.PointStruct(

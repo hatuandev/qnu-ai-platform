@@ -23,7 +23,12 @@ from app.modules.knowledge.models import (
     KnowledgeChunkSet,
     KnowledgeSourceRevision,
 )
-from app.modules.knowledge.services.source_pages import chunk_source_pages, manifest_page_count
+from app.modules.knowledge.normalization.retrieval_units import (
+    manifest_digest,
+    resolve_unit_manifest,
+    unit_chunks,
+)
+from app.modules.knowledge.services.source_artifact import get_source_artifact
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +84,13 @@ class ChunkSetService:
             )
 
         clean_config = {k: v for k, v in (chunk_config or {}).items() if not k.startswith("_")}
-        conf_hash = compute_config_hash(chunk_strategy, clean_config)
+        artifact = get_source_artifact(source_rev)
+        try:
+            units = resolve_unit_manifest(source_rev.canonical_markdown or "", artifact)
+        except ValueError as exc:
+            raise AppException("Đơn vị nguồn không khớp bản Markdown đã lưu.", code="SOURCE_UNIT_INVALID", status_code=422) from exc
+        units_hash = manifest_digest(units)
+        conf_hash = hashlib.sha256(f"{compute_config_hash(chunk_strategy, clean_config)}:{units_hash}".encode()).hexdigest()
         set_key = compute_chunk_set_key(source_rev.canonical_hash, conf_hash)
 
         # 2. Check for existing ChunkSet with same (source_revision_id, config_hash)
@@ -141,7 +152,8 @@ class ChunkSetService:
             )
 
         chunker = get_chunker(chunk_strategy)
-        chunks_data = chunk_source_pages(chunker, canonical_md, manifest_page_count(source_rev.page_manifest), **clean_config)
+        chunks_data = unit_chunks(units, max_chars=clean_config.get("max_chars", 6000),
+                                 chunker=chunker, chunk_config=clean_config)
         if not chunks_data:
             raise AppException(
                 message=f"Chiến lược cắt đoạn '{chunk_strategy}' trả về 0 chunks từ nội dung tài liệu.",
@@ -177,10 +189,7 @@ class ChunkSetService:
         ).hexdigest()
 
         # Save chunk set record
-        saved_config = {**clean_config, "_manifest": manifest_items}
-        from app.modules.knowledge.services.source_artifact import get_source_artifact
-
-        artifact = get_source_artifact(source_rev)
+        saved_config = {**clean_config, "_manifest": manifest_items, "_unit_manifest_hash": units_hash}
         saved_config["_fact_set_hash"] = artifact["fact_set_hash"]
         chunk_set = KnowledgeChunkSet(
             source_revision_id=source_revision_id,

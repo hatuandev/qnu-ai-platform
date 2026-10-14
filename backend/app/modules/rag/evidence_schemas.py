@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.knowledge.normalization.retrieval_models import TemporalScope
+
 
 class StrictContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -12,6 +14,8 @@ class StrictContract(BaseModel):
 class QueryPlan(StrictContract):
     query: str = Field(min_length=1, max_length=2000)
     years: list[int] = Field(default_factory=list, max_length=10)
+    document_years: list[int] = Field(default_factory=list, max_length=10)
+    event_years: list[int] = Field(default_factory=list, max_length=10)
     requires_year: bool = False
     uses_history: bool = False
     coverage: Literal["focused", "enumeration", "comparison"] = "focused"
@@ -44,6 +48,11 @@ class EvidenceBlock(BaseModel):
     fact_id: str | None = None
     fact_context: dict = Field(default_factory=dict)
     scope_years: list[int] = Field(default_factory=list)
+    temporal_scope: TemporalScope = Field(default_factory=TemporalScope)
+    unit_id: str | None = None
+    parent_id: str | None = None
+    unit_manifest_hash: str | None = None
+    is_container: bool = False
 
 
 class QuoteReference(StrictContract):

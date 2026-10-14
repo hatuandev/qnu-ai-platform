@@ -973,14 +973,32 @@ class FactContextEdit(BaseModel):
     unit: str | None = Field(None, max_length=128)
 
 
+class UnitContextEdit(BaseModel):
+    """Generic evidence-bearing time correction for a paragraph/list/table unit."""
+    model_config = ConfigDict(extra="forbid")
+    unit_id: str = Field(min_length=1, max_length=128)
+    data_years: list[int] = Field(default_factory=list, max_length=50)
+    role: Literal["data", "effective", "event", "unknown"] = "unknown"
+    evidence_quote: str = Field(min_length=3, max_length=4000)
+
+    @field_validator("data_years")
+    @classmethod
+    def valid_years(cls, values: list[int]) -> list[int]:
+        if any(year < 1900 or year > 2099 for year in values):
+            raise ValueError("Năm dữ kiện không hợp lệ")
+        return sorted(set(values))
+
+
 class SourceContextEditRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_fact_set_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_unit_manifest_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
     reason: str = Field(min_length=5, max_length=2000)
     issued_date: date | None = None
     issued_year: int | None = Field(None, ge=1900, le=2099)
     subject_years: list[int] | None = Field(None, max_length=50)
     facts: list[FactContextEdit] = Field(default_factory=list, max_length=1000)
+    units: list[UnitContextEdit] = Field(default_factory=list, max_length=1000)
 
     @field_validator("reason", mode="before")
     @classmethod
