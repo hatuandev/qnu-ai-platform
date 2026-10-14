@@ -64,7 +64,7 @@ async def test_rejected_irrelevant_extra_does_not_make_complete_answer_partial()
     from app.modules.rag.evidence_indexed_audit import AuditedClaim, IndexedAudit
 
     audit = IndexedAudit(complete=True, missing_constraints=[], essential_conditions=[], claims=[
-        AuditedClaim(claim_id="good", all_assertions_supported=True, reference_indexes=[0], reason="Exact")])
+        AuditedClaim(claim_id="good", all_assertions_supported=True, reason="Exact")])
     with (patch("app.modules.rag.evidence_pipeline.structured_call", AsyncMock(return_value=QueryPlan(query="Location?"))),
           patch("app.modules.rag.evidence_verification.structured_call", AsyncMock(side_effect=[verdict, audit])),
           patch("app.modules.rag.evidence_pipeline.select_context", AsyncMock(return_value=source)),

@@ -90,6 +90,7 @@ class FeedbackSampleItem(BaseModel):
 
 
 class ConversationCreateMessageRequest(BaseModel):
+    tenant_id: str | None = Field(None, min_length=2, max_length=100)
     thread_id: str | None = Field(None, description="ID phiên hội thoại (nếu đã có)")
     assistant_code: str = Field(..., min_length=2, max_length=50)
     assistant_name: str | None = Field(None, max_length=150)

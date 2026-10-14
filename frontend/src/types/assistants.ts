@@ -1,6 +1,7 @@
 /** Types for Assistants / Chatbots */
 
 export interface AssistantLifecycleConfig {
+  execution_mode?: "rag" | "workflow" | null;
   sample_questions: string[];
   persona_scope: {
     persona: string;
@@ -53,6 +54,7 @@ export interface AssistantLifecycleConfig {
 }
 
 export interface AssistantItem {
+  execution_mode?: "rag" | "workflow";
   id: string;
   code: string;
   name: string;

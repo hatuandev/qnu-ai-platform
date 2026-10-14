@@ -151,12 +151,18 @@ class ConversationService:
             )
             thread = t_res.scalar_one_or_none()
 
+        if thread and req.tenant_id and (
+            thread.tenant_id != req.tenant_id or thread.assistant_code != req.assistant_code
+        ):
+            raise EntityNotFoundError("Phiên hội thoại không thuộc trợ lý hiện tại.")
+
         should_handoff = req.request_handoff or _detect_handoff_intent(req.text)
 
         if not thread:
             thread_id = req.thread_id or f"conv_{uuid.uuid4().hex[:12]}"
             thread = ConversationThreadModel(
                 id=thread_id,
+                tenant_id=req.tenant_id or "tenant_qnu",
                 assistant_code=req.assistant_code,
                 assistant_name=req.assistant_name or f"Trợ lý {req.assistant_code}",
                 user_name=req.user_name or "Thí sinh / Sinh viên",

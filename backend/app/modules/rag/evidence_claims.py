@@ -8,9 +8,9 @@ from app.modules.rag.evidence_blocks import scope_headers
 from app.modules.rag.evidence_lists import uncovered_list_members
 from app.modules.rag.evidence_model import PROPOSE_INSTRUCTION, structured_call
 from app.modules.rag.evidence_passages import (
-    PassageProposal,
     passage_catalog,
     passage_payload,
+    proposal_contract,
     resolve_proposal,
 )
 from app.modules.rag.evidence_schemas import AnswerProposal, EvidenceBlock, QuoteReference
@@ -69,6 +69,7 @@ def bind_claims(proposal: AnswerProposal, blocks: list[EvidenceBlock]) -> tuple[
 async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
                                blocks: list[EvidenceBlock]) -> tuple[AnswerProposal, list[dict], list[dict], bool]:
     catalog = passage_catalog(blocks)
+    contract = proposal_contract(catalog)
     instruction = PROPOSE_INSTRUCTION + (
         "\nSelect evidence_ids from passages. Do NOT generate quotes or source/block IDs. "
         "Each ID is a server-owned exact passage. Select all SAME-SOURCE passages needed "
@@ -77,8 +78,9 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         "question are optional unless omission changes the answer. Counts of different "
         "rounds are not additive. Do not infer conflicts across different years."
     )
-    payload = {**payload, "passages": passage_payload(blocks, catalog)}
-    draft = await structured_call(db, req, PassageProposal, instruction, payload, max_tokens=4000)
+    payload = {key: value for key, value in payload.items() if key != "evidence"}
+    payload["passages"] = passage_payload(blocks, catalog)
+    draft = await structured_call(db, req, contract, instruction, payload, max_tokens=4000)
     proposal = resolve_proposal(draft, catalog)
     claims, rejected = bind_claims(proposal, blocks)
     repaired = False
@@ -87,11 +89,11 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         requested.get("enumeration_subject") or requested.get("entity")) if requested.get("coverage") == "enumeration" else []
     if proposal.claims and (rejected or coverage_missing):
         repaired = True
-        draft = await structured_call(db, req, PassageProposal, instruction +
+        draft = await structured_call(db, req, contract, instruction +
             "\nThe previous proposal failed deterministic source binding. Repair ONCE using exact "
             "quotes from the supplied block.text and same-source scope. Do not add facts or infer "
             "expected answers from validation errors. If unsupported, return missing/partial.",
-            {**payload, "previous_proposal": proposal.model_dump(), "binding_errors": rejected,
+            {**payload, "previous_proposal": draft.model_dump(), "binding_errors": rejected,
              "uncovered_list_block_ids": coverage_missing}, max_tokens=4000)
         proposal = resolve_proposal(draft, catalog)
         claims, rejected = bind_claims(proposal, blocks)

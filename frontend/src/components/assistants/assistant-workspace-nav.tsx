@@ -19,6 +19,7 @@ interface AssistantWorkspaceNavProps {
   onNavigate?: (path: string) => void;
   onSelectSubView?: (subView: AssistantSubView) => void;
   className?: string;
+  showWorkflow?: boolean;
 }
 
 interface WorkspaceTab {
@@ -67,6 +68,7 @@ export function AssistantWorkspaceNav({
   onNavigate,
   onSelectSubView,
   className,
+  showWorkflow = true,
 }: AssistantWorkspaceNavProps) {
   const handleTabClick = (tab: WorkspaceTab) => {
     if (onSelectSubView) {
@@ -84,7 +86,7 @@ export function AssistantWorkspaceNav({
         className,
       )}
     >
-      {WORKSPACE_TABS.map((tab) => {
+      {WORKSPACE_TABS.filter((tab) => showWorkflow || tab.id !== "workflow").map((tab) => {
         const Icon = tab.icon;
         const isActive = activeSubView === tab.id;
 

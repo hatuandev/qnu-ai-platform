@@ -30,6 +30,10 @@ _PROMPT_INJECTION_PATTERNS = (
 )
 
 
+def resolve_execution_mode(config: AssistantLifecycleConfig) -> str:
+    return config.execution_mode or ("rag" if config.knowledge_policy.evidence_policy.enabled else "workflow")
+
+
 def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRuntimeProfile:
     """Create a stable policy snapshot so active runs cannot observe later edits."""
     raw_config = getattr(assistant, "config", {})
@@ -45,9 +49,7 @@ def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRun
         revision = str(updated_at or "")
 
     return AssistantRuntimeProfile(
-        execution_mode=config.execution_mode or (
-            "rag" if config.knowledge_policy.evidence_policy.enabled else "workflow"
-        ),
+        execution_mode=resolve_execution_mode(config),
         assistant_id=getattr(assistant, "id", ""),
         assistant_code=getattr(assistant, "code", ""),
         assistant_revision=revision,

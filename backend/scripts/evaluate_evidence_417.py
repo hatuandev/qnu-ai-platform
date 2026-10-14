@@ -36,6 +36,9 @@ async def evaluate(args):
         Path("app/modules/workflows/nodes/output_chat_node.py")])
     code_files += [Path("app/modules/workflows/service.py"), Path("app/modules/workflows/execution_audit.py"),
                    Path("app/modules/workflows/nodes/rag_answer_node.py")]
+    code_files += [Path("app/modules/assistants/runtime.py"),
+                   Path("app/modules/assistants/services/assistant_chat_service.py"),
+                   Path("app/modules/assistants/services/assistant_rag_chat.py")]
     code_fingerprint = hashlib.sha256(b"".join(p.read_bytes() for p in code_files)).hexdigest()
     report = json.loads(output.read_text(encoding="utf-8")) if args.resume and output.exists() else {
         "started_at": datetime.now(UTC).isoformat(), "document": fixture["document"],
@@ -69,7 +72,7 @@ async def evaluate(args):
                 conversation = f"eval417_{uuid.uuid4().hex[:16]}"
                 item = {"id": case["id"], "question": case["question"], "route": route, "conversation_id": conversation}
                 try:
-                    if route == "dag":
+                    if route in {"dag", "chat"}:
                         endpoint = "/assistants/admissions/chat"
                         body = {"message": case["question"], "conversation_id": conversation}
                     else:

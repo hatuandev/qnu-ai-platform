@@ -91,6 +91,7 @@ export function AssistantToolsSection({
   assistant,
 }: AssistantToolsSectionProps) {
   const assistantCode = assistant?.code || assistant?.id || "";
+  const isRagOnly = assistant?.execution_mode === "rag";
 
   const isToolEnabled = (toolId: string) => {
     return (form.enabled_tools || []).includes(toolId);
@@ -127,8 +128,11 @@ export function AssistantToolsSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isRagOnly && <p className="text-sm text-muted-foreground">
+          Chat sử dụng RAG trực tiếp để tra cứu dữ kiện và trả lời có trích dẫn. Các công cụ hành động và phê duyệt bên dưới chỉ áp dụng cho chế độ workflow.
+        </p>}
         {/* 1. Embedded DAG Workflow Summary Box */}
-        <div className="rounded-lg border p-3.5 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {!isRagOnly && <div className="rounded-lg border p-3.5 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
               <Network className="size-4" />
@@ -157,10 +161,10 @@ export function AssistantToolsSection({
             <span>Mở sơ đồ DAG</span>
             <ExternalLink className="size-3 text-muted-foreground" />
           </Button>
-        </div>
+        </div>}
 
         {/* 2. Published Version Pin */}
-        {assistant && (
+        {assistant && !isRagOnly && (
           <div className="rounded-lg border p-2.5 bg-muted/20 flex items-center justify-between text-xs">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Layers className="size-3.5 text-primary" />

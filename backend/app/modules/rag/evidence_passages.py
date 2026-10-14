@@ -1,10 +1,17 @@
 """Server-owned source passages: models select IDs instead of reproducing quotes."""
 
 import re
+from itertools import pairwise
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, create_model
 
-from app.modules.rag.evidence_schemas import AnswerProposal, EvidenceClaim, QuoteReference, StrictContract
+from app.modules.rag.evidence_schemas import (
+    AnswerProposal,
+    EvidenceClaim,
+    QuoteReference,
+    StrictContract,
+)
 
 
 class PassageClaim(StrictContract):
@@ -19,23 +26,35 @@ class PassageProposal(StrictContract):
     missing_constraints: list[str] = Field(default_factory=list, max_length=10)
 
 
+def proposal_contract(catalog):
+    allowed = Literal[tuple(catalog)]
+    claim = create_model("SourcePassageClaim", __base__=PassageClaim,
+        evidence_ids=(list[allowed], Field(min_length=1, max_length=4)))
+    return create_model("SourcePassageProposal", __base__=PassageProposal,
+        claims=(list[claim], Field(default_factory=list, max_length=12)))
+
+
 def passage_catalog(blocks):
     catalog = {}
     for index, block in enumerate(blocks, 1):
         # Keep punctuation, decimal values and formulas intact in every raw span.
         starts = [0, *[m.end() for m in re.finditer(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])", block.text)], len(block.text)]
-        for part, (start, end) in enumerate(zip(starts, starts[1:]), 1):
+        for part, (start, end) in enumerate(pairwise(starts), 1):
             quote = block.text[start:end].strip()
             if len(quote) >= 3:
                 catalog[f"e{index}.{part}"] = QuoteReference(block_id=block.id, quote=quote)
+        if len(block.text) <= 4000:
+            catalog[f"e{index}"] = QuoteReference(block_id=block.id, quote=block.text)
     return catalog
 
 
 def passage_payload(blocks, catalog):
     by_id = {block.id: block for block in blocks}
-    return [{"id": pid, "block_id": ref.block_id, "text": ref.quote,
+    return [{"id": pid, "text": ref.quote,
              "source_revision_id": by_id[ref.block_id].source_revision_id,
-             "section": by_id[ref.block_id].section} for pid, ref in catalog.items()]
+             "section": by_id[ref.block_id].section,
+             "title": by_id[ref.block_id].title,
+             "temporal_scope": by_id[ref.block_id].temporal_scope.model_dump()} for pid, ref in catalog.items()]
 
 
 def resolve_proposal(proposal: PassageProposal, catalog) -> AnswerProposal:

@@ -421,6 +421,7 @@ export function AssistantDetailPage({
 
       {/* 2. Workspace Navigation Tabs */}
       <AssistantWorkspaceNav
+        showWorkflow={item.execution_mode !== "rag"}
         assistantId={item.code || item.id}
         activeSubView={subView}
         onSelectSubView={(view) => setSubView(view)}
@@ -430,7 +431,11 @@ export function AssistantDetailPage({
       {subView === "playground" ? (
         <AssistantPlaygroundTab assistant={item} />
       ) : subView === "workflow" ? (
-        <AssistantWorkflowTab assistant={item} />
+        item.execution_mode === "rag" ? (
+          <Card><CardContent className="py-6 text-sm text-muted-foreground">
+            Trợ lý này trả lời trực tiếp từ kho tri thức bằng RAG. Sơ đồ DAG không tham gia luồng chat.
+          </CardContent></Card>
+        ) : <AssistantWorkflowTab assistant={item} />
       ) : subView === "models" ? (
         /* Tab 2: Models & Guardrails */
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -197,6 +197,7 @@ class AssistantUpdateRequest(BaseModel):
 
 
 class AssistantResponse(BaseModel):
+    execution_mode: Literal["rag", "workflow"] = "workflow"
     id: str
     code: str
     name: str

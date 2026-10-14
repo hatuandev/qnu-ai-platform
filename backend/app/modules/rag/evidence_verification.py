@@ -8,7 +8,7 @@ from app.core.exceptions import AppException
 from app.modules.rag.evidence_audit import SemanticAudit, audit_coverage
 from app.modules.rag.evidence_indexed_audit import (
     INDEXED_AUDIT_INSTRUCTION,
-    IndexedAudit,
+    audit_contract,
     audit_payload,
     resolve_audit,
 )
@@ -74,7 +74,7 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     missing = verifier.missing_constraints
     if accepted and not verifier.conflict:
         indexed_payload, catalog = audit_payload({**payload, "claims": accepted}, blocks)
-        indexed = await structured_call(db, req, IndexedAudit, INDEXED_AUDIT_INSTRUCTION,
+        indexed = await structured_call(db, req, audit_contract(accepted, catalog), INDEXED_AUDIT_INSTRUCTION,
                                         indexed_payload, max_tokens=2400)
         audit = resolve_audit(indexed, accepted, catalog)
         accepted, audit_errors, missing, complete = audit_coverage(audit, accepted, blocks,

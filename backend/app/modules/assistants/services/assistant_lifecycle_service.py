@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException, EntityAlreadyExistsError, EntityNotFoundError
 from app.modules.assistants.models import AssistantModel, AssistantVersionModel
 from app.modules.assistants.readiness import readiness_engine
+from app.modules.assistants.runtime import resolve_execution_mode
 from app.modules.assistants.schemas import (
     AssistantBundle,
     AssistantBundleWorkflow,
@@ -52,6 +53,7 @@ def _clean_text(value: str | None) -> str | None:
 def _to_response(record: AssistantModel) -> AssistantResponse:
     config = AssistantLifecycleConfig.model_validate(record.config or {})
     return AssistantResponse(
+        execution_mode=resolve_execution_mode(config),
         id=record.id,
         code=record.code,
         name=record.name,
@@ -549,8 +551,8 @@ class AssistantLifecycleService:
         try:
             wf_res = await db.execute(
                 select(WorkflowDefinition).where(WorkflowDefinition.id == record.workflow_id)
-            )
-            wf_def = wf_res.scalar_one_or_none()
+            ) if resolve_execution_mode(AssistantLifecycleConfig.model_validate(record.config or {})) == "workflow" else None
+            wf_def = wf_res.scalar_one_or_none() if wf_res is not None else None
             if wf_def:
                 if wf_def.published_version_id:
                     record.published_workflow_version_id = wf_def.published_version_id
@@ -619,13 +621,16 @@ class AssistantLifecycleService:
 
         new_wf_id = f"wf_ast_{new_code}"
         try:
-            forked = await workflow_service.fork_workflow(
-                db,
-                source_workflow_id=source.workflow_id,
-                new_workflow_id=new_wf_id,
-                new_name=f"Quy trình {new_name}",
-            )
-            cloned_workflow_id = forked.id
+            if resolve_execution_mode(AssistantLifecycleConfig.model_validate(cloned_config)) == "rag":
+                cloned_workflow_id = ""
+            else:
+                forked = await workflow_service.fork_workflow(
+                    db,
+                    source_workflow_id=source.workflow_id,
+                    new_workflow_id=new_wf_id,
+                    new_name=f"Quy trình {new_name}",
+                )
+                cloned_workflow_id = forked.id
             workflow_ownership = "private"
         except Exception as fork_err:
             logger.warning("failed_to_fork_workflow_on_clone: %s, fallback to shared", fork_err)

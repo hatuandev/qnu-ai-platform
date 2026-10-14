@@ -50,7 +50,8 @@ def test_partial_answer_does_not_deny_its_own_verified_content():
 def test_packing_cannot_keep_only_part_of_a_structural_list():
     source = blocks("# SEASON 2026\n\n+ Alpha\n\n+ Beta\n\n+ Gamma")
     # A group must be admitted whole or omitted, not silently truncated.
-    assert not pack_context(source, source[1:], [2026], 3, 10000)
+    assert not pack_context(source, source[1:], [2026], 2, 10000)
+    assert pack_context(source, source[1:], [2026], 3, 10000) == source
 
 
 def test_bm25_cache_is_content_revision_keyed_and_returns_current_objects():

@@ -41,7 +41,7 @@ def _sample_assistant(code: str = "admissions") -> AssistantModel:
         collection_id=str(template["collection_id"]),
         is_active=True,
         tenant_id="tenant_qnu",
-        config=dict(template["config"]),
+        config={**template["config"], "execution_mode": "workflow"},
         created_at=timestamp,
         updated_at=timestamp,
     )
@@ -92,7 +92,7 @@ async def test_create_assistant_auto_forks_private_workflow() -> None:
         collection_id="col_general",
         is_active=True,
         tenant_id="tenant_qnu",
-        config=dict(STANDARD_ASSISTANTS[0]["config"]),
+        config={**STANDARD_ASSISTANTS[0]["config"], "execution_mode": "workflow"},
     )
 
     with patch.object(

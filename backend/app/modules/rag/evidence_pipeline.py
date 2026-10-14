@@ -20,8 +20,7 @@ from app.modules.rag.evidence_blocks import (
 from app.modules.rag.evidence_claims import propose_bound_claims
 from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_facts import reviewed_fact_blocks
-from app.modules.rag.evidence_lists import list_tail_context
-from app.modules.rag.evidence_lists import list_groups, matches_subject
+from app.modules.rag.evidence_lists import list_groups, list_tail_context, matches_subject
 from app.modules.rag.evidence_model import (
     PLAN_INSTRUCTION,
     structured_call,
