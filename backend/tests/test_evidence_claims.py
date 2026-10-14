@@ -285,19 +285,15 @@ async def test_quote_repair_is_bounded_and_never_accepts_unsupported_numbers(rep
     from unittest.mock import AsyncMock, patch
 
     from app.modules.rag.evidence_claims import propose_bound_claims
-    from app.modules.rag.evidence_schemas import (
-        AnswerProposal,
-        EvidenceBlock,
-        EvidenceClaim,
-        QuoteReference,
-    )
+    from app.modules.rag.evidence_passages import PassageClaim, PassageProposal
+    from app.modules.rag.evidence_schemas import EvidenceBlock
     from app.modules.rag.schemas import AskRequest
 
     block = EvidenceBlock(id="b", binding_id="binding", index_revision_id="index", source_revision_id="source",
         title="Official", text="Value: 20", start=0, end=9)
     def proposal(value):
-        return AnswerProposal(status="supported", claims=[EvidenceClaim(id="c", text=f"Value: {value}",
-            references=[QuoteReference(block_id="b", quote="Value: 20")])])
+        return PassageProposal(status="supported", claims=[PassageClaim(id="c", text=f"Value: {value}",
+            evidence_ids=["e1.1"])])
     with patch("app.modules.rag.evidence_claims.structured_call", AsyncMock(side_effect=[
         proposal(30), proposal(20 if repair_succeeds else 30)])) as generate:
         _, claims, rejected, repaired = await propose_bound_claims(None,
@@ -370,7 +366,7 @@ async def test_context_budget_cannot_evict_reviewed_rows_when_scope_headers_are_
             EvidencePolicy(context_limit=10), candidate_mode=False)
     selected_ids = {b.id for b in selected}
     assert {"f1", "f2", "hf"}.issubset(selected_ids)
-    assert len(selected) <= 10
+    assert len([b for b in selected if not b.text.startswith("#")]) <= 10
 
 
 def test_context_pair_budget_counts_fact_metadata_and_never_keeps_orphan_header():
@@ -382,7 +378,7 @@ def test_context_pair_budget_counts_fact_metadata_and_never_keeps_orphan_header(
     fact = EvidenceBlock(id="f", binding_id="b", index_revision_id="i", source_revision_id="s",
         title="Official", text="Value: 20", start=0, end=9, origin="reviewed_fact",
         fact_context={"large_review_metadata": "x" * 7000})
-    assert pack_context([header, fact], [fact], [2026], limit=1, max_chars=10000) == []
+    assert pack_context([header, fact], [fact], [2026], limit=1, max_chars=10000) == [header, fact]
     assert pack_context([header, fact], [fact], [2026], limit=10, max_chars=6000) == []
     assert [b.id for b in pack_context([header, fact], [fact], [2026], 10, 10000)] == ["h", "f"]
 

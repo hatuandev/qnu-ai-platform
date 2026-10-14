@@ -242,7 +242,7 @@ class AssistantLifecycleService:
         workflow_id = _clean_text(request.workflow_id) or request.workflow_id
         workflow_ownership = request.workflow_ownership or "private"
 
-        if workflow_ownership == "private":
+        if request.config.execution_mode != "rag" and workflow_ownership == "private":
             private_wf_id = f"wf_ast_{code}"
             try:
                 forked = await workflow_service.fork_workflow(

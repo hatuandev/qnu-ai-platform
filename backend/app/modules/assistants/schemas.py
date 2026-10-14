@@ -94,6 +94,7 @@ class AssistantEvaluationPolicy(BaseModel):
 class AssistantLifecycleConfig(BaseModel):
     """Seven-layer enterprise lifecycle configuration for one assistant."""
 
+    execution_mode: Literal["rag", "workflow"] | None = None
     sample_questions: list[str] = Field(default_factory=list)
     persona_scope: AssistantPersonaScope = Field(default_factory=AssistantPersonaScope)
     knowledge_policy: AssistantKnowledgePolicy = Field(default_factory=AssistantKnowledgePolicy)
@@ -107,6 +108,7 @@ class AssistantLifecycleConfig(BaseModel):
 class AssistantRuntimeProfile(BaseModel):
     """Immutable assistant policy snapshot attached to one workflow execution."""
 
+    execution_mode: Literal["rag", "workflow"] = "workflow"
     assistant_id: str
     assistant_code: str
     assistant_revision: str
@@ -135,13 +137,13 @@ class AssistantCreateRequest(BaseModel):
     avatar_url: str | None = Field(None, max_length=300)
     category: str = Field("academic", min_length=2, max_length=50)
     system_prompt: str = Field(..., min_length=20, max_length=12000)
-    workflow_id: str = Field(..., min_length=2, max_length=100)
+    workflow_id: str = Field("", max_length=100)
     published_workflow_version_id: str | None = Field(None, max_length=36)
     workflow_ownership: str = Field("private", max_length=20)
     collection_id: str = Field(..., min_length=2, max_length=100)
     is_active: bool = True
     tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
-    config: AssistantLifecycleConfig = Field(default_factory=AssistantLifecycleConfig)
+    config: AssistantLifecycleConfig = Field(default_factory=lambda: AssistantLifecycleConfig(execution_mode="rag"))
 
     @field_validator(
         "code",

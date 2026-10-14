@@ -47,6 +47,8 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
         block = blocks[index]
         if block.is_container:
             continue
+        if re.fullmatch(r"\s*#{1,6}\s+[^\n]+\s*", block.text):
+            continue  # Headings supply context; they are not an answer-bearing hit.
         fact_year = (block.fact_context.get("temporal_context") or {}).get("year")
         if wanted and ((fact_year and fact_year not in wanted)
                        or (block.scope_years and not wanted.intersection(block.scope_years))):
@@ -60,6 +62,6 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
         elif wanted:
             hints = set(block.temporal_scope.heading_years) or {int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", block.source_context)}
             if hints:
-                score *= 1.05 if wanted.intersection(hints) else 0.75
+                score *= 1.05 if wanted.intersection(hints) else 0.1
         ranked.append((score, index))
     return [blocks[index] for score, index in sorted(ranked, reverse=True)[:limit] if score > 0]

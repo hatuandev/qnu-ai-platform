@@ -61,8 +61,10 @@ async def test_rejected_irrelevant_extra_does_not_make_complete_answer_partial()
         ClaimVerdict(claim_id="good", entailed=True, relevant=True, scope_compatible=True, reason="Direct answer"),
         ClaimVerdict(claim_id="extra", entailed=False, relevant=False, scope_compatible=True, reason="Unrelated extra"),
     ])
-    audit = SemanticAudit(complete=True, missing_constraints=[], required_qualifiers=[], atomic_checks=[
-        AtomicCheck(claim_id="good", claim_quote="Location: portal", supporting_quote="Location: portal", entailed=True, reason="Exact")])
+    from app.modules.rag.evidence_indexed_audit import AuditedClaim, IndexedAudit
+
+    audit = IndexedAudit(complete=True, missing_constraints=[], essential_conditions=[], claims=[
+        AuditedClaim(claim_id="good", all_assertions_supported=True, reference_indexes=[0], reason="Exact")])
     with (patch("app.modules.rag.evidence_pipeline.structured_call", AsyncMock(return_value=QueryPlan(query="Location?"))),
           patch("app.modules.rag.evidence_verification.structured_call", AsyncMock(side_effect=[verdict, audit])),
           patch("app.modules.rag.evidence_pipeline.select_context", AsyncMock(return_value=source)),

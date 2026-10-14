@@ -45,6 +45,9 @@ def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRun
         revision = str(updated_at or "")
 
     return AssistantRuntimeProfile(
+        execution_mode=config.execution_mode or (
+            "rag" if config.knowledge_policy.evidence_policy.enabled else "workflow"
+        ),
         assistant_id=getattr(assistant, "id", ""),
         assistant_code=getattr(assistant, "code", ""),
         assistant_revision=revision,

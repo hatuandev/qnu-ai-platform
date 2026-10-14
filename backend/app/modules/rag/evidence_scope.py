@@ -42,6 +42,13 @@ async def resolve_institution_scope(db: AsyncSession, req: AskRequest, scope: di
         return {}
     roles = await structured_call(db, req, InstitutionScope, SCOPE_INSTRUCTION,
                                   {"question": req.question, "assistant_scope": scope}, max_tokens=500)
+    invalid = ((roles.target_basis == "question" and (not roles.target_quote or roles.target_quote not in req.question))
+               or (roles.target_basis == "assistant_scope" and roles.target_quote is not None))
+    if invalid:
+        roles = await structured_call(db, req, InstitutionScope, SCOPE_INSTRUCTION +
+            "\nPrevious role proof was invalid. Copy an exact clause from question for question basis; "
+            "for an implicit owner use assistant_scope and target_quote=null. Do not invent a quote.",
+            {"question": req.question, "assistant_scope": scope, "previous": roles.model_dump()}, max_tokens=500)
     if roles.target_basis == "question" and (not roles.target_quote or roles.target_quote not in req.question):
         raise AppException("Vai trò trường đích không có căn cứ trong câu hỏi.", code="EVIDENCE_TARGET_SCOPE_INVALID", status_code=502)
     if roles.target_basis == "assistant_scope" and roles.target_quote is not None:

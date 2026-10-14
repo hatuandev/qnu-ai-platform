@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
-from app.modules.rag.evidence_audit import AUDIT_INSTRUCTION, SemanticAudit, audit_coverage
+from app.modules.rag.evidence_audit import SemanticAudit, audit_coverage
+from app.modules.rag.evidence_indexed_audit import (
+    INDEXED_AUDIT_INSTRUCTION,
+    IndexedAudit,
+    audit_payload,
+    resolve_audit,
+)
 from app.modules.rag.evidence_lists import uncovered_list_members
 from app.modules.rag.evidence_model import VERIFY_INSTRUCTION, structured_call
 from app.modules.rag.evidence_precedence import apply_precedence, validate_superseding_quotes
@@ -67,8 +73,10 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     complete = False
     missing = verifier.missing_constraints
     if accepted and not verifier.conflict:
-        audit = await structured_call(db, req, SemanticAudit, AUDIT_INSTRUCTION,
-                                      {**payload, "claims": accepted}, max_tokens=4000)
+        indexed_payload, catalog = audit_payload({**payload, "claims": accepted}, blocks)
+        indexed = await structured_call(db, req, IndexedAudit, INDEXED_AUDIT_INSTRUCTION,
+                                        indexed_payload, max_tokens=2400)
+        audit = resolve_audit(indexed, accepted, catalog)
         accepted, audit_errors, missing, complete = audit_coverage(audit, accepted, blocks,
             sorted(set(plan.years + plan.document_years + plan.event_years)))
         errors += audit_errors

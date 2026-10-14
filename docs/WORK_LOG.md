@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-14** | Codex | Phân tích tách DAG khỏi chatbot hỏi đáp | Đề xuất assistantchat→RAGtrựctiếp, giữhistory/PII/ModelOps/snapshot/citations/SSE; DAGtùychọnchotools/HITL; lỗiauditRAGvẫncầnxửlý; chưa sửa code | [Nhật ký #440](./nhat_ky/2026-10-14_phien_440_de_xuat_tach_dag_khoi_chatbot_hoi_dap.md) |
+
+| **2026-10-14** | Codex | Đối soát nguyên nhân thất bại RAG/DAG khi đã có dữ liệu | Nguồn#435/#438cùngfingerprint; nhiều câu đủcontext nhưng audit/binding loại; Q9packing,Q25temporal,Q38scope; verification19–20s/retrieval1,8s; không sửa code/call model | [Nhật ký #439](./nhat_ky/2026-10-14_phien_439_doi_soat_nguyen_nhan_that_bai_rag_dag.md) |
+
+| **2026-10-14** | Codex | Test lại 20 câu RAG/DAG sau khi BE/worker khởi động lại | 40 lượt; DAG20/20 HTTP200 (4 supported), RAG19/20 HTTP200 (3 supported, 1 scope502); latency DAG33,37s/RAG27,17s; ghi nhận numeric binding, temporal noise, qualifier và coverage; không sửa code | [Nhật ký #438](./nhat_ky/2026-10-14_phien_438_test_lai_20_cau_rag_dag_sau_khoi_dong_lai.md) |
+
 | **2026-10-14** | Codex | Triển khai audit semantic cho RAG/DAG | Atomic claim/qualifier audit, target-vs-exam scope, data-year BM25, compact source context, giữ partial khi repair lỗi; focused95/Ruff; full1208pass/11baselinefail/15skip; chưa full82/reindex/publish | [Nhật ký #437](./nhat_ky/2026-10-14_phien_437_trien_khai_audit_rag_dag.md) |
 
 | **2026-10-14** | Codex | Phân biệt context và max_tokens | 5000 là output budget;10blocks/36kJSONchars context; câu6đãcó53+56nhưngbỏý, không output-budget exhaustion; chỉ chẩn đoán | [Nhật ký #436](./nhat_ky/2026-10-14_phien_436_phan_biet_context_va_max_tokens.md) |

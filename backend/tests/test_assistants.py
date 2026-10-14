@@ -35,7 +35,7 @@ def _assistant_record(code: str = "admissions") -> AssistantModel:
         collection_id=str(template["collection_id"]),
         is_active=True,
         tenant_id="tenant_qnu",
-        config=template["config"],
+        config={**template["config"], "execution_mode": "workflow"},
         created_at=timestamp,
         updated_at=timestamp,
     )

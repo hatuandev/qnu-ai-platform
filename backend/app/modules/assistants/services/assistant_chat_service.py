@@ -142,6 +142,12 @@ class AssistantChatService:
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6)
 
+        profile = build_runtime_profile(assistant)
+        if profile.execution_mode == "rag":
+            from app.modules.assistants.services.assistant_rag_chat import chat_with_rag
+
+            return await chat_with_rag(db, assistant, request, profile, recent_history, conversation_id)
+
         # Record user question in persistent conversation thread
         try:
             from app.modules.conversations.schemas import ConversationCreateMessageRequest
@@ -312,6 +318,15 @@ class AssistantChatService:
         tenant_id, workspace_id = await resolve_runtime_scope(db, assistant)
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6)
+
+        profile = build_runtime_profile(assistant)
+        if profile.execution_mode == "rag":
+            from app.modules.assistants.services.assistant_rag_chat import stream_rag_chat
+
+            async for event in stream_rag_chat(db, assistant, request.model_copy(
+                    update={"conversation_id": conversation_id}), profile, recent_history):
+                yield event
+            return
 
         # Record user question in persistent conversation thread
         try:

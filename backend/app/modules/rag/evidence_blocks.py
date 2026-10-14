@@ -182,8 +182,10 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         intros = {b.source_revision_id: b.source_context for b in pair if b.source_context and b.source_revision_id not in intro_sources}
         size = sum(len(json.dumps(model_block(b), ensure_ascii=False)) + 1 for b in pair)
         size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0
-        if len(selected) + len(pair) > limit or used + size > max_chars:
-            dropped.append({"block_id": body.id, "reason": "block_limit" if len(selected) + len(pair) > limit else "character_budget",
+        body_count = sum(not re.fullmatch(r"\s*#{1,6}\s+[^\n]+\s*", b.text)
+                         and b.id not in {h.id for h in headers.values()} for b in [*selected, *pair])
+        if body_count > limit or used + size > max_chars:
+            dropped.append({"block_id": body.id, "reason": "block_limit" if body_count > limit else "character_budget",
                             "group_size": len(pair), "characters": size})
             continue
         selected.extend(pair)

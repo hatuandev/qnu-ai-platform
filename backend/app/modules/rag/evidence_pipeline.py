@@ -21,6 +21,7 @@ from app.modules.rag.evidence_claims import propose_bound_claims
 from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_facts import reviewed_fact_blocks
 from app.modules.rag.evidence_lists import list_tail_context
+from app.modules.rag.evidence_lists import list_groups, matches_subject
 from app.modules.rag.evidence_model import (
     PLAN_INSTRUCTION,
     structured_call,
@@ -151,6 +152,14 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     neighbors = enumeration_neighbors(blocks, shortlist, 6, subject=plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
     tails = list_tail_context(blocks, neighbors) if neighbors else []
     shortlist = list({b.id: b for b in [*direct, *table_rows, *shortlist, *neighbors, *tails]}.values())
+    if plan.coverage == "enumeration":
+        subject = plan.enumeration_subject or plan.entity
+        groups = [group for group in list_groups(blocks) if matches_subject(group, subject)]
+        summaries = [group[0].model_copy(update={"text": "\n".join(b.text for b in group)}) for group in groups]
+        best = rank_blocks(summaries, [subject or plan.query], 1, plan.years)
+        if best:
+            group = next(group for group in groups if group[0].id == best[0].id)
+            shortlist = list({b.id: b for b in [*group, *list_tail_context(blocks, group), *shortlist]}.values())
     packing = {}
     selected = pack_context(blocks, shortlist, plan.years, policy.context_limit, policy.max_context_chars,
                             atomic_lists=plan.coverage == "enumeration", enumeration_subject=plan.enumeration_subject or plan.entity,

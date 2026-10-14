@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-14** | [Phiên #440](./2026-10-14_phien_440_de_xuat_tach_dag_khoi_chatbot_hoi_dap.md) | Đề xuất chat RAG trực tiếp, DAG tùy chọn | Chat/SSEhiệnworkflowbắtbuộc; tracehỏiđápchỉwrapRAG; giữchatpolicy/history/PII/citations, workflowschotácvụ; chỉphântích/chưamigrate |
+
+| **2026-10-14** | [Phiên #439](./2026-10-14_phien_439_doi_soat_nguyen_nhan_that_bai_rag_dag.md) | Phân tích thất bại dù có nguồn | Context cóDQN/53+56/15/30/học phí; Q9packing,Q25yearconflict,Q38scope; audit falsepartial/quote/span và supported thiếuý; chỉ đọc+docs |
+
+| **2026-10-14** | [Phiên #438](./2026-10-14_phien_438_test_lai_20_cau_rag_dag_sau_khoi_dong_lai.md) | Test lại 20 câu RAG/DAG sau restart BE/worker | 40 lượt; DAG20/20 HTTP200 (4 supported), RAG19/20 HTTP200 (3 supported, 1 scope502); ghi nhận numeric binding/temporal/qualifier/latency; không sửa code |
+
 | **2026-10-14** | [Phiên #437](./2026-10-14_phien_437_trien_khai_audit_rag_dag.md) | Triển khai audit completeness RAG/DAG | Semantic claim audit/scope source-context/subject-aware packing/bounded repair; focused95/Ruff; full1208pass/11baselinefail/15skip; chưa full82/reindex/publish |
 
 | **2026-10-14** | [Phiên #436](./2026-10-14_phien_436_phan_biet_context_va_max_tokens.md) | Context và output budget | UI5000khôngwindow; context10blocks/36kJSONchars, thiếuselectionhoặcverification dùquoteđủ; chưasửaruntime |

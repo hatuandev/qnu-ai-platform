@@ -35,8 +35,10 @@ def _lifecycle_config(
     enabled_tools: list[str] | None = None,
     human_approval_required: bool = True,
     no_answer_message: str,
+    execution_mode: str = "rag",
 ) -> dict[str, Any]:
     return {
+        "execution_mode": execution_mode,
         "sample_questions": questions,
         "persona_scope": {
             "persona": persona,
@@ -241,6 +243,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý ảo Hỗ trợ Soạn thảo Văn bản hành chính chuẩn Nghị định 30 của QNU.",
+            execution_mode="workflow",
             topics=["thông báo", "tờ trình", "kế hoạch", "giấy mời", "thể thức Nghị định 30", "xuất file word", "xuất file pdf"],
             questions=[
                 "Soạn thông báo tổ chức Hội nghị Nghiên cứu Khoa học sinh viên cấp Trường.",
@@ -284,6 +287,7 @@ STANDARD_ASSISTANTS: list[dict[str, Any]] = [
         ),
         "config": _lifecycle_config(
             persona="Trợ lý ảo Hỗ trợ Tạo Câu hỏi & Ngân hàng Đề thi theo Chuẩn Đầu ra của QNU.",
+            execution_mode="workflow",
             topics=["ma trận đề", "Bloom", "CLO", "câu hỏi trắc nghiệm", "biểu điểm", "chỉ số độ khó P", "chỉ số phân cách D"],
             questions=[
                 "Tỷ lệ trọng số phân bổ 4 mức độ nhận thức Bloom trong ma trận đề thi kết thúc học phần là bao nhiêu?",
