@@ -1,19 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pause } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 
 export function PauseSourceButton({
   sourceId,
   title,
   status,
+  renderTrigger,
 }: {
   sourceId: string;
   title: string;
   status: string;
+  renderTrigger?: (trigger: ReactNode) => ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const client = useQueryClient();
@@ -35,19 +38,37 @@ export function PauseSourceButton({
   });
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={!["active", "pending"].includes(status) || pause.isPending}
-        onClick={() => setIsOpen(true)}
-      >
-        <Pause className="size-3.5" />
-        {status === "paused"
-          ? "Đã ngừng"
-          : pause.isPending
-            ? "Đang ngừng"
-            : "Ngừng dùng"}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger(
+          <DropdownMenuItem
+            disabled={
+              !["active", "pending"].includes(status) || pause.isPending
+            }
+            onSelect={() => setIsOpen(true)}
+          >
+            <Pause />
+            {status === "paused"
+              ? "Đã ngừng"
+              : pause.isPending
+                ? "Đang ngừng"
+                : "Ngừng dùng"}
+          </DropdownMenuItem>,
+        )
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!["active", "pending"].includes(status) || pause.isPending}
+          onClick={() => setIsOpen(true)}
+        >
+          <Pause className="size-3.5" />
+          {status === "paused"
+            ? "Đã ngừng"
+            : pause.isPending
+              ? "Đang ngừng"
+              : "Ngừng dùng"}
+        </Button>
+      )}
       <ConfirmDialog
         open={isOpen}
         onOpenChange={setIsOpen}

@@ -15,7 +15,8 @@ const searchSchema = z.object({
       "quality",
       "runs",
     ])
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 export const Route = createFileRoute("/assistants/$assistantId")({
@@ -26,10 +27,13 @@ export const Route = createFileRoute("/assistants/$assistantId")({
 function AssistantDetailRoute() {
   const { assistantId } = Route.useParams();
   const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
   return (
     <AssistantDetailPage
       assistantId={assistantId}
       initialTab={tab as AssistantSubView | undefined}
+      key={assistantId}
+      onTabChange={(tab) => navigate({ search: { tab } })}
     />
   );
 }

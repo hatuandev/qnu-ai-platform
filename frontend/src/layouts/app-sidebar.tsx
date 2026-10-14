@@ -57,7 +57,7 @@ function NavLeaf({
 }) {
   const { state, isMobile } = useSidebar();
   if (!item.to) return null;
-  const active = pathname === item.to;
+  const active = isItemActive(item, pathname);
   const Icon = item.icon;
   const compact = state === "collapsed" && !isMobile;
   const content = (

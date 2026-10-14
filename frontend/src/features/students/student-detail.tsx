@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowLeft,
@@ -51,6 +51,7 @@ const statusLabels: Record<StudentStatus, string> = {
 };
 
 export function StudentDetail({ studentId }: { studentId: string }) {
+  const navigate = useNavigate();
   const { can } = useRbac();
   const query = useStudentQuery(studentId);
   const [editOpen, setEditOpen] = useState(false);
@@ -73,7 +74,10 @@ export function StudentDetail({ studentId }: { studentId: string }) {
           Đã xảy ra lỗi khi tải hồ sơ sinh viên hoặc sinh viên không tồn tại.
         </p>
         <div className="mt-6 flex items-center gap-3">
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ href: "/students" })}
+          >
             <ArrowLeft className="mr-2 size-4" /> Quay lại
           </Button>
           <Button onClick={() => void query.refetch()}>Thử lại</Button>
@@ -107,7 +111,7 @@ export function StudentDetail({ studentId }: { studentId: string }) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <button
             type="button"
-            onClick={() => window.history.back()}
+            onClick={() => navigate({ href: "/students" })}
             className="inline-flex items-center gap-1 hover:text-foreground transition-colors font-medium"
           >
             <ArrowLeft className="size-3.5" />
@@ -135,7 +139,7 @@ export function StudentDetail({ studentId }: { studentId: string }) {
             size="sm"
             variant="outline"
             className="gap-1.5 h-8 text-xs font-medium"
-            onClick={() => window.history.back()}
+            onClick={() => navigate({ href: "/students" })}
           >
             <ArrowLeft className="size-3.5" />
             <span>Quay lại</span>

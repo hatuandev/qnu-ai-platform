@@ -131,7 +131,10 @@ export function ApplicationDetail({
           Đã xảy ra lỗi khi tải hồ sơ đăng ký hoặc hồ sơ không tồn tại.
         </p>
         <div className="mt-6 flex items-center gap-3">
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ href: "/applications" })}
+          >
             <ArrowLeft className="mr-2 size-4" /> Quay lại
           </Button>
           <Button onClick={() => void query.refetch()}>Thử lại</Button>
@@ -193,7 +196,7 @@ export function ApplicationDetail({
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => navigate({ href: "/applications" })}
               className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
             >
               <ArrowLeft className="size-3.5" />

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
-  ArrowLeft,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -19,6 +18,7 @@ import {
 import type React from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BackButton } from "@/components/admin/back-button";
 import { EmptyState } from "@/components/admin/empty-state";
 import { DocumentStudioWorkspace } from "@/components/knowledge/ocr/document-studio-workspace";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +69,10 @@ interface SourceDetailPageProps {
   sourceId: string;
   isStudioMode: boolean;
   onStudioModeChange: (isOpen: boolean) => void;
+  revisionId?: string;
+  onRevisionChange: (revisionId: string) => void;
+  activeTab: "content" | "quality" | "chunks" | "revisions";
+  onTabChange: (tab: "content" | "quality" | "chunks" | "revisions") => void;
 }
 
 export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
@@ -76,16 +80,13 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
   sourceId,
   isStudioMode,
   onStudioModeChange,
+  revisionId,
+  onRevisionChange: setSelectedRevisionId,
+  activeTab,
+  onTabChange: setActiveTab,
 }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedRevisionId, setSelectedRevisionId] = useState(
-    () => new URLSearchParams(window.location.search).get("revision") || "",
-  );
-
-  const [activeTab, setActiveTab] = useState<
-    "content" | "quality" | "chunks" | "revisions"
-  >("content");
 
   // Editing state
   const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
@@ -110,7 +111,6 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
     isLoading: isSourceLoading,
     isError: isSourceError,
     error: sourceError,
-    refetch: refetchSource,
   } = useQuery<KnowledgeSourceDetailResponse>({
     queryKey: ["knowledge-source", collectionId, sourceId],
     queryFn: () => knowledgeApi.getKnowledgeSource(collectionId, sourceId),
@@ -127,23 +127,19 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
   // Active Revision
   const activeRev =
-    source?.revisions.find((r) => r.id === selectedRevisionId) ||
+    source?.revisions.find((r) => r.id === revisionId) ||
     source?.revisions?.[0] ||
     source?.active_source_revision;
 
   // Sync markdown content when revision loads
   useEffect(() => {
-    if (activeRev?.canonical_markdown) {
-      setEditedMarkdown(activeRev.canonical_markdown);
-    }
+    setEditedMarkdown(activeRev?.canonical_markdown ?? "");
   }, [activeRev?.canonical_markdown]);
 
   // 3. Fetch Chunk Sets (V3)
-  const {
-    data: chunkSets = [],
-    isLoading: isChunkSetsLoading,
-    refetch: refetchChunkSets,
-  } = useQuery<KnowledgeChunkSetResponse[]>({
+  const { data: chunkSets = [], isLoading: isChunkSetsLoading } = useQuery<
+    KnowledgeChunkSetResponse[]
+  >({
     queryKey: ["knowledge-source-chunk-sets", collectionId, sourceId],
     queryFn: () => knowledgeApi.listSourceChunkSets(collectionId, sourceId),
     enabled: !!sourceId,
@@ -160,15 +156,11 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         editedMarkdown,
       );
     },
-    onSuccess: (revision) => {
+    onSuccess: async (revision) => {
       toast.success("Đã lưu hiệu đính nội dung Markdown chuẩn thành công.");
-      setSelectedRevisionId(revision.id);
       setIsEditingMarkdown(false);
-      refetchSource();
-      refetchChunkSets();
-      queryClient.invalidateQueries({
-        queryKey: ["knowledge-source", collectionId, sourceId],
-      });
+      await refreshSourceQueries(queryClient, collectionId, sourceId);
+      setSelectedRevisionId(revision.id);
     },
     onError: (err: unknown) => {
       toast.error(extractErrorMessage(err, "Cập nhật nội dung thất bại."));
@@ -216,15 +208,11 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         parser_profile: reparseProfile,
         ocr_engine: reparseEngine === "auto" ? undefined : reparseEngine,
       }),
-    onSuccess: (revision) => {
+    onSuccess: async (revision) => {
       toast.success("Đã xếp hàng bóc tách lại. Trạng thái sẽ tự cập nhật.");
-      setSelectedRevisionId(revision.id);
       setIsReparseDialogOpen(false);
-      refetchSource();
-      refetchChunkSets();
-      queryClient.invalidateQueries({
-        queryKey: ["knowledge-source", collectionId, sourceId],
-      });
+      await refreshSourceQueries(queryClient, collectionId, sourceId);
+      setSelectedRevisionId(revision.id);
     },
     onError: (err: unknown) => {
       toast.error(extractErrorMessage(err, "Bóc tách lại thất bại."));
@@ -267,6 +255,22 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
   const violations = qualityReport.violations || [];
   const qualityScore = qualityReport.quality_score;
 
+  if (
+    revisionId &&
+    !source.revisions.some((revision) => revision.id === revisionId)
+  ) {
+    return (
+      <EmptyState
+        title="Không tìm thấy bản nguồn"
+        description="Bản trong đường dẫn không thuộc nguồn này. Hãy mở bản hiện tại."
+        action={{
+          label: "Bản hiện tại",
+          onClick: () => setSelectedRevisionId(""),
+        }}
+      />
+    );
+  }
+
   if (isStudioMode && collection) {
     return (
       <>
@@ -284,6 +288,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
           collection={collection}
           documentId={sourceId}
           revisionId={activeRev?.id}
+          backLabel="Chi tiết nguồn"
           onBack={() => onStudioModeChange(false)}
           onApproveSuccess={(savedRevisionId) => {
             if (savedRevisionId) setSelectedRevisionId(savedRevisionId);
@@ -306,12 +311,13 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         )}
         <Select
           value={activeRev?.id || ""}
-          onValueChange={(id) => {
-            setSelectedRevisionId(id);
-            const url = new URL(window.location.href);
-            url.searchParams.set("revision", id);
-            window.history.replaceState(window.history.state, "", url);
-          }}
+          onValueChange={setSelectedRevisionId}
+          disabled={
+            isEditingMarkdown ||
+            updateContentMutation.isPending ||
+            reviewMutation.isPending ||
+            reparseMutation.isPending
+          }
         >
           <SelectTrigger className="w-full sm:w-72" aria-label="Bản bóc tách">
             <SelectValue placeholder="Chọn bản bóc tách" />
@@ -342,6 +348,16 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       {/* 1. Header & Navigation Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
         <div className="space-y-1">
+          <BackButton
+            label="Kho"
+            className="-ml-3"
+            onClick={() =>
+              navigate({
+                to: "/knowledge/$collectionId",
+                params: { collectionId },
+              })
+            }
+          />
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Link
               to="/knowledge"
@@ -428,21 +444,6 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
               </Link>
             </Button>
           )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() =>
-              navigate({
-                to: "/knowledge/$collectionId",
-                params: { collectionId },
-              })
-            }
-          >
-            <ArrowLeft className="size-3.5" />
-            <span>Quay lại</span>
-          </Button>
         </div>
       </div>
 

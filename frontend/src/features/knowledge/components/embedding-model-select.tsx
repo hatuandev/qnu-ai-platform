@@ -1,11 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { OptionSelect } from "@/components/admin/option-select";
 import { apiClient } from "@/services/modelops-api";
 import type { CollectionDataProcessingConfig } from "@/types/knowledge";
 import type { ModelOption } from "@/types/modelops";
@@ -44,25 +38,16 @@ export function EmbeddingModelSelect({
   disabled?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger
-        aria-label="Mô hình embedding"
-        className="w-full min-w-0 h-auto min-h-9 [&>span]:whitespace-normal [&>span]:text-left"
-      >
-        <SelectValue placeholder="Chọn Embedding từ ModelOps" />
-      </SelectTrigger>
-      <SelectContent className="max-w-[calc(100vw-2rem)]">
-        {models.map((model) => (
-          <SelectItem
-            key={getEmbeddingKey(model)}
-            value={getEmbeddingKey(model)}
-            className="whitespace-normal break-words"
-          >
-            {model.model_name} · {model.provider_name}
-            {model.dimension ? ` · ${model.dimension} chiều` : ""}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <OptionSelect
+      value={value}
+      onValueChange={onChange}
+      disabled={disabled}
+      triggerProps={{ "aria-label": "Mô hình embedding" }}
+      placeholder="Chọn Embedding từ ModelOps"
+      options={models.map((model) => ({
+        value: getEmbeddingKey(model),
+        label: `${model.model_name} · ${model.provider_name}${model.dimension ? ` · ${model.dimension} chiều` : ""}`,
+      }))}
+    />
   );
 }

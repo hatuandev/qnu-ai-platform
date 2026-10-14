@@ -7,6 +7,16 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-14** | [Phiên #437](./2026-10-14_phien_437_trien_khai_audit_rag_dag.md) | Triển khai audit completeness RAG/DAG | Semantic claim audit/scope source-context/subject-aware packing/bounded repair; focused95/Ruff; full1208pass/11baselinefail/15skip; chưa full82/reindex/publish |
+
+| **2026-10-14** | [Phiên #436](./2026-10-14_phien_436_phan_biet_context_va_max_tokens.md) | Context và output budget | UI5000khôngwindow; context10blocks/36kJSONchars, thiếuselectionhoặcverification dùquoteđủ; chưasửaruntime |
+
+| **2026-10-14** | [Phiên #435](./2026-10-14_phien_435_test_20_cau_sau_them_thuyet_minh.md) | Test20 với nguồn thuyết minh mới | 40lượt/RAG16DAG16answered; span/hashđúng nhưng cònsemantic/roles/coverage lỗi,khôngsửaruntime/chưafull82 |
+
+| **2026-10-14** | [Phiên #434](./2026-10-14_phien_434_gom_thao_tac_nguon_vao_menu.md) | Menu thao tác nguồn | Năm mục trong ba chấm; dialog owner ngoài menu, Biome5/build+TS/browser đạt, không mutation |
+
+| **2026-10-14** | [Phiên #433](./2026-10-14_phien_433_ra_soat_luong_frontend_va_dieu_huong.md) | Luồng FE và navigation | URL state/parent back/shared fields/cache/counter thật; Biome32/build+TS/12tests/browser đạt; chưa mọi page hoặc unit-context editor |
+
 | **2026-10-14** | [Phiên #432](./2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md) | Đơn vị nguồn và năm dữ liệu | Scope từng unit/fact, header nhiều tầng, manifest chung; focus95/real2/Ruff đạt, full1198pass11baselinefail; chưa publish corpus thật |
 
 | **2026-10-14** | [Phiên #431](./2026-10-14_phien_431_de_xuat_cau_truc_tri_thuc_chung.md) | Đề xuất cấu trúc tri thức chung | Ngày ban hành khác kỳ dữ liệu/hiệu lực; tree/chunk/provenance/metadata role; nối temporal có sẵn thay global headingyear; chỉ đề xuất, chưa runtime/reindex |

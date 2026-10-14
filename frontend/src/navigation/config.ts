@@ -115,3 +115,33 @@ export const hiddenRouteMeta = [
     icon: UserRoundCog,
   },
 ];
+
+// Deep-page labels supplement the same navigation source used by the sidebar.
+export const detailRouteMeta = [
+  {
+    pattern: /^\/knowledge\/[^/]+\/(sources|documents)\/[^/]+\/?$/,
+    label: "Nguồn tài liệu",
+    parent: {
+      label: "Kho",
+      path: (pathname: string) => pathname.split("/").slice(0, 3).join("/"),
+    },
+  },
+  {
+    pattern: /^\/knowledge\/[^/]+\/add-documents\/?$/,
+    label: "Thêm nguồn",
+    parent: {
+      label: "Kho",
+      path: (pathname: string) => pathname.split("/").slice(0, 3).join("/"),
+    },
+  },
+  {
+    pattern: /^\/documents\/groups\/[^/]+\/?$/,
+    label: "Nhóm tài liệu",
+    parent: { label: "Nhóm", path: () => "/documents/groups" },
+  },
+  { pattern: /^\/documents\/groups\/?$/, label: "Nhóm tài liệu" },
+  { pattern: /^\/settings\/backups\/policy\/?$/, label: "Chính sách" },
+  { pattern: /^\/knowledge\/[^/]+\/?$/, label: "Chi tiết kho" },
+  { pattern: /^\/assistants\/[^/]+\/?$/, label: "Cấu hình trợ lý" },
+  { pattern: /^\/models\/[^/]+\/?$/, label: "Provider" },
+];

@@ -1,0 +1,620 @@
+{
+  "started_at": "2026-10-14T03:34:01.246316+00:00",
+  "finished_at": "2026-10-14T03:44:12.701484+00:00",
+  "stats": {
+    "dag": {
+      "count": 20,
+      "http": {
+        "200": 20
+      },
+      "status": {
+        "answered": 16,
+        "insufficient_context": 4
+      },
+      "median_seconds": 15.23,
+      "max_seconds": 34.42,
+      "mean_seconds": 17.03
+    },
+    "rag": {
+      "count": 20,
+      "http": {
+        "200": 20
+      },
+      "status": {
+        "answered": 16,
+        "insufficient_context": 4
+      },
+      "median_seconds": 11.37,
+      "max_seconds": 34.17,
+      "mean_seconds": 13.43
+    }
+  },
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "code_unchanged": true,
+  "integrity": [
+    {
+      "id": 1,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 1,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 3,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 3,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 5,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 5,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 6,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 6,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 11,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 13,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 16,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 16,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 19,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 19,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 22,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 22,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 25,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 25,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 48,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 51,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 51,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 62,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 66,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 66,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 75,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 75,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 80,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 80,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 81,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 81,
+      "route": "rag",
+      "valid": true
+    },
+    {
+      "id": 82,
+      "route": "dag",
+      "valid": true
+    },
+    {
+      "id": 82,
+      "route": "rag",
+      "valid": true
+    }
+  ],
+  "citation_checks": [
+    {
+      "id": 1,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 1,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 3,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 3,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 5,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 5,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 5,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 5,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 6,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 6,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 6,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 6,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 9,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 11,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 13,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 16,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 16,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 16,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 16,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 19,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 19,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 19,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 19,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 22,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 22,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 22,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 25,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 25,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 48,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 48,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 51,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 51,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 62,
+      "route": "dag",
+      "source_revision_id": "ks_rev_1610bf67e2cf",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 62,
+      "route": "dag",
+      "source_revision_id": "ks_rev_1610bf67e2cf",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 66,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 66,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 75,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 75,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 80,
+      "route": "dag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 80,
+      "route": "rag",
+      "source_revision_id": "ks_rev_6280c8de7f46",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 81,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 81,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 82,
+      "route": "dag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 82,
+      "route": "dag",
+      "source_revision_id": "ks_rev_3e699f33e06c",
+      "hash_valid": true,
+      "span_valid": true
+    },
+    {
+      "id": 82,
+      "route": "rag",
+      "source_revision_id": "ks_rev_aae30aac628c",
+      "hash_valid": true,
+      "span_valid": true
+    }
+  ],
+  "model_calls": 125,
+  "served_models": {
+    "gpt-oss:120b": 123,
+    "gemma4:31b": 2
+  },
+  "fallback_calls": 2,
+  "model_statuses": {
+    "success": 125
+  },
+  "tokens": 939393,
+  "cost_usd": 0.180357,
+  "new_source_citation_turns": 20
+}

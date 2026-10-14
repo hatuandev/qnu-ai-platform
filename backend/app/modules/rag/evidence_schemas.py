@@ -40,6 +40,7 @@ class EvidenceBlock(BaseModel):
     page_number: int | None = None
     section: str = ""
     header_context: str = ""
+    source_context: str = ""
     text: str
     start: int
     end: int

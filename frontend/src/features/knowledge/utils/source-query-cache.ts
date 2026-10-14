@@ -14,6 +14,9 @@ export async function refreshSourceQueries(
     ["knowledge-collection", collectionId],
     ["collection-summary-metrics", collectionId],
     ["knowledge-vector-load", collectionId],
+    ["collection-facts", collectionId],
+    ["binding-index-revisions", sourceId],
+    ["ingestion-tasks", collectionId],
   ];
   await Promise.all(
     queryKeys.map((queryKey) =>

@@ -233,7 +233,7 @@ export function InvoiceDetailPage({
         className="-ml-2 h-8 text-muted-foreground"
         variant="ghost"
         size="sm"
-        onClick={() => window.history.back()}
+        onClick={() => navigate({ href: "/invoices" })}
       >
         <ArrowLeft className="size-4" /> Quay lại
       </Button>

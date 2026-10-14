@@ -14,6 +14,9 @@ test("review refreshes inactive list and summary before returning to collection"
       ["knowledge-bindings", "collection"],
       ["collection-summary-metrics", "collection"],
       ["knowledge-vector-load", "collection"],
+      ["collection-facts", "collection"],
+      ["binding-index-revisions", "source"],
+      ["ingestion-tasks", "collection"],
     ];
     for (const queryKey of keys) {
       await client.fetchQuery({

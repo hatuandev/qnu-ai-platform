@@ -1,4 +1,8 @@
-import { hiddenRouteMeta, navigationGroups } from "@/navigation/config";
+import {
+  detailRouteMeta,
+  hiddenRouteMeta,
+  navigationGroups,
+} from "@/navigation/config";
 import type { NavGroup, NavItem } from "@/navigation/types";
 import { isStudentAccount } from "@/rbac/backend-role-map";
 
@@ -46,11 +50,16 @@ export function flattenNavigation(groups = navigationGroups): NavItem[] {
 }
 
 export function isItemActive(item: NavItem, pathname: string): boolean {
-  if (item.to && pathname === item.to) return true;
-  return item.children?.some((child) => child.to === pathname) ?? false;
+  if (
+    item.to &&
+    (pathname === item.to ||
+      (item.to !== "/" && pathname.startsWith(`${item.to}/`)))
+  )
+    return true;
+  return item.children?.some((child) => isItemActive(child, pathname)) ?? false;
 }
 
-type BreadcrumbItem = { label: string };
+type BreadcrumbItem = { label: string; to?: string };
 
 function withoutDuplicateLabels(items: BreadcrumbItem[]): BreadcrumbItem[] {
   const seen = new Set<string>();
@@ -61,7 +70,7 @@ function withoutDuplicateLabels(items: BreadcrumbItem[]): BreadcrumbItem[] {
   });
 }
 
-export function getBreadcrumbs(pathname: string) {
+export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   if (pathname.startsWith("/buildings/")) {
     return [
       { label: "Ký túc xá" },
@@ -117,5 +126,22 @@ export function getBreadcrumbs(pathname: string) {
     }
   }
   const hidden = hiddenRouteMeta.find((item) => item.to === pathname);
-  return hidden ? [{ label: hidden.title }] : [{ label: "Quản trị" }];
+  if (hidden) return [{ label: hidden.title }];
+  const parent = flattenNavigation()
+    .filter(
+      (item) =>
+        item.to && item.to !== "/" && pathname.startsWith(`${item.to}/`),
+    )
+    .sort((left, right) => (right.to?.length ?? 0) - (left.to?.length ?? 0))[0];
+  if (parent?.to) {
+    const details = detailRouteMeta.find((item) => item.pattern.test(pathname));
+    return [
+      { label: parent.title, to: parent.to },
+      ...(details?.parent
+        ? [{ label: details.parent.label, to: details.parent.path(pathname) }]
+        : []),
+      { label: details?.label ?? "Chi tiết" },
+    ];
+  }
+  return [{ label: "Quản trị" }];
 }

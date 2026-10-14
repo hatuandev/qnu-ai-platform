@@ -1,5 +1,11 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
+## Điều hướng và làm mới giao diện — phiên 433
+
+Studio quay về Chi tiết nguồn của cùng revision, sau đó về Kho và danh sách Kho tri thức. Tab/revision nằm trong URL; F5 và Back/Forward phải khớp nội dung đang xem. Revision không thuộc nguồn hiện lỗi riêng và cho mở Bản hiện tại, không âm thầm áp dụng bản khác.
+
+Sau lưu/hiệu đính/bóc tách lại, FE làm mới chung source, danh sách, summary, facts và jobs trước khi mở bản nguồn mới. Chỉ lưu không tự duyệt hoặc publish. Danh sách kho lấy cùng API summary với trang chi tiết; dấu — là chưa biết số liệu, không phải 0 nguồn. F5 FE để nhận code mới, không reset DB. Editor source-unit scope mới của phiên 432 chưa có UI riêng; xem [nhật ký 433](../nhat_ky/2026-10-14_phien_433_ra_soat_luong_frontend_va_dieu_huong.md).
+
 ## Đơn vị nguồn và năm dữ liệu — cập nhật phiên 432
 
 Markdown chuẩn được chia theo cấu trúc thành tiêu đề, đoạn, mục danh sách và hàng bảng có header. Manifest `source-units-v1` giữ ID, cha, đường dẫn tiêu đề, raw span, trang có chứng cứ và scope thời gian. Ngày ban hành không gán năm dữ liệu cho toàn văn bản. Năm dữ liệu đã duyệt tại từng đơn vị/fact mới là điều kiện lọc cứng; ngữ cảnh chưa rõ không bị tự loại khỏi truy hồi.

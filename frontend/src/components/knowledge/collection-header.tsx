@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   CheckCircle2,
   Clock,
   FileCheck2,
@@ -12,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type React from "react";
+import { BackButton } from "@/components/admin/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -153,17 +153,7 @@ export const CollectionHeader: React.FC<CollectionHeaderProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onBack}
-              className="h-8 px-2.5 rounded-md shrink-0 text-muted-foreground hover:text-foreground text-xs gap-1.5"
-              title="Quay lại danh sách kho tri thức"
-              aria-label="Quay lại danh sách kho tri thức"
-            >
-              <ArrowLeft className="size-3.5" />
-              <span>Kho</span>
-            </Button>
+            <BackButton label="Kho tri thức" onClick={onBack} />
 
             <div className="flex items-center gap-1.5 sm:hidden">
               {renderStatusBadge()}

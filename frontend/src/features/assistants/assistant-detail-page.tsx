@@ -45,6 +45,7 @@ import { buildAssistantPolicyUpdate } from "./policy-update";
 interface AssistantDetailPageProps {
   assistantId: string;
   initialTab?: AssistantSubView;
+  onTabChange: (tab: AssistantSubView) => void;
 }
 
 function toEditForm(item: AssistantItem): AssistantEditForm {
@@ -110,24 +111,17 @@ function downloadBundle(filename: string, bundle: object) {
 export function AssistantDetailPage({
   assistantId,
   initialTab,
+  onTabChange: setSubView,
 }: AssistantDetailPageProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [form, setForm] = useState<AssistantEditForm | null>(null);
-  const [subView, setSubView] = useState<AssistantSubView>(
-    initialTab || "overview",
-  );
+  const subView = initialTab || "overview";
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isEmbedOpen, setIsEmbedOpen] = useState(false);
   const [isCloneOpen, setIsCloneOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-  useEffect(() => {
-    if (initialTab) {
-      setSubView(initialTab);
-    }
-  }, [initialTab]);
 
   // 1. Fetch Assistant
   const assistantQuery = useQuery({
@@ -440,7 +434,7 @@ export function AssistantDetailPage({
       ) : subView === "models" ? (
         /* Tab 2: Models & Guardrails */
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AssistantModelSection
               form={form}
               onChange={setForm}
@@ -471,7 +465,7 @@ export function AssistantDetailPage({
       ) : subView === "tools" ? (
         /* Tab 3: Tools & Danger Zone */
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
             <AssistantToolsSection
               form={form}
               onChange={setForm}
@@ -506,7 +500,7 @@ export function AssistantDetailPage({
       ) : (
         /* Default Tab: Overview (Persona + Knowledge) */
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AssistantPersonaSection
               form={form}
               onChange={setForm}

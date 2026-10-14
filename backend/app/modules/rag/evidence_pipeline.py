@@ -18,16 +18,15 @@ from app.modules.rag.evidence_blocks import (
     rank_blocks,
 )
 from app.modules.rag.evidence_claims import propose_bound_claims
+from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_facts import reviewed_fact_blocks
-from app.modules.rag.evidence_lists import list_tail_context, uncovered_list_members
+from app.modules.rag.evidence_lists import list_tail_context
 from app.modules.rag.evidence_model import (
     PLAN_INSTRUCTION,
-    VERIFY_INSTRUCTION,
     structured_call,
 )
 from app.modules.rag.evidence_precedence import (
     active_preferences,
-    apply_precedence,
     preference_candidates,
 )
 from app.modules.rag.evidence_retrieval import bounded_rerank, retrieve_anchors
@@ -35,15 +34,15 @@ from app.modules.rag.evidence_runtime import assistant_scope, no_answer_message
 from app.modules.rag.evidence_schemas import (
     EvidenceBlock,
     QueryPlan,
-    VerificationResult,
 )
+from app.modules.rag.evidence_scope import resolve_institution_scope
 from app.modules.rag.evidence_validation import (
     VERSION,
     YEAR,
     evidence_digest,
-    temporal_references_supported,
     validate_plan_years,
 )
+from app.modules.rag.evidence_verification import verify_bound_answer
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.schemas import AskRequest, AskResponse, Citation, RetrievalSnapshot
 
@@ -126,6 +125,9 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     anchors = {(c.binding_id, c.index_revision_id, c.page_number) for c in candidates}
     anchored = rank_blocks([b for b in blocks if (b.binding_id, b.index_revision_id, b.page_number) in anchors], queries, 3, plan.years)
     shortlist = list({b.id: b for b in [*ranked[:4], *preferred, *anchored, *ranked]}.values())[:policy.candidate_limit]
+    # Preserve a direct lexical attribute hit alongside semantic winners. It is
+    # only a candidate, never a verified answer or a source-authority override.
+    direct = rank_blocks(blocks, [plan.attribute or plan.query], 2, plan.years)
     if rp.get("enabled", True) and shortlist:
         fused = [FusionCandidate(b.id, b.binding_id, f"{b.title}\n{b.section}\n{b.text}\n{b.header_context[:900]}", 1 / (60 + i),
             page_number=b.page_number, binding_id=b.binding_id, index_revision_id=b.index_revision_id)
@@ -145,13 +147,17 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
         table_rows = [fact_by_id[c.chunk_id] for c in fact_ranked]
     else:
         table_rows = table_rows[:2]
-    neighbors = enumeration_neighbors(blocks, shortlist, 6) if plan.coverage == "enumeration" else []
+    shortlist = list({b.id: b for b in [*direct, *shortlist, *preferred[:2]]}.values())
+    neighbors = enumeration_neighbors(blocks, shortlist, 6, subject=plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
     tails = list_tail_context(blocks, neighbors) if neighbors else []
-    shortlist = list({b.id: b for b in [*neighbors, *tails, *preferred[:5], *table_rows, *shortlist]}.values())
+    shortlist = list({b.id: b for b in [*direct, *table_rows, *shortlist, *neighbors, *tails]}.values())
+    packing = {}
     selected = pack_context(blocks, shortlist, plan.years, policy.context_limit, policy.max_context_chars,
-                            atomic_lists=plan.coverage == "enumeration")
-    logger.info("evidence_selection conversation=%s snapshot=%s corpus=%d candidates=%d packed=%d ids=%s",
-                req.conversation_id, snapshot.snapshot_id, len(blocks), len(shortlist), len(selected), [b.id for b in selected])
+                            atomic_lists=plan.coverage == "enumeration", enumeration_subject=plan.enumeration_subject or plan.entity,
+                            diagnostics=packing)
+    logger.info("evidence_selection conversation=%s snapshot=%s corpus=%d candidates=%d packed=%d chars=%d dropped=%s ids=%s",
+                req.conversation_id, snapshot.snapshot_id, len(blocks), len(shortlist), len(selected), packing["packed_characters"],
+                packing["dropped"], [b.id for b in selected])
     return selected
 
 
@@ -164,9 +170,16 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     stage_started = time.perf_counter()
     default_year = reference_year(policy)
     scope = assistant_scope(req)
+    roles = await resolve_institution_scope(db, req, scope)
     plan = await structured_call(db, req, QueryPlan, PLAN_INSTRUCTION,
         {"question": req.question, "history": req.history or [], "configured_reference_year": default_year,
-         "assistant_scope": scope}, max_tokens=1000)
+         "assistant_scope": scope, "resolved_institution_roles": roles}, max_tokens=1000)
+    if roles:
+        plan.target_institution = roles["target_institution"]
+        plan.exam_organizer = roles["exam_organizer"]
+        if plan.target_institution:
+            plan.query = f"{plan.target_institution}: {plan.query}"[:2000]
+            plan.search_queries = [f"{plan.target_institution}: {query}" for query in plan.search_queries]
     progress["planning_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     if not plan.years and not plan.document_years and not plan.event_years and default_year:
         plan.years = [default_year]
@@ -185,55 +198,61 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     progress["retrieval_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     if not blocks:
         return decision_response(req, snapshot, "missing", "NO_COMPATIBLE_EVIDENCE", plan, started=started)
-    evidence = [b.model_dump() for b in blocks]
+    evidence = model_context(blocks)
     rules = active_preferences(policy, plan, blocks)
     preferences = [rule.model_dump() for rule in rules]
     progress["stage"] = "proposal"
     stage_started = time.perf_counter()
-    proposal, claims, rejected, repaired = await propose_bound_claims(db, req,
-        {"question": req.question, "requested": plan.model_dump(), "evidence": evidence,
-         "source_preferences": preferences, "assistant_scope": scope}, blocks)
+    payload = {"question": req.question, "requested": plan.model_dump(), **evidence,
+               "source_preferences": preferences, "assistant_scope": scope}
+    proposal, claims, rejected, repaired = await propose_bound_claims(db, req, payload, blocks)
     progress["proposal_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     if proposal.status in {"missing", "conflict", "clarify"} and not proposal.claims:
         return decision_response(req, snapshot, proposal.status, "EVIDENCE_NOT_SUPPORTED", plan,
                                  missing=proposal.missing_constraints, started=started, blocks=blocks)
-    by_id = {b.id: b for b in blocks}
     if not claims:
         response = decision_response(req, snapshot, "missing", "INVALID_OR_EMPTY_CLAIMS", plan, started=started, blocks=blocks)
         response.answer_decision.update(binding_rejections=rejected, quote_repair_attempted=repaired)
         return response
     progress["stage"] = "verification"
     stage_started = time.perf_counter()
-    verifier = await structured_call(db, req, VerificationResult, VERIFY_INSTRUCTION,
-        {"question": req.question, "requested": plan.model_dump(), "claims": claims, "evidence": evidence,
-         "source_preferences": preferences, "assistant_scope": scope}, max_tokens=2400)
+    verified = await verify_bound_answer(db, req, payload, claims, blocks, plan, rules)
+    repair_history = []
+    if not verified.complete and not verified.verifier.conflict and proposal.status != "conflict":
+        previous_verified = verified
+        repair_history = [{"errors": rejected + verified.errors, "missing_constraints": verified.missing,
+                           "audit": verified.audit.model_dump() if verified.audit else None,
+                           "uncovered_list_members": verified.uncovered}]
+        proposal, claims, rejected, quote_repaired = await propose_bound_claims(db, req,
+            {**payload, "previous_proposal": proposal.model_dump(), "coverage_feedback": repair_history,
+             "repair_instruction": "Repair the answer ONCE from exact supplied evidence. Retain essential qualifiers, "
+             "split unsupported compound relations, omit unrelated extras. Never invent missing evidence or expected answers."}, blocks)
+        repaired = repaired or quote_repaired
+        if claims:
+            repaired_verified = await verify_bound_answer(db, req, payload, claims, blocks, plan, rules)
+            # A bounded repair must not erase a previously verified safe partial
+            # answer when its new proposal is rejected as a whole.
+            if repaired_verified.claims or not previous_verified.claims:
+                verified = repaired_verified
+        else:
+            verified = previous_verified
+            verified.missing = list(dict.fromkeys([*verified.missing, *proposal.missing_constraints]))
     progress["verification_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
-    verdicts = {v.claim_id: v for v in verifier.verdicts}
-    if len(verdicts) != len(verifier.verdicts) or set(verdicts) != {c["id"] for c in claims}:
-        raise AppException("Kiểm chứng mệnh đề không đầy đủ.", code="EVIDENCE_VERIFICATION_INVALID", status_code=502)
-    precedence_rejections = apply_precedence(verifier, claims, rules, by_id)
-    rejected += precedence_rejections
-    accepted = [{**c, "verified": True} for c in claims if all((verdicts[c["id"]].entailed,
-                verdicts[c["id"]].relevant, verdicts[c["id"]].scope_compatible))
-                and temporal_references_supported(c, plan.years)]
-    if verifier.conflict or proposal.status == "conflict":
+    if verified.verifier.conflict or proposal.status == "conflict":
         return decision_response(req, snapshot, "conflict", "CONFLICTING_EVIDENCE", plan, started=started, blocks=blocks)
-    uncovered = uncovered_list_members(blocks, accepted, plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
-    if uncovered:
-        # A single sentence claiming a total from an incomplete list must not
-        # survive as a supposedly verified partial answer either.
-        accepted = []
-    complete = verifier.complete and proposal.status == "supported" and len(accepted) == len(claims) and not rejected and not uncovered
+    accepted, complete = verified.claims, verified.complete
     status = "supported" if complete else "partial" if accepted else "missing"
     logger.info("evidence_answer_decision status=%s accepted=%d rejected=%d snapshot=%s years=%s",
                 status, len(accepted), len(proposal.claims) - len(accepted), snapshot.snapshot_id, plan.years)
     response = decision_response(req, snapshot, status, "VERIFIED_CLAIM_COVERAGE" if complete else "PARTIAL_OR_MISSING_COVERAGE",
-        plan, bindings=accepted, missing=verifier.missing_constraints or proposal.missing_constraints, started=started)
+        plan, bindings=accepted, missing=verified.missing, started=started)
     response.contexts = [f"{b.title} · trang {b.page_number} · {b.section}\n{b.text}" for b in blocks]
-    response.answer_decision["verification"] = verifier.model_dump()
-    response.answer_decision.update(binding_rejections=rejected, quote_repair_attempted=repaired)
+    response.answer_decision["verification"] = verified.verifier.model_dump()
+    response.answer_decision.update(binding_rejections=rejected + verified.errors, quote_repair_attempted=repaired,
+        semantic_audit=verified.audit.model_dump() if verified.audit else None,
+        semantic_repair_attempted=bool(repair_history), repair_history=repair_history)
     response.answer_decision["source_preferences"] = preferences
-    response.answer_decision["uncovered_list_members"] = uncovered
+    response.answer_decision["uncovered_list_members"] = verified.uncovered
     response.answer_decision["selection"] = [{"id": b.id, "title": b.title, "page": b.page_number} for b in blocks]
     return response
 

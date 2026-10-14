@@ -334,7 +334,8 @@ async def test_source_bound_claim_still_requires_semantic_verification_after_rep
     assert claims and not rejected  # Same number is NOT semantic proof for another attribute.
     verdict = VerificationResult(complete=False, verdicts=[ClaimVerdict(claim_id="c", entailed=False,
         relevant=False, scope_compatible=False, reason="Wrong requested attribute")])
-    with (patch("app.modules.rag.evidence_pipeline.structured_call", AsyncMock(side_effect=[QueryPlan(query="Floor?"), verdict])),
+    with (patch("app.modules.rag.evidence_pipeline.structured_call", AsyncMock(return_value=QueryPlan(query="Floor?"))),
+          patch("app.modules.rag.evidence_verification.structured_call", AsyncMock(return_value=verdict)),
           patch("app.modules.rag.evidence_pipeline.propose_bound_claims", AsyncMock(return_value=(proposal, claims, [], True))),
           patch("app.modules.rag.evidence_pipeline.select_context", AsyncMock(return_value=[block]))):
         response = await _answer(None, AskRequest(question="Floor?", collection_id="test"),

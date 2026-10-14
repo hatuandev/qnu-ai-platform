@@ -6,6 +6,16 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-14** | Codex | Triển khai audit semantic cho RAG/DAG | Atomic claim/qualifier audit, target-vs-exam scope, data-year BM25, compact source context, giữ partial khi repair lỗi; focused95/Ruff; full1208pass/11baselinefail/15skip; chưa full82/reindex/publish | [Nhật ký #437](./nhat_ky/2026-10-14_phien_437_trien_khai_audit_rag_dag.md) |
+
+| **2026-10-14** | Codex | Phân biệt context và max_tokens | 5000 là output budget;10blocks/36kJSONchars context; câu6đãcó53+56nhưngbỏý, không output-budget exhaustion; chỉ chẩn đoán | [Nhật ký #436](./nhat_ky/2026-10-14_phien_436_phan_biet_context_va_max_tokens.md) |
+
+| **2026-10-14** | Codex | Test20 RAG/DAG sau xuất bản thuyết minh | 40HTTP200,16answered mỗi route;57spanhashđúng nhưng RAG16sai/PT3THPT,roles/qualifiers/noanswer còn lỗi; chỉ đối soát+đề xuất | [Nhật ký #435](./nhat_ky/2026-10-14_phien_435_test_20_cau_sau_them_thuyet_minh.md) |
+
+| **2026-10-14** | Codex | Gom thao tác nguồn vào menu ba chấm | Đủ5 mục, giữ dialog/disabled/polling và bulk; Biome5/build+TS/browser đạt, không mutation dữ liệu | [Nhật ký #434](./nhat_ky/2026-10-14_phien_434_gom_thao_tac_nguon_vao_menu.md) |
+
+| **2026-10-14** | Codex | Rà luồng FE, routing và trường dùng chung | Breadcrumb/sidebar/back, URL tab/revision/cache; list19sources227chunks; BackButton/OptionSelect/Field; Biome32/build+TS/12FEtests/browser đạt | [Nhật ký #433](./nhat_ky/2026-10-14_phien_433_ra_soat_luong_frontend_va_dieu_huong.md) |
+
 | **2026-10-14** | Codex | Cấu trúc nguồn và scope thời gian cho ingestion/RAG | Manifest/raw span/parent/header; model đề xuất cần duyệt; focus95/Ruff/real2 đạt, full1198pass11baselinefail15skip; chưa cutover kho thật | [Nhật ký #432](./nhat_ky/2026-10-14_phien_432_don_vi_nguon_va_ngu_canh_thoi_gian.md) |
 
 | **2026-10-14** | Codex | Đề xuất cấu trúc tri thức đa lĩnh vực | Tận dụngtemporal/canonical, táchyearroles/tree/provenance/parentchild chunks/metadatafilters; đọccode vàofficialdocs, chưa runtime/reindex | [Nhật ký #431](./nhat_ky/2026-10-14_phien_431_de_xuat_cau_truc_tri_thuc_chung.md) |

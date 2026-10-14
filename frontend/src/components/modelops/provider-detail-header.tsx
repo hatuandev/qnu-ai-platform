@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowLeft,
   Check,
   CheckCircle2,
   Cloud,
@@ -15,6 +14,7 @@ import {
   Zap,
 } from "lucide-react";
 import type React from "react";
+import { BackButton } from "@/components/admin/back-button";
 import { ProviderIcon } from "../../components/icons/provider-icon";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -59,16 +59,7 @@ export const ProviderDetailHeader: React.FC<ProviderDetailHeaderProps> = ({
     <>
       {/* Navigation Breadcrumb */}
       <div className="flex items-center gap-1.5 sm:gap-2 text-xs min-w-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onBackToList}
-          className="h-8 px-2 sm:px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground -ml-1 shrink-0"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Danh sách Provider</span>
-          <span className="sm:hidden">Provider</span>
-        </Button>
+        <BackButton label="Provider" onClick={onBackToList} />
         <span className="text-muted-foreground/60 shrink-0">/</span>
         <span className="font-semibold text-foreground flex items-center gap-1.5 truncate">
           <ProviderIcon code={selectedProvider.type} size={16} />

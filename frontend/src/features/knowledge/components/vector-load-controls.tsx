@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Layers, Loader2, Upload } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ export function VectorLoadControls({
   initialGenerationId,
   actionLabel = "Nạp vector",
   preferNewGeneration = false,
+  renderTrigger,
 }: {
   collectionId: string;
   targets: VectorLoadItem[];
@@ -52,6 +54,7 @@ export function VectorLoadControls({
   initialGenerationId?: string;
   actionLabel?: string;
   preferNewGeneration?: boolean;
+  renderTrigger?: (trigger: ReactNode) => ReactNode;
 }) {
   const client = useQueryClient();
   const { sources, generations, state } = useVectorWorkflow(collectionId);
@@ -253,25 +256,41 @@ export function VectorLoadControls({
     );
   return (
     <>
-      <Button
-        size="sm"
-        variant={compact ? "outline" : "default"}
-        disabled={!!disabledReason || !targets.length}
-        title={
-          disabledReason ||
-          (preferNewGeneration
-            ? "Tạo chỉ mục mới từ Markdown sạch; chỉ đổi chatbot sau khi xuất bản"
-            : "Nạp Markdown đã lưu vào Qdrant")
-        }
-        onClick={() => {
-          setSelection("");
-          setLoadedGenerationId("");
-          setIsOpen(true);
-        }}
-      >
-        <Upload className="size-3.5" />
-        {actionLabel}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger(
+          <DropdownMenuItem
+            disabled={!!disabledReason || !targets.length}
+            title={disabledReason || "Nạp Markdown đã lưu vào Qdrant"}
+            onSelect={() => {
+              setSelection("");
+              setLoadedGenerationId("");
+              setIsOpen(true);
+            }}
+          >
+            <Upload /> {actionLabel}
+          </DropdownMenuItem>,
+        )
+      ) : (
+        <Button
+          size="sm"
+          variant={compact ? "outline" : "default"}
+          disabled={!!disabledReason || !targets.length}
+          title={
+            disabledReason ||
+            (preferNewGeneration
+              ? "Tạo chỉ mục mới từ Markdown sạch; chỉ đổi chatbot sau khi xuất bản"
+              : "Nạp Markdown đã lưu vào Qdrant")
+          }
+          onClick={() => {
+            setSelection("");
+            setLoadedGenerationId("");
+            setIsOpen(true);
+          }}
+        >
+          <Upload className="size-3.5" />
+          {actionLabel}
+        </Button>
+      )}
       <Dialog
         open={isOpen}
         onOpenChange={(value) => {

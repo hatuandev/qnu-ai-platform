@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowUpRight,
   Calendar,
   FileCode,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BackButton } from "@/components/admin/back-button";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { EmptyState } from "@/components/admin/empty-state";
 import { KpiMetric } from "@/components/admin/kpi-metric";
@@ -123,7 +123,9 @@ export function DocumentGroupDetailPage({
   const documents =
     fileTypeFilter === "all"
       ? rawDocuments
-      : rawDocuments.filter((d) => d.file_type.toLowerCase() === fileTypeFilter);
+      : rawDocuments.filter(
+          (d) => d.file_type.toLowerCase() === fileTypeFilter,
+        );
 
   // Remove document from group mutation
   const removeMutation = useMutation({
@@ -204,19 +206,10 @@ export function DocumentGroupDetailPage({
     <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* 1. Breadcrumb & Back button */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate({ to: "/documents" })}
-          className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          Về Kho Tài Liệu
-        </Button>
-        <span>/</span>
-        <Link to="/documents" className="hover:text-foreground">
-          Kho Tài Liệu
-        </Link>
+        <BackButton
+          label="Nhóm tài liệu"
+          onClick={() => navigate({ to: "/documents/groups" })}
+        />
         <span>/</span>
         <span className="text-foreground font-medium">{group.name}</span>
       </div>
@@ -269,7 +262,9 @@ export function DocumentGroupDetailPage({
         />
         <KpiMetric
           label="Định Dạng Tệp"
-          value={String(new Set(rawDocuments.map((d) => d.file_type)).size || "0")}
+          value={String(
+            new Set(rawDocuments.map((d) => d.file_type)).size || "0",
+          )}
           icon={FileText}
         />
         <KpiMetric
@@ -368,7 +363,10 @@ export function DocumentGroupDetailPage({
                       {doc.title || doc.file_name}
                     </CardTitle>
                   </div>
-                  <Badge variant="outline" className="text-[10px] uppercase font-mono">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase font-mono"
+                  >
                     .{doc.file_type}
                   </Badge>
                 </div>
@@ -420,8 +418,12 @@ export function DocumentGroupDetailPage({
             <TableHeader className="bg-muted/20">
               <TableRow className="h-9 hover:bg-transparent">
                 <TableHead className="text-xs">Tên Tài Liệu & Tệp</TableHead>
-                <TableHead className="w-40 text-xs">Số Hiệu & Phân Loại</TableHead>
-                <TableHead className="w-24 text-center text-xs">Định Dạng</TableHead>
+                <TableHead className="w-40 text-xs">
+                  Số Hiệu & Phân Loại
+                </TableHead>
+                <TableHead className="w-24 text-center text-xs">
+                  Định Dạng
+                </TableHead>
                 <TableHead className="w-28 text-right text-xs">
                   Dung Lượng
                 </TableHead>
@@ -461,7 +463,9 @@ export function DocumentGroupDetailPage({
                         <span>{doc.document_number}</span>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground italic">Chưa có số</span>
+                      <span className="text-muted-foreground italic">
+                        Chưa có số
+                      </span>
                     )}
                   </TableCell>
 

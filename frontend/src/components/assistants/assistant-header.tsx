@@ -1,7 +1,6 @@
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowLeft,
   Bot,
   CheckCircle2,
   ChevronDown,
@@ -20,6 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { BackButton } from "@/components/admin/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -85,16 +85,11 @@ export function AssistantHeader({
       {/* Top Header & Action Toolbar */}
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <Button
-            className="mb-2 -ml-2.5 h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-            size="sm"
-            type="button"
-            variant="ghost"
+          <BackButton
+            label="Trợ lý"
+            className="mb-2 -ml-2.5"
             onClick={() => onNavigate("/assistants")}
-          >
-            <ArrowLeft className="size-3.5" />
-            Danh mục trợ lý
-          </Button>
+          />
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Bot className="size-4 text-primary" />
             <span>Trợ lý AI / {assistant.code}</span>

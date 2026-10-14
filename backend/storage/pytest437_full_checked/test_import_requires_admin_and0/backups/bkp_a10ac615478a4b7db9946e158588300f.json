@@ -1,0 +1,40 @@
+{
+  "id": "bkp_a10ac615478a4b7db9946e158588300f",
+  "created_at": "2026-10-14T04:11:58.692581Z",
+  "updated_at": "2026-10-14T04:11:58.702357Z",
+  "actor_id": "act_admin_qnu",
+  "correlation_id": "unknown",
+  "operation": "import",
+  "status": "unverified",
+  "stage": "Đã nhập; cần kiểm tra bằng mật khẩu",
+  "progress": 100,
+  "size_bytes": 422,
+  "sha256": "27be95407fa73d687c6282a3bf712c6157c8359e5264d75bc31a10e50b3e6b01",
+  "verified_at": null,
+  "drill_at": null,
+  "error": null,
+  "pid": null,
+  "components": {},
+  "history": [
+    {
+      "timestamp": "2026-10-14T04:11:58.702357Z",
+      "operation": "import",
+      "status": "unverified",
+      "actor_id": "act_admin_qnu",
+      "correlation_id": "unknown",
+      "error": null
+    }
+  ],
+  "pinned": true,
+  "origin": "import",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-14T04:11:58.692581Z",
+  "processed_bytes": 422,
+  "total_bytes": 422
+}

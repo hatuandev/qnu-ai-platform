@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 
 export function DeleteSourceButton({
@@ -11,11 +12,13 @@ export function DeleteSourceButton({
   title,
   status,
   onDeleted,
+  renderTrigger,
 }: {
   sourceId: string;
   title: string;
   status: string;
   onDeleted?: () => void;
+  renderTrigger?: (trigger: ReactNode) => ReactNode;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -71,20 +74,37 @@ export function DeleteSourceButton({
     (!!jobId && (!job.data || ["queued", "running"].includes(job.data.status)));
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        className="text-destructive"
-        disabled={!canDelete}
-        title={
-          canDelete
-            ? "Xóa nguồn đã ngừng dùng"
-            : "Hãy ngừng dùng nguồn trước khi xóa."
-        }
-        onClick={() => setIsOpen(true)}
-      >
-        <Trash2 className="size-3.5" /> {isDeleting ? "Đang xóa" : "Xóa"}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger(
+          <DropdownMenuItem
+            variant="destructive"
+            disabled={!canDelete}
+            title={
+              canDelete
+                ? "Xóa nguồn đã ngừng dùng"
+                : "Hãy ngừng dùng nguồn trước khi xóa."
+            }
+            onSelect={() => setIsOpen(true)}
+          >
+            <Trash2 /> {isDeleting ? "Đang xóa" : "Xóa"}
+          </DropdownMenuItem>,
+        )
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-destructive"
+          disabled={!canDelete}
+          title={
+            canDelete
+              ? "Xóa nguồn đã ngừng dùng"
+              : "Hãy ngừng dùng nguồn trước khi xóa."
+          }
+          onClick={() => setIsOpen(true)}
+        >
+          <Trash2 className="size-3.5" /> {isDeleting ? "Đang xóa" : "Xóa"}
+        </Button>
+      )}
       <ConfirmDialog
         open={isOpen}
         onOpenChange={setIsOpen}

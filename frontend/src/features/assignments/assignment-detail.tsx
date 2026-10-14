@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/admin/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ const labels: Record<AssignmentStatus, string> = {
 };
 
 export function AssignmentDetail({ assignmentId }: { assignmentId: string }) {
+  const navigate = useNavigate();
   const query = useAssignmentQuery(assignmentId);
 
   if (query.isLoading) {
@@ -42,7 +44,10 @@ export function AssignmentDetail({ assignmentId }: { assignmentId: string }) {
         title={item.applicationCode}
         description={`${item.studentName} · ${labels[item.status]}`}
         actions={
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ href: "/assignments" })}
+          >
             Quay lại
           </Button>
         }

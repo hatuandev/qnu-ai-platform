@@ -23,24 +23,24 @@ import { CollectionEditDialog } from "./components/collection-edit-dialog";
 export interface CollectionDetailPageProps {
   collectionId: string;
   initialTab?: "sources" | "facts" | "tasks" | "models";
+  onTabChange: (tab: "sources" | "facts" | "tasks") => void;
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
   collectionId,
   initialTab,
+  onTabChange,
 }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   // Preserve old ?tab=models links by opening the metadata editor.
-  const [activeTab, setActiveTab] = useState<"sources" | "facts" | "tasks">(
-    initialTab === "models" ? "sources" : initialTab || "sources",
-  );
+  const activeTab =
+    initialTab === "models" ? "sources" : initialTab || "sources";
   const [isEditOpen, setIsEditOpen] = useState(initialTab === "models");
 
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab === "models" ? "sources" : initialTab);
       if (initialTab === "models") setIsEditOpen(true);
     }
   }, [initialTab]);
@@ -227,7 +227,7 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       <Tabs
         value={activeTab}
         onValueChange={(val) =>
-          setActiveTab(val as "sources" | "facts" | "tasks")
+          onTabChange(val as "sources" | "facts" | "tasks")
         }
         className="space-y-4"
       >

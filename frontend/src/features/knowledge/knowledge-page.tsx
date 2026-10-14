@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -131,25 +136,48 @@ export const KnowledgePage: React.FC = () => {
     data: collections = [],
     isLoading,
     isRefetching,
+    isError,
+    error,
     refetch,
   } = useQuery({
     queryKey: ["collections"],
     queryFn: () => knowledgeApi.getCollections(),
   });
 
-  // Calculate Metrics
-  const metrics = useMemo(() => {
-    const totalCols = collections.length;
-    const totalDocs = collections.reduce(
-      (acc, c) => acc + (c.document_count || 0),
-      0,
-    );
-    const totalChunks = collections.reduce(
-      (acc, c) => acc + (c.chunk_count || 0),
-      0,
-    );
-    return { totalCols, totalDocs, totalChunks };
-  }, [collections]);
+  // Revisioned counts share the detail page's query, not legacy document counters.
+  const summaries = useQueries({
+    queries: collections.map((collection) => ({
+      queryKey: ["collection-summary-metrics", collection.id],
+      queryFn: () => knowledgeApi.getCollectionSummaryMetrics(collection.id),
+      staleTime: 30000,
+    })),
+  });
+  const summaryById = new Map(
+    summaries.flatMap((query) =>
+      query.data && !query.isError
+        ? [[query.data.collection_id, query.data] as const]
+        : [],
+    ),
+  );
+  const countsKnown =
+    !isLoading &&
+    !isError &&
+    summaries.every((query) => query.data && !query.isError);
+  const metrics = {
+    totalCols: collections.length,
+    totalDocs: countsKnown
+      ? summaries.reduce(
+          (sum, query) => sum + (query.data?.total_sources ?? 0),
+          0,
+        )
+      : null,
+    totalChunks: countsKnown
+      ? summaries.reduce(
+          (sum, query) => sum + (query.data?.active_chunks_count ?? 0),
+          0,
+        )
+      : null,
+  };
 
   // Filtered Collections
   const filteredCollections = useMemo(() => {
@@ -266,18 +294,35 @@ export const KnowledgePage: React.FC = () => {
     }
   };
 
+  if (isError)
+    return (
+      <EmptyState
+        title="Không tải được kho tri thức"
+        description={error.message}
+        action={{
+          label: "Thử lại",
+          onClick: () => {
+            void refetch();
+          },
+        }}
+      />
+    );
+
   return (
     <div className="space-y-6">
       {/* 1. Header & Actions */}
       <PageHeader
         title="Kho Tri Thức"
-        description="Quản lý các bộ sưu tập tài liệu, bóc tách OCR, vector hóa BGE-M3 và số liệu facts phục vụ RAG."
+        description="Quản lý nguồn tài liệu, bóc tách, chỉ mục vector và số liệu phục vụ RAG."
         actions={
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
+              onClick={() => {
+                void refetch();
+                for (const summary of summaries) void summary.refetch();
+              }}
               disabled={isLoading || isRefetching}
               className="h-8 text-xs gap-1.5"
             >
@@ -304,24 +349,27 @@ export const KnowledgePage: React.FC = () => {
           <KpiMetric
             icon={BookOpen}
             label="Kho tri thức"
-            value={metrics.totalCols.toLocaleString("vi-VN")}
-            helper="Bộ sưu tập đang hoạt động"
+            value={isLoading ? "—" : metrics.totalCols.toLocaleString("vi-VN")}
           />
           <KpiMetric
             icon={FileText}
-            label="Văn bản bóc tách"
-            value={metrics.totalDocs.toLocaleString("vi-VN")}
-            helper="Tài liệu PDF, DOCX, XLSX"
+            label="Nguồn tài liệu"
+            value={metrics.totalDocs?.toLocaleString("vi-VN") ?? "—"}
           />
           <KpiMetric
             icon={Layers}
-            label="Vector Chunks"
-            value={metrics.totalChunks.toLocaleString("vi-VN")}
-            helper="Chỉ mục BGE-M3 (1024D)"
+            label="Chunks hoạt động"
+            value={metrics.totalChunks?.toLocaleString("vi-VN") ?? "—"}
           />
         </CardContent>
       </Card>
 
+      {summaries.some((query) => query.isError) && (
+        <p role="alert" className="text-sm text-destructive">
+          Chưa tải được đầy đủ số liệu các kho. Hãy bấm Làm mới; dấu — không có
+          nghĩa là kho trống.
+        </p>
+      )}
       {/* 3. Filter Bar & View Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-1 max-w-md">
@@ -489,14 +537,19 @@ export const KnowledgePage: React.FC = () => {
                     className="text-[11px] font-mono gap-1"
                   >
                     <FileText className="size-3 text-muted-foreground" />
-                    <span>{col.document_count || 0} tài liệu</span>
+                    <span>
+                      {summaryById.get(col.id)?.total_sources ?? "—"} nguồn
+                    </span>
                   </Badge>
                   <Badge
                     variant="outline"
                     className="text-[11px] font-mono gap-1"
                   >
                     <Layers className="size-3 text-muted-foreground" />
-                    <span>{col.chunk_count || 0} chunks</span>
+                    <span>
+                      {summaryById.get(col.id)?.active_chunks_count ?? "—"}{" "}
+                      chunks
+                    </span>
                   </Badge>
                   <Badge
                     variant="outline"
@@ -567,10 +620,10 @@ export const KnowledgePage: React.FC = () => {
                     {col.description}
                   </TableCell>
                   <TableCell className="text-center font-mono">
-                    {col.document_count || 0}
+                    {summaryById.get(col.id)?.total_sources ?? "—"}
                   </TableCell>
                   <TableCell className="text-center font-mono">
-                    {col.chunk_count || 0}
+                    {summaryById.get(col.id)?.active_chunks_count ?? "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-[11px]">

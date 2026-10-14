@@ -23,7 +23,8 @@ from app.modules.knowledge.services.source_artifact import (
     get_structured_review_state,
 )
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens  # noqa: F401
-from app.modules.rag.evidence_lists import list_groups
+from app.modules.rag.evidence_context import model_block
+from app.modules.rag.evidence_lists import list_groups, matches_subject
 from app.modules.rag.evidence_schemas import EvidenceBlock
 from app.modules.rag.schemas import RetrievalSnapshot
 
@@ -32,12 +33,13 @@ PARAGRAPH = re.compile(r"\S[\s\S]*?(?=\n\s*\n|\Z)")
 LIST_ITEM = re.compile(r"^\s*(?:[-+*]|\d+[.)]|[a-z][.)])\s")
 
 
-def enumeration_neighbors(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], limit: int) -> list[EvidenceBlock]:
+def enumeration_neighbors(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], limit: int,
+                          subject: str | None = None) -> list[EvidenceBlock]:
     """Complete adjacent syntactic lists, not a hand-authored domain keyword expansion."""
     ids = {block.id for block in selected}
     result = []
     for group in list_groups(blocks):
-        if len(group) <= limit and any(block.id in ids for block in group):
+        if matches_subject(group, subject) and len(group) <= limit and any(block.id in ids for block in group):
             result.extend(group)
     return list({b.id: b for b in result}.values())
 
@@ -129,6 +131,7 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             title=(source.snapshot_metadata or {}).get("title") or binding.id,
             page_number=unit.page_number, section=" / ".join(unit.heading_path), text=unit.text,
             header_context="\n".join([*unit.heading_path, unit.header_context]), start=unit.start, end=unit.end,
+            source_context=markdown[:1200],
             canonical_hash=source.canonical_hash, temporal_scope=unit.temporal,
             scope_years=unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else [],
             unit_id=unit.id, parent_id=unit.parent_id, unit_manifest_hash=digest,
@@ -162,22 +165,33 @@ def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], ye
 
 
 def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], years: list[int],
-                 limit: int, max_chars: int, *, atomic_lists: bool = True) -> list[EvidenceBlock]:
+                 limit: int, max_chars: int, *, atomic_lists: bool = True,
+                 enumeration_subject: str | None = None, diagnostics: dict | None = None) -> list[EvidenceBlock]:
     """Admit whole body/same-source-heading pairs, never truncate off their proof."""
     headers = {b.source_revision_id: b for b in scope_headers(blocks, ordered, years)}
-    groups = {member.id: group for group in list_groups(blocks) for member in group} if atomic_lists else {}
-    selected, seen, used = [], set(), 2  # JSON array brackets.
+    groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
+              for member in group} if atomic_lists else {}
+    selected, seen, used = [], set(), 40  # Payload field names and brackets.
+    intro_sources = set()
+    dropped = []
     for body in ordered:
         header = headers.get(body.source_revision_id)
         bodies = groups.get(body.id, [body])
         parents = structural_context(blocks, body)
         pair = list({b.id: b for b in [header, *parents, *bodies] if b is not None and b.id not in seen}.values())
-        size = sum(len(json.dumps(b.model_dump(), ensure_ascii=False)) + 1 for b in pair)
+        intros = {b.source_revision_id: b.source_context for b in pair if b.source_context and b.source_revision_id not in intro_sources}
+        size = sum(len(json.dumps(model_block(b), ensure_ascii=False)) + 1 for b in pair)
+        size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0
         if len(selected) + len(pair) > limit or used + size > max_chars:
+            dropped.append({"block_id": body.id, "reason": "block_limit" if len(selected) + len(pair) > limit else "character_budget",
+                            "group_size": len(pair), "characters": size})
             continue
         selected.extend(pair)
         seen.update(b.id for b in pair)
         used += size
+        intro_sources.update(intros)
+    if diagnostics is not None:
+        diagnostics.update(packed_characters=used, packed_blocks=len(selected), dropped=dropped)
     return selected
 
 

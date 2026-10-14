@@ -27,6 +27,7 @@ import type {
   SourceArtifact,
   SourceContextEditRequest,
 } from "@/types/knowledge";
+import { refreshSourceQueries } from "../utils/source-query-cache";
 
 type Props = {
   collectionId: string;
@@ -133,12 +134,11 @@ function ContextForm({
         payload,
       ),
     onSuccess: async (revision) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["knowledge-source", props.collectionId, props.sourceId],
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["source-context-studio", props.collectionId, props.sourceId],
-      });
+      await refreshSourceQueries(
+        queryClient,
+        props.collectionId,
+        props.sourceId,
+      );
       props.onSaved(revision.id);
       onClose();
       toast.success(

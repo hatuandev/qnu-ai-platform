@@ -1,14 +1,23 @@
 import type * as React from "react";
+import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-export interface FieldProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface FieldControlProps {
+  id: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
+  "aria-required"?: boolean;
+}
+
+export interface FieldProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "children"> {
   label?: string;
   required?: boolean;
   error?: string;
   hint?: string;
   htmlFor?: string;
-  children: React.ReactNode;
+  children: React.ReactNode | ((control: FieldControlProps) => React.ReactNode);
 }
 
 export function Field({
@@ -21,12 +30,16 @@ export function Field({
   children,
   ...props
 }: FieldProps) {
+  const generatedId = useId();
+  const controlId = htmlFor || generatedId;
+  const helpId = `${controlId}-help`;
+  const errorId = `${controlId}-error`;
   return (
     <div className={cn("space-y-1.5", className)} {...props}>
       {label && (
         <div className="flex items-center justify-between">
           <Label
-            htmlFor={htmlFor}
+            htmlFor={controlId}
             className="flex items-center gap-1 text-xs font-medium"
           >
             <span>{label}</span>
@@ -34,14 +47,28 @@ export function Field({
           </Label>
         </div>
       )}
-      {children}
+      {typeof children === "function"
+        ? children({
+            id: controlId,
+            "aria-describedby": error ? errorId : hint ? helpId : undefined,
+            "aria-invalid": error ? true : undefined,
+            "aria-required": required || undefined,
+          })
+        : children}
       {error && (
-        <p className="text-[11px] font-medium text-destructive leading-normal">
+        <p
+          id={errorId}
+          role="alert"
+          className="text-[11px] font-medium text-destructive leading-normal"
+        >
           {error}
         </p>
       )}
       {!error && hint && (
-        <p className="text-[11px] text-muted-foreground leading-normal">
+        <p
+          id={helpId}
+          className="text-[11px] text-muted-foreground leading-normal"
+        >
           {hint}
         </p>
       )}

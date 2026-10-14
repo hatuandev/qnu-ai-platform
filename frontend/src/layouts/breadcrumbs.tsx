@@ -1,8 +1,9 @@
-import { useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import { getBreadcrumbs } from "@/navigation/utils";
 
 export function Breadcrumbs() {
+  const navigate = useNavigate();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -19,16 +20,37 @@ export function Breadcrumbs() {
                 aria-hidden="true"
               />
             ) : null}
-            <span
-              className={
-                index === items.length - 1
-                  ? "truncate font-medium text-foreground"
-                  : "truncate"
-              }
-              aria-current={index === items.length - 1 ? "page" : undefined}
-            >
-              {item.label}
-            </span>
+            {item.to ? (
+              <a
+                href={item.to}
+                className="truncate hover:text-foreground"
+                onClick={(event) => {
+                  if (
+                    event.button !== 0 ||
+                    event.ctrlKey ||
+                    event.metaKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  void navigate({ href: item.to });
+                }}
+              >
+                {item.label}
+              </a>
+            ) : (
+              <span
+                className={
+                  index === items.length - 1
+                    ? "truncate font-medium text-foreground"
+                    : "truncate"
+                }
+                aria-current={index === items.length - 1 ? "page" : undefined}
+              >
+                {item.label}
+              </span>
+            )}
           </li>
         ))}
       </ol>

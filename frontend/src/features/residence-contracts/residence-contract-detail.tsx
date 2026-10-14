@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   FilePenLine,
@@ -52,6 +53,7 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 type DetailAction = "submit" | "activate" | "cancel";
 
 export function ResidenceContractDetail({ id }: { id: string }) {
+  const navigate = useNavigate();
   const { can } = useRbac();
   const query = useResidenceContractQuery(id);
   const update = useUpdateResidenceContract();
@@ -117,7 +119,7 @@ export function ResidenceContractDetail({ id }: { id: string }) {
       <Button
         variant="ghost"
         className="-ml-3"
-        onClick={() => window.history.back()}
+        onClick={() => navigate({ href: "/residence-contracts" })}
       >
         <ArrowLeft /> Quay lại danh sách
       </Button>

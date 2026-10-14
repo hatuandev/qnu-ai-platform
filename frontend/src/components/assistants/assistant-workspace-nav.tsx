@@ -1,5 +1,6 @@
 import { Bot, Cpu, MessageSquare, Network, Wrench } from "lucide-react";
 import type * as React from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type AssistantSubView =
@@ -88,7 +89,10 @@ export function AssistantWorkspaceNav({
         const isActive = activeSubView === tab.id;
 
         return (
-          <button
+          <Button
+            variant={isActive ? "default" : "ghost"}
+            size="sm"
+            aria-current={isActive ? "page" : undefined}
             type="button"
             key={tab.id}
             onClick={() => handleTabClick(tab)}
@@ -101,7 +105,7 @@ export function AssistantWorkspaceNav({
           >
             <Icon className="size-3.5" />
             <span>{tab.label}</span>
-          </button>
+          </Button>
         );
       })}
     </div>

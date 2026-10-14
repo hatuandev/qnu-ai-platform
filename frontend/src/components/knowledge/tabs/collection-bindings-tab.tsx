@@ -1,13 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import {
-  FileText,
-  Layers,
-  RefreshCw,
-  RotateCcw,
-  Scan,
-  Settings2,
-} from "lucide-react";
+import { Layers, RefreshCw, RotateCcw, Settings2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -30,8 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DeleteSourceButton } from "@/features/knowledge/components/delete-source-button";
-import { PauseSourceButton } from "@/features/knowledge/components/pause-source-button";
+import { SourceActionsMenu } from "@/features/knowledge/components/source-actions-menu";
 import { useVectorWorkflow } from "@/features/knowledge/components/use-vector-workflow";
 import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
 import { getSourceVectorState } from "@/features/knowledge/utils/vector-workflow";
@@ -43,7 +34,6 @@ export function CollectionBindingsTab({
 }: {
   collection: KnowledgeCollection;
 }) {
-  const navigate = useNavigate();
   const client = useQueryClient();
   const { sources, generations, state } = useVectorWorkflow(collection.id);
   const [selectedGenerationId, setSelectedGenerationId] = useState("");
@@ -308,71 +298,12 @@ export function CollectionBindingsTab({
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-end gap-1.5">
-                        <VectorLoadControls
-                          compact
+                      <div className="flex justify-end">
+                        <SourceActionsMenu
                           collectionId={collection.id}
-                          initialGenerationId={effectiveId}
-                          targets={
-                            canLoad
-                              ? [
-                                  {
-                                    binding_id: source.id,
-                                    source_revision_id:
-                                      source.active_source_revision_id || "",
-                                  },
-                                ]
-                              : []
-                          }
-                          disabledReason={
-                            canLoad
-                              ? undefined
-                              : "Hãy bóc tách và duyệt Markdown trước."
-                          }
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            navigate({
-                              to: "/knowledge/$collectionId/sources/$sourceId",
-                              search: { view: "studio", revision: undefined },
-                              params: {
-                                collectionId: collection.id,
-                                sourceId: source.id,
-                              },
-                            })
-                          }
-                        >
-                          <Scan className="size-3.5" />
-                          Studio OCR
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            navigate({
-                              to: "/knowledge/$collectionId/sources/$sourceId",
-                              search: { view: undefined, revision: undefined },
-                              params: {
-                                collectionId: collection.id,
-                                sourceId: source.id,
-                              },
-                            })
-                          }
-                        >
-                          <FileText className="size-3.5" />
-                          Chi tiết
-                        </Button>
-                        <PauseSourceButton
-                          sourceId={source.id}
-                          title={source.document_title || source.id}
-                          status={source.status}
-                        />
-                        <DeleteSourceButton
-                          sourceId={source.id}
-                          status={source.status}
-                          title={source.document_title || source.id}
+                          source={source}
+                          generationId={effectiveId}
+                          canLoad={canLoad}
                           onDeleted={refresh}
                         />
                       </div>

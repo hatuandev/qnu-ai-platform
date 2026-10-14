@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
-  ArrowLeft,
   Download,
   Loader2,
   RefreshCw,
@@ -10,6 +9,7 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { BackButton } from "@/components/admin/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
@@ -35,12 +35,20 @@ export interface DocumentStudioWorkspaceProps {
   documentId: string;
   revisionId?: string;
   onBack: () => void;
+  backLabel?: string;
   onApproveSuccess?: (revisionId?: string) => void;
 }
 
 export const DocumentStudioWorkspace: React.FC<
   DocumentStudioWorkspaceProps
-> = ({ collection, documentId, revisionId, onBack, onApproveSuccess }) => {
+> = ({
+  collection,
+  documentId,
+  revisionId,
+  onBack,
+  backLabel = "Kho",
+  onApproveSuccess,
+}) => {
   const queryClient = useQueryClient();
   // Document state
   const [doc, setDoc] = useState<StudioOCRDocument | null>(null);
@@ -363,9 +371,7 @@ export const DocumentStudioWorkspace: React.FC<
           </p>
         </div>
         <div className="flex items-center gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={onBack}>
-            Quay lại kho
-          </Button>
+          <BackButton variant="outline" label={backLabel} onClick={onBack} />
           <Button size="sm" onClick={() => loadData()}>
             Thử lại
           </Button>
@@ -380,16 +386,7 @@ export const DocumentStudioWorkspace: React.FC<
       <div className="flex flex-wrap items-center justify-between px-3 py-2 border-b border-border bg-card shrink-0 gap-2">
         {/* Left: Back & Document Metadata */}
         <div className="flex items-center gap-2 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground gap-1.5 rounded-md shrink-0 whitespace-nowrap"
-            title={`Quay lại: ${collection.name}`}
-          >
-            <ArrowLeft className="size-3.5" />
-            <span className="font-medium">Quay lại</span>
-          </Button>
+          <BackButton label={backLabel} onClick={onBack} />
 
           <div className="h-4 w-px bg-border/80 hidden sm:block" />
 

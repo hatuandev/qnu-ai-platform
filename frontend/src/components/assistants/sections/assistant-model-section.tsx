@@ -1,4 +1,5 @@
 import { Field } from "@/components/admin/field";
+import { OptionSelect } from "@/components/admin/option-select";
 import type { AssistantEditForm } from "@/components/assistants/types";
 import {
   Card,
@@ -8,13 +9,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   type AssistantModelOption,
   selectedModelValue,
@@ -50,70 +44,62 @@ export function AssistantModelSection({
           </div>
         )}
         <Field htmlFor="detail-primary-model" label="Mô hình chính (Primary)">
-          <Select
-            value={selectedModelValue(
-              availableModels,
-              form.primary_model,
-              form.preferred_provider_id,
-            )}
-            onValueChange={(val) =>
-              onChange({
-                ...form,
-                primary_model:
-                  availableModels.find((m) => m.value === val)?.model ?? "",
-                preferred_provider_id:
-                  availableModels.find((m) => m.value === val)?.providerId ??
-                  "",
-              })
-            }
-          >
-            <SelectTrigger id="detail-primary-model">
-              <SelectValue placeholder="Chưa có mô hình" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Chưa có mô hình</SelectItem>
-              {availableModels.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {(control) => (
+            <OptionSelect
+              triggerProps={control}
+              options={[
+                { value: "__none__", label: "Chưa có mô hình" },
+                ...availableModels,
+              ]}
+              placeholder="Chưa có mô hình"
+              value={selectedModelValue(
+                availableModels,
+                form.primary_model,
+                form.preferred_provider_id,
+              )}
+              onValueChange={(val) =>
+                onChange({
+                  ...form,
+                  primary_model:
+                    availableModels.find((m) => m.value === val)?.model ?? "",
+                  preferred_provider_id:
+                    availableModels.find((m) => m.value === val)?.providerId ??
+                    "",
+                })
+              }
+            />
+          )}
         </Field>
 
         <Field
           htmlFor="detail-fallback-model"
           label="Mô hình dự phòng (Fallback)"
         >
-          <Select
-            value={selectedModelValue(
-              availableModels,
-              form.fallback_model,
-              form.fallback_provider_id,
-            )}
-            onValueChange={(val) =>
-              onChange({
-                ...form,
-                fallback_model:
-                  availableModels.find((m) => m.value === val)?.model ?? "",
-                fallback_provider_id:
-                  availableModels.find((m) => m.value === val)?.providerId ??
-                  "",
-              })
-            }
-          >
-            <SelectTrigger id="detail-fallback-model">
-              <SelectValue placeholder="Chưa có mô hình" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Chưa có mô hình</SelectItem>
-              {availableModels.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {(control) => (
+            <OptionSelect
+              triggerProps={control}
+              options={[
+                { value: "__none__", label: "Chưa có mô hình" },
+                ...availableModels,
+              ]}
+              placeholder="Chưa có mô hình"
+              value={selectedModelValue(
+                availableModels,
+                form.fallback_model,
+                form.fallback_provider_id,
+              )}
+              onValueChange={(val) =>
+                onChange({
+                  ...form,
+                  fallback_model:
+                    availableModels.find((m) => m.value === val)?.model ?? "",
+                  fallback_provider_id:
+                    availableModels.find((m) => m.value === val)?.providerId ??
+                    "",
+                })
+              }
+            />
+          )}
         </Field>
 
         <Field
@@ -137,7 +123,7 @@ export function AssistantModelSection({
         <Field
           htmlFor="detail-max-tokens"
           label="Max Tokens (Hạn mức sinh)"
-          hint="Số lượng token tối đa cho mỗi phản hồi (500 - 4000)"
+          hint="Độ dài tối đa cho mỗi phản hồi; phụ thuộc khả năng của model. Không phải quota sử dụng."
         >
           <Input
             id="detail-max-tokens"
@@ -153,7 +139,7 @@ export function AssistantModelSection({
         <Field
           htmlFor="detail-thinking-budget"
           label="Thinking Budget (Suy nghĩ ngầm)"
-          hint="0 = Tắt suy nghĩ ngầm (phản hồi siêu tốc 1-2s). > 0: Bật suy luận sâu cho Gemini 2.5 (0 - 4096 tokens)"
+          hint="0: không yêu cầu ngân sách suy luận riêng. Giá trị lớn hơn chỉ có tác dụng nếu provider/model hỗ trợ."
         >
           <Input
             id="detail-thinking-budget"

@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ const historyActionLabels: Record<string, string> = {
 };
 
 export function ResidenceDetail({ residenceId }: { residenceId: string }) {
+  const navigate = useNavigate();
   const { can } = useRbac();
   const query = useResidenceQuery(residenceId);
   const history = useResidenceHistoryQuery(residenceId);
@@ -81,7 +83,10 @@ export function ResidenceDetail({ residenceId }: { residenceId: string }) {
         title={`${item.studentName} · ${item.roomCode}`}
         description={`${item.studentCode} · ${labels[item.status]}`}
         actions={
-          <Button variant="outline" onClick={() => window.history.back()}>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ href: "/residences" })}
+          >
             Quay lại
           </Button>
         }
