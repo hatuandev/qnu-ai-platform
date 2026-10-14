@@ -102,7 +102,10 @@ class AssistantChatService:
         try:
             from sqlalchemy import select
 
-            from app.modules.conversations.models import ConversationMessageModel, ConversationThreadModel
+            from app.modules.conversations.models import (
+                ConversationMessageModel,
+                ConversationThreadModel,
+            )
 
             if tenant_id and assistant_code:
                 thread = (await db.execute(select(ConversationThreadModel).where(

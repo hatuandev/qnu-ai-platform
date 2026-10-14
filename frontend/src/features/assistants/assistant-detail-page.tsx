@@ -139,6 +139,9 @@ export function AssistantDetailPage({
   const workflowsQuery = useQuery({
     queryKey: ["workflow-definitions"],
     queryFn: () => workflowsApi.listDefinitions(),
+    enabled:
+      Boolean(assistantQuery.data) &&
+      assistantQuery.data?.execution_mode !== "rag",
   });
 
   const providersQuery = useQuery({
@@ -432,10 +435,15 @@ export function AssistantDetailPage({
         <AssistantPlaygroundTab assistant={item} />
       ) : subView === "workflow" ? (
         item.execution_mode === "rag" ? (
-          <Card><CardContent className="py-6 text-sm text-muted-foreground">
-            Trợ lý này trả lời trực tiếp từ kho tri thức bằng RAG. Sơ đồ DAG không tham gia luồng chat.
-          </CardContent></Card>
-        ) : <AssistantWorkflowTab assistant={item} />
+          <Card>
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              Trợ lý này trả lời trực tiếp từ kho tri thức bằng RAG. Sơ đồ DAG
+              không tham gia luồng chat.
+            </CardContent>
+          </Card>
+        ) : (
+          <AssistantWorkflowTab assistant={item} />
+        )
       ) : subView === "models" ? (
         /* Tab 2: Models & Guardrails */
         <form onSubmit={handleSubmit} className="space-y-6">

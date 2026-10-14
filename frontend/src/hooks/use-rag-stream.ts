@@ -189,6 +189,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
           const reader = response.body.getReader();
           const decoder = new TextDecoder("utf-8");
           let accumulatedContent = "";
+          let streamCompleted = false;
           const finalCitations: ChatCitation[] = [];
           const finalArtifacts: ChatAttachment[] = [];
           let finalSuggestions: string[] = [];
@@ -286,6 +287,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
               } else if (event.event === "done" || event.event === "end") {
                 try {
                   const doneData = JSON.parse(event.data);
+                  streamCompleted = true;
                   if (
                     doneData.suggested_questions &&
                     Array.isArray(doneData.suggested_questions)
@@ -313,12 +315,18 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                   // ignore
                 }
               } else if (event.event === "error") {
+                let failureMessage = event.data || "Lỗi xử lý luồng AI";
                 try {
                   const errPayload = JSON.parse(event.data);
-                  throw new Error(errPayload.error || "Lỗi xử lý luồng AI");
+                  failureMessage =
+                    errPayload.message ||
+                    errPayload.detail ||
+                    errPayload.error ||
+                    "Lỗi xử lý luồng AI";
                 } catch {
-                  throw new Error(event.data || "Lỗi xử lý luồng AI");
+                  // Plain-text errors from older servers remain readable.
                 }
+                throw new Error(failureMessage);
               }
             },
           });
@@ -328,6 +336,12 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             parser.feed(chunk);
+          }
+
+          if (!streamCompleted) {
+            throw new Error(
+              "Luồng trả lời bị gián đoạn trước khi hoàn tất. Vui lòng thử lại.",
+            );
           }
 
           const latencyMs = Math.round(performance.now() - startTime);
@@ -435,7 +449,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
         const errorMsgItem: ChatMessageItem = {
           id: assistantMessageId,
           role: "assistant",
-          content: `⚠️ ${errorMessage}`,
+          content: errorMessage,
           status: "error",
           timestamp: new Date().toLocaleTimeString("vi-VN", {
             hour: "2-digit",

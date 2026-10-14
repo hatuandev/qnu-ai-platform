@@ -17,7 +17,12 @@ def tokens(text: str) -> list[str]:
 
 @lru_cache(maxsize=4)
 def corpus_statistics(signature: tuple[tuple[str, ...], ...]):
-    counts = [Counter(tokens(row[-1])) for row in signature]
+    # Field-weighted term frequencies: body evidence dominates repeated labels.
+    counts = []
+    for row in signature:
+        body = Counter(tokens(row[-1]))
+        context = Counter(tokens(row[-2]))
+        counts.append({term: body[term] + 0.15 * context[term] for term in body.keys() | context.keys()})
     lengths = [sum(count.values()) for count in counts]
     average = sum(lengths) / max(1, len(lengths))
     postings = defaultdict(list)
@@ -32,7 +37,7 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
     if not blocks or limit <= 0:
         return []
     signature = tuple((b.binding_id, b.index_revision_id, b.source_revision_id, b.id,
-                       b.canonical_hash, f"{b.title}\n{b.section}\n{b.text}") for b in blocks)
+                       b.canonical_hash, f"{b.title}\n{b.section}", b.text) for b in blocks)
     lengths, average, postings = corpus_statistics(signature)
     scores = defaultdict(float)
     for term in sorted({term for query in queries for term in tokens(query)}):

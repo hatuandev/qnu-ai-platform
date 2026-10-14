@@ -49,6 +49,7 @@ async def test_chat_handles_workflow_paused_for_approval():
     mock_db.add = MagicMock()
     mock_exec = MagicMock()
     mock_exec.scalar.return_value = 0
+    mock_exec.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_exec
 
     mock_assistant = AssistantModel(
@@ -110,6 +111,7 @@ async def test_chat_stream_yields_approval_required_event():
     mock_db.add = MagicMock()
     mock_exec = MagicMock()
     mock_exec.scalar.return_value = 0
+    mock_exec.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_exec
 
     mock_assistant = AssistantModel(

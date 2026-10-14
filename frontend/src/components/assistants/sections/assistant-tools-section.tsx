@@ -93,6 +93,28 @@ export function AssistantToolsSection({
   const assistantCode = assistant?.code || assistant?.id || "";
   const isRagOnly = assistant?.execution_mode === "rag";
 
+  if (isRagOnly) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Database className="size-4 text-primary" />
+            Tra cứu RAG trực tiếp
+          </CardTitle>
+          <CardDescription>
+            Trợ lý tìm kiếm trong kho đã xuất bản, đối soát chứng cứ và trả lời
+            có trích dẫn. Dữ kiện số hóa được tra cứu trong RAG, không cần công
+            cụ hành động.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          DAG, xuất tệp và phê duyệt hành động không chạy trong chế độ hỏi–đáp
+          này. Cấu hình workflow cũ được bảo lưu cho các quy trình tác vụ riêng.
+        </CardContent>
+      </Card>
+    );
+  }
+
   const isToolEnabled = (toolId: string) => {
     return (form.enabled_tools || []).includes(toolId);
   };
@@ -128,40 +150,39 @@ export function AssistantToolsSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isRagOnly && <p className="text-sm text-muted-foreground">
-          Chat sử dụng RAG trực tiếp để tra cứu dữ kiện và trả lời có trích dẫn. Các công cụ hành động và phê duyệt bên dưới chỉ áp dụng cho chế độ workflow.
-        </p>}
         {/* 1. Embedded DAG Workflow Summary Box */}
-        {!isRagOnly && <div className="rounded-lg border p-3.5 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
-              <Network className="size-4" />
+        {!isRagOnly && (
+          <div className="rounded-lg border p-3.5 bg-muted/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary shrink-0">
+                <Network className="size-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  Sơ Đồ Luồng Suy Luận Trực Thuộc
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Đồ thị DAG nội bộ điều phối các bước tiếp nhận câu hỏi, tra
+                  cứu kho tri thức và sinh lời giải đáp.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-semibold text-foreground">
-                Sơ Đồ Luồng Suy Luận Trực Thuộc
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Đồ thị DAG nội bộ điều phối các bước tiếp nhận câu hỏi, tra cứu
-                kho tri thức và sinh lời giải đáp.
-              </p>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0 self-start sm:self-center"
+              onClick={() =>
+                onNavigate(
+                  `/assistants/${encodeURIComponent(assistantCode)}/workflow`,
+                )
+              }
+            >
+              <span>Mở sơ đồ DAG</span>
+              <ExternalLink className="size-3 text-muted-foreground" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5 shrink-0 self-start sm:self-center"
-            onClick={() =>
-              onNavigate(
-                `/assistants/${encodeURIComponent(assistantCode)}/workflow`,
-              )
-            }
-          >
-            <span>Mở sơ đồ DAG</span>
-            <ExternalLink className="size-3 text-muted-foreground" />
-          </Button>
-        </div>}
+        )}
 
         {/* 2. Published Version Pin */}
         {assistant && !isRagOnly && (

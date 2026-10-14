@@ -153,7 +153,7 @@ export function AssistantHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {targetWorkflowId && (
+              {assistant.execution_mode !== "rag" && targetWorkflowId && (
                 <DropdownMenuItem
                   onClick={() =>
                     onNavigate(

@@ -86,7 +86,9 @@ export function AssistantWorkspaceNav({
         className,
       )}
     >
-      {WORKSPACE_TABS.filter((tab) => showWorkflow || tab.id !== "workflow").map((tab) => {
+      {WORKSPACE_TABS.filter(
+        (tab) => showWorkflow || tab.id !== "workflow",
+      ).map((tab) => {
         const Icon = tab.icon;
         const isActive = activeSubView === tab.id;
 

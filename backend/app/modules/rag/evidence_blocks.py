@@ -24,6 +24,7 @@ from app.modules.knowledge.services.source_artifact import (
 )
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens  # noqa: F401
 from app.modules.rag.evidence_context import model_block
+from app.modules.rag.evidence_dependencies import coverage_order, dependency_groups, source_identity
 from app.modules.rag.evidence_lists import list_groups, matches_subject
 from app.modules.rag.evidence_schemas import EvidenceBlock
 from app.modules.rag.schemas import RetrievalSnapshot
@@ -42,6 +43,28 @@ def enumeration_neighbors(blocks: list[EvidenceBlock], selected: list[EvidenceBl
         if matches_subject(group, subject) and len(group) <= limit and any(block.id in ids for block in group):
             result.extend(group)
     return list({b.id: b for b in result}.values())
+
+
+def section_neighbors(blocks: list[EvidenceBlock], subject: str, years: list[int],
+                       limit: int) -> list[EvidenceBlock]:
+    """Expand matched headings to bounded prose children, never another section."""
+    headings = [block for block in blocks if re.fullmatch(r"\s*#{1,6}\s+[^\n]+\s*", block.text)]
+    labels = [heading.model_copy(update={"text": heading.text.lstrip("# "),
+        "title": "", "section": "", "is_container": False}) for heading in headings]
+    matched = rank_blocks(labels, [subject], 2, years)
+    by_id = {heading.id: heading for heading in headings}
+    result = []
+    for label in matched:
+        heading = by_id[label.id]
+        identity = (heading.binding_id, heading.index_revision_id, heading.source_revision_id)
+        same = [block for block in blocks if (block.binding_id, block.index_revision_id,
+            block.source_revision_id) == identity]
+        boundary = min((block.start for block in same if block.start > heading.start
+            and block.id in by_id), default=float("inf"))
+        children = sorted((block for block in same if heading.end <= block.start < boundary
+            and not block.is_container), key=lambda block: block.start)
+        result.extend(children[:limit])
+    return list({block.id: block for block in result}.values())[:limit]
 
 
 def split_source_blocks(markdown: str, *, binding_id: str, index_id: str,
@@ -146,12 +169,12 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
 
 def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], years: list[int]) -> list[EvidenceBlock]:
     """Attach exact same-source heading spans, never filename-derived years."""
-    sources = {b.source_revision_id for b in selected}
+    sources = {source_identity(b) for b in selected}
     result = []
-    for source_id in sources:
+    for identity in sources:
         choices = []
         for block in blocks:
-            if block.source_revision_id != source_id or len(block.text) > 300:
+            if source_identity(block) != identity or len(block.text) > 300:
                 continue
             found = {int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", block.text)}
             first_line = block.text.splitlines()[0]
@@ -166,16 +189,20 @@ def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], ye
 
 def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], years: list[int],
                  limit: int, max_chars: int, *, atomic_lists: bool = True,
-                 enumeration_subject: str | None = None, diagnostics: dict | None = None) -> list[EvidenceBlock]:
+                 enumeration_subject: str | None = None, diagnostics: dict | None = None,
+                 coverage_goals: list[str] | None = None) -> list[EvidenceBlock]:
     """Admit whole body/same-source-heading pairs, never truncate off their proof."""
-    headers = {b.source_revision_id: b for b in scope_headers(blocks, ordered, years)}
+    headers = {source_identity(b): b for b in scope_headers(blocks, ordered, years)}
     groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
               for member in group} if atomic_lists else {}
+    for member, dependencies in dependency_groups(blocks).items():
+        groups[member] = sorted({b.id: b for b in [*groups.get(member, []), *dependencies]}.values(), key=lambda b: b.start)
+    ordered = coverage_order(ordered, coverage_goals or [], groups, years)
     selected, seen, used = [], set(), 40  # Payload field names and brackets.
     intro_sources = set()
     dropped = []
     for body in ordered:
-        header = headers.get(body.source_revision_id)
+        header = headers.get(source_identity(body))
         bodies = groups.get(body.id, [body])
         parents = structural_context(blocks, body)
         pair = list({b.id: b for b in [header, *parents, *bodies] if b is not None and b.id not in seen}.values())

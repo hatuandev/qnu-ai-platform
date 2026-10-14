@@ -12,6 +12,7 @@ from app.modules.rag.evidence_passages import (
     passage_payload,
     proposal_contract,
     resolve_proposal,
+    source_grounded_claims,
 )
 from app.modules.rag.evidence_schemas import AnswerProposal, EvidenceBlock, QuoteReference
 from app.modules.rag.evidence_validation import (
@@ -73,8 +74,12 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
     instruction = PROPOSE_INSTRUCTION + (
         "\nSelect evidence_ids from passages. Do NOT generate quotes or source/block IDs. "
         "Each ID is a server-owned exact passage. Select all SAME-SOURCE passages needed "
-        "to prove the claim, its numbers and conditions. Preserve numbers written as words "
-        "in claim text; do not convert them into digits. Conditions outside the user's "
+        "to prove the claim, its numbers and conditions. "
+        "The public answer will use selected source sentences verbatim, not your paraphrase. "
+        "Select complete relevant sentences including mandatory conditions and distinctions; "
+        "avoid redundant whole-block IDs when shorter sentences cover the question. "
+        "Your text field is only a relevance label and is not published. "
+        "Conditions outside the user's "
         "question are optional unless omission changes the answer. Counts of different "
         "rounds are not additive. Do not infer conflicts across different years."
     )
@@ -91,10 +96,21 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         repaired = True
         draft = await structured_call(db, req, contract, instruction +
             "\nThe previous proposal failed deterministic source binding. Repair ONCE using exact "
-            "quotes from the supplied block.text and same-source scope. Do not add facts or infer "
+            "passage IDs and same-source scope. Do not add facts or infer "
             "expected answers from validation errors. If unsupported, return missing/partial.",
             {**payload, "previous_proposal": draft.model_dump(), "binding_errors": rejected,
              "uncovered_list_block_ids": coverage_missing}, max_tokens=4000)
         proposal = resolve_proposal(draft, catalog)
         claims, rejected = bind_claims(proposal, blocks)
-    return proposal, claims, rejected, repaired
+    projected = source_grounded_claims(claims, blocks)
+    by_block = {block.id: block for block in blocks}
+    for claim in projected:
+        body = by_block[claim["references"][0]["block_id"]]
+        same_revision = [block for block in blocks if
+            (block.binding_id, block.index_revision_id, block.source_revision_id, block.canonical_hash) ==
+            (body.binding_id, body.index_revision_id, body.source_revision_id, body.canonical_hash)]
+        for header in scope_headers(same_revision, [body], requested.get("years") or []):
+            reference = bind_quote(QuoteReference(block_id=header.id, quote=header.text), by_block)
+            if not any(ref["block_id"] == reference["block_id"] and ref["quote"] == reference["quote"] for ref in claim["references"]):
+                claim["references"].append(reference)
+    return proposal, projected, rejected, repaired

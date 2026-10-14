@@ -1,17 +1,17 @@
 """Source-bound atomic entailment and essential-qualifier coverage."""
 
 import re
-from decimal import Decimal
 
 from pydantic import Field
 
+from app.modules.rag.evidence_constraints import ConstraintRole, retained_condition
 from app.modules.rag.evidence_schemas import EvidenceBlock, QuoteReference, StrictContract
-from app.modules.rag.evidence_validation import bind_quote, number_values
+from app.modules.rag.evidence_validation import bind_quote
 
 
 class AtomicCheck(StrictContract):
     claim_id: str
-    claim_quote: str = Field(min_length=1, max_length=2000)
+    claim_quote: str = Field(min_length=1, max_length=4000)
     supporting_quote: str = Field(max_length=4000)
     entailed: bool
     reason: str = Field(max_length=300)
@@ -19,6 +19,7 @@ class AtomicCheck(StrictContract):
 
 class RequiredQualifier(StrictContract):
     requirement: str = Field(min_length=1, max_length=200)
+    role: ConstraintRole = "value_constraint"
     reference: QuoteReference
     retained_by: list[str] = Field(max_length=12)
 
@@ -139,9 +140,7 @@ def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[Eviden
             missing.append(qualifier.requirement)
             continue
         ids = set(qualifier.retained_by)
-        texts = [by_claim[claim_id]["text"] for claim_id in ids if claim_id in accepted_ids]
-        values = set().union(*(number_values(text) for text in texts)) if texts else set()
-        needed = number_values(ref["quote"]) - {Decimal(year) for year in years}
-        if not ids or not ids.issubset(accepted_ids) or not needed.issubset(values):
+        retained = [by_claim[claim_id] for claim_id in ids if claim_id in accepted_ids]
+        if not ids or not ids.issubset(accepted_ids) or not retained_condition(qualifier.role, ref, retained, years):
             missing.append(qualifier.requirement)
     return accepted, errors, list(dict.fromkeys(missing)), bool(accepted) and audit.complete and not errors and not missing

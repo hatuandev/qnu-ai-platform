@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.assistants.runtime import prepare_user_message, resolve_runtime_scope
-from app.modules.assistants.schemas import AssistantChatResponse
+from app.modules.assistants.schemas import (
+    AssistantChatRequest,
+    AssistantChatResponse,
+    AssistantResponse,
+    AssistantRuntimeProfile,
+)
 from app.modules.conversations.schemas import ConversationCreateMessageRequest
 from app.modules.conversations.service import conversation_service
 from app.modules.rag.schemas import AskRequest
@@ -18,7 +23,8 @@ from app.modules.rag.service import rag_service
 logger = logging.getLogger(__name__)
 
 
-async def record_chat_message(db, assistant, conversation_id, sender, text):
+async def record_chat_message(db: AsyncSession, assistant: AssistantResponse,
+                              conversation_id: str, sender: str, text: str) -> None:
     try:
         await conversation_service.record_message(db, ConversationCreateMessageRequest(
             thread_id=conversation_id, assistant_code=assistant.code,
@@ -30,7 +36,8 @@ async def record_chat_message(db, assistant, conversation_id, sender, text):
         logger.warning("rag_chat_persistence_failed sender=%s error_type=%s", sender, type(exc).__name__)
 
 
-async def chat_with_rag(db: AsyncSession, assistant, request, profile, history,
+async def chat_with_rag(db: AsyncSession, assistant: AssistantResponse, request: AssistantChatRequest,
+                        profile: AssistantRuntimeProfile, history: list[dict[str, str]],
                         conversation_id: str | None = None) -> AssistantChatResponse:
     tenant, workspace = await resolve_runtime_scope(db, assistant)
     if request.attachments:
@@ -72,7 +79,8 @@ async def chat_with_rag(db: AsyncSession, assistant, request, profile, history,
         execution_id=None, artifacts=[])
 
 
-async def stream_rag_chat(db, assistant, request, profile, history) -> AsyncIterator[str]:
+async def stream_rag_chat(db: AsyncSession, assistant: AssistantResponse, request: AssistantChatRequest,
+                          profile: AssistantRuntimeProfile, history: list[dict[str, str]]) -> AsyncIterator[str]:
     conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
     yield "event: status\ndata: " + json.dumps({"stage": "retrieving",
         "message": "Đang tìm kiếm tài liệu đối soát...", "conversation_id": conversation_id}, ensure_ascii=False) + "\n\n"

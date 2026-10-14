@@ -1,0 +1,56 @@
+{
+  "id": "bkp_285b3a7cde0b41dd87744a7650fbe303",
+  "created_at": "2026-10-14T09:42:56.061053Z",
+  "updated_at": "2026-10-14T09:42:58.316727Z",
+  "actor_id": "act_admin_qnu",
+  "correlation_id": "unknown",
+  "operation": "verify",
+  "status": "completed",
+  "stage": "Đã kiểm tra toàn vẹn",
+  "progress": 100,
+  "size_bytes": 501,
+  "sha256": "b30aa7a8617ec476c9378f45f9e279a0fa991c67110ce6dec5c3fc8bea48c823",
+  "verified_at": "2026-10-14T09:42:58.309824Z",
+  "drill_at": null,
+  "error": null,
+  "pid": 3236,
+  "components": {
+    "archive": {
+      "format": "qnu-backup-v1",
+      "release": null,
+      "app_version": null,
+      "schema": null,
+      "note": "Toàn vẹn không chứng minh tương thích release hoặc chất lượng chatbot."
+    }
+  },
+  "history": [
+    {
+      "timestamp": "2026-10-14T09:42:56.227123Z",
+      "operation": "verify",
+      "status": "queued",
+      "actor_id": "act_admin_qnu",
+      "correlation_id": "unknown",
+      "error": null
+    },
+    {
+      "timestamp": "2026-10-14T09:42:58.316727Z",
+      "operation": "verify",
+      "status": "completed",
+      "actor_id": "act_admin_qnu",
+      "correlation_id": "unknown",
+      "error": null
+    }
+  ],
+  "pinned": false,
+  "origin": "manual",
+  "remote_status": "not_configured",
+  "remote_error": null,
+  "remote_verified_at": null,
+  "remote_location": null,
+  "remote_sha256": null,
+  "remote_version_id": null,
+  "error_code": null,
+  "stage_started_at": "2026-10-14T09:42:58.313232Z",
+  "processed_bytes": 0,
+  "total_bytes": 0
+}

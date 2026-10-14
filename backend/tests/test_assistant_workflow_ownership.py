@@ -66,7 +66,8 @@ def _sample_workflow_definition(wf_id: str = "admissions-assistant") -> Workflow
 
 
 @pytest.mark.asyncio
-async def test_create_assistant_auto_forks_private_workflow() -> None:
+@pytest.mark.parametrize("mode", ["workflow", "rag"])
+async def test_create_assistant_auto_forks_private_workflow(mode) -> None:
     """Tạo Assistant mới với workflow_ownership='private' sẽ tự động fork Workflow riêng."""
     db = AsyncMock()
     db.add = MagicMock()
@@ -92,7 +93,7 @@ async def test_create_assistant_auto_forks_private_workflow() -> None:
         collection_id="col_general",
         is_active=True,
         tenant_id="tenant_qnu",
-        config={**STANDARD_ASSISTANTS[0]["config"], "execution_mode": "workflow"},
+        config={**STANDARD_ASSISTANTS[0]["config"], "execution_mode": mode},
     )
 
     with patch.object(
@@ -107,17 +108,19 @@ async def test_create_assistant_auto_forks_private_workflow() -> None:
         created = await assistant_service.create_assistant(db, req)
 
         assert created.code == "test_ast_new"
-        assert created.workflow_id == "wf_ast_test_ast_new"
+        assert created.workflow_id == ("wf_ast_test_ast_new" if mode == "workflow" else "admissions-assistant")
         assert created.workflow_ownership == "private"
-        mock_fork.assert_awaited_once()
+        assert mock_fork.await_count == (1 if mode == "workflow" else 0)
 
 
 @pytest.mark.asyncio
-async def test_clone_assistant_forks_workflow() -> None:
+@pytest.mark.parametrize("mode", ["workflow", "rag"])
+async def test_clone_assistant_forks_workflow(mode) -> None:
     """Nhân bản Assistant với fork_workflow=True sẽ tạo workflow độc lập cho bản sao."""
     db = AsyncMock()
     db.add = MagicMock()
     original = _sample_assistant("admissions")
+    original.config = {**original.config, "execution_mode": mode}
 
     clone_req = AssistantCloneRequest(
         new_code="ast_admissions_copy",
@@ -144,17 +147,19 @@ async def test_clone_assistant_forks_workflow() -> None:
         cloned = await assistant_service.clone_assistant(db, "admissions", clone_req)
 
         assert cloned.code == "ast_admissions_copy"
-        assert cloned.workflow_id == "wf_ast_ast_admissions_copy"
+        assert cloned.workflow_id == ("wf_ast_ast_admissions_copy" if mode == "workflow" else "")
         assert cloned.workflow_ownership == "private"
-        mock_fork.assert_awaited_once()
+        assert mock_fork.await_count == (1 if mode == "workflow" else 0)
 
 
 @pytest.mark.asyncio
-async def test_publish_assistant_pins_workflow_version() -> None:
+@pytest.mark.parametrize("mode", ["workflow", "rag"])
+async def test_publish_assistant_pins_workflow_version(mode) -> None:
     """Xuất bản Assistant ghim published_workflow_version_id bất biến và lưu vào snapshot."""
     db = AsyncMock()
     db.add = MagicMock()
     assistant = _sample_assistant("admissions")
+    assistant.config = {**assistant.config, "execution_mode": mode}
     assistant.published_workflow_version_id = None
 
     wf_def = _sample_workflow_definition(assistant.workflow_id)
@@ -176,7 +181,7 @@ async def test_publish_assistant_pins_workflow_version() -> None:
         result = await assistant_service.publish_assistant(db, assistant.code)
 
         assert result.is_active is True
-        assert assistant.published_workflow_version_id == "wfv_pinned_123"
+        assert assistant.published_workflow_version_id == ("wfv_pinned_123" if mode == "workflow" else None)
         db.commit.assert_awaited()
 
 

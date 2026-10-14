@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-14** | Codex | Bốn ưu tiên chất lượng chatRAG | Role-awareguard/multiqueryhybrid/closure/corrective1/coverage+dedup;focus125/full1256pass11baselinefail15skip;release20HTTP200/18supported2partial,55citationsđúng; còn6/9/13/25/62/75,chưaaccuracy82 | [Nhật ký443](./nhat_ky/2026-10-14_phien_443_bon_uu_tien_chat_rag.md) |
+
+| **2026-10-14** | Codex | Phân tích câu chưa đúng và đề xuất RAG | Xácnhậnnguồncả5/13/38;sửađúngvai tròconstraint/score,đềxuấtparent-child+multiqueryhybrid+correctiveretrieval1lượt,coverage/spandedup; chỉđọc/replay,khôngsửaruntime/gọiLLM | [Nhật ký442](./nhat_ky/2026-10-14_phien_442_phan_tich_cau_loi_va_de_xuat_rag.md) |
+
+| **2026-10-14** | Codex | Chat RAG trực tiếp và bảo toàn chứng cứ | BỏDAGhỏiđáp,giữworkflowtácvụ;passageIDs/BM25/section;focus110/Ruff/Biome6/build/full1227pass11baselinefail15skip;20HTTP200/17supported/2partial/1missing,31spansđúng/SSElive; còn5/13/38,chưafull82 | [Nhật ký #441](./nhat_ky/2026-10-14_phien_441_chat_rag_truc_tiep_va_doi_soat_chung_cu.md) |
+
 | **2026-10-14** | Codex | Phân tích tách DAG khỏi chatbot hỏi đáp | Đề xuất assistantchat→RAGtrựctiếp, giữhistory/PII/ModelOps/snapshot/citations/SSE; DAGtùychọnchotools/HITL; lỗiauditRAGvẫncầnxửlý; chưa sửa code | [Nhật ký #440](./nhat_ky/2026-10-14_phien_440_de_xuat_tach_dag_khoi_chatbot_hoi_dap.md) |
 
 | **2026-10-14** | Codex | Đối soát nguyên nhân thất bại RAG/DAG khi đã có dữ liệu | Nguồn#435/#438cùngfingerprint; nhiều câu đủcontext nhưng audit/binding loại; Q9packing,Q25temporal,Q38scope; verification19–20s/retrieval1,8s; không sửa code/call model | [Nhật ký #439](./nhat_ky/2026-10-14_phien_439_doi_soat_nguyen_nhan_that_bai_rag_dag.md) |

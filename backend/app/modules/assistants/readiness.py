@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.assistants.knowledge_readiness import count_ready_sources
 from app.modules.assistants.model_readiness import check_model_routes
 from app.modules.assistants.models import AssistantModel
+from app.modules.assistants.runtime import resolve_execution_mode
 from app.modules.assistants.schemas import (
     AssistantLifecycleConfig,
     AssistantReadinessResponse,
@@ -75,7 +76,13 @@ class AssistantReadinessEngine:
             warnings.append(m_warn)
 
         # 3. Tool Gateway Allowlist Check
-        t_check, t_blocker, t_warn = self._check_tool_policy(config.tools)
+        if resolve_execution_mode(config) == "rag":
+            t_check = ReadinessCheckItem(category="tools", name="Chế độ RAG trực tiếp",
+                status="passed", score=100, message="Tra cứu không thực thi công cụ hành động hoặc DAG.",
+                details={"execution_mode": "rag", "action_tools_active": False})
+            t_blocker = t_warn = None
+        else:
+            t_check, t_blocker, t_warn = self._check_tool_policy(config.tools)
         checks.append(t_check)
         if t_blocker:
             blockers.append(t_blocker)

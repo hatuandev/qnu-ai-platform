@@ -294,8 +294,10 @@ async def test_quote_repair_is_bounded_and_never_accepts_unsupported_numbers(rep
     def proposal(value):
         return PassageProposal(status="supported", claims=[PassageClaim(id="c", text=f"Value: {value}",
             evidence_ids=["e1.1"])])
+    invalid = proposal(30)
+    invalid.claims[0].evidence_ids = ["unknown"]
     with patch("app.modules.rag.evidence_claims.structured_call", AsyncMock(side_effect=[
-        proposal(30), proposal(20 if repair_succeeds else 30)])) as generate:
+        invalid, proposal(20) if repair_succeeds else invalid])) as generate:
         _, claims, rejected, repaired = await propose_bound_claims(None,
             AskRequest(question="Value?", collection_id="test"), {"evidence": [block.model_dump()]}, [block])
     assert generate.await_count == 2 and repaired

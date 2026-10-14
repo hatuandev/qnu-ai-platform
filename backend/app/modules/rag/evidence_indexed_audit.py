@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, create_model
 
 from app.modules.rag.evidence_audit import AtomicCheck, RequiredQualifier, SemanticAudit
+from app.modules.rag.evidence_constraints import ConstraintRole
 from app.modules.rag.evidence_passages import passage_catalog, passage_payload
 from app.modules.rag.evidence_schemas import StrictContract
 
@@ -17,12 +18,13 @@ class AuditedClaim(StrictContract):
 
 class AuditedCondition(StrictContract):
     requirement: str = Field(min_length=1, max_length=200)
+    role: ConstraintRole = "value_constraint"
     evidence_id: str
     retained_by: list[str] = Field(default_factory=list, max_length=12)
 
 
 class IndexedAudit(StrictContract):
-    claims: list[AuditedClaim] = Field(max_length=12)
+    claims: list[AuditedClaim] = Field(max_length=48)
     essential_conditions: list[AuditedCondition] = Field(default_factory=list, max_length=20)
     complete: bool
     missing_constraints: list[str] = Field(default_factory=list, max_length=10)
@@ -35,7 +37,7 @@ def audit_contract(claims, catalog):
     condition = create_model("SourceConditionAudit", __base__=AuditedCondition,
         evidence_id=(passages, ...), retained_by=(list[ids], Field(default_factory=list, max_length=12)))
     return create_model("SourceAnswerAudit", __base__=IndexedAudit,
-        claims=(list[verdict], Field(max_length=12)),
+        claims=(list[verdict], Field(max_length=48)),
         essential_conditions=(list[condition], Field(default_factory=list, max_length=20)))
 
 
@@ -59,6 +61,7 @@ def resolve_audit(indexed: IndexedAudit, claims, catalog) -> SemanticAudit:
             supporting_quote=proofs[0] if proofs else "", entailed=valid and verdict.all_assertions_supported,
             reason=verdict.reason))
     conditions = [RequiredQualifier(requirement=condition.requirement,
+        role=condition.role,
         reference=catalog[condition.evidence_id], retained_by=condition.retained_by)
         for condition in indexed.essential_conditions if condition.evidence_id in catalog]
     invalid = any(condition.evidence_id not in catalog for condition in indexed.essential_conditions)
@@ -80,9 +83,27 @@ question safely. Select evidence_id, never invent an ID or requirement. The ques
 defines completeness, not the amount of surrounding information. Class-wide policies
 may answer at class level; do not demand every member's name, exclusivity, unrelated
 dates, URLs, formulas or extra totals. Never sum counts from different rounds.
+An update or distinction for the SAME requested metric is not an unrelated extra:
+retain each evidenced scope rather than presenting only an earlier figure as current.
 Check all essential restrictions/exclusions, thresholds, units, time of day and steps
 which the source makes mandatory for the requested action. A yes/no about a method
 must retain exceptions that change eligibility. Historical figures keep their years.
+Classify each condition's role: value_constraint for numeric thresholds, units,
+dates/deadlines (including hours), negations, quantifiers and eligibility rules;
+current_value for a CURRENT scalar metric explicitly requested (e.g. the current
+total), never for formulas/eligibility thresholds, deadlines, comparisons or counts
+with distinct scopes. It excludes older cited document comparison background,
+not another required scope. method_identity for the identity of a named method,
+not a request for its exact code or a numeric eligibility condition. A named method
+may be established by its source alias; do not demand administrative codes not asked.
+data_year ONLY for the applicable data season; document_year ONLY for publication;
+event_year ONLY for the year of a requested event. A season condition must not demand
+every incidental document identifier, issue-date fragment or old comparison value
+in its surrounding sentence. Conversely NEVER classify an eligibility threshold,
+time limit or historical value as a year condition to skip its numeric proof.
+Use the SHORTEST passage expressing the specific condition, not unrelated background.
+Distinguish scores used for ranking from scores required as eligibility prerequisites:
+not using a score to rank applicants does not imply no prerequisite on that score.
 retained_by lists claims retaining the condition in PUBLIC TEXT. An omitted condition
 has retained_by=[]. Year shown in requested header need not be repeated in every claim.
 Numbers written in words are valid; do not demand digit formatting. Synonymous labels

@@ -1,7 +1,7 @@
 """Direct chat, source passage identity and unsupported-claim regressions."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -18,6 +18,7 @@ from app.modules.rag.evidence_passages import (
     PassageProposal,
     passage_catalog,
     resolve_proposal,
+    source_grounded_claims,
 )
 from app.modules.rag.schemas import AskResponse
 
@@ -93,18 +94,26 @@ def test_passage_ids_keep_exact_formula_unicode_and_offsets_without_model_copyin
 
 def test_unknown_passage_id_and_invented_number_are_rejected():
     blocks = split_source_blocks("Value: 20", binding_id="b", index_id="i", source_id="s", title="Policy")
-    for ids, text in [(["invented"], "Value: 20"), (["e1.1"], "Value: 30")]:
+    for ids, text in [(["invented"], "Value: 20")]:
         proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text=text, evidence_ids=ids)])
         claims, errors = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
         assert not claims and errors
+
+    proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text="Value: 30",
+        evidence_ids=["e1.1"])])
+    claims, errors = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
+    assert not errors and claims[0]["text"] == "Value: 20"
 
 
 @pytest.mark.parametrize("supported", [True, False])
 def test_full_claim_audit_rejects_unsupported_compound_relation(supported):
     blocks = split_source_blocks("Method A uses result B", binding_id="b", index_id="i", source_id="s", title="Policy")
     text = "Method A uses result B" if supported else "Method A uses result B and accepts result C"
-    proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text=text, evidence_ids=["e1.1"])])
-    claims, _ = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
+    from app.modules.rag.evidence_schemas import AnswerProposal, EvidenceClaim, QuoteReference
+
+    proposal = AnswerProposal(status="supported", claims=[EvidenceClaim(id="c", text=text,
+        references=[QuoteReference(block_id=blocks[0].id, quote=blocks[0].text)])])
+    claims, _ = bind_claims(proposal, blocks)
     indexed = IndexedAudit(claims=[AuditedClaim(claim_id="c", all_assertions_supported=supported,
         reason="Every relationship checked")], essential_conditions=[],
         complete=True, missing_constraints=[])
@@ -120,3 +129,71 @@ def test_default_evidence_assistant_uses_rag_and_explicit_workflow_is_preserved(
     assert build_runtime_profile(record).execution_mode == "rag"
     record.config.execution_mode = "workflow"
     assert build_runtime_profile(record).execution_mode == "workflow"
+
+
+@pytest.mark.asyncio
+async def test_history_rejects_a_thread_from_another_tenant_before_reading_messages():
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = SimpleNamespace(tenant_id="other", assistant_code="custom")
+    db.execute.return_value = result
+    with pytest.raises(AppException) as error:
+        await AssistantChatService._get_recent_conversation_history(db, "foreign-thread",
+            tenant_id="tenant-x", assistant_code="custom")
+    assert error.value.status_code == 404
+    assert db.execute.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_stream_reports_provider_error_without_done_or_unverified_text():
+    from app.modules.assistants.services.assistant_rag_chat import stream_rag_chat
+
+    record = assistant()
+    with patch("app.modules.assistants.services.assistant_rag_chat.chat_with_rag", AsyncMock(
+        side_effect=AppException("Unavailable", code="ALL_PROVIDERS_UNAVAILABLE", status_code=503))):
+        events = [event async for event in stream_rag_chat(AsyncMock(), record,
+            AssistantChatRequest(message="Question?"), build_runtime_profile(record), [])]
+    assert any("ALL_PROVIDERS_UNAVAILABLE" in event for event in events)
+    assert not any("event: done" in event or "event: token" in event for event in events)
+
+
+def test_audit_missing_or_duplicate_verdicts_cannot_mark_answer_complete():
+    blocks = split_source_blocks("Value: 20", binding_id="b", index_id="i", source_id="s", title="Policy")
+    proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text="Value: 20",
+        evidence_ids=["e1.1"])])
+    claims, _ = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
+    verdict = AuditedClaim(claim_id="c", all_assertions_supported=True, reason="Supported")
+    for verdicts in [[], [verdict, verdict]]:
+        audit = resolve_audit(IndexedAudit(claims=verdicts, complete=True), claims, passage_catalog(blocks))
+        assert not audit.complete
+
+
+def test_selected_source_sentence_keeps_conditions_and_revisions_in_public_claim():
+    raw = "A reports 53 early; a later announcement reports 56 for a distinct scope."
+    blocks = split_source_blocks(raw, binding_id="b", index_id="i", source_id="s", title="Official")
+    proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text="A reports 53 early",
+        evidence_ids=["e1.1"])])
+    claims, errors = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
+    assert not errors
+    grounded = source_grounded_claims(claims, blocks)
+    assert grounded[0]["text"] == raw
+    assert grounded[0]["references"][0]["source_revision_id"] == "s"
+    assert "56" in grounded[0]["text"]
+
+
+def test_source_projection_does_not_turn_scope_headers_into_answers():
+    blocks = split_source_blocks("# PERIOD 2026\n\nCondition A applies only if B.",
+        binding_id="b", index_id="i", source_id="s", title="Official")
+    proposal = PassageProposal(status="supported", claims=[PassageClaim(id="c", text="Condition A in 2026",
+        evidence_ids=["e2.1", "e1.1"])])
+    claims, errors = bind_claims(resolve_proposal(proposal, passage_catalog(blocks)), blocks)
+    assert not errors
+    grounded = source_grounded_claims(claims, blocks)
+    assert len(grounded) == 1 and grounded[0]["text"] == "Condition A applies only if B."
+
+
+def test_blank_institution_quote_is_null_not_invented_user_proof():
+    from app.modules.rag.evidence_scope import InstitutionScope
+
+    assert InstitutionScope(target_institution="A", exam_organizer=None,
+        target_basis="assistant_scope", target_quote=" ").target_quote is None

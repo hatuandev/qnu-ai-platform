@@ -2,12 +2,13 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_schemas import StrictContract
+from app.modules.rag.evidence_validation import normalized_label
 from app.modules.rag.schemas import AskRequest
 
 
@@ -16,6 +17,11 @@ class InstitutionScope(StrictContract):
     exam_organizer: str | None = Field(max_length=200)
     target_basis: Literal["assistant_scope", "question", "unknown"]
     target_quote: str | None = Field(max_length=500)
+
+    @field_validator("target_quote", mode="before")
+    @classmethod
+    def normalize_empty_quote(cls, value):
+        return None if isinstance(value, str) and not value.strip() else value
 
 
 SCOPE_INSTRUCTION = """Resolve only institution ROLES in the original question.
@@ -42,6 +48,7 @@ async def resolve_institution_scope(db: AsyncSession, req: AskRequest, scope: di
         return {}
     roles = await structured_call(db, req, InstitutionScope, SCOPE_INSTRUCTION,
                                   {"question": req.question, "assistant_scope": scope}, max_tokens=500)
+    roles = _scope_basis(roles, req.question, scope)
     invalid = ((roles.target_basis == "question" and (not roles.target_quote or roles.target_quote not in req.question))
                or (roles.target_basis == "assistant_scope" and roles.target_quote is not None))
     if invalid:
@@ -49,8 +56,18 @@ async def resolve_institution_scope(db: AsyncSession, req: AskRequest, scope: di
             "\nPrevious role proof was invalid. Copy an exact clause from question for question basis; "
             "for an implicit owner use assistant_scope and target_quote=null. Do not invent a quote.",
             {"question": req.question, "assistant_scope": scope, "previous": roles.model_dump()}, max_tokens=500)
+        roles = _scope_basis(roles, req.question, scope)
     if roles.target_basis == "question" and (not roles.target_quote or roles.target_quote not in req.question):
         raise AppException("Vai trò trường đích không có căn cứ trong câu hỏi.", code="EVIDENCE_TARGET_SCOPE_INVALID", status_code=502)
     if roles.target_basis == "assistant_scope" and roles.target_quote is not None:
         raise AppException("Phạm vi trợ lý bị gán thành trích dẫn người dùng.", code="EVIDENCE_TARGET_SCOPE_INVALID", status_code=502)
     return roles.model_dump()
+
+
+def _scope_basis(roles: InstitutionScope, question: str, scope: dict) -> InstitutionScope:
+    """A literal name supplied only by configured persona is not a user quote."""
+    name = normalized_label(roles.target_institution or "")
+    if (roles.target_basis == "question" and name and name not in normalized_label(question)
+            and name in normalized_label(str(scope.get("persona") or ""))):
+        return roles.model_copy(update={"target_basis": "assistant_scope", "target_quote": None})
+    return roles

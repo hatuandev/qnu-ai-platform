@@ -79,6 +79,25 @@ def test_bm25_year_filter_applies_even_when_statistics_are_cached():
     assert not rank_blocks(corpus, ["Attribute"], 1, [2025])
 
 
+def test_answer_body_outweighs_repeated_section_label():
+    from app.modules.rag.evidence_bm25 import rank_blocks
+
+    source = blocks("# Operational methods\n\nThe available operational methods are option A; option B; and option C.\n\nA long unrelated paragraph. " * 10)
+    relevant = next(block for block in source if "option A;" in block.text)
+    unrelated = relevant.model_copy(update={"id": "unrelated", "text": "A footnote.",
+        "title": "Operational methods", "section": "Operational methods"})
+    assert rank_blocks([relevant, unrelated], ["operational methods"], 1)[0].id == relevant.id
+
+
+def test_enumeration_expands_matching_heading_to_prose_without_crossing_section():
+    from app.modules.rag.evidence_blocks import section_neighbors
+
+    source = blocks("## Operational methods\n\nOur methods are option A; option B; option C.\n\nEligibility conditions.\n\n## Fees\n\nA different topic.")
+    neighbors = section_neighbors(source, "operational methods", [], 3)
+    assert source[1] in neighbors
+    assert source[-1] not in neighbors
+
+
 def test_precedence_self_reference_is_not_replacement_and_invalid_override_rejects():
     from app.modules.rag.evidence_precedence import apply_precedence
     from app.modules.rag.evidence_schemas import ClaimVerdict, VerificationResult

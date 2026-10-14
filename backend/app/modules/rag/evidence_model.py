@@ -46,7 +46,8 @@ async def structured_call(db: AsyncSession, req: AskRequest, contract: type[Cont
                     "The JSON did not match the schema. Repair ONLY formatting/field names/types; "
                     "do not add unsupported facts. Return a valid JSON object. Invalid fields: " + str(fields)))
     raise AppException("Mô hình trả hợp đồng chứng cứ không hợp lệ sau hai lần kiểm tra.",
-                       code="EVIDENCE_MODEL_CONTRACT_INVALID", status_code=502) from error
+                       code="EVIDENCE_MODEL_CONTRACT_INVALID", status_code=502,
+                       details={"contract": contract.__name__, "invalid_fields": fields}) from error
 
 
 PLAN_INSTRUCTION = """Plan a QNU document-grounded query, WITHOUT answering it.
@@ -85,6 +86,12 @@ query is a standalone search question. search_queries are up to three short sema
 search variants (expanded acronyms/synonyms), preserving every year/method/round/event.
 Use distinct lexical formulations of the entity and requested attribute in Vietnamese,
 not just repeated versions of the same question; this is retrieval, not answer generation.
+Preserve the decision/action and negation in the ORIGINAL question, not merely its
+entities. Eligibility to apply, ranking applicants, confirming admission and enrolling
+are different intents even for the same group and year. Do not rewrite prerequisites
+for a method into prerequisites for another method, or a ranking-score exclusion into
+an absence of score prerequisites. A group-level yes/no needs a group-level conditional
+policy, not necessarily a list of each member. Synonyms must preserve these roles.
 Do not derive facts or values from the question. Do not include an expected answer."""
 
 PROPOSE_INSTRUCTION = """Answer only using identified official evidence blocks.
@@ -152,8 +159,16 @@ superseded_source_revision_ids, never for a claim from the preferred source itse
 or to repeat its own references. Leave it empty when there is no replacement.
 All missing_constraints must be concise Vietnamese phrases, not internal fields.
 Verify answers to the ORIGINAL question, not just the rewritten search query.
+Judge contextual meaning, not literal label equality. A source's own term may
+answer a synonymous user label when identity and role are unambiguous within
+that source. Do not require an explicit synonym dictionary or identical wording.
+Some claims are verbatim source sentences: retain their explicit distinctions,
+conditions and exceptions, not only a shortened paraphrase. Reject irrelevant
+passages even when copied exactly. Do not demand every clause restate the question.
 Offering multiple methods alone does not prove an applicant may apply via all of
 them. Choosing between methods is distinct from combining scores into one method.
+Distinguish scores used for ranking from scores required as eligibility prerequisites.
+An exclusion from ranking does not establish that no prerequisite on that score exists.
 Check the target institution against requested scope, not merely a named exam
 organizer/partner. assistant_scope is identity, not proof of any factual claim.
 For EACH claim_id return entailed, relevant, scope_compatible and a brief reason.
@@ -180,7 +195,9 @@ rounds/events or successive announcements; those sets need not be disjoint.
 Require union/overlap information only when explicitly requested by the user.
 Keep distinct published counts with their original scopes instead of demanding
 an invented new total. Essential qualifiers must appear in the answer text, not
-just its attached quotes. For formulas copy source glyphs verbatim or quote the
+just its attached quotes. If selected evidence distinguishes an earlier and updated
+value for the requested metric, preserve BOTH scopes unless the question pins one.
+For formulas copy source glyphs verbatim or quote the
 entire block; never replace them with a similar Unicode symbol.
 Do NOT infer not-offered/not-required/not-announced from absence.
 Apply source_preferences only to equivalent applicability tuples. When an old-source

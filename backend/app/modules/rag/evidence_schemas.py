@@ -63,7 +63,7 @@ class QuoteReference(StrictContract):
 
 class EvidenceClaim(StrictContract):
     id: str
-    text: str = Field(min_length=3, max_length=2000)
+    text: str = Field(min_length=3, max_length=4000)
     references: list[QuoteReference] = Field(min_length=1, max_length=4)
 
 
@@ -83,7 +83,7 @@ class ClaimVerdict(StrictContract):
 
 
 class VerificationResult(StrictContract):
-    verdicts: list[ClaimVerdict] = Field(default_factory=list, max_length=12)
+    verdicts: list[ClaimVerdict] = Field(default_factory=list, max_length=48)
     complete: bool
     conflict: bool = False
     missing_constraints: list[str] = Field(default_factory=list, max_length=10)

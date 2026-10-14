@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-14** | [Phiên443](./2026-10-14_phien_443_bon_uu_tien_chat_rag.md) | Bốn ưu tiên chatRAG | Role-awareproof/multiqueryhybrid/closure/corrective/packing+dedup;focus125/full1256pass11baselinefail15skip;20HTTP200/18supported2partial,55citationsđúng; còncoverage/đủý,khôngaccuracy82 |
+
+| **2026-10-14** | [Phiên #442](./2026-10-14_phien_442_phan_tich_cau_loi_va_de_xuat_rag.md) | Nguyên nhân5/13/38 và đề xuất thuật toán | Replaynumeric5;13bỏpolicy nhóm;38bỏmục2+a/b/earlyexit;role-awareguard,parent-child,multiqueryhybrid,corrective1lượt; chỉphântích/chưaimplement |
+
+| **2026-10-14** | [Phiên #441](./2026-10-14_phien_441_chat_rag_truc_tiep_va_doi_soat_chung_cu.md) | Chat RAG trực tiếp, bảo toàn câu nguồn | Bỏ DAG hỏiđáp; BM25/IDs/section; focus110/full1227pass11baselinefail15skip/build;20HTTP200/17supported/2partial/1missing,31spansđúng/SSElive; còn5/13/38 |
+
 | **2026-10-14** | [Phiên #440](./2026-10-14_phien_440_de_xuat_tach_dag_khoi_chatbot_hoi_dap.md) | Đề xuất chat RAG trực tiếp, DAG tùy chọn | Chat/SSEhiệnworkflowbắtbuộc; tracehỏiđápchỉwrapRAG; giữchatpolicy/history/PII/citations, workflowschotácvụ; chỉphântích/chưamigrate |
 
 | **2026-10-14** | [Phiên #439](./2026-10-14_phien_439_doi_soat_nguyen_nhan_that_bai_rag_dag.md) | Phân tích thất bại dù có nguồn | Context cóDQN/53+56/15/30/học phí; Q9packing,Q25yearconflict,Q38scope; audit falsepartial/quote/span và supported thiếuý; chỉ đọc+docs |
