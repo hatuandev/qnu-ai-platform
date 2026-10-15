@@ -7,6 +7,100 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **Phiên471 (2026-10-15) — Đóng gói push Gitea theo yêu cầu**: Nhánh `main`, fetch
+  đầu phiên local/Gitea cùng `1f6e611`. Chỉ push remote `gitea` vì `origin` có cả hai đích.
+  Gom mã/tests/fixture/scripts và docs466–470; giữ log `backend/storage/rag_stage*` local,
+  không đụng `docs/tai_lieu`, DB/nguồn/vector/model/config. Không chạy thêm test/giai đoạn5.
+  Kết quả push cần xác nhận SHA remote sau thao tác; không đồng nghĩa đã deploy server.
+  [Nhật ký471](../nhat_ky/2026-10-15_phien_471_chuan_bi_push_gitea.md),
+  [snapshot471](snapshots/2026-10-15_session_471.md).
+
+- **Phiên470 (2026-10-15) — Tiếp giai đoạn4 hợp đồng ô nguồn**: Catalog cells/header raw
+  units/spans/hash/snapshot, scope reqtenant/workspace/collection khớp, không ID ngoài metric.
+  MetricScope chọn intro→RowSelection chọn tọa độ→RowAudit độc lập không xem selection;
+  assistant_scope identity truyền đúng, không dùng persona làm facts. Raw render số/header/entity,
+  notes giữ phạm vi nguyên văn; reject không freegeneration/cache success, policy không đổi.
+  Close empty/dash giữa cột cùng prefixfamily>=2tokens, không bù số; listbranches+continued
+  sentences cùng nguồn; legendparagraph không tự thuộc rule gần nhất. Ghi chú còn dài.
+  Final live2 primaryQwen/no fallback/3generate mỗi câu: QLGD15/18/600/15 và SPToán20/–/–/20,
+  có notes2/a/b+legend đủ nguyên văn;18,30/4,87s không p95/accuracy82.8rounds16testconvos,
+  giữ cả fails; protectedconfig/pub/source/facts/chunks/metadata/inventory unchanged21sources.
+  Rufffullđạt/focus121pass/boundary35pass. Fullđầu1401pass11fail16skip54tempACLerrors;
+  full cuối dùng basetemp mới workspace, không chmod/xóa temp cũ;
+  **1456pass11fail16skip0errors191,45s, exact11IDs trùng469, không lỗi mới**.
+  21/21rawcitation spans/hash/source khớp canonical sau full, protectedfingerprintsunchanged.
+  Không OCR/reset/migration/reparse/index/publish/model/config/restart/20/82/Gitindex.
+  Chỉ rowanchors+factfirst; no catalog/deterministic temporal giữ cũ; false-refuse/notesverbose
+  còn giới hạn, không claim universalquality. Cần nhận codeBEworker rồi20 đa dạng trước82.
+  [Nhật ký470](../nhat_ky/2026-10-15_phien_470_rag_hop_dong_o_nguon.md),
+  [snapshot470](snapshots/2026-10-15_session_470.md).
+
+- **Phiên469 (2026-10-15) — RAG giai đoạn4 generation/status/window**: Chỉ dẫn nghĩa
+  theo nguồn + đủ cột/điều kiện/phần thiếu, giữ custom persona/config. Refusal có citation
+  không tự answered; status/citation sau tách gợi ý/sanitize, empty/noevidence không cache success.
+  Window400 vLLM-compatible đếm /tokenize cùng server/alias/template, không dùng cận dưới
+  “at least”; chỉ giảm cap output request khi đủ chỗ, giữ toàn bộ prompt, bounded1recovery,
+  unavailable/count sai giữ lỗi/fallback. JSON/SSE length nonempty cũng báo budgetexhausted.
+  RED14fail3pass+noevidencebody1fail6pass; focus138pass/boundarycuối47pass/Rufffullđạt;
+  fullverified1438pass11fail16skip194,96s exact11IDs trùng468, không lỗi mới.
+  Live2 thật primaryvLLM/Qwen không fallback; count5099/5378 khớp usage, cap3093/2814,
+  output345/416 không length. Window đã sửa, **generation chưa nghiệm thu**: QLGD bỏ600/15,
+  diễn giải18 sai; SPToán bỏ20/–/–/20 và nói15/học bạ/năm cũ, cả2 vẫnanswered.
+  Hàng đủ trong prompt nhưng còn trộn metric/scope; numeric/phrase guard chưa semanticverify.
+  Đề xuất thêm row-cell answer contract chọn/verify metric+scope quote và render ô gốc,
+  cần user duyệt vì đổi generationcontract/có thể thêm modelcalls. Service95,85s/7,44s,
+  2testconvos+usage normal; protectedconfig/source/pub/facts/chunks/metadata/inventory unchanged
+  sau live và full. Fixture sparse positive namedentity+citation, không nới guard.
+  Không OCR/reset/migrate/reparse/index/publish/model/policy/config/restart/20/82/Gitindex.
+  Prompt/heuristic không là independent semantic verifier, không claim accuracy.
+  [Nhật ký469](../nhat_ky/2026-10-15_phien_469_rag_giai_doan_4_sinh_va_kiem_chung.md),
+  [snapshot469](snapshots/2026-10-15_session_469.md).
+
+- **Phiên468 (2026-10-15) — RAG giai đoạn 3: truy hồi hàng bảng**: Facts entity phrase/mã
+  trước LIMIT, requested applicability-year ưu tiên trước unknown; không suy năm từ issue date.
+  `source_rows` đọc chunk thật trong snapshot, entity cell/mã khớp toàn cụm, không match tổ hợp môn;
+  pin scope/hash/review/parity/manifest/graph. N-gram fallback cho tên mới, lọc ô trước graph;
+  BM25 hiện hữu xếp hàng+intro/notes; reserve2/6anchors và giữ linked units nguyên văn,
+  topK alternatives theo reranker config; không CE giả, noanchor giữ output cũ.
+  Untyped metric không thăng mọi phí/chỉ tiêu cùng entity lên Tier1. Raw citation/trang/source-unit
+  riêng cho notes, không sao chép temporal row hoặc quote embedding projection. Log branch fact_hybrid/evidence,
+  cacheversion entity-rows-v1; policy/model/max5000/quota không đổi. Hai routing xfail466 đã sửa,
+  còn refusalstatus1 strictxfail. Finalregression163pass1skip1xfail9,02s/Rufffullđạt;
+  fullhandoff1415pass11baselinefail16skip1xfail182,78s, exact11IDs giống467, không lỗi mới.
+  Fullđầu1406pass20fail=11baseline+9unitfakeDB thiếu dependency mới; fixture4suite đã cập nhật,
+  giữ assertions và PG/negative anchors riêng, không thêm fakefallback runtime.
+  Readonly PG corpus hai câu: TB điểm sàn26 hạng1, QLGD15/18/600/15 và SPToán20/–/–/20+notes7–8;
+  final843,98/1245,31ms, wrongtenantempty, config/pub/source/facts/chunks/inventory fingerprints unchanged.
+  Không model/OCRcalls/20/82/Ragas/reset/reparse/index/publish/restart/config/Gitindex.
+  Cần BE/worker nhận code; source thiếu số/ngày áp dụng phase2 riêng khi duyệt. Window8192+output5000,
+  refusalstatus/semanticcoverage và scope đa cấp còn giai đoạn sau, không claim accuracy đã tăng.
+  [Nhật ký468](../nhat_ky/2026-10-15_phien_468_rag_giai_doan_3_truy_hoi_hang_bang.md),
+  [snapshot468](snapshots/2026-10-15_session_468.md).
+
+- **Phiên467 (2026-10-15) — RAG giai đoạn 2: nguồn/metadata/ngữ cảnh bảng**:
+  Artifact v7/extractor layout-v10; OCR vùng đầu trang khi thiếu số/ngày, giữ bảng native,
+  chỉ bổ sung field lines và luôn yêu cầu duyệt. Session OCR riêng. Chuẩn hóa khoảng trắng
+  dấu `/` và biên chữ–số; không nhầm ngày văn bản viện dẫn thành ngày ban hành, không tự sửa dấu.
+  Graph `source-context-v1` giữ raw spans, liên kết hàng→đoạn dẫn/header/ghi chú qua trang;
+  nối bảng cần STT/header/trang chứng minh, `context_only` không tự suy năm/điều kiện áp dụng.
+  Projection nhiều tầng, fact pointer khớp duy nhất, DOCX ô gộp qua HTML; bảng lặp mơ hồ có warning.
+  Pin/validate graph trước cache reuse, manifest/artifact cũ tương thích, không migration.
+  Focus cuối **141 passed/3 open xfailed** (19 ca stage2), Ruff toàn Backend đạt.
+  Full handoff sau mọi sửa runtime **1403 passed, 11 failed, 16 skipped, 3 xfailed/182,83s**;
+  exact11ID lỗi trùng baseline432, không lỗi mới trong phần thay đổi.
+  Native PDF thật hash khớp/93units, QLGD-SPToán giữ đủ4 phương thức + notes7–8.
+  User chỉ cho phép PaddleOCR nội bộ100.105.13.53; 4 lượt crop thật, cuối **proposed**
+  số121/ngày09/07/2026,95units, reviewrequired; raw OCR đuôiHDTS cần đối chiếu dấu HĐTS.
+  Không cloud fallback, chỉ log OCR bình thường; config/pub/source/facts/chunks/metadata/inventory
+  fingerprint không đổi cả sau full suite. PDFInspector subprocess thất bại cả nâng quyền;
+  native giữ nguồn, chưa root-cause parser phụ. Chưa real reparse/index/publish/config/restart/20/82.
+  Cần BE/worker mới và targeted reparse→duyệt→staging→probe→publish. Retrieval/window/classifier/status
+  còn giai đoạn sau, policyfalse/max5000 giữ nguyên.
+  [Nhật ký467](../nhat_ky/2026-10-15_phien_467_rag_giai_doan_2_ngu_canh_nguon.md),
+  [snapshot467](snapshots/2026-10-15_session_467.md).
+
+- **Phiên466 (2026-10-15) — RAG giai đoạn1 sau reset**: Chỉ audit/test, không runtimefix.21sources active/epoch2/snapshot c61c923b10b4f8f1aa58; evidence_policy=false dù mode=rag nên legacy, không QueryPlan/BM25 evidence. PDF TB điểm sàn26 hashkhớp, xem1/2/7/8:121ngày09/07/2026;QLGD15/18/600/15,SPToán20/–/–/20+notes8;86/86Qdrant ID/hash đạt. Header2/hàngđúng; native bỏsố/ngày, scopeônull/điểmhọcbạgánadmission_method. Genuine trace2 ngoài sandbox:QLGDchỉ15/SPToánnóithiếu2026nhưnganswered;factsLIMIT5/10missrow/denseQLGDrow11rớtbeforeprompt/SPToánnotopK. PrimaryvLLM400window8192<input>=3193+output5000,cả2servedCloudflare;khôngđổimodel/policy. Red5pass4fail→focus78pass4strictxfail6,53s/Ruffscoped;khôngfullsuite/build/20/82. Sandbox2networkerrorsloạibaseline,tổng4testconvos+usagenormal;config/pub/targetcontent/metadatafingerprintsunchanged. Scripttrace+fixture+report, giữdocs/tai_lieu/Gitindex;chưafix/reindex/publish/deploy. [Báo cáo](../kiem_thu/2026-10-15_rag_giai_doan_1_diem_san_121.md), [Nhật ký466](../nhat_ky/2026-10-15_phien_466_rag_giai_doan_1_diem_san.md).
+
 - **Phiên465 (2026-10-15) — Bỏ theo dõi artifact Git an toàn**: Dọn artifact tự động đang bị Git theo dõi tại HEAD 40c8c65 theo ràng buộc bảo vệ: Bỏ theo dõi qua staged `git rm --cached` 2.022 file (81,95 MiB), gồm `backend/storage/pytest*/` (1.929 file, 76,36 MiB), 80 file log chạy lệnh ngoài `docs/tai_lieu` (4,15 MiB), 13 file ảnh render/QA trong `tmp/` (1,43 MiB). Giữ nguyên toàn bộ file vật lý trên máy; giữ nguyên 100% `docs/tai_lieu`. Giữ lại: `tmp/qa_drafting_render.py` (script QA), 6 file log trong `backend/storage/e2e_fixtures/` (thuộc fixture E2E), 5 file `pytest*.xml` (báo cáo test), toàn bộ source test, conftest, scripts, configs, data, legacy. Cập nhật `.gitignore` có phạm vi cụ thể cho pytest storage, test logs và tmp renders/QA. Chưa commit/push/rewrite lịch sử Git. Thay đổi staged deletion đang chờ người dùng kiểm tra. [Nhật ký465](../nhat_ky/2026-10-15_phien_465_bo_theo_doi_artifact_git_an_toan.md), [snapshot465](snapshots/2026-10-15_session_465.md).
 
 - **Phiên464 (2026-10-15) — Purge có lịch sử xuất bản**: Fix FK_RESTRICT: có activation giữ nguyên history/binding detached/index pruned, clear payload links/points, audit purged_artifacts; không history hard-delete cũ. Guard cross-source activation from/to trước xóa external; ORM mô tả FK migration sẵn có, không migration mới. Re-import detached→pending, workererror không lộSQL. PG regression trước3fail đúnglỗi→cuối56pass11,49s/scopedRuff đạt; không fullsuite/build/serververify. Chưa commit/push/deploy/retrynguồnthật/reset; cần BE+worker mới rồi retry failedjob. Giữ docs/tai_lieu và Gitartifacts. [Nhật ký464](../nhat_ky/2026-10-15_phien_464_purge_publication_history.md), [snapshot464](snapshots/2026-10-15_session_464.md).

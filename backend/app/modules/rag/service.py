@@ -16,6 +16,7 @@ from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
 from app.modules.rag.composer import (
+    GROUNDING_INSTRUCTION,
     answer_format_planner,
     build_generic_system_instruction,
     extract_suggested_questions,
@@ -30,6 +31,7 @@ from app.modules.rag.query_router import (
     scope_history_by_topic,
 )
 from app.modules.rag.retriever import hybrid_retriever
+from app.modules.rag.row_answer import answer_from_rows
 from app.modules.rag.schemas import (
     AskRequest,
     AskResponse,
@@ -38,6 +40,7 @@ from app.modules.rag.schemas import (
     SearchResponse,
     SearchResultItem,
 )
+from app.modules.rag.source_rows import load_row_anchors, merge_row_anchors
 from app.modules.rag.temporal_answer import decide_table_answer, is_temporal_table_question
 
 logger = logging.getLogger(__name__)
@@ -55,8 +58,6 @@ REFUSAL_PHRASES = (
 
 def is_refusal_answer(answer: str, has_evidence: bool) -> bool:
     """Detect No-Answer refusals without domain-specific keyword bias."""
-    if has_evidence:
-        return False
     lowered = answer.lower()
     return any(phrase in lowered for phrase in REFUSAL_PHRASES)
 
@@ -142,10 +143,12 @@ class RagService:
         from app.modules.rag.evidence_runtime import resolve_evidence_request
 
         req, evidence_policy = await resolve_evidence_request(db, req)
+        logger.info("rag_execution_branch assistant=%s snapshot=%s branch=%s", req.assistant_code,
+                    snapshot.snapshot_id, "evidence" if evidence_policy.enabled else "fact_hybrid")
         if evidence_policy.enabled:
             return await answer_with_evidence(db, req, snapshot, evidence_policy,
                                               candidate_mode=candidate_snapshot is not None)
-        policy_version = req.policy_fingerprint()
+        policy_version = req.policy_fingerprint() + ":source-cells-v1"
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
         history_list = req.history if isinstance(req.history, list) else []
@@ -279,6 +282,18 @@ class RagService:
         )
 
         # 5. No-Answer Policy if context is empty
+        rows = await load_row_anchors(db, snapshot, req.question, candidate_mode=candidate_snapshot is not None)
+        if rows and analysis.is_fact_first:
+            row_answer = await answer_from_rows(db, req, snapshot, rows)
+            if row_answer is not None:
+                row_answer.latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return row_answer
+        row_limit = int((req.reranker_policy or {}).get("top_k") or rerank_top_k)
+        candidates = merge_row_anchors(candidates, rows, row_limit)
+        if rows and not analysis.fact_attributes:
+            # Same entity does not prove the requested metric. Untyped fee/quota
+            # cells must not outrank the full source row as 'verified' numbers.
+            facts, fact_markdown = [], ""
         if not candidates and not facts:
             no_answer_text = citation_guard.get_no_answer_response(req.module_code)
             return AskResponse(
@@ -344,6 +359,14 @@ class RagService:
             context_texts=context_texts,
             neighbor_context=neighbor_context,
         )
+        if rows:
+            user_content += (
+                "\nĐỐI SOÁT HÀNG VÀ NGỮ CẢNH NGUỒN:\n"
+                "- Tên cột và đoạn giới thiệu xác định ý nghĩa số liệu; không đổi loại chỉ số chỉ vì cùng thực thể.\n"
+                "- Đọc đủ các cột được hỏi, giữ dấu và ô trống theo chú giải.\n"
+                "- Ghi chú liên kết chỉ là ngữ cảnh; chỉ áp dụng điều kiện khi văn bản xác nhận phạm vi phù hợp.\n"
+                "- Không dùng năm ban hành hoặc tên tệp để tự xác nhận năm áp dụng của hàng.\n"
+            )
 
         # Topic-scoped history: independent new questions must not inherit stale answers.
         llm_messages = self._build_chat_messages(
@@ -366,22 +389,26 @@ class RagService:
         safe_output = output_guardrail.check(synthesized_answer)
         final_answer = safe_output.sanitized_text
 
-        # Evidence-based citation filtering (generic, no domain keyword bias)
-        final_citations = citation_guard.filter_evidence_citations(citations, final_answer)
-
         facts_used_payload = [
             {"entity": f.entity_name, "attr": f.attribute_name, "val": f.attribute_value}
             for f in facts
         ]
-        has_evidence = bool(final_citations or facts_used_payload)
-        refusal_detected = is_refusal_answer(final_answer, has_evidence)
-        status = "insufficient_context" if refusal_detected else "answered"
         clean_answer, suggested_questions = extract_suggested_questions(
             final_answer, current_query=req.question
         )
 
         # Sanitize answer from broken table pipes or verbatim multi-major dumps
         clean_answer = sanitize_rag_answer(clean_answer, target_entity=target_entity_str)
+        # Judge the visible answer, not suggestion text or citations merely retrieved.
+        final_citations = citation_guard.filter_evidence_citations(citations, clean_answer)
+        has_evidence = bool(final_citations or facts_used_payload)
+        refusal_detected = is_refusal_answer(clean_answer, has_evidence)
+        status = "answered" if clean_answer.strip() and has_evidence and not refusal_detected else "insufficient_context"
+        logger.info("rag_answer_validation status=%s refusal=%s citations=%d facts=%d",
+                    status, refusal_detected, len(final_citations), len(facts_used_payload))
+        if not has_evidence and not refusal_detected:
+            clean_answer = citation_guard.get_no_answer_response(req.module_code)
+            suggested_questions = []
 
         # Numeric grounding gate: multi-digit figures in the answer must exist in evidence.
         if status == "answered":
@@ -465,6 +492,8 @@ class RagService:
         candidates: list[FusionCandidate],
     ) -> str:
         """ModelOps alone owns retries/failover; infrastructure errors must propagate."""
+        llm_messages = [message.model_copy(update={"content": message.content + "\n\n" + GROUNDING_INSTRUCTION})
+                        if message.role == "system" else message for message in llm_messages]
         llm_req = LLMGenerateRequest(
             messages=llm_messages, tenant_id=req.tenant_id, assistant_code=req.assistant_code,
             temperature=temperature, max_tokens=req.max_tokens, thinking_budget=req.thinking_budget,

@@ -87,10 +87,16 @@ class ChunkSetService:
         artifact = get_source_artifact(source_rev)
         try:
             units = resolve_unit_manifest(source_rev.canonical_markdown or "", artifact)
-        except ValueError as exc:
+            graph = artifact.get("context_graph")
+            if graph is not None:
+                from app.modules.knowledge.services.source_links import validate_context_graph
+
+                validate_context_graph(graph, units)
+        except (TypeError, ValueError) as exc:
             raise AppException("Đơn vị nguồn không khớp bản Markdown đã lưu.", code="SOURCE_UNIT_INVALID", status_code=422) from exc
         units_hash = manifest_digest(units)
-        conf_hash = hashlib.sha256(f"{compute_config_hash(chunk_strategy, clean_config)}:{units_hash}".encode()).hexdigest()
+        context_hash = ":" + graph["digest"] if graph else ""
+        conf_hash = hashlib.sha256(f"{compute_config_hash(chunk_strategy, clean_config)}:{units_hash}{context_hash}".encode()).hexdigest()
         set_key = compute_chunk_set_key(source_rev.canonical_hash, conf_hash)
 
         # 2. Check for existing ChunkSet with same (source_revision_id, config_hash)
@@ -153,7 +159,7 @@ class ChunkSetService:
 
         chunker = get_chunker(chunk_strategy)
         chunks_data = unit_chunks(units, max_chars=clean_config.get("max_chars", 6000),
-                                 chunker=chunker, chunk_config=clean_config)
+                                 chunker=chunker, chunk_config=clean_config, context_graph=graph)
         if not chunks_data:
             raise AppException(
                 message=f"Chiến lược cắt đoạn '{chunk_strategy}' trả về 0 chunks từ nội dung tài liệu.",

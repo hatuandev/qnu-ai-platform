@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from app.core.exceptions import AppException
+from app.modules.modelops.providers.context_budget import fit_rejected_context
 
 TOKEN_PARAMETERS = frozenset({"max_tokens", "max_completion_tokens", "max_output_tokens"})
 MAX_NEGOTIATIONS = 3
@@ -117,11 +118,17 @@ async def post_chat(
     probe: bool = False,
 ) -> httpx.Response:
     budget_retried = False
+    context_retried = False
     for attempt in range(MAX_NEGOTIATIONS + 1):
         response = await client.post(endpoint, headers=headers, json=payload)
         if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
             response, payload, capabilities, probe=probe
         ):
+            continue
+        if (attempt < MAX_NEGOTIATIONS and not context_retried and not probe
+                and await fit_rejected_context(client, endpoint, headers, payload, response,
+                                               int(capabilities.get("minimum_output_tokens", 1)))):
+            context_retried = True
             continue
         response.raise_for_status()
         if (
@@ -162,15 +169,14 @@ def decode_completion(response: httpx.Response) -> tuple[str, dict[str, Any], st
             code="MODEL_RESPONSE_PROTOCOL_ERROR",
             status_code=502,
         )
-    if completion_is_truncated(response):
-        raise AppException(
-            "Model hết ngân sách token trước khi tạo câu trả lời; chưa xác minh được khả năng trả lời.",
-            code="MODEL_OUTPUT_BUDGET_EXHAUSTED",
-            status_code=502,
-        )
     try:
         data = response.json()
         choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise AppException(
+                "Model đã hết ngân sách đầu ra; câu trả lời chưa hoàn tất.",
+                code="MODEL_OUTPUT_BUDGET_EXHAUSTED", status_code=502,
+            )
         content = choice["message"].get("content")
         if not isinstance(content, str) or not content.strip() or data.get("error"):
             raise ValueError("No answer content")

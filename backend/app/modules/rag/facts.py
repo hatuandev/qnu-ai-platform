@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from sqlalchemy import and_, func, literal_column, or_, select
+from sqlalchemy import and_, case, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.knowledge.models import (
@@ -221,6 +221,24 @@ class FactLayer:
             )
         if requested_years:
             query = query.where(or_(KnowledgeFact.applicability_year.in_(requested_years), KnowledgeFact.applicability_year.is_(None)))
+
+        # Entity precision must be applied BEFORE LIMIT, not to an arbitrary slice
+        # dominated by common attribute names. Never search values for an identity.
+        identities = []
+        for name in target_entities or []:
+            if len(name.strip().split()) >= 2:
+                identities.append(func.to_tsvector(literal_column("'simple'::regconfig"),
+                    func.coalesce(KnowledgeFact.entity_text, KnowledgeFact.entity_name)).op("@@")(
+                        func.phraseto_tsquery(literal_column("'simple'::regconfig"), name.strip())))
+        for code in entity_codes or []:
+            if re.fullmatch(r"\d+(?:\.\d+)*", code.strip()):
+                identities.extend([KnowledgeFact.entity_code == code.strip(),
+                                   KnowledgeFact.raw_data["entity_code"].astext == code.strip()])
+        if identities:
+            query = query.where(or_(*identities))
+        if requested_years:
+            query = query.order_by(case((KnowledgeFact.applicability_year.in_(requested_years), 1), else_=0).desc())
+        query = query.order_by(KnowledgeFact.id)
 
         # Over-fetch when ranking by subjects so the best AND-matches survive the cut.
         fetch_limit = limit * 3 if subject_names else limit

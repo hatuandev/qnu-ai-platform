@@ -19,6 +19,7 @@ from app.modules.modelops.providers.chat_contract import (
     decode_stream_event,
     post_chat,
 )
+from app.modules.modelops.providers.context_budget import fit_rejected_context
 from app.modules.modelops.schemas import ChatMessage
 
 
@@ -131,6 +132,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         payload = self._payload(messages, temperature, max_tokens, True, **kwargs)
         endpoint = f"{(self.base_url or 'https://api.openai.com/v1').rstrip('/')}/chat/completions"
         self.stream_usage = {}
+        context_retried = False
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             for attempt in range(MAX_NEGOTIATIONS + 1):
                 async with client.stream(
@@ -141,6 +143,11 @@ class OpenAIAdapter(BaseLLMAdapter):
                         if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
                             response, payload, self.request_capabilities
                         ):
+                            continue
+                        if (attempt < MAX_NEGOTIATIONS and not context_retried
+                                and await fit_rejected_context(client, endpoint, self._headers(), payload, response,
+                                                               int(self.request_capabilities.get("minimum_output_tokens", 1)))):
+                            context_retried = True
                             continue
                         response.raise_for_status()
                     if "text/event-stream" not in response.headers.get("content-type", ""):
@@ -164,6 +171,11 @@ class OpenAIAdapter(BaseLLMAdapter):
                         choices = event.get("choices", [])
                         if choices:
                             choice = choices[0]
+                            if choice.get("finish_reason") == "length":
+                                raise AppException(
+                                    "Model đã hết ngân sách đầu ra; câu trả lời chưa hoàn tất.",
+                                    code="MODEL_OUTPUT_BUDGET_EXHAUSTED", status_code=502,
+                                )
                             has_finish = has_finish or choice.get("finish_reason") is not None
                             content = choice.get("delta", {}).get("content")
                             if content:

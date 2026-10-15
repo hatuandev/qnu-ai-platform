@@ -30,7 +30,7 @@ def _pin_rag_snapshot_for_unit_tests():
     with patch(
         "app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
         new=AsyncMock(side_effect=resolve),
-    ):
+    ), patch("app.modules.rag.service.load_row_anchors", new=AsyncMock(return_value=[])):
         yield
 
 

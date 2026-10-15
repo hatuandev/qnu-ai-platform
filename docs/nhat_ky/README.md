@@ -7,6 +7,18 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-15** | [Phiên471](./2026-10-15_phien_471_chuan_bi_push_gitea.md) | Đóng gói mã push Gitea | Chỉ remote gitea/main; giữ log local và docs/tai_lieu, không chạy thêm test/deploy |
+
+| **2026-10-15** | [Phiên470](./2026-10-15_phien_470_rag_hop_dong_o_nguon.md) | Hợp đồng ô nguồn giai đoạn4 | Live2Qwen đủ4cột/notes và21rawspansđúng; full1456pass11lỗinền16skip0errors; chưa20/82 |
+
+| **2026-10-15** | [Phiên469](./2026-10-15_phien_469_rag_giai_doan_4_sinh_va_kiem_chung.md) | Giai đoạn4 generation/status/window | Window thật đã sửa; boundary47pass/full1438pass11lỗinền; live2primaryQwen chưa đạt, generation còn mở |
+
+| **2026-10-15** | [Phiên468](./2026-10-15_phien_468_rag_giai_doan_3_truy_hoi_hang_bang.md) | Giai đoạn3 truy hồi hàng | Entity trước LIMIT, row+notes đúng nguồn; full1415pass11lỗinền1openxfail; chưa modelcalls/20/82 |
+
+| **2026-10-15** | [Phiên467](./2026-10-15_phien_467_rag_giai_doan_2_ngu_canh_nguon.md) | Giai đoạn2 ngữ cảnh nguồn | OCR chọn lọc cần duyệt, giữ header/ô gộp/notes; full1403pass11lỗinền, chưa reparse/publish |
+
+| **2026-10-15** | [Phiên466](./2026-10-15_phien_466_rag_giai_doan_1_diem_san.md) | RAG giai đoạn1 sau reset | Nguồn/vector đúng; trace2 còn lỗi retrieval/context/status,78pass4openxfail, chưa sửa runtime |
+
 | **2026-10-15** | [Phiên465](./2026-10-15_phien_465_bo_theo_doi_artifact_git_an_toan.md) | Bỏ theo dõi artifact Git an toàn | Bỏ theo dõi 2.022 artifact (81,95 MiB), giữ file local, giữ docs/tai_lieu & fixtures, cập nhật .gitignore có phạm vi |
 
 | **2026-10-15** | [Phiên464](./2026-10-15_phien_464_purge_publication_history.md) | Purge và lịch sử xuất bản | Fix FK không xóa history,56focuspass; cần BE/worker mới và retry job |

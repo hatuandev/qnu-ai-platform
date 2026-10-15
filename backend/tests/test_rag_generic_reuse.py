@@ -154,7 +154,7 @@ def test_refusal_detection_is_domain_agnostic() -> None:
 
     refusal = "Thông tin này hiện chưa có trong tài liệu chính thức."
     assert is_refusal_answer(refusal, has_evidence=False) is True
-    assert is_refusal_answer(refusal, has_evidence=True) is False
+    assert is_refusal_answer(refusal, has_evidence=True) is True
 
 
 def test_fast_rule_normalize_supports_custom_acronyms() -> None:

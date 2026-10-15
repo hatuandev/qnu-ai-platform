@@ -119,7 +119,9 @@ class CitationGuard:
             title = doc_name or c.section or f"Tài liệu tuyển sinh ({c.document_id[:8]})"
             if title.startswith("doc_"):
                 title = f"Tài liệu ({title})"
-            quote = c.content[:1500].strip() + ("..." if len(c.content) > 1500 else "")
+            source_quote = meta.get("citation_quote")
+            quoted = source_quote if isinstance(source_quote, str) and source_quote.strip() else c.content
+            quote = quoted[:1500].strip() + ("..." if len(quoted) > 1500 else "")
             source_pages = meta.get("source_pages")
             if not source_pages and c.page_number:
                 source_pages = [c.page_number]

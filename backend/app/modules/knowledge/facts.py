@@ -111,6 +111,16 @@ def detect_column_role(header: str) -> tuple[str | None, str | None]:
     return None, year
 
 
+def column_role_evidence(header: str) -> tuple[str | None, str | None]:
+    """Expose the existing catalog match; callers can reject weak/composite labels."""
+    normalized = _normalize_header(header)
+    for role, keywords in _ROLE_KEYWORDS:
+        matched = next((keyword for keyword in keywords if keyword in normalized), None)
+        if matched:
+            return role, matched
+    return None, None
+
+
 class FactExtractor:
     """Turns extracted tables into structured fact dicts for KnowledgeFact rows."""
 

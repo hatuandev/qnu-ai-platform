@@ -17,6 +17,8 @@ METRIC_ATTRIBUTES = {"cutoff_score", "expected_quota", "tuition_fee", "subject_c
 def is_temporal_table_question(question: str, module_code: str) -> bool:
     analysis = query_classifier.analyze(question, module_code=module_code)
     return bool((YEAR.search(question) and METRIC_ATTRIBUTES.intersection(analysis.fact_attributes))
+                or (YEAR.search(question) and analysis.is_fact_first and
+                    (analysis.target_entities or analysis.entity_codes))
                 or "converted_score" in analysis.fact_attributes)
 
 

@@ -19,12 +19,13 @@ from app.core.storage import storage_service
 from app.modules.knowledge.parsers import get_document_parser
 from app.modules.knowledge.parsers.base import ParsedContent
 from app.modules.knowledge.services.blank_pages import inspect_empty_pdf_page
+from app.modules.knowledge.services.header_rescue import prepare_header_rescue, rescue_header
 from app.modules.knowledge.services.layout_text import reconstruct_layout_text
 from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v9-cached-docx-formulas"
+EXTRACTION_VERSION = "layout-v10-source-context"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -144,6 +145,11 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
         used = "+".join(engines)
     else:
         used = "native"
+    if pages and pages[0].get("engine_used") == "native":
+        async with _native_pdf_lock:
+            prepared = await asyncio.to_thread(prepare_header_rescue, content, pages[0])
+        if prepared:
+            await rescue_header(db, pages[0], prepared, engine, tenant_id)
     if not any(p["extracted_text"].strip() for p in pages):
         raise AppException("Tài liệu không có nội dung văn bản để nạp tri thức.",
                            code="EMPTY_EXTRACTED_TEXT", status_code=422)
@@ -201,6 +207,11 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
         preview = await IngestionService()._convert_office_to_pdf(content, filename)
         result = await extract_pdf(db, preview, "preview.pdf", profile, engine, tenant_id)
         await asyncio.to_thread(align_office_markdown, parsed.raw_text, result.pages)
+        for page in result.pages:
+            accepted = (page.get("metadata_rescue") or {}).get("accepted_lines", [])
+            missing = [line for line in accepted if line not in page["extracted_text"]]
+            if missing:
+                page["extracted_text"] = "\n\n".join([*missing, page["extracted_text"]])
         result.raw_text = "\n\n".join(f"<!-- Trang {p['page_number']} -->\n{p['extracted_text']}" for p in result.pages)
         result.tables = parsed.tables or []
         if parsed.canonical_document:

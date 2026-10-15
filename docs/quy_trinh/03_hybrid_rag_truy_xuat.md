@@ -247,3 +247,78 @@ Không thay thế trả lời đúng năm đã supported hoặc partial có clai
   * Cấm gán ghép thiên kiến ngành vào câu hỏi chung khi xử lý đa lượt, ngăn chặn hiện tượng kéo tên ngành cũ (như CNTT) vào làm biến dạng ý định câu hỏi hiện tại.
 
 
+## Truy hồi hàng bảng có ngữ cảnh — cập nhật phiên 468
+
+Sau reset cần xem `rag_execution_branch`: `fact_hybrid` là nhánh legacy, `evidence` là
+nhánh kiểm chứng theo policy. Code không tự bật policy hoặc chuyển model. Historical
+reference/semantic verifier trong evidence path không được mặc nhiên coi đang chạy ở legacy.
+
+Fact lookup lọc đúng entity phrase/mã trước SQL LIMIT và xếp requested applicability-year
+trước unknown. Năm ban hành/tên file không là năm áp dụng. Khi metric chưa được phân giải
+và có row anchors, các ô cùng entity không tự được thăng lên “số liệu đã xác thực”.
+
+Nhánh fact-hybrid bổ sung source-row anchors: tìm ô định danh từ chunk đã đánh chỉ mục,
+pin collection/tenant/workspace/binding/index/source; kiểm hash/review/parity/unit manifest.
+BM25 hiện hữu xếp hạng hàng kèm intro/notes cùng nguồn. Bảo vệ hai hàng đầu, giữ source-units
+ghi chú nguyên văn ngoài slot cạnh tranh; cấu hình topK reranker cho alternatives không đổi.
+Không có anchor giữ nguyên kết quả cũ. Không tạo điểm CE giả hoặc giả lập dữ liệu khi DB lỗi.
+
+Trích dẫn mới lấy raw span, trang hàng/header/ghi chú có chứng cứ riêng; metadata của hàng
+không sao chép sang ghi chú. Liên kết chỉ là ngữ cảnh, không tự chứng minh điều kiện cho
+mọi hàng, năm hoặc mọi cấp đào tạo. Cache legacy có version thuật toán mới, không xóa cache chung.
+
+Không cần migration/reset/reindex cho phần query này; nguồn chưa có source-unit metadata
+cần nâng cấp qua lifecycle ingestion, không tạo hàng giả khi thiếu metadata. Cần BE/worker mới
+trước test chat. Chưa thay output budget hoặc status refusal, chưa mặc định bật policy evidence.
+Diagnostic không gọi model chỉ xác nhận retrieval, không phải accuracy. Xem
+[nhật ký468](../nhat_ky/2026-10-15_phien_468_rag_giai_doan_3_truy_hoi_hang_bang.md).
+
+## Sinh và kiểm chứng đầu ra — cập nhật phiên 469
+
+Generation legacy bổ sung grounding instruction vào system message của lượt gọi, không
+ghi đè persona cấu hình. Đối chiếu tương đương ngữ nghĩa từ chính định nghĩa/header/đoạn
+dẫn, giữ đủ giá trị theo phương thức và điều kiện áp dụng; thiếu phải chỉ rõ phần thiếu,
+không dùng cảnh báo chung để phủ nhận cả đáp án. Không thêm từ điển nghiệp vụ/model.
+
+Tách gợi ý và sanitize trước khi lọc citation/nhận diện refusal. Citation không phủ nhận
+refusal; nội dung rỗng/không evidence không answered hoặc cache success. Đây là boundary
+check heuristic, không thay independent semantic completeness audit trong evidence policy.
+Không tự bật evidence policy sau reset.
+
+OpenAI-compatible window400 được recovery một lần khi tokenizer cùng server trả count
+thực và window khớp. Giữ nguyên prompt/alias/template; chỉ giảm output cap riêng lượt gọi.
+Không dùng “at least” như số đếm chính xác, không cắt nguồn, không persist request count
+thành cấu hình. Không hỗ trợ/không đủ chỗ thì giữ lỗi/fallback. JSON/SSE kết thúc `length`
+không được nhận là hoàn tất, kể cả đã sinh một phần nội dung. Không replay stream đã phát.
+
+Đây không phải nới cửa sổ server hay bỏ quota, không cần migration/reindex. Cần BE/worker
+nhận code mới trước test live, đối soát source/citation/đủ ý thủ công, không lấy HTTP200 hoặc
+status answered làm accuracy. Xem [nhật ký469](../nhat_ky/2026-10-15_phien_469_rag_giai_doan_4_sinh_va_kiem_chung.md).
+
+Kiểm chứng live phiên469 đã hết lỗi window và chạy primary, nhưng hai câu điểm sàn vẫn
+sai/thiếu dù hàng đủ trong prompt. Generation chưa nghiệm thu; chưa triển khai row-cell
+answer contract/semantic validation mới, chưa chạy20/82. Xem mục đề xuất cần duyệt trong nhật ký.
+
+## Hợp đồng ô nguồn ở nhánh fact-hybrid — cập nhật phiên 470
+
+Sau khi duyệt tiếp, fact-first có row anchors đủ header/source-unit provenance sẽ đi
+MetricScope (đoạn dẫn định nghĩa loại số liệu) → RowSelection (ID ô/scope/notes) → RowAudit
+độc lập không nhìn selection. Dùng ModelOps cấu hình hiện hữu và assistant_scope để xác định
+trường ngầm định, không lấy facts từ persona. Không bật evidence policy hoặc đổi model/config.
+
+ID server gắn đúng hàng/cột/raw value; ID ngoài nhóm metric hoặc scope nguồn khác bị chặn.
+Request collection/tenant/workspace phải khớp snapshot. Năm cột rõ ràng không được đổi thành
+năm ban hành; scope chưa rõ không được tự coi verified. Verdict không đạt trả insufficient,
+không free-synthesis để né kiểm chứng, không cache thành công.
+
+Render từ ô gốc thay model viết lại số, có citation raw span/hash/trang/header. Giữ ô trống/dấu
+ở giữa các cột đã chọn cùng họ header, không điền số thiếu hoặc đoán nghĩa dấu. Notes giữ
+đủ nhánh điều kiện và câu tiếp qua trang theo cấu trúc cùng nguồn; các paragraph chú giải
+độc lập không tự thuộc điều kiện đứng trước. Hiển thị rõ từng mục chỉ áp dụng cho phạm vi
+trong chính mục đó. Ghi chú vẫn bảo thủ/khá dài, chưa rút gọn tự do.
+
+No catalog hoặc câu không fact-first vẫn dùng nhánh hiện hữu. Deterministic temporal-table
+trước nhánh này không đổi; historical fallback/evidence policy không mặc nhiên được bật.
+Live hai câu điểm sàn cuối470 đã đủ15/18/600/15 và20/–/–/20 cùngnotes; chưa20/82/accuracy.
+Xem [nhật ký470](../nhat_ky/2026-10-15_phien_470_rag_hop_dong_o_nguon.md).
+

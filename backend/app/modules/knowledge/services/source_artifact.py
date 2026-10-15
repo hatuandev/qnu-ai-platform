@@ -7,7 +7,7 @@ import json
 import re
 from typing import Any
 
-from app.modules.knowledge.facts import detect_column_role
+from app.modules.knowledge.facts import column_role_evidence, detect_column_role
 from app.modules.knowledge.normalization.retrieval_units import build_unit_manifest, manifest_digest
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.fact_identity import build_fact_identity
@@ -19,7 +19,7 @@ from app.modules.knowledge.services.table_context import (
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 
-ARTIFACT_VERSION = "structured-source-v6-source-units"
+ARTIFACT_VERSION = "structured-source-v7-context-links"
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _ATTRIBUTE_CODES = {"benchmark": "cutoff_score", "quota": "expected_quota", "combos": "subject_combinations",
                     "tuition": "tuition_fee", "code": "entity_code", "method": "admission_method"}
@@ -27,12 +27,19 @@ _ATTRIBUTE_CODES = {"benchmark": "cutoff_score", "quota": "expected_quota", "com
 
 def cell_context(header: str) -> dict[str, Any]:
     years = sorted({int(y) for y in _YEAR.findall(header)})
-    role, _ = detect_column_role(header)
+    role, matched = column_role_evidence(header)
+    words = lambda value: re.findall(r"[^\W\d_]+", value.casefold())
+    specific = bool(matched)
+    if role == "benchmark":
+        specific = len(words(matched or "")) >= 2
+    elif role == "method":
+        specific = words(header) == words(matched or "")
     methods = re.findall(r"\(([^()]*)\)", header)
     temporal = {"type": "year" if len(years) == 1 else "unknown", "year": years[0] if len(years) == 1 else None,
                 "years": years, "status": "proposed" if len(years) == 1 else "ambiguous" if years else "unknown",
                 "evidence": "column_header"}
-    return {"attribute_code": _ATTRIBUTE_CODES.get(role), "temporal_context": temporal,
+    return {"attribute_code": _ATTRIBUTE_CODES.get(role) if specific else None, "temporal_context": temporal,
+            "attribute_context": {"raw_header": header, "status": "recognized" if specific else "unknown"},
             "qualifiers": {"method": methods[-1] if role == "benchmark" and len(methods) == 1 else None}}
 
 
@@ -112,9 +119,14 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
                               "confidence": 0.0, "raw_data": evidence})
     temporal_metadata = extract_temporal_metadata(markdown, str(metadata.get("filename") or ""))
     units = build_unit_manifest(markdown, temporal_metadata)
+    from app.modules.knowledge.services.source_links import attach_fact_context, build_context_graph
+
+    graph = build_context_graph(units)
+    attach_fact_context(facts, units, graph)
     return {"version": ARTIFACT_VERSION, "content_hash": content_hash, "metadata": metadata,
             "temporal_metadata": temporal_metadata,
             "retrieval_units": units.model_dump(), "unit_manifest_hash": manifest_digest(units),
+            "context_graph": graph,
             "tables": tables, "parser_tables": parser_tables or [], "facts": facts, "issues": issues,
             "fact_set_hash": hashlib.sha256(json.dumps(facts, sort_keys=True, ensure_ascii=False).encode()).hexdigest(),
             "review": {"status": "required" if issues else "auto_ready"}}
@@ -154,6 +166,10 @@ def add_layout_issues(artifact: dict[str, Any], pages: list[dict[str, Any]]) -> 
     """Retain visual uncertainty instead of making chart numbers into facts."""
     for page in pages:
         number = page.get("page_number", page.get("page"))
+        rescue = page.get("metadata_rescue")
+        if rescue:
+            artifact["issues"].append({"code": "METADATA_OCR_REVIEW", "page_number": number,
+                                       "rescue": rescue})
         blocks = page.get("blocks", [])
         data_regions = [b for b in blocks if b.get("type") == "table" and _is_data_region(b.get("text", ""))]
         if data_regions and not any(t.get("page_number") == number for t in artifact["tables"]):

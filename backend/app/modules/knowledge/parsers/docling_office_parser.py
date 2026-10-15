@@ -79,7 +79,7 @@ class DoclingOfficeParser(BaseDocumentParser):
             raise RuntimeError(f"Docling rejected Office document: {file_name}")
 
         document = input_document._backend.convert()
-        markdown = document.export_to_markdown().strip()
+        markdown = self._preserve_table_spans(document, document.export_to_markdown().strip())
         pages = self._page_count(document)
         tables = self._extract_markdown_tables(markdown)
         return ParsedContent(
@@ -92,6 +92,24 @@ class DoclingOfficeParser(BaseDocumentParser):
                 "source_format": self.extension,
             },
         )
+
+    @staticmethod
+    def _preserve_table_spans(document: Any, markdown: str) -> str:
+        """Use the existing span-aware HTML projection for explicitly merged cells."""
+        from app.modules.knowledge.services.html_tables import normalize_html_tables
+
+        for table in getattr(document, "tables", []):
+            cells = getattr(getattr(table, "data", None), "table_cells", [])
+            if not any(getattr(cell, "row_span", 1) > 1 or getattr(cell, "col_span", 1) > 1 for cell in cells):
+                continue
+            original = table.export_to_markdown(doc=document).strip()
+            projected = normalize_html_tables(table.export_to_html(doc=document)).strip()
+            # Exact single occurrence: never replace an ambiguous repeated table or unrelated prose.
+            if original and markdown.count(original) == 1:
+                markdown = markdown.replace(original, projected, 1)
+            else:
+                logger.warning("docling_table_span_projection_ambiguous")
+        return markdown
 
     @staticmethod
     def _page_count(document: Any) -> int:

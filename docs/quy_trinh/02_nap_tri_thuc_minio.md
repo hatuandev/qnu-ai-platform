@@ -1,5 +1,37 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
+## Ngữ cảnh nguồn và OCR đầu trang — cập nhật phiên 467
+
+Extractor `layout-v10-source-context` phát hiện trường số/ngày hành chính chưa đầy đủ trên
+trang đầu của PDF native. Chỉ vùng đầu trang được gửi OCR theo engine/cấu hình ModelOps;
+không thay thế bảng native đã đúng. Runtime `auto` có thể dùng chuỗi fallback OCR đã cấu hình:
+cần kiểm tra quyền gửi tài liệu trước khi vận hành. Chế độ PaddleOCR tường minh không chuyển
+sang cloud. Kiểm chứng phiên này chỉ được người dùng cho phép PaddleOCR nội bộ.
+
+Các dòng số/ngày OCR chỉ là đề xuất; lỗi, thiếu hoặc mâu thuẫn không tự chế dữ liệu.
+`METADATA_OCR_REVIEW` yêu cầu người duyệt đối chiếu ảnh gốc, chỉnh nội dung khi cần và
+duyệt trước nạp vector. Audit crop/engine/trạng thái giữ trong page manifest; OCR không commit
+transaction nguồn. Năm ban hành không trở thành năm áp dụng cho mọi hàng/ô.
+
+OCR có thể mất dấu tiếng Việt trong số hiệu: bộ chuẩn hóa chỉ sửa khoảng trắng quanh
+dấu `/` hoặc biên chữ–số của dòng ngày, giữ quan sát OCR gốc và không tự vá chữ/dấu.
+Ngày nằm trong phần viện dẫn văn bản khác không dùng để xác định ngày ban hành của nguồn.
+
+Artifact v7 có sidecar `source-context-v1` liên kết hàng với đoạn dẫn/header/ghi chú theo
+cấu trúc và source-unit exact span. Bảng qua trang chỉ nối khi header, STT tiếp diễn và trang
+liền kề khớp. Danh sách điều kiện đánh số sau bảng có thể tiếp ở trang sau; không lấy phần ký tên.
+Liên kết chỉ là ngữ cảnh, không tự xác nhận mọi điều kiện áp dụng cho mọi hàng. Projection tìm kiếm
+thêm `nhãn cột: giá trị`; raw quote giữ nguyên và ghi chú không bị nhân bản vào từng vector.
+
+Header mơ hồ giữ nhãn gốc và mã thuộc tính chưa xác định thay vì đoán nhầm điểm/mã phương thức.
+DOCX có rowspan/colspan rõ ràng giữ đường dẫn header qua HTML projection; bảng lặp không phân
+biệt được có warning, phải kiểm tra thực tế, không khẳng định xử lý mọi layout.
+
+Không cần migration/reset DB. Nguồn đã xuất bản vẫn giữ nguyên, artifact/manifest cũ đọc tương thích.
+Sau BE/worker restart, chỉ chọn nguồn cần nâng cấp: **Bóc tách lại → đối soát và duyệt → tạo chỉ mục
+staging → thử hỏi → xuất bản**. Không tự reparse toàn kho hoặc xuất bản chỉ vì code/test đã đạt.
+Xem [nhật ký 467](../nhat_ky/2026-10-15_phien_467_rag_giai_doan_2_ngu_canh_nguon.md).
+
 ## Điều hướng và làm mới giao diện — phiên 433
 
 Studio quay về Chi tiết nguồn của cùng revision, sau đó về Kho và danh sách Kho tri thức. Tab/revision nằm trong URL; F5 và Back/Forward phải khớp nội dung đang xem. Revision không thuộc nguồn hiện lỗi riêng và cho mở Bản hiện tại, không âm thầm áp dụng bản khác.

@@ -74,6 +74,7 @@ def normalize_source_pages(
                 "blocks": p.get("blocks", []) if isinstance(p, dict) else getattr(p, "blocks", []),
                 "has_tables": p.get("has_tables", False) if isinstance(p, dict) else getattr(p, "has_tables", False),
                 "engine_used": p.get("engine_used") if isinstance(p, dict) else None,
+                "metadata_rescue": p.get("metadata_rescue") if isinstance(p, dict) else None,
                 "content_status": p.get("content_status") if isinstance(p, dict) else None,
                 "blank_detection": p.get("blank_detection") if isinstance(p, dict) else None,
             }
@@ -100,6 +101,8 @@ def normalize_source_pages(
             manifest_item["has_tables"] = True
         if record.get("engine_used"):
             manifest_item["engine_used"] = record["engine_used"]
+        if record.get("metadata_rescue"):
+            manifest_item["metadata_rescue"] = record["metadata_rescue"]
         if record.get("content_status"):
             manifest_item["content_status"] = record["content_status"]
         if record.get("blank_detection"):

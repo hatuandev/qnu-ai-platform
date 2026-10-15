@@ -31,7 +31,7 @@ def _pin_rag_snapshot_for_unit_tests():
     with patch(
         "app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot",
         new=AsyncMock(side_effect=resolve),
-    ):
+    ), patch("app.modules.rag.service.load_row_anchors", new=AsyncMock(return_value=[])):
         yield
 
 
@@ -332,11 +332,11 @@ class TestCitationGroundingAndFactFirst:
         mock_candidate = FusionCandidate(
             chunk_id="chk_01",
             document_id="doc_ts_2026",
-            content="Thông tin tuyển sinh ngành X: Các tổ hợp môn xét tuyển: Toán - Hóa - Anh.",
+            content="Thông tin tuyển sinh ngành Kỹ thuật phần mềm: Các tổ hợp môn xét tuyển: Toán - Hóa - Anh.",
             rrf_score=0.9,
             dense_rank=1,
             sparse_rank=1,
-            section="Ngành X",
+            section="Kỹ thuật phần mềm",
             page_number=6,
             metadata={},
         )
@@ -356,12 +356,13 @@ class TestCitationGroundingAndFactFirst:
             mock_retrieve.return_value = [mock_candidate]
             mock_expand.return_value = {"chk_01": ["Bối cảnh kề: điều kiện xét tuyển chung."]}
             mock_llm_res = MagicMock()
-            mock_llm_res.content = "Các ngành có tổ hợp."
+            mock_llm_res.content = "Ngành Kỹ thuật phần mềm có tổ hợp môn Toán - Hóa - Anh."
             mock_generate.return_value = mock_llm_res
 
             resp = await rag_service.ask(AsyncMock(), req)
 
             assert resp.status == "answered"
+            assert resp.citations  # The positive control must actually cite its source.
             variants = mock_retrieve.await_args.kwargs.get("sparse_variants") or []
             assert variants and any("toán" in v.lower() for v in variants)
             user_texts = [

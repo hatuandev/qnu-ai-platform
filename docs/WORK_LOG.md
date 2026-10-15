@@ -6,6 +6,18 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-15** | Codex | Đóng gói push riêng Gitea | Gom mã/tests/docs466–470; loại log tạm khỏi commit, giữ tài liệu gốc; không test thêm hoặc deploy | [Nhật ký471](./nhat_ky/2026-10-15_phien_471_chuan_bi_push_gitea.md) |
+
+| **2026-10-15** | Codex | Tiếp RAG giai đoạn4: ô nguồn | Metric/scope/select/audit độc lập, raw cells+spans, giữ dấu/điều kiện; live2Qwen đủ4cột,21rawspansđúng; full1456pass11lỗinền16skip0errors, config/corpus giữ nguyên | [Nhật ký470](./nhat_ky/2026-10-15_phien_470_rag_hop_dong_o_nguon.md) |
+
+| **2026-10-15** | Codex | RAG giai đoạn4: sinh và kiểm chứng | Window/tokenizer thật đã đạt; boundary47pass/full1438pass11lỗinền. Live2primaryQwen vẫn sai/thiếu nên chưa nghiệm thu generation; đề xuất row-cell contract, giữ config/nguồn/vector | [Nhật ký469](./nhat_ky/2026-10-15_phien_469_rag_giai_doan_4_sinh_va_kiem_chung.md) |
+
+| **2026-10-15** | Codex | RAG giai đoạn3: truy hồi hàng | Entity trước LIMIT, reserve row + notes, BM25/raw citations; PG thật2 nguồn đúng hạng1, regression163pass/full1415pass11lỗinền1openxfail; chưa chat20/82 | [Nhật ký468](./nhat_ky/2026-10-15_phien_468_rag_giai_doan_3_truy_hoi_hang_bang.md) |
+
+| **2026-10-15** | Codex | RAG giai đoạn2: ngữ cảnh nguồn | OCR đầu trang cần duyệt/Paddle thật số121-ngày09/07, row/header/notes links, DOCX ô gộp; focus141pass3openxfail/full1403pass11lỗinền; chưa reparse/publish thật | [Nhật ký467](./nhat_ky/2026-10-15_phien_467_rag_giai_doan_2_ngu_canh_nguon.md) |
+
+| **2026-10-15** | Codex | Chẩn đoán RAG giai đoạn1 | Đối soát PDF/Qdrant86/86,trace2 thật sau reset; policyoff/retrievalmiss/window8192/falsestatus;78pass4openxfail,khôngruntimefix | [Nhật ký466](./nhat_ky/2026-10-15_phien_466_rag_giai_doan_1_diem_san.md) |
+
 | **2026-10-15** | Codex | Bỏ theo dõi artifact Git an toàn | Bỏ theo dõi 2.022 artifact (81,95 MiB), giữ file local, giữ docs/tai_lieu & fixtures, cập nhật .gitignore có phạm vi | [Nhật ký465](./nhat_ky/2026-10-15_phien_465_bo_theo_doi_artifact_git_an_toan.md) |
 
 | **2026-10-15** | Codex | Sửa xóa nguồn có lịch sử | Giữ activation/index pruned và binding ẩn; guard tham chiếu chéo, retry/re-import, lỗi thân thiện;56focuspass, chưa deploy | [Nhật ký464](./nhat_ky/2026-10-15_phien_464_purge_publication_history.md) |

@@ -154,22 +154,32 @@ def resolve_unit_manifest(markdown: str, artifact: dict[str, Any]) -> UnitManife
 
 
 def unit_chunks(manifest: UnitManifest, max_chars: int = 6000, *, chunker: BaseChunker | None = None,
-                chunk_config: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+                chunk_config: dict[str, Any] | None = None,
+                context_graph: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """Preserve atomic structure; oversize units need review, never silent truncation."""
     result = []
     digest = manifest_digest(manifest)
+    if context_graph:
+        from app.modules.knowledge.services.source_links import validate_context_graph
+
+        validate_context_graph(context_graph, manifest)
     for unit in manifest.units:
         if unit.is_container:
             continue
         metadata = {"source_unit_version": manifest.version, "source_unit_id": unit.id,
             "source_unit": unit.model_dump(), "unit_manifest_hash": digest}
+        projection = ""
+        if context_graph:
+            metadata.update(context_graph_hash=context_graph["digest"],
+                            context_unit_ids=context_graph["links"].get(unit.id, []))
+            projection = context_graph["row_projections"].get(unit.id, "")
         views = [unit.text]
         if chunker is not None and unit.kind == "paragraph":
             views = [view.content for view in chunker.chunk(unit.text, **(chunk_config or {}))]
             if not views:
                 raise AppException("Chiến lược cắt đoạn không trả nội dung.", code="CHUNKER_RETURNED_ZERO", status_code=422)
         for view in views:
-            content = "\n".join(dict.fromkeys([*unit.heading_path, unit.header_context, view])).strip()
+            content = "\n".join(dict.fromkeys([*unit.heading_path, unit.header_context, view, projection])).strip()
             if len(content) > max_chars:
                 raise AppException("Đơn vị nguồn quá dài; cần chia theo cấu trúc trước khi nạp vector.",
                     code="SOURCE_UNIT_TOO_LARGE", status_code=422, details={"unit_id": unit.id})
