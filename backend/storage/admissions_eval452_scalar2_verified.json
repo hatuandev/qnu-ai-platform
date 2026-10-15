@@ -1,0 +1,15 @@
+{
+  "report": "storage\\admissions_eval452_scalar2.json",
+  "cases": 2,
+  "statuses": {
+    "supported": 2
+  },
+  "canonical_citations_checked": 7,
+  "failures": [],
+  "reviewed_fact_citations_checked": 0,
+  "mean_seconds": 25.94,
+  "runtime_unchanged": true,
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "workflow_executions": 0
+}

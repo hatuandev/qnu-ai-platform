@@ -1,0 +1,120 @@
+[
+  {
+    "page": 52,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "q u ả n t r ị k i n h d o a n h",
+        "docx": "quản trị kinh doanh"
+      }
+    ]
+  },
+  {
+    "page": 54,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "t à i c h í n h n g â n h à n g",
+        "docx": "tài chính ngân hàng"
+      }
+    ]
+  },
+  {
+    "page": 56,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "k ế t o á n",
+        "docx": "kế toán"
+      }
+    ]
+  },
+  {
+    "page": 58,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "k ế t o á n đ ị n h h ư ớ n g a c c a",
+        "docx": "kế toán định hướng acca"
+      }
+    ]
+  },
+  {
+    "page": 60,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "k i ể m t o á n",
+        "docx": "kiểm toán"
+      }
+    ]
+  },
+  {
+    "page": 62,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "l u ậ t",
+        "docx": "luật"
+      }
+    ]
+  },
+  {
+    "page": 93,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "khuyế n",
+        "docx": "khuyến"
+      },
+      {
+        "kind": "replace",
+        "pdf": "nẵ ng",
+        "docx": "nẵng"
+      },
+      {
+        "kind": "replace",
+        "pdf": "đố i",
+        "docx": "đối"
+      }
+    ]
+  },
+  {
+    "page": 94,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "replace",
+        "pdf": "n ô n g h ọ c",
+        "docx": "nông học"
+      }
+    ]
+  },
+  {
+    "page": 98,
+    "pdf_only_numbers": [],
+    "docx_only_numbers": [],
+    "changes": [
+      {
+        "kind": "insert",
+        "pdf": "",
+        "docx": "quản trị dịch vụ du lịch và lữ hành"
+      }
+    ]
+  }
+]

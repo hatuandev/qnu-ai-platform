@@ -15,6 +15,7 @@ import structlog
 from sqlalchemy import select
 
 from app.core.database import AsyncSessionFactory
+from app.core.exceptions import AppException
 from app.core.storage import storage_service
 from app.modules.jobs.models import JobRecord
 from app.modules.jobs.service import is_job_cancelled
@@ -607,7 +608,11 @@ async def task_knowledge_source_purge(ctx: dict[str, Any], job_id: str) -> dict[
         except Exception as exc:
             await db.rollback()
             await db.refresh(job)
-            job.status, job.phase, job.error = "failed", "purge_failed", str(exc)[:500]
+            job.status, job.phase = "failed", "purge_failed"
+            job.error = (
+                exc.message if isinstance(exc, AppException)
+                else "Không thể xóa nguồn. Vui lòng thử lại hoặc gửi mã tác vụ cho quản trị viên."
+            )
             await db.commit()
             logger.exception("knowledge_source_purge_failed", job_id=job_id)
             raise

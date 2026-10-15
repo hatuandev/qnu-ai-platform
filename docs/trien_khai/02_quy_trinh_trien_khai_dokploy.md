@@ -45,7 +45,19 @@ Production dùng SSO: `DEV_AUTH_ENABLED=false`, `SSO_ENABLED=true`, cùng author
 
 Compose chuyển cấu hình SSO vào bootstrap/BE/worker và chuyển cấu hình OIDC công khai vào bước build FE. Đổi cấu hình OIDC yêu cầu build lại FE; không truyền password, client secret hoặc API key vào `VITE_*`.
 
-**Chưa có SSO thì chưa thể nghiệm thu đăng nhập production bằng bản cấu hình này.** Mật khẩu Dev Access Gate cũ không dùng được ở production. Không đổi `ENVIRONMENT=development` rồi mở Internet để né điều kiện này: chế độ development có nhánh default actor dành cho local. Muốn demo mật khẩu cần thiết kế xác thực bắt buộc riêng hoặc bảo vệ toàn bộ truy cập qua lớp kiểm soát bên ngoài đã được xác nhận; phiên chỉnh Docker không thay đổi cơ chế đăng nhập ứng dụng.
+Theo yêu cầu demo mật khẩu (#460), có thể giữ `ENVIRONMENT=production` và chủ động bật:
+
+```env
+DEV_AUTH_ENABLED=true
+DEV_AUTH_ALLOW_IN_PRODUCTION=true
+SSO_ENABLED=false
+```
+
+Đặt `DEV_ACCESS_PASSWORD` riêng ngẫu nhiên 24–128 ký tự (không dùng mật khẩu đã xuất hiện trong ảnh), `SECRET_KEY` ít nhất 32 ký tự và `ALLOWED_ORIGINS` chứa đúng origin HTTPS của FE, không wildcard/path/trailing slash. Không đổi khóa ký nếu khóa hiện tại đã đáp ứng điều kiện. Hai cờ mặc định tắt trong Compose; SSO production vẫn là lựa chọn mặc định. Để áp dụng cần deploy code/Compose mới và tạo lại container, chỉ sửa env trên image cũ sẽ không hoạt động.
+
+Mật khẩu này cấp quyền quản trị toàn hệ thống cho người biết mật khẩu, chỉ dùng demo nội bộ có kiểm soát, không phải tài khoản riêng cho từng người. Cookie `Secure`, `HttpOnly`, `SameSite=Lax`, tối đa 60 phút; token production có purpose/issuer/audience riêng và gắn phiên bản mật khẩu. Đổi mật khẩu rồi tạo lại mọi API container sẽ vô hiệu hóa phiên cũ. Đăng xuất xóa cookie trên trình duyệt, không thu hồi từng JWT đã bị sao chép trước đó; khi nghi lộ phiên phải đổi mật khẩu. Tắt cờ production và tạo lại API containers để ngừng nhận toàn bộ phiên Dev. Không có cookie/token hợp lệ thì API quản trị luôn trả 401, không tự cấp default actor.
+
+Redis dùng chung giới hạn mỗi peer 10 lần/5 phút, toàn bản cài đặt 100 lần/5 phút (gồm cả đăng nhập thành công). Redis lỗi/timeout trả 503, không bỏ qua bảo vệ. Lấy địa chỉ peer từ ASGI, không tin trực tiếp `X-Forwarded-For`; nếu proxy chưa truyền IP đáng tin thì nhiều người có thể chung hạn mức của proxy. Chỉ cấu hình trusted proxy cho địa chỉ proxy đã xác minh, không mở `forwarded-allow-ips=*` tùy tiện. Origin của login/logout và thao tác dùng cookie phải thuộc `ALLOWED_ORIGINS`; CLI gửi header Origin đúng khi gọi login. Không public HTTP, không đổi `development` để né xác thực.
 
 ### Kết nối 9router và server AI
 
@@ -54,6 +66,10 @@ Compose chuyển cấu hình SSO vào bootstrap/BE/worker và chuyển cấu hì
 Tương tự, kiểm tra kết nối từ BE và worker tới embedding/reranker/OCR trên server AI. Không đổi model embedding của kho chỉ để thay địa chỉ mạng.
 
 ## 4. Build và routing
+
+### Giới hạn tải tài liệu — #461
+
+`frontend/nginx.conf` đặt `client_max_body_size 60m` trong khối server để nhận tệp 50 MiB kèm multipart overhead, khớp giới hạn giao diện. Dockerfile COPY cấu hình vào image: phải build/deploy lại Frontend để nhận thay đổi; không cần reset DB. Đây là giới hạn toàn request, không tăng giới hạn từng tệp trên UI/Backend. Nếu vẫn trả HTTP 413 sau deploy, kiểm tra giới hạn ở proxy phía trước container theo response/log thực tế. Chưa kiểm chứng upload trên server sau thay đổi.
 
 Trong Dokploy chọn repository và commit đã kiểm tra, build context gốc repository, đường dẫn `docker-compose.yml`. Trước Deploy, kiểm tra Preview Compose và cấu hình Environment.
 

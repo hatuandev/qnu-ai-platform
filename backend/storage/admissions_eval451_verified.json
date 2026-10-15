@@ -1,0 +1,17 @@
+{
+  "report": "storage\\admissions_eval451_camnang20.json",
+  "cases": 20,
+  "statuses": {
+    "supported": 8,
+    "partial": 3,
+    "missing": 9
+  },
+  "canonical_citations_checked": 26,
+  "failures": [],
+  "reviewed_fact_citations_checked": 4,
+  "mean_seconds": 24.96,
+  "runtime_unchanged": true,
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "workflow_executions": 0
+}

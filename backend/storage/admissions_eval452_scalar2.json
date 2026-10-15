@@ -1,0 +1,1649 @@
+{
+  "started_at": "2026-10-14T16:26:06.175892+00:00",
+  "cases": [
+    {
+      "id": 2105,
+      "question": "Năm 2025 ngành Giáo dục Mầm non của QNU xét tuyển bằng tổ hợp môn nào?"
+    },
+    {
+      "id": 2108,
+      "question": "Theo cẩm nang năm 2025, ngành Khoa học vật liệu có mã ngành nào, học bao lâu và được cấp bằng gì?"
+    }
+  ],
+  "results": [
+    {
+      "id": 2105,
+      "question": "Năm 2025 ngành Giáo dục Mầm non của QNU xét tuyển bằng tổ hợp môn nào?",
+      "route": "chat",
+      "conversation_id": "eval452scalar_d0971de2abcc449a",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2025:\n\n12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+          "requested": {
+            "query": "QNU: QNU 2025 Giáo dục Mầm non xét tuyển tổ hợp môn nào",
+            "years": [
+              2025
+            ],
+            "document_years": [],
+            "event_years": [
+              2025
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "historical_reference_allowed": true,
+            "coverage": "focused",
+            "enumeration_subject": null,
+            "entity": "ngành Giáo dục Mầm non",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "xét tuyển",
+            "attribute": "tổ hợp môn",
+            "education_level": null,
+            "requested_topics": [
+              "tổ hợp môn",
+              "ngành Giáo dục Mầm non",
+              "QNU 2025"
+            ],
+            "method": "xét tuyển",
+            "round": null,
+            "event": "tuyển sinh",
+            "search_queries": [
+              "QNU: QNU 2025 Giáo dục Mầm non tổ hợp môn xét tuyển",
+              "QNU: QNU xét tuyển ngành Giáo dục Mầm non 2025 môn nào",
+              "QNU: QNU tuyển sinh 2025 Giáo dục Mầm non tổ hợp"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1.1",
+              "text": "12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+              "references": [
+                {
+                  "block_id": "ks_rev_988ea265f24c:2612:2705",
+                  "quote": "12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 2,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 2 — CÁC NGÀNH TUYỂN SINH 2025",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": null,
+                  "record_path": [],
+                  "start": 2612,
+                  "end": 2705
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:17:52",
+                  "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 1,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": null,
+                  "record_path": [],
+                  "start": 17,
+                  "end": 52
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "6974ba9bf180c966c72131f061bbe739335dbe1f8e22f8c33c2e859953b6601d",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Quote matches claim exactly, provides tổ hợp môn (Toán, Văn, NK GDMN) for ngành Giáo dục Mầm non mã 7140201, trong tài liệu 2025 QNU.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": [],
+            "topic_coverage": {
+              "tổ hợp môn": true,
+              "ngành Giáo dục Mầm non": true,
+              "QNU 2025": true
+            }
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+                "supporting_quote": "12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+                "entailed": true,
+                "reason": "Both program code 7140201 and subject combination (Toán, Văn, NK GDMN) appear in source."
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_988ea265f24c:2612:2705",
+                  "quote": "Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)"
+                },
+                "retained_by": [
+                  "c1.1"
+                ]
+              }
+            ],
+            "complete": true,
+            "missing_constraints": []
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [],
+          "corrective_retrieval_attempted": false,
+          "corrective_new_block_ids": [],
+          "source_preferences": [],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_988ea265f24c:17:52",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32267:32288",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32381:32385",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32290:32316",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32317:32352",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32353:32379",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 13
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32405:32415",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 14
+            },
+            {
+              "id": "ks_rev_988ea265f24c:32417:32783",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 14
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2735:2770",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2772:2814",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_988ea265f24c:175:201",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_988ea265f24c:710:749",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_988ea265f24c:2612:2705",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:1496:1510",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2313:2351",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2823:2958",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 7245.39,
+            "retrieval_ms": 5221.86,
+            "proposal_ms": 4014.92,
+            "verification_ms": 7391.59
+          },
+          "historical_diagnostics": {
+            "historical_outcome": "not_eligible"
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\n12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 2612,
+            "span_end": 2705,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 2 — CÁC NGÀNH TUYỂN SINH 2025",
+            "page_number": 2,
+            "quote": "12. **Giáo dục Mầm non** — Mã ngành: **7140201** . Tổ hợp môn xét tuyển: (Toán, Văn, NK GDMN)",
+            "source_pages": [
+              2
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 17,
+            "span_end": 52,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+            "page_number": 1,
+            "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 23877.22,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval452scalar_d0971de2abcc449a"
+      },
+      "elapsed_seconds": 24.19,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3406,
+          "completion_tokens": 302,
+          "latency_ms": 3215.94
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4463,
+          "completion_tokens": 876,
+          "latency_ms": 3781.79
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13246,
+          "completion_tokens": 331,
+          "latency_ms": 2550.19
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11704,
+          "completion_tokens": 534,
+          "latency_ms": 3684.18
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13757,
+          "completion_tokens": 631,
+          "latency_ms": 2976.13
+        }
+      ]
+    },
+    {
+      "id": 2108,
+      "question": "Theo cẩm nang năm 2025, ngành Khoa học vật liệu có mã ngành nào, học bao lâu và được cấp bằng gì?",
+      "route": "chat",
+      "conversation_id": "eval452scalar_5d6729524a7b4df6",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2025:\n\n**MÃ NGÀNH: 7440122**\n\n- Thời gian đào tạo: 4 năm\n\n- Bằng tốt nghiệp: Cử nhân",
+          "requested": {
+            "query": "QNU: Theo cẩm nang 2025, ngành Khoa học vật liệu mã ngành, thời gian học, bằng cấp?",
+            "years": [
+              2025
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "historical_reference_allowed": true,
+            "coverage": "focused",
+            "enumeration_subject": null,
+            "entity": "Khoa học vật liệu",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "retrieve_program_details",
+            "attribute": "mã ngành, thời gian học, bằng cấp",
+            "education_level": "đại học",
+            "requested_topics": [
+              "mã ngành",
+              "thời gian học",
+              "bằng cấp"
+            ],
+            "method": null,
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: Khoa học vật liệu QNU mã ngành 2025 thời gian học bằng cấp",
+              "QNU: cẩm nang 2025 QNU ngành Khoa học vật liệu mã ngành",
+              "QNU: QNU chương trình Khoa học vật liệu 2025 thời gian học và bằng cấp"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1.1",
+              "text": "**MÃ NGÀNH: 7440122**",
+              "references": [
+                {
+                  "block_id": "ks_rev_988ea265f24c:83350:83371",
+                  "quote": "**MÃ NGÀNH: 7440122**",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83350,
+                  "end": 83371
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83373:83399",
+                  "quote": "- Thời gian đào tạo: 4 năm",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83373,
+                  "end": 83399
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83436:83462",
+                  "quote": "- Bằng tốt nghiệp: Cử nhân",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83436,
+                  "end": 83462
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83326:83348",
+                  "quote": "#### KHOA HỌC VẬT LIỆU",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83326,
+                  "end": 83348
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:17:52",
+                  "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 1,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": null,
+                  "record_path": [],
+                  "start": 17,
+                  "end": 52
+                }
+              ],
+              "verified": true
+            },
+            {
+              "id": "c1.2",
+              "text": "- Thời gian đào tạo: 4 năm",
+              "references": [
+                {
+                  "block_id": "ks_rev_988ea265f24c:83373:83399",
+                  "quote": "- Thời gian đào tạo: 4 năm",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83373,
+                  "end": 83399
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83350:83371",
+                  "quote": "**MÃ NGÀNH: 7440122**",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83350,
+                  "end": 83371
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83436:83462",
+                  "quote": "- Bằng tốt nghiệp: Cử nhân",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83436,
+                  "end": 83462
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83326:83348",
+                  "quote": "#### KHOA HỌC VẬT LIỆU",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83326,
+                  "end": 83348
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:17:52",
+                  "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 1,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": null,
+                  "record_path": [],
+                  "start": 17,
+                  "end": 52
+                }
+              ],
+              "verified": true
+            },
+            {
+              "id": "c1.3",
+              "text": "- Bằng tốt nghiệp: Cử nhân",
+              "references": [
+                {
+                  "block_id": "ks_rev_988ea265f24c:83436:83462",
+                  "quote": "- Bằng tốt nghiệp: Cử nhân",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83436,
+                  "end": 83462
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83350:83371",
+                  "quote": "**MÃ NGÀNH: 7440122**",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83350,
+                  "end": 83371
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83373:83399",
+                  "quote": "- Thời gian đào tạo: 4 năm",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83373,
+                  "end": 83399
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:83326:83348",
+                  "quote": "#### KHOA HỌC VẬT LIỆU",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 34,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [
+                      2025
+                    ],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": "KHOA HỌC VẬT LIỆU",
+                  "record_path": [
+                    "KHOA HỌC VẬT LIỆU"
+                  ],
+                  "start": 83326,
+                  "end": 83348
+                },
+                {
+                  "block_id": "ks_rev_988ea265f24c:17:52",
+                  "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "binding_id": "bnd_eb69bdeaf0f0",
+                  "index_revision_id": "idx_rev_919d97a25b33",
+                  "source_revision_id": "ks_rev_988ea265f24c",
+                  "page_number": 1,
+                  "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+                  "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+                  "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "record_label": null,
+                  "record_path": [],
+                  "start": 17,
+                  "end": 52
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "a60b0bea964192ab260db6055efea81dc3b6838c1612b124d372ff0b356987af",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Mã ngành 7440122 xuất hiện trong cẩm nang 2025 cho Khoa học vật liệu tại QNU.",
+                "superseded_by": []
+              },
+              {
+                "claim_id": "c1.2",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Thời gian đào tạo 4 năm được ghi trong cẩm nang 2025 cho Khoa học vật liệu QNU.",
+                "superseded_by": []
+              },
+              {
+                "claim_id": "c1.3",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Bằng tốt nghiệp Cử nhân nêu trong cẩm nang 2025 cho Khoa học vật liệu QNU.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": [],
+            "topic_coverage": {
+              "mã ngành": true,
+              "thời gian học": true,
+              "bằng cấp": true
+            }
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "**MÃ NGÀNH: 7440122**",
+                "supporting_quote": "**MÃ NGÀNH: 7440122**",
+                "entailed": true,
+                "reason": "Mã ngành 7440122 có trong nguồn ks_rev_988ea265f24c"
+              },
+              {
+                "claim_id": "c1.2",
+                "claim_quote": "- Thời gian đào tạo: 4 năm",
+                "supporting_quote": "- Thời gian đào tạo: 4 năm",
+                "entailed": true,
+                "reason": "Thời gian đào tạo 4 năm, mã ngành 7440122, bằng Cử nhân đều có trong nguồn ks_rev_988ea265f24c"
+              },
+              {
+                "claim_id": "c1.3",
+                "claim_quote": "- Bằng tốt nghiệp: Cử nhân",
+                "supporting_quote": "- Bằng tốt nghiệp: Cử nhân",
+                "entailed": true,
+                "reason": "Bằng tốt nghiệp Cử nhân, mã ngành 7440122, thời gian đào tạo 4 năm đều có trong nguồn ks_rev_988ea265f24c"
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "Mã ngành: 7440122",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_988ea265f24c:83350:83371",
+                  "quote": "**MÃ NGÀNH: 7440122**"
+                },
+                "retained_by": [
+                  "c1.1",
+                  "c1.2",
+                  "c1.3"
+                ]
+              },
+              {
+                "requirement": "Thời gian đào tạo: 4 năm",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_988ea265f24c:83373:83399",
+                  "quote": "- Thời gian đào tạo: 4 năm"
+                },
+                "retained_by": [
+                  "c1.2",
+                  "c1.3"
+                ]
+              },
+              {
+                "requirement": "Bằng tốt nghiệp: Cử nhân",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_988ea265f24c:83436:83462",
+                  "quote": "- Bằng tốt nghiệp: Cử nhân"
+                },
+                "retained_by": [
+                  "c1.2",
+                  "c1.3"
+                ]
+              }
+            ],
+            "complete": true,
+            "missing_constraints": []
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [],
+          "corrective_retrieval_attempted": false,
+          "corrective_new_block_ids": [],
+          "source_preferences": [],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_988ea265f24c:17:52",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83326:83348",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83350:83371",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83436:83462",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83373:83399",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83400:83435",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83464:83479",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_988ea265f24c:83481:83794",
+              "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+              "page": 34
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19552:19599",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19601:19718",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19720:19900",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19902:20196",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:20198:20340",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "facts:f35558e2c65b2871ccd7",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 8
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 9017.04,
+            "retrieval_ms": 5346.57,
+            "proposal_ms": 3103.64,
+            "verification_ms": 9997.29
+          },
+          "historical_diagnostics": {
+            "historical_outcome": "not_eligible"
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\n**MÃ NGÀNH: 7440122**\n\n- Thời gian đào tạo: 4 năm\n\n- Bằng tốt nghiệp: Cử nhân",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 83350,
+            "span_end": 83371,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+            "page_number": 34,
+            "quote": "**MÃ NGÀNH: 7440122**",
+            "source_pages": [
+              34
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 83373,
+            "span_end": 83399,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+            "page_number": 34,
+            "quote": "- Thời gian đào tạo: 4 năm",
+            "source_pages": [
+              34
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 83436,
+            "span_end": 83462,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+            "page_number": 34,
+            "quote": "- Bằng tốt nghiệp: Cử nhân",
+            "source_pages": [
+              34
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 83326,
+            "span_end": 83348,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 70 / #### KHOA HỌC VẬT LIỆU",
+            "page_number": 34,
+            "quote": "#### KHOA HỌC VẬT LIỆU",
+            "source_pages": [
+              34
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 17,
+            "span_end": 52,
+            "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+            "source_id": "bnd_eb69bdeaf0f0",
+            "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+            "section": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+            "page_number": 1,
+            "quote": "## CẨM NANG TUYỂN SINH ĐẠI HỌC 2025",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_eb69bdeaf0f0",
+            "index_revision_id": "idx_rev_919d97a25b33",
+            "source_revision_id": "ks_rev_988ea265f24c",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 27465.94,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval452scalar_5d6729524a7b4df6"
+      },
+      "elapsed_seconds": 27.69,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3412,
+          "completion_tokens": 436,
+          "latency_ms": 2538.24
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4466,
+          "completion_tokens": 990,
+          "latency_ms": 6260.3
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13970,
+          "completion_tokens": 467,
+          "latency_ms": 3024.08
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 16497,
+          "completion_tokens": 674,
+          "latency_ms": 2914.1
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 18683,
+          "completion_tokens": 1276,
+          "latency_ms": 6912.74
+        }
+      ]
+    }
+  ],
+  "method": "Sequential fresh chat questions; no expected answers sent; statuses are not accuracy.",
+  "code_fingerprint": "d973eb60f052a7e171b6d8c3d2dfd1144171b9362279c76063789d07b97c9742",
+  "file_hash": "e6ddb2c892c3a8efbd83ddfd3dd318b91bc3eaa0ced082f5b7c2dcabfa0cd757",
+  "assistant": {
+    "collection_id": "col_admissions",
+    "tenant_id": "tenant_qnu",
+    "updated_at": "2026-10-13T16:44:40.925985"
+  },
+  "configuration_fingerprint": "ffa0e9380725eab6673f3df2b2e5b21279cbf71fd6ee19dfc18274f2d2a9bd87",
+  "model_policy": {
+    "preferred_provider_id": "prov_20261013041934",
+    "fallback_provider_id": "prov_20261013041934",
+    "primary_model": "ollama/gpt-oss:120b",
+    "fallback_model": "ollama/gemma4:31b",
+    "temperature": 0.2,
+    "max_tokens": 5000,
+    "thinking_budget": 0
+  },
+  "evidence_policy": {
+    "enabled": true,
+    "reference_year_mode": "current_year",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "default_reference_year": null,
+    "historical_reference_enabled": true,
+    "candidate_limit": 24,
+    "context_limit": 10,
+    "max_context_chars": 36000,
+    "timeout_seconds": 90,
+    "retrieval_timeout_seconds": 10.0,
+    "rerank_timeout_seconds": 3.0,
+    "source_preferences": [
+      {
+        "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+        "superseded_source_revision_ids": [
+          "ks_rev_f122689af572"
+        ],
+        "years": [
+          2026
+        ],
+        "same_context_only": true,
+        "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+      }
+    ]
+  },
+  "publication": {
+    "snapshot": {
+      "snapshot_id": "snap_col_admissions_10_c6cc8893",
+      "collection_id": "col_admissions",
+      "collection_epoch": 10,
+      "binding_revisions": {
+        "bnd_9da34f16ef75": "idx_rev_ec8a7677282b",
+        "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+        "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+        "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+        "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+        "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+        "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+        "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+        "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+        "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+        "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+        "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+        "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+        "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+        "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+        "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+        "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+        "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+        "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+        "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247",
+        "bnd_eb69bdeaf0f0": "idx_rev_919d97a25b33"
+      },
+      "vector_generations": {
+        "bnd_9da34f16ef75": "vg_21324678abcf",
+        "bnd_0798d6ebb09d": "vg_21324678abcf",
+        "bnd_0a0fefc849ab": "vg_21324678abcf",
+        "bnd_0dd3d2789954": "vg_21324678abcf",
+        "bnd_18c9c944ee36": "vg_21324678abcf",
+        "bnd_35c0b812a4fe": "vg_21324678abcf",
+        "bnd_4bd40bc6a972": "vg_21324678abcf",
+        "bnd_4d788e0c0ee2": "vg_21324678abcf",
+        "bnd_574bfd4e5288": "vg_21324678abcf",
+        "bnd_5fe00fd59740": "vg_21324678abcf",
+        "bnd_60019f7e73d6": "vg_21324678abcf",
+        "bnd_62ff83603eec": "vg_21324678abcf",
+        "bnd_887623d8d318": "vg_21324678abcf",
+        "bnd_8dc32a78128f": "vg_21324678abcf",
+        "bnd_b7be60e6ada9": "vg_21324678abcf",
+        "bnd_bdb1f500cdbe": "vg_21324678abcf",
+        "bnd_c6d3848722ab": "vg_21324678abcf",
+        "bnd_db935aea6524": "vg_21324678abcf",
+        "bnd_e4492e8d7016": "vg_21324678abcf",
+        "bnd_ed14ffc71bc0": "vg_21324678abcf",
+        "bnd_eb69bdeaf0f0": "vg_21324678abcf"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-14T16:26:07.382291+00:00"
+    },
+    "fingerprint": "6180f8f51b791da886a2",
+    "sources": [
+      {
+        "source": "ks_rev_b62147adc5ac",
+        "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+        "binding": "bnd_8dc32a78128f",
+        "index": "idx_rev_97f860b2edbf",
+        "hash": "e73f91a10deac0250e482ca9f21bb5f78523e8585368e7ac8ace8d4d6bcb39a5"
+      },
+      {
+        "source": "ks_rev_2d6dd82b25ce",
+        "title": "Muc hoc phi 2024",
+        "binding": "bnd_18c9c944ee36",
+        "index": "idx_rev_2b7b7ec56f95",
+        "hash": "5a3f338fc0865418cd191e10f490e9acc4cee23dcf757d2889232e2038595fbd"
+      },
+      {
+        "source": "ks_rev_a12f0f3f4a99",
+        "title": "Hương dan thi Nang khieu GDTC 2026",
+        "binding": "bnd_574bfd4e5288",
+        "index": "idx_rev_76cae24bd0dd",
+        "hash": "bd6919a94a93945d2e7923cced6b3a1548c55eba917b1d9464721805366fb52a"
+      },
+      {
+        "source": "ks_rev_ad7e7e64bccf",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed",
+        "binding": "bnd_0dd3d2789954",
+        "index": "idx_rev_daf4d2e4f534",
+        "hash": "eb991fad090fea44b9152f8e18428ba7be059a66176d17939871ca1aee3e053f"
+      },
+      {
+        "source": "ks_rev_0aea050f89c4",
+        "title": "BC Kết quả khảo sát Tư vấn tuyển sinh 2022",
+        "binding": "bnd_60019f7e73d6",
+        "index": "idx_rev_575e4b49149a",
+        "hash": "94d8f0904a6740b6d7c026865b7153ad35aa88e4479598cb1b6e5801f22db169"
+      },
+      {
+        "source": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "binding": "bnd_ed14ffc71bc0",
+        "index": "idx_rev_46812c2c2247",
+        "hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f"
+      },
+      {
+        "source": "ks_rev_3e699f33e06c",
+        "title": "HD nhập học",
+        "binding": "bnd_e4492e8d7016",
+        "index": "idx_rev_42074c9dee55",
+        "hash": "411182a446724cd9594b58b09f38f68dfb5bcef19f0e673015238526e6fb9a2c"
+      },
+      {
+        "source": "ks_rev_aae30aac628c",
+        "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+        "binding": "bnd_9da34f16ef75",
+        "index": "idx_rev_ec8a7677282b",
+        "hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd"
+      },
+      {
+        "source": "ks_rev_1610bf67e2cf",
+        "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+        "binding": "bnd_c6d3848722ab",
+        "index": "idx_rev_d7b434305a6c",
+        "hash": "53e4ec625751a196322a2f616ab73a1310f1e527a1293b7b7c5ae29b1d29798d"
+      },
+      {
+        "source": "ks_rev_672bd2a13d44",
+        "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+        "binding": "bnd_0a0fefc849ab",
+        "index": "idx_rev_a90d85902c4f",
+        "hash": "f4f3c8ce3546b36f092175aa6cefa5a61a98c24f7f88c5355810f374f2d08d7b"
+      },
+      {
+        "source": "ks_rev_cf1863148443",
+        "title": "TB điểm sàn 26",
+        "binding": "bnd_35c0b812a4fe",
+        "index": "idx_rev_ac9ec09ebb97",
+        "hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c"
+      },
+      {
+        "source": "ks_rev_4be16227642e",
+        "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+        "binding": "bnd_0798d6ebb09d",
+        "index": "idx_rev_d64d0baf0c06",
+        "hash": "bf379846754a4821d262767505d60f0dbe5cc7268adfdb726c89b9776d926075"
+      },
+      {
+        "source": "ks_rev_988ea265f24c",
+        "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+        "binding": "bnd_eb69bdeaf0f0",
+        "index": "idx_rev_919d97a25b33",
+        "hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c"
+      },
+      {
+        "source": "ks_rev_403157cd7511",
+        "title": "Phuong huong tuyen sinh 2024_DHQN_final",
+        "binding": "bnd_887623d8d318",
+        "index": "idx_rev_d39d623aef4e",
+        "hash": "340e133e1e0f99042d6c893a701aa23ed071cbcb667c4b1dd0026994ae81148a"
+      },
+      {
+        "source": "ks_rev_c9344b18c429",
+        "title": "TB lịch xét tuyển ĐH",
+        "binding": "bnd_db935aea6524",
+        "index": "idx_rev_44d332b2f2e8",
+        "hash": "f9ca20b7e4328551fb99f2bf59bb57c1462f7fe5cdb566364f9ce6aae265e5bc"
+      },
+      {
+        "source": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "binding": "bnd_62ff83603eec",
+        "index": "idx_rev_e0dc72a9102b",
+        "hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1"
+      },
+      {
+        "source": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "binding": "bnd_b7be60e6ada9",
+        "index": "idx_rev_33446987e9fc",
+        "hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74"
+      },
+      {
+        "source": "ks_rev_2764521a96a3",
+        "title": "TB học phí K49",
+        "binding": "bnd_4bd40bc6a972",
+        "index": "idx_rev_57e15196704d",
+        "hash": "57afdb9f55f0910dac916a8806168e15c0466434740bede12db2f035dfc7072a"
+      },
+      {
+        "source": "ks_rev_26248a79ce32",
+        "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+        "binding": "bnd_5fe00fd59740",
+        "index": "idx_rev_c0a54bf73b18",
+        "hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e"
+      },
+      {
+        "source": "ks_rev_dbdaf646862a",
+        "title": "Cac nganh Tuyen sinh 2025_moi",
+        "binding": "bnd_bdb1f500cdbe",
+        "index": "idx_rev_742b1ff6d265",
+        "hash": "f096720b0d414129b5270933f2cdc3df176be224f65b34d1531b4b2edd81f7c2"
+      },
+      {
+        "source": "ks_rev_2d628688cb78",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao",
+        "binding": "bnd_4d788e0c0ee2",
+        "index": "idx_rev_00fbccf1d07e",
+        "hash": "726942e56640e65aee7d906d422b6e717185c6379e6e3866f20b9875a52bb28e"
+      }
+    ],
+    "matched_handbook": [
+      {
+        "source": "ks_rev_988ea265f24c",
+        "binding": "bnd_eb69bdeaf0f0",
+        "index": "idx_rev_919d97a25b33",
+        "title": "Cam_nang_tuyen_sinh_Dai_hoc_Quy_Nhon_2025_day_du",
+        "origin_hash": "e6ddb2c892c3a8efbd83ddfd3dd318b91bc3eaa0ced082f5b7c2dcabfa0cd757",
+        "canonical_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c",
+        "canonical_chars": 127135,
+        "source_status": "ready",
+        "index_status": "active",
+        "chunk_count": 1257,
+        "fact_count": 0,
+        "fact_years": {},
+        "qdrant_retrievable_points": 1257,
+        "parity": {
+          "checked_at": "2026-10-14T15:20:04.256234+00:00",
+          "fact_set_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "parity_passed": true,
+          "parity_reason": "Đối chiếu point ID, revision và content hash thành công.",
+          "expected_count": 1257,
+          "verified_count": 1257,
+          "unit_manifest_hash": "b4ed72646abb0864023bc954c02243fe2db75697d27943d34f28c5ac163b2e25",
+          "source_content_hash": "6c7ff00e0da3e194087e52d9aaa0fc27ac61e14f28efcd9e20b67a5aa644127c"
+        },
+        "block_count": 1257,
+        "year_scopes": {
+          "proposed:unknown": 1257
+        },
+        "heading_samples": [
+          {
+            "text": "#### SƯ PHẠM TOÁN HỌC",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 4 / #### SƯ PHẠM TOÁN HỌC",
+            "parent": "span:11414:11425",
+            "page": 4
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 4 / #### GIỚI THIỆU",
+            "parent": "span:11414:11425",
+            "page": 4
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 6 / #### GIỚI THIỆU",
+            "parent": "span:14472:14483",
+            "page": 5
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 8 / #### GIỚI THIỆU",
+            "parent": "span:16207:16218",
+            "page": 6
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 10 / #### GIỚI THIỆU",
+            "parent": "span:18127:18139",
+            "page": 7
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 12 / #### GIỚI THIỆU",
+            "parent": "span:20084:20096",
+            "page": 8
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 14 / #### GIỚI THIỆU",
+            "parent": "span:22240:22252",
+            "page": 9
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 15 / #### GIỚI THIỆU",
+            "parent": "span:23195:23207",
+            "page": 10
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 18 / #### GIỚI THIỆU",
+            "parent": "span:25331:25343",
+            "page": 10
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 20 / #### GIỚI THIỆU",
+            "parent": "span:26962:26974",
+            "page": 11
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 22 / #### GIỚI THIỆU",
+            "parent": "span:28854:28866",
+            "page": 12
+          },
+          {
+            "text": "#### GIỚI THIỆU",
+            "section": "## TUYỂN SINH ĐẠI HỌC 2025 / ### Trang 23 / #### GIỚI THIỆU",
+            "parent": "span:29622:29634",
+            "page": 13
+          }
+        ]
+      }
+    ]
+  },
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "code_unchanged": true,
+  "finished_at": "2026-10-14T16:27:00.881314+00:00"
+}

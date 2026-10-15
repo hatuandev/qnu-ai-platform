@@ -46,6 +46,28 @@ def _fresh_session() -> AsyncMock:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [RuntimeError("DELETE FROM private_table; raw driver parameters"),
+                                  AppException("Nguồn đang được tham chiếu.", code="SOURCE_ARTIFACT_SHARED", status_code=409)])
+async def test_source_purge_failure_keeps_sql_out_of_user_job_error(failure):
+    from app.modules.jobs.models import JobRecord
+
+    job = JobRecord(id="fixture-purge", job_type="knowledge_source_purge", status="queued")
+    db = _fresh_session()
+    with (
+        patch.object(tasks_module, "AsyncSessionFactory", _session_factory(db)),
+        patch.object(tasks_module, "_load_job", AsyncMock(return_value=job)),
+        patch("app.modules.knowledge.services.source_purge.run_purge", AsyncMock(side_effect=failure)),
+        pytest.raises(type(failure)),
+    ):
+        await tasks_module.task_knowledge_source_purge({}, job.id)
+    assert job.status == "failed"
+    assert "DELETE FROM" not in job.error
+    if isinstance(failure, AppException):
+        assert job.error == failure.message
+    db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_knowledge_ingestion_cancelled_batch_is_not_worker_failure():
     job = SimpleNamespace(id="job_cancelled_batch", payload={"item_id": "item"})
     session = _fresh_session()

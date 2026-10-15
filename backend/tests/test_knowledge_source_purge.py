@@ -18,6 +18,8 @@ from app.modules.knowledge.models import (
     KnowledgeChunkSet,
     KnowledgeCollection,
     KnowledgeFact,
+    KnowledgeIndexActivation,
+    KnowledgeIndexRevision,
     KnowledgeSourceRevision,
     KnowledgeVectorGeneration,
 )
@@ -105,9 +107,15 @@ async def test_purge_removes_knowledge_only_and_waits_for_external_cleanup(purge
 
 
 @pytest.mark.asyncio
-async def test_storage_failure_keeps_plan_for_retry(purge_db):
+@pytest.mark.parametrize("published", [False, True])
+async def test_storage_failure_keeps_plan_for_retry(purge_db, published):
     db = purge_db
-    _, doc, binding, revision, _ = await seed_source(db)
+    if published:
+        _, doc, binding, revision, _, _, _ = await seed_publication_history(db)
+        binding.status = "paused"
+        await db.commit()
+    else:
+        _, doc, binding, revision, _ = await seed_source(db)
     with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="test-no-dispatch")):
         job = await source_purge.request_purge(db, binding.id)
     with (
@@ -254,3 +262,110 @@ async def test_pause_then_purge_and_retry_remain_available(purge_db):
     with patch.object(source_purge.jobs_service, "retry_job", AsyncMock(return_value=job)) as retry:
         assert await source_purge.request_purge(db, binding.id) is job
     retry.assert_awaited_once_with(db, job.id, actor=None)
+
+
+async def seed_publication_history(db):
+    col, doc, binding, revision, chunks = await seed_source(db, status="active")
+    generation = KnowledgeVectorGeneration(collection_id=col.id, embedding_model="fixture",
+        provider_id="fixture", qdrant_collection_name=f"fixture_{col.id}",
+        config_hash=col.id, embedding_dimension=2, status="ready")
+    db.add(generation)
+    await db.flush()
+    indexes = [KnowledgeIndexRevision(binding_id=binding.id,
+        source_revision_v2_id=revision.id, source_revision_id=revision.id,
+        chunk_set_id=chunks.id, vector_generation_id=generation.id,
+        revision_no=number, status="active" if number == 2 else "ready",
+        point_ids=[f"fixture-point-{number}"], parity_report={"parity_passed": True})
+        for number in (1, 2)]
+    db.add_all(indexes)
+    await db.flush()
+    activations = [KnowledgeIndexActivation(binding_id=binding.id,
+        from_index_revision_id=previous, to_index_revision_id=target,
+        epoch=epoch, action=action, reason="Fixture audit must survive", activated_by="fixture-officer")
+        for epoch, previous, target, action in (
+            (1, None, indexes[0].id, "promote"),
+            (2, indexes[0].id, indexes[1].id, "promote"),
+            (3, indexes[1].id, indexes[0].id, "rollback"),
+        )]
+    db.add_all(activations)
+    binding.active_index_revision_id = indexes[0].id
+    binding.active_epoch = 3
+    await db.commit()
+    return col, doc, binding, revision, chunks, indexes, activations
+
+
+@pytest.mark.asyncio
+async def test_purge_of_published_source_preserves_activation_history_and_hides_source(purge_db):
+    from app.modules.knowledge.services.binding_service import binding_service
+    from app.modules.knowledge.services.source_pause import pause_source
+
+    db = purge_db
+    col, doc, binding, revision, chunks, indexes, activations = await seed_publication_history(db)
+    before = [(item.id, item.from_index_revision_id, item.to_index_revision_id,
+               item.action, item.epoch, item.activated_by, item.reason) for item in activations]
+    await pause_source(db, binding.id)
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="fixture-no-dispatch")):
+        job = await source_purge.request_purge(db, binding.id)
+    with (
+        patch.object(source_purge.vector_indexer, "delete_source_points", AsyncMock(return_value=2)),
+        patch.object(source_purge.storage_service, "delete_confirmed", AsyncMock()),
+    ):
+        await source_purge.run_purge(db, job)
+    assert job.status == "completed"
+    assert binding.status == "detached"
+    assert binding.active_source_revision_id is None
+    assert binding.active_index_revision_id is None
+    assert await binding_service.list_bindings(db, col.id) == []
+    for index in indexes:
+        await db.refresh(index)
+        assert index.status == "pruned"
+        assert index.point_ids == []
+        assert index.source_revision_v2_id is None and index.source_revision_id is None
+        assert index.chunk_set_id is None
+        assert index.parity_report["purged_artifacts"]["job_id"] == job.id
+    for activation, expected in zip(activations, before, strict=True):
+        await db.refresh(activation)
+        assert (activation.id, activation.from_index_revision_id, activation.to_index_revision_id,
+                activation.action, activation.epoch, activation.activated_by, activation.reason) == expected
+    assert await db.scalar(select(KnowledgeSourceRevision.id).where(KnowledgeSourceRevision.id == revision.id)) is None
+    assert await db.scalar(select(KnowledgeChunkSet.id).where(KnowledgeChunkSet.id == chunks.id)) is None
+    assert await db.scalar(select(RepositoryDocument.id).where(RepositoryDocument.id == doc.id)) == doc.id
+    assert job.result["publication_history_preserved"] is True
+    # History remains inspectable, but old payload cannot be republished via rollback.
+    from app.modules.knowledge.services.index_build_service import index_build_service
+
+    with pytest.raises(AppException) as error:
+        await index_build_service.rollback_index_revision(db, binding.id, indexes[0].id,
+                                                     expected_epoch=binding.active_epoch)
+    assert error.value.code == "REVISION_ALREADY_PRUNED"
+    # Replaying a completed deletion cannot touch external data or erase history.
+    with patch.object(source_purge.vector_indexer, "delete_source_points", AsyncMock()) as vectors:
+        await source_purge.run_purge(db, job)
+    vectors.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reference", ["from", "to"])
+async def test_purge_refuses_cross_source_activation_before_external_cleanup(purge_db, reference):
+    from app.modules.knowledge.services.source_pause import pause_source
+
+    db = purge_db
+    _, _, binding, _, _, indexes, _ = await seed_publication_history(db)
+    _, _, other, _, _, other_indexes, _ = await seed_publication_history(db)
+    invalid = KnowledgeIndexActivation(binding_id=other.id, epoch=4,
+        from_index_revision_id=indexes[0].id if reference == "from" else None,
+        to_index_revision_id=indexes[0].id if reference == "to" else other_indexes[0].id)
+    db.add(invalid)
+    await db.commit()
+    await pause_source(db, binding.id)
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="fixture-no-dispatch")):
+        job = await source_purge.request_purge(db, binding.id)
+    with (
+        patch.object(source_purge.vector_indexer, "delete_source_points", AsyncMock()) as vectors,
+        patch.object(source_purge.storage_service, "delete_confirmed", AsyncMock()) as storage,
+        pytest.raises(AppException) as error,
+    ):
+        await source_purge.run_purge(db, job)
+    assert error.value.code == "SOURCE_ARTIFACT_SHARED"
+    vectors.assert_not_awaited()
+    storage.assert_not_awaited()

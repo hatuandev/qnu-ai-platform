@@ -2,6 +2,12 @@
 
 Tài liệu này mô tả chi tiết thứ tự điều phối nạp các container, kiểm tra tính sẵn sàng (Healthcheck Probes) và khởi tạo kết nối hạ tầng khi nền tảng khởi động.
 
+## Ngoại lệ Dev Access Gate cho demo production — #460
+
+Theo yêu cầu người vận hành, `DEV_AUTH_ENABLED=true` chỉ được dùng trên production khi đồng thời bật `DEV_AUTH_ALLOW_IN_PRODUCTION=true`. Mặc định Compose vẫn tắt cả hai. Settings kiểm tra mật khẩu riêng 24–128 ký tự, khóa ký >=32 ký tự/HS256 và origin HTTPS chính xác; nếu không SSO cũng không có password gate hợp lệ thì chặn khởi động. Không chuyển môi trường sang development.
+
+Luồng: kiểm tra Origin → Redis giới hạn tần suất dùng chung worker (lỗi thì 503) → kiểm tra mật khẩu → cookie Secure/HttpOnly/SameSite=Lax tối đa 60 phút → xác thực signature/issuer/audience/purpose/phiên bản mật khẩu tại API. Không có token hợp lệ luôn 401 trong production, tuyệt đối không sử dụng nhánh default actor local. `/auth/me` dùng cùng bộ xác thực với API. Đổi mật khẩu hoặc tắt gate sau khi tạo lại toàn bộ API containers chặn phiên cũ. Đây là mật khẩu quản trị dùng chung cho demo có kiểm soát, không thay thế SSO/RBAC từng người. Xem [runbook Dokploy](../trien_khai/02_quy_trinh_trien_khai_dokploy.md) để cấu hình và thu hồi.
+
 ## Worker ingestion đa người — cập nhật #376
 
 - ARQ dùng `max_tries` đúng phiên bản thư viện, mặc định 3; `WORKER_MAX_JOBS=10`, `WORKER_JOB_TIMEOUT_SECONDS=900`. Docker worker có probe `arq --check` mỗi 30s thay vì disable healthcheck; cron điều phối mỗi 15s.

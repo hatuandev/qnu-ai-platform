@@ -99,9 +99,20 @@ def test_compose_production_defaults_and_shared_security(compose_config: Compose
         environment = services[service]["environment"]
         assert environment["ENVIRONMENT"] == "production"
         assert environment["DEV_AUTH_ENABLED"] == "false"
+        assert environment["DEV_AUTH_ALLOW_IN_PRODUCTION"] == "false"
         assert environment["SSO_ENABLED"] == "true"
         assert environment["SSO_AUTHORITY"].startswith("https://")
         assert environment["PROVIDER_ENCRYPTION_KEY"] == REQUIRED_ENV["PROVIDER_ENCRYPTION_KEY"]
+
+
+def test_compose_forwards_explicit_production_password_gate(compose_config: ComposeLoader) -> None:
+    result = compose_config({"DEV_AUTH_ENABLED": "true", "DEV_AUTH_ALLOW_IN_PRODUCTION": "true", "SSO_ENABLED": "false"})
+    assert result.returncode == 0, result.stderr
+    for service in ("bootstrap", "backend", "worker"):
+        environment = json.loads(result.stdout)["services"][service]["environment"]
+        assert environment["DEV_AUTH_ENABLED"] == "true"
+        assert environment["DEV_AUTH_ALLOW_IN_PRODUCTION"] == "true"
+        assert environment["SSO_ENABLED"] == "false"
 
 
 def test_compose_forwards_sso_to_api_worker_and_frontend_build(

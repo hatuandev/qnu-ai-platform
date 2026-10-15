@@ -676,8 +676,14 @@ class KnowledgeIndexActivation(Base):
         nullable=False,
         index=True,
     )
-    from_index_revision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    to_index_revision_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    from_index_revision_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("knowledge_index_revisions.id", ondelete="SET NULL",
+                               name="fk_index_activation_from_revision"), nullable=True,
+    )
+    to_index_revision_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("knowledge_index_revisions.id", ondelete="RESTRICT",
+                               name="fk_index_activation_to_revision"), nullable=False,
+    )
     action: Mapped[str] = mapped_column(String(32), default="promote", nullable=False)  # promote, rollback, rebuild
     epoch: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)

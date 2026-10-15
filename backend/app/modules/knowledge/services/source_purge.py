@@ -16,6 +16,7 @@ from app.modules.knowledge.models import (
     KnowledgeFact,
     KnowledgeImportBatch,
     KnowledgeImportItem,
+    KnowledgeIndexActivation,
     KnowledgeIndexRevision,
     KnowledgeSourceRevision,
     KnowledgeVectorGeneration,
@@ -97,9 +98,10 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     chunk_ids = list((await db.scalars(select(KnowledgeChunkSet.id).where(
         KnowledgeChunkSet.source_revision_id.in_(revision_ids),
     ))).all())
-    index_ids = list((await db.scalars(select(KnowledgeIndexRevision.id).where(
+    indexes = list((await db.scalars(select(KnowledgeIndexRevision).where(
         KnowledgeIndexRevision.binding_id == binding.id,
     ))).all())
+    index_ids = [index.id for index in indexes]
     # A malformed cross-source reference must not be silently cascade-deleted.
     shared = await db.scalar(select(KnowledgeIndexRevision.id).where(
         KnowledgeIndexRevision.binding_id != binding.id,
@@ -112,8 +114,16 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
         or_(KnowledgeBinding.active_source_revision_id.in_(revision_ids),
             KnowledgeBinding.active_index_revision_id.in_(index_ids)),
     ).limit(1))
-    if shared or shared_pointer:
+    shared_activation = await db.scalar(select(KnowledgeIndexActivation.id).where(
+        KnowledgeIndexActivation.binding_id != binding.id,
+        or_(KnowledgeIndexActivation.from_index_revision_id.in_(index_ids),
+            KnowledgeIndexActivation.to_index_revision_id.in_(index_ids)),
+    ).limit(1))
+    if shared or shared_pointer or shared_activation:
         raise AppException("Dữ liệu đang được nguồn khác tham chiếu.", code="SOURCE_ARTIFACT_SHARED", status_code=409)
+    history_count = await db.scalar(select(func.count()).select_from(KnowledgeIndexActivation).where(
+        KnowledgeIndexActivation.binding_id == binding.id,
+    ))
     namespaces = set((await db.scalars(select(KnowledgeVectorGeneration.qdrant_collection_name).where(
         KnowledgeVectorGeneration.collection_id == collection.id,
         KnowledgeVectorGeneration.tenant_id == job.tenant_id,
@@ -156,10 +166,27 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     for model in (KnowledgeChunk, KnowledgeFact):
         await db.execute(delete(model).where(or_(model.binding_id == binding.id,
                                                 model.index_revision_id.in_(index_ids))))
-    await db.execute(delete(KnowledgeIndexRevision).where(KnowledgeIndexRevision.binding_id == binding.id))
+    if history_count:
+        # Immutable publication events retain their revision targets. Only their
+        # payload is gone: pruned revisions can never be published or rolled back.
+        for index in indexes:
+            index.parity_report = {**(index.parity_report or {}), "purged_artifacts": {
+                "job_id": job.id, "source_revision_id": index.source_revision_id,
+                "source_revision_v2_id": index.source_revision_v2_id,
+                "chunk_set_id": index.chunk_set_id,
+            }}
+            index.status, index.point_ids = "pruned", []
+            index.source_revision_id = None
+            index.source_revision_v2_id = None
+            index.chunk_set_id = None
+        binding.status = "detached"
+        await db.flush()
+    else:
+        await db.execute(delete(KnowledgeIndexRevision).where(KnowledgeIndexRevision.binding_id == binding.id))
     await db.execute(delete(KnowledgeChunkSet).where(KnowledgeChunkSet.id.in_(chunk_ids)))
     await db.execute(delete(KnowledgeSourceRevision).where(KnowledgeSourceRevision.binding_id == binding.id))
-    await db.execute(delete(KnowledgeBinding).where(KnowledgeBinding.id == binding.id))
+    if not history_count:
+        await db.execute(delete(KnowledgeBinding).where(KnowledgeBinding.id == binding.id))
     for batch_id in batch_ids:
         counts = dict((await db.execute(select(KnowledgeImportItem.status, func.count()).where(
             KnowledgeImportItem.batch_id == batch_id,
@@ -169,6 +196,8 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
             setattr(batch, f"{state}_count", counts.get(state, 0))
     job.status, job.phase, job.progress = "completed", "completed", 100
     job.result = {"binding_id": binding.id, "source_revisions_deleted": len(revisions),
-                  "chunk_sets_deleted": len(chunk_ids), "repository_preserved": True}
+                  "chunk_sets_deleted": len(chunk_ids), "repository_preserved": True,
+                  "publication_history_preserved": bool(history_count),
+                  "publication_events_preserved": int(history_count or 0)}
     job.error = None
     await db.commit()

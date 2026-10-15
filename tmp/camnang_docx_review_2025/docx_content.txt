@@ -1,0 +1,1087 @@
+[0 Normal] CẨM NANG TUYỂN SINH ĐẠI HỌC NĂM 2025
+[1 Normal] TRƯỜNG ĐẠI HỌC QUY NHƠN (QUY NHON UNIVERSITY)
+[2 Normal] Mã trường: DQN
+[3 Normal] I. 5 PHƯƠNG THỨC XÉT TUYỂN
+[4 Normal] 1. Xét tuyển theo kết quả thi tốt nghiệp THPT.
+[5 Normal] 2. Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).
+[6 Normal] 3. Xét tuyển theo kết quả kỳ thi Đánh giá năng lực (ĐGNL) của ĐHQG TP.HCM và ĐHQG Hà Nội (trừ các ngành sư phạm).
+[7 Normal] 4. Xét tuyển theo kết quả kỳ thi ĐGNL của các trường ĐH Sư phạm.
+[8 Normal] 5. Xét tuyển thẳng theo Quy chế tuyển sinh của Bộ GD&ĐT.
+[9 Normal] II. CÁC NGÀNH TUYỂN SINH 2025
+[10 row 0] STT | MÃ NGÀNH | NGÀNH ĐÀO TẠO | TỔ HỢP MÔN XÉT TUYỂN
+[10 row 1] 1 | 7140209 | Sư phạm Toán học | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 2] 2 | 7140210 | Sư phạm Tin học | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Văn, Anh); (Toán, Văn, Tin)
+[10 row 3] 3 | 7140211 | Sư phạm Vật lý | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Lý, Sinh); (Toán, Lý, Giáo dục KT&PL)
+[10 row 4] 4 | 7140212 | Sư phạm Hóa học | (Toán, Lý, Hóa); (Toán, Hóa, Sinh); (Toán, Hóa, Anh); (Toán, Văn, Hóa)
+[10 row 5] 5 | 7140213 | Sư phạm Sinh học | (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)
+[10 row 6] 6 | 7140217 | Sư phạm Ngữ văn | (Văn, Sử, Địa); (Văn, Sử, Anh); (Văn, Địa, Anh); (Văn, Toán, Anh)
+[10 row 7] 7 | 7140218 | Sư phạm Lịch sử | (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Văn, Sử, Anh); (Văn, Toán, Sử); (Toán, Sử, Giáo dục KT&PL); (Toán, Sử, Địa); (Toán, Sử, Anh)
+[10 row 8] 8 | 7140219 | Sư phạm Địa lý | (Văn, Sử, Địa); (Văn, Địa, Giáo dục KT&PL); (Văn, Toán, Địa); (Văn, Địa, Anh); (Toán, Địa, Anh); (Toán, Sử, Địa); (Toán, Địa, Giáo dục KT&PL)
+[10 row 9] 9 | 7140231 | Sư phạm Tiếng Anh | (Toán, Văn, Anh)
+[10 row 10] 10 | 7140247 | Sư phạm Khoa học tự nhiên | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Lý, Sinh); (Toán, Hóa, Sinh); (Toán, Sinh, Anh)
+[10 row 11] 11 | 7140249 | Sư phạm Lịch sử - Địa lý | (Toán, Sử, Địa); (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Văn, Địa, Giáo dục KT&PL); (Văn, Sử, Anh); (Văn, Địa, Anh)
+[10 row 12] 12 | 7140201 | Giáo dục Mầm non | (Toán, Văn, NK GDMN)
+[10 row 13] 13 | 7140202 | Giáo dục Tiểu học | (Toán, Lý, Hóa); (Văn, Sử, Địa); (Toán, Văn, Anh)
+[10 row 14] 14 | 7140205 | Giáo dục Chính trị | (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Văn, Địa, Giáo dục KT&PL); (Toán, Văn, Anh); (Văn, Sử, Anh); (Văn, Toán, Giáo dục KT&PL); (Toán, Anh, Giáo dục KT&PL)
+[10 row 15] 15 | 7140206 | Giáo dục Thể chất | (Toán, Sinh, NK TDTT); (Toán, Văn, NK TDTT); (Văn, Sinh, NK TDTT); (Toán, Lý, NK TDTT); (Văn, Giáo dục KT&PL, NK TDTT)
+[10 row 16] 16 | 7140114 | Quản lý Giáo dục | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Văn, Sử, Địa); (Toán, Văn, Anh)
+[10 row 17] 17 | 7220201 | Ngôn ngữ Anh | (Toán, Lý, Anh); (Toán, Văn, Anh); (Văn, Sử, Anh); (Văn, Địa, Anh)
+[10 row 18] 18 | 7220204 | Ngôn ngữ Trung Quốc | (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Văn, Tiếng Trung); (Văn, Địa, Anh)
+[10 row 19] 19 | 7229030 | Văn học | (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Văn, Sử, Anh); (Văn, Địa, Anh)
+[10 row 20] 20 | 7310101 | Kinh tế | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Giáo dục KT&PL); (Toán, Anh, Tin)
+[10 row 21] 21 | 7310205 | Quản lý nhà nước | (Văn, Sử, Địa); (Văn, Toán, Giáo dục KT&PL); (Văn, Sử, Giáo dục KT&PL); (Toán, Văn, Anh); (Văn, Sử, Anh); (Toán, Anh, Giáo dục KT&PL)
+[10 row 22] 22 | 7310403 | Tâm lý học giáo dục | (Toán, Lý, Hóa); (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Toán, Văn, Anh)
+[10 row 23] 23 | 7310608 | Đông phương học | (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Văn, Sử, Anh); (Văn, Địa, Anh)
+[10 row 24] 24 | 7310630 | Việt Nam học | (Văn, Sử, Địa); (Văn, Sử, Giáo dục KT&PL); (Toán, Văn, Anh); (Văn, Địa, Anh)
+[10 row 25] 25 | 7340101 | Quản trị kinh doanh | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Văn, Toán, Giáo dục KT&PL); (Văn, Toán, Anh); (Văn, Toán, Tiếng Trung); (Toán, Anh, Giáo dục KT&PL); (Văn, Anh, Giáo dục KT&PL); (Toán, Anh, Tin)
+[10 row 26] 26 | 7340201 | Tài chính - Ngân hàng | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Văn, Toán, Giáo dục KT&PL); (Toán, Giáo dục KT&PL, Anh)
+[10 row 27] 27 | 7340301 | Kế toán | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Anh, Giáo dục KT&PL)
+[10 row 28] 28 | 7340301_ACCA | Kế toán (Định hướng ACCA) | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Anh, Giáo dục KT&PL)
+[10 row 29] 29 | 7340302 | Kiểm toán | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Giáo dục KT&PL); (Toán, Anh, Tin)
+[10 row 30] 30 | 7380101 | Luật | (Toán, Lý, Anh); (Văn, Sử, Địa); (Văn, Toán, Giáo dục KT&PL); (Văn, Sử, Giáo dục KT&PL); (Toán, Văn, Anh); (Văn, Sử, Anh); (Toán, Anh, Giáo dục KT&PL)
+[10 row 31] 31 | 7440112 | Hóa học (Hóa dược, Hóa mỹ phẩm) | (Toán, Lý, Hóa); (Toán, Hóa, Sinh); (Toán, Hóa, Sử); (Toán, Hóa, Địa); (Toán, Hóa, Giáo dục KT&PL); (Văn, Toán, Hóa); (Văn, Lý, Hóa); (Văn, Hóa, Sinh); (Toán, Hóa, Anh); (Văn, Hóa, Anh)
+[10 row 32] 32 | 7460112 | Toán ứng dụng | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 33] 33 | 7480109 | Khoa học dữ liệu | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 34] 34 | 7480103 | Kỹ thuật phần mềm | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 35] 35 | 7480201 | Công nghệ thông tin | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 36] 36 | 7480207 | Trí tuệ nhân tạo | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Văn, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin)
+[10 row 37] 37 | 7510205 | Công nghệ kỹ thuật ô tô | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 38] 38 | 7510401 | Công nghệ kỹ thuật hóa học | (Toán, Lý, Hóa); (Toán, Hóa, Sinh); (Toán, Lý, Anh); (Toán, Hóa, Sử); (Toán, Hóa, Địa); (Toán, Hóa, Giáo dục KT&PL); (Văn, Toán, Hóa); (Văn, Hóa, Sinh); (Văn, Toán, Anh); (Toán, Hóa, Anh); (Văn, Hóa, Anh)
+[10 row 39] 39 | 7510605 | Logistics và Quản lý chuỗi cung ứng | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Địa, Giáo dục KT&PL); (Văn, Toán, Giáo dục KT&PL); (Văn, Toán, Anh); (Toán, Địa, Anh); (Toán, Giáo dục KT&PL, Anh); (Toán, Anh, Tin)
+[10 row 40] 40 | 7520116 | Kỹ thuật cơ khí động lực | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 41] 41 | 7520201 | Kỹ thuật điện | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 42] 42 | 7520207 | Kỹ thuật điện tử - viễn thông (Thiết kế vi mạch) | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 43] 43 | 7520216 | Kỹ thuật điều khiển và Tự động hóa | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 44] 44 | 7520401 | Vật lý kỹ thuật (Chuyên ngành Bán dẫn) | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Lý, Sinh); (Toán, Lý, Sử); (Văn, Toán, Lý); (Toán, Hóa, Sinh); (Toán, Lý, Địa); (Văn, Lý, Hóa); (Văn, Lý, Sinh); (Văn, Lý, Anh); (Toán, Lý, Giáo dục KT&PL)
+[10 row 45] 45 | 7540101 | Công nghệ thực phẩm | (Toán, Lý, Hóa); (Toán, Lý, Sinh); (Toán, Hóa, Địa); (Toán, Hóa, Giáo dục KT&PL); (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Văn, Toán, Hóa); (Văn, Lý, Hóa); (Văn, Hóa, Sinh); (Văn, Toán, Tiếng Nhật); (Toán, Hóa, Anh); (Văn, Hóa, Anh)
+[10 row 46] 46 | 7580201 | Kỹ thuật xây dựng | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Anh, Tin); (Toán, Văn, Anh); (Toán, Lý, Tin); (Toán, Lý, Văn)
+[10 row 47] 47 | 7620109 | Nông học | (Toán, Hóa, Sinh); (Toán, Sử, Sinh); (Toán, Sinh, Văn); (Toán, Sinh, Giáo dục KT&PL); (Toán, Sinh, Anh); (Toán, Lý, Sinh); (Văn, Sinh, Anh); (Văn, Hóa, Sinh); (Văn, Sử, Sinh)
+[10 row 48] 48 | 7760101 | Công tác xã hội | (Văn, Sử, Địa); (Toán, Văn, Anh); (Văn, Sử, Anh); (Văn, Sử, Giáo dục KT&PL)
+[10 row 49] 49 | 7810103 | Quản trị dịch vụ du lịch và lữ hành | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Sử, Giáo dục KT&PL); (Toán, Địa, Giáo dục KT&PL); (Toán, Sử, Anh); (Văn, Toán, Anh); (Văn, Toán, Giáo dục KT&PL); (Văn, Toán, Tiếng Trung); (Văn, Anh, Giáo dục KT&PL); (Toán, Anh, Giáo dục KT&PL)
+[10 row 50] 50 | 7810201 | Quản trị khách sạn | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Sử, Giáo dục KT&PL); (Toán, Địa, Giáo dục KT&PL); (Toán, Sử, Anh); (Văn, Toán, Anh); (Văn, Toán, Giáo dục KT&PL); (Văn, Toán, Tiếng Trung); (Văn, Anh, Giáo dục KT&PL); (Toán, Anh, Giáo dục KT&PL)
+[10 row 51] 51 | 7850101 | Quản lý tài nguyên và môi trường | (Toán, Vật lý, Hóa); (Toán, Lý, Sinh); (Toán, Lý, Sử); (Toán, Lý, Địa); (Toán, Hóa, Sử); (Toán, Hóa, Địa); (Toán, Sử, Địa); (Toán, Địa, Giáo dục KT&PL); (Toán, Hóa, Sinh); (Toán, Sinh, Địa); (Văn, Toán, Địa); (Văn, Sinh, Địa); (Văn, Địa, Giáo dục KT&PL); (Văn, Toán, Anh); (Toán, Địa, Anh); (Văn, Địa, Anh)
+[10 row 52] 52 | 7850103 | Quản lý đất đai | (Toán, Lý, Hóa); (Toán, Hóa, Sinh); (Toán, Lý, Anh); (Toán, Lý, Sinh); (Toán, Lý, Sử); (Toán, Lý, Địa); (Toán, Hóa, Địa); (Toán, Địa, Giáo dục KT&PL); (Toán, Địa lý, Anh); (Toán, Hóa, Giáo dục KT&PL); (Toán, Hóa, Anh)
+[11 Normal] 
+[12 Normal] III. CHI TIẾT CÁC NGÀNH ĐÀO TẠO
+[13 Normal] 1. SƯ PHẠM TOÁN HỌC
+[14 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[15 Normal] • Thời gian đào tạo: 4 năm
+[16 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[17 Normal] • Bằng tốt nghiệp: Cử nhân
+[18 Normal] GIỚI THIỆU
+[19 Normal] • Sư phạm Toán là một ngành thế mạnh của Trường Đại học Quy Nhơn. Chương trình đào tạo được thiết kế, vận hành và liên tục cập nhật bởi đội ngũ khoảng 50 giảng viên, trong đó hầu hết có học hàm Phó giáo sư và học vị tiến sĩ, tiến sĩ khoa học từ các trường đại học danh tiếng Châu Âu, Châu Úc và Bắc Mỹ.
+[20 Normal] • Chương trình đào tạo đảm bảo “top” sinh viên giỏi có thể giảng dạy Toán bằng Tiếng Anh sau khi ra trường, có thể tham gia giảng dạy ở các trường quốc tế.
+[21 Normal] • Sinh viên giỏi có cơ hội nhận các học bổng Thạc sĩ, Tiến sĩ ở Châu Âu, Châu Úc và Bắc Mỹ. Sinh viên năm cuối có thể cùng lúc tham gia khóa học Master 1 (online) ở Trường ĐH Limoges (Pháp). Hoàn thành khóa Master 1, được cấp học bổng để sang Pháp hoàn thành khóa học Thạc sĩ chỉ sau 1 năm tốt nghiệp cử nhân.
+[22 Normal] CƠ HỘI VIỆC LÀM
+[23 Normal] • Giảng dạy Toán ở các trường phổ thông, trung cấp, cao đẳng, đại học.
+[24 Normal] • Giảng dạy Toán ở các trường quốc tế.
+[25 Normal] • Làm việc ở các trung tâm, viện nghiên cứu khoa học, Toán học trong và ngoài nước.
+[26 Normal] • Đặc biệt, cơ hội việc làm hấp dẫn, đảm bảo trên 95% có việc làm sau khi tốt nghiệp nếu hoàn tất một chương trình đào tạo ngắn hạn bổ sung (3-6 tháng) theo một trong hai định hướng:
+[27 Normal] ◦ Chương trình phối hợp với Đại học trực tuyến FUNiX và với các công ty phần mềm: FPT Software, Kins Solutions, TMA Solutions về đào tạo nguồn nhân lực phát triển phần mềm chuyên nghiệp từ ngành Toán theo chuẩn công nghiệp, "from non-IT students to professional software developers".
+[28 Normal] ◦ Chương trình hợp tác với TMA Solutions về đào tạo nguồn nhân lực về khoa học dữ liệu cho sinh viên năm cuối, cơ hội làm việc hấp dẫn ngay tại quê hương Bình Định (trung tâm khoa học dữ liệu của TMA Solutions – Lab 7 Bình Định) và các công ty ở các vùng công nghiệp trọng điểm của cả nước.
+[29 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[30 Normal] • Sinh viên có cơ hội lớn để nhận các học bổng Thạc sĩ, Tiến sĩ toán học tại các trường đại học, các trung tâm khoa học và các viện nghiên cứu trong nước với sự tài trợ tài chính có giá trị từ tập đoàn Vingroup.
+[31 Normal] • Có cơ hội lớn để học tập ở nước ngoài thông qua các chương trình cao học liên kết với một số trường đại học bên Pháp như Đại học Limoges, Orléans, Aix-Marseille, hoặc các chương trình cao học quốc tế của Viện Toán học, chương trình Thạc sĩ Toán ứng dụng Việt - Pháp của ĐH KHTN TP. Hồ Chí Minh, chương trình Diploma Toán của Trung tâm Vật lý lý thuyết quốc tế của Ý.
+[32 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[33 Normal] • Các trường THPT ở khu vực miền Trung - Tây Nguyên.
+[34 Normal] • Viện nghiên cứu Trí tuệ nhân tạo AI - VinAI Research, các công ty phần mềm FPT Software, Kins Solutions, TMA Solutions.
+[35 Normal] • Viện Toán học - Viện Hàn lâm Khoa học và Công nghệ Việt Nam, Viện nghiên cứu cao cấp về Toán (VIASM).
+[36 Normal] • Các Trường Đại học Limoges, Orléans, Aix-Marseille của Pháp.
+[37 Normal] • Các Trường Đại học Macquarie, Deakin và Wayne State của Úc và Mỹ.
+[38 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[39 Normal] 2. SƯ PHẠM TIN HỌC
+[40 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[41 Normal] • Thời gian đào tạo: 4 năm
+[42 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[43 Normal] • Bằng tốt nghiệp: Cử nhân
+[44 Normal] GIỚI THIỆU
+[45 Normal] • Sư phạm Tin học là ngành chuyên đào tạo đội ngũ cử nhân có trình độ chuyên môn, nghiệp vụ, phẩm chất đạo đức nghề nghiệp để giảng dạy môn Tin ở các cấp học phổ thông, các trường sư phạm, các khoa sư phạm Tin học của các trường cao đẳng, đại học ở Việt Nam và rất nhiều công việc có liên quan đến lĩnh vực Công nghệ thông tin.
+[46 Normal] • Hiện tại, cả nước đang thiếu hụt rất nhiều giáo viên giảng dạy ở các bậc học phổ thông, vì vậy cơ hội việc làm sau khi tốt nghiệp ngành học này rất lớn.
+[47 Normal] CƠ HỘI VIỆC LÀM
+[48 Normal] • Giảng dạy Tin học ở các trường phổ thông, trung cấp, cao đẳng, đại học.
+[49 Normal] • Có khả năng sử dụng Tin học để làm việc trong các tổ chức hành chính, các doanh nghiệp, các cơ sở giáo dục và đào tạo...
+[50 Normal] • Trở thành lập trình viên, thiết kế chương trình và dữ liệu, quản trị các hệ cơ sở dữ liệu, kiểm thử viên phần mềm, nghiên cứu viên...
+[51 Normal] • Nghiên cứu viên trong các trường Đại học hay Viện nghiên cứu về lĩnh vực CNTT.
+[52 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[53 Normal] • Thường xuyên nhận học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[54 Normal] • Sinh viên có cơ hội lớn để nhận các học bổng Thạc sĩ, Tiến sĩ toán học tại các trường đại học, các trung tâm khoa học và các viện nghiên cứu trong nước với sự tài trợ tài chính có giá trị từ tập đoàn Vingroup.
+[55 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[56 Normal] • Các trường phổ thông các cấp ở khu vực miền Trung - Tây Nguyên và cả nước.
+[57 Normal] • Viện, Trung tâm nghiên cứu về lĩnh vực Công nghệ thông tin, TMA Solutions; Công ty CP FPT Software (FSoft Quy Nhơn); Quỹ Đổi mới Sáng tạo Vingroup (VINIF), Viện Nghiên cứu Dữ liệu lớn (VNCDLLL); Công ty CP Fujinet Systems.
+[58 Normal] 3. SƯ PHẠM VẬT LÝ
+[59 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[60 Normal] • Thời gian đào tạo: 4 năm
+[61 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[62 Normal] • Bằng tốt nghiệp: Cử nhân
+[63 Normal] GIỚI THIỆU
+[64 Normal] • Sư phạm Vật lý là một ngành thuộc khối ngành Sư phạm. Đây là ngành đào tạo các Cử nhân Sư phạm Vật lý đáp ứng các trình độ chuyên môn, nghiệp vụ, phẩm chất đạo đức nghề nghiệp để tham gia công tác giảng dạy tại các trường phổ thông, cao đẳng, đại học.
+[65 Normal] • Ngành học này trang bị cho sinh viên những kiến thức đại cương về khoa học tự nhiên, khoa học xã hội, ngoại ngữ, tin học; kiến thức cơ bản và chuyên sâu về vật lý; về khoa học giáo dục và sư phạm; kỹ năng sử dụng các phương pháp cơ bản, hiện đại giảng dạy Vật lý và công nghệ dạy học.
+[66 Normal] CƠ HỘI VIỆC LÀM
+[67 Normal] • Giảng dạy Vật lý ở trường phổ thông, trường chuyên nghiệp, trường cao đẳng, trường đại học.
+[68 Normal] • Làm việc tại các viện nghiên cứu về Vật lý và các lĩnh vực liên quan.
+[69 Normal] • Làm việc tại các cơ sở ứng dụng khoa học kĩ thuật trên các lĩnh vực: quang tử, cơ - điện, sản xuất, kinh doanh thiết bị khoa học - kĩ thuật.
+[70 Normal] • Có đủ khả năng làm việc ở các lĩnh vực chuyên môn cần sử dụng kiến thức Vật lý như kĩ thuật điện tử, bưu chính, viễn thông...
+[71 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[72 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[73 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[74 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[75 Normal] • Sinh viên có cơ hội lớn để nhận các học bổng Thạc sĩ, Tiến sĩ vật lý tại các trường đại học, các trung tâm khoa học và các viện nghiên cứu trong nước với sự tài trợ tài chính có giá trị từ tập đoàn Vingroup.
+[76 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[77 Normal] • Các trường Trung học phổ thông ở Nam Trung Bộ và Tây Nguyên.
+[78 Normal] • Các viện AIST, ITIMS (Trường Đại học Bách khoa Hà Nội).
+[79 Normal] • Trường Đại học Leuven (Vương quốc Bỉ).
+[80 Normal] • Hội Gặp gỡ Việt Nam.
+[81 Normal] • Trung tâm Quốc tế Khoa học và Giáo dục Liên ngành (ICISE).
+[82 Normal] • Trung tâm Khám phá Khoa học.
+[83 Normal] 4. SƯ PHẠM HÓA HỌC
+[84 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[85 Normal] • Thời gian đào tạo: 4 năm
+[86 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[87 Normal] • Bằng tốt nghiệp: Cử nhân
+[88 Normal] GIỚI THIỆU
+[89 Normal] • Sư phạm Hóa học là ngành học thuộc khối ngành Sư phạm, đào tạo cử nhân Sư phạm Hóa học có đầy đủ phẩm chất nghề giáo cũng như nắm vững kiến thức chuyên môn để sau khi tốt nghiệp có thể tiến hành đứng lớp giảng dạy tại các trường THPT. Đồng thời, cung cấp cho người học những kiến thức chuyên ngành hóa học để sau khi tốt nghiệp có thể tham gia nghiên cứu khoa học tại các trung tâm nghiên cứu hoặc theo học cao học.
+[90 Normal] CƠ HỘI VIỆC LÀM
+[91 Normal] • Giảng dạy môn Hóa học tại các trường đại học, cao đẳng, phổ thông trung học, hướng dẫn và bồi dưỡng học sinh giỏi Hóa học tại các trường phổ thông.
+[92 Normal] • Làm công tác nghiên cứu ở các cơ quan quản lý giáo dục, các cơ sở đào tạo, viện nghiên cứu, đặc biệt về lĩnh vực Hóa học, Lí luận và phương pháp dạy học bộ môn Hóa học.
+[93 Normal] • Làm việc tại các công ty liên quan đến hóa chất.
+[94 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[95 Normal] • Thường xuyên nhận học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[96 Normal] • Sinh viên có cơ hội lớn để nhận các học bổng Thạc sĩ, Tiến sĩ toán học tại các trường đại học, các trung tâm khoa học và các viện nghiên cứu trong nước với sự tài trợ tài chính có giá trị từ tập đoàn Vingroup.
+[97 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[98 Normal] • Các Trường Trung học phổ thông của Tỉnh Bình Định, Gia Lai, Phú Yên, Đắk Lắk, Quảng Ngãi, Quảng Nam, Kon Tum, Khánh Hòa.
+[99 Normal] • Các công ty gửi sinh viên thực tập, thực tế như: Nhà máy Hóa chất Tân Bình 2; Nhà máy Hóa chất Biên Hòa; Công ty cổ phần Pin Ắc quy Miền Nam; Nhà máy Hóa chất Đồng Nai; Nhà máy Nhựa và Hóa chất Phú Mỹ; Công ty VEDAN; Nhà máy Đạm Phú Mỹ.
+[100 Normal] • Các đơn vị đã ký kết thỏa thuận hợp tác: Công ty Cổ phần Chăn nuôi C.P. Việt Nam; Công ty TNHH Sinh hóa Minh Dương Việt Nam; Công ty CP Thép Hòa Phát Dung Quất; Công ty CP Giám định - Khử trùng VietnamControl; Công ty CP Nông nghiệp Trường Hải (THAGRICO).
+[101 Normal] 5. SƯ PHẠM SINH HỌC
+[102 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[103 Normal] • Thời gian đào tạo: 4 năm
+[104 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[105 Normal] • Bằng tốt nghiệp: Cử nhân
+[106 Normal] GIỚI THIỆU
+[107 Normal] • Sư phạm Sinh học là ngành đào tạo cử nhân Sư phạm Sinh học có trình độ tiên tiến về khoa học cơ bản, khoa học sinh học và giáo dục để sau khi tốt nghiệp có thể làm giáo viên Sinh học chất lượng cao tại các trường học trong hệ thống giáo dục quốc dân, đồng thời có thể đảm nhiệm các công việc nghiên cứu trong các cơ quan nghiên cứu về khoa học Sinh học, khoa học Giáo dục.
+[108 Normal] CƠ HỘI VIỆC LÀM
+[109 Normal] • Giảng dạy môn Sinh học tại các trường trung học phổ thông, trung cấp, cao đẳng, đại học.
+[110 Normal] • Nghiên cứu trong lĩnh vực Sinh học và phương pháp dạy học môn Sinh học tại các viện, trung tâm và cơ quan nghiên cứu thuộc các Bộ, Ngành, các cơ sở đào tạo, các tổ chức quốc tế...
+[111 Normal] • Làm việc tại các phòng thí nghiệm của các Trung tâm Y tế dự phòng.
+[112 Normal] • Làm việc tại các khu Bảo tồn Thiên nhiên, các khu du lịch sinh thái...
+[113 Normal] • Có thể làm việc trong các cơ quan quản lý tài nguyên sinh vật, tài nguyên môi trường, cơ sở sản xuất trong nước và nước ngoài, các tổ chức sử dụng lao động có kiến thức sinh học và sư phạm sinh học.
+[114 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[115 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[116 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[117 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[118 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[119 Normal] • Các Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[120 Normal] • Các cơ sở thực tập, thực tế như: Phòng thí nghiệm Sinh lý sinh sản và tập tính (INRA, Cộng hòa Pháp), Viện bảo tàng Động vật Đà Lạt, Viện nghiên cứu biển Nha Trang, Viện KHKT Nông nghiệp Duyên hải Nam Trung Bộ, Viện Sốt rét - Ký sinh trùng - Côn trùng Quy Nhơn, Viện Nghiên cứu Nuôi trồng thủy sản III, Bệnh viện Quân y 13, Trung tâm Giống cây trồng Bình Định và các khoa Sinh, Nông, Lâm,... thuộc nhiều trường đại học khác.
+[121 Normal] • Các cơ quan, doanh nghiệp đã ký kết thỏa thuận hợp tác: Công ty Cổ phần Chăn nuôi C.P. Việt Nam; Công ty TNHH Sinh hóa Minh Dương Việt Nam; Công ty CP Nông nghiệp Trường Hải (THAGRICO).
+[122 Normal] 6. SƯ PHẠM NGỮ VĂN
+[123 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[124 Normal] • Thời gian đào tạo: 4 năm
+[125 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[126 Normal] • Bằng tốt nghiệp: Cử nhân
+[127 Normal] GIỚI THIỆU
+[128 Normal] • Sư phạm Ngữ văn là ngành đào tạo giáo viên có đầy đủ kiến thức giảng dạy tại các trường phổ thông đại trà, trường chuyên, trường chất lượng cao và các cơ sở giáo dục chuyên nghiệp. Với mục tiêu đào tạo ra các thế hệ giáo viên có khả năng truyền đạt tốt và kiến thức vững chắc về môn học, ngành Sư phạm Ngữ văn hiện đang là một trong những ngành được các bạn học sinh yêu thích.
+[129 Normal] CƠ HỘI VIỆC LÀM
+[130 Normal] • Giảng dạy môn Ngữ văn tại các trường trung học phổ thông, trung cấp, cao đẳng, đại học.
+[131 Normal] • Nghiên cứu và phê bình văn học tại các Viện nghiên cứu về văn học, văn hóa, ngôn ngữ,...
+[132 Normal] • Biên tập viên cho các đài phát thanh, đài truyền hình trên khắp cả nước.
+[133 Normal] • Làm công tác chuyên môn cho các tổ chức, cơ quan liên quan kiến thức về khoa học xã hội.
+[134 Normal] • Chuyên viên phụ trách môn Ngữ văn ở Phòng/Sở Giáo dục và Đào tạo.
+[135 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[136 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[137 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[138 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[139 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[140 Normal] • Các Sở GD&ĐT, các Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[141 Normal] • Các tòa soạn báo, đài phát thanh và truyền hình Bình Định.
+[142 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[143 Normal] 7. SƯ PHẠM LỊCH SỬ
+[144 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[145 Normal] • Thời gian đào tạo: 4 năm
+[146 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[147 Normal] • Bằng tốt nghiệp: Cử nhân
+[148 Normal] GIỚI THIỆU
+[149 Normal] • Sư phạm Lịch sử là ngành đào tạo cử nhân sư phạm dành cho những học sinh yêu thích tìm hiểu về lịch sử trong nước cũng như lịch sử thế giới. Ngành học sẽ trang bị kiến thức sâu rộng, vững chắc về khoa học Lịch sử, năng lực và phẩm chất sư phạm; có khả năng vận dụng những kiến thức mới vào trong phương pháp giảng dạy phù hợp với từng bậc học.
+[150 Normal] CƠ HỘI VIỆC LÀM
+[151 Normal] • Làm công tác giảng dạy lịch sử tại các trường đại học, cao đẳng, phổ thông trung học. Có khả năng hướng dẫn và bồi dưỡng học sinh giỏi Lịch sử tại các trường phổ thông.
+[152 Normal] • Làm công tác nghiên cứu ở tổ chức, cơ quan quản lý giáo dục, các cơ sở đào tạo, viện nghiên cứu, đặc biệt về lĩnh vực Sử học, Lý luận và phương pháp dạy học bộ môn Lịch sử.
+[153 Normal] • Chuyên viên và quản lý ở các trường học, các phòng giáo dục, các cơ sở giáo dục.
+[154 Normal] • Làm công tác quản lý tư liệu lịch sử, quản lý bảo tàng, di tích lịch sử...
+[155 Normal] • Làm công tác lịch sử, văn hóa ở các cơ quan nhà nước, đoàn thể xã hội.
+[156 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[157 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[158 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[159 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[160 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[161 Normal] • Các Sở GD&ĐT, các Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[162 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[163 Normal] 8. SƯ PHẠM ĐỊA LÝ
+[164 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[165 Normal] • Thời gian đào tạo: 4 năm
+[166 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[167 Normal] • Bằng tốt nghiệp: Cử nhân
+[168 Normal] GIỚI THIỆU
+[169 Normal] • Sư phạm Địa lý là ngành đào tạo cử nhân khoa học ngành Địa lý nắm vững các tri thức về địa lý cơ bản và phương pháp giảng dạy Địa lý ở trường Trung học phổ thông; đáp ứng chương trình phân ban cũng như chuyên ban phù hợp với nội dung đổi mới phương pháp dạy và học ở trường Trung học phổ thông hiện nay.
+[170 Normal] CƠ HỘI VIỆC LÀM
+[171 Normal] • Giảng dạy địa lý tại các trường THPT, các trường đại học và cao đẳng trong cả nước.
+[172 Normal] • Nghiên cứu tại các trung tâm, viện nghiên cứu về khoa học địa lý, tài nguyên và môi trường, khí tượng thủy văn, địa chính, khoa học xã hội và nhân văn, viện nghiên cứu giáo dục, dự án dân số, đô thị hóa, phát triển nông thôn...
+[173 Normal] • Chuyên viên và quản lý tại các bộ phận ở các trường học, các cơ sở quản lý giáo dục, các cơ sở khác phù hợp với chuyên môn như du lịch, văn hóa, địa chính...
+[174 Normal] • Đảm nhận công việc trong các lĩnh vực liên quan đến địa lí như: phân vùng - quy hoạch lãnh thổ, quản lí tài nguyên môi trường, các dự án dân số, phát triển nông thôn, đô thị hoá...
+[175 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[176 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[177 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[178 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[179 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[180 Normal] • Các Sở GD&ĐT, các Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[181 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[182 Normal] 9. SƯ PHẠM TIẾNG ANH
+[183 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[184 Normal] • Thời gian đào tạo: 4 năm
+[185 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[186 Normal] • Bằng tốt nghiệp: Cử nhân
+[187 Normal] GIỚI THIỆU
+[188 Normal] • Sư phạm Tiếng Anh là ngành đào tạo cử nhân Sư phạm Tiếng Anh có trình độ chuyên môn, nghiệp vụ, phẩm chất đạo đức nghề nghiệp để giảng dạy tiếng Anh ở các cấp học phổ thông, các trường sư phạm, các khoa sư phạm tiếng Anh của các trường cao đẳng, đại học ở Việt Nam; có khả năng học ở các trình độ cao hơn. Nhu cầu xã hội cho ngành học này rất lớn, sinh viên tốt nghiệp làm được ở nhiều vị trí việc làm.
+[189 Normal] CƠ HỘI VIỆC LÀM
+[190 Normal] • Giảng dạy tại các trường tiểu học, các trường trung học, các trường trung học chuyên nghiệp và dạy nghề, các trường cao đẳng và đại học.
+[191 Normal] • Giảng dạy Tiếng Anh tại các Trung tâm ngoại ngữ dành cho mọi lứa tuổi.
+[192 Normal] • Nghiên cứu tại các trung tâm, viện nghiên cứu về ngôn ngữ, giáo dục.
+[193 Normal] • Làm biên - phiên dịch cho các cơ quan ngoại giao, cơ quan truyền thông, các tổ chức kinh tế, xã hội của Việt Nam và quốc tế; dịch thuật cho các NXB, trung tâm phát hành sách, báo, tạp chí... trong và ngoài nước.
+[194 Normal] • Hướng dẫn viên, chuyên viên tư vấn tại các công ty du lịch, lữ hành, nhà hàng khách sạn, các khu nghỉ mát quốc tế.
+[195 Normal] • Chuyên viên truyền thông, tổ chức sự kiện, thư ký, trợ lý giám đốc... trong các công ty nước ngoài.
+[196 Normal] • Làm nhân viên phòng Quan hệ doanh nghiệp; Hợp tác quốc tế; Quảng cáo và tìm đối tác kinh doanh cho các công ty lớn...
+[197 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[198 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[199 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[200 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[201 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[202 Normal] • Các Sở GD&ĐT, Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[203 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[204 Normal] 10. SƯ PHẠM KHOA HỌC TỰ NHIÊN
+[205 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[206 Normal] • Thời gian đào tạo: 4 năm
+[207 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[208 Normal] • Bằng tốt nghiệp: Cử nhân
+[209 Normal] GIỚI THIỆU
+[210 Normal] • Đào tạo giáo viên giảng dạy môn Khoa học tự nhiên tại trường THCS theo Chương trình giáo dục phổ thông mới.
+[211 Normal] • Làm chuyên viên phụ trách chuyên môn tại các phòng và sở giáo dục đào tạo.
+[212 Normal] • Làm việc tại các trung tâm nghiên cứu khoa học và công nghệ, khoa học tự nhiên, các viện nghiên cứu sư phạm, khoa học giáo dục.
+[213 Normal] CƠ HỘI VIỆC LÀM
+[214 Normal] • Giảng dạy môn Khoa học tự nhiên tại trường THCS theo Chương trình giáo dục phổ thông mới.
+[215 Normal] • Làm chuyên viên phụ trách chuyên môn tại các phòng và sở giáo dục đào tạo.
+[216 Normal] • Làm việc tại các trung tâm nghiên cứu khoa học và công nghệ, khoa học tự nhiên, các viện nghiên cứu sư phạm, khoa học giáo dục.
+[217 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[218 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[219 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[220 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[221 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[222 Normal] • Các Sở GD&ĐT, Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[223 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[224 Normal] 11. SƯ PHẠM LỊCH SỬ - ĐỊA LÝ
+[225 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[226 Normal] • Thời gian đào tạo: 4 năm
+[227 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[228 Normal] • Bằng tốt nghiệp: Cử nhân Sư phạm Lịch sử - Địa lý
+[229 Normal] GIỚI THIỆU
+[230 Normal] • Sư phạm Lịch sử - Địa lý là ngành học đào tạo giáo viên bậc trung học cơ sở có kiến thức lý thuyết và thực tiễn về ngành Lịch sử và Địa lý, phát hiện và giải quyết những vấn đề liên quan đến các nội dung, phương pháp, hình thức tổ chức dạy và học môn Lịch sử và Địa lý bậc THCS; có tư duy phản biện, phê phán và đề xuất được các giải pháp giải quyết các vấn đề nhằm nâng cao hiệu quả dạy và học môn Lịch sử và Địa lý bậc THCS.
+[231 Normal] • Người học ngành Sư phạm Lịch sử - Địa lý sẽ được đào tạo các kiến thức chuyên ngành như: Dẫn luận ngôn ngữ học, Lịch sử văn minh thế giới, Địa lí kinh tế – xã hội, Lịch sử Việt Nam, Lịch sử thế giới, Bản đồ, Địa lý tự nhiên Việt Nam và thế giới, Biển và hải đảo Việt Nam, Các cuộc phát kiến địa lý, Các tôn giáo trên thế giới, Địa lý du lịch, Địa phương học, Phương pháp dạy học liên môn, Thực hành dạy học liên môn, Nghiệp vụ sư phạm...
+[232 Normal] CƠ HỘI VIỆC LÀM
+[233 Normal] • Giáo viên trong các trường THCS quốc tế, THCS công lập, tư thục, các trường THCS hoặc cơ sở giáo dục liên quan đến nước ngoài.
+[234 Normal] • Cán bộ, chuyên viên trong các cơ quan quản lý giáo dục.
+[235 Normal] • Tiếp tục học tập và nâng cao bồi dưỡng cán bộ nghiên cứu trong các viện nghiên cứu, các cơ quan khoa học của các tỉnh, thành phố, quận, huyện, tổ chức theo hướng phát triển khoa học xã hội, cơ quan trong lĩnh vực báo chí, du lịch, văn hóa hoặc cơ sở giáo dục đại học, cao đẳng liên quan đến giáo dục bậc THCS.
+[236 Normal] • Tiếp tục học tập nâng cao trình độ bậc đào tạo sau đại học các ngành/chuyên ngành phù hợp.
+[237 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[238 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[239 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[240 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[241 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[242 Normal] • Các Sở GD&ĐT, Trường THPT các tỉnh khu vực Miền Trung và Tây Nguyên.
+[243 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[244 Normal] 12. GIÁO DỤC MẦM NON
+[245 Normal] • Đơn vị: Khoa Giáo dục Tiểu học và Mầm non (GDTH&MN)
+[246 Normal] • Thời gian đào tạo: 4 năm
+[247 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[248 Normal] • Bằng tốt nghiệp: Cử nhân
+[249 Normal] GIỚI THIỆU
+[250 Normal] • Giáo dục mầm non là cấp học đầu tiên trong hệ thống giáo dục quốc dân, đặt nền móng cho sự phát triển về thể chất, tình cảm xã hội và thẩm mỹ cho trẻ. Giáo dục mầm non sẽ chuẩn bị cho trẻ đầy đủ những kỹ năng như tự lập, sự kiềm chế, khả năng diễn đạt, đồng thời hình thành hứng thú đối với việc học, việc giao tiếp với những tình huống cụ thể trước khi bước vào đời.
+[251 Normal] • Ngành học trang bị kiến thức cơ bản về Tâm lý học mầm non, Giáo dục học mầm non, Phương pháp dạy học của mầm non. Các kiến thức chuyên môn, bảo đảm dạy tốt các môn học và các hoạt động giáo dục trẻ...
+[252 Normal] • Ngành học này yêu cầu người học phải yêu nghề, say mê, tận tụy với công việc; yêu trẻ, tôn trọng và có tinh thần trách nhiệm cao với trẻ.
+[253 Normal] CƠ HỘI VIỆC LÀM
+[254 Normal] • Hệ thống các trường mầm non công lập và tư thục trên cả nước.
+[255 Normal] • Các cơ quan quản lý giáo dục, các tổ chức, trung tâm trong và ngoài nước về giáo dục.
+[256 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[257 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[258 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[259 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[260 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[261 Normal] • Hệ thống các trường mầm non công lập tỉnh Bình Định hỗ trợ môi trường thực tập sư phạm.
+[262 Normal] • Hệ thống Giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu).
+[263 Normal] • Công ty TNHH Giáo dục FPT (FPT Education).
+[264 Normal] 13. GIÁO DỤC TIỂU HỌC
+[265 Normal] • Đơn vị: Khoa Giáo dục Tiểu học và Mầm non (GDTH&MN)
+[266 Normal] • Thời gian đào tạo: 4 năm
+[267 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[268 Normal] • Bằng tốt nghiệp: Cử nhân
+[269 Normal] GIỚI THIỆU
+[270 Normal] • Giáo dục Tiểu học là giai đoạn thứ nhất của giáo dục bắt buộc, là bậc giáo dục cho trẻ em từ lớp 1 đến hết lớp 5. Đây là bậc học quan trọng đối với sự phát triển của trẻ em, thời gian hình thành nhân cách và năng lực (trí tuệ và thể chất).
+[271 Normal] • Sinh viên ngành Giáo dục Tiểu học được trang bị kiến thức, kỹ năng và phẩm chất nghề nghiệp để giảng dạy các môn học ở Tiểu học. Có năng lực lập và thực hiện kế hoạch dạy học; năng lực vận dụng phương pháp, phương tiện và hình thức tổ chức dạy học bộ môn; năng lực giải quyết các tình huống sư phạm; năng lực kiểm tra đánh giá kết quả học tập, tổ chức đánh giá trong giáo dục; năng lực xây dựng, quản lí và sử dụng hồ sơ dạy học; năng lực phát triển chương trình môn học...
+[272 Normal] • Hiện nay, ngành Giáo dục Tiểu học đang thiếu hụt nhân lực trên cả nước nên cơ hội việc làm ngành này rất rộng mở. Bên cạnh đó, các trường dân lập, tư thục, quốc tế mở ra ngày càng nhiều cũng có nghĩa sẽ mang đến nhiều cơ hội việc làm cho các giáo viên Tiểu học hơn nữa.
+[273 Normal] CƠ HỘI VIỆC LÀM
+[274 Normal] • Giáo viên dạy các môn chính ở các trường từ bậc tiểu học đến giảng viên dạy chuyên ngành Giáo dục Tiểu học tại đại học, cao đẳng.
+[275 Normal] • Nghiên cứu tại các trung tâm, viện nghiên cứu thuộc ngành Giáo dục, phát triển giáo dục.
+[276 Normal] • Cán bộ trong hệ thống quản lý giáo dục từ cấp địa phương tới Trung ương.
+[277 Normal] • Làm việc tại các tổ chức phát triển giáo dục phi chính phủ.
+[278 Normal] • Tiếp tục học lên các trình độ thạc sĩ, tiến sĩ về Giáo dục Tiểu học, Quản lý giáo dục và có khả năng trở thành giáo viên cốt cán của cấp Tiểu học.
+[279 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[280 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[281 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[282 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[283 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[284 Normal] • Hệ thống các trường, cơ quan quản lý giáo dục công lập và tư thục trong khu vực và cả nước.
+[285 Normal] • Ký thỏa thuận hợp tác với Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[286 Normal] 14. GIÁO DỤC CHÍNH TRỊ
+[287 Normal] • Đơn vị: Khoa Sư phạm (Faculty of Education)
+[288 Normal] • Thời gian đào tạo: 4 năm
+[289 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[290 Normal] • Bằng tốt nghiệp: Cử nhân
+[291 Normal] GIỚI THIỆU
+[292 Normal] • Ngành Giáo dục chính trị là ngành chuyên đào tạo những tri thức cơ bản, nền tảng về các vấn đề chính trị, xã hội của đất nước. Ngoài ra, ngành học này còn cung cấp cho sinh viên những kỹ năng giải quyết các vấn đề gặp phải trong sự vận động phức tạp của đời sống xã hội.
+[293 Normal] • Ngành Giáo dục chính trị là một bộ phận của khoa học chính trị, bộ phận công tác tư tưởng của Đảng, có nội dung chủ yếu là giáo dục chủ nghĩa Mác - Lênin, tư tưởng Hồ Chí Minh, Cương lĩnh, đường lối của Đảng nhằm hình thành thế giới quan, phương pháp luận khoa học, bản lĩnh chính trị, niềm tin và năng lực hoạt động thực tiễn cho cán bộ, đảng viên và nhân dân, đáp ứng yêu cầu xây dựng và phát triển của đất nước.
+[294 Normal] CƠ HỘI VIỆC LÀM
+[295 Normal] • Công tác giảng dạy môn Đạo đức ở bậc Tiểu học; môn Giáo dục công dân ở các trường THCS; môn Giáo dục kinh tế và pháp luật ở các trường THPT.
+[296 Normal] • Giảng viên nghiên cứu, cán bộ khoa học về lý luận chính trị ở các trường đại học, học viện, trường cao đẳng, trung học chuyên nghiệp, các cơ sở đào tạo, nghiên cứu khoa học, các cơ quan lý luận, tổ chức chính trị - xã hội.
+[297 Normal] • Giảng dạy và nghiên cứu các môn lý luận chính trị, Pháp luật, Đạo đức ở các trường đại học, học viện, trường cao đẳng, trung học chuyên nghiệp, các cơ sở đào tạo, nghiên cứu khoa học, các cơ quan lý luận, tổ chức chính trị - xã hội.
+[298 Normal] • Cán bộ, công chức, viên chức tại các cơ quan hành chính, sự nghiệp, các tổ chức chính trị - xã hội, các lực lượng vũ trang...
+[299 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[300 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[301 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[302 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[303 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[304 Normal] • Hệ thống các trường, cơ quan quản lý giáo dục công lập và tư thục trong khu vực và cả nước.
+[305 Normal] • Các cơ quan hành chính, sự nghiệp, các tổ chức chính trị - xã hội, các lực lượng vũ trang.
+[306 Normal] • Ký thỏa thuận hợp tác với Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[307 Normal] 15. GIÁO DỤC THỂ CHẤT
+[308 Normal] • Đơn vị: Khoa Giáo dục Thể chất (KHOA GDTC)
+[309 Normal] • Thời gian đào tạo: 4 năm
+[310 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[311 Normal] • Bằng tốt nghiệp: Cử nhân
+[312 Normal] GIỚI THIỆU
+[313 Normal] • Giáo dục thể chất là một loại hình giáo dục mà nội dung chuyên biệt là dạy học vận động (động tác) và phát triển có chủ định các tố chất vận động của con người. Tổng hợp quá trình đó xác định khả năng thích nghi thể lực của con người. Giáo dục thể chất được chia thành hai mặt riêng biệt: dạy học động tác và giáo dục các tố chất vận động.
+[314 Normal] • Sinh viên theo học ngành Giáo dục Thể chất sẽ có đầy đủ trình độ chuyên môn, nghiệp vụ và phẩm chất đạo đức nghề nghiệp để giảng dạy, nghiên cứu khoa học, huấn luyện và tổ chức các hoạt động Thể dục thể thao tại các trường học, các trung tâm hoặc làm việc tại các cơ quan tổ chức.
+[315 Normal] CƠ HỘI VIỆC LÀM
+[316 Normal] • Giáo viên dạy môn Giáo dục Thể chất ở các trường từ bậc Tiểu học đến Trung học phổ thông; Giảng viên dạy chuyên ngành Giáo dục Thể chất tại đại học, cao đẳng.
+[317 Normal] • Làm việc tại các trung tâm, câu lạc bộ thể thao và các công ty tổ chức sự kiện Thể dục Thể thao; Làm việc tại các tổ chức phát triển giáo dục thể chất phi chính phủ.
+[318 Normal] • Cán bộ trong hệ thống quản lý giáo dục từ cấp Địa phương tới Trung ương; Nghiên cứu tại các trung tâm nghiên cứu, viện nghiên cứu thuộc ngành Giáo dục, phát triển giáo dục.
+[319 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[320 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[321 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[322 Normal] • Hỗ trợ sinh viên môi trường thực tập sư phạm và tuyển dụng việc làm sau khi tốt nghiệp.
+[323 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[324 Normal] • Hệ thống các trường, cơ quan quản lý giáo dục công lập và tư thục trong khu vực và cả nước.
+[325 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Tổ chức Giáo dục FPT.
+[326 Normal] 16. QUẢN LÝ GIÁO DỤC
+[327 Normal] • Đơn vị: Khoa Khoa học Xã hội và Nhân văn (Faculty of Social Sciences and Humanities)
+[328 Normal] • Thời gian đào tạo: 4 năm
+[329 Normal] • Khối lượng kiến thức: 138 tín chỉ
+[330 Normal] • Bằng tốt nghiệp: Cử nhân
+[331 Normal] GIỚI THIỆU
+[332 Normal] • Ngành Quản lý giáo dục có chức năng là tổ chức hoạt động giáo dục và giám sát đánh giá hoạt động giáo dục, giúp nhà trường hoạt động ổn định, cải thiện chất lượng hoạt động giáo dục.
+[333 Normal] • Trong quản lý giáo dục, chủ thể quản lý ở các cấp chính là bộ máy quản lý giáo dục từ Trung ương đến địa phương, còn đối tượng quản lý chính là nguồn nhân lực, cơ sở vật chất kỹ thuật và các hoạt động thực hiện chức năng của giáo dục đào tạo.
+[334 Normal] • Theo học ngành Quản lý giáo dục, sinh viên sẽ có kiến thức cơ bản về quản lí giáo dục và kỹ năng thực hành quản lí giáo dục đáp ứng nhu cầu quản lý, nghiên cứu, ứng dụng khoa học và các hoạt động của nhà trường và các cơ quan quản lý giáo dục các cấp trong và ngoài hệ thống giáo dục quốc dân.
+[335 Normal] CƠ HỘI VIỆC LÀM
+[336 Normal] • Chuyên viên quản lý hành chính về giáo dục trong các cơ quan quản lý giáo dục.
+[337 Normal] • Chuyên viên làm công tác (văn phòng, quản lý cơ sở vật chất và thiết bị trường học; Quản lý công tác học sinh, sinh viên; Chuyên viên phòng Đào tạo, phòng Đảm bảo chất lượng, phòng Thanh tra giáo dục, phòng Tổ chức cán bộ...) ở các trường mầm non, tiểu học, trung học cơ sở, trung học phổ thông, cao đẳng, đại học.
+[338 Normal] • Chuyên viên làm công tác quản lý giáo dục trong các cơ sở giáo dục: Trường học, Trung tâm giáo dục thường xuyên; Các cơ sở đào tạo bồi dưỡng, các cơ quan quản lý giáo dục của các tổ chức chính trị - xã hội, đoàn thể và các tổ chức dịch vụ giáo dục...
+[339 Normal] • Cán bộ nghiên cứu trong các cơ quan nghiên cứu về Quản lý giáo dục (các viện nghiên cứu, các trung tâm nghiên cứu của các trường cao đẳng, đại học...).
+[340 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[341 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[342 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[343 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[344 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[345 Normal] • Hệ thống các trường, cơ quan quản lý giáo dục công lập và tư thục trong khu vực và cả nước.
+[346 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT.
+[347 Normal] 17. NGÔN NGỮ ANH
+[348 Normal] • Đơn vị: Khoa Ngoại ngữ (Department of Foreign Languages)
+[349 Normal] • Thời gian đào tạo: 4 năm
+[350 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[351 Normal] • Bằng tốt nghiệp: Cử nhân
+[352 Normal] GIỚI THIỆU
+[353 Normal] • Ngôn ngữ Anh là tiếng mẹ đẻ của trên 500 triệu người, ngôn ngữ thứ 2 của trên 1 tỷ dân và dần dần trở thành ngôn ngữ toàn cầu. Tiếng Anh hiện diện trong mọi lĩnh vực của đời sống, là một trong những tiêu chí giúp con người hội nhập thế giới. Ngành Ngôn ngữ Anh không chỉ đào tạo về tiếng Anh với các kỹ năng nghe, nói, đọc, viết căn bản. Học chuyên sâu vào ngôn ngữ, bạn sẽ cảm nhận sống động về đời sống vận động của ngôn ngữ đó trong lịch sử phát triển; đặc điểm nền văn hóa, phong cách sống, thói quen sinh hoạt của người bản xứ thông qua cách họ sử dụng ngôn ngữ. Là ngôn ngữ toàn cầu, tiếng Anh cũng như ngành Ngôn ngữ Anh mở ra cho bạn nhiều lựa chọn nghề nghiệp hấp dẫn, gần như không giới hạn về lĩnh vực việc làm, đất nước làm việc; tùy thuộc vào định hướng, sở trường của mỗi người.
+[354 Normal] CƠ HỘI VIỆC LÀM
+[355 Normal] • Biên dịch viên tại các công ty liên doanh, doanh nghiệp nước ngoài, cơ quan ngoại giao, tổ chức kinh tế, cơ quan truyền thông... Chuyên viên truyền thông trong các công ty nước ngoài như: Tổ chức sự kiện, nhân viên PR, trợ lý hay thư ký cho lãnh đạo người nước ngoài.
+[356 Normal] • Hướng dẫn viên, chuyên viên tư vấn tại các công ty về du lịch hay nhà hàng, khách sạn lớn, tiếp xúc và làm việc với người nước ngoài.
+[357 Normal] • Nhà hoạt động ngoại giao, làm việc cho công ty xuất nhập khẩu, phụ trách công việc hợp tác quốc tế ở các cơ quan, trường học.
+[358 Normal] • Giảng dạy tiếng Anh tại các trường đại học, cao đẳng, trung cấp nghề chuyên nghiệp, cấp phổ thông trung học, trung tâm ngoại ngữ...
+[359 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[360 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[361 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[362 Normal] • Hỗ trợ sinh viên môi trường thực tập nghề nghiệp và tuyển dụng việc làm sau khi tốt nghiệp.
+[363 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[364 Normal] • Mạng lưới gần 80 cơ quan, doanh nghiệp, trung tâm Anh ngữ đã ký kết thỏa thuận hợp tác.
+[365 Normal] • Hệ thống giáo dục Sky-Line; Công ty CP Giáo dục Thành Thành Công (TTC Edu); Công ty TNHH Giáo dục FPT,...
+[366 Normal] 18. NGÔN NGỮ TRUNG QUỐC
+[367 Normal] • Đơn vị: Khoa Ngoại ngữ (Department of Foreign Languages)
+[368 Normal] • Thời gian đào tạo: 4 năm
+[369 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[370 Normal] • Bằng tốt nghiệp: Cử nhân Ngôn ngữ Trung Quốc
+[371 Normal] GIỚI THIỆU
+[372 Normal] • Ngành Ngôn ngữ Trung Quốc là ngành học nghiên cứu về cách sử dụng ngôn ngữ Trung Quốc trên mọi lĩnh vực: kinh tế, thương mại, du lịch, ngoại giao. Ngành học này đào tạo chuyên sâu về những kỹ năng cần thiết cho sinh viên có thể hòa nhập một cách nhanh chóng với môi trường mới, công việc mới.
+[373 Normal] • Chương trình đào tạo ngành Ngôn ngữ Trung Quốc trang bị cho sinh viên những kiến thức ngữ pháp về tiếng Trung bao gồm: Hán tự, khẩu ngữ và các kỹ năng cơ bản như: biên dịch, phiên dịch, giao tiếp... Đồng thời, tìm hiểu thêm về địa lý, lịch sử, văn hóa Trung Quốc, tiếng Trung thương mại, du lịch, khách sạn, văn phòng... Theo học ngành này, sinh viên còn được cung cấp những nền tảng chuyên sâu về ngôn ngữ – văn hóa Trung Quốc, giúp sử dụng thành thạo bốn kỹ năng nghe – nói – đọc – viết bằng tiếng Trung trong giao tiếp; hình thành những kỹ năng mềm mang tính thực hành cao như làm việc nhóm, thu thập thông tin, thuyết trình, phân tích tình huống và xử lý tình huống trong công việc và cuộc sống.
+[374 Normal] CƠ HỘI VIỆC LÀM
+[375 Normal] Sau khi tốt nghiệp ngành Ngôn ngữ Trung Quốc, bạn có cơ hội làm việc trong nhiều lĩnh vực khác nhau như sư phạm ngoại ngữ, biên – phiên dịch, marketing, kinh tế đối ngoại, ngân hàng, du lịch... Sinh viên tốt nghiệp ngành Ngôn ngữ Trung Quốc với kỹ năng ngoại ngữ tốt, dễ dàng ứng tuyển những công việc như:
+[376 Normal] • Phiên dịch/biên dịch/biên tập: Làm việc độc lập về dịch văn bản, soạn thảo văn bản tiếng Trung, hay phiên dịch trong các hội nghị, đàm phán, kí kết; phiên dịch cho các công ty truyền thông, báo chí, tạp chí; phóng viên, biên tập viên tại cơ sở, địa phương nước ngoài; biên soạn thủ tục hành chính, quản lý nhân sự hay hợp đồng cho các công ty, doanh nghiệp nước ngoài.
+[377 Normal] • Trợ lý/thư ký/hướng dẫn viên cho các lãnh đạo người nước ngoài: Làm trợ lý giám đốc, thư ký cho lãnh đạo người nước ngoài, công ty liên doanh, chuyên phụ trách về mảng đối ngoại, hợp tác, kinh doanh...
+[378 Normal] • Trợ lý cho giám đốc người nước ngoài: Chuyên đàm phán, kí kết hợp đồng hay sắp xếp công việc, lịch trình làm việc, công tác cho giám đốc.
+[379 Normal] • Hướng dẫn viên: Tại các khu du lịch có nhiều du khách Trung Quốc, hướng dẫn viên tại các khu nghỉ dưỡng chuyên dành cho người Trung Quốc...
+[380 Normal] • Giảng viên/Nghiên cứu viên: Làm giảng viên tại các khoa tiếng Trung trường cao đẳng, trường nghề đào tạo tiếng Trung, hay làm nghiên cứu viên tại các viện nghiên cứu Ngôn ngữ Trung Quốc.
+[381 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[382 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[383 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[384 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[385 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[386 Normal] • Mạng lưới gần 80 cơ quan, doanh nghiệp đã ký kết thỏa thuận hợp tác.
+[387 Normal] • Các Trung tâm Ngoại ngữ.
+[388 Normal] 19. VĂN HỌC (CHUYÊN NGÀNH BÁO CHÍ - TRUYỀN THÔNG)
+[389 Normal] • Thời gian đào tạo: 4 năm
+[390 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[391 Normal] • Bằng tốt nghiệp: Cử nhân Văn học (Chuyên ngành Báo chí – Truyền thông)
+[392 Normal] GIỚI THIỆU
+[393 Normal] • Ngành Văn học đào tạo cho sinh viên những kiến thức cơ bản về ngôn ngữ học, quy tắc sử dụng ngôn ngữ trong văn học, văn nói, văn viết phục vụ cho công tác giảng dạy và nghiên cứu Văn học. Theo học ngành này, sinh viên cảm thụ kỹ năng về: Phân tích, đánh giá, bình luận các tác phẩm văn học, để có cái nhìn sâu sắc hơn về nền Văn học nước nhà. Với chuyên ngành Văn học thiên về báo chí, sinh viên được đào tạo kiến thức về lĩnh vực báo chí, truyền thông, giúp sinh viên làm quen với hoạt động biên tập, phóng viên, biên soạn. Trong quá trình học, sinh viên sẽ được đào tạo chuyên sâu và thực hành về nghiệp vụ báo chí với sự hướng dẫn của các phóng viên chuyên nghiệp của các cơ quan báo chí là đối tác của trường. Sinh viên được thực tập ở các tòa soạn báo, đài phát thanh và truyền hình, các trung tâm văn hóa nhằm rèn luyện nghiệp vụ, đáp ứng nhu cầu tuyển dụng của các cơ quan, doanh nghiệp.
+[394 Normal] CƠ HỘI VIỆC LÀM
+[395 Normal] • Giảng dạy và nghiên cứu về văn học: Trở thành thầy cô giáo tại các trường đại học, cao đẳng, trung học, trung cấp nghề, các viện và các trung tâm nghiên cứu; hoặc giảng dạy môn Ngữ văn tại trường THPT, THCS.
+[396 Normal] • Phóng viên, biên tập viên: Tham gia biên tập bài viết, viết bài cho cơ quan báo chí, truyền thông truyền hình, sáng tác kịch bản phim, kịch bản chương trình, làm MC...
+[397 Normal] • Quản lý văn phòng: Làm hành chính văn phòng, quản trị nhân sự, quản trị văn phòng, quản lý, soạn thảo văn bản hay làm thư ký, trợ lý...
+[398 Normal] • Biên dịch, xuất bản: Làm công tác biên tập, biên dịch sách giáo khoa, sách tham khảo, truyện tranh, thơ, văn... tại những công ty phát hành sách, truyện. Sáng tác trong lĩnh vực văn học nghệ thuật: sáng tác văn, thơ, tham gia phê bình văn học, viết lời bình cho truyện.
+[399 Normal] • Truyền thông Marketing: Tham gia các hoạt động ngoại giao, đàm phán, quảng cáo, tiếp thị...
+[400 Normal] • Quản lý nhà nước: Tham gia đề xuất, lên kế hoạch ý tưởng về chính sách văn học, văn hóa, chính sách dân tộc, chính sách bảo tồn ngôn ngữ và văn hóa dân tộc.
+[401 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[402 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[403 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[404 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[405 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[406 Normal] • Mạng lưới gần 80 cơ quan, doanh nghiệp đã ký kết thỏa thuận hợp tác.
+[407 Normal] • Tòa soạn báo Bình Định, Báo Lao động, Báo Pháp luật và Đời sống, Báo Tuổi trẻ, Báo Thanh Niên, Báo Gia Lai; Đài phát thanh và truyền hình Bình Định và nhiều cơ quan báo chí khác.
+[408 Normal] 20. KINH TẾ
+[409 Normal] • Thời gian đào tạo: 4 năm
+[410 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[411 Normal] • Bằng tốt nghiệp: Cử nhân Kinh tế (Chuyên ngành Kinh tế đầu tư, Kinh tế phát triển)
+[412 Normal] GIỚI THIỆU
+[413 Normal] Ngành Kinh tế đào tạo sinh viên có kiến thức về kinh tế ở tầm vĩ mô và vi mô; có phẩm chất chính trị, đạo đức và sức khoẻ tốt; nắm vững những kiến thức cơ bản về kinh tế - xã hội, kinh doanh, kế hoạch và đầu tư; có năng lực nghiên cứu, hoạch định chính sách và giải quyết các vấn đề chuyên môn trong lĩnh vực kinh tế, quản lý và phát triển kinh tế - xã hội; có kỹ năng tin học, ngoại ngữ, giao tiếp kinh doanh, làm việc nhóm nhằm thích nghi với sự thay đổi nhanh chóng của môi trường kinh doanh và khả năng cần thiết cho mục tiêu học tập suốt đời. Sinh viên có thể đăng ký đào tạo ở 2 chuyên ngành sau:
+[414 Normal] • Kinh tế đầu tư: Là một lĩnh vực quan trọng trong kinh tế, tập trung nghiên cứu về cách tài nguyên được phân bổ và sử dụng hiệu quả trong các hoạt động đầu tư. Nghiên cứu các yếu tố ảnh hưởng đến quyết định đầu tư, tác động của các yếu tố kinh tế, chính trị và xã hội đến việc đầu tư, cũng như phân tích rủi ro và tiềm năng sinh lợi của các dự án đầu tư.
+[415 Normal] • Kinh tế phát triển: Là ngành khoa học kinh tế nghiên cứu về quá trình tăng trưởng và phát triển kinh tế, hướng tới các mục tiêu phát triển bền vững trong bối cảnh quốc tế hóa, toàn cầu hóa và biến đổi toàn cầu.
+[416 Normal] CƠ HỘI VIỆC LÀM
+[417 Normal] • Các Bộ, ngành Trung ương; Ủy ban nhân dân cấp tỉnh, thành phố trực thuộc Trung ương.
+[418 Normal] • Các Sở Kế hoạch và Đầu tư các tỉnh, thành phố, phòng Kế hoạch - Tài chính của các quận, huyện; UBND cấp huyện, xã; các doanh nghiệp.
+[419 Normal] • Các tổng công ty, công ty, ngân hàng, các cơ quan tư vấn dịch vụ đầu tư và các định chế phi ngân hàng hoặc các Viện nghiên cứu, các trường Đại học, Cao đẳng và Trung học chuyên nghiệp,...
+[420 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[421 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[422 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[423 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[424 Normal] • Sinh viên học tiếp các bậc Sau đại học.
+[425 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[426 Normal] • Mạng lưới gần 80 cơ quan, doanh nghiệp đã ký kết thỏa thuận hợp tác.
+[427 Normal] • Đại học Kinh tế Quốc dân, Đại học Kinh tế TP. Hồ Chí Minh, Đại học Kinh tế - Đại học Đà Nẵng, các Sở, Ngành các tỉnh, thành phố, huyện, xã, các tập đoàn kinh tế, các ngân hàng, các tổ chức tài chính, bảo hiểm và các doanh nghiệp trên cả nước.
+[428 Normal] 21. QUẢN LÝ NHÀ NƯỚC
+[429 Normal] • Thời gian đào tạo: 4 năm
+[430 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[431 Normal] • Bằng tốt nghiệp: Cử nhân Quản lý nhà nước
+[432 Normal] GIỚI THIỆU
+[433 Normal] • Ngành Quản lý nhà nước là một ngành học về những thủ tục hành chính nhà nước, nghiên cứu một cách tổng quát nhất về những vấn đề liên quan đến thủ tục hành chính, về tư tưởng của Nhà nước trong các hoạt động chính trị - xã hội.
+[434 Normal] • Chương trình đào tạo ngành Quản lý Nhà nước cung cấp cho sinh viên những kiến thức cơ bản về quản lý, kiến thức chuyên sâu về quản lý hành chính nhà nước và có khả năng thực hiện được các công việc quản lý hành chính thuộc khu vực công hoặc khu vực tư.
+[435 Normal] CƠ HỘI VIỆC LÀM
+[436 Normal] • Làm cán bộ quản lý, chuyên viên hành chính, cán bộ hành chính văn phòng, thư ký tổng hợp, chuyên viên văn phòng, cán bộ văn thư – lưu trữ các cơ quan, tổ chức và doanh nghiệp thuộc khu vực công và khu vực tư.
+[437 Normal] • Công chức, viên chức làm việc trong các cơ quan chuyên môn quản lý nhà nước (ban, ngành, sở, phòng, trung tâm...), cơ quan, đơn vị hành chính, sự nghiệp các cấp.
+[438 Normal] • Công chức, viên chức làm việc trong hệ thống chính trị, các cơ quan Đảng, đoàn thể, tổ chức chính trị - xã hội, lực lượng vũ trang.
+[439 Normal] • Làm việc ở Bộ phận tham mưu, tổng hợp; trợ lý cho các cấp lãnh đạo, quản lý cho các cơ quan, tổ chức tham mưu hoạch định chiến lược, chính sách của Đảng và Nhà nước.
+[440 Normal] • Làm công tác giảng dạy, nghiên cứu viên về khoa học Hành chính, khoa học Quản lý ở Trường Đại học, Trường Cao đẳng, Trường Chính trị, các Trung tâm và Viện nghiên cứu.
+[441 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[442 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[443 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[444 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[445 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[446 Normal] • Mạng lưới gần 80 cơ quan, doanh nghiệp đã ký kết thỏa thuận hợp tác.
+[447 Normal] • Học viện Hành chính Quốc gia, Học viện Báo chí và Tuyên truyền; Đại học Kinh tế - Đại học Đà Nẵng,...
+[448 Normal] 22. TÂM LÝ HỌC GIÁO DỤC
+[449 Normal] • Thời gian đào tạo: 4 năm
+[450 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[451 Normal] • Bằng tốt nghiệp: Cử nhân Tâm lý học giáo dục
+[452 Normal] GIỚI THIỆU
+[453 Normal] • Tâm lý học là một bộ môn học thuật thuộc khoa học xã hội, tìm hiểu về các cá nhân và nhóm bằng cách thiết lập những nguyên tắc chung và nghiên cứu những trường hợp cụ thể. Ngành Tâm lý học nghiên cứu việc xử lý thông tin và biểu hiện hành vi ở con người, làm rõ bản chất của con người bằng cách đi sâu vào mọi ngõ ngách của đời sống, từ kinh tế, chính trị, xã hội cho đến văn hóa, giáo dục, y học, triết học...
+[454 Normal] • Tâm lý học giáo dục là ngành học nghiên cứu về cách mà con người học được từ môi trường giáo dục xung quanh. Ngành học này liên quan đến những phương pháp học khác nhau, thường tập trung vào những đối tượng người học có nhu cầu đặc biệt như trẻ em có năng khiếu và người khuyết tật về thể chất hay tinh thần.
+[455 Normal] • Ngành Tâm lý học giáo dục được đánh giá là ngành học có nhiều triển vọng nghề nghiệp trong tương lai, bởi đây là lĩnh vực đang nhận được nhiều sự quan tâm của xã hội.
+[456 Normal] CƠ HỘI VIỆC LÀM
+[457 Normal] • Tham vấn học đường, làm công tác hướng nghiệp tại các trường phổ thông và các cơ sở giáo dục.
+[458 Normal] • Đánh giá tâm lý và can thiệp một số rối loạn tâm lý trong các trung tâm can thiệp tâm lý, bệnh viện, viện sức khỏe tâm thần.
+[459 Normal] • Cán bộ nghiên cứu tại các cơ quan đoàn thể, các tổ chức chính trị - xã hội...
+[460 Normal] • Tham gia các dự án chăm sóc sức khỏe tâm thần, phát triển cộng đồng của các tổ chức trong và ngoài nước.
+[461 Normal] • Giảng dạy Tâm lý học, Kỹ năng sống và một số chuyên đề có liên quan tại các trường đại học, cao đẳng, các trường trung học chuyên nghiệp và trường phổ thông.
+[462 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[463 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[464 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[465 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[466 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[467 Normal] • Các trường Tiểu học, trung học khu vực Miền Trung - Tây Nguyên và Thành phố Hồ Chí Minh.
+[468 Normal] • Các bệnh viện trong khu vực Miền Trung - Tây Nguyên và Thành phố Hồ Chí Minh.
+[469 Normal] 23. ĐÔNG PHƯƠNG HỌC (CHUYÊN NGÀNH NHẬT BẢN HỌC, TRUNG QUỐC HỌC, HÀN QUỐC HỌC)
+[470 Normal] • Thời gian đào tạo: 4 năm
+[471 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[472 Normal] • Bằng tốt nghiệp: Cử nhân Đông phương học (kèm theo hướng chuyên ngành sinh viên chọn học như: Nhật Bản học, Trung Quốc học, Hàn Quốc học).
+[473 Normal] GIỚI THIỆU
+[474 Normal] • Đông phương học là ngành học tìm hiểu về lịch sử, địa lý, kinh tế, chính trị, ngôn ngữ, văn hóa... các nước phương Đông. Với những bạn có thiên hướng về ngành xã hội, muốn tìm tòi, khám phá và nghiên cứu những điều mới mẻ từ các quốc gia thì Đông phương học chính là một lựa chọn vô cùng phù hợp.
+[475 Normal] • Theo học ngành Đông phương học, bạn sẽ được cung cấp những tri thức, hiểu biết đặc sắc về những nền văn hóa lớn như Nhật Bản, Hàn Quốc, Trung Quốc, khu vực Đông Á, Đông Nam Á... Song song với việc học ngôn ngữ, sinh viên cũng sẽ lĩnh hội những nền tảng căn bản thông qua những môn học thú vị như cơ sở văn hóa Việt Nam, xã hội học, lịch sử văn minh thế giới...
+[476 Normal] CƠ HỘI VIỆC LÀM
+[477 Normal] • Nghiên cứu viên, chuyên viên tư vấn, thư ký tại các cơ quan Nhà nước như Bộ Công Thương, Sở Ngoại vụ và tại các Doanh nghiệp đầu tư trực tiếp từ các nước: Nhật Bản, Hàn Quốc, Trung Quốc, Đài Loan, Hồng Kông, Ấn Độ... hoặc làm quản lý các nhóm lao động xuất khẩu đến các nước trên.
+[478 Normal] • Các viện nghiên cứu khoa học xã hội, các cơ quan thông tấn báo chí, các đài phát thanh - truyền hình trung ương lẫn địa phương.
+[479 Normal] • Các công ty du lịch – lữ hành, các doanh nghiệp tư nhân và nước ngoài có trụ sở đặt tại Việt Nam với những vị trí như biên phiên dịch, admin, thư ký, trợ lý, hướng dẫn viên...
+[480 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[481 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[482 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[483 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[484 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[485 Normal] • Sở Ngoại vụ các tỉnh Nam Trung Bộ và các Doanh nghiệp đầu tư trực tiếp từ các nước Nhật Bản, Hàn Quốc, Ấn Độ, Trung Quốc và các lãnh thổ Đài Loan, Hồng Kông... trên địa bàn các tỉnh Nam Trung Bộ.
+[486 Normal] • Các cơ quan, doanh nghiệp trong và ngoài nước đã ký kết thỏa thuận hợp tác với Nhà trường: J-Test Việt Nam, Công ty TNHH Sinh hóa Minh Dương Việt Nam, Công ty TNHH Du lịch Trung Hội - Resort Crown Retreat Quy Nhơn, Công ty cổ phần FLC Quy Nhơn Beach & Golf Resort, Hiệp hội Doanh nghiệp Hàn Quốc VKBIA...
+[487 Normal] 24. VIỆT NAM HỌC (CHUYÊN NGÀNH VĂN HÓA DU LỊCH)
+[488 Normal] • Thời gian đào tạo: 4 năm
+[489 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[490 Normal] • Bằng tốt nghiệp: Cử nhân Việt Nam học
+[491 Normal] GIỚI THIỆU
+[492 Normal] • Ngành Việt Nam học là ngành khoa học chuyên nghiên cứu về đất nước và con người Việt Nam từ những thành tố văn hóa, lịch sử, địa lí, phong tục tập quán, ngôn ngữ, văn học... để qua đó làm rõ những nét riêng độc đáo, nghiên cứu toàn diện và đa dạng những lĩnh vực của một quốc gia trên góc nhìn văn hóa.
+[493 Normal] • Ngành Việt Nam học có sứ mạng cao cả trong việc truyền bá văn hóa Việt Nam ra thế giới, làm cầu nối văn hóa giữa Việt Nam và bạn bè thế giới, góp phần quan trọng trong quá trình hội nhập quốc tế của Việt Nam trong bối cảnh đương đại.
+[494 Normal] • Sinh viên ngành Việt Nam học được đào tạo 2 khối lượng kiến thức chủ yếu: Nghiên cứu và giảng dạy văn hóa, ngôn ngữ Việt Nam và Nghiên cứu, hướng dẫn du lịch.
+[495 Normal] CƠ HỘI VIỆC LÀM
+[496 Normal] • Hướng dẫn viên nội địa hoặc nước ngoài.
+[497 Normal] • Điều hành các chương trình du lịch nội địa hoặc nước ngoài.
+[498 Normal] • Nhân viên ngoại giao tại các tổ chức quốc tế, cơ quan đại diện, văn phòng thương mại, các tổ chức chính phủ và phi chính phủ ở trong và ngoài nước Việt Nam.
+[499 Normal] • Công tác hành chính tại các cơ quan văn hóa, du lịch.
+[500 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[501 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp.
+[502 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, rèn luyện kỹ năng nghề nghiệp.
+[503 Normal] • Hỗ trợ sinh viên môi trường thực tập và tuyển dụng việc làm sau khi tốt nghiệp.
+[504 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[505 Normal] • Mạng lưới gần 80 cơ quan doanh nghiệp đã ký kết thỏa thuận hợp tác.
+[506 Normal] • Công ty Du lịch Vietravel, Công ty Du lịch Trung Anh, Công ty Bidimex Tourist Quy Nhơn,... và các sở văn hóa, du lịch, Trung tâm văn hóa của các tỉnh thuộc địa bàn Nam Trung Bộ và Tây Nguyên.
+[507 Normal] 25. QUẢN TRỊ KINH DOANH
+[508 Normal] • Đơn vị: Khoa Tài chính - Ngân hàng & Quản trị Kinh doanh (FBA)
+[509 Normal] • Thời gian đào tạo: 4 năm
+[510 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[511 Normal] • Bằng tốt nghiệp: Cử nhân
+[512 Normal] GIỚI THIỆU
+[513 Normal] • Quản trị kinh doanh là ngành học chuyên về thực hiện các hành vi quản trị quá trình kinh doanh để duy trì, phát triển công việc kinh doanh của doanh nghiệp, bao gồm việc cân nhắc, tạo ra hệ thống, quy trình và tối đa hóa "hiệu suất", "quản lý hoạt động kinh doanh" bằng quá trình tư duy và ra quyết định của nhà quản lý.
+[514 Normal] • Quản trị kinh doanh chia thành nhiều ngành chuyên sâu như: quản trị nhân sự, quản trị kinh doanh tổng hợp, quản trị kinh doanh quốc tế, thương mại, quản trị truyền thông, marketing,... Quản trị kinh doanh là 1 ngành học phổ biến, giúp người học có cái nhìn bao quát về các hoạt động kinh doanh, quản lý doanh nghiệp, giúp mở rộng con đường sự nghiệp vì tính đa dạng và khả năng thích ứng với nhiều vị trí công việc khác nhau.
+[515 Normal] • Sinh viên sẽ được cung cấp kiến thức nền tảng, chuyên sâu về quản trị doanh nghiệp, quản trị marketing, quản trị tài chính – ngân hàng để điều hành và quản lý doanh nghiệp.
+[516 Normal] CƠ HỘI VIỆC LÀM
+[517 Normal] • Làm việc trong các lĩnh vực như: quản trị nguồn nhân lực, quản trị tài chính, quản lý sản xuất, quản trị Marketing, quản trị chuỗi cung ứng, quản trị chiến lược,...
+[518 Normal] • Làm việc tại các vị trí như: chuyên viên tại phòng kinh doanh, phòng kế hoạch, phòng marketing, phòng hành chính nhân sự, chuyên viên xây dựng chiến lược, phát triển thị trường và tìm kiếm đối tác tại các công ty dịch vụ, sản xuất, các công ty xuất nhập khẩu hay các công ty/tập đoàn đa quốc gia.
+[519 Normal] • Mở cửa hàng kinh doanh riêng, mở đại lý hoặc làm đại diện phân phối sản phẩm cho các doanh nghiệp trong và ngoài nước.
+[520 Normal] • Giảng viên, nghiên cứu viên tại các trường Đại học, Cao đẳng – Trung cấp, viện nghiên cứu về quản trị kinh doanh.
+[521 Normal] • Có cơ hội thăng tiến trở thành nhóm trưởng, tổ trưởng, trưởng phòng, Giám đốc điều hành, Giám đốc tài chính tại các tập đoàn, công ty, tự thành lập và điều hành công ty riêng.
+[522 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[523 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[524 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[525 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[526 Normal] • Các đơn vị hợp tác đào tạo: ACCA Việt Nam, VAA Việt Nam, VACPA, Trường ĐH Kinh tế - Đại học Quốc gia Hà Nội, Trường ĐH Kinh tế Quốc dân, ĐH Kinh tế Thành phố Hồ Chí Minh, Trường Đại học Kinh tế - Đại học Đà Nẵng.
+[527 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Hội Doanh nhân trẻ tỉnh Bình Định, Công ty Cổ phần Chăn nuôi C.P. Việt Nam; Văn phòng điều hành Hoa Sen tại Miền Trung; Ngân hàng TMCP Kiên Long (CN Bình Định); Công ty CP Thép Hòa Phát Dung Quất; Công ty Maersk Line Việt Nam; Công ty CP Tập đoàn Tài chính Đặng Nam; Công ty CP Vinpearl; Ngân hàng TMCP Quân đội (CN Bình Định); Công ty cổ phần FLC Quy Nhơn Beach & Golf Resort; Công ty TNHH Du lịch Trung Hội - Resort Crown Retreat Quy Nhơn; Công ty CP Nông nghiệp Trường Hải (THACO AGRI); Công ty TNHH HKT Global.
+[528 Normal] 26. TÀI CHÍNH - NGÂN HÀNG
+[529 Normal] • Đơn vị: Khoa Tài chính - Ngân hàng & Quản trị Kinh doanh (FBA)
+[530 Normal] • Thời gian đào tạo: 4 năm
+[531 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[532 Normal] • Bằng tốt nghiệp: Cử nhân
+[533 Normal] GIỚI THIỆU
+[534 Normal] • Tài chính - Ngân hàng là một lĩnh vực quan trọng của nền kinh tế mà nó tập trung vào việc quản lý tiền bạc và tài sản. Ngành Tài chính - Ngân hàng không chỉ đóng vai trò quan trọng trong việc cung cấp dịch vụ cho cá nhân và doanh nghiệp mà còn ảnh hưởng đến sự phát triển và ổn định của nền kinh tế toàn cầu. Ngành Tài chính - Ngân hàng cung cấp các dịch vụ tài chính như cho vay, tiết kiệm, đầu tư, quản lý rủi ro, thanh toán và các dịch vụ khác liên quan đến tiền bạc và tài sản. Hoạt động chính của ngành Tài chính - Ngân hàng là kinh doanh tiền tệ và cũng giống như các tổ chức kinh doanh hoạt động khác, ngân hàng tìm kiếm lợi nhuận thông qua chênh lệch giữa lãi suất cho vay, đầu tư với lãi suất huy động.
+[535 Normal] CƠ HỘI VIỆC LÀM
+[536 Normal] • Làm việc tại các bộ phận tài chính, kế toán của các doanh nghiệp; chuyên viên các ngân hàng thương mại, ngân hàng Nhà nước; các công ty tài chính, công ty bảo hiểm, công ty chứng khoán, công ty cho thuê tài chính và các quỹ đầu tư trong và ngoài nước.
+[537 Normal] • Chuyên viên của phòng Tài chính, Sở Tài chính; cơ quan Thuế của Nhà nước; Kho bạc Nhà nước các cấp; cơ quan Hải quan; phụ trách bộ phận Tài chính - kế toán của các đơn vị hành chính sự nghiệp các cấp.
+[538 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm liên quan đến lĩnh vực tài chính, ngân hàng.
+[539 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[540 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[541 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[542 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[543 Normal] • Các đơn vị hợp tác đào tạo: ACCA Việt Nam, VAA Việt Nam, VACPA, Trường ĐH Kinh tế - Đại học Quốc gia Hà Nội, Trường ĐH Kinh tế Quốc dân, ĐH Kinh tế Thành phố Hồ Chí Minh, Trường Đại học Kinh tế - Đại học Đà Nẵng.
+[544 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Hội Doanh nhân trẻ tỉnh Bình Định, Công ty Cổ phần Chăn nuôi C.P. Việt Nam; Văn phòng điều hành Hoa Sen tại Miền Trung; Ngân hàng TMCP Kiên Long (CN Bình Định); Công ty CP Thép Hòa Phát Dung Quất; Công ty Maersk Line Việt Nam; Công ty CP Tập đoàn Tài chính Đặng Nam; Công ty CP Vinpearl; Ngân hàng TMCP Quân đội (CN Bình Định); Công ty cổ phần FLC Quy Nhơn Beach & Golf Resort; Công ty TNHH Du lịch Trung Hội - Resort Crown Retreat Quy Nhơn; Công ty CP Nông nghiệp Trường Hải (THACO AGRI); Công ty TNHH HKT Global.
+[545 Normal] 27. KẾ TOÁN
+[546 Normal] • Thời gian đào tạo: 4 năm
+[547 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[548 Normal] • Bằng tốt nghiệp: Cử nhân
+[549 Normal] GIỚI THIỆU
+[550 Normal] • Kế toán là ngành thực hiện quá trình thu thập, xử lý và cung cấp thông tin về tài sản, nguồn hình thành tài sản và sự vận động của tài sản trong các tổ chức. Kế toán được vận dụng không chỉ trong các doanh nghiệp mà còn trong các tổ chức phi lợi nhuận, các tổ chức của chính phủ và nhiều tổ chức khác.
+[551 Normal] CƠ HỘI VIỆC LÀM
+[552 Normal] • Làm việc tại các bộ phận kế toán, tài chính, kiểm toán trong các loại hình doanh nghiệp của nền kinh tế, các tập đoàn, các công ty đa quốc gia, các tổ chức phi lợi nhuận, tổ chức xã hội, tổ chức phi chính phủ.
+[553 Normal] • Khi được trang bị chứng chỉ nghề nghiệp, có thể tự tạo lập công ty dịch vụ kế toán, kiểm toán để tìm kiếm cơ hội kinh doanh riêng cho bản thân.
+[554 Normal] • Khi được trang bị các chứng chỉ nghề nghiệp quốc tế, có thể phát triển nghề nghiệp theo hướng đủ năng lực để đáp ứng vị trí tư vấn phân tích tài chính, vị trí giám đốc tài chính (CFO) của các tập đoàn, các công ty đa quốc gia.
+[555 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến lĩnh vực kiểm toán.
+[556 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm liên quan đến lĩnh vực kế toán, kiểm toán.
+[557 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[558 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[559 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[560 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[561 Normal] • Các đơn vị hợp tác đào tạo: ACCA Việt Nam, VAA Việt Nam, VACPA, Trường ĐH Kinh tế - Đại học Quốc gia Hà Nội, Trường ĐH Kinh tế Quốc dân, ĐH Kinh tế Thành phố Hồ Chí Minh, Trường Đại học Kinh tế - Đại học Đà Nẵng.
+[562 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Hội Doanh nhân trẻ tỉnh Bình Định, các Sở, Ngành các tỉnh, thành phố, các tập đoàn kinh tế, các ngân hàng, các tổ chức tài chính, bảo hiểm và các doanh nghiệp trên cả nước,...
+[563 Normal] 28. KẾ TOÁN (ĐỊNH HƯỚNG ACCA)
+[564 Normal] • Thời gian đào tạo: 4 năm
+[565 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[566 Normal] • Bằng tốt nghiệp: Cử nhân
+[567 Normal] GIỚI THIỆU
+[568 Normal] • Kế toán là ngành thực hiện quá trình thu thập, xử lý và cung cấp thông tin về tài sản, nguồn hình thành tài sản và sự vận động của tài sản trong các tổ chức. Kế toán được vận dụng không chỉ trong các doanh nghiệp mà còn trong các tổ chức phi lợi nhuận, các tổ chức của chính phủ và nhiều tổ chức khác.
+[569 Normal] • Đào tạo Cử nhân Kế toán (chất lượng cao) có năng lực về chuyên môn để thực hiện các công tác kế toán, kiểm soát, kiểm toán, phân tích tài chính, dự toán và phân tích ngân sách trong các đơn vị, tổ chức một cách độc lập; có phẩm chất đạo đức tốt, có ý thức tuân thủ đạo đức nghề nghiệp, có tính kỷ luật và tính chuyên nghiệp cao, có đầy đủ các kỹ năng làm việc cần thiết (kỹ năng làm việc theo nhóm, kỹ năng giao tiếp kinh doanh, kỹ năng thuyết trình,...) để thích nghi với sự thay đổi nhanh chóng của môi trường kinh doanh, môi trường làm việc đa văn hoá; thành thạo tiếng Anh và các phần mềm kế toán, công cụ kế toán để làm việc chuyên môn kế toán, kiểm toán; có ý thức không ngừng học tập để nâng cao trình độ và năng lực chuyên môn. Cử nhân Kế toán của chương trình chất lượng cao có đủ năng lực và các kỹ năng nghề nghiệp để làm việc tại các tập đoàn, các tổng công ty, các công ty đa quốc gia trong và ngoài nước.
+[570 Normal] CƠ HỘI VIỆC LÀM
+[571 Normal] • Làm việc tại các bộ phận kế toán, tài chính, kiểm toán trong các loại hình doanh nghiệp của nền kinh tế, các tập đoàn, các công ty đa quốc gia, các tổ chức phi lợi nhuận, tổ chức xã hội, tổ chức phi chính phủ.
+[572 Normal] • Khi được trang bị chứng chỉ nghề nghiệp, có thể tự tạo lập công ty dịch vụ kế toán, kiểm toán để tìm kiếm cơ hội kinh doanh riêng cho bản thân.
+[573 Normal] • Khi được trang bị các chứng chỉ nghề nghiệp quốc tế, có thể phát triển nghề nghiệp theo hướng đủ năng lực để đáp ứng vị trí tư vấn phân tích tài chính, vị trí giám đốc tài chính (CFO) của các tập đoàn, các công ty đa quốc gia.
+[574 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến lĩnh vực kiểm toán.
+[575 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm liên quan đến lĩnh vực kế toán, kiểm toán.
+[576 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[577 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[578 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[579 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[580 Normal] • Các đơn vị hợp tác đào tạo: ACCA Việt Nam, VAA Việt Nam, VACPA, Trường ĐH Kinh tế - Đại học Quốc gia Hà Nội, Trường ĐH Kinh tế Quốc dân, ĐH Kinh tế Thành phố Hồ Chí Minh, Trường Đại học Kinh tế - Đại học Đà Nẵng.
+[581 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Hội Doanh nhân trẻ tỉnh Bình Định, các Sở, Ngành các tỉnh, thành phố, các tập đoàn kinh tế, các ngân hàng, các tổ chức tài chính, bảo hiểm và các doanh nghiệp trên cả nước,...
+[582 Normal] 29. KIỂM TOÁN
+[583 Normal] • Thời gian đào tạo: 4 năm
+[584 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[585 Normal] • Bằng tốt nghiệp: Cử nhân
+[586 Normal] GIỚI THIỆU
+[587 Normal] • Tại Việt Nam, nghề kiểm toán mới chỉ được nhắc đến từ đầu thập niên 1990. Ngành Kiểm toán hiện nay đang là một ngành học rất hot ở nước ta, bởi cơ hội nghề nghiệp vô cùng lớn và có nhiều tiềm năng phát triển trong tương lai. Nếu kế toán cung cấp các thông tin về tình hình tài chính của tổ chức thông qua báo cáo tài chính thì kiểm toán là quá trình thu thập và đánh giá bằng chứng về thông tin tài chính (do kế toán cung cấp) nhằm xác minh và bày tỏ ý kiến về mức độ phù hợp của các thông tin này với các quy định, chuẩn mực đã được thiết lập.
+[588 Normal] • Xu thế toàn cầu hóa tạo cơ hội cho các doanh nghiệp phát triển thì nhu cầu về ngành nghề kiểm toán cũng tăng lên không ngừng. Đầu tư xuyên quốc gia và mở cửa các thị trường đến đâu thì kiểm toán sẽ mở rộng đến đó. Kiểm toán còn là bước khởi đầu của những nhà lãnh đạo tài chính và kinh doanh trong quá trình làm việc trong một môi trường năng động và đòi hỏi hiệu quả cao. Vì thế, cơ hội việc làm của nghề kiểm toán rất rộng với mức thu nhập hấp dẫn.
+[589 Normal] CƠ HỘI VIỆC LÀM
+[590 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến lĩnh vực kiểm toán.
+[591 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm liên quan đến lĩnh vực kế toán, kiểm toán.
+[592 Normal] • Làm việc Kiểm toán viên độc lập tại các công ty kiểm toán độc lập.
+[593 Normal] • Kiểm toán viên Nhà nước tại cơ quan kiểm toán nhà nước với tư cách là một tổ chức cơ quan hành chính tương đương Bộ có quyền kiểm soát các Bộ khác trong các hoạt động đầu tư xây dựng cơ bản, các dự án vay nợ, sử dụng ngân sách nhà nước...
+[594 Normal] • Kiểm toán viên nội bộ: làm việc trong bộ phận kiểm toán trực thuộc một công ty, tổ chức, cơ quan...
+[595 Normal] • Thành viên Ban kiểm soát, bộ phận kiểm soát nội bộ của công ty, tổ chức.
+[596 Normal] • Tư vấn các dịch vụ về kế toán - kiểm toán – tài chính – thuế cho các công ty, doanh nghiệp cần đến hoạt động kiểm toán.
+[597 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[598 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[599 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[600 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[601 Normal] • Các đơn vị hợp tác đào tạo: ACCA Việt Nam, VAA Việt Nam, VACPA, Trường ĐH Kinh tế - Đại học Quốc gia Hà Nội, Trường ĐH Kinh tế Quốc dân, ĐH Kinh tế Thành phố Hồ Chí Minh, Trường Đại học Kinh tế - Đại học Đà Nẵng.
+[602 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Hội Doanh nhân trẻ tỉnh Bình Định, các Sở, Ngành các tỉnh, thành phố, các tập đoàn kinh tế, các ngân hàng, các tổ chức tài chính, bảo hiểm và các doanh nghiệp trên cả nước,...
+[603 Normal] 30. LUẬT
+[604 Normal] • Thời gian đào tạo: 4 năm
+[605 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[606 Normal] • Bằng tốt nghiệp: Cử nhân
+[607 Normal] GIỚI THIỆU
+[608 Normal] • Luật là lĩnh vực nghiên cứu và áp dụng các quy tắc, nguyên tắc, và hệ thống luật để điều chỉnh hành vi và quan hệ trong xã hội. Ngành Luật bao gồm việc nghiên cứu về các quy định pháp luật, pháp lý và đưa ra giải thích, cũng như tham gia vào quá trình tạo lập và thay đổi luật pháp. Ngành Luật rộng lớn và phong phú, với nhiều chuyên ngành như luật hình sự, luật doanh nghiệp, luật lao động, luật gia đình, và nhiều lĩnh vực khác. Luật quốc tế cũng đóng một vai trò quan trọng, đặc biệt trong bối cảnh toàn cầu hóa ngày nay.
+[609 Normal] • Luật giúp duy trì trật tự xã hội, bảo vệ quyền lợi và tự do của cá nhân, và cung cấp khung pháp lý cho quá trình giải quyết tranh chấp. Các chuyên gia luật, bao gồm luật sư và nhà nghiên cứu luật, thường phải hiểu rõ về quy định và nguyên tắc pháp luật để tư vấn, đại diện cho khách hàng, và thực hiện công việc pháp lý.
+[610 Normal] CƠ HỘI VIỆC LÀM
+[611 Normal] • Làm việc tại Tòa án nhân dân, Viện Kiểm sát nhân dân các cấp; Luật sư tư vấn hoặc tranh tụng; Quản lý hoặc cố vấn pháp lý trong các doanh nghiệp, tập đoàn, công ty, tổ chức trong nước, quốc tế.
+[612 Normal] • Làm việc tại các cơ quan hành chính Nhà nước ở trung ương và địa phương như: các Bộ, cơ quan ngang bộ, sở, cơ quan thanh tra Nhà nước các cấp; Hội đồng nhân dân các cấp, các tổ chức chính trị - xã hội như Mặt trận Tổ quốc Việt Nam và các tổ chức thành viên trực thuộc, các cơ quan Đảng, lực lượng vũ trang, các đơn vị sự nghiệp công lập, doanh nghiệp nhà nước (như các đơn vị thanh tra, pháp chế, tổ chức nhân sự...).
+[613 Normal] • Có khả năng tự khởi nghiệp, tự hành nghề: Luật sư; Thành lập công ty luật hoặc văn phòng luật sư; Công chứng viên,...
+[614 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm nghiên cứu pháp luật.
+[615 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[616 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[617 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[618 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[619 Normal] • Các đơn vị hợp tác đào tạo: Viện Kiểm sát nhân dân tỉnh Bình Định, Tòa án nhân dân tỉnh Bình Định, Trường Đại học Luật Hà Nội, Trường Đại học Luật TP. Hồ Chí Minh, Trường Đại học Luật – Đại học Huế,...
+[620 Normal] • Các đối tác tuyển dụng: Mạng lưới đối tác các cơ quan, doanh nghiệp; Các công ty Luật: Công ty Luật TNHH LDL Chi nhánh Gia Lai, Công ty Luật Hợp danh Sài Gòn, Công ty Luật TNHH Đại Trí, Công ty Luật TNHH MTV Nam Luật...
+[621 Normal] 31. HÓA HỌC (HÓA DƯỢC, HÓA MỸ PHẨM)
+[622 Normal] • Thời gian đào tạo: 4 năm
+[623 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[624 Normal] • Bằng tốt nghiệp: Cử nhân
+[625 Normal] GIỚI THIỆU
+[626 Normal] • Ngành Hóa dược là ngành khoa học dựa trên nền tảng là hóa học để từ đó nghiên cứu các vấn đề của các ngành khoa học sinh học, y học và dược học, chuyên nghiên cứu vấn đề về thiết kế, tổng hợp dược. Trong đó kỹ thuật Hóa dược đóng vai trò quan trọng trong việc cải thiện sức khỏe và chất lượng cuộc sống thông qua việc tiếp tục phát triển, sản xuất quy mô lớn, đóng gói và phân phối các sản phẩm lĩnh vực sức khỏe.
+[627 Normal] • Ngành Hóa mỹ phẩm là ngành chuyên nghiên cứu, điều chế các chất, hợp chất hóa học để tạo ra mỹ phẩm hoặc dược chất phù hợp với mục đích sử dụng của người tiêu dùng, đáp ứng thị hiếu chăm sóc sắc đẹp và làm sạch cơ thể con người.
+[628 Normal] CƠ HỘI VIỆC LÀM
+[629 Normal] Sinh viên tốt nghiệp từ ngành Hóa học, chuyên ngành Hóa dược/Hóa mỹ phẩm có thể làm việc ở các vị trí liên quan đến:
+[630 Normal] • Phân tích, kiểm nghiệm, đảm bảo và quản lý chất lượng sản phẩm (QA/QC) về dược phẩm/mỹ phẩm.
+[631 Normal] • Nghiên cứu và phát triển các sản phẩm về dược và mỹ phẩm.
+[632 Normal] • Sản xuất dược phẩm, mỹ phẩm.
+[633 Normal] • Kinh doanh dược phẩm, mỹ phẩm.
+[634 Normal] • Giảng dạy ở các trường đại học và cao đẳng.
+[635 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[636 Normal] • Học bổng tân sinh viên, khuyến học của Khoa Khoa học Tự nhiên.
+[637 Normal] • Học bổng Vallet, Kovalevskaia, Hóa lượng tử; nghiên cứu khoa học sinh viên.
+[638 Normal] • Học bổng các công ty Đạm Cà Mau, Đạm Phú Mỹ, PJICO,...
+[639 Normal] • Học bổng trao đổi sinh viên quốc tế Erasmus, nghị định thư.
+[640 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[641 Normal] • Công ty cổ phần công nghệ Nanomedicine Cao Gia, Công ty Cổ phần Phát triển Công nghệ xanh Nature, Viện mỹ phẩm thiên nhiên (Hội khoa học các sản phẩm thiên nhiên Việt Nam), Hiệp hội Tinh dầu Hương liệu Mỹ phẩm Việt Nam, Công ty CP Dược - Trang thiết bị y tế Bình Định (Bidiphar), Công ty cổ phần Nông nghiệp Trường Hải, Công ty CP Bia Sài Gòn - Miền Trung tại Quy Nhơn; Công ty TNHH Sinh Hóa Minh Dương; Nhà máy sữa Vinamilk Bình Định, Viện Sốt rét - Ký sinh trùng – Côn trùng Quy Nhơn, Tập đoàn Mocha,...
+[642 Normal] 32. TOÁN ỨNG DỤNG
+[643 Normal] • Thời gian đào tạo: 4 năm
+[644 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[645 Normal] • Bằng tốt nghiệp: Cử nhân
+[646 Normal] GIỚI THIỆU
+[647 Normal] • Toán ứng dụng đóng góp những công cụ, phương pháp không thể thay thế để phân tích, tổng hợp, tìm giải pháp tối ưu trong các lĩnh vực kinh tế, tài chính, kỹ thuật và công nghệ.
+[648 Normal] • Ngành Toán ứng dụng đào tạo người học phương pháp tư duy chính xác, tư duy logic, tư duy thuật toán và cách tiếp cận các vấn đề thực tế một cách khoa học. Sinh viên ngành Toán ứng dụng được trang bị đầy đủ các kiến thức cơ bản và chuyên sâu về Toán học, Tin học, Khoa học máy tính và các lĩnh vực công nghệ liên quan để có thể làm việc ở nhiều ngành nghề khác nhau theo xu hướng nghề nghiệp của cuộc Cách mạng công nghiệp lần thứ tư.
+[649 Normal] CƠ HỘI VIỆC LÀM
+[650 Normal] • Chuyên viên phân tích, thống kê; chuyên viên dự báo, quản trị rủi ro, thẩm định đầu tư, định phí bảo hiểm; chuyên viên phần mềm, lập trình, phân tích hệ thống, tin học, Data & AI; nghiên cứu, ứng dụng và giảng dạy Toán học.
+[651 Normal] • Làm việc ở các trung tâm, viện nghiên cứu Toán học, Toán ứng dụng trong và ngoài nước.
+[652 Normal] • Giảng dạy môn Toán ở các trường đại học, cao đẳng và các trường THPT, THCS (sau khi hoàn thành chương trình bồi dưỡng nghiệp vụ sư phạm ngay tại Trường ĐH Quy Nhơn).
+[653 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[654 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[655 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[656 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[657 Normal] • Các đơn vị hợp tác đào tạo: Viện nghiên cứu Cao cấp về Toán (VIASM), Quỹ Đổi mới Sáng tạo Vingroup (VINIF), Viện Nghiên cứu Dữ liệu lớn (VNCDLLL), Học viện Công nghệ Bưu chính Viễn thông, Viện Toán học, Viện Hàn lâm Khoa học và Công nghệ Việt Nam, Phòng thí nghiệm Khoa học dữ liệu (thuộc VIASM), Khoa Toán - Tin Trường ĐH Khoa học Tự nhiên - ĐHQG TP. Hồ Chí Minh, Khoa Toán - Cơ - Tin học Trường ĐH Khoa học Tự nhiên - ĐHQG Hà Nội.
+[658 Normal] • Các đối tác tuyển dụng: Các công ty công nghệ: TMA Solutions, FPT Software, Fujinet Systems, Hưng Thịnh Innovation, Công ty Cổ phần NCCPLUS Việt Nam, Công ty LogiGear Việt Nam; Các ngân hàng: Vietcombank Bình Định, BIDV Bình Định,...; Đại học trực tuyến FUNiX (thuộc tập đoàn FPT), Công ty TNHH VTI Education.
+[659 Normal] 33. KHOA HỌC DỮ LIỆU
+[660 Normal] • Thời gian đào tạo: 4 năm
+[661 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[662 Normal] • Bằng tốt nghiệp: Cử nhân
+[663 Normal] GIỚI THIỆU
+[664 Normal] • Khoa học dữ liệu là một lĩnh vực nghiên cứu và ứng dụng các phương pháp, công cụ, và kỹ thuật để phân tích, hiểu, và rút ra thông tin từ dữ liệu. Nó kết hợp kiến thức từ các lĩnh vực như thống kê, toán học, máy học, và khoa học máy tính để giải quyết các vấn đề liên quan đến xử lý và phân tích dữ liệu lớn. Các ứng dụng của khoa học dữ liệu rất đa dạng, từ dự đoán xu hướng thị trường đến phân tích y tế và tìm kiếm giải pháp cho các vấn đề xã hội. Công việc trong lĩnh vực này thường đòi hỏi kỹ năng sâu rộng về dữ liệu và khả năng diễn đạt kết quả phân tích một cách rõ ràng để hỗ trợ quyết định trong doanh nghiệp và nghiên cứu.
+[665 Normal] CƠ HỘI VIỆC LÀM
+[666 Normal] • Chuyên viên phân tích dữ liệu, kỹ sư dữ liệu, nhà khoa học dữ liệu tại các công ty công nghệ, kinh doanh, tài chính, ngân hàng, thương mại điện tử.
+[667 Normal] • Làm việc ở các trung tâm, viện nghiên cứu Toán học, Khoa học dữ liệu trong và ngoài nước.
+[668 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[669 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[670 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[671 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[672 Normal] • Các đơn vị hợp tác đào tạo: Viện nghiên cứu Cao cấp về Toán (VIASM), Quỹ Đổi mới Sáng tạo Vingroup (VINIF), Viện Nghiên cứu Dữ liệu lớn (VNCDLLL), Học viện Công nghệ Bưu chính Viễn thông, Viện Toán học, Viện Hàn lâm Khoa học và Công nghệ Việt Nam, Phòng thí nghiệm Khoa học dữ liệu (thuộc VIASM), Khoa Toán - Tin Trường ĐH Khoa học Tự nhiên - ĐHQG TP. Hồ Chí Minh, Khoa Toán - Cơ - Tin học Trường ĐH Khoa học Tự nhiên - ĐHQG Hà Nội.
+[673 Normal] • Các đối tác tuyển dụng: Các công ty công nghệ: TMA Solutions, FPT Software, Fujinet Systems, Hưng Thịnh Innovation, Công ty Cổ phần NCCPLUS Việt Nam, Công ty LogiGear Việt Nam; Các ngân hàng: Vietcombank Bình Định, BIDV Bình Định,...; Đại học trực tuyến FUNiX (thuộc tập đoàn FPT), Công ty TNHH VTI Education, Hiệp hội Khoa học dữ liệu và Trí tuệ nhân tạo TP. Hồ Chí Minh (DatAI@SG).
+[674 Normal] 34. KHOA HỌC VẬT LIỆU (VẬT LÝ KỸ THUẬT)
+[675 Normal] • Đơn vị: Khoa Khoa học Tự nhiên (Faculty of Natural Sciences)
+[676 Normal] • Mã ngành: 7440122 (Lưu ý: Tương ứng định hướng Vật lý kỹ thuật / Khoa học vật liệu)
+[677 Normal] • Thời gian đào tạo: 4 năm
+[678 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[679 Normal] • Bằng tốt nghiệp: Cử nhân
+[680 Normal] GIỚI THIỆU
+[681 Normal] • Khoa học vật liệu là một lĩnh vực nghiên cứu chuyên sâu về cấu trúc, tính chất, và ứng dụng của các vật liệu. Ngành Khoa học vật liệu bao gồm việc nghiên cứu và phát triển các vật liệu mới, cũng như tối ưu hóa và cải tiến các vật liệu hiện có để đáp ứng các yêu cầu đặc biệt trong các ngành công nghiệp khác nhau.
+[682 Normal] • Ứng dụng của khoa học vật liệu rất rộng lớn và đa dạng, từ sản xuất vật liệu dẻo, kim loại, cho đến vật liệu thông minh có khả năng phản ứng và thích ứng với điều kiện môi trường. Các lĩnh vực như công nghệ thông tin, y tế, năng lượng tái tạo, và công nghiệp hàng không - vũ trụ đều phụ thuộc mạnh mẽ vào sự tiến bộ trong lĩnh vực này.
+[683 Normal] CƠ HỘI VIỆC LÀM
+[684 Normal] • Cán bộ nghiên cứu và phát triển sản phẩm mới (R&D); cán bộ quản lý; cán bộ kỹ thuật và phân tích chất lượng sản phẩm; chuyên gia về công nghệ; cán bộ thiết kế, chế tạo sản phẩm;... tại các Công ty, doanh nghiệp, tập đoàn liên quan đến Khoa học vật liệu, Vật liệu tiên tiến, Năng lượng tái tạo ở trong và ngoài nước, các công ty sơn, xi mạ, mỹ phẩm, dược phẩm, Công ty/Nhà máy năng lượng mặt trời, năng lượng gió, năng lượng hydro, pin nhiên liệu...
+[685 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh các lĩnh vực liên quan đến lĩnh vực khoa học vật liệu, vật liệu tiên tiến...
+[686 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Trường, Viện, Trung tâm về khoa học vật liệu, vật liệu tiên tiến, năng lượng tái tạo...
+[687 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[688 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ, học bổng hữu nghị Việt – Hàn...
+[689 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[690 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[691 Normal] • Các đơn vị hợp tác đào tạo: Trường KU Leuven (Vương quốc Bỉ); Trường Đại học Quốc gia Chungnam (Hàn Quốc); Trường Đại học Sư phạm Hà Nội; Trường ĐH Bách khoa - ĐHQG TP. Hồ Chí Minh; Trường ĐH Phenikaa; Trường ĐH Cần Thơ; Trung tâm Quốc tế Khoa học và Giáo dục liên ngành (ICISE), Trung tâm Khám phá Khoa học (ExploraScience Quy Nhon); Viện Đào tạo Quốc tế về Khoa học Vật liệu (ITIMS) và Viện Tiên tiến Khoa học và Công nghệ (AIST) thuộc ĐH Bách khoa Hà Nội; Viện Khoa học vật liệu, Học viện Khoa học và Công nghệ thuộc Viện Hàn lâm Khoa học và Công nghệ Việt Nam.
+[692 Normal] • Các đối tác tuyển dụng: Công ty TNHH TM XNK SONXI; Công ty CP Dược – Trang thiết bị y tế Bình Định; Công ty TNHH Điện Mặt trời Gia Khang, Nhà máy Năng lượng Mặt trời Phù Mỹ, Nhà máy Điện gió Nhơn Hội, các DN hội viên thuộc Hội Doanh nhân trẻ tỉnh Bình Định...
+[693 Normal] 35. KỸ THUẬT PHẦN MỀM
+[694 Normal] • Thời gian đào tạo: 4,5 năm
+[695 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[696 Normal] • Bằng tốt nghiệp: Kỹ sư
+[697 Normal] GIỚI THIỆU
+[698 Normal] • Ngành Kỹ thuật phần mềm là một trong năm ngành thuộc nhóm ngành Công nghệ thông tin. Chương trình đào tạo kỹ sư chính quy ngành Kỹ thuật phần mềm được xây dựng nhằm mục tiêu cung cấp cho người học những kiến thức liên quan đến quy trình phát triển phần mềm một cách chuyên nghiệp nhằm tạo ra sản phẩm phần mềm đạt chất lượng cao, đáp ứng được các yêu cầu về nghiên cứu phát triển và ứng dụng công nghệ thông tin của xã hội. Hệ đào tạo kỹ sư được bổ sung thêm nhiều kiến thức chuyên sâu và chú trọng vào thực tế và thực hành hơn so với hệ cử nhân kỹ thuật.
+[699 Normal] CƠ HỘI VIỆC LÀM
+[700 Normal] • Giám đốc kỹ thuật, Quản trị dự án phần mềm.
+[701 Normal] • Kỹ sư quy trình sản xuất phần mềm, Kỹ sư phát triển ứng dụng (ứng dụng di động, game, ứng dụng trí tuệ nhân tạo, ứng dụng quản lý, thương mại điện tử,...).
+[702 Normal] • Kỹ sư đảm bảo chất lượng phần mềm, Kỹ sư cầu nối, Kỹ sư phân tích nghiệp vụ.
+[703 Normal] • Có khả năng tự khởi nghiệp trong lĩnh vực cung cấp, phát triển các giải pháp, chương trình, phần mềm để phục vụ cuộc sống.
+[704 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực công nghệ thông tin, kỹ thuật phần mềm.
+[705 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[706 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[707 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[708 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[709 Normal] • Các đơn vị hợp tác đào tạo: Học viện Công nghệ Bưu chính Viễn thông, Đại học Bách khoa Hà Nội, Trường ĐH Bách khoa Đà Nẵng; Trường ĐH Bách khoa TP.HCM...
+[710 Normal] • Các đối tác tuyển dụng: Hội Doanh nhân trẻ Bình Định, TMA Solutions, FPT Software, Fujinet Systems, Gameloft, Học viện đào tạo mạng Cisco, Công ty LogiGear Việt Nam, Công ty TNHH Dịch vụ xử lý số FPT (FPT DPS), Công ty Cổ phần NCCPLUS Việt Nam, Công ty TNHH VTI Education.
+[711 Normal] 36. CÔNG NGHỆ THÔNG TIN
+[712 Normal] • Thời gian đào tạo: 4 năm
+[713 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[714 Normal] • Bằng tốt nghiệp: Cử nhân
+[715 Normal] GIỚI THIỆU
+[716 Normal] • Công nghệ thông tin (CNTT) là lĩnh vực nghiên cứu, phát triển và ứng dụng các công nghệ, phần mềm liên quan đến việc chuyển đổi, lưu trữ, bảo vệ, xử lý, truyền và thu thập thông tin. Ngành Công nghệ thông tin bao gồm nhiều lĩnh vực khác nhau như lập trình, quản lý dữ liệu, mạng máy tính, phân tích dữ liệu, trí tuệ nhân tạo (AI) và học máy (ML), thiết kế giao diện người dùng, bảo mật thông tin, phát triển web, quản lý dự án và kinh doanh công nghệ.
+[717 Normal] CƠ HỘI VIỆC LÀM
+[718 Normal] • Lập trình viên (phát triển phần mềm di động, game, ứng dụng quản lý, thương mại điện tử, trí tuệ nhân tạo,...).
+[719 Normal] • Chuyên gia phân tích và xử lý dữ liệu trong các hệ thống thông tin.
+[720 Normal] • Chuyên gia bảo mật, đảm bảo an ninh và quản trị các hệ thống mạng.
+[721 Normal] • Chuyên gia kiểm thử chất lượng phần mềm.
+[722 Normal] • Chuyên gia kỹ thuật, vận hành, quản lý các hệ thống thông tin.
+[723 Normal] • Chuyên gia quản lý, điều phối các dự án công nghệ thông tin.
+[724 Normal] • Chuyên gia quản lý, kinh doanh công nghệ thông tin.
+[725 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh liên quan đến lĩnh vực công nghệ thông tin.
+[726 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực công nghệ thông tin.
+[727 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[728 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[729 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[730 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[731 Normal] • Các đơn vị hợp tác đào tạo: Học viện Công nghệ Bưu chính Viễn thông, Đại học Bách khoa Hà Nội, Trường ĐH Bách khoa Đà Nẵng; Trường ĐH Bách khoa TP.HCM...
+[732 Normal] • Các đối tác tuyển dụng: Hội Doanh nhân trẻ Bình Định, TMA Solutions, FPT Software, Fujinet Systems, Gameloft, Học viện đào tạo mạng Cisco, Công ty LogiGear Việt Nam, Công ty TNHH Dịch vụ xử lý số FPT (FPT DPS), Công ty Cổ phần NCCPLUS Việt Nam, Công ty TNHH VTI Education.
+[733 Normal] 37. TRÍ TUỆ NHÂN TẠO
+[734 Normal] • Thời gian đào tạo: 4 năm
+[735 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[736 Normal] • Bằng tốt nghiệp: Cử nhân
+[737 Normal] GIỚI THIỆU
+[738 Normal] • Trí tuệ nhân tạo (Artificial Intelligence - AI) là một ngành của khoa học máy tính liên quan đến việc tự động hóa các hành vi thông minh, tạo ra các máy móc, hệ thống thông minh thông qua việc sử dụng mô hình máy tính, kỹ thuật và công nghệ liên quan, giúp thực hiện các công việc yêu cầu trí thông minh của con người. Trí tuệ nhân tạo có thể xử lý dữ liệu ở mức rộng lớn hơn, quy mô hơn, hệ thống, khoa học và nhanh hơn so với con người. Đây là ngành đào tạo mũi nhọn hướng đến sự phát triển của công nghệ và khoa học kỹ thuật trong thời đại số hóa ngày nay, đặc biệt là trong bối cảnh của cuộc cách mạng công nghiệp lần thứ 4.
+[739 Normal] CƠ HỘI VIỆC LÀM
+[740 Normal] • Làm việc trong các dự án phát triển phần mềm, giải pháp ứng dụng trí tuệ nhân tạo như xử lý ngôn ngữ tự nhiên, thị giác máy, xử lý và phân tích dữ liệu lớn v.v... trong các tập đoàn công nghệ lớn (như FPT, TMA, Fujinet Systems, Vingroup, Viettel, VNPT,...) và các công ty công nghệ thông tin trong và ngoài nước.
+[741 Normal] • Làm việc trong các dự án phát triển phần mềm game, di động, thương mại điện tử thông minh, ứng dụng quản lý thông minh,...
+[742 Normal] • Chuyên gia kỹ thuật, vận hành, quản lý các hệ thống thông minh.
+[743 Normal] • Chuyên gia quản lý, điều phối các dự án công nghệ thông tin.
+[744 Normal] • Chuyên gia quản lý, kinh doanh công nghệ thông tin.
+[745 Normal] • Có khả năng tự khởi nghiệp trong lĩnh vực cung cấp, phát triển các giải pháp, chương trình phân tích dữ liệu và ứng dụng của trí tuệ nhân tạo để phục vụ cuộc sống.
+[746 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực công nghệ thông tin, trí tuệ nhân tạo.
+[747 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[748 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[749 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[750 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[751 Normal] • Các đơn vị hợp tác đào tạo: Học viện Công nghệ Bưu chính Viễn thông, Đại học Bách khoa Hà Nội, Trường ĐH Bách khoa Đà Nẵng; Trường ĐH Bách khoa TP.HCM...
+[752 Normal] • Các đối tác tuyển dụng: Hội Doanh nhân trẻ Bình Định, TMA Solutions, FPT Software, Fujinet Systems, Gameloft, Học viện đào tạo mạng Cisco, Công ty LogiGear Việt Nam, Công ty TNHH Dịch vụ xử lý số FPT (FPT DPS), Công ty Cổ phần NCCPLUS Việt Nam, Công ty TNHH VTI Education.
+[753 Normal] 38. CÔNG NGHỆ KỸ THUẬT Ô TÔ
+[754 Normal] • Thời gian đào tạo: 4,5 năm
+[755 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[756 Normal] • Bằng tốt nghiệp: Kỹ sư
+[757 Normal] GIỚI THIỆU
+[758 Normal] • Ngành Công nghệ kỹ thuật ô tô là ngành học tích hợp kiến thức của nhiều lĩnh vực: cơ khí, tự động hóa, điện - điện tử và công nghệ chế tạo máy, chuyên về khai thác, sử dụng và quản lý dịch vụ kỹ thuật ô tô như điều hành sản xuất phụ tùng, lắp ráp, cải tiến, nâng cao hiệu quả sử dụng.
+[759 Normal] • Học ngành Công nghệ kỹ thuật ô tô, sinh viên được trang bị các kiến thức và kỹ năng nền tảng và chuyên sâu về cơ khí ô tô - máy động lực, hệ thống truyền động - truyền lực, cơ cấu khí, hệ thống điều khiển,... để có khả năng áp dụng những nguyên lý kỹ thuật cơ bản, kỹ năng thực hành cao và các kỹ năng liên quan đến ô tô.
+[760 Normal] CƠ HỘI VIỆC LÀM
+[761 Normal] • Làm việc với vai trò trực tiếp quản lý hoặc trong lĩnh vực dịch vụ kỹ thuật ô tô tại các công ty, nhà máy sản xuất - lắp ráp ô tô, lập trình, thiết kế phần mềm, hệ thống điều khiển ô tô, công ty kinh doanh và dịch vụ bảo trì, sửa chữa ô tô, các cơ quan kiểm định cơ giới đường bộ, các đơn vị quản lý hành chính và chuyên môn liên quan đến ngành công nghệ ô tô.
+[762 Normal] • Làm việc với vai trò trưởng phòng kỹ thuật của các công ty, nhà máy, xí nghiệp chuyên ngành cơ khí ô tô và cơ khí động lực; Trưởng ngành khai thác, bảo trì, sửa chữa ô tô và thiết bị động lực trong doanh nghiệp, trưởng garage, trưởng chuyền lắp ráp, sản xuất ô tô.
+[763 Normal] • Chuyên viên kiểm định trong các trạm đăng kiểm.
+[764 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh các dịch vụ ô tô.
+[765 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực công nghệ ô tô, cơ khí.
+[766 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[767 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[768 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[769 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[770 Normal] • Các đơn vị hợp tác đào tạo: Trường ĐH Bách khoa Đà Nẵng; Trường ĐH Sư phạm Kỹ thuật TP. Hồ Chí Minh; Trường ĐH Sư phạm Kỹ thuật Vĩnh Long.
+[771 Normal] • Các đối tác tuyển dụng: Công ty Cổ phần Ô tô Trường Hải (THACO), Công ty TNHH MTV Toyota Bình Định, Công ty CP Ô tô Bình Định (Hyundai Bình Định), Mitsubishi Quy Nhơn, Công ty TNHH TM và DV Ô tô Honda Dũng Tiến...
+[772 Normal] 39. CÔNG NGHỆ KỸ THUẬT HÓA HỌC
+[773 Normal] • Thời gian đào tạo: 4,5 năm
+[774 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[775 Normal] • Bằng tốt nghiệp: Kỹ sư
+[776 Normal] GIỚI THIỆU
+[777 Normal] • Công nghệ kỹ thuật hóa học đóng vai trò quan trọng trong nền kinh tế hiện đại, mang lại nhiều đóng góp cho sự phát triển và cải thiện chất lượng cuộc sống. Công nghệ kỹ thuật hóa học tập trung vào ứng dụng của kiến thức hóa học để phát triển và cải tiến các sản phẩm, quy trình sản xuất, và giải pháp trong nhiều lĩnh vực khác nhau bao gồm: Sản xuất và chế biến các sản phẩm hóa học, dầu khí, dược phẩm, vật liệu; Nghiên cứu và phát triển nguồn năng lượng mới, sạch, bảo vệ môi trường; Chế tạo và phát triển các vật liệu, sản phẩm công nghiệp mới; Nghiên cứu và phát triển để đưa ra các giải pháp sáng tạo, tiên tiến và bền vững; Quản lý an toàn và rủi ro trong sản xuất và sử dụng.
+[778 Normal] CƠ HỘI VIỆC LÀM
+[779 Normal] • Quản lý và vận hành các hệ thống thiết bị công nghệ sản xuất ngành hóa chất, thực phẩm, dược phẩm, dầu khí, các hệ thống xử lý nước thải, khí thải.
+[780 Normal] • Làm việc tại các phòng thí nghiệm ở các nhà máy, xí nghiệp hoặc các Trung tâm quan trắc.
+[781 Normal] • Tính toán thiết kế, giám sát, thi công các thiết bị, công nghệ, các công trình xử lý chất thải (rắn, lỏng, khí).
+[782 Normal] • Nghiên cứu và phát triển sản phẩm, phân tích – quản lý chất lượng sản phẩm tại nhà máy hay tại các Viện Hóa học, Viện Môi trường, Viện Vật liệu, Mỹ phẩm...
+[783 Normal] • Tư vấn hồ sơ môi trường cho các doanh nghiệp.
+[784 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh các lĩnh vực liên quan đến lĩnh vực công nghệ kỹ thuật hóa học, công nghệ môi trường, mỹ phẩm...
+[785 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về hóa học, kỹ thuật hóa học.
+[786 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[787 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ, học bổng hữu nghị Việt – Hàn...
+[788 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[789 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[790 Normal] • Nhà máy (NM) Lọc dầu Dung Quất, NM Đạm Phú Mỹ, NM Lọc dầu Cát Lái, NM Xử lý khí Dinh Cố, Công ty Xăng dầu khu vực 5 Petrolimex Đà Nẵng, Tổng kho xăng dầu Nhà Bè PVOIL, Công ty dầu nhờn Nhà Bè, Công ty kiểm định năng lượng EIC Dung Quất, Công ty CP Khoáng sản Bình Định, NM Phân bón Hiệp Phước, Công ty TNHH Sinh hóa Minh Dương, NM Hóa chất Biên Hòa - Đồng Nai, Công ty CP Đường mía Tuy Hòa, Trung tâm Tư vấn xây dựng - Môi trường KKT, Chi nhánh công ty CP đầu tư và xây dựng Bình Định, Chi cục Bảo vệ môi trường tỉnh Bình Định, Trung tâm phân tích và kiểm nghiệm, Trung tâm Phân tích và đo lường chất lượng Bình Định, Trung tâm Quan trắc tài nguyên và môi trường, Sở Tài nguyên và Môi trường...
+[791 Normal] 40. LOGISTICS VÀ QUẢN LÝ CHUỖI CUNG ỨNG
+[792 Normal] • Thời gian đào tạo: 4 năm
+[793 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[794 Normal] • Bằng tốt nghiệp: Cử nhân
+[795 Normal] GIỚI THIỆU
+[796 Normal] • Trong thời kỳ hội nhập kinh tế khu vực và thế giới ngày càng cao, công tác quản trị dữ liệu hàng hóa nhằm phân phối sản phẩm đến tất cả khách hàng một cách nhanh chóng, hiệu quả nhất là rất cần thiết và được doanh nghiệp đánh giá rất cao. Ngành Logistics và Quản lý chuỗi cung ứng tập trung khai thác các kiến thức khoa học cơ bản, kiến thức cơ sở và chuyên ngành liên quan đến công tác quản trị các dịch vụ vận chuyển trong quá trình sản xuất kinh doanh như: dự báo, tìm kiếm và quản trị nguồn nguyên vật liệu, hoạt động vận tải, kho bãi, xuất - nhập hàng hóa, giao nhận, dịch vụ khách hàng,... Tất cả các hoạt động này nhằm đảm bảo luồng chuyển dịch của dòng hàng hóa, từ lúc nguyên vật liệu trở thành sản phẩm đến tay người tiêu dùng, được kiểm soát và vận hành một cách hiệu quả, giảm chi phí, đem lại lợi nhuận tối đa cho doanh nghiệp.
+[797 Normal] CƠ HỘI VIỆC LÀM
+[798 Normal] • Làm việc tại các doanh nghiệp làm dịch vụ logistics, dịch vụ vận tải đa phương thức nói riêng và các doanh nghiệp dịch vụ vận tải, giao nhận nói chung cũng như các cơ quan quản lý nhà nước.
+[799 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến dịch vụ logistics và quản lý chuỗi cung ứng.
+[800 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về dịch vụ logistics và vận tải đa phương thức cũng như lĩnh vực quản trị kinh doanh trong nước và quốc tế.
+[801 Normal] • Có thể đảm nhiệm chức danh quản lý các cấp tại các doanh nghiệp và tổ chức liên quan đến logistics và quản lý chuỗi cung ứng tại các doanh nghiệp sản xuất, doanh nghiệp dịch vụ như các tập đoàn bán lẻ, các công ty quốc tế, tư vấn toàn cầu, các công ty cung ứng dịch vụ logistics, các doanh nghiệp vận tải biển, đường bộ, đường sắt, đường thủy và đường hàng không, các đại lý hàng không, đại lý vận tải, cảng biển, ICD, cảng hàng không, tổ chức - khai thác - quy hoạch kho hàng, công ty và doanh nghiệp có ứng dụng logistics trong các hoạt động tổ chức khai thác sản xuất của doanh nghiệp.
+[802 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[803 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[804 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[805 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[806 Normal] • Các đơn vị hợp tác đào tạo: Đại học Kinh tế Quốc dân, Đại học Kinh tế TP. HCM,...
+[807 Normal] • Các đối tác tuyển dụng: Công ty TNHH Vận tải và Tiếp vận Toàn Cầu (Glotrans), Công ty CP Giao Nhận Vận Tải Con Ong (Bee Logistics), Công ty CP Giao Nhận Toàn Cầu DHL (VN), Công ty CP Cảng Quy Nhơn, Tổng Công ty CP Bưu Chính Viettel, Công ty CP DV CPN Phương Trang Futa...
+[808 Normal] 41. KỸ THUẬT ĐIỆN
+[809 Normal] • Thời gian đào tạo: 4,5 năm
+[810 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[811 Normal] • Bằng tốt nghiệp: Kỹ sư
+[812 Normal] GIỚI THIỆU
+[813 Normal] • Ngành Kỹ thuật điện dành cho các sinh viên có sở thích liên quan đến điện năng. Chương trình bao gồm các môn học cốt lõi cần thiết về Kỹ thuật điện nói chung, và Kỹ thuật điện – Công nghệ thông tin nói riêng, cùng với nhiều môn học lựa chọn về thiết bị điện, điện tử công suất, nhà máy điện, lưới điện, hệ thống điện, năng lượng tái tạo, hệ thống nhúng thông minh, mạng máy tính, an ninh IT và khai phá dữ liệu. Chương trình sẽ đào tạo thành những kỹ sư có trình độ cao, có thể thiết kế các giải pháp cho các vấn đề thuộc lĩnh vực kỹ thuật điện trong công nghiệp, thương mại, khoa học, giải trí và xã hội.
+[814 Normal] CƠ HỘI VIỆC LÀM
+[815 Normal] • Làm việc trong các công ty điện lực, trạm biến áp, công ty thủy điện và nhiệt điện, nhà máy điện gió, nhà máy điện mặt trời với vai trò người vận hành, hoặc quản lý, điều phối kỹ thuật.
+[816 Normal] • Làm việc trong các công ty tư vấn, thiết kế, xây lắp, vận hành, thí nghiệm, bảo trì các thiết bị và hệ thống điện.
+[817 Normal] • Làm việc trong các cơ quan quản lý lĩnh vực điện - tự động hóa, cơ quan kiểm toán năng lượng, công ty mua bán, kinh doanh điện năng, công ty sản xuất chế tạo thiết bị điện.
+[818 Normal] • Làm việc trong các công ty, nhà máy sản xuất công nghiệp tự động hóa, các dây chuyền, khu công nghiệp.
+[819 Normal] • Làm việc trong các công ty sản xuất và lắp ráp thiết bị điện, điện tử, công ty sản xuất thang máy, băng chuyền.
+[820 Normal] • Làm việc trong các doanh nghiệp, công ty sản xuất, trung tâm thương mại với vai trò quản trị hệ thống điện, chiếu sáng.
+[821 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp kinh doanh trong lĩnh vực điện và các công ty tư vấn, thiết kế M&E.
+[822 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực điện.
+[823 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[824 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[825 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[826 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[827 Normal] • Các đơn vị hợp tác đào tạo: ĐH Bách khoa Hà Nội; ĐH Bách khoa Đà Nẵng, ĐH Công nghệ Sydney,...
+[828 Normal] • Các đối tác: Hội Doanh nhân trẻ tỉnh Bình Định, Công ty Điện lực Bình Định, Truyền tải điện Bình Định, Công ty cổ phần Thủy điện Vĩnh Sơn – Sông Hinh, Công ty Thủy điện An Khê – Ka Nak, Công ty Cổ phần Thép Hòa Phát Dung Quất, các công ty thành viên ở các tỉnh/thành thuộc Tập đoàn Điện lực Việt Nam (EVN),...
+[829 Normal] 42. KỸ THUẬT ĐIỆN TỬ - VIỄN THÔNG (THIẾT KẾ VI MẠCH)
+[830 Normal] • Thời gian đào tạo: 4,5 năm
+[831 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[832 Normal] • Bằng tốt nghiệp: Kỹ sư
+[833 Normal] GIỚI THIỆU
+[834 Normal] • Ngành Kỹ thuật điện tử - viễn thông dành cho sinh viên có sở thích và đam mê làm việc trong các lĩnh vực về công nghệ viễn thông và thông tin, công nghệ và thiết kế mạch tích hợp, thiết kế hệ thống nhúng và điện tử ứng dụng, kỹ thuật xử lý tín hiệu âm thanh - hình ảnh và đa phương tiện. Chương trình bao gồm các môn học cốt lõi thuộc về Kỹ thuật điện tử, Kỹ thuật viễn thông nói chung và Hệ thống nhúng & IoT nói riêng, cùng với các môn học lựa chọn liên quan đến mạng cảm biến không dây, truyền thông đa phương tiện, thiết kế hệ thống nhúng và ứng dụng IoT, trí tuệ nhân tạo và điện toán đám mây... Chương trình đào tạo bậc kỹ sư có khả năng vận hành và khai thác các hệ thống thông tin - viễn thông cũng như triển khai các giải pháp khoa học trong hệ thống điện tử ứng dụng và hệ thống IoT.
+[835 Normal] CƠ HỘI VIỆC LÀM
+[836 Normal] • Làm việc trong các cơ quan quản lý nhà nước các cấp về Bưu chính, Thông tin - Truyền thông, Khoa học - Công nghệ.
+[837 Normal] • Làm việc trong các Tập đoàn, Tổng công ty về lĩnh vực Điện tử - Viễn thông: VNPT, Viettel, MobiFone, FPT Telecom; Đài truyền hình, đài phát thanh từ Trung ương đến địa phương và các công ty Truyền thông đa phương tiện.
+[838 Normal] • Kỹ sư thiết kế hệ thống nhúng, hệ thống IoT và lập trình trong các công ty công nghệ thông tin: FPT Software, TMA Solutions, Fujinet Systems...
+[839 Normal] • Kỹ sư thiết kế, vận hành và tư vấn kỹ thuật cho các doanh nghiệp hoạt động trong lĩnh vực sản xuất, kinh doanh, cung cấp thiết bị điện tử, máy tính và viễn thông.
+[840 Normal] • Có khả năng thành lập doanh nghiệp về tư vấn thiết kế điện tử - viễn thông, thiết kế và quản trị hệ thống mạng máy tính.
+[841 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực điện tử, viễn thông và máy tính.
+[842 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[843 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[844 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[845 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[846 Normal] • Các đơn vị hợp tác đào tạo: ĐH Bách khoa Hà Nội; ĐH Bách khoa Đà Nẵng, ĐH Công nghệ Sydney,...
+[847 Normal] • Các tập đoàn viễn thông: Tập đoàn Công nghiệp - Viễn thông Quân đội Viettel, FPT Telecom, Viễn thông MobiFone, Tập đoàn VNPT...
+[848 Normal] • Các công ty về phần mềm & giải pháp kỹ thuật: FPT Software, TMA Solutions,...
+[849 Normal] • Các đối tác khác: Hội Doanh nhân trẻ tỉnh Bình Định, Công ty Samsung Electronics, Đài Phát thanh - Truyền hình Bình Định, Truyền hình cáp, Đài Ra đa Vũng Chua.
+[850 Normal] 43. KỸ THUẬT ĐIỀU KHIỂN VÀ TỰ ĐỘNG HÓA
+[851 Normal] • Thời gian đào tạo: 4,5 năm
+[852 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[853 Normal] • Bằng tốt nghiệp: Kỹ sư
+[854 Normal] GIỚI THIỆU
+[855 Normal] • Ngành Kỹ thuật điều khiển và tự động hóa là sự kết hợp giữa ba lĩnh vực: Điều khiển, Tự động hoá và Công nghệ thông tin. Do đó, ngành “Kỹ thuật điều khiển và tự động hoá” trang bị cho người học kiến thức về các lĩnh vực như: Robot, Auto, Smart, IoT, Control, Electronic... cho phép máy móc thay thế con người. Cuộc cách mạng công nghệ 4.0 diễn ra cần có lượng lớn kỹ sư điều khiển và tự động hoá để đáp ứng. Sinh viên tự động hoá ra trường làm việc được trong tất cả các lĩnh vực công nghệ ô tô, công nghệ chế tạo, cơ khí hoá, điện thông minh, điện tử, lập trình ứng dụng...
+[856 Normal] CƠ HỘI VIỆC LÀM
+[857 Normal] • Làm việc trong các lĩnh vực vận hành lưới điện thông minh, SCADA, thiết bị đo lường, kiểm định và một số công việc khác ở các Công ty điện lực tại các tỉnh.
+[858 Normal] • Làm việc trong các lĩnh vực vận hành hệ thống điều khiển, cải tiến sửa chữa một số hỏng hóc, đề xuất một số giải pháp thay thế thiết bị ở các nhà máy phát điện.
+[859 Normal] • Thiết kế kỹ thuật, vận hành, giám sát, sửa chữa các dây chuyền sản xuất tại các công ty, nhà máy sản xuất chế tạo trong công nghiệp.
+[860 Normal] • Thiết kế, lắp ráp máy cho các công ty sản xuất, lắp đặt máy trong các lĩnh vực điều khiển, tự động hoá, xưởng sản xuất, công nghệ sản xuất tự động, thông minh.
+[861 Normal] • Vận hành hệ thống điều khiển, giám sát tại các trung tâm thương mại, khách sạn, toà nhà và các hệ thống điều khiển, giám sát thông minh Smart Home, Smart City.
+[862 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp kinh doanh như công ty tư vấn thiết kế điện thông minh, công ty năng lượng mặt trời, công ty lắp đặt vận hành các hệ thống tự động công nghiệp, công ty kinh doanh các linh kiện, mua bán sửa chữa thiết bị thông minh, phần mềm, camera...
+[863 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực điều khiển, tự động hóa.
+[864 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[865 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[866 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[867 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[868 Normal] • Các đơn vị hợp tác đào tạo: ĐH Bách khoa Hà Nội; ĐH Bách khoa Đà Nẵng, ĐH Công nghệ Sydney,...
+[869 Normal] • Các đối tác: Hội Doanh nhân trẻ tỉnh Bình Định, Công ty Điện lực Bình Định, Truyền tải điện Bình Định, Công ty cổ phần Thủy điện An Khê – Ka Nak, Công ty TNHH Công viên cây xanh và chiếu sáng đô thị Quy Nhơn, Công ty Tự động, Công ty cổ phần Sữa Việt Nam (Vinamilk) - Chi nhánh Bình Định, Công ty TNHH Kỹ thuật Tự động Phú Tài, Công ty CP Dược - Trang thiết bị y tế Bình Định, các công ty thành viên ở các tỉnh/thành thuộc Tập đoàn Điện lực Việt Nam (EVN)...
+[870 Normal] 44. CÔNG NGHỆ THỰC PHẨM
+[871 Normal] • Thời gian đào tạo: 4,5 năm
+[872 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[873 Normal] • Bằng tốt nghiệp: Kỹ sư
+[874 Normal] GIỚI THIỆU
+[875 Normal] • Ngành Công nghệ thực phẩm là một lĩnh vực đa ngành hợp nhất kiến thức và kỹ thuật từ nhiều lĩnh vực khác nhau như hóa học, sinh học, kỹ thuật thực phẩm, và kỹ thuật máy móc. Mục tiêu của ngành này là nâng cao chất lượng và an toàn của thực phẩm, tăng cường sự hiệu quả sản xuất và gia tăng giá trị dinh dưỡng.
+[876 Normal] • Ngành Công nghệ thực phẩm bao gồm các lĩnh vực quan trọng: Chế biến thực phẩm, Kỹ thuật phân tích thực phẩm, Bảo quản thực phẩm, Nghiên cứu và phát triển sản phẩm mới, An toàn thực phẩm, Chất lượng dinh dưỡng, Tự động hóa và quản lý sản xuất.
+[877 Normal] CƠ HỘI VIỆC LÀM
+[878 Normal] • Làm việc tại các công ty, doanh nghiệp trong nước và quốc tế sản xuất và kinh doanh thực phẩm và dinh dưỡng.
+[879 Normal] • Làm việc tại các cơ quan dịch vụ, quản lý chất lượng, vệ sinh an toàn thực phẩm, môi trường và sức khỏe cộng đồng.
+[880 Normal] • Làm việc tại các cơ quan quản lý nhà nước về công nghệ, sở hữu trí tuệ liên quan đến lĩnh vực thực phẩm và dinh dưỡng.
+[881 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh các lĩnh vực liên quan đến thực phẩm và dinh dưỡng.
+[882 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực thực phẩm và dinh dưỡng.
+[883 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[884 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ, học bổng hữu nghị Việt – Hàn...
+[885 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[886 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[887 Normal] • Các đơn vị hợp tác đào tạo: Trường ĐH Bách khoa Đà Nẵng, Trường ĐH Nha Trang, Trường ĐH Sư phạm Kỹ thuật TP.HCM.
+[888 Normal] • Các đối tác: Công ty CP Nông nghiệp Trường Hải (THACO AGRI), Công ty Cổ phần Chăn nuôi C.P. Việt Nam (CPV), Công ty TNHH Thủy sản Hải Long Nha Trang, Công ty TNHH KD Nông sản Việt Nam, Công ty TNHH Wilmar Agro Việt Nam, Chi nhánh Công ty CP Bia Sài Gòn - Miền Trung tại Quy Nhơn; Công ty CP Bia Sài Gòn - Phú Yên, Công ty TNHH Sinh hóa Minh Dương; Nhà máy sữa Vinamilk Bình Định, Công ty Cổ phần Mía đường Tuy Hòa, Nhà máy Chế biến Tinh bột sắn Vân Canh; Công ty CP Tinh bột sắn Quảng Nam...
+[889 Normal] 45. KỸ THUẬT XÂY DỰNG
+[890 Normal] • Thời gian đào tạo: 4,5 năm
+[891 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[892 Normal] • Bằng tốt nghiệp: Kỹ sư
+[893 Normal] GIỚI THIỆU
+[894 Normal] • Ngành Kỹ thuật xây dựng là một lĩnh vực rộng lớn liên quan đến việc thiết kế, xây dựng, và quản lý các công trình cơ sở hạ tầng và công trình dân dụng. Ngành Kỹ thuật xây dựng đóng vai trò quan trọng trong việc phát triển cơ sở hạ tầng và đáp ứng nhu cầu về nhà ở, văn hóa, giáo dục, y tế, và các dự án khác. Ngành Kỹ thuật xây dựng bao gồm các lĩnh vực quan trọng: Thiết kế công trình, Quản lý dự án, Vật liệu và kỹ thuật xây dựng, An toàn xây dựng, Xây dựng bền vững, Công nghệ thông tin, Nhà ở và đô thị hóa.
+[895 Normal] CƠ HỘI VIỆC LÀM
+[896 Normal] • Kỹ sư thiết kế, kỹ sư tư vấn giám sát, kỹ sư hiện trường, kỹ sư tư vấn quản lý dự án.
+[897 Normal] • Làm việc tại các Sở, ban ngành trong lĩnh vực kiến trúc - xây dựng, các ban quản lý dự án, ban quản lý khu công nghiệp, khu kinh tế.
+[898 Normal] • Làm việc tại các doanh nghiệp hoạt động trong lĩnh vực kiến trúc và xây dựng, các trung tâm tư vấn và kiểm định xây dựng.
+[899 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp trong lĩnh vực kiến trúc và xây dựng.
+[900 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực kiến trúc và xây dựng.
+[901 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[902 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[903 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[904 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[905 Normal] • Các đơn vị hợp tác đào tạo: Trường Đại học Xây dựng; Trường Đại học Bách khoa TP.HCM; Trường Đại học Bách khoa Đà Nẵng...
+[906 Normal] • Các đối tác: Hội Doanh nhân trẻ tỉnh Bình Định, Sở Xây dựng Bình Định, Ban Quản lý dự án Dân dụng và Công nghiệp tỉnh Bình Định, Tập đoàn Xây dựng Hòa Bình, Công ty CP Xây dựng 47, Công ty TNHH Công nghệ và Xây dựng Nam Ngân, Công ty TNHH Kiều Việt...
+[907 Normal] 46. NÔNG HỌC
+[908 Normal] • Đơn vị: Khoa Khoa học Tự nhiên (Faculty of Natural Sciences)
+[909 Normal] • Thời gian đào tạo: 4,5 năm
+[910 Normal] • Khối lượng kiến thức: 150 tín chỉ
+[911 Normal] • Bằng tốt nghiệp: Kỹ sư
+[912 Normal] GIỚI THIỆU
+[913 Normal] • Ngành Nông học là một lĩnh vực khoa học nghiên cứu và ứng dụng các kiến thức về nông nghiệp để tối ưu hóa sản xuất lương thực, thực phẩm, thủy hải sản, chăm sóc động vật và quản lý tài nguyên nông nghiệp. Ngành này đóng vai trò quan trọng trong việc cải thiện năng suất, chất lượng, và bền vững của ngành nông nghiệp. Ngành Nông học bao gồm các lĩnh vực quan trọng: Chăm sóc cây trồng, Chăm sóc và Quản lý động vật, Nuôi trồng thủy sản, Nghiên cứu về đất đai và tài nguyên nước, Phát triển giống và biến đổi gen, Quản lý hệ thống nông nghiệp thông minh, Bảo vệ môi trường và phát triển bền vững.
+[914 Normal] CƠ HỘI VIỆC LÀM
+[915 Normal] • Làm việc tại các cơ quan quản lý nhà nước về nông nghiệp như: Ban nông nghiệp xã, phòng nông nghiệp quận/huyện, các Sở Nông nghiệp và Phát triển nông thôn, Sở Khoa học và Công nghệ, các cơ quan trung tâm khuyến nông, trạm bảo vệ thực vật, trạm thú y.
+[916 Normal] • Làm việc tại các hợp tác xã nông nghiệp, trang trại trồng trọt, chăn nuôi, thủy sản, trung tâm Khuyến nông – Khuyến ngư, trung tâm nghiên cứu cây lương thực, thực phẩm, cây công nghiệp.
+[917 Normal] • Làm việc tại các doanh nghiệp sản xuất - kinh doanh - dịch vụ kỹ thuật nông nghiệp trong và ngoài nước.
+[918 Normal] • Có khả năng tự khởi nghiệp, tự mở doanh nghiệp sản xuất, kinh doanh các lĩnh vực liên quan đến nông nghiệp, thủy sản.
+[919 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực khoa học cây trồng, thủy sản.
+[920 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[921 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ; học bổng hữu nghị Việt – Hàn...
+[922 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[923 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[924 Normal] • Các đơn vị hợp tác: Viện KHKT Nông nghiệp Duyên hải Nam Trung Bộ, Viện Nghiên cứu Nuôi trồng Thủy sản III, Chi cục Chăn nuôi và Thú y Bình Định, Trung tâm Giống nông nghiệp Bình Định, Trung tâm Ứng dụng tiến bộ khoa học và công nghệ Bình Định.
+[925 Normal] • Các đối tác tuyển dụng: Công ty CP Nông nghiệp Trường Hải (THACO AGRI), Công ty Cổ phần Chăn nuôi C.P. Việt Nam (CPV), Tập đoàn Việt Úc, Công ty Cổ phần Phân bón và Hóa chất Dầu khí Miền Trung (PVFCCo Central), Công ty Dalat Hasfarm, Công ty TNHH Hóa Chất Ý Mỹ...
+[926 Normal] 47. CÔNG TÁC XÃ HỘI
+[927 Normal] • Đơn vị: Khoa Khoa học Xã hội và Nhân văn (Faculty of Social Sciences and Humanities)
+[928 Normal] • Thời gian đào tạo: 4 năm
+[929 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[930 Normal] • Bằng tốt nghiệp: Cử nhân
+[931 Normal] GIỚI THIỆU
+[932 Normal] • Ngành Công tác xã hội là một lĩnh vực chuyên sâu trong việc giải quyết vấn đề xã hội và nâng cao chất lượng cuộc sống của cộng đồng. Các chuyên gia và nhân viên làm việc trong ngành này thường có mục tiêu chính là hỗ trợ những người gặp khó khăn, những vấn đề cần giải quyết như tình trạng nghèo đói, bất bình đẳng giới và giúp đỡ những thành phần dễ bị tổn thương như người khuyết tật, trẻ em mồ côi, người cao tuổi cô đơn, người nhiễm HIV/AIDS, người nghiện ma túy… tạo điều kiện thuận lợi cho sự phát triển và hòa nhập của cộng đồng, cũng như bảo vệ quyền lợi và nguyên tắc công bằng xã hội.
+[933 Normal] CƠ HỘI VIỆC LÀM
+[934 Normal] • Làm việc tại các cơ quan nhà nước từ trung ương tới địa phương, hoạt động trong các lĩnh vực lao động xã hội, gia đình, trẻ em, y tế, giáo dục, bảo hiểm xã hội...
+[935 Normal] • Làm việc tại các cơ sở xã hội, các tổ chức đoàn thể, hội… và các tổ chức phi chính phủ trong và ngoài nước; các trung tâm chăm sóc cộng đồng; trợ lí dự án phát triển cộng đồng và cán bộ truyền thông trong các dự án phát triển; tư vấn, hỗ trợ cho các nhà quản lý lãnh đạo tham mưu, giám sát quá trình thực hiện chính sách cho các nhóm đối tượng yếu thế trong xã hội.
+[936 Normal] • Có khả năng tự khởi nghiệp, tự mở trung tâm, cơ sở hoạt động liên quan đến lĩnh vực công tác xã hội.
+[937 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực công tác xã hội.
+[938 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[939 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[940 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[941 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[942 Normal] • Các trung tâm Bảo trợ xã hội và Dịch vụ xã hội, các tổ chức Bảo trợ xã hội trên địa bàn tỉnh Bình Định và ở các tỉnh khu vực miền Trung, Tây Nguyên.
+[943 Normal] • Các cơ sở y tế, cơ sở giáo dục nhà nước và tư nhân trên địa bàn tỉnh Bình Định và ở các tỉnh khu vực miền Trung, Tây Nguyên.
+[944 Normal] • Các sở, ban ngành, tổ chức chính trị - xã hội trên địa bàn tỉnh Bình Định và khu vực miền Trung, Tây Nguyên.
+[945 Normal] • Các tổ chức phi chính phủ trên địa bàn tỉnh Bình Định và ở các tỉnh khu vực miền Trung, Tây Nguyên.
+[946 Normal] 48. QUẢN TRỊ DỊCH VỤ DU LỊCH VÀ LỮ HÀNH
+[947 Normal] • Thời gian đào tạo: 4 năm
+[948 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[949 Normal] • Bằng tốt nghiệp: Cử nhân
+[950 Normal] GIỚI THIỆU
+[951 Normal] • Trong nền kinh tế - xã hội hiện đại, Ngành Quản trị dịch vụ du lịch và lữ hành là một trong những ngành học dẫn đầu về nhu cầu nhân lực, có mức lương cao. Ngành này tập trung vào việc phát triển, quản lý và cung cấp các dịch vụ liên quan đến ngành du lịch và lữ hành. Ngành Quản trị dịch vụ du lịch và lữ hành đóng vai trò quan trọng trong việc hỗ trợ người du lịch và tạo ra trải nghiệm tích cực cho họ. Do đó, học ngành Quản trị dịch vụ du lịch và lữ hành trở thành xu thế lựa chọn của nhiều bạn trẻ.
+[952 Normal] CƠ HỘI VIỆC LÀM
+[953 Normal] • Chuyên viên trong lĩnh vực kinh doanh du lịch, lữ hành và các lĩnh vực kinh doanh khác như khách sạn, nhà hàng, dịch vụ vận chuyển, dịch vụ đại lý lữ hành…, đặc biệt là làm việc trong các doanh nghiệp lữ hành, các cơ sở trong hệ thống phân phối sản phẩm lữ hành; các cơ sở tổ chức sự kiện, kinh doanh MICE; các tổ chức chính phủ, phi chính phủ về du lịch và lữ hành.
+[954 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến dịch vụ du lịch và lữ hành.
+[955 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về dịch vụ du lịch và lữ hành.
+[956 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[957 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[958 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[959 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[960 Normal] • Các đơn vị hợp tác đào tạo: Đại học Victoria Wellington (New Zealand), Đại học Edith Cowan (Tây Úc), Đại học Prince of Songkla (Thái Lan), Đại học Kinh tế Quốc dân, Đại học Kinh tế TP. HCM,…
+[961 Normal] • Các đối tác tuyển dụng: Vietravel, Khách sạn Pullman, Khách sạn Mường Thanh, Khách sạn Hải Âu (Seagull Hotel) 4 sao, FLC Luxury Hotel Quy Nhon – Vietnam, FLC Quy Nhơn Beach & Golf Resort, ANYA Premier Quy Nhơn, Fleur de Lys Hotel Quy Nhơn, Vinpearl Nha Trang, Vinpearl Phú Quốc, Maia Resort Quy Nhơn, Sun World Ba Na Hills, Sở Du lịch Bình Định, Saigontourist, Quy Nhơn Tourist, Công ty du lịch Đất Nước Việt,…
+[962 Normal] 49. QUẢN TRỊ KHÁCH SẠN
+[963 Normal] • Thời gian đào tạo: 4 năm
+[964 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[965 Normal] • Bằng tốt nghiệp: Cử nhân
+[966 Normal] GIỚI THIỆU
+[967 Normal] • Trong nền kinh tế - xã hội hiện đại, Quản trị khách sạn là một trong những ngành học dẫn đầu về nhu cầu nhân lực, có mức lương cao. Ngành quản trị khách sạn là một lĩnh vực trong du lịch và dịch vụ, chuyên về việc quản lý và vận hành các doanh nghiệp lưu trú như khách sạn, resort, nhà nghỉ, hoặc các hình thức cư trú khác. Quản trị khách sạn đòi hỏi kiến thức đa ngành, kỹ năng quản lý, và khả năng giao tiếp hiệu quả để đáp ứng nhu cầu của khách hàng và duy trì hoạt động kinh doanh hiệu quả. Ngành này bao gồm các lĩnh vực quan trọng: Quản lý nhân sự, Quản lý dịch vụ và tiện nghi, Quản lý tài chính, Quản lý đặt phòng và hệ thống thanh toán, Quản lý khách hàng và tiếp thị.
+[968 Normal] CƠ HỘI VIỆC LÀM
+[969 Normal] • Làm việc tại các vị trí từ nhân viên tới quản lý các cấp tại các bộ phận như Tiền sảnh, Buồng phòng, Ẩm thực, Tổ chức sự kiện, Tài chính, Kế toán, Bán phòng, Nhân sự…
+[970 Normal] • Có khả năng tự khởi nghiệp, tự mở công ty, doanh nghiệp hoạt động liên quan đến dịch vụ khách sạn, nghỉ dưỡng.
+[971 Normal] • Tiếp tục học tập theo định hướng giảng dạy hoặc làm nghiên cứu tại các Viện, Trường Đại học, Cao đẳng và Trung cấp về lĩnh vực quản trị khách sạn.
+[972 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[973 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học.
+[974 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[975 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[976 Normal] • Các đơn vị hợp tác đào tạo: Đại học Victoria Wellington (New Zealand), Đại học Edith Cowan (Tây Úc), Đại học Prince of Songkla (Thái Lan), Đại học Kinh tế Quốc dân, Đại học Kinh tế TP. HCM,…
+[977 Normal] • Các đối tác tuyển dụng: Vietravel, Khách sạn Pullman, Khách sạn Mường Thanh, Khách sạn Hải Âu (Seagull Hotel) 4 sao, FLC Luxury Hotel Quy Nhon – Vietnam, FLC Quy Nhơn Beach & Golf Resort, ANYA Premier Quy Nhơn, Fleur de Lys Hotel Quy Nhơn, Vinpearl Nha Trang, Vinpearl Phú Quốc, Maia Resort Quy Nhơn, Sun World Ba Na Hills, Sở Du lịch Bình Định, Saigontourist, Quy Nhơn Tourist, Công ty du lịch Đất Nước Việt,…
+[978 Normal] 50. QUẢN LÝ TÀI NGUYÊN VÀ MÔI TRƯỜNG
+[979 Normal] • Thời gian đào tạo: 4 năm
+[980 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[981 Normal] • Bằng tốt nghiệp: Cử nhân
+[982 Normal] GIỚI THIỆU
+[983 Normal] • Quản lý tài nguyên và môi trường là một lĩnh vực nghiên cứu và ứng dụng kiến thức về việc bảo vệ và quản lý tài nguyên tự nhiên cũng như giữ gìn môi trường sống. Lĩnh vực này tập trung vào việc phát triển chiến lược và chính sách để duy trì sự cân bằng giữa sự phát triển kinh tế và bảo vệ môi trường. Ngành này bao gồm các lĩnh vực sau: Bảo vệ tài nguyên tự nhiên, Quản lý chất lượng không khí và nước, Bảo vệ đa dạng sinh học, Năng lượng và phát triển bền vững, Quản lý rủi ro thiên nhiên và biến đổi khí hậu...
+[984 Normal] CƠ HỘI VIỆC LÀM
+[985 Normal] • Khối cơ quan nhà nước:
+[986 Normal] ◦ Sở Khoa học và Công nghệ, Sở Tài nguyên và Môi trường, Sở Nông nghiệp và Phát triển nông thôn.
+[987 Normal] ◦ Phòng Tài nguyên và Môi trường; Chuyên viên làm việc tại UBND các cấp Tỉnh/Thành phố, Quận/Huyện.
+[988 Normal] ◦ Chi cục Bảo vệ môi trường; Chi cục Kiểm lâm.
+[989 Normal] • Khối đơn vị sự nghiệp:
+[990 Normal] ◦ Khu Công nghiệp; Khu Kinh tế...
+[991 Normal] ◦ Trung tâm Dự báo khí tượng, Trung tâm Biến đổi khí hậu, Trung tâm Quy hoạch và phát triển rừng.
+[992 Normal] ◦ Các trường đại học, cao đẳng, viện nghiên cứu trong lĩnh vực công nghệ Môi trường, Xử lý môi trường.
+[993 Normal] • Khối doanh nghiệp:
+[994 Normal] ◦ Công ty Môi trường đô thị, các công ty xử lý môi trường, các nhà máy, xí nghiệp, khu chế xuất hoạt động trong lĩnh vực xử lí môi trường, môi trường đô thị, cấp thoát nước,…
+[995 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[996 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ; học bổng hữu nghị Việt – Hàn...
+[997 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[998 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[999 Normal] • Các Sở Tài nguyên và Môi trường, các đơn vị sự nghiệp của nhà nước, các Trường Đại học, Viện nghiên cứu, Trung tâm nghiên cứu, các đơn vị tư vấn trong lĩnh vực tài nguyên và môi trường.
+[1000 Normal] • Các doanh nghiệp, các công ty Môi trường.
+[1001 Normal] 51. QUẢN LÝ ĐẤT ĐAI
+[1002 Normal] • Thời gian đào tạo: 4 năm
+[1003 Normal] • Khối lượng kiến thức: 135 tín chỉ
+[1004 Normal] • Bằng tốt nghiệp: Cử nhân
+[1005 Normal] GIỚI THIỆU
+[1006 Normal] • Quản lý đất đai là một lĩnh vực quan trọng trong quản lý tài nguyên tự nhiên, có vai trò quyết định trong việc bảo vệ môi trường, phát triển kinh tế và xã hội. Quản lý đất đai bao gồm việc thu thập, phân tích thông tin về đất đai, đánh giá tình trạng sử dụng và quản lý, cũng như đề xuất các biện pháp quản lý hợp lý. Ngành này bao gồm các lĩnh vực sau: Thu thập và phân tích dữ liệu về đất đai, Đánh giá và quản lý sử dụng đất, Bảo vệ môi trường, Xây dựng và thực thi các quy định, luật lệ và chính sách liên quan đến việc sử dụng và bảo vệ đất đai, Quản lý đất nông nghiệp và đô thị, Quản lý thị trường bất động sản, Nghiên cứu và phát triển để cải tiến kỹ thuật quản lý đất đai.
+[1007 Normal] CƠ HỘI VIỆC LÀM
+[1008 Normal] • Khối cơ quan nhà nước:
+[1009 Normal] ◦ Sở Tài nguyên và Môi trường các tỉnh/thành phố trực thuộc TW; UBND cấp tỉnh.
+[1010 Normal] ◦ Phòng Tài nguyên và Môi trường các quận/huyện/thị xã/thành phố thuộc tỉnh; UBND cấp huyện.
+[1011 Normal] ◦ Cán bộ địa chính xã, phường, thị trấn, UBND cấp xã.
+[1012 Normal] • Khối đơn vị sự nghiệp:
+[1013 Normal] ◦ Văn phòng Đăng ký đất đai, Chi nhánh Văn phòng Đăng ký đất đai.
+[1014 Normal] ◦ Trung tâm Công nghệ thông tin, Trung tâm Kỹ thuật dịch vụ TNMT thuộc Sở TNMT.
+[1015 Normal] ◦ Trung tâm Phát triển quỹ đất cấp tỉnh/huyện; Ban Giải phóng mặt bằng và Phát triển quỹ đất thuộc Khu Kinh tế.
+[1016 Normal] ◦ Các trường ĐH, CĐ, Viện nghiên cứu trong lĩnh vực công nghệ GIS, Viễn thám.
+[1017 Normal] • Khối doanh nghiệp & Khác:
+[1018 Normal] ◦ Các Công ty tư vấn đo đạc, quy hoạch, xây dựng, thẩm định giá, các công ty Bất động sản,…
+[1019 Normal] ◦ Các cơ quan quản lí nhà nước và đơn vị sự nghiệp trong lĩnh vực Nông nghiệp và Xây dựng.
+[1020 Normal] HỌC BỔNG VÀ HỖ TRỢ HỌC TẬP
+[1021 Normal] • Học bổng khuyến khích học tập, học bổng tài trợ từ doanh nghiệp, học bổng du học: học bổng VINIF, Erasmus+, IUC, học bổng Vallet, học bổng Đạm Cà Mau, học bổng Đạm Phú Mỹ; học bổng hữu nghị Việt – Hàn...
+[1022 Normal] • Hỗ trợ sinh viên nghiên cứu khoa học, khởi nghiệp, thực tập nâng cao kỹ năng nghề nghiệp.
+[1023 Normal] ĐỐI TÁC CHIẾN LƯỢC
+[1024 Normal] • Các Sở Tài nguyên và Môi trường, các đơn vị sự nghiệp của nhà nước, các Trường Đại học, Viện nghiên cứu, Trung tâm nghiên cứu, các đơn vị tư vấn trong lĩnh vực đất đai, Tài nguyên và Môi trường.
+[1025 Normal] • Các doanh nghiệp, công ty đo đạc, công ty Bất động sản.
+[1026 Normal] IV. SỨ MỆNH - TẦM NHÌN - GIÁ TRỊ CỐT LÕI - TRIẾT LÝ GIÁO DỤC
+[1027 Normal] 1. Sứ mệnh
+[1028 Normal] Trường Đại học Quy Nhơn là cơ sở giáo dục đại học đa ngành, đa lĩnh vực có sứ mệnh đào tạo, phát triển nguồn nhân lực chất lượng cao; bồi dưỡng nhân tài; nghiên cứu khoa học, truyền bá tri thức và chuyển giao công nghệ; phục vụ hiệu quả sự phát triển bền vững của đất nước, đặc biệt đối với khu vực Nam Trung Bộ - Tây Nguyên; góp phần thúc đẩy tiến bộ xã hội.
+[1029 Normal] 2. Tầm nhìn
+[1030 Normal] Đến năm 2030, Trường Đại học Quy Nhơn sẽ là trường đại học đa ngành, đa lĩnh vực định hướng ứng dụng có uy tín cao, đạt tiêu chuẩn chất lượng của khu vực Đông Nam Á; có vị thế quan trọng về hợp tác đào tạo, nghiên cứu, trao đổi học thuật, giao lưu văn hóa trong nước và quốc tế.
+[1031 Normal] 3. Giá trị cốt lõi
+[1032 Normal] Trách nhiệm - Chuyên nghiệp - Chất lượng - Sáng tạo - Nhân văn
+[1033 Normal] 4. Triết lý giáo dục
+[1034 Normal] TOÀN DIỆN - KHAI PHÓNG - THỰC NGHIỆP

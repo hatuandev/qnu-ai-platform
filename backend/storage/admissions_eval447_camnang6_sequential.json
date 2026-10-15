@@ -1,0 +1,2083 @@
+{
+  "started_at": "2026-10-14T13:44:46.361603+00:00",
+  "cases": [
+    {
+      "id": 2001,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, ngành Sư phạm Toán học học bao lâu và ra trường có thể làm công việc gì?"
+    },
+    {
+      "id": 2002,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, ngành Kỹ thuật phần mềm học bao lâu và có những cơ hội việc làm nào?"
+    },
+    {
+      "id": 2003,
+      "question": "Năm 2025, ngành Sư phạm Lịch sử có những tổ hợp môn xét tuyển nào?"
+    },
+    {
+      "id": 2004,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, xét học bạ sử dụng kết quả lớp nào?"
+    },
+    {
+      "id": 2005,
+      "question": "Năm 2026 xét học bạ của QNU chỉ dùng điểm lớp 12 như cẩm nang 2025 có đúng không?"
+    },
+    {
+      "id": 2006,
+      "question": "Có thể dùng các tổ hợp môn trong cẩm nang tuyển sinh QNU năm 2025 để khẳng định chắc chắn tổ hợp xét tuyển năm 2026 không?"
+    }
+  ],
+  "results": [
+    {
+      "id": 2001,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, ngành Sư phạm Toán học học bao lâu và ra trường có thể làm công việc gì?",
+      "route": "chat",
+      "conversation_id": "eval447_5b633ba3f4d9451b",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "missing",
+          "reason": "INVALID_OR_EMPTY_CLAIMS",
+          "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "QNU: cẩm nang tuyển sinh 2025 Sư phạm Toán học thời gian học và công việc sau tốt nghiệp QNU",
+            "years": [
+              2025
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "enumeration",
+            "enumeration_subject": "công việc",
+            "entity": "Sư phạm Toán học",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "information",
+            "attribute": "thời gian học, công việc sau tốt nghiệp",
+            "method": null,
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: cẩm nang tuyển sinh 2025 Sư phạm Toán học thời gian học QNU",
+              "QNU: cẩm nang tuyển sinh 2025 Sư phạm Toán học nghề nghiệp sau tốt nghiệp QNU",
+              "QNU: QNU Sư phạm Toán học học bao lâu và làm gì sau khi ra trường 2025"
+            ]
+          },
+          "claim_bindings": [],
+          "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "missing_constraints": [
+            "thời gian học",
+            "công việc sau tốt nghiệp"
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_09753d4edfaa:17:57",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_09753d4edfaa:39540:39633",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 20
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19552:19599",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19601:19718",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19720:19900",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19902:20196",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:20198:20340",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "facts:a006cf9d83b8ff4cfa5b",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 6
+            },
+            {
+              "id": "ks_rev_09753d4edfaa:31312:31405",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 17
+            },
+            {
+              "id": "ks_rev_b62147adc5ac:4245:4359",
+              "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_b62147adc5ac:5552:5711",
+              "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_4be16227642e:8965:9065",
+              "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+              "page": 5
+            },
+            {
+              "id": "facts:c1ab918a794706c3c1d0",
+              "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+              "page": 14
+            }
+          ],
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "corrective_retrieval_attempted": true,
+          "corrective_new_block_ids": [
+            "ks_rev_09753d4edfaa:17:57",
+            "ks_rev_09753d4edfaa:39540:39633",
+            "ks_rev_09753d4edfaa:31312:31405",
+            "ks_rev_4be16227642e:8965:9065",
+            "facts:c1ab918a794706c3c1d0"
+          ],
+          "repair_history": [
+            {
+              "errors": [],
+              "missing_constraints": [
+                "thời gian học",
+                "công việc sau tốt nghiệp"
+              ],
+              "uncovered_list_members": []
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 10438.13,
+            "retrieval_ms": 4587.07,
+            "proposal_ms": 2646.17,
+            "corrective_retrieval_ms": 4618.02,
+            "verification_ms": 7293.27
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "status": "insufficient_context",
+        "error_code": null,
+        "citations": [],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 24965.05,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_5b633ba3f4d9451b"
+      },
+      "elapsed_seconds": 25.17,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3414,
+          "completion_tokens": 500,
+          "latency_ms": 3284.8
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3478,
+          "completion_tokens": 344,
+          "latency_ms": 2547.22
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4255,
+          "completion_tokens": 938,
+          "latency_ms": 4293.47
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11776,
+          "completion_tokens": 208,
+          "latency_ms": 2499.21
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13065,
+          "completion_tokens": 234,
+          "latency_ms": 2598.82
+        }
+      ]
+    },
+    {
+      "id": 2002,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, ngành Kỹ thuật phần mềm học bao lâu và có những cơ hội việc làm nào?",
+      "route": "chat",
+      "conversation_id": "eval447_c9b0101ba1424412",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "missing",
+          "reason": "INVALID_OR_EMPTY_CLAIMS",
+          "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "QNU: cẩm nang tuyển sinh QNU 2025 Kỹ thuật phần mềm thời gian học và cơ hội việc làm",
+            "years": [
+              2025
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "enumeration",
+            "enumeration_subject": "cơ hội việc làm",
+            "entity": "Kỹ thuật phần mềm",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "information",
+            "attribute": "thời gian học",
+            "method": null,
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: cẩm nang tuyển sinh QNU 2025 Kỹ thuật phần mềm thời gian học",
+              "QNU: cẩm nang tuyển sinh QNU 2025 Kỹ thuật phần mềm cơ hội việc làm",
+              "QNU: QNU 2025 Kỹ thuật phần mềm học bao lâu và việc làm"
+            ]
+          },
+          "claim_bindings": [],
+          "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "missing_constraints": [
+            "thời gian học",
+            "cơ hội việc làm"
+          ],
+          "selection": [
+            {
+              "id": "ks_rev_09753d4edfaa:17:57",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19552:19599",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19601:19718",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19720:19900",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:19902:20196",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:20198:20340",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 9
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:1496:1510",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:4430:4475",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:4477:4558",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:4560:4864",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:4866:5101",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:3589:3618",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:9334:9554",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 5
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:9556:9936",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 5
+            },
+            {
+              "id": "facts:46868883d9b0aad70be1",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 6
+            }
+          ],
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "corrective_retrieval_attempted": true,
+          "corrective_new_block_ids": [],
+          "repair_history": [
+            {
+              "errors": [],
+              "missing_constraints": [
+                "thời gian học",
+                "cơ hội việc làm"
+              ],
+              "uncovered_list_members": []
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 9016.21,
+            "retrieval_ms": 4548.17,
+            "proposal_ms": 2242.6,
+            "corrective_retrieval_ms": 4831.59,
+            "verification_ms": 4831.67
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "status": "insufficient_context",
+        "error_code": null,
+        "citations": [],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 20639.12,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_c9b0101ba1424412"
+      },
+      "elapsed_seconds": 20.84,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3412,
+          "completion_tokens": 500,
+          "latency_ms": 2760.45
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3471,
+          "completion_tokens": 302,
+          "latency_ms": 2092.64
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4253,
+          "completion_tokens": 897,
+          "latency_ms": 3914.41
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 14505,
+          "completion_tokens": 259,
+          "latency_ms": 2161.76
+        }
+      ]
+    },
+    {
+      "id": 2003,
+      "question": "Năm 2025, ngành Sư phạm Lịch sử có những tổ hợp môn xét tuyển nào?",
+      "route": "chat",
+      "conversation_id": "eval447_ba77634e8a1844de",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "missing",
+          "reason": "PARTIAL_OR_MISSING_COVERAGE",
+          "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+          "requested": {
+            "query": "QNU: Các tổ hợp môn xét tuyển ngành Sư phạm Lịch sử năm 2025 tại QNU",
+            "years": [
+              2025
+            ],
+            "document_years": [],
+            "event_years": [
+              2025
+            ],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "enumeration",
+            "enumeration_subject": "tổ hợp môn",
+            "entity": "Sư phạm Lịch sử",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "enumeration",
+            "attribute": "tổ hợp môn xét tuyển",
+            "method": null,
+            "round": null,
+            "event": "tuyển sinh",
+            "search_queries": [
+              "QNU: tổ hợp môn xét tuyển Sư phạm Lịch sử 2025 QNU",
+              "QNU: các tổ hợp môn tuyển sinh ngành Sư phạm Lịch sử năm 2025 QNU",
+              "QNU: đề án tuyển sinh Sư phạm Lịch sử 2025 QNU tổ hợp môn"
+            ]
+          },
+          "claim_bindings": [],
+          "evidence_digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "missing_constraints": [
+            "thiếu danh sách các tổ hợp môn cụ thể cho Sư phạm Lịch sử năm 2025",
+            "các tổ hợp môn xét tuyển cho ngành Sư phạm Lịch sử năm 2025"
+          ],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Source contains exact line 'Sư phạm Lịch sử TỔ HỢP MÔN XÉT TUYỂN: (' in 2025 QNU recruitment guide.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [
+            {
+              "claim_id": "c1.1",
+              "reason": "Nguồn chỉ cho tiêu đề \"Sư phạm Lịch sử TỔ HỢP MÔN XÉT TUYỂN: (\" mà không liệt kê bất kỳ tổ hợp môn nào; do đó khẳng định về các tổ hợp không được chứng minh."
+            }
+          ],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "Sư phạm Lịch sử\nTỔ HỢP MÔN XÉT TUYỂN: (",
+                "supporting_quote": "Sư phạm Lịch sử\nTỔ HỢP MÔN XÉT TUYỂN: (",
+                "entailed": false,
+                "reason": "Nguồn chỉ cho tiêu đề \"Sư phạm Lịch sử TỔ HỢP MÔN XÉT TUYỂN: (\" mà không liệt kê bất kỳ tổ hợp môn nào; do đó khẳng định về các tổ hợp không được chứng minh."
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "các tổ hợp môn xét tuyển cho ngành Sư phạm Lịch sử năm 2025",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "facts:0ecd5f488b48d07cf733",
+                  "quote": "Sư phạm Lịch sử\nTỔ HỢP MÔN XÉT TUYỂN: ("
+                },
+                "retained_by": []
+              }
+            ],
+            "complete": false,
+            "missing_constraints": [
+              "thiếu danh sách các tổ hợp môn cụ thể cho Sư phạm Lịch sử năm 2025"
+            ]
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [
+            {
+              "errors": [
+                {
+                  "claim_id": "c1.1",
+                  "reason": "Nguồn chỉ cho tiêu đề \"Sư phạm Lịch sử TỔ HỢP MÔN XÉT TUYỂN: (\" mà không liệt kê bất kỳ tổ hợp môn nào; do đó khẳng định về các tổ hợp không được chứng minh."
+                }
+              ],
+              "missing_constraints": [
+                "thiếu danh sách các tổ hợp môn cụ thể cho Sư phạm Lịch sử năm 2025",
+                "các tổ hợp môn xét tuyển cho ngành Sư phạm Lịch sử năm 2025"
+              ],
+              "uncovered_list_members": []
+            }
+          ],
+          "corrective_retrieval_attempted": true,
+          "corrective_new_block_ids": [],
+          "source_preferences": [],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_09753d4edfaa:17:57",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "facts:0ecd5f488b48d07cf733",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2735:2770",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:2772:2814",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:1496:1510",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:3191:3216",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:3218:3355",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:3357:3452",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:3454:3546",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:14001:14050",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 7
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16601:16814",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16816:16953",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16955:17411",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:17413:17591",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 6984.48,
+            "retrieval_ms": 4181.69,
+            "proposal_ms": 6595.9,
+            "corrective_retrieval_ms": 4699.42,
+            "verification_ms": 15403.44
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\nChưa đủ căn cứ để trả lời đầy đủ yêu cầu của bạn.\n\nTrong nguồn đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho phần thông tin bạn hỏi. Bạn có thể liên hệ tư vấn tuyển sinh QNU qua 1800.55.88.49 để được xác nhận.",
+        "status": "insufficient_context",
+        "error_code": null,
+        "citations": [],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 33166.26,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_ba77634e8a1844de"
+      },
+      "elapsed_seconds": 33.34,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3405,
+          "completion_tokens": 411,
+          "latency_ms": 3449.51
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4246,
+          "completion_tokens": 879,
+          "latency_ms": 3363.71
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13148,
+          "completion_tokens": 617,
+          "latency_ms": 6512.71
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11662,
+          "completion_tokens": 577,
+          "latency_ms": 5860.49
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13579,
+          "completion_tokens": 595,
+          "latency_ms": 4648.42
+        }
+      ]
+    },
+    {
+      "id": 2004,
+      "question": "Theo cẩm nang tuyển sinh năm 2025, xét học bạ sử dụng kết quả lớp nào?",
+      "route": "chat",
+      "conversation_id": "eval447_2633747b39b646f3",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2025:\n\n**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+          "requested": {
+            "query": "QNU: Theo cẩm nang tuyển sinh năm 2025, xét học bạ sử dụng kết quả lớp nào?",
+            "years": [
+              2025
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "enumeration_subject": null,
+            "entity": "học bạ",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "information",
+            "attribute": "kết quả lớp",
+            "method": "xét học bạ",
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: cẩm nang tuyển sinh 2025 QNU học bạ lớp nào",
+              "QNU: QNU xét học bạ kết quả lớp nào 2025",
+              "QNU: QNU tuyển sinh 2025 học bạ lớp"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1.1",
+              "text": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+              "references": [
+                {
+                  "block_id": "ks_rev_09753d4edfaa:214:320",
+                  "quote": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+                  "binding_id": "bnd_af2d17a6f0d9",
+                  "index_revision_id": "idx_rev_c1837199e835",
+                  "source_revision_id": "ks_rev_09753d4edfaa",
+                  "page_number": 1,
+                  "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+                  "section": "",
+                  "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "unknown",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 214,
+                  "end": 320
+                },
+                {
+                  "block_id": "ks_rev_09753d4edfaa:17:57",
+                  "quote": "**CẨM NANG TUYỂN SINH ĐẠI HỌC NĂM 2025**",
+                  "binding_id": "bnd_af2d17a6f0d9",
+                  "index_revision_id": "idx_rev_c1837199e835",
+                  "source_revision_id": "ks_rev_09753d4edfaa",
+                  "page_number": 1,
+                  "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+                  "section": "",
+                  "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 17,
+                  "end": 57
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "f90b4f1f69abd262b5b436eb5ede8050d6be60b7eb5558c7522f0aad423c00f1",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Guide 2025 explicitly states học bạ uses điểm trung bình cả năm lớp 12.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+                "supporting_quote": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+                "entailed": true,
+                "reason": "Claim matches exact wording in source evidence e2"
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "điểm trung bình cả năm lớp 12",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_09753d4edfaa:214:320",
+                  "quote": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển)."
+                },
+                "retained_by": [
+                  "c1.1"
+                ]
+              }
+            ],
+            "complete": true,
+            "missing_constraints": []
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [],
+          "corrective_retrieval_attempted": false,
+          "corrective_new_block_ids": [],
+          "source_preferences": [],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_09753d4edfaa:17:57",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_09753d4edfaa:214:320",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:136:226",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:1496:1510",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2313:2351",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2477:2508",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2510:2563",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2565:2639",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2641:2774",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_672bd2a13d44:2776:2821",
+              "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:14001:14050",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 7
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16601:16814",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16816:16953",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:16955:17411",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:17413:17591",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 8
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 5925.81,
+            "retrieval_ms": 4018.95,
+            "proposal_ms": 2652.3,
+            "verification_ms": 9174.62
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2025:\n\n**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 214,
+            "span_end": 320,
+            "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+            "source_id": "bnd_af2d17a6f0d9",
+            "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+            "section": "",
+            "page_number": 1,
+            "quote": "**2.** Xét tuyển theo kết quả học tập THPT (Học bạ - điểm trung bình cả năm lớp 12 theo tổ hợp xét tuyển).",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_af2d17a6f0d9",
+            "index_revision_id": "idx_rev_c1837199e835",
+            "source_revision_id": "ks_rev_09753d4edfaa",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 17,
+            "span_end": 57,
+            "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+            "source_id": "bnd_af2d17a6f0d9",
+            "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+            "section": "",
+            "page_number": 1,
+            "quote": "**CẨM NANG TUYỂN SINH ĐẠI HỌC NĂM 2025**",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_af2d17a6f0d9",
+            "index_revision_id": "idx_rev_c1837199e835",
+            "source_revision_id": "ks_rev_09753d4edfaa",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 21772.55,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_2633747b39b646f3"
+      },
+      "elapsed_seconds": 21.97,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3405,
+          "completion_tokens": 400,
+          "latency_ms": 2556.39
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4246,
+          "completion_tokens": 638,
+          "latency_ms": 3206.81
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 12871,
+          "completion_tokens": 342,
+          "latency_ms": 2529.07
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11375,
+          "completion_tokens": 355,
+          "latency_ms": 2634.65
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 13295,
+          "completion_tokens": 566,
+          "latency_ms": 6353.09
+        }
+      ]
+    },
+    {
+      "id": 2005,
+      "question": "Năm 2026 xét học bạ của QNU chỉ dùng điểm lớp 12 như cẩm nang 2025 có đúng không?",
+      "route": "chat",
+      "conversation_id": "eval447_302a291a5c204ed0",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nĐối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+          "requested": {
+            "query": "QNU: QNU xét học bạ 2026 chỉ dùng điểm lớp 12 như cẩm nang 2025 có đúng không",
+            "years": [
+              2026
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "enumeration_subject": null,
+            "entity": "học bạ",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "xác nhận",
+            "attribute": "điểm lớp 12",
+            "method": "xét học bạ",
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: QNU xét học bạ 2026 chỉ dùng điểm lớp 12 cẩm nang 2025",
+              "QNU: QNU tiêu chí xét học bạ 2026 điểm lớp 12",
+              "QNU: QNU handbook 2025 điểm lớp 12 xét học bạ 2026"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1.1",
+              "text": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+              "references": [
+                {
+                  "block_id": "ks_rev_aae30aac628c:3584:4106",
+                  "quote": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+                  "binding_id": "bnd_9da34f16ef75",
+                  "index_revision_id": "idx_rev_ec8a7677282b",
+                  "source_revision_id": "ks_rev_aae30aac628c",
+                  "page_number": 2,
+                  "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+                  "section": "## III. Xét tuyển bằng kết quả học tập trung học phổ thông",
+                  "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2026
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 3584,
+                  "end": 3737
+                },
+                {
+                  "block_id": "ks_rev_aae30aac628c:17:69",
+                  "quote": "**BỘ TRI THỨC TUYỂN SINH ĐẠI HỌC QUY NHƠN NĂM 2026**",
+                  "binding_id": "bnd_9da34f16ef75",
+                  "index_revision_id": "idx_rev_ec8a7677282b",
+                  "source_revision_id": "ks_rev_aae30aac628c",
+                  "page_number": 1,
+                  "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+                  "section": "",
+                  "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2026
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 17,
+                  "end": 69
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "65ae060d745fdc666286e4c69cdc83b344a3f1aa396cfcd7e9dedc79473148f1",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Quote explicitly states PT2 method uses grades from lớp 10, 11, 12 for 2026 recruitment at QNU.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+                "supporting_quote": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+                "entailed": true,
+                "reason": "Supported by e5.1"
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "kết quả học tập lấy từ lớp 10, lớp 11 và lớp 12",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_aae30aac628c:3584:4106",
+                  "quote": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12."
+                },
+                "retained_by": [
+                  "c1.1"
+                ]
+              }
+            ],
+            "complete": true,
+            "missing_constraints": []
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [],
+          "corrective_retrieval_attempted": false,
+          "corrective_new_block_ids": [],
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_aae30aac628c:17:69",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_aae30aac628c:7563:7616",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_aae30aac628c:8094:8600",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_aae30aac628c:3524:3582",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_aae30aac628c:3584:4106",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_aae30aac628c:4108:4613",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_aae30aac628c:12545:12586",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 5
+            },
+            {
+              "id": "ks_rev_aae30aac628c:13980:14313",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 6
+            },
+            {
+              "id": "ks_rev_aae30aac628c:12588:13096",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 5
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:14334:14371",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 9
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 4772.14,
+            "retrieval_ms": 4990.81,
+            "proposal_ms": 2637.63,
+            "verification_ms": 6017.89
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2026:\n\nĐối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 3584,
+            "span_end": 3737,
+            "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+            "source_id": "bnd_9da34f16ef75",
+            "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+            "section": "## III. Xét tuyển bằng kết quả học tập trung học phổ thông",
+            "page_number": 2,
+            "quote": "Đối với phương thức xét học bạ PT2 trong tuyển sinh năm 2026 của Trường Đại học Quy Nhơn, kết quả học tập được lấy từ cả ba năm lớp 10, lớp 11 và lớp 12.",
+            "source_pages": [
+              2
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_9da34f16ef75",
+            "index_revision_id": "idx_rev_ec8a7677282b",
+            "source_revision_id": "ks_rev_aae30aac628c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 17,
+            "span_end": 69,
+            "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+            "source_id": "bnd_9da34f16ef75",
+            "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+            "section": "",
+            "page_number": 1,
+            "quote": "**BỘ TRI THỨC TUYỂN SINH ĐẠI HỌC QUY NHƠN NĂM 2026**",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_9da34f16ef75",
+            "index_revision_id": "idx_rev_ec8a7677282b",
+            "source_revision_id": "ks_rev_aae30aac628c",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 18419.38,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_302a291a5c204ed0"
+      },
+      "elapsed_seconds": 18.58,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3412,
+          "completion_tokens": 242,
+          "latency_ms": 1786.98
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4260,
+          "completion_tokens": 840,
+          "latency_ms": 2789.78
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11098,
+          "completion_tokens": 398,
+          "latency_ms": 2550.53
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 8827,
+          "completion_tokens": 284,
+          "latency_ms": 2574.72
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 11574,
+          "completion_tokens": 641,
+          "latency_ms": 3268.26
+        }
+      ]
+    },
+    {
+      "id": 2006,
+      "question": "Có thể dùng các tổ hợp môn trong cẩm nang tuyển sinh QNU năm 2025 để khẳng định chắc chắn tổ hợp xét tuyển năm 2026 không?",
+      "route": "chat",
+      "conversation_id": "eval447_f2721fe71662407a",
+      "http": 200,
+      "response": {
+        "answer_decision": {
+          "version": "evidence-claims-v1",
+          "status": "supported",
+          "reason": "VERIFIED_CLAIM_COVERAGE",
+          "answer": "Đối chiếu năm 2026:\n\nSư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)\n\nĐiểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+          "requested": {
+            "query": "QNU: cẩm nang tuyển sinh QNU 2025 tổ hợp môn dùng để khẳng định tổ hợp xét tuyển 2026",
+            "years": [
+              2026
+            ],
+            "document_years": [
+              2025
+            ],
+            "event_years": [],
+            "requires_year": true,
+            "uses_history": false,
+            "coverage": "focused",
+            "enumeration_subject": null,
+            "entity": "tổ hợp môn",
+            "target_institution": "QNU",
+            "exam_organizer": null,
+            "intent": "xác định tính áp dụng của tổ hợp môn năm trước cho năm tiếp theo",
+            "attribute": "độ chắc chắn",
+            "method": "cẩm nang tuyển sinh",
+            "round": null,
+            "event": null,
+            "search_queries": [
+              "QNU: cẩm nang tuyển sinh QNU 2025 tổ hợp môn",
+              "QNU: tổ hợp xét tuyển QNU 2026",
+              "QNU: so sánh cẩm nang QNU 2025 và 2026 tổ hợp môn"
+            ]
+          },
+          "claim_bindings": [
+            {
+              "id": "c1.1",
+              "text": "Sư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)",
+              "references": [
+                {
+                  "block_id": "facts:6aa0bd5e04e23ed65fa3",
+                  "quote": "Sư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)",
+                  "binding_id": "bnd_af2d17a6f0d9",
+                  "index_revision_id": "idx_rev_c1837199e835",
+                  "source_revision_id": "ks_rev_09753d4edfaa",
+                  "page_number": 1,
+                  "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+                  "section": "",
+                  "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+                  "origin": "reviewed_fact",
+                  "fact_id": "fct_5cfbdd05f38ef3d0b9f8f1e4",
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "unknown",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": "Sư phạm Sinh học",
+                  "start": null,
+                  "end": null
+                }
+              ],
+              "verified": true
+            },
+            {
+              "id": "c2.1",
+              "text": "Điểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+              "references": [
+                {
+                  "block_id": "ks_rev_aae30aac628c:13980:14313",
+                  "quote": "Điểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+                  "binding_id": "bnd_9da34f16ef75",
+                  "index_revision_id": "idx_rev_ec8a7677282b",
+                  "source_revision_id": "ks_rev_aae30aac628c",
+                  "page_number": 6,
+                  "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+                  "section": "## XII. Quy đổi điểm giữa các phương thức",
+                  "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2025,
+                      2026
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 13980,
+                  "end": 14313
+                },
+                {
+                  "block_id": "ks_rev_aae30aac628c:17:69",
+                  "quote": "**BỘ TRI THỨC TUYỂN SINH ĐẠI HỌC QUY NHƠN NĂM 2026**",
+                  "binding_id": "bnd_9da34f16ef75",
+                  "index_revision_id": "idx_rev_ec8a7677282b",
+                  "source_revision_id": "ks_rev_aae30aac628c",
+                  "page_number": 1,
+                  "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+                  "section": "",
+                  "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+                  "origin": "canonical",
+                  "fact_id": null,
+                  "temporal_scope": {
+                    "issued_date": null,
+                    "mentioned_years": [
+                      2026
+                    ],
+                    "heading_years": [],
+                    "data_years": [],
+                    "status": "proposed",
+                    "role": "unknown",
+                    "evidence_quote": null
+                  },
+                  "entity_name": null,
+                  "start": 17,
+                  "end": 69
+                }
+              ],
+              "verified": true
+            }
+          ],
+          "evidence_digest": "be997162c0fdbf15dc1cde91b4cb103a772df249a5fb2d91c7ebe202efba9677",
+          "missing_constraints": [],
+          "verification": {
+            "verdicts": [
+              {
+                "claim_id": "c1.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Quote exact; shows 2025 subject combos for Sư phạm Sinh học; matches QNU context.",
+                "superseded_by": []
+              },
+              {
+                "claim_id": "c2.1",
+                "entailed": true,
+                "relevant": true,
+                "scope_compatible": true,
+                "reason": "Quote states 2025 cutoff only historical, cannot guarantee 2026 admission; directly answers certainty question.",
+                "superseded_by": []
+              }
+            ],
+            "complete": true,
+            "conflict": false,
+            "missing_constraints": []
+          },
+          "binding_rejections": [],
+          "quote_repair_attempted": false,
+          "semantic_audit": {
+            "atomic_checks": [
+              {
+                "claim_id": "c1.1",
+                "claim_quote": "Sư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)",
+                "supporting_quote": "Sư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)",
+                "entailed": true,
+                "reason": "All statements matched source"
+              },
+              {
+                "claim_id": "c2.1",
+                "claim_quote": "Điểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+                "supporting_quote": "Điểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+                "entailed": true,
+                "reason": "All statements matched source"
+              }
+            ],
+            "required_qualifiers": [
+              {
+                "requirement": "Không được dùng dữ liệu năm trước để khẳng định chắc chắn kết quả tuyển sinh năm tiếp theo",
+                "role": "value_constraint",
+                "reference": {
+                  "block_id": "ks_rev_aae30aac628c:13980:14313",
+                  "quote": "Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh."
+                },
+                "retained_by": [
+                  "c2.1"
+                ]
+              }
+            ],
+            "complete": true,
+            "missing_constraints": [
+              "Không có bằng chứng tổ hợp môn 2026 để khẳng định tính chắc chắn"
+            ]
+          },
+          "semantic_repair_attempted": false,
+          "repair_history": [],
+          "corrective_retrieval_attempted": false,
+          "corrective_new_block_ids": [],
+          "source_preferences": [
+            {
+              "preferred_source_revision_id": "ks_rev_6280c8de7f46",
+              "superseded_source_revision_ids": [
+                "ks_rev_f122689af572"
+              ],
+              "years": [
+                2026
+              ],
+              "same_context_only": true,
+              "authorization_note": "Người quản trị xác nhận ngày 2026-10-13: Ưu tiên TB 1906 cập nhật cho thông tin cùng ngữ cảnh; thay flyer đầu mùa chỉ khi cùng năm và cùng thông tin."
+            }
+          ],
+          "uncovered_list_members": [],
+          "selection": [
+            {
+              "id": "ks_rev_aae30aac628c:17:69",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_aae30aac628c:12545:12586",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 5
+            },
+            {
+              "id": "ks_rev_aae30aac628c:13980:14313",
+              "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+              "page": 6
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:179:237",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:269:768",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_a12f0f3f4a99:175:285",
+              "title": "Hương dan thi Nang khieu GDTC 2026",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_a12f0f3f4a99:613:628",
+              "title": "Hương dan thi Nang khieu GDTC 2026",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_a12f0f3f4a99:1868:2113",
+              "title": "Hương dan thi Nang khieu GDTC 2026",
+              "page": 2
+            },
+            {
+              "id": "facts:6aa0bd5e04e23ed65fa3",
+              "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+              "page": 1
+            },
+            {
+              "id": "facts:b73a30a201e4881e3af8",
+              "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2346:2410",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:2624:2641",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:3589:3618",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 2
+            },
+            {
+              "id": "ks_rev_a34cee5023eb:7328:7555",
+              "title": "Quy chế tuyển sinh đại học 2026 - 363",
+              "page": 4
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:2936:3105",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 3
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:960:988",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_1610bf67e2cf:989:1097",
+              "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+              "page": 1
+            },
+            {
+              "id": "ks_rev_6280c8de7f46:79:141",
+              "title": "Thông tin TSĐH cập nhật",
+              "page": 1
+            }
+          ],
+          "stage_timings_ms": {
+            "planning_ms": 5618.64,
+            "retrieval_ms": 4374.65,
+            "proposal_ms": 3083.69,
+            "verification_ms": 9357.58
+          }
+        },
+        "assistant_code": "admissions",
+        "assistant_name": "Mô-đun trợ lý ảo tư vấn tuyển sinh",
+        "answer": "Đối chiếu năm 2026:\n\nSư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)\n\nĐiểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+        "status": "answered",
+        "error_code": null,
+        "citations": [
+          {
+            "evidence_origin": "reviewed_fact",
+            "fact_id": "fct_5cfbdd05f38ef3d0b9f8f1e4",
+            "span_start": null,
+            "span_end": null,
+            "canonical_hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3",
+            "source_id": "bnd_af2d17a6f0d9",
+            "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+            "section": "",
+            "page_number": 1,
+            "quote": "Sư phạm Sinh học\nTỔ HỢP MÔN XÉT TUYỂN: (Toán, Hóa, Sinh); (Toán, Sinh, Anh); (Toán, Lý, Sinh)",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_af2d17a6f0d9",
+            "index_revision_id": "idx_rev_c1837199e835",
+            "source_revision_id": "ks_rev_09753d4edfaa",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 13980,
+            "span_end": 14313,
+            "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+            "source_id": "bnd_9da34f16ef75",
+            "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+            "section": "## XII. Quy đổi điểm giữa các phương thức",
+            "page_number": 6,
+            "quote": "Điểm chuẩn năm 2025 của Trường Đại học Quy Nhơn chỉ có thể được sử dụng như dữ liệu lịch sử để tham khảo khi đánh giá cơ hội trúng tuyển năm 2026. Không được lấy điểm chuẩn của năm trước để kết luận chắc chắn một thí sinh sẽ trúng tuyển trong năm tiếp theo, vì điều kiện và kết quả xét tuyển có thể thay đổi theo từng mùa tuyển sinh.",
+            "source_pages": [
+              6
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_9da34f16ef75",
+            "index_revision_id": "idx_rev_ec8a7677282b",
+            "source_revision_id": "ks_rev_aae30aac628c",
+            "revision_no": null
+          },
+          {
+            "evidence_origin": "canonical",
+            "fact_id": null,
+            "span_start": 17,
+            "span_end": 69,
+            "canonical_hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd",
+            "source_id": "bnd_9da34f16ef75",
+            "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+            "section": "",
+            "page_number": 1,
+            "quote": "**BỘ TRI THỨC TUYỂN SINH ĐẠI HỌC QUY NHƠN NĂM 2026**",
+            "source_pages": [
+              1
+            ],
+            "entity_key": null,
+            "binding_id": "bnd_9da34f16ef75",
+            "index_revision_id": "idx_rev_ec8a7677282b",
+            "source_revision_id": "ks_rev_aae30aac628c",
+            "revision_no": null
+          }
+        ],
+        "suggested_questions": [
+          "Điểm chuẩn ngành Sư phạm Toán học và Công nghệ thông tin các năm gần nhất là bao nhiêu?",
+          "Trường Đại học Quy Nhơn áp dụng những phương thức xét tuyển nào?",
+          "Chính sách hỗ trợ học phí và sinh hoạt phí cho sinh viên Sư phạm theo Nghị định 116 như thế nào?"
+        ],
+        "latency_ms": 22435.53,
+        "execution_id": null,
+        "artifacts": [],
+        "conversation_id": "eval447_f2721fe71662407a"
+      },
+      "elapsed_seconds": 22.59,
+      "served_models": [
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 3418,
+          "completion_tokens": 324,
+          "latency_ms": 1993.46
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 4265,
+          "completion_tokens": 787,
+          "latency_ms": 3418.01
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 14174,
+          "completion_tokens": 729,
+          "latency_ms": 2991.93
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 12410,
+          "completion_tokens": 1126,
+          "latency_ms": 4297.27
+        },
+        {
+          "model": "gpt-oss:120b",
+          "provider": "custom",
+          "fallback": false,
+          "status": "success",
+          "prompt_tokens": 15107,
+          "completion_tokens": 1064,
+          "latency_ms": 4878.76
+        }
+      ]
+    }
+  ],
+  "method": "Fresh handbook and year controls; chat requests contain questions only, no expected answers.",
+  "code_fingerprint": "34ba3da044866f39e9cc73e2fb0f2845a890fbd92aff0d404d424be301ec16bc",
+  "assistant": {
+    "collection_id": "col_admissions",
+    "tenant_id": "tenant_qnu",
+    "updated_at": "2026-10-13T16:44:40.925985"
+  },
+  "configuration_fingerprint": "d44d96c4f2a9646a212d33470690dd9da590d6293bbf665a149bfddb00043e1b",
+  "publication": {
+    "snapshot": {
+      "snapshot_id": "snap_col_admissions_7_ca8cdb0c",
+      "collection_id": "col_admissions",
+      "collection_epoch": 7,
+      "binding_revisions": {
+        "bnd_af2d17a6f0d9": "idx_rev_c1837199e835",
+        "bnd_9da34f16ef75": "idx_rev_ec8a7677282b",
+        "bnd_0798d6ebb09d": "idx_rev_d64d0baf0c06",
+        "bnd_0a0fefc849ab": "idx_rev_a90d85902c4f",
+        "bnd_0dd3d2789954": "idx_rev_daf4d2e4f534",
+        "bnd_18c9c944ee36": "idx_rev_2b7b7ec56f95",
+        "bnd_35c0b812a4fe": "idx_rev_ac9ec09ebb97",
+        "bnd_4bd40bc6a972": "idx_rev_57e15196704d",
+        "bnd_4d788e0c0ee2": "idx_rev_00fbccf1d07e",
+        "bnd_574bfd4e5288": "idx_rev_76cae24bd0dd",
+        "bnd_5fe00fd59740": "idx_rev_c0a54bf73b18",
+        "bnd_60019f7e73d6": "idx_rev_575e4b49149a",
+        "bnd_62ff83603eec": "idx_rev_e0dc72a9102b",
+        "bnd_887623d8d318": "idx_rev_d39d623aef4e",
+        "bnd_8dc32a78128f": "idx_rev_97f860b2edbf",
+        "bnd_b7be60e6ada9": "idx_rev_33446987e9fc",
+        "bnd_bdb1f500cdbe": "idx_rev_742b1ff6d265",
+        "bnd_c6d3848722ab": "idx_rev_d7b434305a6c",
+        "bnd_db935aea6524": "idx_rev_44d332b2f2e8",
+        "bnd_e4492e8d7016": "idx_rev_42074c9dee55",
+        "bnd_ed14ffc71bc0": "idx_rev_46812c2c2247"
+      },
+      "vector_generations": {
+        "bnd_af2d17a6f0d9": "vg_21324678abcf",
+        "bnd_9da34f16ef75": "vg_21324678abcf",
+        "bnd_0798d6ebb09d": "vg_21324678abcf",
+        "bnd_0a0fefc849ab": "vg_21324678abcf",
+        "bnd_0dd3d2789954": "vg_21324678abcf",
+        "bnd_18c9c944ee36": "vg_21324678abcf",
+        "bnd_35c0b812a4fe": "vg_21324678abcf",
+        "bnd_4bd40bc6a972": "vg_21324678abcf",
+        "bnd_4d788e0c0ee2": "vg_21324678abcf",
+        "bnd_574bfd4e5288": "vg_21324678abcf",
+        "bnd_5fe00fd59740": "vg_21324678abcf",
+        "bnd_60019f7e73d6": "vg_21324678abcf",
+        "bnd_62ff83603eec": "vg_21324678abcf",
+        "bnd_887623d8d318": "vg_21324678abcf",
+        "bnd_8dc32a78128f": "vg_21324678abcf",
+        "bnd_b7be60e6ada9": "vg_21324678abcf",
+        "bnd_bdb1f500cdbe": "vg_21324678abcf",
+        "bnd_c6d3848722ab": "vg_21324678abcf",
+        "bnd_db935aea6524": "vg_21324678abcf",
+        "bnd_e4492e8d7016": "vg_21324678abcf",
+        "bnd_ed14ffc71bc0": "vg_21324678abcf"
+      },
+      "tenant_id": "tenant_qnu",
+      "workspace_id": "workspace_qnu",
+      "created_at": "2026-10-14T13:44:46.953028+00:00"
+    },
+    "fingerprint": "c53f1acbde1bacbed06b",
+    "sources": [
+      {
+        "source": "ks_rev_b62147adc5ac",
+        "title": "2025_huong-dan-tuyen-sinh-dh-cd",
+        "binding": "bnd_8dc32a78128f",
+        "index": "idx_rev_97f860b2edbf",
+        "hash": "e73f91a10deac0250e482ca9f21bb5f78523e8585368e7ac8ace8d4d6bcb39a5"
+      },
+      {
+        "source": "ks_rev_2d6dd82b25ce",
+        "title": "Muc hoc phi 2024",
+        "binding": "bnd_18c9c944ee36",
+        "index": "idx_rev_2b7b7ec56f95",
+        "hash": "5a3f338fc0865418cd191e10f490e9acc4cee23dcf757d2889232e2038595fbd"
+      },
+      {
+        "source": "ks_rev_a12f0f3f4a99",
+        "title": "Hương dan thi Nang khieu GDTC 2026",
+        "binding": "bnd_574bfd4e5288",
+        "index": "idx_rev_76cae24bd0dd",
+        "hash": "bd6919a94a93945d2e7923cced6b3a1548c55eba917b1d9464721805366fb52a"
+      },
+      {
+        "source": "ks_rev_ad7e7e64bccf",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2024_FINAL (1)_signed_signed-signed",
+        "binding": "bnd_0dd3d2789954",
+        "index": "idx_rev_daf4d2e4f534",
+        "hash": "eb991fad090fea44b9152f8e18428ba7be059a66176d17939871ca1aee3e053f"
+      },
+      {
+        "source": "ks_rev_0aea050f89c4",
+        "title": "BC Kết quả khảo sát Tư vấn tuyển sinh 2022",
+        "binding": "bnd_60019f7e73d6",
+        "index": "idx_rev_575e4b49149a",
+        "hash": "94d8f0904a6740b6d7c026865b7153ad35aa88e4479598cb1b6e5801f22db169"
+      },
+      {
+        "source": "ks_rev_f122689af572",
+        "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+        "binding": "bnd_ed14ffc71bc0",
+        "index": "idx_rev_46812c2c2247",
+        "hash": "ad580f750edf36b297877b6be432ba03f61551e49689cfac1a7b6277dc76a44f"
+      },
+      {
+        "source": "ks_rev_3e699f33e06c",
+        "title": "HD nhập học",
+        "binding": "bnd_e4492e8d7016",
+        "index": "idx_rev_42074c9dee55",
+        "hash": "411182a446724cd9594b58b09f38f68dfb5bcef19f0e673015238526e6fb9a2c"
+      },
+      {
+        "source": "ks_rev_aae30aac628c",
+        "title": "QNU_TuyenSinh_2026_VanBanThuyetMinh",
+        "binding": "bnd_9da34f16ef75",
+        "index": "idx_rev_ec8a7677282b",
+        "hash": "78598a325c3e36879b0e0d6f341c6af965dbd31c9c1657f822b2084e01babefd"
+      },
+      {
+        "source": "ks_rev_1610bf67e2cf",
+        "title": "Thong_bao_quy_doi_tuong_duong_QNU_2026_Chinh thuc-signed",
+        "binding": "bnd_c6d3848722ab",
+        "index": "idx_rev_d7b434305a6c",
+        "hash": "53e4ec625751a196322a2f616ab73a1310f1e527a1293b7b7c5ae29b1d29798d"
+      },
+      {
+        "source": "ks_rev_672bd2a13d44",
+        "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+        "binding": "bnd_0a0fefc849ab",
+        "index": "idx_rev_a90d85902c4f",
+        "hash": "f4f3c8ce3546b36f092175aa6cefa5a61a98c24f7f88c5355810f374f2d08d7b"
+      },
+      {
+        "source": "ks_rev_cf1863148443",
+        "title": "TB điểm sàn 26",
+        "binding": "bnd_35c0b812a4fe",
+        "index": "idx_rev_ac9ec09ebb97",
+        "hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c"
+      },
+      {
+        "source": "ks_rev_4be16227642e",
+        "title": "phu-luc-hd-tuyen-sinh-2025.signed",
+        "binding": "bnd_0798d6ebb09d",
+        "index": "idx_rev_d64d0baf0c06",
+        "hash": "bf379846754a4821d262767505d60f0dbe5cc7268adfdb726c89b9776d926075"
+      },
+      {
+        "source": "ks_rev_403157cd7511",
+        "title": "Phuong huong tuyen sinh 2024_DHQN_final",
+        "binding": "bnd_887623d8d318",
+        "index": "idx_rev_d39d623aef4e",
+        "hash": "340e133e1e0f99042d6c893a701aa23ed071cbcb667c4b1dd0026994ae81148a"
+      },
+      {
+        "source": "ks_rev_09753d4edfaa",
+        "title": "Cam_Nang_Tuyen_Sinh_Dai_Hoc_2025_QNU",
+        "binding": "bnd_af2d17a6f0d9",
+        "index": "idx_rev_c1837199e835",
+        "hash": "d9440eda31b9b4be3d6f87dda98b169daff9a54482e761af02eae0048b0bf3e3"
+      },
+      {
+        "source": "ks_rev_c9344b18c429",
+        "title": "TB lịch xét tuyển ĐH",
+        "binding": "bnd_db935aea6524",
+        "index": "idx_rev_44d332b2f2e8",
+        "hash": "f9ca20b7e4328551fb99f2bf59bb57c1462f7fe5cdb566364f9ce6aae265e5bc"
+      },
+      {
+        "source": "ks_rev_a34cee5023eb",
+        "title": "Quy chế tuyển sinh đại học 2026 - 363",
+        "binding": "bnd_62ff83603eec",
+        "index": "idx_rev_e0dc72a9102b",
+        "hash": "a4ad7ae78898691f96a36d4d07330d7101c272a253f966407a2af4174c66d5e1"
+      },
+      {
+        "source": "ks_rev_6280c8de7f46",
+        "title": "Thông tin TSĐH cập nhật",
+        "binding": "bnd_b7be60e6ada9",
+        "index": "idx_rev_33446987e9fc",
+        "hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74"
+      },
+      {
+        "source": "ks_rev_2764521a96a3",
+        "title": "TB học phí K49",
+        "binding": "bnd_4bd40bc6a972",
+        "index": "idx_rev_57e15196704d",
+        "hash": "57afdb9f55f0910dac916a8806168e15c0466434740bede12db2f035dfc7072a"
+      },
+      {
+        "source": "ks_rev_26248a79ce32",
+        "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+        "binding": "bnd_5fe00fd59740",
+        "index": "idx_rev_c0a54bf73b18",
+        "hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e"
+      },
+      {
+        "source": "ks_rev_dbdaf646862a",
+        "title": "Cac nganh Tuyen sinh 2025_moi",
+        "binding": "bnd_bdb1f500cdbe",
+        "index": "idx_rev_742b1ff6d265",
+        "hash": "f096720b0d414129b5270933f2cdc3df176be224f65b34d1531b4b2edd81f7c2"
+      },
+      {
+        "source": "ks_rev_2d628688cb78",
+        "title": "Báo cáo công tác Tư vấn tuyển sinh năm 2025_Du thao",
+        "binding": "bnd_4d788e0c0ee2",
+        "index": "idx_rev_00fbccf1d07e",
+        "hash": "726942e56640e65aee7d906d422b6e717185c6379e6e3866f20b9875a52bb28e"
+      }
+    ]
+  },
+  "configuration_unchanged": true,
+  "publication_unchanged": true,
+  "code_unchanged": true,
+  "finished_at": "2026-10-14T13:47:10.649048+00:00"
+}

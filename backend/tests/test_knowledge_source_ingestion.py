@@ -14,6 +14,7 @@ Verifies:
 from __future__ import annotations
 
 import hashlib
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -151,7 +152,8 @@ def _execute_result(scalar: Any = None, scalars_list: list[Any] | None = None, a
 # Unit Tests for Source Ingestion Pipeline
 # ==============================================================================
 @pytest.mark.asyncio
-async def test_process_import_item_clean_source_ready_and_zero_writeback() -> None:
+@pytest.mark.parametrize("reimport,needs_review", [(False, False), (True, False), (True, True)])
+async def test_process_import_item_clean_source_ready_and_zero_writeback(reimport, needs_review) -> None:
     """Verify clean document ingestion reaches 'ready' and respects zero-writeback invariant."""
     coll = KnowledgeCollection(
         id="col_tuyensinh_2026",
@@ -185,6 +187,9 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback() -> No
     )
     item.batch = batch
 
+    previous_binding = KnowledgeBinding(collection_id=coll.id, repository_document_id=doc.id,
+        tenant_id=coll.tenant_id, workspace_id=coll.workspace_id, status="detached") if reimport else None
+
     mock_db = AsyncMock()
     # Execute calls:
     # 1. Load item
@@ -196,7 +201,7 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback() -> No
         side_effect=[
             _execute_result(scalar=item),
             _execute_result(scalar=doc),
-            _execute_result(scalar=None),
+            _execute_result(scalar=previous_binding),
             _execute_result(scalar=0),
             _execute_result(scalar=None),
         ]
@@ -209,7 +214,9 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback() -> No
         "Phương thức tuyển sinh bao gồm xét tuyển thẳng, xét điểm thi tốt nghiệp THPT, và xét học bạ. "
         "Mọi thắc mắc vui lòng liên hệ Ban Tư vấn Tuyển sinh để được giải đáp chi tiết."
     )
-    with patch.object(storage_service, "get", new_callable=AsyncMock) as mock_storage_get, \
+    quality_override = patch("app.modules.knowledge.services.source_ingestion_service.evaluate_revision_quality",
+                             return_value={"overall_status": "warning"}) if needs_review else nullcontext()
+    with quality_override, patch.object(storage_service, "get", new_callable=AsyncMock) as mock_storage_get, \
          patch.object(storage_service, "save", new_callable=AsyncMock), \
          patch.object(storage_service, "exists", new_callable=AsyncMock, return_value=True), \
          patch("app.modules.knowledge.services.source_ingestion_service.extract_source", new_callable=AsyncMock,
@@ -240,14 +247,17 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback() -> No
             item_id=item.id,
         )
 
-        assert source_rev.status == "ready"
+        assert source_rev.status == ("review_required" if needs_review else "ready")
         assert source_rev.revision_no == 1
         assert "QUY CHẾ TUYỂN SINH" in (source_rev.canonical_markdown or "")
-        assert source_rev.quality_report.get("overall_status") == "passed"
-        assert item.status == "succeeded"
-        assert item.phase == "completed"
-        assert batch.succeeded_count == 1
-        assert batch.status == "completed"
+        assert source_rev.quality_report.get("overall_status") == ("warning" if needs_review else "passed")
+        assert item.status == ("review_required" if needs_review else "succeeded")
+        assert item.phase == ("validate" if needs_review else "completed")
+        assert batch.succeeded_count == (0 if needs_review else 1)
+        assert batch.status == ("review_required" if needs_review else "completed")
+        if reimport:
+            assert source_rev.binding_id == previous_binding.id
+            assert previous_binding.status == ("pending" if needs_review else "active")
 
         # ADR-012 CRITICAL INVARIANT: Zero Writeback to RepositoryDocument
         assert doc.parse_status == "stored", "ADR-012 Violation: doc.parse_status must remain 'stored'!"

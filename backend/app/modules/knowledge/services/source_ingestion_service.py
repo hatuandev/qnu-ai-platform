@@ -163,6 +163,10 @@ class SourceIngestionService:
             if binding and binding.status == "deleting":
                 raise AppException("Nguồn đang xóa vĩnh viễn; chờ hoàn tất rồi nạp lại.",
                                    code="SOURCE_DELETING", status_code=409)
+            if binding and binding.status == "detached":
+                # Re-import revives the shell retained for publication history.
+                # Pending keeps failed/review-required parses visible, not serving.
+                binding.status = "pending"
             if not binding:
                 binding = KnowledgeBinding(
                     id=f"bnd_{uuid.uuid4().hex[:12]}",
