@@ -7,6 +7,39 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **Phiên474 (2026-10-15) — Review liệt kê tổ hợp và followup**: Chỉ đọc hội thoại/DB/mã,
+  không sửa runtime. Câu tổ hợp trả7ngành trong khi cẩm nang2025canonical có33mã phù hợp;
+  thiếu ngay Hóa học/CNTP được citation. Classifier nhận đủ3môn nhưng mixedlookup5 và topK
+  không có exhaustivecoverage. Lượt đó fallbackCloudflare4716/512tokens, chưa có finishreason.
+  “sao ít thế” khôngusage, noquerysignals; history chỉ tới prompt sau retrieval, không resolve
+  followup trướcsearch. Đề xuất enumeration scoped/paginated/setcoverage, yearpartition và
+  contextual followup trướcretrieval; chưa implement. Lượt1 còn dòng cũ/notes trùng.
+  [Nhật ký474](../nhat_ky/2026-10-15_phien_474_chan_doan_liet_ke_to_hop_va_followup.md),
+  [snapshot474](snapshots/2026-10-15_session_474.md).
+
+- **Phiên473 (2026-10-15) — Sửa metric header và audit context**: Header/năm gốc vào
+  MetricScope, không đưa số ô; shared header mở rộng theo tọa độ cùng source/hash, không theo
+  text trùng. Auditor được bổ sung context đúng hàng đã chọn, vẫn strict cellset/semantic
+  audit; nguồn lạ/missing metric/entity vẫn từ chối. Log missing reason, thêm8regressions,
+  focus43pass/Rufffullđạt; finalfull1464pass11fail16skip0errors190.59s, exact11IDs trùng470,
+  theo `backend/storage/pytest473_verified.xml`.
+  Probe thật cuối2primaryQwen/no fallback: điểm trúng tuyển2024/2025 đúng26.5/25.85 và
+  16.5/21.5, điểm sàn20/–/–/20+notes đủ. Còn dòng2023/2024trùng ý và notes dài;
+  JSONinvalid/providerfailure ở lượt trước giữ report, không coi ổn định toàn diện.
+  19rawspans/hashkhớp, protectedfingerprintsunchanged; khôngsource/model/config/restart/git.
+  [Nhật ký473](../nhat_ky/2026-10-15_phien_473_sua_metric_header_va_audit_context.md),
+  [snapshot473](snapshots/2026-10-15_session_473.md).
+
+- **Phiên472 (2026-10-15) — Chẩn đoán từ chối điểm chuẩn gần nhất**: Chỉ đọc DB/mã,
+  không gọi model hoặc sửa runtime. Có hai hàng điểm trúng tuyển2024–2025 trong nguồn
+  `Thông tin TSĐH cập nhật.pdf`, anchors lấy được: SPToán26.5/25.85, CNTT16.5/21.5.
+  `_metric_payload` loại header bảng chứa metric/năm, intro còn lại quá chung nên false refusal.
+  Một usageQwen1129/11tokens phù hợp dừng MetricScope; JSON/reason cũ không lưu nên không
+  khẳng định đã đọc trace mã cụ thể. Đề xuất header+intro proof, relativeyears theo cột,
+  multi-entity/method regression; chưa triển khai. Phiên471 chỉ staged, chưa commit/push.
+  [Nhật ký472](../nhat_ky/2026-10-15_phien_472_chan_doan_diem_chuan_gan_nhat.md),
+  [snapshot472](snapshots/2026-10-15_session_472.md).
+
 - **Phiên471 (2026-10-15) — Đóng gói push Gitea theo yêu cầu**: Nhánh `main`, fetch
   đầu phiên local/Gitea cùng `1f6e611`. Chỉ push remote `gitea` vì `origin` có cả hai đích.
   Gom mã/tests/fixture/scripts và docs466–470; giữ log `backend/storage/rag_stage*` local,

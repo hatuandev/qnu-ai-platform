@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-15** | Codex | Chẩn đoán liệt kê tổ hợp/followup | Có33mã trong cẩm nang2025 nhưng trả7; lookup5/topK thiếu coverage, followup chưa resolve trước search; chỉ đọc, đề xuất chưa sửa | [Nhật ký474](./nhat_ky/2026-10-15_phien_474_chan_doan_liet_ke_to_hop_va_followup.md) |
+
+| **2026-10-15** | Codex | Sửa metric header/audit context | Header gốc/đa ngành đúng nguồn, context audit có kiểm soát; focus43pass/full1464pass11lỗinền/live2answered; còn dòng cũ/notes thừa | [Nhật ký473](./nhat_ky/2026-10-15_phien_473_sua_metric_header_va_audit_context.md) |
+
+| **2026-10-15** | Codex | Chẩn đoán điểm chuẩn gần nhất | Có dữ liệu2024–2025/cả hai ngành; metric proof bỏ header nên từ chối thừa, đề xuất sửa cấu trúc đầu vào; chỉ đọc, chưa runtimefix/push | [Nhật ký472](./nhat_ky/2026-10-15_phien_472_chan_doan_diem_chuan_gan_nhat.md) |
+
 | **2026-10-15** | Codex | Đóng gói push riêng Gitea | Gom mã/tests/docs466–470; loại log tạm khỏi commit, giữ tài liệu gốc; không test thêm hoặc deploy | [Nhật ký471](./nhat_ky/2026-10-15_phien_471_chuan_bi_push_gitea.md) |
 
 | **2026-10-15** | Codex | Tiếp RAG giai đoạn4: ô nguồn | Metric/scope/select/audit độc lập, raw cells+spans, giữ dấu/điều kiện; live2Qwen đủ4cột,21rawspansđúng; full1456pass11lỗinền16skip0errors, config/corpus giữ nguyên | [Nhật ký470](./nhat_ky/2026-10-15_phien_470_rag_hop_dong_o_nguon.md) |

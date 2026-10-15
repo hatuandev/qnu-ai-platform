@@ -1,0 +1,3253 @@
+{
+  "mode": "read_only_retrieval",
+  "model_calls": 0,
+  "cases": [
+    {
+      "question": "Điểm sàn ngành Quản lý giáo dục năm 2026 là bao nhiêu?",
+      "latency_ms": 1249.88,
+      "analysis": {
+        "intent": "mixed",
+        "keywords": [
+          "bao nhiêu",
+          "năm 2026",
+          "điểm",
+          "sàn",
+          "quản"
+        ],
+        "entity_codes": [],
+        "fact_attributes": [],
+        "is_fact_first": true,
+        "subject_names": [],
+        "target_entities": [
+          "Quản Lý Giáo Dục"
+        ]
+      },
+      "anchors": [
+        {
+          "chunk_id": "chk_6ad667e8a38d",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:1326:1539",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:463:654",
+                "text": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:656:859",
+                "text": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:861:1034",
+                "text": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:14209:14468",
+                "text": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+                "page_number": 7
+              },
+              {
+                "unit_id": "span:14487:14689",
+                "text": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14691:15064",
+                "text": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15066:15532",
+                "text": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15533:15896",
+                "text": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15898:16721",
+                "text": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:16723:16876",
+                "text": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+                "page_number": 8
+              }
+            ]
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_c15f1d5eb82e",
+          "document_id": "bnd_70465c368929",
+          "content": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2990:3194",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2568:2733",
+                "text": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2735:2770",
+                "text": "4. Các ngành, tổ hợp môn xét tuyển:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2772:2814",
+                "text": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:13982:14023",
+                "text": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14025:14177",
+                "text": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14196:14332",
+                "text": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14334:14371",
+                "text": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14373:14550",
+                "text": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+                "page_number": 9
+              }
+            ]
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_9d6b6f3f2b83",
+          "document_id": "bnd_1c25db92f0d5",
+          "content": "# TUYÊN SINH DẠI HỌC 2026\n| STT | MĂNGÀNH | NGÀNH/CHUYỀN NGÀNH ĐAO TẠO | TỔ HỢP MÔN XÉT TUYỀN | PHƯƠNG THỰC |\n| :---: | :--- | :--- | :--- | :--- |\n| 16 | 7140114 | Quản lý giáo dục | (Văn, Sử, Đia); (Văn, Sử, Giáo dục KT và PL); (Văn, Địa, Giáo dục KT và PL) (Văn, Toán, Giáo dục KT và PL); (Văn, Toán, Anh); (Văn, Toán, Sử) | 1,2,3,4 |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "# TUYÊN SINH DẠI HỌC 2026",
+          "page_number": 2,
+          "metadata": {
+            "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+            "file_name": "FLYER TUYENSINH 2026-final2-16032026 (1).pdf",
+            "chunk_index": 56,
+            "source_unit": {
+              "id": "span:5469:5658",
+              "end": 5658,
+              "kind": "table",
+              "text": "| 16 | 7140114 | Quản lý giáo dục | (Văn, Sử, Đia); (Văn, Sử, Giáo dục KT và PL); (Văn, Địa, Giáo dục KT và PL) (Văn, Toán, Giáo dục KT và PL); (Văn, Toán, Anh); (Văn, Toán, Sử) | 1,2,3,4 |",
+              "start": 5469,
+              "temporal": {
+                "role": "unknown",
+                "status": "proposed",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [
+                  2026
+                ],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3294:8146",
+              "page_number": 2,
+              "heading_path": [
+                "# TUYÊN SINH DẠI HỌC 2026"
+              ],
+              "is_container": false,
+              "header_context": "| STT | MĂNGÀNH | NGÀNH/CHUYỀN NGÀNH ĐAO TẠO | TỔ HỢP MÔN XÉT TUYỀN | PHƯƠNG THỰC |\n| :---: | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_94563df86aa8",
+            "document_title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+            "source_unit_id": "span:5469:5658",
+            "document_number": null,
+            "source_revision_id": "ks_rev_f556f2c19af3",
+            "unit_manifest_hash": "4d720f940204075672830343f0f9092529adb037023663fdccc0f11d1837803a",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "bf1303a081f7f26af0367fcdf14569644d2487cdaefbe0f0fe8a041c2d7ecbb5",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2953:3193",
+                "text": "Xét tuyển theo kết quả học tập 3 năm\nTHPT (học bạ) theo quy định của Bộ GD&ĐT,\nĐĂNG KÝ TUYỂN SINH\nTHÔNG TIN CHI TIẾT\nNgoài ra, thực hiện Xét tuyển thẳng theo Quy chế tuyển sinh\n170 An Dương Vương, P. Quy Nhơn Nam, Gia Lai\nhttps://qnu.edu.vn",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:3212:3276",
+                "text": "<div style=\"text-align: center;\">CÁC NGÀNH TUYỀN SINH 2026</div>",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:3278:3292",
+                "text": "Mã trưởng: DQN",
+                "page_number": 2
+              }
+            ]
+          },
+          "binding_id": "bnd_1c25db92f0d5",
+          "index_revision_id": "idx_rev_b8f3df9e0901",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_ea103a3033ef",
+          "document_id": "bnd_1140ee99730e",
+          "content": "| STT | Mã xét tuyển | Tên ngành xét tuyển | Chỉ tiêu | Phương thức | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo<br>dục | 50 | 1,2,3,4,6 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Văn, Sử, Địa)<br>(Toán, Văn, Anh)<br>(Văn, Toán, Địa)<br>(Văn, Toán, Sử)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 2,
+          "metadata": {
+            "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "file_name": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed.pdf",
+            "chunk_index": 34,
+            "source_unit": {
+              "id": "span:2980:3213",
+              "end": 3213,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 50 | 1,2,3,4,6 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Văn, Sử, Địa)<br>(Toán, Văn, Anh)<br>(Văn, Toán, Địa)<br>(Văn, Toán, Sử)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL) |",
+              "start": 2980,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2842:3821",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành xét tuyển | Chỉ tiêu | Phương thức | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_ed4b8bdcf89d",
+            "document_title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "source_unit_id": "span:2980:3213",
+            "document_number": null,
+            "source_revision_id": "ks_rev_61ed5ddbe2bd",
+            "unit_manifest_hash": "f4b53026b3acfa11c0c4751867000fedf775f27c067648132c3ca5c11d0e5a6a",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2586:2609",
+                "text": "4. Chỉ tiêu tuyển sinh:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2611:2659",
+                "text": "Chỉ tiêu các ngành đào tạo giáo viên là dự kiến.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2661:2840",
+                "text": "Ngành Sư phạm Tiếng Anh, Ngôn ngữ Anh: điểm môn Tiếng Anh nhân hệ\nsố 2. Ngành Giáo dục Thể chất: điểm môn năng khiếu nhân hệ số 2. Ngành\nToán ứng dụng: điểm môn Toán nhân hệ số 2.",
+                "page_number": 2
+              }
+            ]
+          },
+          "binding_id": "bnd_1140ee99730e",
+          "index_revision_id": "idx_rev_41d26c724475",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_f7f251c19b93",
+          "document_id": "bnd_1bc245a264cd",
+          "content": "| **Số TT** | **Tên ngành** | **Mã ngành** | **Chỉ tiêu năm 2024** | **Số lượng tuyển sinh trong 3 năm (02 đợt/năm)** |  |  |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n| **I.** | **Trình độ tiến sĩ** |  |  | **2021** | **2022** | **2023** |\n| 4 | Quản lý giáo dục | 8140114 | 25 | *41* | *24* | *18* |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 6,
+          "metadata": {
+            "title": "Phuong huong tuyen sinh 2024_DHQN_final",
+            "file_name": "Phuong huong tuyen sinh 2024_DHQN_final.docx",
+            "chunk_index": 149,
+            "source_unit": {
+              "id": "span:10378:10438",
+              "end": 10438,
+              "kind": "table",
+              "text": "| 4 | Quản lý giáo dục | 8140114 | 25 | *41* | *24* | *18* |",
+              "start": 10378,
+              "temporal": {
+                "role": "unknown",
+                "status": "proposed",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:9414:11266",
+              "page_number": 6,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| **Số TT** | **Tên ngành** | **Mã ngành** | **Chỉ tiêu năm 2024** | **Số lượng tuyển sinh trong 3 năm (02 đợt/năm)** |  |  |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n| **I.** | **Trình độ tiến sĩ** |  |  | **2021** | **2022** | **2023** |"
+            },
+            "chunk_set_id": "chk_set_67a13e476336",
+            "document_title": "Phuong huong tuyen sinh 2024_DHQN_final",
+            "source_unit_id": "span:10378:10438",
+            "document_number": null,
+            "source_revision_id": "ks_rev_52971c550fb4",
+            "unit_manifest_hash": "a2110d5c1fcc951e59c03d39697f7d50d7fb9b6aa1826787411998428518f635",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "340e133e1e0f99042d6c893a701aa23ed071cbcb667c4b1dd0026994ae81148a",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:9308:9350",
+                "text": "*(Ghi chú: đánh dấu X là đăng ký đào tạo)*",
+                "page_number": 6
+              },
+              {
+                "unit_id": "span:9352:9365",
+                "text": "**PHỤ LỤC 3**",
+                "page_number": 6
+              },
+              {
+                "unit_id": "span:9367:9412",
+                "text": "**CÁC NGÀNH TUYỂN SINH SAU ĐẠI HỌC NĂM 2024**",
+                "page_number": 6
+              }
+            ]
+          },
+          "binding_id": "bnd_1bc245a264cd",
+          "index_revision_id": "idx_rev_8b9093db3eb2",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_d4e871e1d4d8",
+          "document_id": "bnd_c93ff5ca2241",
+          "content": "# NGHỊ QUYẾT Về việc ban hành Phương hướng tuyển sinh năm 2025 của Trường Đại học Quy Nhơn\n## QUYẾT NGHỊ:\n### 2. Trình độ thạc sĩ\n| Số TT | Tên ngành | Mã ngành | Chỉ tiêu năm 2025 | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n| I. | Trình độ tiến sĩ | Trình độ tiến sĩ | Trình độ tiến sĩ | 2022 | 2023 | 2024 |\n| 4 | Quản lý giáo dục | 8140114 | 50 | 24 | 18 | 25 |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "# NGHỊ QUYẾT Về việc ban hành Phương hướng tuyển sinh năm 2025 của Trường Đại học Quy Nhơn / ## QUYẾT NGHỊ: / ### 2. Trình độ thạc sĩ",
+          "page_number": 8,
+          "metadata": {
+            "title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+            "file_name": "NQ57.2024_ Phương hướng tuyển sinh 2025.pdf",
+            "chunk_index": 193,
+            "source_unit": {
+              "id": "span:13292:13346",
+              "end": 13346,
+              "kind": "table",
+              "text": "| 4 | Quản lý giáo dục | 8140114 | 50 | 24 | 18 | 25 |",
+              "start": 13292,
+              "temporal": {
+                "role": "unknown",
+                "status": "proposed",
+                "data_years": [],
+                "issued_date": "2024-12-20",
+                "heading_years": [
+                  2025
+                ],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:11781:13831",
+              "page_number": 8,
+              "heading_path": [
+                "# NGHỊ QUYẾT Về việc ban hành Phương hướng tuyển sinh năm 2025 của Trường Đại học Quy Nhơn",
+                "## QUYẾT NGHỊ:",
+                "### 2. Trình độ thạc sĩ"
+              ],
+              "is_container": false,
+              "header_context": "| Số TT | Tên ngành | Mã ngành | Chỉ tiêu năm 2025 | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) | Số lượng tuyển sinh trong 3 năm (02 đợt/năm) |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- |\n| I. | Trình độ tiến sĩ | Trình độ tiến sĩ | Trình độ tiến sĩ | 2022 | 2023 | 2024 |"
+            },
+            "chunk_set_id": "chk_set_e71c8b4f9bce",
+            "document_title": "NQ57.2024_ Phương hướng tuyển sinh 2025",
+            "source_unit_id": "span:13292:13346",
+            "document_number": "57/NQ-HDT",
+            "source_revision_id": "ks_rev_ea24c51a5f28",
+            "unit_manifest_hash": "ef8e2383bf061f098b353fcb6041ee31766c2f20bb12114b7e4a6c42c1648f15",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "091122dd23d4626a9763b3050886cb908b13a5077d680396e15b28939c1f9a46",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:11617:11657",
+                "text": "(Ghi chú: đánh dấu X là đăng ký đào tạo)",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:11659:11707",
+                "text": "<div style=\"text-align: center;\">PHU LUC 3</div>",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:11709:11779",
+                "text": "<div style=\"text-align: center;\">TUYỀN SINH SẨU ĐẠI HỌC NĂM 2025</div>",
+                "page_number": 8
+              }
+            ]
+          },
+          "binding_id": "bnd_c93ff5ca2241",
+          "index_revision_id": "idx_rev_c6f464106bdb",
+          "document_revision": null,
+          "relevance_score": null
+        }
+      ],
+      "retained_context": [
+        {
+          "chunk_id": "chk_6ad667e8a38d",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:1326:1539",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:463:654",
+                "text": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:656:859",
+                "text": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:861:1034",
+                "text": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:14209:14468",
+                "text": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+                "page_number": 7
+              },
+              {
+                "unit_id": "span:14487:14689",
+                "text": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14691:15064",
+                "text": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15066:15532",
+                "text": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15533:15896",
+                "text": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15898:16721",
+                "text": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:16723:16876",
+                "text": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+                "page_number": 8
+              }
+            ]
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_c15f1d5eb82e",
+          "document_id": "bnd_70465c368929",
+          "content": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2990:3194",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2568:2733",
+                "text": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2735:2770",
+                "text": "4. Các ngành, tổ hợp môn xét tuyển:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2772:2814",
+                "text": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:13982:14023",
+                "text": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14025:14177",
+                "text": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14196:14332",
+                "text": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14334:14371",
+                "text": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14373:14550",
+                "text": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+                "page_number": 9
+              }
+            ]
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:463:654",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:463:654",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:656:859",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:656:859",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:861:1034",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:861:1034",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14209:14468",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 7,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14209:14468",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14487:14689",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14487:14689",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14691:15064",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14691:15064",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15066:15532",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15066:15532",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15533:15896",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15533:15896",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15898:16721",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15898:16721",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:16723:16876",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 12,
+            "source_unit": {
+              "id": "span:1326:1539",
+              "end": 1539,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo<br>dục | 15 | 18 | 600 | 15 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 1326,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1036:2293",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:16723:16876",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2568:2733",
+          "document_id": "bnd_70465c368929",
+          "content": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2568:2733",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2735:2770",
+          "document_id": "bnd_70465c368929",
+          "content": "4. Các ngành, tổ hợp môn xét tuyển:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2735:2770",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2772:2814",
+          "document_id": "bnd_70465c368929",
+          "content": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2772:2814",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:13982:14023",
+          "document_id": "bnd_70465c368929",
+          "content": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:13982:14023",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14025:14177",
+          "document_id": "bnd_70465c368929",
+          "content": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14025:14177",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14196:14332",
+          "document_id": "bnd_70465c368929",
+          "content": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14196:14332",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14334:14371",
+          "document_id": "bnd_70465c368929",
+          "content": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14334:14371",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14373:14550",
+          "document_id": "bnd_70465c368929",
+          "content": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 31,
+            "source_unit": {
+              "id": "span:2990:3194",
+              "end": 3194,
+              "kind": "table",
+              "text": "| 1 | 7140114 | Quản lý giáo dục | 1,2,3,4 | 44 | (Văn, Sử, Địa)<br>(Văn, Sử, Giáo dục KT và PL)<br>(Văn, Địa, Giáo dục KT và PL)<br>(Văn, Toán, Giáo dục KT và PL)<br>(Văn, Toán, Anh)<br>(Văn, Toán, Sử) |",
+              "start": 2990,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2816:3800",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14373:14550",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        }
+      ],
+      "fact_entities": [
+        "Quản lý giáo dục"
+      ],
+      "fact_count": 10,
+      "untyped_facts_promoted": false,
+      "first_source_is_target": true
+    },
+    {
+      "question": "Điểm sàn ngành Sư phạm Toán học năm 2026 là bao nhiêu?",
+      "latency_ms": 1727.55,
+      "analysis": {
+        "intent": "exact_fact",
+        "keywords": [
+          "7140209",
+          "sư phạm toán học",
+          "sư phạm toán",
+          "bao nhiêu",
+          "năm 2026"
+        ],
+        "entity_codes": [
+          "7140209"
+        ],
+        "fact_attributes": [],
+        "is_fact_first": true,
+        "subject_names": [],
+        "target_entities": [
+          "Sư Phạm Toán Học",
+          "Sư Phạm Toán"
+        ]
+      },
+      "anchors": [
+        {
+          "chunk_id": "chk_f0922010be8a",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 2,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:2602:2734",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:463:654",
+                "text": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:656:859",
+                "text": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:861:1034",
+                "text": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:14209:14468",
+                "text": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+                "page_number": 7
+              },
+              {
+                "unit_id": "span:14487:14689",
+                "text": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14691:15064",
+                "text": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15066:15532",
+                "text": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15533:15896",
+                "text": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15898:16721",
+                "text": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:16723:16876",
+                "text": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+                "page_number": 8
+              }
+            ]
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_23a0984ad805",
+          "document_id": "bnd_70465c368929",
+          "content": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 3,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:3993:4116",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2568:2733",
+                "text": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2735:2770",
+                "text": "4. Các ngành, tổ hợp môn xét tuyển:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2772:2814",
+                "text": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:13982:14023",
+                "text": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14025:14177",
+                "text": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14196:14332",
+                "text": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14334:14371",
+                "text": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14373:14550",
+                "text": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+                "page_number": 9
+              }
+            ]
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_5365b5b5cbfa",
+          "document_id": "bnd_1140ee99730e",
+          "content": "| STT | Mã xét tuyển | Tên ngành xét tuyển | Chỉ tiêu | Phương thức | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 6 | 7140209 | Sư phạm Toán<br>học | 70 | 1,4,6 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Anh, Tin) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 3,
+          "metadata": {
+            "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "file_name": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed.pdf",
+            "chunk_index": 40,
+            "source_unit": {
+              "id": "span:3978:4105",
+              "end": 4105,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 70 | 1,4,6 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Anh, Tin) |",
+              "start": 3978,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3840:5596",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành xét tuyển | Chỉ tiêu | Phương thức | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_ed4b8bdcf89d",
+            "document_title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "source_unit_id": "span:3978:4105",
+            "document_number": null,
+            "source_revision_id": "ks_rev_61ed5ddbe2bd",
+            "unit_manifest_hash": "f4b53026b3acfa11c0c4751867000fedf775f27c067648132c3ca5c11d0e5a6a",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2586:2609",
+                "text": "4. Chỉ tiêu tuyển sinh:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2611:2659",
+                "text": "Chỉ tiêu các ngành đào tạo giáo viên là dự kiến.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2661:2840",
+                "text": "Ngành Sư phạm Tiếng Anh, Ngôn ngữ Anh: điểm môn Tiếng Anh nhân hệ\nsố 2. Ngành Giáo dục Thể chất: điểm môn năng khiếu nhân hệ số 2. Ngành\nToán ứng dụng: điểm môn Toán nhân hệ số 2.",
+                "page_number": 2
+              }
+            ]
+          },
+          "binding_id": "bnd_1140ee99730e",
+          "index_revision_id": "idx_rev_41d26c724475",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_9b4a37511573",
+          "document_id": "bnd_d6bc17402e9d",
+          "content": "| STT | Khối ngành | Mã số | Tên ngành | Thời gian học (năm) | Số tín chỉ toàn khóa học | Số tín chỉ học kỳ I | Học phí toàn khóa học (tạm tính) | Mức học phí /tín chỉ (tạm tính) | Mức học phí học kỳ I (tạm thu) |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 6 |  | 7140209 | Sư phạm Toán học | 4 | 150 | 21 | 83.074.000 | 554.000 | 11.634.000 |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 1,
+          "metadata": {
+            "title": "TB học phí K49",
+            "file_name": "TB học phí K49.pdf",
+            "chunk_index": 19,
+            "source_unit": {
+              "id": "span:1857:1945",
+              "end": 1945,
+              "kind": "table",
+              "text": "| 6 |  | 7140209 | Sư phạm Toán học | 4 | 150 | 21 | 83.074.000 | 554.000 | 11.634.000 |",
+              "start": 1857,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:1104:2855",
+              "page_number": 1,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Khối ngành | Mã số | Tên ngành | Thời gian học (năm) | Số tín chỉ toàn khóa học | Số tín chỉ học kỳ I | Học phí toàn khóa học (tạm tính) | Mức học phí /tín chỉ (tạm tính) | Mức học phí học kỳ I (tạm thu) |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e6a2455b9808",
+            "document_title": "TB học phí K49",
+            "source_unit_id": "span:1857:1945",
+            "document_number": null,
+            "source_revision_id": "ks_rev_a3268c90bf96",
+            "unit_manifest_hash": "7218c03eab6684ce31df7a5d1eb23b2cd64ccec19aaeae3748cf8800decea257",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "57afdb9f55f0910dac916a8806168e15c0466434740bede12db2f035dfc7072a",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:706:903",
+                "text": "Căn cứQuy định số2160/QyĐ-ĐHQN ngày 21/7/2026 của Trường Đại học Quy Nhơn về\nmức thu học phí tạm tính từnăm học 2026-2027 đối với đào tạo đại học hệchính quy Khóa 49\n(2026-2030) tổ chức tại Trường.",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:905:1091",
+                "text": "Trường Đại học Quy Nhơn thông báo mức học phí tạm tính toàn khóa, mức học phí/tín chỉ\nvà học phí Học kỳI năm học 2026-2027 cho Khóa 49 (2026-2030) hệđại học chính quy tại\nTrường như sau:",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:1093:1102",
+                "text": "ĐVT: Đồng",
+                "page_number": 1
+              }
+            ]
+          },
+          "binding_id": "bnd_d6bc17402e9d",
+          "index_revision_id": "idx_rev_fce9c5633663",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_42a82f5f601f",
+          "document_id": "bnd_1c25db92f0d5",
+          "content": "# TUYÊN SINH DẠI HỌC 2026\n| STT | MĂNGÀNH | NGÀNH/CHUYỀN NGÀNH ĐAO TẠO | TỔ HỢP MÔN XÉT TUYỀN | PHƯƠNG THỰC |\n| :---: | :--- | :--- | :--- | :--- |\n| 5 | 7140209 | Sư phạm Toán học | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Tín, Anh) | 1,4 |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "# TUYÊN SINH DẠI HỌC 2026",
+          "page_number": 2,
+          "metadata": {
+            "title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+            "file_name": "FLYER TUYENSINH 2026-final2-16032026 (1).pdf",
+            "chunk_index": 45,
+            "source_unit": {
+              "id": "span:3975:4086",
+              "end": 4086,
+              "kind": "table",
+              "text": "| 5 | 7140209 | Sư phạm Toán học | (Toán, Lý, Hóa); (Toán, Lý, Anh); (Toán, Hóa, Anh); (Toán, Tín, Anh) | 1,4 |",
+              "start": 3975,
+              "temporal": {
+                "role": "unknown",
+                "status": "proposed",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [
+                  2026
+                ],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3294:8146",
+              "page_number": 2,
+              "heading_path": [
+                "# TUYÊN SINH DẠI HỌC 2026"
+              ],
+              "is_container": false,
+              "header_context": "| STT | MĂNGÀNH | NGÀNH/CHUYỀN NGÀNH ĐAO TẠO | TỔ HỢP MÔN XÉT TUYỀN | PHƯƠNG THỰC |\n| :---: | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_94563df86aa8",
+            "document_title": "FLYER TUYENSINH 2026-final2-16032026 (1)",
+            "source_unit_id": "span:3975:4086",
+            "document_number": null,
+            "source_revision_id": "ks_rev_f556f2c19af3",
+            "unit_manifest_hash": "4d720f940204075672830343f0f9092529adb037023663fdccc0f11d1837803a",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "bf1303a081f7f26af0367fcdf14569644d2487cdaefbe0f0fe8a041c2d7ecbb5",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2953:3193",
+                "text": "Xét tuyển theo kết quả học tập 3 năm\nTHPT (học bạ) theo quy định của Bộ GD&ĐT,\nĐĂNG KÝ TUYỂN SINH\nTHÔNG TIN CHI TIẾT\nNgoài ra, thực hiện Xét tuyển thẳng theo Quy chế tuyển sinh\n170 An Dương Vương, P. Quy Nhơn Nam, Gia Lai\nhttps://qnu.edu.vn",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:3212:3276",
+                "text": "<div style=\"text-align: center;\">CÁC NGÀNH TUYỀN SINH 2026</div>",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:3278:3292",
+                "text": "Mã trưởng: DQN",
+                "page_number": 2
+              }
+            ]
+          },
+          "binding_id": "bnd_1c25db92f0d5",
+          "index_revision_id": "idx_rev_b8f3df9e0901",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_32979850d7c3",
+          "document_id": "bnd_1140ee99730e",
+          "content": "| Tên môn thi học sinh giỏi quốc gia | Tên ngành đào tạo | Mã ngành |\n| :--- | :--- | :--- |\n| Toán | Sư phạm Toán học | 7140209 |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 13,
+          "metadata": {
+            "title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "file_name": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed.pdf",
+            "chunk_index": 186,
+            "source_unit": {
+              "id": "span:23466:23503",
+              "end": 23503,
+              "kind": "table",
+              "text": "| Toán | Sư phạm Toán học | 7140209 |",
+              "start": 23466,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:23373:25087",
+              "page_number": 13,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| Tên môn thi học sinh giỏi quốc gia | Tên ngành đào tạo | Mã ngành |\n| :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_ed4b8bdcf89d",
+            "document_title": "Thong tin Tuyen_sinh_2025_QNU_V6_signed_signed_signed",
+            "source_unit_id": "span:23466:23503",
+            "document_number": null,
+            "source_revision_id": "ks_rev_61ed5ddbe2bd",
+            "unit_manifest_hash": "f4b53026b3acfa11c0c4751867000fedf775f27c067648132c3ca5c11d0e5a6a",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "d2c17efe80fb857ba482ec9ac3449e0e44363a75abac3e5258e8a31ec192db6e",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:23263:23284",
+                "text": "PGS.TS. Đoàn Đức Tùng",
+                "page_number": 12
+              },
+              {
+                "unit_id": "span:23304:23313",
+                "text": "PHỤ LỤC 1",
+                "page_number": 13
+              },
+              {
+                "unit_id": "span:23315:23371",
+                "text": "Danh sách các ngành xét tuyển thẳng và ưu tiên xét tuyển",
+                "page_number": 13
+              }
+            ]
+          },
+          "binding_id": "bnd_1140ee99730e",
+          "index_revision_id": "idx_rev_41d26c724475",
+          "document_revision": null,
+          "relevance_score": null
+        }
+      ],
+      "retained_context": [
+        {
+          "chunk_id": "chk_f0922010be8a",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 2,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:2602:2734",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:463:654",
+                "text": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:656:859",
+                "text": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:861:1034",
+                "text": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+                "page_number": 1
+              },
+              {
+                "unit_id": "span:14209:14468",
+                "text": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+                "page_number": 7
+              },
+              {
+                "unit_id": "span:14487:14689",
+                "text": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14691:15064",
+                "text": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15066:15532",
+                "text": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15533:15896",
+                "text": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:15898:16721",
+                "text": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:16723:16876",
+                "text": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+                "page_number": 8
+              }
+            ]
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "chk_23a0984ad805",
+          "document_id": "bnd_70465c368929",
+          "content": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |\n| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": "",
+          "page_number": 3,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:3993:4116",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "row_context": [
+              {
+                "unit_id": "span:2568:2733",
+                "text": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2735:2770",
+                "text": "4. Các ngành, tổ hợp môn xét tuyển:",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:2772:2814",
+                "text": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+                "page_number": 2
+              },
+              {
+                "unit_id": "span:13982:14023",
+                "text": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14025:14177",
+                "text": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+                "page_number": 8
+              },
+              {
+                "unit_id": "span:14196:14332",
+                "text": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14334:14371",
+                "text": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+                "page_number": 9
+              },
+              {
+                "unit_id": "span:14373:14550",
+                "text": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+                "page_number": 9
+              }
+            ]
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:463:654",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Căn cứ Quyết định số 1961/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo thuộc lĩnh vực pháp\nluật năm 2026 của Bộ Giáo dục và Đào tạo;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:463:654",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:656:859",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Căn cứ Quyết định số 1963/QĐ-BGDĐT ngày 07/7/2026 về việc xác định\nngưỡng bảo đảm chất lượng đầu vào đối với chương trình đào tạo giáo viên trình độ\nđại học, cao đẳng năm 2026 của Bộ Giáo dục và Đào tạo;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:656:859",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:861:1034",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Trường Đại học Quy Nhơn thông báo ngưỡng bảo đảm chất lượng đầu vào tuyển\nsinh đại học chính quy năm 2026 các ngành, chương trình đào tạo, các phương thức xét\ntuyển như sau:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 1,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:861:1034",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14209:14468",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "1. Thí sinh được xét tuyển phải có tổng điểm 03 môn thi kỳ thi tốt nghiệp THPT năm\n2026 (kỳ thi tốt nghiệp trung học nghề đối với đối tượng trung học nghề) theo tổ hợp xét\ntuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt tối thiểu 15,00",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 7,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14209:14468",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14487:14689",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "điểm theo thang điểm 30 (trừ các ngành đào tạo giáo viên và ngành Luật thực hiện theo\nngưỡng bảo đảm chất lượng đầu vào do Bộ Giáo dục và Đào tạo quy định), áp dụng đối với\nthí sinh tốt nghiệp năm 2026;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14487:14689",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:14691:15064",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "2. Đối với các ngành đào tạo giáo viên thí sinh xét tuyển theo phương thức không sử\ndụng kết quả thi tốt nghiệp THPT (xét điểm thi đánh giá năng lực SPHN) ngoài mức điểm\nnêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định tại khoản 2 Điều 9 Quy chế\ntuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT ngày 15/02/2026 của Bộ\nGiáo dục và Đào tạo; cụ thể là:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:14691:15064",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15066:15532",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "a) Kết quả trung bình chung học tập được đánh giá mức tốt (học lực xếp loại từ\ngiỏi trở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng\ntrung học nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT theo tổ hợp\nxét tuyển (hoặc sử dụng điểm thi môn Toán, Ngữ văn và một môn thi khác) đạt 18,00\nđiểm trở lên hoặc điểm xét tốt nghiệp THPT (điểm thi tốt nghiệp trung học nghề) từ\n8,50 trở lên, trừ các trường hợp quy định tại điểm b;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15066:15532",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15533:15896",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "b) Kết quả trung bình chung học tập đánh giá mức khá (học lực xếp loại từ khá\ntrở lên) cả năm lớp 12 (kết quả học tập 02 học kỳ năm cuối cấp đối với đối tượng trung\nhọc nghề và tương đương) và tổng điểm 03 môn thi tốt nghiệp THPT đạt 16,50 điểm\ntrở lên hoặc điểm xét tốt nghiệp THPT (trung học nghề) từ 6,50 trở lên đối với chương\ntrình đào tạo Giáo dục thể chất;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15533:15896",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:15898:16721",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "3. Đối với ngành Luật, thí sinh xét tuyển theo phương thức không sử dụng kết quả thi\ntốt nghiệp THPT (xét kết quả học tập THPT, xét điểm thi đánh giá năng lực ĐHQG TPHCM\nhoặc SPHN) ngoài mức điểm nêu trên còn phải đáp ứng điều kiện về kết quả học tập quy định\ntại khoản 2 Điều 9 Quy chế tuyển sinh ban hành kèm theo Thông tư số 06/2026/TT-BGDĐT\nngày 15/02/2026 của Bộ Giáo dục và Đào tạo, cụ thể là: Kết quả trung bình chung học tập\nđược đánh giá mức tốt (học lực xếp loại từ giỏi trở lên) cả năm lớp 12 (kết quả học tập\n02 học kỳ năm cuối cấp đối với đối tượng trung học nghề và tương đương) và tổng\nđiểm 03 môn thi tốt nghiệp THPT theo tổ hợp xét tuyển (hoặc sử dụng điểm thi môn\nToán, Ngữ văn và một môn thi khác) đạt 18,00 điểm trở lên hoặc điểm xét tốt nghiệp\nTHPT (điểm thi tốt nghiệp trung học nghề) từ 8,50 trở lên;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:15898:16721",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_73ea05d14446:span:16723:16876",
+          "document_id": "bnd_e4b071bb147f",
+          "content": "Ký hiệu \"–\": Trường không xét tuyển theo phương thức tương ứng đối với ngành này.\nHội đồng tuyển sinh thông báo cho thí sinh biết để đăng ký xét tuyển./.",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "TB điểm sàn 26",
+            "file_name": "TB điểm sàn 26.pdf",
+            "chunk_index": 18,
+            "source_unit": {
+              "id": "span:2602:2734",
+              "end": 2734,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán<br>học | 20 | – | – | 20 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 2602,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:2312:4152",
+              "page_number": 2,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành/CTĐT xét tuyển | Phương thức xét điểm thi TN. THPT | Phương thức xét kết quả học tập THPT | Phương thức xét điểm thi ĐGNL ĐHQG TPHCM | Phương thức xét điểm thi ĐGNL ĐHSP HN | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_84c586ab86b9",
+            "document_title": "TB điểm sàn 26",
+            "source_unit_id": "span:16723:16876",
+            "document_number": null,
+            "source_revision_id": "ks_rev_73ea05d14446",
+            "unit_manifest_hash": "4b55d0d2759fce6ddf6612df6a3b8a02cb29df3119a85eaa8a4adb099c81e705",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "cc91c629659b85b2fcebb778bc8fdbb00d8b21fd2941312bd51565028d9eb23c",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_e4b071bb147f",
+          "index_revision_id": "idx_rev_a443d796d020",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2568:2733",
+          "document_id": "bnd_70465c368929",
+          "content": "3. Quy tắc quy đổi tương đương ngưỡng đầu vào và điểm trúng tuyển giữa\ncác tổ hợp, phương thức tuyển sinh: thông báo sau khi có kết quả thi tốt nghiệp\nTHPT năm 2026.",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2568:2733",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2735:2770",
+          "document_id": "bnd_70465c368929",
+          "content": "4. Các ngành, tổ hợp môn xét tuyển:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2735:2770",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:2772:2814",
+          "document_id": "bnd_70465c368929",
+          "content": "Tổng số lượng tuyển sinh: 5.173 (chỉ tiêu)",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 2,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:2772:2814",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:13982:14023",
+          "document_id": "bnd_70465c368929",
+          "content": "a. Điều kiện phụ sử dụng trong xét tuyển:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:13982:14023",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14025:14177",
+          "document_id": "bnd_70465c368929",
+          "content": "Trường hợp nhiều thí sinh có cùng điểm xét ở cuối danh sách, thứ tự xét\nưu tiên đối với các thí sinh có điểm cộng thấp hơn; trường hợp nhiều thí sinh có",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 8,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14025:14177",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14196:14332",
+          "document_id": "bnd_70465c368929",
+          "content": "cùng điểm xét ở cuối danh sách và có điểm cộng bằng nhau, thứ tự xét ưu tiên\nđối với các thí sinh có thứ tự ưu tiên nguyện vọng cao hơn;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14196:14332",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14334:14371",
+          "document_id": "bnd_70465c368929",
+          "content": "b. Điểm cộng: xem chi tiết tại Mục 7;",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14334:14371",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        },
+        {
+          "chunk_id": "ks_rev_ee85a12d415e:span:14373:14550",
+          "document_id": "bnd_70465c368929",
+          "content": "c. Sử dụng chứng chỉ VSTEP, IELTS (còn hiệu lực) thay cho điểm môn\nTiếng Anh trong tổ hợp môn xét tuyển, khi xét tuyển theo Phương thức 1 và\nphương thức 2, được quy đổi như sau:",
+          "rrf_score": 0.0,
+          "dense_rank": -1,
+          "sparse_rank": -1,
+          "section": null,
+          "page_number": 9,
+          "metadata": {
+            "title": "Thông tin TSĐH cập nhật",
+            "file_name": "Thông tin TSĐH cập nhật.pdf",
+            "chunk_index": 37,
+            "source_unit": {
+              "id": "span:3993:4116",
+              "end": 4116,
+              "kind": "table",
+              "text": "| 6 | 7140209 | Sư phạm Toán học | 1,4 | 100 | (Toán, Lý, Hóa)<br>(Toán, Lý, Anh)<br>(Toán, Hóa, Anh)<br>(Toán, Tin, Anh) |",
+              "start": 3993,
+              "temporal": {
+                "role": "unknown",
+                "status": "unknown",
+                "data_years": [],
+                "issued_date": null,
+                "heading_years": [],
+                "evidence_quote": null,
+                "mentioned_years": []
+              },
+              "parent_id": "span:3819:5447",
+              "page_number": 3,
+              "heading_path": [],
+              "is_container": false,
+              "header_context": "| STT | Mã xét tuyển | Tên ngành, chương trình xét tuyển | Phương thức tuyển sinh | Số lượng tuyển sinh | Tổ hợp môn xét tuyển |\n| :---: | :--- | :--- | :--- | :--- | :--- |"
+            },
+            "chunk_set_id": "chk_set_e86a4eed700e",
+            "document_title": "Thông tin TSĐH cập nhật",
+            "source_unit_id": "span:14373:14550",
+            "document_number": null,
+            "source_revision_id": "ks_rev_ee85a12d415e",
+            "unit_manifest_hash": "7e4a0ddae3191f4858be1d6e46eec9a9989ed1373c4f047e75da8ccf8462f7b2",
+            "source_unit_version": "source-units-v1",
+            "canonical_hash": "a11fba888e99e9842e6730d27e596ebc05a7419f8d1a6c45f8f4d0014cc10e74",
+            "data_years": [],
+            "context_only": true
+          },
+          "binding_id": "bnd_70465c368929",
+          "index_revision_id": "idx_rev_8a86d7979f3a",
+          "document_revision": null,
+          "relevance_score": null
+        }
+      ],
+      "fact_entities": [
+        "Khối ngành I",
+        "Sư phạm Toán học"
+      ],
+      "fact_count": 10,
+      "untyped_facts_promoted": false,
+      "first_source_is_target": true
+    }
+  ],
+  "evidence_policy_enabled": false,
+  "snapshot": {
+    "snapshot_id": "snap_col_admissions_2_6e3241fb",
+    "collection_id": "col_admissions",
+    "collection_epoch": 2,
+    "binding_revisions": {
+      "bnd_063df26142cb": "idx_rev_21fe29be6449",
+      "bnd_1140ee99730e": "idx_rev_41d26c724475",
+      "bnd_1635101644c1": "idx_rev_991d685eeafc",
+      "bnd_1bc245a264cd": "idx_rev_8b9093db3eb2",
+      "bnd_1c25db92f0d5": "idx_rev_b8f3df9e0901",
+      "bnd_25ddc55686a7": "idx_rev_884f543996c6",
+      "bnd_2904c7cb5c33": "idx_rev_bfc3b873e29e",
+      "bnd_4303e3a3951c": "idx_rev_f65a381b6401",
+      "bnd_50b2980985bd": "idx_rev_7a86e2479ff7",
+      "bnd_58509a6c7f92": "idx_rev_33508043e816",
+      "bnd_6ee881b021de": "idx_rev_b17cbd66dbfc",
+      "bnd_70465c368929": "idx_rev_8a86d7979f3a",
+      "bnd_748fe583208e": "idx_rev_b82a3a303c53",
+      "bnd_9c50d40d07b4": "idx_rev_45fdd77bb291",
+      "bnd_9fc6a6b7fea0": "idx_rev_15b450d5d169",
+      "bnd_a37a71bb53a8": "idx_rev_7dd812275a80",
+      "bnd_c81516d9fffd": "idx_rev_81f75854acf6",
+      "bnd_c93ff5ca2241": "idx_rev_c6f464106bdb",
+      "bnd_d6bc17402e9d": "idx_rev_fce9c5633663",
+      "bnd_e4b071bb147f": "idx_rev_a443d796d020",
+      "bnd_e52fd3712ac3": "idx_rev_8c79cf8eb463"
+    },
+    "vector_generations": {
+      "bnd_063df26142cb": "vg_a6e3190d11af",
+      "bnd_1140ee99730e": "vg_a6e3190d11af",
+      "bnd_1635101644c1": "vg_a6e3190d11af",
+      "bnd_1bc245a264cd": "vg_a6e3190d11af",
+      "bnd_1c25db92f0d5": "vg_a6e3190d11af",
+      "bnd_25ddc55686a7": "vg_a6e3190d11af",
+      "bnd_2904c7cb5c33": "vg_a6e3190d11af",
+      "bnd_4303e3a3951c": "vg_a6e3190d11af",
+      "bnd_50b2980985bd": "vg_a6e3190d11af",
+      "bnd_58509a6c7f92": "vg_a6e3190d11af",
+      "bnd_6ee881b021de": "vg_a6e3190d11af",
+      "bnd_70465c368929": "vg_a6e3190d11af",
+      "bnd_748fe583208e": "vg_a6e3190d11af",
+      "bnd_9c50d40d07b4": "vg_a6e3190d11af",
+      "bnd_9fc6a6b7fea0": "vg_a6e3190d11af",
+      "bnd_a37a71bb53a8": "vg_a6e3190d11af",
+      "bnd_c81516d9fffd": "vg_a6e3190d11af",
+      "bnd_c93ff5ca2241": "vg_a6e3190d11af",
+      "bnd_d6bc17402e9d": "vg_a6e3190d11af",
+      "bnd_e4b071bb147f": "vg_a6e3190d11af",
+      "bnd_e52fd3712ac3": "vg_a6e3190d11af"
+    },
+    "tenant_id": "tenant_qnu",
+    "workspace_id": "workspace_qnu",
+    "created_at": "2026-10-15T08:51:38.335717+00:00"
+  },
+  "wrong_tenant_empty": true,
+  "before": {
+    "configuration_fingerprint": "ac8ec8a446ce74b53a8237cc8ea4b873d81a38639cb3dd1cd434acd9bb618fe1",
+    "snapshot_fingerprint": "1fdd12dea709d39b4419eca398b85fb54a162753837cc7329c32a0780dd14d0e",
+    "collection_metadata_fingerprint": "622aca09169b5b7298d2eb74c255a637b310e179324d3ee4063c96655fada128",
+    "target_data_fingerprint": "6beaec5f6b2f7703b3cfd81bda17beb994a113fd9f54e241e6513ea1bd97c9d9",
+    "inventory": "aa8fcab96b1b3f03600e273543ef682a0309c76232b5a621a9450f52060e2feb"
+  },
+  "after": {
+    "configuration_fingerprint": "ac8ec8a446ce74b53a8237cc8ea4b873d81a38639cb3dd1cd434acd9bb618fe1",
+    "snapshot_fingerprint": "1fdd12dea709d39b4419eca398b85fb54a162753837cc7329c32a0780dd14d0e",
+    "collection_metadata_fingerprint": "622aca09169b5b7298d2eb74c255a637b310e179324d3ee4063c96655fada128",
+    "target_data_fingerprint": "6beaec5f6b2f7703b3cfd81bda17beb994a113fd9f54e241e6513ea1bd97c9d9",
+    "inventory": "aa8fcab96b1b3f03600e273543ef682a0309c76232b5a621a9450f52060e2feb"
+  },
+  "publication_unchanged": true
+}

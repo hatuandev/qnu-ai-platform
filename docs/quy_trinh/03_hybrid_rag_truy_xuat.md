@@ -322,3 +322,15 @@ trước nhánh này không đổi; historical fallback/evidence policy không m
 Live hai câu điểm sàn cuối470 đã đủ15/18/600/15 và20/–/–/20 cùngnotes; chưa20/82/accuracy.
 Xem [nhật ký470](../nhat_ky/2026-10-15_phien_470_rag_hop_dong_o_nguon.md).
 
+### Cập nhật473 — Header cũng là bằng chứng metric
+
+MetricScope nhận cả header raw chứa đường dẫn metric/năm, không chỉ văn xuôi trước bảng.
+Không gửi giá trị ô trong bước nhận diện này. Khi một header gốc liên kết với nhiều hàng,
+alias được mở rộng theo cùng binding/index/source/hash/start/end, không theo text giống nhau.
+Hai bộ chọn/audit vẫn phải đồng ý tập ô; auditor có thể bổ sung context còn thiếu, nhưng chỉ
+trong scope/notes đã liên kết với các hàng được chọn. Không bổ sung ô, mượn nguồn, bỏ semantic
+flags hoặc cho phép free generation khi rejected. Mọi missing đều log snapshot/reason/count.
+Năm gần nhất dựa nhãn năm dữ liệu, không lấy năm ban hành làm override. Chỉ dẫn chọn năm
+còn phụ thuộc model: chưa bảo đảm loại hết bảng cũ trùng ý. Không suy chất lượng toàn kho từ
+hai ca đã trả lời; xem [nhật ký473](../nhat_ky/2026-10-15_phien_473_sua_metric_header_va_audit_context.md).
+

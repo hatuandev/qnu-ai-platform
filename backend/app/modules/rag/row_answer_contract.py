@@ -159,6 +159,22 @@ def validate_selection(selection: RowSelection, catalog: RowCatalog, question: s
             raise ValueError("No same-source scope for requested year")
 
 
+def complete_audit_context(selection: RowSelection, audit: RowAudit, catalog: RowCatalog) -> RowSelection:
+    """Add independently requested context only within the already selected rows.
+
+    Cell agreement and semantic audit flags remain mandatory at the call site.
+    Unknown/foreign references are not repaired: the subset validation rejects them.
+    """
+    selected_rows = {catalog.cells[key].row_id for key in selection.cell_ids}
+    scopes = {key for row_id in selected_rows for key in catalog.rows[row_id]["scope_candidates"]}
+    notes = {key for row_id in selected_rows for key in catalog.rows[row_id]["note_candidates"]}
+    required = set(audit.required_context_ids)
+    return selection.model_copy(update={
+        "scope_ids": list(dict.fromkeys([*selection.scope_ids, *sorted(required.intersection(scopes))])),
+        "note_ids": list(dict.fromkeys([*selection.note_ids, *sorted(required.intersection(notes))])),
+    })
+
+
 def close_context(selection: RowSelection, catalog: RowCatalog) -> RowSelection:
     """Keep whole conditional branches/continued sentences; never infer applicability."""
     required = set(selection.scope_ids + selection.note_ids)

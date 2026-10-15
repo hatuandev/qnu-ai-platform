@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-15** | [Phiên474](./2026-10-15_phien_474_chan_doan_liet_ke_to_hop_va_followup.md) | Review tổ hợp và followup | Thiếu danh sách không do thiếu dữ liệu; lookup5/topK/coverage/history, chưa sửa runtime |
+
+| **2026-10-15** | [Phiên473](./2026-10-15_phien_473_sua_metric_header_va_audit_context.md) | Metric header/audit context | Focus43pass/full1464pass11lỗinền/live2answered/19rawspansđúng; còn notes dài/dòng cũ, chưa20/82 |
+
+| **2026-10-15** | [Phiên472](./2026-10-15_phien_472_chan_doan_diem_chuan_gan_nhat.md) | Chẩn đoán điểm chuẩn gần nhất | Dữ liệu có, truy hồi được; kiểm chứng metric thiếu header, chưa sửa code |
+
 | **2026-10-15** | [Phiên471](./2026-10-15_phien_471_chuan_bi_push_gitea.md) | Đóng gói mã push Gitea | Chỉ remote gitea/main; giữ log local và docs/tai_lieu, không chạy thêm test/deploy |
 
 | **2026-10-15** | [Phiên470](./2026-10-15_phien_470_rag_hop_dong_o_nguon.md) | Hợp đồng ô nguồn giai đoạn4 | Live2Qwen đủ4cột/notes và21rawspansđúng; full1456pass11lỗinền16skip0errors; chưa20/82 |

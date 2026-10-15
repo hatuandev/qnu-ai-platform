@@ -22,7 +22,7 @@ def fact_location(blocks: list[EvidenceBlock], index_id: str, raw: dict) -> tupl
 
 
 async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
-                               plan: QueryPlan, blocks: list[EvidenceBlock]) -> list[EvidenceBlock]:
+                               plan: QueryPlan, blocks: list[EvidenceBlock], *, exhaustive: bool = False) -> list[EvidenceBlock]:
     if not snapshot.binding_revisions:
         return []
     query = (select(KnowledgeFact).join(KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id)
@@ -32,12 +32,20 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
                KnowledgeCollection.workspace_id == snapshot.workspace_id,
                KnowledgeBinding.status == "active",
                KnowledgeFact.index_revision_id.in_(snapshot.binding_revisions.values()))
-        .order_by(KnowledgeFact.id).limit(5001))
+        .order_by(KnowledgeFact.id))
     try:
-        facts = list((await db.execute(query)).scalars().all())
+        facts = []
+        cursor = None
+        while True:
+            page_query = query.where(KnowledgeFact.id > cursor) if cursor else query
+            page = list((await db.execute(page_query.limit(500 if exhaustive else 5001))).scalars().all())
+            facts.extend(page)
+            if not exhaustive or len(page) < 500:
+                break
+            cursor = page[-1].id
     except Exception as exc:
         raise AppException("Không thể tải hàng bảng đã xuất bản.", code="EVIDENCE_FACT_UNAVAILABLE", status_code=503) from exc
-    if len(facts) > 5000:
+    if not exhaustive and len(facts) > 5000:
         raise AppException("Bảng số liệu vượt ngân sách đối soát; cần phân vùng nguồn.", code="EVIDENCE_FACT_BUDGET", status_code=422)
     sources = {b.index_revision_id: b for b in blocks}
     groups = {}
@@ -78,6 +86,8 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
                 "cells": [{"fact_id": f.id, "attribute": f.attribute_name, "value": f.attribute_value,
                 **{k: (f.raw_data or {}).get(k) for k in ("temporal_context", "qualifiers", "attribute_code", "relation")}}
                 for f in members]}))
+    if exhaustive:
+        return result
     queries = [req.question, plan.query, *plan.search_queries,
                *([plan.entity] if plan.entity else []), *([plan.attribute] if plan.attribute else [])]
     selected = [b for query in queries for b in rank_blocks(result, [query], 6, plan.years)]

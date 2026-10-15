@@ -116,6 +116,22 @@ class RagService:
         )
 
     async def ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
+        from app.modules.rag.conversation_resolution import resolve_followup
+
+        started = time.perf_counter()
+        effective, resolution = await resolve_followup(db, req)
+        if resolution and resolution["mode"] == "clarify":
+            return AskResponse(status="insufficient_context",
+                answer="Bạn muốn mình rà lại danh sách hoặc nội dung nào trong câu hỏi trước? Hãy nói rõ chủ đề hoặc năm cần đối chiếu.",
+                answer_decision={"version": "conversation-resolution-v1", "status": "clarify",
+                                 "question_resolution": resolution})
+        result = await self._ask(db, effective, candidate_snapshot=candidate_snapshot)
+        if resolution:
+            result.answer_decision = {**(result.answer_decision or {}), "question_resolution": resolution}
+        result.latency_ms = round((time.perf_counter() - started) * 1000, 2)
+        return result
+
+    async def _ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
         start_time = time.perf_counter()
 
         # 1. Input Guardrail safety check (Prompt Injection)
@@ -148,7 +164,14 @@ class RagService:
         if evidence_policy.enabled:
             return await answer_with_evidence(db, req, snapshot, evidence_policy,
                                               candidate_mode=candidate_snapshot is not None)
-        policy_version = req.policy_fingerprint() + ":source-cells-v1"
+        from app.modules.rag.combination_enumeration import enumerate_combinations
+
+        analysis = query_classifier.analyze(req.question, module_code=req.module_code)
+        enumeration = await enumerate_combinations(db, req, snapshot, analysis,
+            candidate_mode=candidate_snapshot is not None)
+        if enumeration is not None:
+            return enumeration
+        policy_version = req.policy_fingerprint() + ":enumeration-context-v1"
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
         history_list = req.history if isinstance(req.history, list) else []
@@ -182,7 +205,6 @@ class RagService:
             return AskResponse.model_validate(cached)
 
         # 3. Query Intent Analysis & Fact-First Routing (module-aware, reusable)
-        analysis = query_classifier.analyze(req.question, module_code=req.module_code)
         lookup_limit = 1000 if typed_fact_query else 10 if analysis.intent == QueryIntent.EXACT_FACT else 5
 
         facts = await fact_layer.lookup_facts(
