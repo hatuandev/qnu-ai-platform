@@ -1,1 +1,0 @@
-Dữ liệu đã duyệt, không dùng nguồn thật.

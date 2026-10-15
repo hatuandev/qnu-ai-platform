@@ -83,6 +83,18 @@ htmlcov/
 .ruff_cache/
 .mypy_cache/
 
+# Test artifacts & temporary QA outputs (Phiên 464)
+backend/storage/pytest*/
+backend/storage/pytest*.xml
+backend/storage/*.log
+!backend/storage/e2e_fixtures/**
+frontend-build*.log
+tmp/drafting-document-qa.docx
+tmp/drafting-document-qa.pdf
+tmp/drafting-document-render/
+tmp/pdfs/
+
+
 # Frontend test artifacts & build info (AGENTS.md 9.1: không commit)
 *.tsbuildinfo
 frontend/playwright-report/

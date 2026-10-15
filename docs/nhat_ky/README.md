@@ -7,6 +7,18 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-15** | [Phiên465](./2026-10-15_phien_465_bo_theo_doi_artifact_git_an_toan.md) | Bỏ theo dõi artifact Git an toàn | Bỏ theo dõi 2.022 artifact (81,95 MiB), giữ file local, giữ docs/tai_lieu & fixtures, cập nhật .gitignore có phạm vi |
+
+| **2026-10-15** | [Phiên464](./2026-10-15_phien_464_purge_publication_history.md) | Purge và lịch sử xuất bản | Fix FK không xóa history,56focuspass; cần BE/worker mới và retry job |
+
+| **2026-10-15** | [Phiên463](./2026-10-15_phien_463_audit_git_ngoai_tai_lieu.md) | Audit ngoài docs/tai_lieu | Giữ thư mục tài liệu;2028artifact82,03MiB là ứng viên, chưa dọn |
+
+| **2026-10-15** | [Phiên462](./2026-10-15_phien_462_audit_git_artifacts.md) | Audit Git artifacts | Giữ test source; storage/tài liệu lớn cần dọn tracking có phạm vi, chưa thực thi |
+
+| **2026-10-15** | [Phiên461](./2026-10-15_phien_461_nginx_upload_limit.md) | Nginx upload | Thêm client_max_body_size60m, không test/build thêm theo user; chưa push/deploy |
+
+| **2026-10-15** | [Phiên460](./2026-10-15_phien_460_dev_login_production.md) | Dev login production | Ngoại lệ opt-in theo user, không anonymous admin; focus87+Redis HTTP đạt, dừng test theo yêu cầu, chưa deploy |
+
 | **2026-10-15** | [Phiên459](./2026-10-15_phien_459_review_env_dokploy.md) | Review env Dokploy | Template đủ biến/cú pháp, không phải cấu hình thật; SSO và placeholder cần xử lý, chưa sửa |
 
 | **2026-10-15** | [Phiên458](./2026-10-15_phien_458_kiem_chung_migration_db_tao_san.md) | Migration DB tạo sẵn | Có qnu_ai_platform riêng; 4 tình huống PostgreSQL cô lập, 2 upgrade đạt/2 xung đột chặn; chưa xác minh DB server |

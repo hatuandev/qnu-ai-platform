@@ -1,3 +1,0 @@
-{"id": 1, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 22.38}
-{"id": 2, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 36.03}
-{"id": 3, "route": "dag", "http": 200, "status": "failed", "error": null, "seconds": 93.91}

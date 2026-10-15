@@ -1,7 +1,0 @@
-{"id": 1, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 43.78}
-{"id": 3, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 23.95}
-{"id": 5, "route": "dag", "http": 200, "status": "failed", "error": null, "seconds": 91.7}
-{"id": 9, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 36.92}
-{"id": 13, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 26.44}
-{"id": 41, "route": "dag", "http": 200, "status": "answered", "error": null, "seconds": 24.94}
-{"id": 42, "route": "dag", "http": 200, "status": "insufficient_context", "error": null, "seconds": 13.22}

@@ -6,6 +6,18 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-15** | Codex | Bỏ theo dõi artifact Git an toàn | Bỏ theo dõi 2.022 artifact (81,95 MiB), giữ file local, giữ docs/tai_lieu & fixtures, cập nhật .gitignore có phạm vi | [Nhật ký465](./nhat_ky/2026-10-15_phien_465_bo_theo_doi_artifact_git_an_toan.md) |
+
+| **2026-10-15** | Codex | Sửa xóa nguồn có lịch sử | Giữ activation/index pruned và binding ẩn; guard tham chiếu chéo, retry/re-import, lỗi thân thiện;56focuspass, chưa deploy | [Nhật ký464](./nhat_ky/2026-10-15_phien_464_purge_publication_history.md) |
+
+| **2026-10-15** | Codex | Audit Git ngoài tài liệu | Giữ nguyên docs/tai_lieu; khoanh2028artifact82,03MiB, E2Efixtures còn phụ thuộc, chưa dọn/index/push | [Nhật ký463](./nhat_ky/2026-10-15_phien_463_audit_git_ngoai_tai_lieu.md) |
+
+| **2026-10-15** | Codex | Audit Git test artifacts | Test source1,50MiB nên giữ; storage129,93MiB/docs274,17MiB cần phân loại, PDF162MiB; chưa dọn hoặc rewrite | [Nhật ký462](./nhat_ky/2026-10-15_phien_462_audit_git_artifacts.md) |
+
+| **2026-10-15** | Codex | Nginx upload 60m | Nhận file50MiB kèm multipart; chỉ sửa cấu hình/runbook, không test thêm theo user, cần deploy FE | [Nhật ký461](./nhat_ky/2026-10-15_phien_461_nginx_upload_limit.md) |
+
+| **2026-10-15** | Codex | Dev login production opt-in | Giữ DEV_AUTH_ENABLED với cờ production riêng, cookie bắt buộc/Redis throttle/Origin; focus87+Redis HTTP đạt; user yêu cầu dừng test, chưa deploy | [Nhật ký460](./nhat_ky/2026-10-15_phien_460_dev_login_production.md) |
+
 | **2026-10-15** | Codex | Review env Dokploy | Required keys/cú pháp đạt; còn placeholder/SSO demo và warning copy khóa; pool optional cần forward nếu tuning; chỉ review/docs | [Nhật ký459](./nhat_ky/2026-10-15_phien_459_review_env_dokploy.md) |
 
 | **2026-10-15** | Codex | Kiểm chứng migration DB tạo sẵn | PG16 cô lập: empty và26/09→head đạt, cột/bảng đủ trong metadata/repeat đạt; collision/unknown revision từ chối đúng; không chạm DB thật | [Nhật ký458](./nhat_ky/2026-10-15_phien_458_kiem_chung_migration_db_tao_san.md) |
