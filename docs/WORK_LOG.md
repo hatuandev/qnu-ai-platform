@@ -6,6 +6,36 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-15** | Codex | Review env Dokploy | Required keys/cú pháp đạt; còn placeholder/SSO demo và warning copy khóa; pool optional cần forward nếu tuning; chỉ review/docs | [Nhật ký459](./nhat_ky/2026-10-15_phien_459_review_env_dokploy.md) |
+
+| **2026-10-15** | Codex | Kiểm chứng migration DB tạo sẵn | PG16 cô lập: empty và26/09→head đạt, cột/bảng đủ trong metadata/repeat đạt; collision/unknown revision từ chối đúng; không chạm DB thật | [Nhật ký458](./nhat_ky/2026-10-15_phien_458_kiem_chung_migration_db_tao_san.md) |
+
+| **2026-10-15** | Codex | Phân biệt migration và reset | Tìm thấy reset script riêng qua Make; Compose bootstrap không tự reset; cảnh báo truncate public/all Qdrant, chưa chạy trên server | [Nhật ký457](./nhat_ky/2026-10-15_phien_457_phan_biet_migration_va_reset.md) |
+
+| **2026-10-15** | Codex | Chuẩn hóa Docker/Dokploy | Lock/pin build, env ModelOps/SSO, loại storage khỏi context; 17contract+2API đạt, BE/FE Docker+smoke/Vite/Ruff đạt; full1344pass13fail15skip (11nền+2PGstartup đã pass riêng); chưa deploy/auth demo | [Nhật ký456](./nhat_ky/2026-10-15_phien_456_chuan_hoa_docker_dokploy.md) |
+
+| **2026-10-15** | Codex | Docker Compose và nâng cấp DB | Không cần reset để deploy; xác minh pending migration, auth/env/network, lock build và volume; Compose config đạt, chỉ review | [Nhật ký455](./nhat_ky/2026-10-15_phien_455_docker_compose_va_nang_cap_db.md) |
+
+| **2026-10-14** | Codex | Rà soát Dokploy demo | Compose config đạt; cần xử lý mật khẩu demo an toàn, chuyển dữ liệu đồng bộ và mạng riêng tới 9router local; chưa sửa/deploy/server verify | [Nhật ký454](./nhat_ky/2026-10-14_phien_454_ra_soat_dokploy_demo.md) |
+
+| **2026-10-14** | Codex | RAG đúng phạm vi và đủ ý | Read-time hierarchy/facetpacking/scope/binding/historicaltrace;focus160/full1329pass11baselinefail15skip/Ruffđạt;probe2105/2108đúng7spans;20chưahoàntất504/lịch sửchưanghiệmthu;khôngđổikho/model | [Nhật ký452](./nhat_ky/2026-10-14_phien_452_rag_pham_vi_va_du_y.md) |
+
+| **2026-10-14** | Codex | Test cẩm nang2025 mới sau xuất bản | Exacthash/1257points/parityđạt;20HTTP200/8supported3partial9missing;review6đạt+1từchốiantoàn/13cầnxửlý;26spans+4factsđúng,scope vẫn sai; chỉtest/docs,khôngfix | [Nhật ký451](./nhat_ky/2026-10-14_phien_451_test_cam_nang_2025_sau_xuat_ban.md) |
+
+| **2026-10-14** | Codex | Review cẩm nang2025 đầy đủ mới | Nội dung chính bámPDF/3 sai lệchđã sửa/5800-liên hệ đủ;108mốc52records; khuyến nghị hierarchy ngành vàbảngnative; chưaQAWordlayout/nạp/testapp | [Nhật ký450](./nhat_ky/2026-10-14_phien_450_review_cam_nang_2025_day_du.md) |
+
+| **2026-10-14** | Codex | RAG tham khảo thông tin năm trước | Một lượt historical verification cùng scope/snapshot; partial có nhãn năm, không suy rộng năm mới; giữ citations và lỗi dịch vụ; focus159/Ruff đạt, full1308pass11baselinefail15skip; không đổi kho/model | [Nhật ký449](./nhat_ky/2026-10-14_phien_449_rag_tham_khao_nam_cu.md) |
+
+| **2026-10-14** | Codex | Đối chiếu DOCX cẩm nang2025 với PDF | PT2 thiếu loại trừ sư phạm/PT3 thêm ĐHQG Hà Nội/PT4 mở rộng trường; thiếu5800/liên hệ; không tự gộp7440122–7520401; bảngWord đủ52ngành, ingestion447cụt; chỉreview/docs, chưa sửa | [Nhật ký448](./nhat_ky/2026-10-14_phien_448_review_noi_dung_cam_nang_docx_2025.md) |
+
+| **2026-10-14** | Codex | Test chatbot sau nạp cẩm nang2025 | NguồnDOCX53trang/1099Qdrantpoints;20HTTP200/13supported3partial1conflict3missing/49citationsđúng;P1scope2006,còn bảng/heading/keybusy;chỉharness+docs,khôngfix | [Nhật ký447](./nhat_ky/2026-10-14_phien_447_test_sau_nap_cam_nang_2025.md) |
+
+| **2026-10-14** | Codex | Review độc lập RAG full82 | 82HTTP200/72supported;222spans+3factsđúng;focus88/Ruffđạt;2P1 audit bỏ điều kiện/formula crash,2P2 locator/continuation;full82trướcvácuối;chỉdocs,khôngaccuracy | [Nhật ký446](./nhat_ky/2026-10-14_phien_446_review_rag_full82.md) |
+
+| **2026-10-14** | Codex | Chạy full 82 câu chatbot 4 giai đoạn | GĐ1-20/GĐ2-20/GĐ3-20/GĐ4-22:82HTTP200/72supported/8partial/1conflict/1missing,225spans+3factsđúng,mean20,78s;válegend-intro+1test;focus107/full1276pass11baselinefail15skip;khôngaccuracy/TM-08 | [Nhật ký445](./nhat_ky/2026-10-14_phien_445_chay_full_82_cau_4_giai_doan.md) |
+
+| **2026-10-14** | Codex | Đủ ý, phạm vi nhóm và tính dùng được chatRAG | Advisory-missing/union-retain/row-gap/sentence-continuation/formula-run/locator-gap;focus106/full1275pass11baselinefail15skip;probe12:8supported/3partial/1missing,30spansđúng;6/9/25đạt,62/75partialtrungthực,13daođộng,chưaaccuracy82 | [Nhật ký444](./nhat_ky/2026-10-14_phien_444_chat_rag_du_y_pham_vi_dung_duoc.md) |
+
 | **2026-10-14** | Codex | Bốn ưu tiên chất lượng chatRAG | Role-awareguard/multiqueryhybrid/closure/corrective1/coverage+dedup;focus125/full1256pass11baselinefail15skip;release20HTTP200/18supported2partial,55citationsđúng; còn6/9/13/25/62/75,chưaaccuracy82 | [Nhật ký443](./nhat_ky/2026-10-14_phien_443_bon_uu_tien_chat_rag.md) |
 
 | **2026-10-14** | Codex | Phân tích câu chưa đúng và đề xuất RAG | Xácnhậnnguồncả5/13/38;sửađúngvai tròconstraint/score,đềxuấtparent-child+multiqueryhybrid+correctiveretrieval1lượt,coverage/spandedup; chỉđọc/replay,khôngsửaruntime/gọiLLM | [Nhật ký442](./nhat_ky/2026-10-14_phien_442_phan_tich_cau_loi_va_de_xuat_rag.md) |

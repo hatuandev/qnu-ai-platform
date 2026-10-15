@@ -10,7 +10,7 @@ from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
 
 
 def search_queries(question: str, plan: QueryPlan, missing: list[str] | None = None) -> list[str]:
-    fields = [plan.target_institution, plan.entity, plan.attribute, plan.method, plan.round,
+    fields = [plan.target_institution, plan.entity, plan.attribute, plan.education_level, plan.method, plan.round,
               plan.event, plan.exam_organizer, *map(str, plan.years + plan.document_years + plan.event_years)]
     constraints = " · ".join(dict.fromkeys(value for value in fields if value))
     allowed = number_values(f"{question} {constraints}")

@@ -5,7 +5,5 @@ dist
 .vscode
 .idea
 *.log
-.env
-.env.local
-.env.*.local
+.env*
 coverage

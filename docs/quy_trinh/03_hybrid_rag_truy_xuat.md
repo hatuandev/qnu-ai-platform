@@ -17,6 +17,14 @@ Sau projection, backend gắn thêm header mùa thật trong cùng binding/index
 
 Các ví dụ/ca tuyển sinh nằm trong kiểm thử, không tạo từ điển FAQ, tên model, số liệu hay alias hardcoded trong runtime. Không cần reset, reindex hoặc xuất bản lại để dùng thay đổi đọc này; worker/API cần chạy phiên bản code mới. Bộ 20 câu đối soát và kiểm tra span không thay thế TM-08 hoặc kiểm định độc lập toàn bộ 82 câu.
 
+## Kiểm chứng đủ ý, phạm vi nhóm và tính dùng được — phiên 444
+
+1. **Missing tự bịa không chặn completeness**: `missing_constraints` tự do mà mọi con số đã có trong claims (phép cộng/tổng mới ngoài ý định hỏi, trừ số người dùng đã nêu) chỉ là ghi chú tư vấn, không ép partial; thiếu số chưa trích hoặc thiếu không số vẫn chặn. Qualifier `retained_by` rỗng được bù khi hợp claims đã đủ proof số/method; trỏ claim lạ vẫn là gap; proof năm giữ nghiêm; ref không số/không alias-digit (như URL) không được auto-retain.
+2. **Hàng đơn lẻ không chứng minh cả nhóm**: mọi claim đều `reviewed_fact` mà không claim canonical-thực-chất nào và không hàng nào trùng thực thể hỏi thì partial kèm phạm vi đã chứng minh; muốn kết luận nhóm phải trích đoạn chính sách nhóm hoặc ghi rõ phần thiếu, giữ nguyên "một số" không suy rộng.
+3. **Nối câu qua trang/chunk**: khối trước dở câu (không kết bằng `.!?…:;`), khối sau cùng nguồn/cùng section/kề thứ tự mở đầu chữ thường, không heading/marker/container thì đóng gói và projection cùng nhau (tối đa 2); chữ hoa/heading/list là dừng. Mục đánh số còn nhóm cả đoạn tiếp nối không marker (dòng công thức, "Trong đó:") và dãy bullet định nghĩa sau dấu hai chấm, tối đa 8 khối.
+4. **Công thức phải dùng được**: câu hỏi công thức mà claim trích glyph công thức nhưng anh em cùng nhóm cấu trúc (chú giải biến, điều kiện) chưa trích thì partial; có thì trình bày nguyên văn công thức + chú giải + chỉ Phụ lục, thiếu đầu vào thì nói rõ, không bịa số.
+5. **Nơi đăng ký thiếu locator là partial**: câu hỏi vị trí mà trích dẫn có số hiệu văn bản nhưng không có token URL thì partial "chưa có đường dẫn hoặc địa chỉ cụ thể được trích dẫn"; tuyệt đối không tự tạo URL và không lấy cổng chung đắp vào thông báo riêng.
+
 ## Ngữ cảnh thời gian và cấu trúc dùng chung — phiên 432
 
 QueryPlan tách `years` (kỳ dữ liệu), `document_years` và `event_years`. Ví dụ hỏi số liệu 2023 trong báo cáo 2026: năm dữ liệu lọc là 2023, không phải cả 2023/2026. Không ghi vai trò năm nào thì tiếp tục chính sách năm hiện tại của trợ lý; năm rõ trong câu hỏi phải được giữ. Kế hoạch tự đổi/bịa năm trả lỗi `EVIDENCE_PLAN_SCOPE_INVALID`.
@@ -214,6 +222,20 @@ Tự động lập kế hoạch trình bày câu trả lời:
   * Tự động làm sạch các cụm ký tự pipe rác `||||||` do OCR tài liệu sinh ra.
   * Chốt chặn trường hợp LLM nhả cả khối bảng nhiều ngành: tự động phân tích và chuyển đổi thành danh sách gạch đầu dòng chuẩn mực cho đúng thực thể được hỏi.
   * Giữ nguyên vẹn tính toàn vẹn của các bảng Markdown chuẩn.
+
+### Ngữ cảnh bản ghi và đủ ý trong shared evidence path (phiên452)
+
+Lớp đọc bổ sung recordpath từ lược đồ field lặp, giữ mục con qua marker trang và gắn rawheading vào claim cùng nguồn. Những heading chưa phân loại giữ unknown; không viết ngược canonical/unitmanifest/index hoặc tự xác nhận năm dữ liệu. BM25 dùng đường dẫn như context, packing ưu tiên subsection đúng bản ghi và các facet được hỏi trong ngân sách cấu hình hiện có.
+
+Primary body sai bản ghi bị chặn; verifier/audit kiểm tra entity, education level, attribute và public topic coverage. Fact dùng context đúng trang hàng/header, không dùng section cuối tài liệu. Tách proposal nhiều source để bind/verify riêng, không mượn điều kiện/năm giữa source. Giá trị bôi đậm vẫn là evidence; fieldtuple không tạo yêu cầu enum ngoài câu hỏi. Nhánh lịch sử ghi rõ điểm dừng, giữ partial có nhãn và lỗi dịch vụ thật; timeout ở historical_verification không được biến thành missing.
+
+### Tham khảo khác năm trong shared evidence path (phiên 449)
+
+Ưu tiên trả lời và kiểm chứng theo năm được hỏi. Nếu chưa có claim hợp lệ cho năm đó, có thể tra cứu một năm dữ liệu trước gần nhất từ ứng viên liên quan trong chính snapshot đã pin, rồi kiểm chứng riêng theo năm tham khảo. Không dùng năm filename/ngày ban hành để tự xác nhận năm dữ liệu; giữ đúng thực thể, thuộc tính, trường, phương thức, đợt và sự kiện.
+
+Phản hồi có căn cứ lịch sử luôn là `partial` / `HISTORICAL_REFERENCE_ONLY`: `requested.years` giữ năm người dùng hỏi, `historical_reference` ghi năm hỏi/năm tham khảo; citations/span/hash giữ nguồn thật. Nói rõ chưa tìm thấy căn cứ đã kiểm chứng đủ rõ cho năm hỏi và thông tin năm cũ không xác nhận áp dụng năm mới. Không kết luận Trường chưa công bố thông tin từ kết quả tìm kiếm thiếu.
+
+Không thay thế trả lời đúng năm đã supported hoặc partial có claims, không che conflict/clarify/DB/model/timeout. Không tự fallback câu so sánh nhiều năm, publication/event-year, hoặc yêu cầu cấm tham khảo khác năm. Giữ timeout chung, provider/model/reranker và tenant/snapshot. Nhánh này chỉ thuộc evidence policy; legacy non-evidence giữ hành vi cũ.
 
 ### Bước 13: Chuẩn Hóa Góc Độ Nút Gợi Ý & Chống Entity Hijacking Đa Lượt (phiên #189)
 - **Chuyển đổi góc độ Nút Gợi Ý (`convert_or_filter_suggestion_perspective`)**:

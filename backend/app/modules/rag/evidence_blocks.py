@@ -24,8 +24,14 @@ from app.modules.knowledge.services.source_artifact import (
 )
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens  # noqa: F401
 from app.modules.rag.evidence_context import model_block
-from app.modules.rag.evidence_dependencies import coverage_order, dependency_groups, source_identity
-from app.modules.rag.evidence_lists import list_groups, matches_subject
+from app.modules.rag.evidence_dependencies import (
+    coverage_order,
+    dependency_groups,
+    sentence_continuations,
+    source_identity,
+)
+from app.modules.rag.evidence_hierarchy import enrich_hierarchy
+from app.modules.rag.evidence_lists import family, list_groups, matches_subject
 from app.modules.rag.evidence_schemas import EvidenceBlock
 from app.modules.rag.schemas import RetrievalSnapshot
 
@@ -93,7 +99,7 @@ def split_source_blocks(markdown: str, *, binding_id: str, index_id: str,
                     title=title, page_number=page, section=" / ".join(headers[-3:]),
                     header_context=header_context, text=markdown[start:finish], start=start, end=finish,
                     canonical_hash=canonical_hash))
-    return blocks
+    return enrich_hierarchy(blocks)
 
 
 def source_heading_years(blocks: list[EvidenceBlock]) -> list[int]:
@@ -164,7 +170,7 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             source_blocks = [b for b in source_blocks if not (
                 re.search(r"(?m)^\s*\|", b.text) or re.search(r"<table\b", b.text, re.IGNORECASE))]
         blocks.extend(source_blocks)
-    return blocks
+    return enrich_hierarchy(blocks)
 
 
 def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], years: list[int]) -> list[EvidenceBlock]:
@@ -190,14 +196,32 @@ def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], ye
 def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], years: list[int],
                  limit: int, max_chars: int, *, atomic_lists: bool = True,
                  enumeration_subject: str | None = None, diagnostics: dict | None = None,
-                 coverage_goals: list[str] | None = None) -> list[EvidenceBlock]:
+                 coverage_goals: list[str] | None = None, priority_ids: set[str] | None = None) -> list[EvidenceBlock]:
     """Admit whole body/same-source-heading pairs, never truncate off their proof."""
     headers = {source_identity(b): b for b in scope_headers(blocks, ordered, years)}
     groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
               for member in group} if atomic_lists else {}
     for member, dependencies in dependency_groups(blocks).items():
         groups[member] = sorted({b.id: b for b in [*groups.get(member, []), *dependencies]}.values(), key=lambda b: b.start)
+    if atomic_lists:
+        for group in list_groups(blocks):
+            if not matches_subject(group, enumeration_subject):
+                continue
+            first = group[0]
+            preceding = max((b for b in blocks if source_identity(b) == source_identity(first)
+                             and b.end <= first.start), key=lambda b: b.end, default=None)
+            if preceding and re.fullmatch(r"\s*\*\*[^\n]+\*\*\s*", preceding.text):
+                groups[preceding.id] = [preceding, *group]
+        for summary in ordered:
+            if not re.fullmatch(r"\s*\*\*[^\n]+\*\*\s*", summary.text):
+                continue
+            following = min((b for b in blocks if source_identity(b) == source_identity(summary)
+                             and b.start >= summary.end), key=lambda b: b.start, default=None)
+            if following and family(following):
+                groups[summary.id] = [summary, *groups.get(following.id, [following])]
     ordered = coverage_order(ordered, coverage_goals or [], groups, years)
+    if priority_ids:
+        ordered = sorted(ordered, key=lambda b: b.id not in priority_ids)
     selected, seen, used = [], set(), 40  # Payload field names and brackets.
     intro_sources = set()
     dropped = []
@@ -205,7 +229,10 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         header = headers.get(source_identity(body))
         bodies = groups.get(body.id, [body])
         parents = structural_context(blocks, body)
-        pair = list({b.id: b for b in [header, *parents, *bodies] if b is not None and b.id not in seen}.values())
+        body_ids = {b.id for b in bodies}
+        continuations = [block for member in bodies for block in sentence_continuations(blocks, member)
+                         if block.id not in seen and block.id not in body_ids][:2]
+        pair = list({b.id: b for b in [header, *parents, *bodies, *continuations] if b is not None and b.id not in seen}.values())
         intros = {b.source_revision_id: b.source_context for b in pair if b.source_context and b.source_revision_id not in intro_sources}
         size = sum(len(json.dumps(model_block(b), ensure_ascii=False)) + 1 for b in pair)
         size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0
@@ -230,6 +257,8 @@ def structural_context(blocks: list[EvidenceBlock], body: EvidenceBlock) -> list
     same = [block for block in blocks if (block.binding_id, block.index_revision_id, block.source_revision_id) == identity]
     by_unit = {block.unit_id: block for block in same if block.unit_id}
     result = []
+    if body.record_heading_id:
+        result.extend(b for b in same if b.id == body.record_heading_id)
     parent = by_unit.get(body.parent_id)
     for _ in range(6):
         if not parent:

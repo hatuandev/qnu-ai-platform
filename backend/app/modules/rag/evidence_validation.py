@@ -40,6 +40,67 @@ def normalized_label(text: str) -> str:
     return " ".join(unicodedata.normalize("NFC", text).casefold().split())
 
 
+def _is_scope_header_text(text: str) -> bool:
+    first = text.strip().splitlines()[0] if text.strip() else ""
+    letters = [c for c in first if c.isalpha()]
+    return bool(letters and all(c.isupper() for c in letters)) or first.lstrip().startswith("#")
+
+
+MATH_GLYPH = re.compile(r"[\U0001D400-\U0001D7FF]")
+
+
+def formula_legend_gap(claims: list[dict], blocks: list[EvidenceBlock], intent: str | None, attribute: str | None) -> bool:
+    """A quoted formula without its neighbouring legend is not yet usable.
+
+    When the plan asks for a formula and an accepted claim quotes formula
+    glyphs, every other member of that claim's structural run group (variable
+    legend, conditions) must also be cited. Shape and structure only.
+    """
+    from app.modules.rag.evidence_dependencies import dependency_groups
+
+    label = f"{intent or ''} {attribute or ''}".casefold()
+    if "formula" not in label and "công thức" not in label:
+        return False
+    cited = {ref.get("block_id") for claim in claims for ref in claim.get("references") or []}
+    groups = dependency_groups(blocks)
+    for claim in claims:
+        references = claim.get("references") or []
+        if not references or not any(MATH_GLYPH.search(ref.get("quote") or "") for ref in references):
+            continue
+        members = groups.get(references[0].get("block_id") or "", [references[0]])
+        # A bare intro line ("Trong đó:") carries no formula content itself;
+        # the legend members after it are what must be cited.
+        if any(member.id not in cited and not member.text.strip().endswith(":") for member in members):
+            return True
+    return False
+
+
+def group_single_row_gap(claims: list[dict], entity: str | None) -> list[str]:
+    """A lone table row proves only its own entity, never a whole group.
+
+    Returns display names of the evidenced rows when the answer holds no
+    group-wide (canonical, non-header) policy claim and no row matches the
+    requested entity. Pure metadata shapes only, no domain vocabulary.
+    """
+    if not entity or not claims:
+        return []
+    for claim in claims:
+        references = claim.get("references") or []
+        if not references:
+            continue
+        if references[0].get("origin") == "canonical" and not _is_scope_header_text(claim.get("text") or ""):
+            return []
+    display: list[str] = []
+    for claim in claims:
+        references = claim.get("references") or []
+        name = references[0].get("entity_name") or "" if references else ""
+        if normalized_label(entity) == normalized_label(name):
+            return []
+        if name and name not in display:
+            display.append(name)
+    return display[:3]
+
+
 def row_entities_supported(claim: str, references: list[dict]) -> bool:
     for ref in references:
         if ref.get("origin") != "reviewed_fact":
@@ -75,6 +136,7 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
             "origin": block.origin, "fact_id": block.fact_id,
             "temporal_scope": block.temporal_scope.model_dump(),
             "entity_name": block.fact_context.get("entity_name") if block.origin == "reviewed_fact" else None,
+            "record_label": block.record_label, "record_path": block.record_path,
             "start": block.start + local if block.origin == "canonical" else None,
             "end": block.start + local + len(quote) if block.origin == "canonical" else None}
 
@@ -107,7 +169,11 @@ def temporal_references_supported(claim: dict, years: list[int]) -> bool:
         TemporalScope,
         temporal_is_compatible,
     )
+    from app.modules.rag.evidence_constraints import data_year_values
 
+    body_years = data_year_values(claim.get("text") or "")
+    if years and body_years and not body_years.intersection(years):
+        return False
     return all(temporal_is_compatible(TemporalScope.model_validate(ref.get("temporal_scope") or {}), years)
                for ref in claim["references"])
 
@@ -120,10 +186,23 @@ def validate_decision_integrity(decision: dict, answer: str, citations: list[dic
         return False
     if decision.get("status") not in {"supported", "partial"} or not bindings:
         return False
+    years = decision.get("requested", {}).get("years") or []
+    historical_year = None
+    if decision.get("historical_reference") or decision.get("reason") == "HISTORICAL_REFERENCE_ONLY":
+        from app.modules.rag.evidence_historical import (
+            historical_claim_supported,
+            validate_historical_label,
+        )
+
+        historical_year = validate_historical_label(decision, answer)
+        if historical_year is None:
+            return False
+        years = [historical_year]
     for claim in bindings:
         refs = claim.get("references") or []
         if (not refs or not same_source(refs) or not claim.get("verified")
-                or not temporal_references_supported(claim, decision.get("requested", {}).get("years") or [])
+                or not temporal_references_supported(claim, years)
+                or historical_year is not None and not historical_claim_supported(claim, historical_year)
                 or not numbers_supported(claim["text"], [r["quote"] for r in refs])
                 or not row_entities_supported(claim["text"], refs)):
             return False

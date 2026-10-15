@@ -7,6 +7,36 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-15** | [Phiên459](./2026-10-15_phien_459_review_env_dokploy.md) | Review env Dokploy | Template đủ biến/cú pháp, không phải cấu hình thật; SSO và placeholder cần xử lý, chưa sửa |
+
+| **2026-10-15** | [Phiên458](./2026-10-15_phien_458_kiem_chung_migration_db_tao_san.md) | Migration DB tạo sẵn | Có qnu_ai_platform riêng; 4 tình huống PostgreSQL cô lập, 2 upgrade đạt/2 xung đột chặn; chưa xác minh DB server |
+
+| **2026-10-15** | [Phiên457](./2026-10-15_phien_457_phan_biet_migration_va_reset.md) | Migration và reset | Có reset script riêng, không tự chạy khi Deploy; scope xóa rộng, chỉ chẩn đoán không thực thi |
+
+| **2026-10-15** | [Phiên456](./2026-10-15_phien_456_chuan_hoa_docker_dokploy.md) | Chuẩn hóa Docker/Dokploy | BE/FE build+smoke đạt, 17contract+2API đạt, lock/env/SSO/context/SOP chỉnh; không reset/deploy, auth demo chưa mở |
+
+| **2026-10-15** | [Phiên455](./2026-10-15_phien_455_docker_compose_va_nang_cap_db.md) | Docker Compose và nâng cấp DB | Giữ stack, không reset chỉ để nâng code; cần kiểm tra migration/auth/env/build, chuyển dữ liệu local là việc riêng; chưa triển khai |
+
+| **2026-10-14** | [Phiên454](./2026-10-14_phien_454_ra_soat_dokploy_demo.md) | Rà soát Dokploy demo | Dữ liệu local/mật khẩu/9router cá nhân; Compose config đạt nhưng auth/data/network còn cần chuẩn bị; chỉ review/docs |
+
+| **2026-10-14** | [Phiên452](./2026-10-14_phien_452_rag_pham_vi_va_du_y.md) | RAG đúng phạm vi và đủ ý | Hierarchyread-time/facetpacking/scopeguard/factlocation/binding/boldscalar/rowprefix/historicaltrace;focus160/Ruffđạt;probe2đúng7spans;live20dừng504,khôngđổimodel/kho |
+
+| **2026-10-14** | [Phiên451](./2026-10-14_phien_451_test_cam_nang_2025_sau_xuat_ban.md) | Test cẩm nang2025 mới sau xuất bản | 1257points/parityđạt/20HTTP200;6nội dungđạt+1từchốiantoàn/13cầnxửlý;26spans+4factsđúng, sai phạm vi ngành/trình độ/thuộc tính vẫn pass; chỉtest, chưafix |
+
+| **2026-10-14** | [Phiên450](./2026-10-14_phien_450_review_cam_nang_2025_day_du.md) | Review cẩm nang2025 đầy đủ mới | PT2/3/4 sửa đúng,5800/liên hệ đủ;108mốc/52records; còn hierarchyHeading2=TrangX/0bảngnative choRAG; chỉreview, chưa sửa/nạp |
+
+| **2026-10-14** | [Phiên449](./2026-10-14_phien_449_rag_tham_khao_nam_cu.md) | RAG tham khảo năm cũ có nhãn | Shared evidence: partial/requested giữ năm gốc/citations không đổi; năm trước kiểm chứng riêng; không che lỗi dịch vụ hay đè current claims; focus159/Ruff đạt, full1308pass11baselinefail15skip |
+
+| **2026-10-14** | [Phiên448](./2026-10-14_phien_448_review_noi_dung_cam_nang_docx_2025.md) | Review nội dung DOCX cẩm nang2025 | 3 sai lệch phương thức; thiếu chỉ tiêu/liên hệ; gộp ngành chưa có căn cứ; Word đủ52hàng ngành, lỗi bảng447 thuộc ingestion; chưa sửa file/runtime |
+
+| **2026-10-14** | [Phiên447](./2026-10-14_phien_447_test_sau_nap_cam_nang_2025.md) | Test sau nạp cẩm nang2025 | 21nguồn/1099Qdrantpoints;20HTTP200/13supported3partial1conflict3missing;49citationsđúng;2006lẫnscope/attribute+numericmissingbịbỏ;7facts/rowcụt/headingmất;6busy503banđầu;khôngsửaruntime/full82 |
+
+| **2026-10-14** | [Phiên446](./2026-10-14_phien_446_review_rag_full82.md) | Review độc lập patch444/445 và full82 | DB verifier 222spans+3facts=225citations;focus88/Ruffđạt;2P1 audit/formula,2P2 locator/continuation;82trướcválegendcuối;26/32/37/52/62/74/75cònđiểm cần xử lý;khôngsửaruntime/accuracy |
+
+| **2026-10-14** | [Phiên445](./2026-10-14_phien_445_chay_full_82_cau_4_giai_doan.md) | Full82 câu 4 giai đoạn | GĐ1-20/GĐ2-20/GĐ3-20/GĐ4-22:82HTTP200/72supported/8partial/1conflict/1missing,225spans+3factsđúng;válegend-intro+1test;focus107/full1276pass11baselinefail15skip;13đúngphạmvi,75khôngbịaURL,khôngaccuracy/TM-08 |
+
+| **2026-10-14** | [Phiên444](./2026-10-14_phien_444_chat_rag_du_y_pham_vi_dung_duoc.md) | Đủ ý, phạm vi nhóm, tính dùng được | Advisory-missing/union-retain/row-gap/sentence-continuation/formula-run/locator-gap;focus106/full1275pass11baselinefail15skip;probe12:8supported/3partial/1missing,30spansđúng;13daođộng,legendchưatríchổnđịnh,khôngaccuracy82 |
+
 | **2026-10-14** | [Phiên443](./2026-10-14_phien_443_bon_uu_tien_chat_rag.md) | Bốn ưu tiên chatRAG | Role-awareproof/multiqueryhybrid/closure/corrective/packing+dedup;focus125/full1256pass11baselinefail15skip;20HTTP200/18supported2partial,55citationsđúng; còncoverage/đủý,khôngaccuracy82 |
 
 | **2026-10-14** | [Phiên #442](./2026-10-14_phien_442_phan_tich_cau_loi_va_de_xuat_rag.md) | Nguyên nhân5/13/38 và đề xuất thuật toán | Replaynumeric5;13bỏpolicy nhóm;38bỏmục2+a/b/earlyexit;role-awareguard,parent-child,multiqueryhybrid,corrective1lượt; chỉphântích/chưaimplement |

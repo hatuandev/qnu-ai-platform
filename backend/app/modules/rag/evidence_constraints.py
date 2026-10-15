@@ -9,6 +9,24 @@ from app.modules.rag.evidence_validation import YEAR, number_values
 ConstraintRole = Literal["value_constraint", "current_value", "method_identity", "data_year", "document_year", "event_year"]
 DATE = re.compile(r"(?<!\w)\d{1,2}[/.-]\d{1,2}[/.-](?:19|20)\d{2}(?!\w)")
 IDENTIFIER = re.compile(r"(?<!\w)\d+(?:/\d+)?/[A-ZĐ][\w/-]*", re.IGNORECASE)
+URL_SHAPE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
+
+
+def location_pointer_gap(claims: list[dict], intent: str | None, attribute: str | None = None) -> bool:
+    """A where-answer pointing at another notice without quoting any path is incomplete.
+
+    Token shapes only (URL vs document identifier); never borrows a generic
+    portal address for a notice-specific path and never invents a locator.
+    The planner labels intents freely, so match the stable role substrings
+    instead of one exact label.
+    """
+    label = f"{intent or ''} {attribute or ''}".casefold()
+    if ("location" not in label and "địa điểm" not in label) or not claims:
+        return False
+    quotes = [ref.get("quote") or "" for claim in claims for ref in claim.get("references") or []]
+    if any(URL_SHAPE.search(quote) for quote in quotes):
+        return False
+    return any(IDENTIFIER.search(quote) for quote in quotes)
 
 
 def current_value_numbers(text: str) -> set:

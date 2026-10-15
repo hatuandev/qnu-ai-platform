@@ -38,13 +38,21 @@ async def structured_call(db: AsyncSession, req: AskRequest, contract: type[Cont
         except (ValidationError, ValueError) as exc:
             error = exc
             fields = [e["loc"] for e in exc.errors(include_input=False)] if isinstance(exc, ValidationError) else []
+            constraints = [{"field": e["loc"], "type": e["type"],
+                "constraints": {key: value for key, value in (e.get("ctx") or {}).items()
+                    if value is None or isinstance(value, (str, int, float, bool))}}
+                for e in exc.errors(include_input=False, include_url=False)] if isinstance(exc, ValidationError) else []
             logger.warning("evidence_contract_invalid stage=%s attempt=%d fields=%s provider=%s model=%s",
                            contract.__name__, attempt + 1, fields, result.provider, result.model)
             if attempt == 0:
                 messages.append(ChatMessage(role="assistant", content=result.content))
                 messages.append(ChatMessage(role="user", content=
                     "The JSON did not match the schema. Repair ONLY formatting/field names/types; "
-                    "do not add unsupported facts. Return a valid JSON object. Invalid fields: " + str(fields)))
+                    "do not add unsupported facts. For string_too_long, shorten the descriptive "
+                    "label without changing the original scope; do not copy a whole evidence quote "
+                    "into a label field. NEVER truncate or alter quotes/claims to hide unsupported "
+                    "conditions. Return a valid JSON object. Invalid fields: "
+                    + json.dumps(constraints, ensure_ascii=False)))
     raise AppException("Mô hình trả hợp đồng chứng cứ không hợp lệ sau hai lần kiểm tra.",
                        code="EVIDENCE_MODEL_CONTRACT_INVALID", status_code=502,
                        details={"contract": contract.__name__, "invalid_fields": fields}) from error
@@ -74,7 +82,16 @@ Keep target_institution separately from exam_organizer; intent describes the
 actual decision/eligibility request, not an invented combination of scores. Preserve
 an explicitly requested different target; never invent its policies from persona.
 Entity/attribute/method/round/event are descriptive semantic labels, not a fixed vocabulary.
+education_level is the qualification level explicitly requested, including the level
+of an explicitly named source such as an undergraduate handbook, not the institution name.
+requested_topics lists up to six distinct answer facets in concise searchable phrases.
+Split duration, qualification, careers or contact channels when several are requested.
+Do not add adjacent topics or expected values. Keep attribute nonempty for compound
+questions; enumeration_subject does not replace requested_topics.
 requires_year=true when eligibility, figures, fees or schedules can change by year.
+historical_reference_allowed=false when the user explicitly forbids information
+from other years or requests only the exact season without historical reference.
+Otherwise allow a separately labeled historical reference if current evidence is missing.
 If no year is given and no related conversational year or configured reference year
 exists, years=[]; NEVER assume the machine year or the year in a document filename.
 Use history only for genuinely dependent follow-ups; not an independent new topic.
@@ -95,6 +112,15 @@ policy, not necessarily a list of each member. Synonyms must preserve these role
 Do not derive facts or values from the question. Do not include an expected answer."""
 
 PROPOSE_INSTRUCTION = """Answer only using identified official evidence blocks.
+Respect requested.education_level, requested_topics and the ORIGINAL question.
+record_label/record_path are structural retrieval hints from repeated source templates.
+Inspect the identified record heading to establish the actual subject. Do not answer
+about one record using the body of another. Unknown context is not proof of compatibility.
+For compound questions select relevant evidence for EVERY requested facet.
+If historical_reference is supplied, question and requested refer to a SEPARATE
+reference-year lookup authorized by the server, not an answer for its original year.
+Preserve the original entity, attribute, institution, method, round and event.
+Verify applicability to reference_year and never infer it applies to requested_year.
 source_context is the verbatim beginning of the SAME source revision, supplied
 once for each source. Use it to resolve document ownership and pronouns such as
 the institution. It is NOT a general data-year override or additional quotable
@@ -133,6 +159,12 @@ an OCR spelling into a corrected name: copy the authoritative row identity and
 quote the entire block.text for that row. If identity is unclear, mark partial.
 a specific row into a conclusion about all members of a broader group. Name the
 actual evidenced entities, or mark missing coverage for the remaining entities.
+If a sentence is cut by a page boundary, select BOTH parts as evidence. For a
+formula question, select the verbatim formula block, its variable legend and the
+appendix pointer; a method-name description alone is partial. A single table row
+answers only that named entity: for a group question cite the class-wide policy
+paragraph or mark the rest missing. For a where-question, quote the actual path;
+a pointer to another notice without its locator is partial.
 Attach SAME-SOURCE scope heading quotes to the claim when its year/method/event
 is established by a document heading, even if the value paragraph does not repeat it.
 All references for ONE claim must belong to the same source_revision_id. For a
@@ -146,6 +178,20 @@ Only supported if every requested subquestion/constraint is directly covered."""
 
 VERIFY_INSTRUCTION = """Independently audit each proposed claim against its attached
 quotes and source context. This is not a request to justify the proposal.
+Audit the PRIMARY body reference's subject and attribute, not just any other attached
+reference. A correct duration quote for one program cannot make another program's
+career paragraph applicable. record_label/record_path are hints; the actual identified
+record heading and source section establish subject context. Verify qualification level
+against requested.education_level; the institution's name containing 'university' does
+NOT make postgraduate facts undergraduate facts. For facts inspect source_sections and
+their location_ambiguous flag; missing location is not positive applicability proof.
+Populate topic_coverage for EVERY exact requested_topics entry. A facet is true only
+when relevant accepted public claim text answers it with its own applicable references.
+A quote attached merely as context is NOT an answered facet. Unrelated attributes are
+relevant=false, even if the entity and year match. If any facet is false/missing,
+complete=false and list that facet in concise Vietnamese missing_constraints.
+With historical_reference, audit the separate question/requested reference year;
+retain the original topic/conditions and never assert applicability to the original year.
 source_context is the actual beginning of the SAME document revision. It can
 resolve an institution/pronoun in a policy paragraph; do not insist that every
 paragraph repeat the document owner's full name. It cannot supply a missing
@@ -175,10 +221,12 @@ For EACH claim_id return entailed, relevant, scope_compatible and a brief reason
 Reject any unsupported negation, exception, arithmetic, number, or conclusion.
 Compare entity+attribute+year+method+round+event+unit+conditions as one tuple.
 Specific rows support those named entities only, NOT all members of their category.
-Explicit class-wide policy, however, may answer a class question without naming
-each individual member. Do not demand proof of exclusivity unless the user asks
-whether ONLY that class has the rule. Do not invent additional requirements or
-subquestions outside the original question merely because adjacent evidence exists.
+A single row never proves a group rule; a pointer without a quoted locator never
+answers a where-question. Explicit class-wide policy, however, may answer a class
+question without naming each individual member. Do not demand proof of exclusivity
+unless the user asks whether ONLY that class has the rule. Do not invent additional
+requirements or subquestions outside the original question merely because adjacent
+evidence exists.
 Reject broader/universal conclusions unless explicit group-wide policy or complete
 group coverage is evidenced. Correct numbers from one row cannot establish another.
 Values merely appearing anywhere in a document do not support another attribute.

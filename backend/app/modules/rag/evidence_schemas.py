@@ -18,6 +18,7 @@ class QueryPlan(StrictContract):
     event_years: list[int] = Field(default_factory=list, max_length=10)
     requires_year: bool = False
     uses_history: bool = False
+    historical_reference_allowed: bool = True
     coverage: Literal["focused", "enumeration", "comparison"] = "focused"
     enumeration_subject: str | None = None
     entity: str | None = None
@@ -25,6 +26,8 @@ class QueryPlan(StrictContract):
     exam_organizer: str | None = None
     intent: str | None = None
     attribute: str | None = None
+    education_level: str | None = None
+    requested_topics: list[str] = Field(default_factory=list, max_length=6)
     method: str | None = None
     round: str | None = None
     event: str | None = None
@@ -54,6 +57,9 @@ class EvidenceBlock(BaseModel):
     parent_id: str | None = None
     unit_manifest_hash: str | None = None
     is_container: bool = False
+    record_label: str | None = None
+    record_heading_id: str | None = None
+    record_path: list[str] = Field(default_factory=list)
 
 
 class QuoteReference(StrictContract):
@@ -87,3 +93,4 @@ class VerificationResult(StrictContract):
     complete: bool
     conflict: bool = False
     missing_constraints: list[str] = Field(default_factory=list, max_length=10)
+    topic_coverage: dict[str, bool] = Field(default_factory=dict)

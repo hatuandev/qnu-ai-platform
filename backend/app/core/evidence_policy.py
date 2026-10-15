@@ -20,6 +20,7 @@ class EvidencePolicy(BaseModel):
     reference_year_mode: Literal["clarify", "current_year", "fixed"] = "clarify"
     timezone: str = "Asia/Ho_Chi_Minh"
     default_reference_year: int | None = Field(None, ge=1900, le=2099)
+    historical_reference_enabled: bool = True
     candidate_limit: int = Field(24, ge=8, le=40)
     context_limit: int = Field(10, ge=3, le=16)
     max_context_chars: int = Field(36000, ge=6000, le=64000)

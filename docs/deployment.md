@@ -3,8 +3,8 @@
 Tài liệu này hướng dẫn chi tiết các bước cài đặt và vận hành hệ thống QNU.AI Platform trên môi trường máy cá nhân (Local Dev) và máy chủ Production.
 
 ## 1. Yêu Cầu Tiên Quyết
-- **Python**: Phiên bản 3.11 hoặc 3.12 (khuyến nghị dùng trình quản lý `uv`)
-- **Node.js**: Phiên bản 20.x trở lên (kèm `npm`)
+- **Python**: Phiên bản 3.12 (theo `backend/pyproject.toml` và lockfile)
+- **Node.js**: Phiên bản 22 tương thích Vite hiện tại (kèm `npm`)
 - **Docker & Docker Compose**: Để khởi chạy PostgreSQL, Qdrant và Redis
 
 ## 2. Môi Trường Phát Triển Cục Bộ (Local Dev)
@@ -12,20 +12,20 @@ Tài liệu này hướng dẫn chi tiết các bước cài đặt và vận h�
 ### Bước 1: Khởi động Hạ tầng Dữ liệu
 ```powershell
 # Tại thư mục gốc qnu-ai-platform/
-docker compose up -d
+docker compose -f docker-compose.infra.yml up -d
 ```
 
 ### Bước 2: Khởi động Backend API (Port 8001)
 ```powershell
 cd backend
-uv sync
+uv sync --locked --extra dev
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --env-file ../.env
 ```
 
 ### Bước 3: Khởi động Frontend Studio UI (Port 3000)
 ```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -34,6 +34,8 @@ Truy cập:
 - API Docs: `http://localhost:8001/docs`
 
 ## 3. Môi Trường Triển Khai Production & Dokploy PaaS
+
+`docker-compose.yml` là stack ứng dụng production, không phải hạ tầng local. Dùng `.env.dokploy.example` làm mẫu và giữ nguyên secret/đích dữ liệu khi nâng cấp; không reset DB chỉ để deploy. Production hiện cần SSO, không dùng mật khẩu Dev Access Gate. Chuyển dữ liệu local sang server là tác vụ riêng gồm DB, file và vector.
 
 Để triển khai toàn diện trên máy chủ Production sử dụng **Dokploy PaaS** (kèm Traefik SSL tự động, bảo vệ CSDL nội bộ và cơ chế đệm SSE Streaming), vui lòng xem chi tiết tại:
 

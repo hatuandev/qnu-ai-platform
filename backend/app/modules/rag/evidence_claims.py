@@ -86,7 +86,7 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
     payload = {key: value for key, value in payload.items() if key != "evidence"}
     payload["passages"] = passage_payload(blocks, catalog)
     draft = await structured_call(db, req, contract, instruction, payload, max_tokens=4000)
-    proposal = resolve_proposal(draft, catalog)
+    proposal = resolve_proposal(draft, catalog, blocks)
     claims, rejected = bind_claims(proposal, blocks)
     repaired = False
     requested = payload.get("requested", {})
@@ -100,7 +100,7 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
             "expected answers from validation errors. If unsupported, return missing/partial.",
             {**payload, "previous_proposal": draft.model_dump(), "binding_errors": rejected,
              "uncovered_list_block_ids": coverage_missing}, max_tokens=4000)
-        proposal = resolve_proposal(draft, catalog)
+        proposal = resolve_proposal(draft, catalog, blocks)
         claims, rejected = bind_claims(proposal, blocks)
     projected = source_grounded_claims(claims, blocks)
     by_block = {block.id: block for block in blocks}
@@ -109,6 +109,11 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         same_revision = [block for block in blocks if
             (block.binding_id, block.index_revision_id, block.source_revision_id, block.canonical_hash) ==
             (body.binding_id, body.index_revision_id, body.source_revision_id, body.canonical_hash)]
+        heading = by_block.get(body.record_heading_id or "")
+        if heading and heading in same_revision:
+            reference = bind_quote(QuoteReference(block_id=heading.id, quote=heading.text), by_block)
+            if not any(ref["block_id"] == heading.id for ref in claim["references"]):
+                claim["references"].append(reference)
         for header in scope_headers(same_revision, [body], requested.get("years") or []):
             reference = bind_quote(QuoteReference(block_id=header.id, quote=header.text), by_block)
             if not any(ref["block_id"] == reference["block_id"] and ref["quote"] == reference["quote"] for ref in claim["references"]):

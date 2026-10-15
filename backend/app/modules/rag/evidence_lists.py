@@ -41,6 +41,12 @@ def list_groups(blocks: list[EvidenceBlock]) -> list[list[EvidenceBlock]]:
 def matches_subject(group: list[EvidenceBlock], subject: str | None) -> bool:
     if not subject:
         return True
+    # A record's heterogeneous key/value fields are not an enumeration of the
+    # requested topic. Individual requested fields are covered by topic verification.
+    # Never apply this exception to unclassified policy lists or record subsections.
+    if group and all(b.record_label and b.record_path == [b.record_label]
+                     and re.match(r"^\s*[-+*]\s+[^:\n]{1,80}:\s*\S", b.text) for b in group):
+        return False
     labels = [tokens(MARKER.sub("", b.text).splitlines()[0]) for b in group]
     prefix = []
     for parts in zip(*labels, strict=False):

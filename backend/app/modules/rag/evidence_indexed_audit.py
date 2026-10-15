@@ -17,7 +17,7 @@ class AuditedClaim(StrictContract):
 
 
 class AuditedCondition(StrictContract):
-    requirement: str = Field(min_length=1, max_length=200)
+    requirement: str = Field(min_length=1, max_length=1000)
     role: ConstraintRole = "value_constraint"
     evidence_id: str
     retained_by: list[str] = Field(default_factory=list, max_length=12)
@@ -73,6 +73,14 @@ def resolve_audit(indexed: IndexedAudit, claims, catalog) -> SemanticAudit:
 
 
 INDEXED_AUDIT_INSTRUCTION = """Independently verify ALL assertions in each COMPLETE claim.
+Reject a primary body from another record, qualification level or requested attribute.
+An additional reference with the right subject cannot rescue that unrelated body.
+Only use essential_conditions passages applicable to requested.entity and education_level.
+Never introduce requirements from another record's duration/qualification/career section.
+Evaluate requested_topics against PUBLIC claim text, not merely unused attached quotes.
+If historical_reference is supplied, question/requested describe a separately
+authorized reference-year lookup. Audit THAT year and the unchanged original
+topic/conditions, not applicability to historical_reference.requested_year.
 Return one entry per exact claim_id. all_assertions_supported is true ONLY if every
 clause, relationship, number, negation, target, year and eligibility condition is
 entailed by its OWN attached references. Do not copy claim text or quotes, or
@@ -102,8 +110,11 @@ every incidental document identifier, issue-date fragment or old comparison valu
 in its surrounding sentence. Conversely NEVER classify an eligibility threshold,
 time limit or historical value as a year condition to skip its numeric proof.
 Use the SHORTEST passage expressing the specific condition, not unrelated background.
-Distinguish scores used for ranking from scores required as eligibility prerequisites:
-not using a score to rank applicants does not imply no prerequisite on that score.
+Formula requests need the quoted formula and legend; where-requests need the quoted
+locator. Never demand a new total over separately scoped counts unless the question
+explicitly requests that combination. Distinguish scores used for ranking from scores
+required as eligibility prerequisites: not using a score to rank applicants does not
+imply no prerequisite on that score.
 retained_by lists claims retaining the condition in PUBLIC TEXT. An omitted condition
 has retained_by=[]. Year shown in requested header need not be repeated in every claim.
 Numbers written in words are valid; do not demand digit formatting. Synonymous labels

@@ -11,7 +11,7 @@ x-backend-build: &backend-build
 x-backend-environment: &backend-environment
   ENVIRONMENT: ${ENVIRONMENT:-production}
   CONFIGS_DIR: /app/configs
-  APP_IMAGE_TAG: ${APP_IMAGE_TAG:-unversioned}
+  APP_IMAGE_TAG: ${APP_IMAGE_TAG:-latest}
   BACKUP_DIRECTORY: ${BACKUP_DIRECTORY:-/app/storage/backups}
   BACKUP_PG_CONTAINER: ${BACKUP_PG_CONTAINER:-}
   BACKUP_DRILL_ENABLED: ${BACKUP_DRILL_ENABLED:-false}
@@ -37,16 +37,17 @@ x-backend-environment: &backend-environment
   GOTENBERG_URL: ${GOTENBERG_URL:?Set GOTENBERG_URL in Dokploy Environment}
   GOTENBERG_USERNAME: ${GOTENBERG_USERNAME:-}
   GOTENBERG_PASSWORD: ${GOTENBERG_PASSWORD:-}
-  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-  DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-gpt-4o-mini}
-  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-  GEMINI_MODEL_NAME: ${GEMINI_MODEL_NAME:-gemini-2.5-flash-lite}
+  # Model names, endpoints and provider credentials are resolved from ModelOps DB.
   SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in Dokploy Environment}
   PROVIDER_ENCRYPTION_KEY: ${PROVIDER_ENCRYPTION_KEY:?Set PROVIDER_ENCRYPTION_KEY in Dokploy Environment}
+  OLD_PROVIDER_ENCRYPTION_KEYS: ${OLD_PROVIDER_ENCRYPTION_KEYS:-[]}
   INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY in Dokploy Environment}
-  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
-  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:?Set DEV_ACCESS_PASSWORD in Dokploy Environment}
+  DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-false}
+  DEV_ACCESS_PASSWORD: ${DEV_ACCESS_PASSWORD:-}
+  SSO_ENABLED: ${SSO_ENABLED:-true}
+  SSO_AUTHORITY: ${SSO_AUTHORITY:-https://sso.qnu.edu.vn}
+  SSO_CLIENT_ID: ${SSO_CLIENT_ID:-qnu-ai-platform}
+  SSO_AUDIENCE: ${SSO_AUDIENCE:-ai.api}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS in Dokploy Environment}
 
@@ -129,6 +130,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_SSO_AUTHORITY: ${SSO_AUTHORITY:-https://sso.qnu.edu.vn}
+        VITE_SSO_CLIENT_ID: ${SSO_CLIENT_ID:-qnu-ai-platform}
+        VITE_SSO_REDIRECT_URI: ${VITE_SSO_REDIRECT_URI:-/signin-oidc}
+        VITE_SSO_POST_LOGOUT_REDIRECT_URI: ${VITE_SSO_POST_LOGOUT_REDIRECT_URI:-/sign-in}
+        VITE_SSO_SCOPE: ${VITE_SSO_SCOPE:-openid profile email roles offline_access ai.api}
     restart: unless-stopped
     networks:
       - dokploy-network

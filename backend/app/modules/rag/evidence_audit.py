@@ -1,12 +1,13 @@
 """Source-bound atomic entailment and essential-qualifier coverage."""
 
 import re
+from decimal import Decimal
 
 from pydantic import Field
 
 from app.modules.rag.evidence_constraints import ConstraintRole, retained_condition
 from app.modules.rag.evidence_schemas import EvidenceBlock, QuoteReference, StrictContract
-from app.modules.rag.evidence_validation import bind_quote
+from app.modules.rag.evidence_validation import bind_quote, number_values
 
 
 class AtomicCheck(StrictContract):
@@ -18,7 +19,7 @@ class AtomicCheck(StrictContract):
 
 
 class RequiredQualifier(StrictContract):
-    requirement: str = Field(min_length=1, max_length=200)
+    requirement: str = Field(min_length=1, max_length=1000)
     role: ConstraintRole = "value_constraint"
     reference: QuoteReference
     retained_by: list[str] = Field(max_length=12)
@@ -115,8 +116,42 @@ def _resolve_audit_labels(audit: SemanticAudit, claims: list[dict]) -> SemanticA
                                 for qualifier in audit.required_qualifiers]})
 
 
+def _has_checkable_proof(role: ConstraintRole, quote: str) -> bool:
+    """A condition with no numeric or alias digits cannot be proven by numbers.
+
+    URL-only or prose-only references must never be auto-retained through a
+    vacuous numeric subset; their gaps stay blocking until quoted.
+    """
+    if role == "method_identity":
+        stripped = re.sub(r"\b\d+[A-Z]+\b", "", quote)
+        return bool(number_values(stripped)) or bool(re.findall(r"\b[A-Za-z]+(\d+)\b", stripped))
+    return bool(number_values(quote))
+
+
+def _advisory_missing(item: str, accepted: list[dict], question: str, years: list[int]) -> bool:
+    """A demand whose every number is already quoted needs no new data.
+
+    Derived arithmetic or scope unions over quoted figures must be explicitly
+    requested by the user. A demand naming numbers the user mentioned, quoting
+    unattested numbers, or carrying no numbers at all always stays blocking,
+    so genuine gaps (counts, deadlines, thresholds) can never be filtered away.
+    """
+    needed = number_values(item)
+    if not needed or not accepted:
+        return False
+    quoted = set().union(*(number_values(claim["text"]) for claim in accepted))
+    if not needed.issubset(quoted):
+        return False
+    year_values = {Decimal(year) for year in years}
+    fresh = {value for value in needed if value not in year_values}
+    if not fresh:
+        return True
+    asked = {value for value in number_values(question) if value not in year_values} if question else set()
+    return not fresh.intersection(asked)
+
+
 def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[EvidenceBlock],
-                   years: list[int]) -> tuple[list[dict], list[dict], list[str], bool]:
+                   years: list[int], question: str = "") -> tuple[list[dict], list[dict], list[str], bool]:
     """Validate source/claim spans and numeric qualifiers before trusting an audit."""
     audit = _resolve_audit_labels(audit, claims)
     by_claim = {claim["id"]: claim for claim in claims}
@@ -130,8 +165,10 @@ def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[Eviden
             errors.extend({"claim_id": claim["id"], "reason": reason} for reason in failures)
         else:
             accepted.append(claim)
-    missing = list(audit.missing_constraints)
+    missing = [item for item in audit.missing_constraints
+               if not _advisory_missing(item, accepted, question, years)]
     accepted_ids = {claim["id"] for claim in accepted}
+    collective = [by_claim[claim_id] for claim_id in accepted_ids]
     for qualifier in audit.required_qualifiers:
         try:
             ref = bind_quote(qualifier.reference, by_block)
@@ -142,5 +179,13 @@ def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[Eviden
         ids = set(qualifier.retained_by)
         retained = [by_claim[claim_id] for claim_id in ids if claim_id in accepted_ids]
         if not ids or not ids.issubset(accepted_ids) or not retained_condition(qualifier.role, ref, retained, years):
+            # The model may leave retained_by empty even when the accepted claims
+            # collectively prove a numeric/method condition; recheck deterministically
+            # for those roles instead of inventing a gap. A reference to an unknown
+            # claim stays a gap, and year proof stays strict.
+            if not ids and qualifier.role in {"value_constraint", "current_value", "method_identity"} and \
+                    _has_checkable_proof(qualifier.role, ref["quote"]) and \
+                    retained_condition(qualifier.role, ref, collective, years):
+                continue
             missing.append(qualifier.requirement)
-    return accepted, errors, list(dict.fromkeys(missing)), bool(accepted) and audit.complete and not errors and not missing
+    return accepted, errors, list(dict.fromkeys(missing)), bool(accepted) and not errors and not missing

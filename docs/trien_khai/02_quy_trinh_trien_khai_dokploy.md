@@ -1,152 +1,94 @@
-# Quy Trình Từng Bước Triển Khai Trên Dokploy
+# Triển khai và nâng cấp trên Dokploy
 
-Tài liệu này là cẩm nang hướng dẫn thao tác chi tiết (SOP) dành cho đội ngũ kỹ thuật khi thực hiện đưa dự án **QNU AI Platform** lên máy chủ thông qua giao diện quản trị **Dokploy**.
+Stack hiện tại triển khai ứng dụng lên hạ tầng Dokploy đã có. Nâng cấp code không yêu cầu reset DB. Việc đưa dữ liệu mới nhất từ máy cá nhân lên server là một tác vụ chuyển dữ liệu riêng, không diễn ra tự động khi build hoặc migration.
 
----
+## 1. Kiến trúc và điều kiện triển khai
 
-## 📋 Tóm Tắt Quy Trình 6 Bước
+`docker-compose.yml` ở gốc repository có bốn dịch vụ:
 
-```mermaid
-graph LR
-    B1[1. Chuẩn bị VPS & Cài Dokploy] --> B2[2. Cấu hình DNS Tên miền]
-    B2 --> B3[3. Tạo Compose Stack trên Dokploy]
-    B3 --> B4[4. Điền Biến môi trường .env]
-    B4 --> B5[5. Deploy & Cấp SSL Traefik]
-    B5 --> B6[6. Chạy Migration & Kiểm định]
-```
+| Dịch vụ | Chức năng | Điều kiện khởi động |
+| --- | --- | --- |
+| `bootstrap` | Chờ PostgreSQL, khóa bootstrap, migration lên head, seed và kiểm tra | Hạ tầng có sẵn và credential hợp lệ |
+| `backend` | API cổng nội bộ 8001 | Bootstrap kết thúc thành công |
+| `worker` | Xử lý ARQ | Bootstrap kết thúc thành công |
+| `frontend` | React đã build, Nginx cổng nội bộ 80, proxy API | Backend healthy |
 
----
+PostgreSQL, Redis, Qdrant, MinIO và Gotenberg **không được tạo bởi Compose ứng dụng**. Chuẩn bị các dịch vụ này trước và bảo đảm container ứng dụng kết nối được qua `dokploy-network` hoặc tuyến mạng được cấp quyền. Không dùng `docker-compose.infra.yml` để thay hạ tầng server đang có; file đó phục vụ local development.
 
-## Bước 1: Chuẩn Bị Máy Chủ VPS & Cài Đặt Dokploy
+Compose cần chế độ Docker Compose hỗ trợ build và `service_completed_successfully`, không phải Docker Stack/Swarm. Nguồn Git phải có đủ Dockerfile, lockfile, `backend/app`, migrations, `configs` và mã FE. Dán riêng Raw Compose mà không có build context không đủ để build ứng dụng.
 
-1. **Khởi tạo máy chủ**: Thuê hoặc cấp phát máy chủ VPS (hệ điều hành **Ubuntu 22.04 LTS** hoặc **24.04 LTS**).
-2. **Cài đặt Dokploy**: Đăng nhập SSH vào máy chủ bằng tài khoản `root` và chạy lệnh cài đặt chính thức tự động:
-   ```bash
-   curl -sSL https://dokploy.com/install.sh | sh
-   ```
-3. **Cấu hình tường lửa cơ bản**: Chỉ mở các cổng cần thiết cho web và SSH:
-   ```bash
-   sudo ufw allow 22/tcp    # SSH
-   sudo ufw allow 80/tcp    # HTTP (Let's Encrypt challenge)
-   sudo ufw allow 443/tcp   # HTTPS (Traefik SSL)
-   sudo ufw allow 3000/tcp  # Giao diện Dokploy Dashboard
-   sudo ufw enable
-   ```
-4. **Đăng nhập Dokploy**: Mở trình duyệt truy cập `http://<IP_VPS>:3000`, tạo tài khoản Quản trị viên (Admin) cho lần đầu truy cập.
+## 2. Chuẩn bị trước khi nâng cấp
 
----
+1. Ghi lại commit đang chạy, phiên bản PostgreSQL/Qdrant và Alembic revision của DB server. Có thể đọc `alembic_version` trên DB hoặc chạy `alembic current` trong container hiện tại nếu container có cấu hình tương ứng.
+2. Sao lưu đồng bộ PostgreSQL, MinIO/files và Qdrant; giữ khóa `PROVIDER_ENCRYPTION_KEY` tương ứng ở nơi riêng an toàn. Không dán khóa vào báo cáo hoặc chat.
+3. Giữ nguyên các đích dữ liệu: `DATABASE_URL`, bucket, collection và named volume `qnu_platform_storage`. Kiểm tra volume cũ cho phép UID/GID `10001:10001` ghi tại `/app/storage`; không đổi quyền đệ quy trên thư mục chưa xác minh.
+4. Nếu server cách nhiều phiên bản, kiểm tra các migration pending trên bản sao trước. Có migration dọn provider local đã ngừng hỗ trợ và facts mồ côi, không phải mọi migration chỉ thêm bảng. Chỉ migration chưa áp dụng mới chạy.
+5. Đặt cửa sổ bảo trì khi nâng schema không tương thích: ngừng nhận yêu cầu và dừng API/worker cũ trước khi bootstrap mới thay đổi schema. `depends_on` chỉ bảo đảm thứ tự khởi động, không tự drain bản cũ.
+6. Gán `APP_IMAGE_TAG` theo bản phát hành để nhận diện image và rollback. Không ghi đè image đang chạy nếu cần giữ khả năng quay lại bản cũ.
 
-## Bước 2: Cấu Hình Bản Ghi DNS Tên Miền
+Không reset DB, không `down -v`, không xóa bucket/Qdrant, không `alembic stamp head` để bỏ qua migration lỗi. Rollback image sau khi schema đã thay đổi cần kiểm tra tương thích; không giả định chỉ chạy image cũ là đủ.
 
-Trước khi khởi tạo dịch vụ, cần cấu hình các bản ghi tên miền trỏ về IP của máy chủ để Traefik có thể tự động cấp chứng chỉ SSL:
-- **Bản ghi chính cho Backend API**:
-  - Tên (Host): `api.ai.qnu.edu.vn` (hoặc tên miền trường cấp)
-  - Loại (Type): `A`
-  - Giá trị (Value): `<IP_VPS_CUA_BAN>`
-- *(Tùy chọn)* **Bản ghi cho MinIO Web Console**:
-  - Tên (Host): `storage-console.ai.qnu.edu.vn`
-  - Loại (Type): `A`
-  - Giá trị (Value): `<IP_VPS_CUA_BAN>`
+## 3. Cấu hình Environment
 
----
+Dùng [mẫu Environment](../../.env.dokploy.example) làm danh sách biến cần kiểm tra. Với bản đang chạy, cập nhật từng mục, **không chép placeholder đè lên secret hoặc địa chỉ dữ liệu thật**.
 
-## Bước 3: Tạo Dự Án & Compose Stack Trên Dokploy Dashboard
+- Khai báo `DATABASE_URL` chuẩn asyncpg, URL-encode phần username/password nếu cần. Compose yêu cầu biến này; chỉ đặt `CONNECTION_STRING` không đáp ứng điều kiện Compose hiện tại.
+- Điền Redis, Qdrant, MinIO, Gotenberg theo kết nối server thực tế; `S3_SECURE` phù hợp HTTP/HTTPS.
+- `ALLOWED_ORIGINS` là danh sách origin HTTPS được phép, không dùng wildcard cho bản public có xác thực.
+- Giữ nguyên `SECRET_KEY`, `PROVIDER_ENCRYPTION_KEY`, `INTERNAL_API_KEY` của bản cài đặt khi nâng cấp. Rotation là quy trình riêng; `OLD_PROVIDER_ENCRYPTION_KEYS` mặc định `[]`.
+- Chat/OCR/embedding/reranker, endpoint và API key được quản lý qua `/models` trong PostgreSQL, không qua biến LLM trong Environment. Compose không chuyển tiếp các biến model/key LLM cũ.
+- `AUTO_SEED=false` không tắt bootstrap. Bootstrap vẫn migration và seed idempotent; kiểm tra log và dữ liệu trên bản sao khi nâng từ bản cũ.
 
-1. Trên thanh điều hướng Dokploy, bấm chọn **Projects** $\rightarrow$ bấm **Create Project**.
-2. Đặt tên dự án: `QNU-AI-Platform`.
-3. Trong trang chi tiết dự án, bấm **Create Service** $\rightarrow$ chọn mục **Compose**.
-4. Cấu hình nguồn triển khai (Deployment Source):
-   - **Tùy chọn 1 (Khuyên dùng - Kết nối Git Repository)**:
-     - Chọn nhà cung cấp: GitHub hoặc GitLab.
-     - Chọn Repository chứa mã nguồn dự án.
-     - Chọn Branch: `main` (hoặc branch release tương ứng).
-     - Điền đường dẫn tệp Compose: `docker-compose.yml`.
-   - **Tùy chọn 2 (Trực tiếp - Raw Compose File)**:
-     - Chọn tab **Raw**, copy toàn bộ nội dung file `docker-compose.yml` gốc của dự án và dán vào trình soạn thảo trên giao diện Dokploy.
+### Đăng nhập
 
----
+Production dùng SSO: `DEV_AUTH_ENABLED=false`, `SSO_ENABLED=true`, cùng authority/client/audience thực tế. Đăng ký redirect URI đầy đủ tại SSO, ví dụ `https://TEN_MIEN_DEMO/signin-oidc` và logout `https://TEN_MIEN_DEMO/sign-in`.
 
-## Bước 4: Thiết Lập Biến Môi Trường (Environment Variables)
+Compose chuyển cấu hình SSO vào bootstrap/BE/worker và chuyển cấu hình OIDC công khai vào bước build FE. Đổi cấu hình OIDC yêu cầu build lại FE; không truyền password, client secret hoặc API key vào `VITE_*`.
 
-Chuyển sang tab **Environment** của Compose Service trên Dokploy, dán các biến môi trường sau và điền thông số thực tế của bạn:
+**Chưa có SSO thì chưa thể nghiệm thu đăng nhập production bằng bản cấu hình này.** Mật khẩu Dev Access Gate cũ không dùng được ở production. Không đổi `ENVIRONMENT=development` rồi mở Internet để né điều kiện này: chế độ development có nhánh default actor dành cho local. Muốn demo mật khẩu cần thiết kế xác thực bắt buộc riêng hoặc bảo vệ toàn bộ truy cập qua lớp kiểm soát bên ngoài đã được xác nhận; phiên chỉnh Docker không thay đổi cơ chế đăng nhập ứng dụng.
 
-```dotenv
-# ==========================================
-# CẤU HÌNH TÊN MIỀN & GIAO DIỆN
-# ==========================================
-DOMAIN_BACKEND=api.ai.qnu.edu.vn
-ALLOWED_ORIGINS=["https://ai.qnu.edu.vn","https://api.ai.qnu.edu.vn"]
+### Kết nối 9router và server AI
 
-# ==========================================
-# CSDL POSTGRESQL 16 NỘI BỘ
-# ==========================================
-POSTGRES_USER=qnu
-POSTGRES_PASSWORD=MatKhauCSDLCucKyAnToan_2026!
-POSTGRES_DB=qnu_ai_platform
+`localhost:20128` trong container là chính container, không phải máy cá nhân. Nếu 9router tiếp tục chạy trên máy cá nhân, dùng địa chỉ mạng riêng mà server có thể truy cập, ví dụ Tailscale, kiểm tra listener/firewall/API key rồi sửa base URL trong `/models`. Không công khai gateway không bảo vệ ra Internet.
 
-# ==========================================
-# KHO LƯU TRỮ MINIO (S3 OBJECT STORAGE)
-# ==========================================
-S3_ACCESS_KEY=qnu_minio_admin
-S3_SECRET_KEY=MinioSecretKey_BaoMat_2026!
-S3_BUCKET=qnu-ai-documents
-STORAGE_DRIVER=s3
+Tương tự, kiểm tra kết nối từ BE và worker tới embedding/reranker/OCR trên server AI. Không đổi model embedding của kho chỉ để thay địa chỉ mạng.
 
-# ==========================================
-# KHÓA API MÔ HÌNH LLM
-# ==========================================
-OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx
-DEFAULT_LLM_MODEL=gpt-4o-mini
-GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxx
+## 4. Build và routing
 
-# ==========================================
-# BẢO MẬT & XÁC THỰC NỘI BỘ
-# ==========================================
-# Tạo bằng lệnh: openssl rand -hex 32
-SECRET_KEY=chuoi_hex_ngau_nhien_64_ky_tu_dung_sinh_jwt
-INTERNAL_API_KEY=chuoi_secret_key_noi_bo_he_thong
-DEV_AUTH_ENABLED=false
-LOG_LEVEL=INFO
-```
+Trong Dokploy chọn repository và commit đã kiểm tra, build context gốc repository, đường dẫn `docker-compose.yml`. Trước Deploy, kiểm tra Preview Compose và cấu hình Environment.
 
-Sau khi dán xong, bấm **Save** để lưu lại cấu hình.
+Lệnh kiểm tra tương đương ở checkout server:
 
----
-
-## Bước 5: Bấm Triển Khai (Deploy) & Xác Minh SSL
-
-1. Bấm nút **Deploy** ở góc phải màn hình Dokploy.
-2. Theo dõi tab **Deployments** và **Logs**:
-   - Dokploy sẽ tự động tải các hình ảnh Docker chính thức (`postgres:16-alpine`, `qdrant/qdrant`, `redis:7-alpine`, `minio/minio`, `gotenberg/gotenberg`).
-   - Dokploy tự động build Dockerfile cho `backend` và `worker`.
-   - Traefik sẽ tự động liên hệ với Let's Encrypt để cấp chứng chỉ HTTPS (SSL) cho tên miền `api.ai.qnu.edu.vn`.
-3. Khi toàn bộ các container chuyển sang màu xanh lá cây (**Running / Healthy**), quá trình đóng gói hạ tầng đã thành công.
-
----
-
-## Bước 6: Khởi Tạo CSDL (Alembic Migrations) & Kiểm Tra Nghiệm Thu
-
-### 6.1. Chạy Migrations CSDL
-Để khởi tạo các bảng CSDL (assistants, documents, chunks, facts, modelops logs, eval runs), mở tab **Terminal** của container `qnu_backend` trên Dokploy (hoặc SSH vào server VPS) và thực thi lệnh:
 ```bash
-docker exec -it qnu_backend uv run alembic upgrade head
+docker compose --env-file /DUONG_DAN_ENV_RIENG -f docker-compose.yml config --quiet
+docker compose --env-file /DUONG_DAN_ENV_RIENG -f docker-compose.yml build bootstrap backend worker frontend
 ```
 
-### 6.2. Kiểm tra Nghiệm thu (Smoke Test)
-1. **Kiểm tra tài liệu Swagger API**:
-   - Mở trình duyệt truy cập: `https://api.ai.qnu.edu.vn/docs`
-   - Kiểm tra giao diện Swagger hiển thị đủ 8 nhóm endpoints.
-2. **Kiểm tra Health Probes**:
-   - `https://api.ai.qnu.edu.vn/health/live` $\rightarrow$ Trả về `{"status": "alive"}`.
-   - `https://api.ai.qnu.edu.vn/health/ready` $\rightarrow$ Trả về trạng thái sẵn sàng của Database và Redis.
-3. **Thử nghiệm tương tác RAG**:
-   - Gửi thử một câu hỏi đến endpoint `/platform/v1alpha1/assistants/admissions/chat` để xác nhận mô hình phản hồi và ghi nhận chi phí vào `llm_usage_logs`.
+`config --quiet` chỉ kiểm tra cú pháp và biến bắt buộc; không chứng minh credential hoặc mạng hợp lệ. Không xuất toàn bộ `docker compose config` vào log vì có thể chứa secret.
 
----
+BE dùng Python 3.12 và uv cố định, `uv sync --locked --no-dev`, không cài runtime model local/PyTorch ngoài lock. FE dùng `npm ci` và build/typecheck. Base images cố định bằng digest; cập nhật digest có kiểm chứng để nhận bản vá bảo mật, không giữ bất biến vô thời hạn. Root build context loại `backend/storage`, backup, tmp, tài liệu gốc và `.env*`; dữ liệu không được chuyển theo image.
 
-## 🔄 7. Quy Trình Cập Nhật Khi Có Bản Code Mới (Day-2 Operations)
+Trong tab Domains, trỏ tên miền HTTPS tới service **`frontend`**, container port **`80`**. Nginx tự proxy `/platform/` và health tới backend nội bộ; không cần mở cổng DB, 8001 hoặc Redis ra Internet. Xác nhận các dịch vụ ngoài ở đúng network trước khi Deploy.
 
-Khi team phát triển có các tính năng mới hoặc bản vá lỗi được merge vào nhánh `main`:
-1. Nếu đã kết nối Git Webhook: Dokploy sẽ **tự động phát hiện commit mới và deploy lại**.
-2. Nếu deploy thủ công: Thành viên chỉ cần đăng nhập Dokploy Dashboard $\rightarrow$ bấm nút **Redeploy**.
-3. **Lưu ý**: Dữ liệu CSDL, Vector và tệp tài liệu trong các Named Volumes (`qnu_postgres_data`, `qnu_qdrant_data`, `qnu_minio_data`) được giữ nguyên vẹn 100%, không bị ảnh hưởng khi container được build lại.
+Volume `qnu_platform_storage` và alias `qnu-backend` giữ tương thích bản hiện tại. Nếu chủ động tạo hai stack song song trên cùng network thì phải thiết kế tách image tag/volume/alias và proxy đích; không copy nguyên stack rồi mặc định hai bản độc lập.
+
+## 5. Deploy và kiểm tra
+
+Sau bảo trì và sao lưu, Deploy trên Dokploy, theo dõi theo thứ tự:
+
+1. Bootstrap kết thúc với exit 0 và log `Production bootstrap completed successfully`. Bootstrap là tác vụ một lần, trạng thái exited thành công là bình thường.
+2. Backend healthy; `python -m app.cli db check` trong backend xác nhận schema. Không chạy migration song song với bootstrap.
+3. Worker healthcheck thành công, không có lỗi credential/decrypt/bucket hoặc kết nối broker.
+4. Frontend HTTPS trả giao diện; deep link vẫn mở được khi F5. Kiểm tra `/health/live` và `/health/ready` qua cùng tên miền; health chưa chứng minh chất lượng RAG.
+5. Kiểm tra chưa đăng nhập bị từ chối trên API được bảo vệ, đăng nhập SSO thành công, quyền tài khoản đúng.
+6. Kiểm tra `/models`, nguồn đã xuất bản, citation mở được tài liệu, hỏi một câu có nguồn và một câu thiếu nguồn. Xem model thực tế/fallback và lỗi timeout, không chỉ dựa vào HTTP 200.
+
+Nếu bootstrap lỗi, giữ log đã loại secrets và xác định migration cụ thể; không reset DB để vượt lỗi. Nếu mạng AI lỗi, sửa tuyến mạng/cấu hình provider, không đổi schema hay xóa vector.
+
+## 6. Chuyển dữ liệu local để demo
+
+Migration chỉ nâng cấu trúc DB server, không lấy dữ liệu từ máy cá nhân. Muốn tái hiện dữ liệu local cần kế hoạch chuyển đồng bộ DB, file/object storage, Qdrant và khóa provider; đối soát snapshot và đường dẫn Windows khi sang Linux. Không restore riêng DB đè lên server rồi dùng bucket/vector cũ không tương ứng. Việc restore dữ liệu server cần được xác nhận riêng trước khi thực hiện.
+
+## Tham khảo
+
+[Dokploy Compose](https://docs.dokploy.com/docs/core/docker-compose), [Dokploy Domains](https://docs.dokploy.com/docs/core/docker-compose/domains), [uv Docker](https://docs.astral.sh/uv/guides/integration/docker/).

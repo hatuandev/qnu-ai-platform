@@ -3,7 +3,7 @@
 import re
 from collections import defaultdict
 
-from app.modules.rag.evidence_lists import MARKER
+from app.modules.rag.evidence_lists import MARKER, family
 from app.modules.rag.evidence_schemas import EvidenceBlock
 
 
@@ -24,13 +24,36 @@ def _numbered_groups(source: list[EvidenceBlock]) -> list[list[EvidenceBlock]]:
         if _level(parent) != 1:
             continue
         children = []
+        run: list[EvidenceBlock] = []
+        run_mode = False
+        in_definition = False
         for child in source[position + 1:]:
             if _level(child) == 1 or child.text.lstrip().startswith("#") or child.section != parent.section:
                 break
+            if not children and not run and family(child) is None and _level(child) is None:
+                # An unmarked explanatory run (formula lines, legend lead-in) belongs
+                # to its numbered parent; option bullets keep their own packing rule.
+                run_mode = True
+            if run_mode:
+                member = family(child)
+                if member in ("letter", "number"):
+                    break
+                if member is not None:
+                    if not (run and (in_definition or run[-1].text.rstrip().endswith(":"))):
+                        break
+                    in_definition = True
+                elif in_definition:
+                    break
+                run.append(child)
+                if len(run) >= 8:
+                    break
+                continue
             if not children and _level(child) != 2:
                 break
             children.append(child)
-        if children:
+        if run:
+            groups.append([parent, *run])
+        elif children:
             groups.extend(_branch_groups(parent, children))
     return groups
 
@@ -110,3 +133,40 @@ def coverage_order(blocks: list[EvidenceBlock], goals: list[str], groups: dict,
 def dependency_intros(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
     return {member: [group[0]] for member, group in dependency_groups(blocks).items()
             if group and group[0].id != member and _level(group[0]) == 1 and len(group[0].text) <= 4000}
+
+
+_SENTENCE_END = re.compile(r"[.!?…:;]\s*$")
+
+
+def sentence_continuations(blocks: list[EvidenceBlock], body: EvidenceBlock, limit: int = 2) -> list[EvidenceBlock]:
+    """Resume a sentence cut by a page/chunk boundary in the adjacent block.
+
+    Structural signals only: same immutable source and section, strictly forward
+    order, an unfinished prior sentence and a lowercase continuation start.
+    Never crosses headings, list markers, containers or sources.
+    """
+    if body.is_container:
+        return []
+    same = [block for block in blocks if source_identity(block) == source_identity(body)
+            and block.section == body.section and not block.is_container]
+    ordered = sorted(same, key=lambda block: (block.start, block.end))
+    try:
+        index = [block.id for block in ordered].index(body.id)
+    except ValueError:
+        return []
+    result = []
+    previous = body
+    for following in ordered[index + 1:]:
+        if len(result) >= limit or following.start < previous.end:
+            break
+        if _SENTENCE_END.search(previous.text.strip()):
+            break
+        stripped = following.text.strip()
+        if not stripped or stripped.startswith("#") or family(following) is not None:
+            break
+        first = re.search(r"[^\W\d_]", stripped)
+        if not first or not first.group().islower():
+            break
+        result.append(following)
+        previous = following
+    return result

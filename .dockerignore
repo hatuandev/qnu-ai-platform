@@ -19,9 +19,11 @@
 **/build
 **/.env*
 !**/.env.example
-storage/uploads/*
-!storage/uploads/.gitkeep
-storage/artifacts/*
-!storage/artifacts/.gitkeep
-storage/backups/*
-!storage/backups/.gitkeep
+# Runtime data must never be sent to the repository-root image builder.
+backend/storage
+storage
+tmp
+docs/tai_lieu
+**/*.log
+**/test-results
+**/coverage

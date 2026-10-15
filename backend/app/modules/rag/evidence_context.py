@@ -7,7 +7,9 @@ def model_block(block: EvidenceBlock) -> dict:
     return {"id": block.id, "source_revision_id": block.source_revision_id, "text": block.text,
             "title": block.title, "page_number": block.page_number, "section": block.section,
             "header_context": block.header_context, "temporal_scope": block.temporal_scope.model_dump(),
-            "origin": block.origin, "fact_context": block.fact_context}
+            "origin": block.origin, "fact_context": block.fact_context,
+            "record_label": block.record_label, "record_path": block.record_path,
+            "record_heading_id": block.record_heading_id}
 
 
 def model_context(blocks: list[EvidenceBlock]) -> dict:

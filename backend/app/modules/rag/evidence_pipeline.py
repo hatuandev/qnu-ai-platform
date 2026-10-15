@@ -21,6 +21,7 @@ from app.modules.rag.evidence_blocks import (
 from app.modules.rag.evidence_claims import propose_bound_claims
 from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_facts import reviewed_fact_blocks
+from app.modules.rag.evidence_hierarchy import record_candidates, scope_candidates
 from app.modules.rag.evidence_lists import list_groups, list_tail_context, matches_subject
 from app.modules.rag.evidence_model import (
     PLAN_INSTRUCTION,
@@ -116,6 +117,8 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
         await asyncio.gather(*tasks, return_exceptions=True)
     blocks = await load_published_blocks(db, snapshot, candidate_mode=candidate_mode)
     blocks += await reviewed_fact_blocks(db, req, snapshot, plan, blocks)
+    blocks = scope_candidates(blocks, plan)
+    record_hits = record_candidates(blocks, plan, policy.context_limit)
     rules = active_preferences(policy, plan, blocks)
     preferred = preference_candidates(rules, plan, blocks)
     preferred_lexical = preferred[:3]
@@ -155,7 +158,7 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     shortlist = list({b.id: b for b in [*direct, *shortlist, *preferred[:2]]}.values())
     neighbors = enumeration_neighbors(blocks, shortlist, 6, subject=plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
     tails = list_tail_context(blocks, neighbors) if neighbors else []
-    shortlist = list({b.id: b for b in [*direct, *table_rows, *shortlist, *neighbors, *tails]}.values())
+    shortlist = list({b.id: b for b in [*record_hits, *direct, *table_rows, *shortlist, *neighbors, *tails]}.values())
     if plan.coverage == "enumeration":
         subject = plan.enumeration_subject or plan.entity
         sections = section_neighbors(blocks, subject or plan.query, plan.years, 3)
@@ -169,7 +172,8 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
     packing = {}
     selected = pack_context(blocks, shortlist, plan.years, policy.context_limit, policy.max_context_chars,
                             atomic_lists=plan.coverage == "enumeration", enumeration_subject=plan.enumeration_subject or plan.entity,
-                            diagnostics=packing, coverage_goals=[req.question, plan.attribute or "", plan.method or "", *(missing or [])])
+                            diagnostics=packing, coverage_goals=[*plan.requested_topics, req.question, plan.attribute or "", plan.method or "", *(missing or [])],
+                            priority_ids={b.id for b in record_hits})
     logger.info("evidence_selection conversation=%s snapshot=%s corpus=%d candidates=%d packed=%d chars=%d dropped=%s ids=%s",
                 req.conversation_id, snapshot.snapshot_id, len(blocks), len(shortlist), len(selected), packing["packed_characters"],
                 packing["dropped"], [b.id for b in selected])
@@ -311,7 +315,16 @@ async def answer_with_evidence(db: AsyncSession, req: AskRequest, snapshot: Retr
     try:
         async with asyncio.timeout(policy.timeout_seconds):
             response = await _answer(db, req, snapshot, policy, started, candidate_mode, progress)
+            from app.modules.rag.evidence_historical import try_historical_reference
+
+            response = await try_historical_reference(db, req, snapshot, policy, response, started,
+                candidate_mode, progress, select_context, decision_response)
+            response.latency_ms = round((time.perf_counter() - started) * 1000, 2)
             response.answer_decision["stage_timings_ms"] = {k: v for k, v in progress.items() if k.endswith("_ms")}
+            historical = {k: v for k, v in progress.items() if k.startswith("historical_") and not k.endswith("_ms")}
+            response.answer_decision["historical_diagnostics"] = historical
+            logger.info("evidence_historical_decision conversation=%s snapshot=%s diagnostics=%s",
+                        req.conversation_id, snapshot.snapshot_id, historical)
             return response
     except TimeoutError as exc:
         stage = progress.get("stage", "initialization")

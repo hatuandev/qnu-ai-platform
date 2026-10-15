@@ -37,7 +37,7 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
     if not blocks or limit <= 0:
         return []
     signature = tuple((b.binding_id, b.index_revision_id, b.source_revision_id, b.id,
-                       b.canonical_hash, f"{b.title}\n{b.section}", b.text) for b in blocks)
+                       b.canonical_hash, f"{b.title}\n{b.section}\n{' / '.join(b.record_path)}", b.text) for b in blocks)
     lengths, average, postings = corpus_statistics(signature)
     scores = defaultdict(float)
     for term in sorted({term for query in queries for term in tokens(query)}):
