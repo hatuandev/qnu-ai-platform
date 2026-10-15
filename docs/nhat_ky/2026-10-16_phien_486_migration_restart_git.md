@@ -30,3 +30,13 @@ không reset DB, không thay publication/vector/ModelOps hoặc bật glossary t
   frontend build và 46 auth test pass; không chạy lại full suite cho thao tác vận hành.
 - Commit/push chỉ được xác nhận bằng kết quả Git và đối chiếu remote sau thao tác;
   chưa coi việc tạo commit local là đã đồng bộ Gitea.
+
+## Kết quả Git
+
+- Đã commit batch thành `9fd0cbd` (205 file; 8776 dòng thêm/1565 dòng bỏ).
+- Scan 8778 dòng thêm trước dọn 2 dòng trống cuối tài liệu: 0 ứng viên secret
+  theo mẫu private-key/provider-token/URL credential/literal secret; không phải
+  chứng nhận phát hiện mọi dạng bí mật. Staged diff-check sau dọn đạt, exit 0.
+- `git push gitea main:main` exit 0. Đọc lại `refs/heads/main` từ Gitea khớp
+  chính xác `9fd0cbd58c10a5efbe5a9943ae77799a291913cb` với local HEAD lúc push.
+- Không push GitHub. Các artifact/corpus ngoài phạm vi vẫn để nguyên trên máy.
