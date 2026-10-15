@@ -9,9 +9,15 @@ from fastapi import APIRouter, Request, Response
 
 from app.core.config import get_settings
 from app.core.exceptions import AppException
-from app.core.security import create_access_token, decode_access_token
+from app.core.security import create_access_token
+from app.modules.auth.dependencies import get_current_actor
+from app.modules.auth.dev_access import (
+    dev_gate_allowed,
+    enforce_login_rate_limit,
+    production_session_token,
+    validate_browser_origin,
+)
 from app.modules.auth.schemas import AuthActor, AuthStatusResponse, DevLoginRequest
-from app.modules.auth.sso_validator import validate_sso_token
 
 settings = get_settings()
 
@@ -19,11 +25,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Access Gate"])
 
 
 @router.post("/login", response_model=AuthStatusResponse, summary="Đăng nhập Dev Access Gate bằng mật khẩu môi trường")
-async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
+async def login(req: DevLoginRequest, response: Response, request: Request) -> AuthStatusResponse:
     """Verify dev access key and issue a secure HttpOnly session cookie."""
     current_settings = get_settings()
     is_prod = current_settings.ENVIRONMENT.lower() in ("production", "prod")
-    if not current_settings.DEV_AUTH_ENABLED or is_prod:
+    if not dev_gate_allowed(current_settings):
         raise AppException(
             "Dev Access Gate bị vô hiệu hóa trong môi trường này.",
             code="dev_auth_disabled",
@@ -37,7 +43,9 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
             code="auth_not_configured",
             status_code=503,
         )
-    if not hmac.compare_digest(req.access_key.strip(), expected_password.strip()):
+    validate_browser_origin(request, current_settings)
+    await enforce_login_rate_limit(request, current_settings)
+    if not hmac.compare_digest(req.access_key.strip().encode("utf-8"), expected_password.strip().encode("utf-8")):
         raise AppException(
             "Mật khẩu truy cập Dev không chính xác.",
             code="invalid_credentials",
@@ -69,10 +77,14 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
         expires_delta=timedelta(minutes=current_settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
+    lifetime = current_settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    if is_prod:
+        token, lifetime = production_session_token(current_settings, actor)
+    response.headers["Cache-Control"] = "no-store"
     response.set_cookie(
         key="qnu_session",
         value=token,
-        max_age=current_settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=lifetime * 60,
         httponly=True,
         samesite="lax",
         secure=is_prod,
@@ -85,9 +97,12 @@ async def login(req: DevLoginRequest, response: Response) -> AuthStatusResponse:
 
 
 @router.post("/logout", summary="Đăng xuất Dev Access Gate")
-async def logout(response: Response) -> dict[str, str]:
+async def logout(response: Response, request: Request) -> dict[str, str]:
     """Clear session cookie."""
-    response.delete_cookie(key="qnu_session")
+    current_settings = get_settings()
+    validate_browser_origin(request, current_settings)
+    response.headers["Cache-Control"] = "no-store"
+    response.delete_cookie(key="qnu_session", secure=current_settings.ENVIRONMENT.lower() in ("production", "prod"), httponly=True, samesite="lax")
     return {"status": "logged_out", "message": "Đã kết thúc phiên làm việc."}
 
 
@@ -95,8 +110,7 @@ async def logout(response: Response) -> dict[str, str]:
 async def get_current_user(request: Request) -> AuthStatusResponse:
     """Check current authentication status from QNU SSO Bearer token or Dev session cookie."""
     current_settings = get_settings()
-    is_prod = current_settings.ENVIRONMENT.lower() in ("production", "prod")
-    dev_gate_allowed = (not is_prod) and current_settings.DEV_AUTH_ENABLED
+    is_dev_gate_allowed = dev_gate_allowed(current_settings)
 
     token: str | None = None
 
@@ -104,48 +118,14 @@ async def get_current_user(request: Request) -> AuthStatusResponse:
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
 
-    if not token and dev_gate_allowed:
+    if not token and is_dev_gate_allowed:
         token = request.cookies.get("qnu_session")
 
     if token:
-        # Check if local dev token (HS256)
-        is_local_dev = False
-        if dev_gate_allowed:
-            try:
-                import jwt
-
-                header = jwt.get_unverified_header(token)
-                if header.get("alg") == current_settings.JWT_ALGORITHM:
-                    is_local_dev = True
-            except Exception:
-                pass
-
-        if is_local_dev:
-            try:
-                payload = decode_access_token(token)
-                actor = AuthActor(
-                    actor_id=str(payload.get("actor_id", "act_admin_qnu")),
-                    username=str(payload.get("sub", "admin")),
-                    display_name=str(payload.get("display_name", "Cán bộ Quản trị QNU")),
-                    email=str(payload.get("email", "admin@qnu.edu.vn")),
-                    user_type=str(payload.get("user_type", "admin")),
-                    tenant_id=str(payload.get("tenant_id", "tenant_qnu")),
-                    workspace_id=str(payload.get("workspace_id", "workspace_qnu")),
-                    role="AI.Admin",
-                    roles=["AI.Admin"],
-                    permissions=["ai.access.admin"],
-                    authenticated=True,
-                    session_version=str(payload.get("session_version", "v1")),
-                )
-                return AuthStatusResponse(authenticated=True, actor=actor)
-            except Exception:
-                return AuthStatusResponse(authenticated=False, actor=None, message="Phiên làm việc không hợp lệ")
-
-        # Validate SSO token
         try:
-            sso_actor = await validate_sso_token(token)
-            return AuthStatusResponse(authenticated=True, actor=sso_actor)
-        except Exception:
+            actor = await get_current_actor(request)
+            return AuthStatusResponse(authenticated=True, actor=actor)
+        except AppException:
             return AuthStatusResponse(authenticated=False, actor=None, message="Phiên làm việc không hợp lệ")
 
     return AuthStatusResponse(authenticated=False, actor=None, message="Chưa đăng nhập")

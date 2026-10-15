@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -288,6 +289,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     INTERNAL_API_KEY: str = "qnu_internal_secret_key_2026"
     DEV_AUTH_ENABLED: bool = True
+    # Explicit opt-in for password-only demo deployments; never enables anonymous admin.
+    DEV_AUTH_ALLOW_IN_PRODUCTION: bool = False
     DEV_ACCESS_PASSWORD: str = "QNU@2026"
     RATE_LIMIT_PER_MINUTE: int = 120
 
@@ -362,15 +365,31 @@ class Settings(BaseSettings):
                     "Production security violation: PROVIDER_ENCRYPTION_KEY must be configured."
                 )
 
-            if not self.SSO_ENABLED:
+            production_dev_gate = self.DEV_AUTH_ENABLED and self.DEV_AUTH_ALLOW_IN_PRODUCTION
+            if not self.SSO_ENABLED and not production_dev_gate:
                 raise ValueError("Production security violation: SSO_ENABLED must be True in production.")
 
-            if self.DEV_AUTH_ENABLED:
+            if production_dev_gate:
+                password = self.DEV_ACCESS_PASSWORD.strip()
+                if len(password) < 24 or len(password) > 128:
+                    raise ValueError("Production Dev Access Gate requires a private password of 24–128 characters.")
+                if len(self.SECRET_KEY) < 32 or self.JWT_ALGORITHM != "HS256":
+                    raise ValueError("Production Dev Access Gate requires SECRET_KEY >= 32 characters and HS256.")
+                if not self.ALLOWED_ORIGINS:
+                    raise ValueError("Production Dev Access Gate requires exact HTTPS ALLOWED_ORIGINS.")
+                for origin in self.ALLOWED_ORIGINS:
+                    parsed = urlsplit(origin)
+                    if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+                            or parsed.password or parsed.path or parsed.query or parsed.fragment or "*" in origin):
+                        raise ValueError("Production Dev Access Gate requires exact HTTPS ALLOWED_ORIGINS.")
+            elif self.DEV_AUTH_ENABLED:
                 if self.DEV_ACCESS_PASSWORD == "" or self.SSO_AUTHORITY == "http://localhost:5000":
                     self.DEV_AUTH_ENABLED = False
                 else:
                     raise ValueError("Production security violation: DEV_AUTH_ENABLED must be False in production.")
 
+            if not self.SSO_ENABLED:
+                return self
             if not self.SSO_AUTHORITY or not self.SSO_AUTHORITY.strip():
                 raise ValueError("Production security violation: SSO_AUTHORITY must be HTTPS in production.")
             elif self.SSO_AUTHORITY == "http://localhost:5000":

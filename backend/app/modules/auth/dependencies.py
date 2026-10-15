@@ -7,6 +7,11 @@ from fastapi import Depends, Request
 from app.core.config import get_settings
 from app.core.exceptions import AppException
 from app.core.security import decode_access_token
+from app.modules.auth.dev_access import (
+    decode_production_actor,
+    dev_gate_allowed,
+    validate_browser_origin,
+)
 from app.modules.auth.schemas import AuthActor
 from app.modules.auth.sso_validator import validate_sso_token
 
@@ -17,12 +22,12 @@ async def get_current_actor(request: Request) -> AuthActor:
     """Extract authenticated actor from Authorization header (Bearer QNU SSO) or HttpOnly session cookie.
 
     Enforces strict fail-closed security:
-    - Production: Unauthenticated request always raises 401. Local dev JWT is rejected.
+    - Production: Always requires authentication, including an explicitly enabled password gate.
     - Development / Test: Default dev actor allowed ONLY when DEV_AUTH_ENABLED=True and not enforcing auth.
     """
     current_settings = get_settings()
     is_prod = current_settings.ENVIRONMENT.lower() in ("production", "prod")
-    dev_gate_allowed = (not is_prod) and current_settings.DEV_AUTH_ENABLED
+    is_dev_gate_allowed = dev_gate_allowed(current_settings)
 
     token: str | None = None
 
@@ -32,13 +37,15 @@ async def get_current_actor(request: Request) -> AuthActor:
         token = auth_header[7:].strip()
 
     # 2. Check HttpOnly cookie (Dev Access Gate session) ONLY when Dev Gate is allowed
-    if not token and dev_gate_allowed:
+    if not token and is_dev_gate_allowed:
         token = request.cookies.get("qnu_session")
+        if token:
+            validate_browser_origin(request, current_settings)
 
     if token:
         # Check if token is local dev JWT (HS256) vs SSO token (RS256)
         is_local_dev_token = False
-        if dev_gate_allowed:
+        if is_dev_gate_allowed:
             try:
                 import jwt
 
@@ -49,6 +56,8 @@ async def get_current_actor(request: Request) -> AuthActor:
                 pass
 
         if is_local_dev_token:
+            if is_prod:
+                return decode_production_actor(token, current_settings)
             # Decode local dev JWT
             try:
                 payload = decode_access_token(token)
@@ -79,7 +88,7 @@ async def get_current_actor(request: Request) -> AuthActor:
 
     # If no token provided:
     # In production or when DEV_AUTH_ENABLED is False, fail-closed with 401
-    if is_prod or not dev_gate_allowed:
+    if is_prod or not is_dev_gate_allowed:
         raise AppException(
             "Chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập qua QNU Single Sign-On.",
             code="unauthorized",
