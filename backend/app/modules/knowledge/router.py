@@ -8,9 +8,19 @@ from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, Upl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import EntityNotFoundError
 from app.modules.auth.dependencies import require_permission
 from app.modules.auth.schemas import AuthActor
 from app.modules.jobs.schemas import JobResponse
+from app.modules.knowledge.glossary_schemas import (
+    GlossaryReview,
+    GlossarySettingsResponse,
+    GlossarySettingsUpdate,
+    GlossaryTermCreate,
+    GlossaryTermListResponse,
+    GlossaryTermResponse,
+    GlossaryTermUpdate,
+)
 from app.modules.knowledge.schemas import (
     ActivateVectorGenerationResponse,
     ApproveDocumentRequest,
@@ -89,6 +99,7 @@ from app.modules.knowledge.service import knowledge_service
 from app.modules.knowledge.services.backfill_service import BackfillV3Report, backfill_v3_service
 from app.modules.knowledge.services.candidate_service import candidate_service
 from app.modules.knowledge.services.chunk_set_service import chunk_set_service
+from app.modules.knowledge.services.glossary_service import glossary_service
 from app.modules.knowledge.services.group_source_service import group_source_service
 from app.modules.knowledge.services.import_batch_service import import_batch_service
 from app.modules.knowledge.services.reconciliation_service import (
@@ -1735,3 +1746,133 @@ async def clean_orphan_points_endpoint(
         actor=actor,
     )
     return {"collection_id": collection_id, "cleaned_points": cleaned}
+
+
+# =========================================================================
+# Collection glossary — admin-curated search aliases (approval-gated)
+# =========================================================================
+
+
+def _glossary_in_collection(term: Any, collection_id: str) -> None:
+    if term.collection_id != collection_id:
+        raise EntityNotFoundError(
+            f"Không tìm thấy thuật ngữ '{term.id}' trong kho '{collection_id}'."
+        )
+
+
+@router.get(
+    "/collections/{collection_id}/glossary",
+    response_model=GlossaryTermListResponse,
+    summary="Danh sách thuật ngữ của kho tri thức",
+)
+async def list_glossary_terms(
+    collection_id: str,
+    search: str | None = Query(None, description="Tìm trong cụm hỏi và thuật ngữ đích"),
+    status: str | None = Query(None, description="Lọc trạng thái: pending, approved, rejected, revoked"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> GlossaryTermListResponse:
+    items, total = await glossary_service.list_terms(
+        db, actor, collection_id, search=search, status=status, page=page, page_size=page_size)
+    return GlossaryTermListResponse(
+        items=[GlossaryTermResponse.model_validate(item, from_attributes=True) for item in items],
+        total=total, page=page, page_size=page_size)
+
+
+@router.post(
+    "/collections/{collection_id}/glossary",
+    response_model=GlossaryTermResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Thêm thuật ngữ mới (luôn ở trạng thái chờ duyệt)",
+)
+async def create_glossary_term(
+    collection_id: str,
+    body: GlossaryTermCreate,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> GlossaryTermResponse:
+    term = await glossary_service.create_term(db, actor, collection_id, body)
+    return GlossaryTermResponse.model_validate(term, from_attributes=True)
+
+
+@router.get(
+    "/collections/{collection_id}/glossary/{term_id}",
+    response_model=GlossaryTermResponse,
+    summary="Chi tiết một thuật ngữ",
+)
+async def get_glossary_term(
+    collection_id: str,
+    term_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> GlossaryTermResponse:
+    term = await glossary_service.get_term(db, actor, term_id)
+    _glossary_in_collection(term, collection_id)
+    return GlossaryTermResponse.model_validate(term, from_attributes=True)
+
+
+@router.put(
+    "/collections/{collection_id}/glossary/{term_id}",
+    response_model=GlossaryTermResponse,
+    summary="Sửa thuật ngữ (sửa mục đã duyệt phải duyệt lại)",
+)
+async def update_glossary_term(
+    collection_id: str,
+    term_id: str,
+    body: GlossaryTermUpdate,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> GlossaryTermResponse:
+    term = await glossary_service.get_term(db, actor, term_id)
+    _glossary_in_collection(term, collection_id)
+    updated = await glossary_service.update_term(db, actor, term_id, body)
+    return GlossaryTermResponse.model_validate(updated, from_attributes=True)
+
+
+@router.post(
+    "/collections/{collection_id}/glossary/{term_id}/review",
+    response_model=GlossaryTermResponse,
+    summary="Duyệt, từ chối hoặc thu hồi thuật ngữ",
+)
+async def review_glossary_term(
+    collection_id: str,
+    term_id: str,
+    body: GlossaryReview,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.review")),
+) -> GlossaryTermResponse:
+    term = await glossary_service.get_term(db, actor, term_id)
+    _glossary_in_collection(term, collection_id)
+    reviewed = await glossary_service.review_term(db, actor, term_id, body)
+    return GlossaryTermResponse.model_validate(reviewed, from_attributes=True)
+
+
+@router.get(
+    "/collections/{collection_id}/glossary-settings",
+    response_model=GlossarySettingsResponse,
+    summary="Cấu hình sử dụng thuật ngữ của kho",
+)
+async def get_glossary_settings(
+    collection_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> GlossarySettingsResponse:
+    settings = await glossary_service.get_settings(db, actor, collection_id)
+    return GlossarySettingsResponse.model_validate(settings, from_attributes=True)
+
+
+@router.put(
+    "/collections/{collection_id}/glossary-settings",
+    response_model=GlossarySettingsResponse,
+    summary="Bật/tắt sử dụng thuật ngữ của kho",
+)
+async def update_glossary_settings(
+    collection_id: str,
+    body: GlossarySettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.review")),
+) -> GlossarySettingsResponse:
+    settings = await glossary_service.update_settings(db, actor, collection_id, body)
+    return GlossarySettingsResponse.model_validate(settings, from_attributes=True)

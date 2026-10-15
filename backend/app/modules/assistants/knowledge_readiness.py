@@ -34,9 +34,7 @@ async def count_ready_sources(db: AsyncSession, collection: KnowledgeCollection)
         return len(indexes)
     # A revisioned collection must not fall back to unrelated legacy documents.
     bindings = (await db.execute(select(func.count(KnowledgeBinding.id)).where(
-        KnowledgeBinding.collection_id == collection.id,
-        KnowledgeBinding.tenant_id == collection.tenant_id,
-        KnowledgeBinding.workspace_id == collection.workspace_id))).scalar_one()
+        KnowledgeBinding.collection_id == collection.id))).scalar_one()
     if bindings or (collection.collection_metadata or {}).get("active_vector_generation_id"):
         return 0
     return (await db.execute(select(func.count(KnowledgeDocument.id)).where(

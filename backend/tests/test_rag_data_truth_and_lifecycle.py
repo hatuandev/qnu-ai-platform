@@ -166,8 +166,8 @@ async def test_search_dense_positive_allowlist():
     }
     assert field_conditions.get("is_active") is True
     assert field_conditions.get("is_retrievable") is True
-    assert field_conditions.get("tenant_id") == "tenant_qnu"
-    assert field_conditions.get("workspace_id") == "ws_default"
+    assert "tenant_id" not in field_conditions and "workspace_id" not in field_conditions
+    assert field_conditions["collection_id"] == "col1"
 
     # Status must match Any ["ready", "approved"]
     status_cond = [
@@ -248,10 +248,10 @@ def test_semantic_cache_key_partition():
         policy_version="v1",
     )
     assert key_v1.startswith(
-        "rag:cache:tenant_qnu:ws_main:col_admissions:e1:current:default:v1:"
+        "rag:cache:app-v1:col_admissions:e1:current:default:v1:"
     )
 
-    # Isolation check: different workspace yields different key
+    # Obsolete workspace hints cannot select another cache namespace.
     key_other_ws = cache._make_key(
         collection_id="col_admissions",
         query="điểm chuẩn CNTT",
@@ -260,7 +260,7 @@ def test_semantic_cache_key_partition():
         workspace_id="ws_secondary",
         policy_version="v1",
     )
-    assert key_v1 != key_other_ws
+    assert key_v1 == key_other_ws
 
     # History isolation: same short follow-up with different context never collides
     key_hist_a = cache._make_key(

@@ -506,8 +506,6 @@ class GroupSourceSyncService:
         group = await db.get(DocumentGroup, req.group_id)
         if (
             not group
-            or group.tenant_id != col.tenant_id
-            or (col.workspace_id and group.workspace_id != col.workspace_id)
         ):
             raise AppException(
                 message=f"Không tìm thấy nhóm tài liệu '{req.group_id}'.",
@@ -641,11 +639,7 @@ class GroupSourceSyncService:
         col = await get_scoped_collection(db, collection_id, actor=actor)
         source = await db.get(KnowledgeGroupSource, source_id)
         if (
-            not source
-            or source.collection_id != col.id
-            or source.tenant_id != col.tenant_id
-            or (col.workspace_id and source.workspace_id != col.workspace_id)
-            or source.status == "detached"
+            (not source) or (source.collection_id != col.id) or (source.status == "detached")
         ):
             raise AppException(
                 message=f"Không tìm thấy nguồn nhóm tài liệu '{source_id}'.",
@@ -656,8 +650,6 @@ class GroupSourceSyncService:
         group = await db.get(DocumentGroup, source.document_group_id)
         if (
             not group
-            or group.tenant_id != col.tenant_id
-            or (col.workspace_id and group.workspace_id != col.workspace_id)
         ):
             raise AppException(
                 message=f"Nhóm tài liệu gốc '{source.document_group_id}' không tồn tại.",

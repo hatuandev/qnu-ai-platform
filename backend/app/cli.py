@@ -454,8 +454,8 @@ async def verify_core_seed_data() -> bool:
                 await db.execute(
                     select(KnowledgeCollection.id).where(
                         KnowledgeCollection.id.in_(required_collection_ids),
-                        KnowledgeCollection.tenant_id == "tenant_qnu",
-                        KnowledgeCollection.workspace_id == "workspace_qnu",
+
+
                     )
                 )
             )

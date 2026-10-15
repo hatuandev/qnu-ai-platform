@@ -260,8 +260,8 @@ class TestCitationGroundingAndFactFirst:
             assert called_kwargs["collection_id"] == "col_admissions"
             assert called_kwargs["top_k"] == 8
             assert called_kwargs["rerank_top_k"] == 6
-            assert called_kwargs["tenant_id"] == "tenant_qnu"
-            assert called_kwargs["workspace_id"] == "ws_main"
+            assert "tenant_id" not in req.model_dump()
+            assert "workspace_id" not in req.model_dump()
             assert "7480107" in called_kwargs["query"]
 
     @pytest.mark.asyncio
@@ -323,7 +323,7 @@ class TestCitationGroundingAndFactFirst:
         from app.modules.rag.schemas import AskRequest
 
         req = AskRequest(
-            question="các ngành xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học",
+            question="Giải thích cách xét tuyển tổ hợp môn Toán, Tiếng Anh, Hóa học ngành Kỹ thuật phần mềm",
             collection_id="col_admissions",
             module_code="admissions",
             tenant_id="tenant_qnu",

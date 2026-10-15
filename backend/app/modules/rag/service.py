@@ -125,6 +125,19 @@ class RagService:
                 answer="Bạn muốn mình rà lại danh sách hoặc nội dung nào trong câu hỏi trước? Hãy nói rõ chủ đề hoặc năm cần đối chiếu.",
                 answer_decision={"version": "conversation-resolution-v1", "status": "clarify",
                                  "question_resolution": resolution})
+        if resolution and resolution.get("mode") in ("explain", "reformat", "filter"):
+            from app.modules.rag.conversation_acts import answer_dialogue_act
+
+            handled = await answer_dialogue_act(db, effective, resolution,
+                                                candidate_snapshot=candidate_snapshot)
+            if handled is not None:
+                handled.answer_decision = {**(handled.answer_decision or {}), "question_resolution": resolution}
+                handled.latency_ms = round((time.perf_counter() - started) * 1000, 2)
+                return handled
+            return AskResponse(status="insufficient_context",
+                answer="Mình chưa xác định chắc phần bạn muốn giải thích, rút gọn hoặc lọc. Bạn nhắc lại chủ đề và phạm vi cần xem nhé.",
+                answer_decision={"version": "conversation-resolution-v2", "status": "clarify",
+                                 "reason": "ACT_REQUIRES_CLARIFICATION", "question_resolution": resolution})
         result = await self._ask(db, effective, candidate_snapshot=candidate_snapshot)
         if resolution:
             result.answer_decision = {**(result.answer_decision or {}), "question_resolution": resolution}
@@ -159,6 +172,11 @@ class RagService:
         from app.modules.rag.evidence_runtime import resolve_evidence_request
 
         req, evidence_policy = await resolve_evidence_request(db, req)
+        from app.modules.rag.score_conversion_chat import maybe_convert_score
+
+        converted = await maybe_convert_score(db, req)
+        if converted is not None:
+            return converted
         logger.info("rag_execution_branch assistant=%s snapshot=%s branch=%s", req.assistant_code,
                     snapshot.snapshot_id, "evidence" if evidence_policy.enabled else "fact_hybrid")
         if evidence_policy.enabled:
@@ -171,7 +189,14 @@ class RagService:
             candidate_mode=candidate_snapshot is not None)
         if enumeration is not None:
             return enumeration
-        policy_version = req.policy_fingerprint() + ":enumeration-context-v1"
+        from app.modules.rag.glossary_expansion import resolve_glossary_queries
+
+        glossary_queries, glossary_trace = await resolve_glossary_queries(
+            db, req.collection_id, req.question,
+            plan_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)])
+        glossary_version = glossary_trace.get("settings_version", 0) if glossary_trace.get("enabled") else 0
+        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1" + (
+            f":glossary-v{glossary_version}" if glossary_version else ":glossary-off")
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
         history_list = req.history if isinstance(req.history, list) else []
@@ -239,6 +264,7 @@ class RagService:
                                   source_pages=sorted({p for p in (f["raw_data"].get("page_number"), f["raw_data"].get("header_page_number")) if isinstance(p, int)}),
                                   binding_id=f.get("binding_id"), index_revision_id=f.get("index_revision_id"),
                                   source_revision_id=f["raw_data"].get("source_revision_id")) for f in matched]
+            decision["glossary_expansion"] = glossary_trace
             return AskResponse(status="answered" if decision["status"] == "supported" else "insufficient_context",
                                answer=decision["answer"], answer_format="markdown_table" if matched else "paragraph",
                                answer_decision=decision, citations=citations,
@@ -298,6 +324,7 @@ class RagService:
             dense_weight=dense_weight,
             sparse_weight=sparse_weight,
             sparse_variants=sparse_variants,
+            glossary_queries=glossary_queries,
             reranker_policy=req.reranker_policy,
             snapshot=snapshot,
             **({"candidate_mode": True, "read_mode_override": "revisioned"} if candidate_snapshot is not None else {}),
@@ -465,6 +492,7 @@ class RagService:
             snapshot=snapshot,
             latency_ms=exec_ms,
             contexts=[c.content for c in candidates],
+            answer_decision={"glossary_expansion": glossary_trace},
         )
 
         # 9. Save to Semantic Cache (Only cache valid answered queries with citations)

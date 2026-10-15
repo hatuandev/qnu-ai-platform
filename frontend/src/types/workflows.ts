@@ -15,7 +15,6 @@ export interface WorkflowRun {
 export interface WorkflowExecuteRequest {
   workflow_id: string;
   inputs: Record<string, unknown>;
-  tenant_id?: string;
   conversation_id?: string;
 }
 

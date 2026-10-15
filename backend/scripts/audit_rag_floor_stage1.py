@@ -174,12 +174,12 @@ def trace_sync(target: Any, method: str, stages: list) -> Any:
     return observed
 
 
-async def trace_case(case: dict, assistant_code: str) -> dict:
+async def trace_case(case: dict, assistant_code: str, *, conversation_id: str | None = None) -> dict:
     from app.modules.rag import service as rag_module
     from app.modules.rag.service import rag_service
 
     stages: list[dict] = []
-    conversation = "stage1_466_" + uuid.uuid4().hex[:16]
+    conversation = conversation_id or "stage1_466_" + uuid.uuid4().hex[:16]
     result = {**case, "conversation_id": conversation, "stages": stages,
               "analysis": asdict(query_classifier.analyze(case["question"], module_code=assistant_code))}
     hooks = [(rag_module.fact_layer, "lookup_facts", "normal"),

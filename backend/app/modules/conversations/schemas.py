@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.single_application import SingleApplicationModel
+
 
 class ConversationMessageResponse(BaseModel):
     id: str
@@ -43,13 +45,13 @@ class ConversationStatusUpdateRequest(BaseModel):
     assigned_to: str | None = Field(None, max_length=100)
 
 
-class FeedbackVoteRequest(BaseModel):
+class FeedbackVoteRequest(SingleApplicationModel):
     thread_id: str | None = Field(None, max_length=36, description="ID phiên hội thoại (nếu có)")
     assistant_code: str = Field("admissions", min_length=2, max_length=50)
     vote: Literal["up", "down"] = Field(..., description="Đánh giá câu trả lời: up/down")
     question: str | None = Field(None, max_length=2000, description="Câu hỏi được đánh giá")
     answer: str | None = Field(None, max_length=8000, description="Câu trả lời được đánh giá")
-    tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
+
 
 
 class FeedbackVoteResponse(BaseModel):
@@ -89,8 +91,8 @@ class FeedbackSampleItem(BaseModel):
     created_at: datetime
 
 
-class ConversationCreateMessageRequest(BaseModel):
-    tenant_id: str | None = Field(None, min_length=2, max_length=100)
+class ConversationCreateMessageRequest(SingleApplicationModel):
+
     thread_id: str | None = Field(None, description="ID phiên hội thoại (nếu đã có)")
     assistant_code: str = Field(..., min_length=2, max_length=50)
     assistant_name: str | None = Field(None, max_length=150)

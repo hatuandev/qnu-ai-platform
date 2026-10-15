@@ -259,7 +259,7 @@ async def test_policy_database_outage_fails_closed_before_legacy_answering():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("cross_tenant", [True, False])
-async def test_required_collection_policy_cannot_resolve_other_tenant_or_disabled_assistant(cross_tenant):
+async def test_required_collection_policy_rejects_disabled_assistant_regardless_of_legacy_scope(cross_tenant):
     from types import SimpleNamespace
     from unittest.mock import AsyncMock, Mock
 
@@ -275,8 +275,7 @@ async def test_required_collection_policy_cannot_resolve_other_tenant_or_disable
         await resolve_evidence_request(db, AskRequest(question="Test", collection_id="c",
             tenant_id="tenant", workspace_id="workspace"))
     assert error.value.code == "EVIDENCE_POLICY_UNAVAILABLE"
-    if cross_tenant:
-        db.execute.assert_not_awaited()
+    db.execute.assert_awaited_once()
 
 
 @pytest.mark.asyncio

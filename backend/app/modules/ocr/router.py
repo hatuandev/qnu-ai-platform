@@ -27,7 +27,6 @@ async def list_ocr_engines() -> list[OCREngineResponse]:
 async def extract_document_text(
     file: UploadFile = File(..., description="Tệp tài liệu scan hoặc ảnh (PDF, PNG, JPG)"),
     engine_name: str | None = Form(None, description="Tên engine OCR (mặc định: pymupdf_ocr)"),
-    tenant_id: str = Form("tenant_qnu", description="Mã tổ chức / tenant"),
     session: AsyncSession = Depends(get_db),
 ) -> OCRExtractResponse:
     """Bóc tách văn bản và bảng biểu từ tài liệu scan với cơ chế tự động Fallback."""
@@ -42,7 +41,6 @@ async def extract_document_text(
         content=content,
         filename=filename,
         engine_name=engine_name,
-        tenant_id=tenant_id,
     )
 
 
@@ -57,8 +55,6 @@ async def extract_document_text(
 async def parse_studio_document(
     file: UploadFile | None = File(None, description="Tệp tài liệu scan hoặc văn bản (PDF, PNG, JPG, DOCX, XLSX)"),
     engine_id: str = Form("pymupdf_ocr", description="Mã engine OCR hoặc provider API"),
-    tenant_id: str = Form("tenant_qnu", description="Mã tổ chức / tenant"),
-    workspace_id: str = Form("workspace_qnu", description="Mã workspace"),
 ) -> StudioOCRParseResponse:
     """Thực hiện bóc tách OCR đa tầng, vẽ Bounding Boxes và render ảnh trang xem trước Split-Screen."""
     if file is None:
@@ -75,8 +71,6 @@ async def parse_studio_document(
         content=content,
         filename=filename,
         engine_name=engine_id,
-        tenant_id=tenant_id,
-        workspace_id=workspace_id,
     )
 
 

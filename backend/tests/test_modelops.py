@@ -679,7 +679,7 @@ async def test_provider_models_test_single_model_and_invalid(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_api_get_quota_endpoints():
-    """Verify both /quotas/{tenant_id} and /quota?tenant_id= query alias return TenantQuotaResponse."""
+    """Both application quota endpoints omit legacy scope from their public responses."""
     mock_db = AsyncMock()
     mock_quota = TenantQuota(
         tenant_id="tenant_qnu",
@@ -701,18 +701,18 @@ async def test_api_get_quota_endpoints():
 
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
                 # 1. Path param standard endpoint
-                res_path = await ac.get("/platform/v1alpha1/modelops/quotas/tenant_qnu")
+                res_path = await ac.get("/platform/v1alpha1/modelops/quotas/current")
                 assert res_path.status_code == 200
                 data_path = res_path.json()
-                assert data_path["tenant_id"] == "tenant_qnu"
+                assert "tenant_id" not in data_path
                 assert data_path["tokens_used"] == 125_000
                 assert data_path["monthly_token_limit"] == 5_000_000
 
                 # 2. Query param backward-compatible alias endpoint
-                res_query = await ac.get("/platform/v1alpha1/modelops/quota?tenant_id=tenant_qnu")
+                res_query = await ac.get("/platform/v1alpha1/modelops/quota?tenant_id=ignored")
                 assert res_query.status_code == 200
                 data_query = res_query.json()
-                assert data_query["tenant_id"] == "tenant_qnu"
+                assert "tenant_id" not in data_query
                 assert data_query["tokens_used"] == 125_000
                 assert data_query["monthly_token_limit"] == 5_000_000
     finally:

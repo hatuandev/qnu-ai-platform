@@ -76,7 +76,7 @@ export function UserFormSheet({
           </SheetTitle>
           <SheetDescription>
             {mode === "create"
-              ? "Gửi lời mời tham gia không gian làm việc với cấp độ truy cập phù hợp."
+              ? "Gửi lời mời tham gia ứng dụng với cấp độ truy cập phù hợp."
               : "Cập nhật hồ sơ và cấp độ truy cập của người dùng."}
           </SheetDescription>
         </SheetHeader>

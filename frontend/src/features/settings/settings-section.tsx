@@ -39,18 +39,6 @@ const sectionLabels = {
 } as const;
 
 const generalSchema = z.object({
-  workspaceName: z
-    .string()
-    .trim()
-    .min(2, "Tên không gian làm việc phải có ít nhất 2 ký tự.")
-    .max(80, "Tên không gian làm việc tối đa 80 ký tự."),
-  workspaceSlug: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Slug chỉ dùng chữ thường, số và dấu gạch ngang.",
-    ),
   timezone: z.string().min(1, "Chọn múi giờ."),
   language: z.string().min(1, "Chọn ngôn ngữ."),
   dateFormat: z.string().min(1, "Chọn định dạng ngày."),
@@ -86,10 +74,10 @@ export function SettingsSection({
         title={section === "General" ? "Cài đặt" : label}
         description={
           section === "General"
-            ? "Quản lý tùy chọn chung của không gian làm việc."
+            ? "Quản lý tùy chọn chung của ứng dụng."
             : section === "Notifications"
-              ? "Kiểm soát cách không gian làm việc gửi các thông báo quan trọng."
-              : "Quản lý các tùy chọn bảo mật đại diện cho không gian làm việc."
+              ? "Kiểm soát cách ứng dụng gửi các thông báo quan trọng."
+              : "Quản lý các tùy chọn bảo mật của ứng dụng."
         }
       />
       {!canUpdate ? (
@@ -113,8 +101,6 @@ export function SettingsSection({
 function GeneralSettings({ canUpdate }: { canUpdate: boolean }) {
   const form = useForm({
     defaultValues: {
-      workspaceName: "ProjectHub Workspace",
-      workspaceSlug: "projecthub-workspace",
       timezone: "Asia/Ho_Chi_Minh",
       language: "vi-VN",
       dateFormat: "dd/MM/yyyy",
@@ -125,43 +111,6 @@ function GeneralSettings({ canUpdate }: { canUpdate: boolean }) {
       formApi.reset(value);
     },
   });
-  const field = (name: "workspaceName" | "workspaceSlug") => (
-    <form.Field name={name}>
-      {(current) => {
-        const error = fieldError(current.state.meta.errors);
-        return (
-          <div className="grid gap-2">
-            <Label htmlFor={`settings-${name}`}>
-              {name === "workspaceName"
-                ? "Tên không gian làm việc"
-                : "Workspace slug"}
-            </Label>
-            <Input
-              id={`settings-${name}`}
-              value={current.state.value}
-              disabled={!canUpdate}
-              onBlur={current.handleBlur}
-              onChange={(event) =>
-                current.handleChange(
-                  name === "workspaceSlug"
-                    ? event.target.value.toLowerCase().replace(/\s+/g, "-")
-                    : event.target.value,
-                )
-              }
-            />
-            <p className="type-supporting text-muted-foreground">
-              {name === "workspaceName"
-                ? "Tên hiển thị trong thanh điều hướng và lời mời."
-                : "Định danh thân thiện dùng trong các liên kết nội bộ."}
-            </p>
-            {error ? (
-              <p className="type-supporting text-destructive">{error}</p>
-            ) : null}
-          </div>
-        );
-      }}
-    </form.Field>
-  );
   return (
     <form
       className="max-w-2xl space-y-6"
@@ -171,15 +120,6 @@ function GeneralSettings({ canUpdate }: { canUpdate: boolean }) {
         void form.handleSubmit();
       }}
     >
-      <AdminSettingsSection
-        title="Thông tin không gian làm việc"
-        description="Những giá trị này được dùng trong các màn hình quản trị."
-      >
-        <div className="space-y-5">
-          {field("workspaceName")}
-          {field("workspaceSlug")}
-        </div>
-      </AdminSettingsSection>
       <AdminSettingsSection
         title="Tùy chọn khu vực"
         description="Chọn múi giờ, ngôn ngữ và cách hiển thị ngày."
@@ -330,7 +270,7 @@ function NotificationSettings({ canUpdate }: { canUpdate: boolean }) {
       </AdminSettingsSection>
       <AdminSettingsSection
         title="Không gian làm việc"
-        description="Điều chỉnh các cập nhật sản phẩm và hoạt động của workspace."
+        description="Điều chỉnh các cập nhật sản phẩm và hoạt động của ứng dụng."
       >
         <div className="border-t">
           <SettingsRow
@@ -350,7 +290,7 @@ function NotificationSettings({ canUpdate }: { canUpdate: boolean }) {
       </AdminSettingsSection>
       <AdminSettingsSection
         title="Báo cáo"
-        description="Nhận bản tổng hợp định kỳ về không gian làm việc."
+        description="Nhận bản tổng hợp định kỳ về ứng dụng."
       >
         <div className="border-t">
           <SettingsRow

@@ -114,7 +114,6 @@ export function ChannelsPage() {
     clearMessages: clearPreviewMessages,
   } = useRAGStream({
     assistantCode: selectedAssistantCode,
-    tenantId: "tenant_qnu",
   });
 
   const handleSendPreview = (e?: React.FormEvent) => {

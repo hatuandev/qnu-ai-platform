@@ -67,7 +67,7 @@ class BindingService:
     ) -> AvailableRepositoryDocumentsResponse:
         """List repository documents with binding status for a given collection."""
         # 1. Verify collection exists in actor's scope
-        col = await get_scoped_collection(db, collection_id, actor=actor)
+        await get_scoped_collection(db, collection_id, actor=actor)
 
         # 2. Build base query
         # Left join with KnowledgeBinding for this collection
@@ -81,11 +81,10 @@ class BindingService:
             )
             .where(
                 RepositoryDocument.status == "active",
-                RepositoryDocument.tenant_id == col.tenant_id,
+
             )
         )
-        if col.workspace_id:
-            stmt = stmt.where(RepositoryDocument.workspace_id == col.workspace_id)
+
 
         if search and search.strip():
             term = f"%{search.strip()}%"
@@ -185,19 +184,7 @@ class BindingService:
                 )
                 failed_count += 1
                 continue
-            if (
-                rep_doc.tenant_id != resolved_tenant_id
-                or (resolved_workspace_id and rep_doc.workspace_id != resolved_workspace_id)
-            ):
-                results.append(
-                    BindingResultItem(
-                        repository_document_id=item.repository_document_id,
-                        status="failed",
-                        message="Tài liệu không thuộc tenant/workspace của bộ sưu tập.",
-                    )
-                )
-                failed_count += 1
-                continue
+
 
             # 3. Resolve target revision
             target_rev_id = item.target_revision_id or rep_doc.current_revision_id
@@ -297,7 +284,7 @@ class BindingService:
         actor: Any | None = None,
     ) -> list[KnowledgeBindingResponse]:
         """List active bindings in a knowledge collection with document metadata."""
-        col = await get_scoped_collection(db, collection_id, actor=actor)
+        await get_scoped_collection(db, collection_id, actor=actor)
 
         stmt = (
             select(KnowledgeBinding, KnowledgeSourceRevision)
@@ -307,11 +294,10 @@ class BindingService:
             )
             .where(
                 KnowledgeBinding.collection_id == collection_id,
-                KnowledgeBinding.tenant_id == col.tenant_id,
+
             )
         )
-        if col.workspace_id:
-            stmt = stmt.where(KnowledgeBinding.workspace_id == col.workspace_id)
+
 
         if status:
             stmt = stmt.where(KnowledgeBinding.status == status)
@@ -499,8 +485,8 @@ class BindingService:
         """Internal helper evaluating group members for collection binding without modifying state."""
         # 1. Verify scoped collection
         col = await get_scoped_collection(db, collection_id, actor=actor)
-        resolved_tenant_id = getattr(actor, "tenant_id", None) or tenant_id or col.tenant_id
-        resolved_workspace_id = getattr(actor, "workspace_id", None) or workspace_id or col.workspace_id
+
+
 
         # 2. Verify scoped document group
         group = await db.get(DocumentGroup, group_id)
@@ -511,14 +497,7 @@ class BindingService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != resolved_tenant_id or (
-            resolved_workspace_id and group.workspace_id != resolved_workspace_id
-        ):
-            raise AppException(
-                message="Không có quyền truy cập nhóm tài liệu này trong workspace hiện tại.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         # 3. Read group members from server database (tenant-isolated)
         doc_stmt = (
@@ -530,12 +509,11 @@ class BindingService:
             .where(
                 DocumentGroupMembership.group_id == group.id,
                 RepositoryDocument.is_active.is_(True),
-                RepositoryDocument.tenant_id == resolved_tenant_id,
+
             )
             .order_by(DocumentGroupMembership.added_at.asc())
         )
-        if resolved_workspace_id:
-            doc_stmt = doc_stmt.where(RepositoryDocument.workspace_id == resolved_workspace_id)
+
         group_docs = (await db.execute(doc_stmt)).scalars().all()
 
         if not group_docs:

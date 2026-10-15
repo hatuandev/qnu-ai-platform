@@ -56,8 +56,8 @@ class CandidateService:
         coll_res = await db.execute(
             select(KnowledgeCollection).where(
                 KnowledgeCollection.id == collection_id,
-                KnowledgeCollection.tenant_id == tenant_id,
-                KnowledgeCollection.workspace_id == workspace_id,
+
+
             )
         )
         coll = coll_res.scalar_one_or_none()
@@ -71,10 +71,6 @@ class CandidateService:
         # 2. Get all groups in workspace
         groups_res = await db.execute(
             select(DocumentGroup)
-            .where(
-                DocumentGroup.tenant_id == tenant_id,
-                DocumentGroup.workspace_id == workspace_id,
-            )
             .order_by(DocumentGroup.created_at.desc())
         )
         groups = groups_res.scalars().all()
@@ -143,8 +139,8 @@ class CandidateService:
         coll_res = await db.execute(
             select(KnowledgeCollection).where(
                 KnowledgeCollection.id == collection_id,
-                KnowledgeCollection.tenant_id == tenant_id,
-                KnowledgeCollection.workspace_id == workspace_id,
+
+
             )
         )
         coll = coll_res.scalar_one_or_none()
@@ -175,8 +171,8 @@ class CandidateService:
 
         # 3. Build query for Repository Documents
         query = select(RepositoryDocument).where(
-            RepositoryDocument.tenant_id == tenant_id,
-            RepositoryDocument.workspace_id == workspace_id,
+
+
             RepositoryDocument.is_active.is_(True),
         )
 

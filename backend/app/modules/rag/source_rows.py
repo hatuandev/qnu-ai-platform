@@ -135,9 +135,9 @@ async def load_row_anchors(db: AsyncSession, snapshot: RetrievalSnapshot, questi
             KnowledgeSourceRevision.binding_id == KnowledgeBinding.id,
             KnowledgeBinding.collection_id == snapshot.collection_id, KnowledgeBinding.status == "active",
             KnowledgeIndexRevision.status.in_(["active", "ready"] if candidate_mode else ["active"]),
-            KnowledgeSourceRevision.status == "ready", KnowledgeCollection.tenant_id == snapshot.tenant_id,
-            KnowledgeCollection.workspace_id == snapshot.workspace_id, KnowledgeBinding.tenant_id == snapshot.tenant_id,
-            KnowledgeBinding.workspace_id == snapshot.workspace_id,
+            KnowledgeSourceRevision.status == "ready",
+
+
             KnowledgeChunk.chunk_metadata["source_unit"]["kind"].astext == "table", or_(*terms)))
     try:
         records = (await db.execute(query)).all()

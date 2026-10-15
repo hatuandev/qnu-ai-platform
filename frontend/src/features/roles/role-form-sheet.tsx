@@ -107,7 +107,7 @@ export function RoleFormSheet({
           <SheetDescription>
             {mode === "edit"
               ? "Cập nhật thông tin và quyền được gán cho vai trò."
-              : "Tạo một cấp độ truy cập mới cho không gian làm việc."}
+              : "Tạo một cấp độ truy cập mới cho ứng dụng."}
           </SheetDescription>
         </SheetHeader>
         <form

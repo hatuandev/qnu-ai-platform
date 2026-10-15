@@ -458,9 +458,7 @@ class WorkflowService:
         correlation_id: str | None = None,
     ) -> WorkflowExecuteResponse:
         """Run workflow DAG end-to-end and audit execution trace."""
-        if assistant_profile and (assistant_profile.tenant_id != req.tenant_id
-                                  or assistant_profile.workspace_id != req.workspace_id):
-            raise AppException("Phạm vi trợ lý không khớp phiên chạy.", code="WORKFLOW_SCOPE_MISMATCH", status_code=403)
+
         # Check if caller requested an exact immutable workflow version (e.g. pinned by assistant)
         target_version_id = req.workflow_version_id
         if not target_version_id:

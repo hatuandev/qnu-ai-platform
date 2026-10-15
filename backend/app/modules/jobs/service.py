@@ -185,10 +185,7 @@ class JobsService:
         actor: Any | None = None,
     ) -> list[JobRecord]:
         query = select(JobRecord).order_by(JobRecord.created_at.desc()).limit(limit)
-        if actor and getattr(actor, "tenant_id", None):
-            query = query.where(JobRecord.tenant_id == actor.tenant_id)
-            if getattr(actor, "workspace_id", None):
-                query = query.where(JobRecord.workspace_id == actor.workspace_id)
+
         if status:
             query = query.where(JobRecord.status == status)
         res = await db.execute(query)
@@ -201,10 +198,7 @@ class JobsService:
         actor: Any | None = None,
     ) -> JobRecord:
         query = select(JobRecord).where(JobRecord.id == job_id)
-        if actor and getattr(actor, "tenant_id", None):
-            query = query.where(JobRecord.tenant_id == actor.tenant_id)
-            if getattr(actor, "workspace_id", None):
-                query = query.where(JobRecord.workspace_id == actor.workspace_id)
+
         res = await db.execute(query)
         job = res.scalar_one_or_none()
         if not job:
@@ -219,10 +213,7 @@ class JobsService:
         actor: Any | None = None,
     ) -> dict[str, int]:
         stmt = select(JobRecord.status, func.count(JobRecord.id))
-        if actor and getattr(actor, "tenant_id", None):
-            stmt = stmt.where(JobRecord.tenant_id == actor.tenant_id)
-            if getattr(actor, "workspace_id", None):
-                stmt = stmt.where(JobRecord.workspace_id == actor.workspace_id)
+
         stmt = stmt.group_by(JobRecord.status)
         res = await db.execute(stmt)
         counts: dict[str, int] = {row[0]: row[1] for row in res.all()}
@@ -297,10 +288,7 @@ class JobsService:
                     status_code=400,
                 )
         stmt = delete(JobRecord).where(JobRecord.status.in_(target_statuses))
-        if actor and getattr(actor, "tenant_id", None):
-            stmt = stmt.where(JobRecord.tenant_id == actor.tenant_id)
-            if getattr(actor, "workspace_id", None):
-                stmt = stmt.where(JobRecord.workspace_id == actor.workspace_id)
+
         if collection_id:
             stmt = stmt.where(JobRecord.collection_id == collection_id)
         res = await db.execute(stmt)

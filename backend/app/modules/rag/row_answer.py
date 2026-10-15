@@ -210,8 +210,7 @@ async def _audited_response(db: AsyncSession, req: AskRequest, payload: dict, se
 async def answer_from_rows(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot,
                            rows: list[FusionCandidate]) -> AskResponse | None:
     started = time.perf_counter()
-    if (req.collection_id != snapshot.collection_id or req.tenant_id != snapshot.tenant_id
-            or req.workspace_id != snapshot.workspace_id):
+    if req.collection_id != snapshot.collection_id:
         raise AppException("Phạm vi trả lời không khớp snapshot.", code="ROW_ANSWER_SCOPE_MISMATCH", status_code=403)
     catalog = build_catalog(rows, snapshot)
     if not catalog.cells:

@@ -287,16 +287,8 @@ Khi viết mã TSX/TS, **bắt buộc tuân thủ các quy tắc sau** để tr�
 
 ---
 
-## 8. Quy Trình Kiểm Thử & Nghiệm Thu Giao Diện Tinh Gọn (Fast-Path Build Verification)
+## 8. Kiểm chứng và tài liệu chi tiết
 
-Khi chỉ thực hiện chỉnh sửa, tối ưu giao diện Frontend (UI/UX, CSS, Component, Page, Dialog), **tuyệt đối không chạy các bộ test Backend (`pytest`), không chạy quét toàn bộ linter hay các tác vụ cồng kềnh làm chậm quá trình phát triển**.
+Dùng [bảng kiểm chứng chung](../../rules/verification.md): Biome trên file sửa và production build; thêm test hành vi khi đổi logic, auth, API hoặc SSE. Build không chứng minh layout, quyền hoặc luồng server đã đúng. Không chạy backend suite cho thay đổi UI thuần túy.
 
-Agent chỉ cần chạy kiểm tra đóng gói bản Production:
-
-```bash
-# Đóng gói kiểm thử bản Production (Bảo đảm không có lỗi cú pháp, types hoặc vỡ bundle)
-npm run build
-```
-
-Nếu lệnh `npm run build` kết thúc thành công (Exit code 0), Agent nghiệm thu ngay và phản hồi cho người dùng, tối ưu hóa tốc độ lặp (iteration speed).
-
+Các quy định bố cục, nhãn ngắn, filter bar, KPI và ViewModeToggle chuyển từ root tại [admin-patterns](references/admin-patterns.md). Đọc thêm `frontend/AGENTS.md` theo đường dẫn tính từ root repo; token thực ở `frontend/src/styles/tokens.css` ưu tiên hơn số minh họa.

@@ -112,12 +112,11 @@ async def record_feedback_vote(
 @router.get("/feedback/stats", response_model=FeedbackStatsResponse)
 async def get_feedback_stats(
     assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
-    tenant_id: str | None = Query(None, description="Lọc theo tenant"),
     db: AsyncSession = Depends(get_db),
 ) -> FeedbackStatsResponse:
     """Thống kê tín hiệu eval online (tổng vote, tỷ lệ up)."""
     return await conversation_service.feedback_stats(
-        db, assistant_code=assistant_code, tenant_id=tenant_id
+        db, assistant_code=assistant_code
     )
 
 
@@ -125,12 +124,11 @@ async def get_feedback_stats(
 async def get_feedback_trend(
     days: int = Query(14, ge=1, le=90, description="Số ngày gần nhất"),
     assistant_code: str | None = Query(None, description="Lọc theo mã trợ lý"),
-    tenant_id: str | None = Query(None, description="Lọc theo tenant"),
     db: AsyncSession = Depends(get_db),
 ) -> FeedbackTrendResponse:
     """Xu hướng vote theo ngày để phát hiện drift chất lượng RAG."""
     return await conversation_service.feedback_trend(
-        db, days=days, assistant_code=assistant_code, tenant_id=tenant_id
+        db, days=days, assistant_code=assistant_code
     )
 
 

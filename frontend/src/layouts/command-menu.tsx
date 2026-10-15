@@ -530,7 +530,7 @@ export function CommandMenu({
           {canReadSettings ? (
             <>
               <CommandItem
-                value="cài đặt không gian làm việc settings cấu hình"
+                value="cài đặt ứng dụng settings cấu hình"
                 onSelect={() => navigateTo("/settings")}
               >
                 <span
@@ -545,7 +545,7 @@ export function CommandMenu({
                     Cài đặt không gian
                   </span>
                   <span className="truncate text-xs text-muted-foreground/75">
-                    Cấu hình / Tùy chọn không gian làm việc
+                    Cấu hình / Tùy chọn ứng dụng
                   </span>
                 </div>
                 <div className="ml-auto hidden sm:flex items-center text-xs text-primary font-medium opacity-0 group-data-[selected=true]:opacity-100 transition-opacity">

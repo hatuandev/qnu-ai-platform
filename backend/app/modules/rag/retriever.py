@@ -26,6 +26,12 @@ from app.modules.knowledge.models import (
 )
 from app.modules.knowledge.normalization.retrieval_models import SourceUnit, temporal_is_compatible
 from app.modules.rag.fusion import FusionCandidate, reciprocal_rank_fusion
+from app.modules.rag.query_expansion import (
+    SearchQuery,
+    lexical_weights,
+    normalized_query,
+    query_shares,
+)
 from app.modules.rag.reranker import reranker_client
 from app.modules.rag.schemas import RetrievalSnapshot
 from app.modules.rag.vector_indexer import vector_indexer
@@ -96,6 +102,9 @@ def extract_weighted_tokens(
         if token not in scored or weight > scored[token]:
             scored[token] = weight
 
+    if isinstance(query, SearchQuery):
+        term_weights = lexical_weights([query], lambda text: re.findall(r"[A-Za-zÀ-ỹ0-9]+", text.lower()))
+        scored = {token: weight * term_weights.get(token, 0) for token, weight in scored.items()}
     sorted_tokens = sorted(scored.items(), key=lambda item: (-item[1], -len(item[0])))
     return sorted_tokens[:limit]
 
@@ -148,10 +157,8 @@ class HybridRetriever:
         collection = await db.get(KnowledgeCollection, collection_id)
         if not collection:
             raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
-        if tenant_id and collection.tenant_id != tenant_id:
-            raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
-        if workspace_id and collection.workspace_id != workspace_id:
-            raise EntityNotFoundError(f"Không tìm thấy bộ sưu tập '{collection_id}'")
+
+
 
         try:
             active_gen_id = None
@@ -167,8 +174,8 @@ class HybridRetriever:
                 KnowledgeBinding.active_index_revision_id == KnowledgeIndexRevision.id,
             ).where(
                 KnowledgeBinding.collection_id == collection_id,
-                KnowledgeBinding.tenant_id == collection.tenant_id,
-                KnowledgeBinding.workspace_id == collection.workspace_id,
+
+
                 KnowledgeBinding.status == "active",
                 KnowledgeIndexRevision.status == "active",
             )
@@ -202,24 +209,12 @@ class HybridRetriever:
             collection_epoch=collection.index_epoch,
             binding_revisions=binding_revisions,
             vector_generations=vector_generations,
-            tenant_id=collection.tenant_id,
-            workspace_id=collection.workspace_id,
         )
 
         if pinned_snapshot:
             valid = (
-                pinned_snapshot.collection_id == current.collection_id
-                and pinned_snapshot.collection_epoch == current.collection_epoch
-                and pinned_snapshot.binding_revisions == current.binding_revisions
-                and (
-                    not pinned_snapshot.vector_generations
-                    or pinned_snapshot.vector_generations == current.vector_generations
-                )
-                and (not pinned_snapshot.tenant_id or pinned_snapshot.tenant_id == current.tenant_id)
-                and (
-                    not pinned_snapshot.workspace_id
-                    or pinned_snapshot.workspace_id == current.workspace_id
-                )
+                (pinned_snapshot.collection_id == current.collection_id) and (pinned_snapshot.collection_epoch == current.collection_epoch) and (pinned_snapshot.binding_revisions == current.binding_revisions) and (not pinned_snapshot.vector_generations
+                    or pinned_snapshot.vector_generations == current.vector_generations)
             )
             if not valid:
                 raise AppException(
@@ -361,10 +356,8 @@ class HybridRetriever:
             )
             if snapshot_filter is not None:
                 stmt_weighted = stmt_weighted.where(snapshot_filter)
-            if tenant_id:
-                stmt_weighted = stmt_weighted.where(KnowledgeCollection.tenant_id == tenant_id)
-            if workspace_id:
-                stmt_weighted = stmt_weighted.where(KnowledgeCollection.workspace_id == workspace_id)
+
+
             stmt_weighted = stmt_weighted.order_by(desc(total_score)).limit(top_k)
 
             try:
@@ -417,10 +410,8 @@ class HybridRetriever:
                 )
                 if snapshot_filter is not None:
                     stmt_fts = stmt_fts.where(snapshot_filter)
-                if tenant_id:
-                    stmt_fts = stmt_fts.where(KnowledgeCollection.tenant_id == tenant_id)
-                if workspace_id:
-                    stmt_fts = stmt_fts.where(KnowledgeCollection.workspace_id == workspace_id)
+
+
                 stmt_fts = stmt_fts.order_by(desc(rank_expr)).limit(top_k)
                 res_fts = await db.execute(stmt_fts)
                 scalars_fts = res_fts.scalars()
@@ -485,10 +476,8 @@ class HybridRetriever:
                     )
                     if snapshot_filter is not None:
                         stmt_uni = stmt_uni.where(snapshot_filter)
-                    if tenant_id:
-                        stmt_uni = stmt_uni.where(KnowledgeCollection.tenant_id == tenant_id)
-                    if workspace_id:
-                        stmt_uni = stmt_uni.where(KnowledgeCollection.workspace_id == workspace_id)
+
+
                     stmt_uni = stmt_uni.order_by(desc(uni_total_score)).limit(top_k)
                     res_uni = await db.execute(stmt_uni)
                     scalars_uni = res_uni.scalars()
@@ -564,11 +553,9 @@ class HybridRetriever:
                 stmt = select(KnowledgeChunk).join(
                     KnowledgeCollection, KnowledgeChunk.collection_id == KnowledgeCollection.id
                 ).where(KnowledgeChunk.collection_id == collection_id)
-                if snapshot:
-                    if cand.binding_id and snapshot.binding_revisions.get(cand.binding_id) != cand.index_revision_id:
-                        continue
-                    stmt = stmt.where(KnowledgeCollection.tenant_id == snapshot.tenant_id,
-                                      KnowledgeCollection.workspace_id == snapshot.workspace_id)
+                if snapshot and cand.binding_id and snapshot.binding_revisions.get(cand.binding_id) != cand.index_revision_id:
+                    continue
+
                 if cand.binding_id and cand.index_revision_id:
                     stmt = stmt.join(KnowledgeBinding, KnowledgeChunk.binding_id == KnowledgeBinding.id).where(
                         KnowledgeChunk.binding_id == cand.binding_id,
@@ -615,6 +602,7 @@ class HybridRetriever:
         dense_weight: float = 1.0,
         sparse_weight: float = 1.0,
         sparse_variants: list[str] | None = None,
+        glossary_queries: list | None = None,
         reranker_policy: dict[str, Any] | None = None,
         snapshot: RetrievalSnapshot | None = None,
         pin_snapshot: bool = True,
@@ -664,7 +652,13 @@ class HybridRetriever:
                 return []
 
         # 1. Concurrent Dense & Sparse Search (Non-blocking asyncio.gather)
-        variant_queries = [v for v in (sparse_variants or []) if v and v.strip()]
+        variant_queries = list({normalized_query(variant): variant for variant in (sparse_variants or [])
+                                if variant and variant.strip() and normalized_query(variant) != normalized_query(query)}.values())[:2]
+        authority = getattr(query, "original", str(query))
+        variant_queries = [SearchQuery(variant, authority, "variant") for variant in variant_queries]
+        glossary_search = [query if isinstance(query, SearchQuery) else
+                           SearchQuery(str(query), authority, "glossary")
+                           for query in (glossary_queries or [])[:2]]
         dense_hits, sparse_hits, *variant_hits = await asyncio.gather(
             _safe_dense_search(),
             self.search_sparse_fts(
@@ -677,19 +671,23 @@ class HybridRetriever:
                 snapshot=active_snapshot,
                 read_mode_override=read_mode_override,
             ),
-            *(_safe_variant_search(v) for v in variant_queries[:2]),
+            *(_safe_variant_search(v) for v in [*variant_queries[:2], *glossary_search]),
         )
 
         # 2. Reciprocal Rank Fusion (RRF) with discounted variant lists
         dense_hits = filter_unit_years(dense_hits, data_years or [])
         sparse_hits = filter_unit_years(sparse_hits, data_years or [])
-        extra_lists = [(filter_unit_years(hits, data_years or []), 0.5) for hits in variant_hits if hits]
+        shares = query_shares([SearchQuery(query, authority, "original"), *variant_queries[:2],
+                                 *glossary_search])
+        total_weight = dense_weight + sparse_weight
+        extra_lists = [(filter_unit_years(hits, data_years or []), total_weight * shares[index + 1])
+                       for index, hits in enumerate(variant_hits) if hits]
         fused = reciprocal_rank_fusion(
             dense_results=dense_hits,
             sparse_results=sparse_hits,
             k=60,
-            dense_weight=dense_weight,
-            sparse_weight=sparse_weight,
+            dense_weight=dense_weight * shares[0],
+            sparse_weight=sparse_weight * shares[0],
             extra_lists=extra_lists or None,
         )
 

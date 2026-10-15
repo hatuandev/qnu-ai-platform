@@ -57,7 +57,7 @@ def leased_execution(function: Callable[..., Awaitable[dict[str, Any]]]) -> Call
                 return {"status": job.status if job else "missing", "job_id": job_id}
             attempt = job.attempt or 0
             resource = job.document_id or (job.payload or {}).get("binding_id") or job_id
-            resource_key = f"qnu:source-execution:{job.tenant_id}:{job.workspace_id}:{job.collection_id}:{resource}"
+            resource_key = f"qnu:source-execution:app-v1:{job.collection_id}:{resource}"
         ttl = settings.WORKER_JOB_TIMEOUT_SECONDS + 120
         lock = redis.lock(execution_key(job_id), timeout=ttl, blocking_timeout=0)
         resource_lock = redis.lock(resource_key, timeout=ttl, blocking_timeout=0)

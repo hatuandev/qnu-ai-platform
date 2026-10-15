@@ -72,7 +72,8 @@ async def test_pinned_hash_review_scope_and_corrected_row_use_real_database():
                         snapshot, QueryPlan(query="TEST entity", years=[2026]), blocks)
                     assert len(rows) == 1 and "Sàn: 20" in rows[0].text and "13,34" in rows[0].text
                     assert rows[0].origin == "reviewed_fact" and rows[0].page_number == 1
-                    assert not await load_published_blocks(db, snapshot.model_copy(update={"tenant_id": "other_tenant"}))
+                    assert await load_published_blocks(db, snapshot.model_copy(update={"tenant_id": "other_tenant"}))
+                    assert not await load_published_blocks(db, snapshot.model_copy(update={"collection_id": "other"}))
                     source.canonical_hash = "invalid"
                     await db.flush()
                     with pytest.raises(AppException) as error:

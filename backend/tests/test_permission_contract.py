@@ -49,7 +49,7 @@ def test_permission_contract_all_backend_permissions_exist_in_manifest():
 
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
     canonical_permissions = {p["name"] for p in manifest_data.get("permissions", [])}
-    assert len(canonical_permissions) == 27, f"Manifest should contain exactly 27 permissions, found {len(canonical_permissions)}"
+    assert len(canonical_permissions) == 28, f"Manifest should contain exactly 28 permissions, found {len(canonical_permissions)}"
 
     backend_permissions = _collect_backend_required_permissions()
     assert len(backend_permissions) > 0, "Backend must have endpoints guarded by require_permission."

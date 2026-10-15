@@ -72,7 +72,8 @@ async def test_real_db_candidate_isolation_and_tampered_fact_rejected():
                     index.parity_report = {}
                     await db.flush()
                     assert len(await load_snapshot_table_evidence(db, snapshot)) == 1
-                    assert await load_snapshot_table_evidence(db, snapshot.model_copy(update={"tenant_id": "other"})) == []
+                    assert len(await load_snapshot_table_evidence(db, snapshot.model_copy(update={"tenant_id": "other"}))) == 1
+                    assert await load_snapshot_table_evidence(db, snapshot.model_copy(update={"collection_id": "other"})) == []
                     binding.status = "paused"
                     await db.flush()
                     assert await load_snapshot_table_evidence(db, snapshot) == []

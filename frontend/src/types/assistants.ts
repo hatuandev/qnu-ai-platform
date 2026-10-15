@@ -67,7 +67,6 @@ export interface AssistantItem {
   workflow_ownership?: "private" | "shared";
   collection_id: string;
   is_active: boolean;
-  tenant_id: string;
   sample_questions: string[];
   config: AssistantLifecycleConfig;
   created_at: string;

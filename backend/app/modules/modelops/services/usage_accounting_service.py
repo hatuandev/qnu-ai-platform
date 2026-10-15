@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.core.single_application import LEGACY_TENANT
 from app.modules.modelops.models import LLMUsageLog, TenantQuota
 from app.modules.modelops.pricing import calculate_cost_usd
 from app.modules.modelops.schemas import (
@@ -39,7 +40,8 @@ class UsageAccountingService:
     async def get_or_create_quota(
         self, db: AsyncSession, tenant_id: str, month_period: str | None = None
     ) -> TenantQuota:
-        """Get or initialize monthly quota record for a tenant."""
+        """Use one application quota; the old column remains a storage key only."""
+        tenant_id = LEGACY_TENANT
         period = month_period or datetime.now(UTC).strftime("%Y-%m")
         stmt = select(TenantQuota).where(
             TenantQuota.tenant_id == tenant_id, TenantQuota.month_period == period
@@ -66,13 +68,14 @@ class UsageAccountingService:
     async def check_quota_available(
         self, db: AsyncSession, tenant_id: str, estimated_tokens: int = 500
     ) -> TenantQuota:
-        """Respect account blocks; a zero monthly token budget is unlimited."""
+        """Respect application blocks; a zero monthly token budget is unlimited."""
+        tenant_id = LEGACY_TENANT
         quota = await self._call_get_or_create_quota(db, tenant_id)
         if quota.is_blocked:
             raise AppException(
                 status_code=403,
                 title="Tài khoản bị tạm khóa",
-                detail=f"Đơn vị '{tenant_id}' đã bị tạm khóa do vi phạm chính sách.",
+                detail="Ứng dụng đã bị tạm khóa do chính sách sử dụng.",
                 code="TENANT_BLOCKED",
             )
 
@@ -84,7 +87,7 @@ class UsageAccountingService:
                 status_code=429,
                 title="Hạn ngạch Token đã cạn",
                 detail=(
-                    f"Đơn vị '{tenant_id}' đã sử dụng {quota.tokens_used:,} / "
+                    f"Ứng dụng đã sử dụng {quota.tokens_used:,} / "
                     f"{quota.monthly_token_limit:,} tokens trong tháng {quota.month_period}."
                 ),
                 code="QUOTA_EXCEEDED",
@@ -107,6 +110,7 @@ class UsageAccountingService:
         error_message: str | None = None,
     ) -> LLMUsageLog:
         """Record usage metrics for audit, cost estimation, and quota tracking."""
+        tenant_id = LEGACY_TENANT
         total_tokens = prompt_tokens + completion_tokens
         cost_usd = calculate_cost_usd(model_name, prompt_tokens, completion_tokens)
 
@@ -154,8 +158,7 @@ class UsageAccountingService:
 
         # Query all logs within period
         stmt = select(LLMUsageLog).where(LLMUsageLog.created_at >= since_date.replace(tzinfo=None))
-        if tenant_id:
-            stmt = stmt.where(LLMUsageLog.tenant_id == tenant_id)
+
         stmt = stmt.order_by(LLMUsageLog.created_at.desc())
 
         res = await db.execute(stmt)

@@ -21,13 +21,10 @@ export interface AssistantInput {
   workflow_id: string;
   collection_id: string;
   is_active: boolean;
-  tenant_id: string;
   config: AssistantLifecycleConfig;
 }
 
-export type AssistantUpdateInput = Partial<
-  Omit<AssistantInput, "code" | "tenant_id">
->;
+export type AssistantUpdateInput = Partial<Omit<AssistantInput, "code">>;
 
 export interface AssistantTemplate {
   code: string;

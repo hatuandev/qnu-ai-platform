@@ -144,8 +144,10 @@ async def test_real_postgres_entity_and_year_selection_precedes_limit():
                         target_entities=["Target Entity"], requested_years=[2026], active_index_revision_ids={scope},
                         tenant_id=scope, workspace_id=scope, limit=1)
                     assert len(result) == 1 and result[0].attribute_value == "23"
-                    assert await fact_layer.lookup_facts(db, collection.id, keywords=["Metric label"],
-                        target_entities=["Target Entity"], tenant_id=scope + "_other", limit=1) == []
+                    assert len(await fact_layer.lookup_facts(db, collection.id, keywords=["Metric label"],
+                        target_entities=["Target Entity"], tenant_id=scope + "_other", limit=1)) == 1
+                    assert await fact_layer.lookup_facts(db, "missing_collection", keywords=["Metric label"],
+                        target_entities=["Target Entity"], limit=1) == []
             finally:
                 await transaction.rollback()
     finally:

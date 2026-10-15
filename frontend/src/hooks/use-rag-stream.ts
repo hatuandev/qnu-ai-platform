@@ -40,7 +40,6 @@ export interface ChatMessageItem {
 
 export interface UseRAGStreamOptions {
   assistantCode?: string;
-  tenantId?: string;
   conversationId?: string;
   initialMessages?: ChatMessageItem[];
   onFinish?: (message: ChatMessageItem) => void;
@@ -50,7 +49,6 @@ export interface UseRAGStreamOptions {
 export function useRAGStream(options: UseRAGStreamOptions = {}) {
   const {
     assistantCode = "admissions",
-    tenantId = "tenant_qnu",
     conversationId,
     initialMessages = [],
     onFinish,
@@ -153,7 +151,6 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
             body: JSON.stringify({
               message: trimmed,
               conversation_id: currentConversationId || conversationId,
-              tenant_id: tenantId,
               stream: true,
               attachments: (attachments || []).map((a) => ({
                 id: a.id,
@@ -473,7 +470,6 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
       assistantCode,
       conversationId,
       currentConversationId,
-      tenantId,
       stopStreaming,
       onFinish,
       onError,

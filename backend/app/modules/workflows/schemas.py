@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core.single_application import SingleApplicationModel
+
 
 class WorkflowNodeSpec(BaseModel):
     id: str = Field(..., description="Mã định danh duy nhất của Node")
@@ -36,14 +38,14 @@ class WorkflowDagSpec(BaseModel):
     edges: list[WorkflowEdgeSpec] = Field(default_factory=list)
 
 
-class WorkflowExecuteRequest(BaseModel):
+class WorkflowExecuteRequest(SingleApplicationModel):
     workflow_id: str = Field(..., description="Mã workflow hoặc tên tệp định nghĩa")
     workflow_version_id: str | None = Field(
         None, description="Mã phiên bản bất biến cụ thể cần thực thi"
     )
     inputs: dict[str, Any] = Field(..., description="Dữ liệu đầu vào (ví dụ: {'message': '...'})")
-    tenant_id: str = Field("tenant_qnu", description="Mã người thuê")
-    workspace_id: str = Field("workspace_qnu", min_length=2, max_length=100)
+
+
     conversation_id: str | None = Field(None, description="Mã phiên hội thoại")
 
 

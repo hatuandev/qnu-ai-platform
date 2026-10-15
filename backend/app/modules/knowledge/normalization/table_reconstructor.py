@@ -336,6 +336,17 @@ def _normalize_spacer_columns(
     if not has_interspersed_spacers:
         return headers, rows
 
+    # A blank header is not proof of a blank column. Preserve populated cells
+    # unless the established task-layout remapping below explicitly handles it.
+    compact_rows = all(len(row.cells) == len(semantic_indices)
+                       or sum(bool(cell.raw_value.strip()) for cell in row.cells) == len(semantic_indices)
+                       for row in rows)
+    if not compact_rows and not _looks_like_implementation_table(headers) and any(
+        index not in semantic_indices and index < len(row.cells) and row.cells[index].raw_value.strip()
+        for row in rows for index in range(len(headers))
+    ):
+        return headers, rows
+
     semantic_headers = [headers[index] for index in semantic_indices]
     normalized_rows: list[CanonicalRow] = []
     for row in rows:

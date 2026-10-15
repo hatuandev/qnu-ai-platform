@@ -160,6 +160,15 @@
       "isSensitive": true
     },
     {
+      "name": "ai.knowledge.review",
+      "displayName": "Duyệt Thuật ngữ Tìm kiếm",
+      "description": "Duyệt, từ chối, thu hồi thuật ngữ tìm kiếm và bật/tắt sử dụng theo kho",
+      "resource": "knowledge",
+      "action": "review",
+      "isEnabled": true,
+      "isSensitive": false
+    },
+    {
       "name": "ai.facts.manage",
       "displayName": "Quản lý Bảng Số Liệu (Facts)",
       "description": "Quản lý tầng số liệu có cấu trúc Knowledge Facts",

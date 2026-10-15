@@ -987,8 +987,8 @@ class VectorIndexer:
         source_filter = qmodels.Filter(must=[
             qmodels.FieldCondition(key="collection_id", match=qmodels.MatchValue(value=collection_id)),
             qmodels.FieldCondition(key="binding_id", match=qmodels.MatchValue(value=binding_id)),
-            qmodels.FieldCondition(key="tenant_id", match=qmodels.MatchValue(value=tenant_id)),
-            qmodels.FieldCondition(key="workspace_id", match=qmodels.MatchValue(value=workspace_id)),
+
+
         ])
         try:
             if not await self.client.collection_exists(namespace):
@@ -1067,7 +1067,7 @@ class VectorIndexer:
         candidate_mode: bool = False,
     ) -> list[dict[str, Any]]:
         """Perform dense cosine similarity search in Qdrant with positive allowlist lifecycle, tenant, score threshold and snapshot isolation filtering."""
-        if candidate_mode and (snapshot is None or not snapshot.binding_revisions or not tenant_id or not workspace_id):
+        if candidate_mode and (snapshot is None or not snapshot.binding_revisions):
             raise AppException("Candidate snapshot thiếu phạm vi.", code="INVALID_CANDIDATE_SNAPSHOT", status_code=403)
         cname = qdrant_collection_name or self._get_collection_name(collection_id)
         snapshot_generation = None
@@ -1117,25 +1117,16 @@ class VectorIndexer:
                     key="document_status",
                     match=qmodels.MatchAny(any=["ready", "approved"]),
                 ),
+                qmodels.FieldCondition(
+                    key="collection_id", match=qmodels.MatchValue(value=collection_id),
+                ),
             ]
             if candidate_mode:
-                must_conditions = [must_conditions[0], qmodels.FieldCondition(
+                must_conditions = [must_conditions[0], must_conditions[-1], qmodels.FieldCondition(
                     key="document_status", match=qmodels.MatchAny(any=["staging", "ready", "approved"]),
                 )]
-            if tenant_id:
-                must_conditions.append(
-                    qmodels.FieldCondition(
-                        key="tenant_id",
-                        match=qmodels.MatchValue(value=tenant_id),
-                    )
-                )
-            if workspace_id:
-                must_conditions.append(
-                    qmodels.FieldCondition(
-                        key="workspace_id",
-                        match=qmodels.MatchValue(value=workspace_id),
-                    )
-                )
+
+
 
             if snapshot and getattr(snapshot, "binding_revisions", None):
                 revision_pairs = []

@@ -137,12 +137,10 @@ class DocumentRevisionService:
             RepositoryDocument.is_active.is_(True),
         )
         if actor:
-            tenant_id = getattr(actor, "tenant_id", None)
-            if tenant_id:
-                stmt = stmt.where(RepositoryDocument.tenant_id == tenant_id)
-            workspace_id = getattr(actor, "workspace_id", None)
-            if workspace_id:
-                stmt = stmt.where(RepositoryDocument.workspace_id == workspace_id)
+            getattr(actor, "tenant_id", None)
+
+            getattr(actor, "workspace_id", None)
+
         if for_update:
             stmt = stmt.with_for_update()
         doc = (await db.execute(stmt)).scalar_one_or_none()

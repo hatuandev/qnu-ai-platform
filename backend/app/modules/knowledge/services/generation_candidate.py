@@ -83,8 +83,8 @@ async def resolve_candidate_snapshot(db: AsyncSession, collection_id: str, gener
         raise AppException("Không tìm thấy chỉ mục.", code="VECTOR_GENERATION_NOT_FOUND", status_code=404)
     bindings = list((await db.execute(select(KnowledgeBinding).where(
         KnowledgeBinding.collection_id == collection.id,
-        KnowledgeBinding.tenant_id == collection.tenant_id,
-        KnowledgeBinding.workspace_id == collection.workspace_id,
+
+
         KnowledgeBinding.status == "active",
     ))).scalars().all())
     selected = []

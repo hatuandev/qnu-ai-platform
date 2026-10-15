@@ -31,7 +31,7 @@ Chọn chế độ thực thi:
 | Trung bình | Tính năng CRUD/API/UI có contract rõ, refactor cục bộ | Đọc đủ phạm vi, sửa code theo một batch, rà diff, viết/cập nhật test hành vi, chạy kiểm tra một lần ở cuối |
 | Thấp | Microcopy, spacing, semantic token, đổi nhãn không đổi logic | Sửa trực tiếp, chạy Biome/build hoặc validator tương ứng; không tạo test hình thức |
 
-Không chạy full suite sau từng thay đổi nhỏ. Final verification vẫn phải tuân thủ quality gate Backend/Frontend trong `AGENTS.md`.
+Không chạy full suite sau từng thay đổi nhỏ. Dùng [bảng kiểm chứng chung](../../rules/verification.md); tài liệu/skill thuần túy chỉ kiểm tra cấu trúc/encoding/link, không chạy test ứng dụng.
 
 ## 1. Mười Điều Răn Clean Code Bắt Buộc (The 10 Commandments)
 
@@ -155,7 +155,7 @@ function renderDocumentBadge(doc: KnowledgeDocument | null) {
 
 ---
 
-## 3. Chuẩn Mực Backend (FastAPI, Python 3.14, Pydantic v2, Ruff)
+## 3. Chuẩn Mực Backend (FastAPI, Python theo pyproject.toml, Pydantic v2, Ruff)
 
 ### 3.1. 100% Asynchronous & Type Annotated
 - Mọi hàm trong service, router, database query đều có type hints và `async/await`:
@@ -220,7 +220,7 @@ Mỗi lần AI Agent chuẩn bị trả kết quả cho người dùng, hãy rà
 - [ ] 1. Tôi đã xóa toàn bộ code comment thừa và `console.log` debug chưa?
 - [ ] 2. Tôi đã xóa các `import` và biến khai báo nhưng không dùng chưa?
 - [ ] 3. Mã nguồn có sử dụng `any` không? Có hardcode màu sắc thô không?
-- [ ] 4. Đã chạy `npm run lint` và `npm run typecheck` đạt 0 lỗi chưa?
+- [ ] 4. Đã chạy gate đúng phạm vi theo [verification](../../rules/verification.md), phân biệt PASS/FAIL/NOT RUN và lỗi nền chưa?
 - [ ] 5. Tôi có đang **hardcode dữ liệu mẫu vào form, fake submit bằng `setTimeout` trỏ ID cũ, hay clone đè dữ liệu cũ lên file mới của người dùng** không?
 - [ ] 6. Mã nguồn và dữ liệu có bị **lỗi vỡ font tiếng Việt (Mojibake, ký tự rác `\ufffd`, `?`, thiếu UTF-8)** không?
 - [ ] 7. Mọi dòng diff có phục vụ trực tiếp yêu cầu, và tôi đã tránh sửa phần lân cận không liên quan chưa?

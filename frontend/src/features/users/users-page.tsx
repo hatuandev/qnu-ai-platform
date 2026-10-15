@@ -211,7 +211,7 @@ export function UsersPage({
       <PageHeader
         eyebrow="Quản trị / Quản lý"
         title="Người dùng"
-        description="Quản lý quyền truy cập không gian làm việc với danh sách người dùng có tìm kiếm, sắp xếp và phân quyền."
+        description="Quản lý quyền truy cập ứng dụng với danh sách người dùng có tìm kiếm, sắp xếp và phân quyền."
         actions={
           can("users.create") ? (
             <Button
@@ -292,7 +292,7 @@ export function UsersPage({
           if (!open) setDeleteUsers([]);
         }}
         title={`Xóa ${deleteUsers.length === 1 ? "người dùng" : `${deleteUsers.length} người dùng`}?`}
-        description="Hành động này sẽ xóa người dùng khỏi không gian làm việc demo và không thể hoàn tác."
+        description="Hành động này sẽ xóa người dùng khỏi ứng dụng demo và không thể hoàn tác."
         confirmLabel="Xóa"
         onConfirm={confirmDelete}
       />

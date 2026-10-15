@@ -62,7 +62,8 @@ def reference_year(policy: EvidencePolicy, now: datetime | None = None) -> int |
 def decision_response(req: AskRequest, snapshot: RetrievalSnapshot, status: str, reason: str,
                       plan: QueryPlan | None = None, bindings: list[dict] | None = None,
                       missing: list[str] | None = None, started: float = 0,
-                      blocks: list[EvidenceBlock] | None = None) -> AskResponse:
+                      blocks: list[EvidenceBlock] | None = None,
+                      glossary: dict | None = None) -> AskResponse:
     bindings = bindings or []
     lines = list(dict.fromkeys(c["text"] for c in bindings))
     if plan and plan.years:
@@ -91,6 +92,8 @@ def decision_response(req: AskRequest, snapshot: RetrievalSnapshot, status: str,
     decision = {"version": VERSION, "status": status, "reason": reason, "answer": answer,
         "requested": plan.model_dump() if plan else {}, "claim_bindings": bindings,
         "evidence_digest": evidence_digest(bindings), "missing_constraints": missing or []}
+    if glossary is not None:
+        decision["glossary_expansion"] = glossary
     if blocks is not None:
         decision["selection"] = [{"id": b.id, "title": b.title, "page": b.page_number} for b in blocks]
     return AskResponse(answer_decision=decision, status="answered" if status == "supported" else "insufficient_context",
@@ -101,9 +104,10 @@ def decision_response(req: AskRequest, snapshot: RetrievalSnapshot, status: str,
 
 async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot, plan: QueryPlan,
                          policy: EvidencePolicy, *, candidate_mode: bool,
-                         missing: list[str] | None = None) -> list[EvidenceBlock]:
+                         missing: list[str] | None = None,
+                         glossary_queries: list | None = None) -> list[EvidenceBlock]:
     # First retrieval establishes semantic page anchors. Supplement is read-only and bounded.
-    queries = search_queries(req.question, plan, missing)
+    queries = search_queries(req.question, plan, missing, glossary_queries=glossary_queries)
     # Each hybrid query owns a separate DB session and the same pinned snapshot.
     # Concurrent calls share one stage deadline, not four serial timeout budgets.
     tasks = [asyncio.create_task(retrieve_anchors(req, snapshot, query, policy,
@@ -207,16 +211,24 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     except ValueError as exc:
         raise AppException("Bộ lập kế hoạch thay đổi ngữ cảnh năm được hỏi.", code="EVIDENCE_PLAN_SCOPE_INVALID", status_code=502) from exc
     requested_years = sorted(set(plan.years + plan.document_years + plan.event_years))
+    from app.modules.rag.glossary_expansion import resolve_glossary_queries
+
+    glossary_queries, glossary_trace = await resolve_glossary_queries(
+        db, req.collection_id, req.question,
+        plan_years=plan.years, plan_method=plan.method, plan_entity=plan.entity)
     if plan.requires_year and not requested_years:
-        return decision_response(req, snapshot, "clarify", "YEAR_REQUIRED", plan, started=started)
+        return decision_response(req, snapshot, "clarify", "YEAR_REQUIRED", plan, started=started,
+                                 glossary=glossary_trace)
     if plan.requires_year and not YEAR.search(plan.query):
         plan.query += " năm " + ", ".join(map(str, requested_years))
     progress["stage"] = "retrieval"
     stage_started = time.perf_counter()
-    blocks = await select_context(db, req, snapshot, plan, policy, candidate_mode=candidate_mode)
+    blocks = await select_context(db, req, snapshot, plan, policy, candidate_mode=candidate_mode,
+                                    glossary_queries=glossary_queries)
     progress["retrieval_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     if not blocks:
-        return decision_response(req, snapshot, "missing", "NO_COMPATIBLE_EVIDENCE", plan, started=started)
+        return decision_response(req, snapshot, "missing", "NO_COMPATIBLE_EVIDENCE", plan, started=started,
+                                 glossary=glossary_trace)
     evidence = model_context(blocks)
     rules = active_preferences(policy, plan, blocks)
     preferences = [rule.model_dump() for rule in rules]
@@ -245,7 +257,8 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
             "missing_constraints": missing, "uncovered_list_members": verified.uncovered if verified else []}]
         progress["stage"] = "corrective_retrieval"
         retrieval_started = time.perf_counter()
-        corrected = await select_context(db, req, snapshot, plan, policy, candidate_mode=candidate_mode, missing=feedback)
+        corrected = await select_context(db, req, snapshot, plan, policy, candidate_mode=candidate_mode, missing=feedback,
+                                           glossary_queries=glossary_queries)
         # Keep previously cited blocks eligible; whole dependency groups still
         # count against the ORIGINAL budget. No external/web evidence or new plan.
         pinned = {ref["block_id"] for c in previous_verified.claims for ref in c["references"]} if previous_verified else set()
@@ -283,10 +296,11 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     progress["verification_ms"] = round((time.perf_counter() - stage_started) * 1000, 2)
     if proposal.status in {"conflict", "clarify"} or verified and verified.verifier.conflict:
         status = "conflict" if proposal.status == "conflict" or verified and verified.verifier.conflict else "clarify"
-        return decision_response(req, snapshot, status, "EVIDENCE_NOT_SUPPORTED", plan, started=started, blocks=blocks)
+        return decision_response(req, snapshot, status, "EVIDENCE_NOT_SUPPORTED", plan, started=started, blocks=blocks,
+                                 glossary=glossary_trace)
     if not verified:
         response = decision_response(req, snapshot, "missing", "INVALID_OR_EMPTY_CLAIMS", plan,
-            missing=missing, started=started, blocks=blocks)
+            missing=missing, started=started, blocks=blocks, glossary=glossary_trace)
         response.answer_decision.update(binding_rejections=rejected, quote_repair_attempted=repaired,
             corrective_retrieval_attempted=corrective, corrective_new_block_ids=added, repair_history=repair_history)
         return response
@@ -295,7 +309,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     logger.info("evidence_answer_decision status=%s accepted=%d rejected=%d snapshot=%s years=%s",
                 status, len(accepted), len(rejected + verified.errors), snapshot.snapshot_id, plan.years)
     response = decision_response(req, snapshot, status, "VERIFIED_CLAIM_COVERAGE" if complete else "PARTIAL_OR_MISSING_COVERAGE",
-        plan, bindings=accepted, missing=verified.missing, started=started)
+        plan, bindings=accepted, missing=verified.missing, started=started, glossary=glossary_trace)
     response.contexts = [f"{b.title} · trang {b.page_number} · {b.section}\n{b.text}" for b in blocks]
     response.answer_decision["verification"] = verified.verifier.model_dump()
     response.answer_decision.update(binding_rejections=rejected + verified.errors, quote_repair_attempted=repaired,

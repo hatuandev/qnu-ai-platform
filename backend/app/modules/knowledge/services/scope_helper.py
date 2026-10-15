@@ -1,4 +1,4 @@
-"""Helper functions for strict Tenant & Workspace Scoping in Knowledge Publishing V2."""
+"""Collection/binding/revision lookup and lifecycle checks for one application."""
 
 from __future__ import annotations
 
@@ -24,18 +24,7 @@ def apply_actor_scope(
     model: Any,
     actor: AuthActor | None,
 ) -> Select[Any]:
-    """Apply strict tenant_id and optional workspace_id filtering to a query."""
-    if not actor:
-        return stmt
-
-    tenant_id = getattr(actor, "tenant_id", None)
-    if tenant_id and hasattr(model, "tenant_id"):
-        stmt = stmt.where(model.tenant_id == tenant_id)
-
-    workspace_id = getattr(actor, "workspace_id", None)
-    if workspace_id and hasattr(model, "workspace_id"):
-        stmt = stmt.where(model.workspace_id == workspace_id)
-
+    """Legacy call-site bridge; routers/services still enforce actor permissions."""
     return stmt
 
 
@@ -45,7 +34,7 @@ async def get_scoped_collection(
     actor: AuthActor | None = None,
     for_update: bool = False,
 ) -> KnowledgeCollection:
-    """Retrieve a KnowledgeCollection ensuring it belongs to actor's tenant/workspace."""
+    """Retrieve the exact collection; permission checks remain at service boundaries."""
     if actor is None and not for_update:
         col = await db.get(KnowledgeCollection, collection_id)
         if col is None:

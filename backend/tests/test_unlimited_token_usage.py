@@ -80,7 +80,7 @@ async def test_api_reports_zero_limit_without_dividing_by_zero(monkeypatch):
         monthly_cost_limit_usd=0, tokens_used=5_002_480, cost_used_usd=1, is_blocked=False,
     )
     monkeypatch.setattr(modelops_service, "get_or_create_quota", AsyncMock(return_value=quota))
-    response = await get_tenant_quota("unlimited", AsyncMock())
+    response = await get_tenant_quota(AsyncMock())
     assert response.monthly_token_limit == 0
     assert response.usage_percent == 0
     assert response.tokens_used == 5_002_480

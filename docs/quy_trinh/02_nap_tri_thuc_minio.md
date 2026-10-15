@@ -1,5 +1,22 @@
 # QUY TRÌNH 02: NẠP TRI THỨC, PHÂN NHÁNH PDF INSPECTOR/OCR & ĐỐI SOÁT HITL TRƯỚC KHI NẠP VECTOR DB
 
+## Sửa bảng native không ghi đè publication — phiên 481
+
+PDF có header ô gộp dùng bbox cha bao tâm cột dữ liệu để dựng đường dẫn cha/con trước
+normalize; không forward-fill tên tùy tiện, không coi cột có số là spacer chỉ vì thiếu tên.
+Extractor version `layout-v11-native-headers` phân biệt artifact parser mới, không tự reparse nguồn cũ.
+
+Công cụ vận hành `scripts.prepare_native_table_review` dry-run mặc định; apply phải có
+ủy quyền cho đúng collection/source/base/hash. Đối chiếu bảng/hàng/ô cũ với native, số với
+words nằm đúng bbox, chỉ thay đoạn bảng thiếu cột. Lưu revision mới `review_required`,
+không đổi binding active source/index hay facts/vector. Hash lệch, base thay, job đang chạy,
+bảng khác phạm vi hoặc draft trùng đều dừng. Caller kiểm protected fingerprints và kiểm soát commit.
+
+Bản sửa giữ tọa độ native cell/hash và audit phiên bản gốc; đánh dấu stale phần layout-text
+alignment cũ ở trang thay đổi. Không dùng công cụ này tự phê duyệt hoặc tự kích hoạt quy đổi điểm.
+Sau khi người quản trị duyệt: nạp vector và xuất bản bằng luồng chuẩn. Cấu hình công thức/
+mapping/rounding của score tool là bước duyệt riêng với index mới, không lấy ID cũ.
+
 ## Ngữ cảnh nguồn và OCR đầu trang — cập nhật phiên 467
 
 Extractor `layout-v10-source-context` phát hiện trường số/ngày hành chính chưa đầy đủ trên

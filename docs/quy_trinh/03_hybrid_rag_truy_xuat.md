@@ -2,6 +2,14 @@
 
 Tài liệu này đặc tả cơ chế tìm kiếm hỗn hợp (Dense Vector + Sparse Lexical), thuật toán dung hợp thứ hạng Reciprocal Rank Fusion ($k=60$), tái xếp hạng Cross-Encoder và chốt chặn bảo vệ trích dẫn (Citation Guardrail).
 
+## Liệt kê tổ hợp và câu hỏi tiếp nối — phiên475
+
+Trước retrieval, câu phụ thuộc ngắn được phân giải từ câu hỏi user trước; assistant prose không phải evidence. Hợp đồng recheck chạy lại nguyên yêu cầu trước, không để model suy đoán lý do trả ít. Rewrite đổi/bịa số, làm mất năm hiện tại hoặc antecedent không rõ thì yêu cầu làm rõ. Chủ đề độc lập giữ nguyên.
+
+Nhánh fact_hybrid có enumeration riêng trước cache/TopK: đọc canonical đúng publication/hash/review và reviewed facts qua keyset, chỉ khớp khi mọi môn trong cùng tuple. Cụm môn theo cấu trúc vị trí tránh trùng từ trong văn xuôi. Model chỉ phân loại ý định/default source scope, không chọn tên ngành hay sinh giá trị. Renderer duyệt toàn records, năm ô/cột thắng năm văn bản, unknown-year không gộp chéo nguồn; ghi rõ nguồn và số bản ghi khác số ngành duy nhất. Năm default phải có heading ancestor cùng nguồn hoặc verified scope; ngày ban hành/tên tệp không đủ. Filter explicit year ở cấp record; không có thì no-answer, không trả TopK như danh sách đầy đủ. Lỗi DB/model vẫn là lỗi dịch vụ.
+
+Đây không phải thay đổi ingestion/index hay mọi enumeration trong evidence-policy opt-in. Cần BE/worker nhận mã mới, không reset/nạp lại vector. [Kiểm chứng và giới hạn phiên475](../nhat_ky/2026-10-15_phien_475_sua_liet_ke_va_ngu_canh_hoi_thoai.md).
+
 ## Chat RAG trực tiếp và bốn ưu tiên chất lượng — phiên 443
 
 Đối với trợ lý hỏi đáp chọn `execution_mode=rag`, endpoint chat/SSE gọi trực tiếp RAG, không tạo workflow execution. Workflow vẫn dùng riêng cho tác vụ/công cụ/HITL; không đưa DAG trở lại để thực hiện truy hồi bổ sung.
@@ -333,4 +341,108 @@ flags hoặc cho phép free generation khi rejected. Mọi missing đều log sn
 Năm gần nhất dựa nhãn năm dữ liệu, không lấy năm ban hành làm override. Chỉ dẫn chọn năm
 còn phụ thuộc model: chưa bảo đảm loại hết bảng cũ trùng ý. Không suy chất lượng toàn kho từ
 hai ca đã trả lời; xem [nhật ký473](../nhat_ky/2026-10-15_phien_473_sua_metric_header_va_audit_context.md).
+
+### Cập nhật476 — Điều phối hội thoại agent-lite trên kết quả liệt kê
+
+Resolver thêm act ngữ nghĩa `explain` (hỏi về đáp án trước), `reformat` (trình bày lại cùng dữ kiện),
+`filter` (chỉ thu hẹp năm tường minh) bên cạnh independent/followup/recheck/clarify, chung một
+structured_call với guard số/năm/phủ định/đổi-subject đã có; cấm phân loại bằng danh sách từ khóa.
+Đổi ngành/điều kiện/phủ định không đi filter mà đi followup RAG đầy đủ hoặc clarify.
+
+`conversation_acts` tải lại records lượt trước một cách định danh từ snapshot hiện tại (không tin
+bản ghi client gửi, không storage mới), tái dùng scope năm đã kiểm chứng của listing (plan model +
+validated_scopes, fallback định danh khi model lỗi), rồi render đúng act bằng template định danh:
+explain thống kê bản ghi/duy nhất/tài liệu/năm; reformat gom gọn theo năm giữ đủ facts; filter lọc
+năm chính xác, hết dòng thì missing. Mọi bất định trả None để rơi về luồng cũ; lỗi hạ tầng ném typed,
+không bịa đáp án. Mở đầu gắn đúng câu hỏi/phạm vi lượt trước và nói rõ vừa kiểm tra lại.
+
+Định danh 3 trạng thái: chuẩn / mờ (giữ riêng, nêu giới hạn) / hỏng cấu trúc (cách ly có đếm).
+Chỉ gộp trùng khít (mã,tên); cụm gần-giống exact và biến thể dấu (gộp Unicode, không từ điển tên)
+giữ riêng kèm ví dụ giới hạn. Đếm đoạn trích không ghi thành đếm tài liệu; citations nhóm theo tài
+liệu thật. Không gộp khác năm/unknown-year; không năm đồng hồ. Xem
+[nhật ký476](../nhat_ky/2026-10-15_phien_476_dieu_phoi_hoi_thoai_agent_lite.md).
+
+## Cập nhật phiên 480: trọng số truy vấn và quy đổi có kiểm chứng
+
+Truy vấn mở rộng mang vai trò original/variant/feedback, không xác định vai trò bằng vị trí mảng.
+RRF chia ngân sách nhóm gốc 0,65 và toàn nhóm mở rộng 0,35, loại phiếu trùng; lexical discount
+terms mới và giới hạn tổng mass. Không đổi scope năm/ngành bằng điểm xếp hạng; không TopK cắt
+danh sách đầy đủ. Cần benchmark holdout trước kết luận cải thiện; chưa có RM3.
+
+Liệt kê nhiều năm chưa chỉ năm hỏi rõ phạm vi; explain/reformat giữ năm antecedent, unknown-year
+khác nguồn không gộp. Bất định hỏi lại, lỗi hạ tầng trả lỗi, không replay bảng.
+
+Endpoint read-only có xác thực `POST /platform/v1alpha1/rag/scores/convert` nhận collection, năm,
+phương thức nguồn, tổ hợp và điểm chuỗi; scope lấy từ actor. Engine dùng rule DB đã duyệt,
+mapping và các ô cùng hàng/cột thuộc active revision/hash, tính Decimal, làm tròn cuối một lần.
+Không rule/bằng chứng thì chưa tính, không dùng LLM bịa bảng hay ngoại suy.
+Hiện chưa có rule được kích hoạt; xem [cổng duyệt nguồn và rule](../ke_hoach/2026-10-15_kiem_chung_bang_quy_doi_diem.md).
+
+## Cập nhật phiên 482: danh tính tổ hợp theo ô đã duyệt và cổng kích hoạt rule
+
+**Hàng bảng đã duyệt không nhất thiết tự định danh bằng mã.** Nguồn thật
+(Thông báo quy đổi tương đương 2026) đặt `entity_name` của hàng ánh xạ là **danh sách môn**
+và để `entity_code = NULL`. Vì vậy tầng bằng chứng phải mang theo ngữ cảnh hàng:
+`reviewed_fact_blocks` đưa `row_context` (danh sách cặp `[nhãn_cột, giá_trị]` sinh từ chính
+header đã duyệt khi tái tạo bảng) vào `fact_context`, và `EvidenceBlock.fact_context` gồm
+`entity_name`, `entity_code`, `source_sections`, `location_ambiguous`, `row_context`, `cells`.
+
+**Đối chiếu danh tính tổ hợp**: nhãn cột mã là **trường đã duyệt** trên rule
+(`ConversionRule.combination_context_attribute`), không phải hằng số trong mã nguồn.
+`reviewed_row_code()` chuẩn hóa NFC + casefold + gom khoảng trắng rồi yêu cầu **đúng một ô**
+khớp nhãn. Không khớp, trùng hai ô, `row_context` sai hình dạng (không phải cặp hai phần tử)
+hoặc thiếu → từ chối. **Không nới thành tìm chuỗi con tùy tiện**, không hardcode danh sách
+tổ hợp hay bảng điểm (Tôn chỉ 7).
+
+**Cổng kích hoạt rule (bắt buộc)**:
+
+1. Rule chỉ được **suy ra từ publication đang sống**, không gõ tay: thứ tự hàng lấy từ
+   `row_index` đã duyệt (giữ đúng thứ tự bách phân vị, **không sắp xếp theo giá trị**);
+   nhãn cột gốc/mã, tập tổ hợp gốc và cột đích của mỗi gốc suy từ hình thái ô;
+   mọi mơ hồ hoặc trùng mã → **dừng**, không tự chọn mốc/hàng.
+2. Script cấu hình **tự hủy nếu publication đã đổi** so với tham chiếu đã duyệt
+   (binding / index revision / source revision / canonical hash).
+3. Mỗi rule phải tự kiểm chứng chéo trước khi ghi: quét toàn bộ mốc, mẫu biên, dò nội suy
+   bằng công thức cài **độc lập lần hai**, ngoài khoảng, các đột biến phủ định và oracle công bố.
+4. **Chỉ ghi khi có danh tính người duyệt thật.** Cấm giả danh người duyệt, và **người duyệt
+   tài liệu nguồn không đương nhiên là người duyệt cấu hình rule**; thời điểm duyệt tài liệu
+   không phải bằng chứng người đó đã duyệt mọi cấu hình công cụ. Khi chưa đủ điều kiện thì
+   báo rõ và **giữ công cụ tắt** (endpoint trả `NO_VERIFIED_CONVERSION_RULE`).
+5. Ghi qua cơ chế quản trị server-trusted hiện có (`PUT /knowledge/collections/{id}`,
+   quyền `ai.knowledge.update`), **chỉ chạm khóa `score_conversion_rules`**, giữ nguyên
+   metadata khác. Không nhận rule, bảng số hay bằng chứng "đã duyệt" từ request/chat.
+
+**Trạng thái lỗi phải lộ đúng, không thành đáp án giả**: sự cố CSDL ở bước phân giải snapshot
+hay bước đọc rule đều trả RFC 7807 `SCORE_RULE_UNAVAILABLE` (503); `AppException` đi xuyên
+nguyên trạng để từ chối phạm vi (403/404) không bị đội lốt lỗi hạ tầng. Thiếu rule → `missing`.
+Điểm ngoài khoảng → `missing` + `SCORE_OUTSIDE_VERIFIED_RANGE`; không clamp, không ngoại suy,
+không dùng bảng năm khác, không lấy số do LLM sinh.
+
+**Phạm vi năm**: năm áp dụng chỉ được chứng minh bằng trích dẫn canonical của nguồn,
+**không suy từ tên file hay năm ban hành**. Facts có `temporal_context = unknown` phải giữ
+nguyên trạng thái đó; **cấm âm thầm sửa thành năm cụ thể** để khớp yêu cầu.
+
+Xem [nhật ký482](../nhat_ky/2026-10-15_phien_482_kiem_chung_quy_doi_diem_du_lieu_that.md).
+
+## Single application và thuật ngữ — phiên 485
+
+Từ xác nhận ngày 2026-10-16, tenant/workspace không còn là tham số API, bộ lọc truy hồi
+hoặc biên cache. Quyền vẫn do server xác thực; mọi đường giữ collection, binding,
+revision đang xuất bản và lifecycle. Cột/đối số legacy chỉ để đọc dữ liệu và chạy worker
+cũ tương thích; không dùng chúng để khôi phục phân vùng hoặc tin giá trị client gửi.
+
+Thuật ngữ được quản lý theo collection, có duyệt và công tắc tắt mặc định. Scope là
+năm/phương thức/thực thể có kiểu dữ liệu; lọc scope trước kiểm tra xung đột. Dữ liệu
+scope cũ hỏng bị skip có reason, không biến thành thuật ngữ toàn cục. Fact/hybrid chỉ
+nhận scope nhãn nguyên cụm được nêu trong câu gốc nếu không có planner ngữ nghĩa.
+Thuật ngữ hỗ trợ tìm kiếm, không thay thế chứng cứ hoặc sửa năm/phủ định của câu hỏi.
+
+Cache dùng `rag:cache:app-v1:{collection_id}:...` cùng epoch/snapshot/model/policy/history
+và version glossary. Đọc bảng glossary nằm trong savepoint; thiếu bảng `42P01` không
+làm hỏng transaction cha, lỗi quyền/cột/kết nối phải báo lỗi thật. Duyệt/sửa khóa dòng
+và refresh ORM trước kiểm tra phiên bản, không duyệt bằng đối tượng đã đọc cũ.
+
+Không cần reset DB/reindex để bỏ phân vùng. Khi rollout phải thay FE/BE/worker đồng bộ
+và chờ job worker cũ hoàn tất vì lease nguồn cũng chuyển sang app-v1. Xóa cột legacy
+vật lý là đợt migration/backup riêng, không nằm trong lần thay đổi này.
 

@@ -31,6 +31,7 @@ from app.modules.knowledge.parsers.blocks import (
     find_page_tables,
     suppress_nested_tables,
 )
+from app.modules.knowledge.parsers.native_headers import native_header_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +271,7 @@ class PyMuPdfParser(BaseDocumentParser):
             # Convert to _RawTableItem and apply horizontal side-by-side fusion
             raw_table_items: list[_RawTableItem] = []
             for tab in page_tables:
-                extracted = tab.extract() or []
+                extracted, _ = native_header_matrix(tab)
                 cleaned_rows = [
                     [str(c or "").strip() for c in r]
                     for r in extracted

@@ -174,12 +174,11 @@ class GroupSourceService:
             .where(
                 KnowledgeGroupSource.collection_id == col.id,
                 KnowledgeGroupSource.status != "detached",
-                KnowledgeGroupSource.tenant_id == col.tenant_id,
+
             )
             .order_by(KnowledgeGroupSource.created_at.asc())
         )
-        if col.workspace_id:
-            stmt = stmt.where(KnowledgeGroupSource.workspace_id == col.workspace_id)
+
 
         rows = (await db.execute(stmt)).all()
         results: list[KnowledgeGroupSourceResponse] = []
@@ -197,11 +196,10 @@ class GroupSourceService:
                     KnowledgeBinding.group_source_id == src.id,
                     KnowledgeBinding.status == "active",
                     KnowledgeBinding.active_index_revision_id.is_not(None),
-                    KnowledgeBinding.tenant_id == col.tenant_id,
+
                 )
             )
-            if col.workspace_id:
-                pub_stmt = pub_stmt.where(KnowledgeBinding.workspace_id == col.workspace_id)
+
 
             published_count = (await db.execute(pub_stmt)).scalar() or 0
 
@@ -261,21 +259,17 @@ class GroupSourceService:
         src_stmt = select(KnowledgeGroupSource).where(
             KnowledgeGroupSource.collection_id == col.id,
             KnowledgeGroupSource.status != "detached",
-            KnowledgeGroupSource.tenant_id == col.tenant_id,
+
         )
-        if col.workspace_id:
-            src_stmt = src_stmt.where(KnowledgeGroupSource.workspace_id == col.workspace_id)
+
 
         sources = (await db.execute(src_stmt)).scalars().all()
         binding_count_stmt = select(func.count(KnowledgeBinding.id)).where(
             KnowledgeBinding.collection_id == col.id,
-            KnowledgeBinding.tenant_id == col.tenant_id,
+
             KnowledgeBinding.status.notin_(["detached", "deleting"]),
         )
-        if col.workspace_id:
-            binding_count_stmt = binding_count_stmt.where(
-                KnowledgeBinding.workspace_id == col.workspace_id
-            )
+
         total_sources = (await db.execute(binding_count_stmt)).scalar() or 0
 
         # 2. Published documents count & active chunks count
@@ -291,11 +285,10 @@ class GroupSourceService:
             .where(
                 KnowledgeBinding.collection_id == col.id,
                 KnowledgeBinding.status == "active",
-                KnowledgeBinding.tenant_id == col.tenant_id,
+
             )
         )
-        if col.workspace_id:
-            pub_stmt = pub_stmt.where(KnowledgeBinding.workspace_id == col.workspace_id)
+
 
         pub_row = (await db.execute(pub_stmt)).one()
         published_docs_count = pub_row[0] or 0
@@ -310,9 +303,7 @@ class GroupSourceService:
 
         for src in sources:
             group = await db.get(DocumentGroup, src.document_group_id)
-            if group and group.tenant_id == col.tenant_id and (
-                not col.workspace_id or group.workspace_id == col.workspace_id
-            ):
+            if (group) and (True):
                 diff = await self.diff_service.evaluate_group_diff(
                     db=db, collection=col, group=group, source=src
                 )

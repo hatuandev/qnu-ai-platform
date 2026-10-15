@@ -28,8 +28,8 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
     query = (select(KnowledgeFact).join(KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id)
         .join(KnowledgeCollection, KnowledgeBinding.collection_id == KnowledgeCollection.id)
         .where(KnowledgeFact.collection_id == req.collection_id,
-               KnowledgeCollection.tenant_id == snapshot.tenant_id,
-               KnowledgeCollection.workspace_id == snapshot.workspace_id,
+
+
                KnowledgeBinding.status == "active",
                KnowledgeFact.index_revision_id.in_(snapshot.binding_revisions.values()))
         .order_by(KnowledgeFact.id))
@@ -61,6 +61,8 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
         key = (fact.index_revision_id, raw.get("table_id"), raw.get("row_index"), fact_year)
         if key[1] is None or key[2] is None:
             key = (fact.index_revision_id, fact.id, None, fact_year)
+        if exhaustive:
+            key = (*key, fact.entity_name)  # Independent identities in a side-by-side row stay separate.
         groups.setdefault(key, []).append(fact)
     result = []
     for members in groups.values():
@@ -81,8 +83,8 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
                 role="data" if fact_year else "unknown", status="verified" if fact_year else "unknown",
                 evidence_quote=text if fact_year else None), canonical_hash=source.canonical_hash,
             origin="reviewed_fact", fact_id=first.id,
-            fact_context={"entity_name": first.entity_name, "source_sections": sections,
-                "location_ambiguous": len(sections) != 1,
+            fact_context={"entity_name": first.entity_name, "entity_code": getattr(first, "entity_code", None), "source_sections": sections,
+                "location_ambiguous": len(sections) != 1, "row_context": raw.get("row_context") or [],
                 "cells": [{"fact_id": f.id, "attribute": f.attribute_name, "value": f.attribute_value,
                 **{k: (f.raw_data or {}).get(k) for k in ("temporal_context", "qualifiers", "attribute_code", "relation")}}
                 for f in members]}))

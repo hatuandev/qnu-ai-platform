@@ -1,68 +1,25 @@
 ---
 name: qnu-rag-pipeline
-description: >-
-  Use this skill when configuring, tuning, debugging, or extending the Hybrid RAG engine (Qdrant vector indexing, PostgreSQL FTS lexical search, Reciprocal Rank Fusion with legal priority weighting, Cross-Encoder reranking, facts layer, citation guardrails). Do NOT use for basic frontend UI edits or non-RAG backend modules.
+description: Tune or debug QNU retrieval, scope, fusion, reranking, evidence context and citations in the existing Python pipeline. Use for RAG behavior changes; use qnu-rag-evaluation for comparative benchmarks and qnu-knowledge-ingestion for parsing.
 ---
 
-# Hướng Dẫn Vận Hành & Tối Ưu Hybrid RAG Pipeline
+# Retrieval có phạm vi và bằng chứng
 
-Tài liệu hướng dẫn chuyên sâu về "Trái tim" hỏi đáp thông minh của **QNU AI Platform** ([backend/app/modules/rag](backend/app/modules/rag)).
+Đọc mã/config/snapshot trước. Điểm vào thường ở `backend/app/modules/rag/service.py`, `retriever.py`, `vector_indexer.py`, `fusion.py`, `reranker.py`, `evidence_pipeline.py`, `evidence_runtime.py` và `facts.py`; pipeline chọn theo assistant/policy, không mặc định mọi request đi cùng một nhánh.
 
----
+## Cách làm
 
-## 1. Kiến Trúc Luồng Hybrid Retrieval Đa Tầng
+1. Vẽ luồng thật ngắn: resolve hội thoại/scope → snapshot/quyền → retrieval → fusion/rerank → evidence/context → answer/citation/cache. Chỉ ra nhánh đang dùng, nhánh chưa chạy và điểm lỗi trước khi sửa.
+2. Scope gồm actor/tenant/workspace, collection/binding, publication/index/source revision và yêu cầu năm/đợt/ngành/metric. Lọc đủ mọi nhánh trước khi chấm/chọn candidate khi có scope xác thực; không chỉ lọc ở prompt hoặc sau TopK. Unknown không tự biến thành năm được hỏi. Nếu schema chưa có trường cần thiết, nêu gap và phương án riêng, không giả vờ filter đã có.
+3. Phân biệt năm ban hành, năm từng dòng/cột, hiệu lực và trường tổ chức kỳ thi với trường đích. Query expansion/history không được thay đổi scope gốc. Follow-up phải tái dựng cùng scope/nguồn; lỗi resolver không thành unknown rồi trả answered.
+4. Xác minh embedding endpoint trả được gì. Dense, PostgreSQL FTS, BM25 và BGE-M3 learned sparse là những nhánh khác nhau. BM25 trong evidence không có nghĩa sparse Qdrant đã được index. Đổi dimension/model/normalization phải có generation/reindex tương thích và rollout được phép.
+5. Fusion giữ ID và provenance; không cộng raw cosine/FTS/BM25 khác thang. RRF gộp thứ hạng; weighted RRF khác weighted normalized score. Alpha từ paper không phải tỷ lệ 30/70 hay tham số RRF. Trọng số và legal priority là quyết định cần ablation, không thay kiểm tra hiệu lực.
+6. Tách `K_dense`, `K_sparse`, `K_fusion`, `K_rerank_input`, `K_context`; lấy từ config thật, ghi trace. Giá trị 30/30/30/5, k=60, dimension hoặc ngưỡng score chỉ là ví dụ/thiết lập khi đã xác minh, không tối ưu mặc định.
+7. Giữ thứ hạng, source/binding/revision/hash qua dedup, expansion và rerank; xử lý ID thiếu/trùng, ties và response sai. Lỗi reranker chỉ degrade nếu policy cho phép, kèm trace; lỗi auth/tenant không được biến thành no-answer hay fallback mở quyền.
+8. Context giữ header/đơn vị/footnote cùng ô được trích; không gộp số liệu khác nguồn/năm chưa rõ. Câu hỏi liệt kê toàn bộ cần enumeration có scope, pagination/set coverage; TopK RAG không chứng minh đã liệt kê hết. Phép tính dùng engine/rule đã duyệt và source-bound, không để LLM tự tính số chính thức.
+9. Cache key/validation phải gắn tenant/workspace, quyền, assistant/policy, normalized query, scope, snapshot và model/config ảnh hưởng đáp án. Cache hit vẫn kiểm tra quyền và nguồn còn hiệu lực; không dùng threshold cache cố định để bỏ qua kiểm chứng.
+10. Trước bàn giao đối chiếu evidence/citations thật; thiếu căn cứ thì abstain/clarify với lý do. Không bịa trang/URL/thông tin liên hệ. Dùng [qnu-rag-evaluation](../qnu-rag-evaluation/SKILL.md) khi đo chất lượng và [gate chung](../../rules/verification.md) khi kiểm chứng.
 
-```mermaid
-graph TD
-    Query[Câu hỏi người dùng] --> Cache{Semantic Cache?}
-    Cache -- Trùng khớp >=0.95 --> FastReturn[Trả câu trả lời ngay lập tức]
-    Cache -- Chưa có trong cache --> ConcurrentSearch[Song song 2 luồng tìm kiếm]
-    
-    ConcurrentSearch --> DenseSearch[Qdrant: BGE-M3 Dense Vector 1024d]
-    ConcurrentSearch --> SparseSearch[Postgres: Lexical Full-Text Search]
-    
-    DenseSearch --> RRF[Reciprocal Rank Fusion - RRF k=60 + Trọng số Pháp lý]
-    SparseSearch --> RRF
-    
-    RRF --> RerankCheck{BGE-Reranker Online?}
-    RerankCheck -- Có --> CrossEncoder[BAAI/bge-reranker-v2-m3: Top 5]
-    RerankCheck -- Không / Timeout --> FallbackRRF[Graceful Fallback: Giữ nguyên RRF]
-    
-    CrossEncoder --> FactLayer[Structured Fact Layer: Bảng Điểm chuẩn / Học phí]
-    FallbackRRF --> FactLayer
-    
-    FactLayer --> CitationGuard[Citation Guard: Kiểm tra độ bám sát Ngữ cảnh]
-    CitationGuard -- Đạt chuẩn --> Composer[AnswerFormatPlanner: Sinh bảng/checklist/đoạn văn]
-    CitationGuard -- Thiếu căn cứ --> PoliteRefusal[No-Answer Policy: Trả số Hotline Tuyển sinh QNU]
-```
+## Bằng chứng bàn giao
 
----
-
-## 2. Các Thành Phần & Quy Tắc Tinh Chỉnh
-
-### 1. Vector Indexer ([vector_indexer.py](backend/app/modules/rag/vector_indexer.py))
-- **Mô hình Embedding**: `BAAI/bge-m3` (độ dài vector: 1024 chiều).
-- **Khoảng cách**: Cosine Distance.
-- **Index Batching**: Đẩy từng lô 32 chunks để tối ưu băng thông mạng và RAM của Qdrant.
-- **Payload Filter**: Luôn gắn bộ lọc theo `collection_id`, `tenant_id`, `workspace_id`, `document_status == "ready"`, và `is_retrievable == true` để bảo vệ dữ liệu đa người thuê (Multi-tenancy) và tránh bóc tách chunk chưa sẵn sàng.
-
-### 2. Reciprocal Rank Fusion ([fusion.py](backend/app/modules/rag/fusion.py))
-- Công thức chuẩn kết hợp Trọng số Pháp lý (Legal Priority Weighting):
-  $$RRF(d) = \sum_{m \in \{\text{dense}, \text{sparse}\}} \frac{1}{k + r_m(d)} \times \text{priority\_multiplier}(d)$$
-  với $\text{priority\_multiplier} = 1.0 + (\text{priority} - 5) \times 0.02$ (văn bản cấp 10 như Quy chế, Quyết định được ưu tiên $+10\%$).
-- Hằng số $k = 60$ theo chuẩn công nghiệp, giúp cân bằng hoàn hảo giữa kết quả tìm kiếm ngữ nghĩa và tìm kiếm từ khóa chính xác.
-
-### 3. Cross-Encoder Reranker ([reranker.py](backend/app/modules/rag/reranker.py))
-- Tái xếp hạng Top-K (mặc định lấy 8 chunks ban đầu, rerank chọn ra 5 chunks tốt nhất).
-- **Nguyên tắc Chịu Lỗi**: Bắt buộc bọc khối gọi API trong `try/except`. Nếu microservice reranker bị offline hoặc chậm quá 3 giây, tự động fallback lấy top từ danh sách RRF mà không làm gián đoạn câu trả lời của người dùng.
-
-### 4. Structured Fact Layer ([facts.py](backend/app/modules/rag/facts.py))
-- Đối với câu hỏi về điểm chuẩn, chỉ tiêu, mã ngành: Ưu tiên tra cứu thẳng vào bảng `knowledge_facts`.
-- Dữ liệu dạng sự thật sẽ được render thành **Bảng Markdown** chuẩn, tuyệt đối không để LLM đoán số liệu.
-
-### 5. Citation Guard ([citation_guard.py](backend/app/modules/rag/citation_guard.py))
-- Trích dẫn bắt buộc phải có: `title`, `section` (Điều/Khoản), `page_number` và trích đoạn ngắn `quote`.
-- **No-Answer Policy**:
-  - Tuyển sinh: Cung cấp Hotline Tuyển sinh ĐH Quy Nhơn `0256.3846.156` hoặc Email `tuyensinh@qnu.edu.vn`.
-  - Quy chế học vụ: Hướng dẫn liên hệ Phòng Đào tạo (P.108 Nhà A1).
-
+Luồng đang chạy, phạm vi file, diff hành vi, test scope/provenance/ranking, candidate counts, fallback trace và giới hạn chưa chạy. Không tuyên bố dense/hybrid/model thật hoạt động chỉ vì có class hoặc mock test xanh.

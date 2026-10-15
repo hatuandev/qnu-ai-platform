@@ -74,6 +74,7 @@ async def test_rag_runtime_missing_year_blocks_model_and_retrieval():
     db.get.return_value = SimpleNamespace(collection_metadata={})  # Legacy policy explicitly disabled.
     with patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot)), \
          patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[fact])), \
+         patch("app.modules.rag.snapshot_fact_evidence.load_snapshot_table_evidence", AsyncMock(return_value=[])), \
          patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock()) as retrieval, \
          patch("app.modules.rag.service.modelops_service.generate", AsyncMock()) as model:
         result = await RagService().ask(db, AskRequest(question="Điểm chuẩn Công nghệ thông tin năm 2026?", collection_id="collection", module_code="admissions"))

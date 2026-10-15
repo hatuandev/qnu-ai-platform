@@ -200,7 +200,7 @@ async def test_vector_delete_uses_source_scope_and_waits_for_actual_removal():
     args = client.delete.await_args.kwargs
     assert args["wait"] is True
     fields = {condition.key: condition.match.value for condition in args["points_selector"].filter.must}
-    assert fields == {"collection_id": "col", "binding_id": "binding", "tenant_id": "tenant", "workspace_id": "workspace"}
+    assert fields == {"collection_id": "col", "binding_id": "binding"}
     client.delete_collection.assert_not_called()
     client.count.return_value = SimpleNamespace(count=1)
     with patch.object(source_purge.vector_indexer, "client", client), pytest.raises(AppException) as error:
@@ -210,15 +210,15 @@ async def test_vector_delete_uses_source_scope_and_waits_for_actual_removal():
 
 
 @pytest.mark.asyncio
-async def test_purge_rejects_another_tenant_and_cannot_be_cancelled(purge_db):
+async def test_purge_requires_existing_binding_and_cannot_be_cancelled(purge_db):
     db = purge_db
     _, _, binding, _, _ = await seed_source(db)
     actor = SimpleNamespace(tenant_id="unrelated-tenant", workspace_id=binding.workspace_id)
     with pytest.raises(EntityNotFoundError):
-        await source_purge.request_purge(db, binding.id, actor=actor)
+        await source_purge.request_purge(db, "missing-binding", actor=actor)
     assert binding.status == "paused"
     with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="test-no-dispatch")):
-        job = await source_purge.request_purge(db, binding.id)
+        job = await source_purge.request_purge(db, binding.id, actor=actor)
     with pytest.raises(AppException) as error:
         await source_purge.jobs_service.cancel_job(db, job.id)
     assert error.value.code == "PURGE_NOT_CANCELLABLE"

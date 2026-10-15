@@ -26,6 +26,9 @@ import type {
   FactListResponse,
   GarbageCollectionReport,
   GarbageCollectionRequest,
+  GlossarySettings,
+  GlossaryTerm,
+  GlossaryTermListResponse,
   IndexActivationRequest,
   IndexActivationResponse,
   KnowledgeBinding,
@@ -2066,6 +2069,106 @@ export const knowledgeApi = {
           `Lỗi tải danh sách tập đoạn cắt (HTTP ${res.status}).`,
         ),
       );
+    }
+    return res.json();
+  },
+
+  async listGlossaryTerms(
+    collectionId: string,
+    params: { search?: string; status?: string; page?: number; page_size?: number } = {},
+  ): Promise<GlossaryTermListResponse> {
+    const query = new URLSearchParams();
+    if (params.search) query.set("search", params.search);
+    if (params.status) query.set("status", params.status);
+    query.set("page", String(params.page ?? 1));
+    query.set("page_size", String(params.page_size ?? 20));
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary?${query.toString()}`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Tải danh sách thuật ngữ thất bại (HTTP ${res.status}).`));
+    }
+    return res.json();
+  },
+
+  async createGlossaryTerm(
+    collectionId: string,
+    payload: { user_phrase: string; target_term: string; note?: string; scope?: Record<string, unknown> },
+  ): Promise<GlossaryTerm> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary`, {
+      method: "POST",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Thêm thuật ngữ thất bại (HTTP ${res.status}).`));
+    }
+    return res.json();
+  },
+
+  async updateGlossaryTerm(
+    collectionId: string,
+    termId: string,
+    payload: { user_phrase?: string; target_term?: string; note?: string; scope?: Record<string, unknown>; expected_version: number },
+  ): Promise<GlossaryTerm> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary/${termId}`, {
+      method: "PUT",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Sửa thuật ngữ thất bại (HTTP ${res.status}).`));
+    }
+    return res.json();
+  },
+
+  async reviewGlossaryTerm(
+    collectionId: string,
+    termId: string,
+    payload: { action: "approve" | "reject" | "revoke"; reason?: string; expected_version: number },
+  ): Promise<GlossaryTerm> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary/${termId}/review`,
+      {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Duyệt thuật ngữ thất bại (HTTP ${res.status}).`));
+    }
+    return res.json();
+  },
+
+  async getGlossarySettings(collectionId: string): Promise<GlossarySettings> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Tải cấu hình thuật ngữ thất bại (HTTP ${res.status}).`));
+    }
+    return res.json();
+  },
+
+  async updateGlossarySettings(
+    collectionId: string,
+    payload: { is_enabled: boolean; expected_version: number },
+  ): Promise<GlossarySettings> {
+    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`, {
+      method: "PUT",
+      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(extractErrorMessage(err, `Bật/tắt thuật ngữ thất bại (HTTP ${res.status}).`));
     }
     return res.json();
   },

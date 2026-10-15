@@ -353,15 +353,16 @@ async def reveal_provider_key(
 
 
 @router.get(
-    "/quotas/{tenant_id}",
+    "/quotas/current",
     response_model=TenantQuotaResponse,
-    summary="Tra cứu trạng thái hạn ngạch token và chi phí tháng của một đơn vị / khoa phòng",
+    summary="Tra cứu hạn ngạch và chi phí tháng của ứng dụng",
 )
 async def get_tenant_quota(
-    tenant_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> TenantQuotaResponse:
-    quota = await modelops_service.get_or_create_quota(db, tenant_id)
+    from app.core.single_application import LEGACY_TENANT
+
+    quota = await modelops_service.get_or_create_quota(db, LEGACY_TENANT)
     percent = (
         round((quota.tokens_used / quota.monthly_token_limit) * 100, 2)
         if quota.monthly_token_limit > 0
@@ -385,10 +386,9 @@ async def get_tenant_quota(
     summary="Tra cứu trạng thái hạn ngạch token qua query parameter (tương thích ngược)",
 )
 async def get_tenant_quota_query(
-    tenant_id: str = "tenant_qnu",
     db: AsyncSession = Depends(get_db),
 ) -> TenantQuotaResponse:
-    return await get_tenant_quota(tenant_id=tenant_id, db=db)
+    return await get_tenant_quota(db=db)
 
 
 @router.get(
@@ -398,7 +398,6 @@ async def get_tenant_quota_query(
 )
 async def get_modelops_usage_stats(
     days: int = 30,
-    tenant_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> UsageStatsResponse:
-    return await modelops_service.get_usage_statistics(db, days=days, tenant_id=tenant_id)
+    return await modelops_service.get_usage_statistics(db, days=days)

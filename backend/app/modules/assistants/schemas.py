@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.evidence_policy import EvidencePolicy
+from app.core.single_application import SingleApplicationModel
 
 
 class AssistantPersonaScope(BaseModel):
@@ -105,15 +106,15 @@ class AssistantLifecycleConfig(BaseModel):
     evaluation_policy: AssistantEvaluationPolicy = Field(default_factory=AssistantEvaluationPolicy)
 
 
-class AssistantRuntimeProfile(BaseModel):
+class AssistantRuntimeProfile(SingleApplicationModel):
     """Immutable assistant policy snapshot attached to one workflow execution."""
 
     execution_mode: Literal["rag", "workflow"] = "workflow"
     assistant_id: str
     assistant_code: str
     assistant_revision: str
-    tenant_id: str
-    workspace_id: str = "workspace_qnu"
+
+
     system_prompt: str
     collection_id: str
     persona_scope: AssistantPersonaScope
@@ -125,7 +126,7 @@ class AssistantRuntimeProfile(BaseModel):
     evaluation_policy: AssistantEvaluationPolicy
 
 
-class AssistantCreateRequest(BaseModel):
+class AssistantCreateRequest(SingleApplicationModel):
     code: str = Field(
         ...,
         min_length=2,
@@ -142,7 +143,7 @@ class AssistantCreateRequest(BaseModel):
     workflow_ownership: str = Field("private", max_length=20)
     collection_id: str = Field(..., min_length=2, max_length=100)
     is_active: bool = True
-    tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
+
     config: AssistantLifecycleConfig = Field(default_factory=lambda: AssistantLifecycleConfig(execution_mode="rag"))
 
     @field_validator(
@@ -155,7 +156,6 @@ class AssistantCreateRequest(BaseModel):
         "workflow_id",
         "workflow_ownership",
         "collection_id",
-        "tenant_id",
         mode="before",
     )
     @classmethod
@@ -196,7 +196,7 @@ class AssistantUpdateRequest(BaseModel):
         return value
 
 
-class AssistantResponse(BaseModel):
+class AssistantResponse(SingleApplicationModel):
     execution_mode: Literal["rag", "workflow"] = "workflow"
     id: str
     code: str
@@ -210,7 +210,7 @@ class AssistantResponse(BaseModel):
     workflow_ownership: str = "private"
     collection_id: str
     is_active: bool
-    tenant_id: str
+
     sample_questions: list[str] = Field(default_factory=list)
     config: AssistantLifecycleConfig
     created_at: datetime
@@ -264,10 +264,10 @@ class AssistantBundle(BaseModel):
     workflow: AssistantBundleWorkflow | None = None
 
 
-class AssistantChatRequest(BaseModel):
+class AssistantChatRequest(SingleApplicationModel):
     message: str = Field(..., min_length=1, max_length=10000)
     conversation_id: str | None = Field(None, max_length=128)
-    tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
+
     stream: bool = False
     is_approved: bool = False
     attachments: list[dict[str, Any]] = Field(default_factory=list)

@@ -1106,3 +1106,45 @@ export interface BuildVectorGenerationResponse {
   failed_count: number;
   status: string;
 }
+
+// ==============================================================================
+// Collection Glossary: admin-curated search aliases (approval-gated)
+// ==============================================================================
+
+export type GlossaryTermStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "revoked";
+
+export interface GlossaryTerm {
+  id: string;
+  collection_id: string;
+  user_phrase: string;
+  target_term: string;
+  note: string;
+  scope: Record<string, unknown>;
+  status: GlossaryTermStatus;
+  created_by?: string | null;
+  updated_by?: string | null;
+  reviewed_by?: string | null;
+  review_reason?: string | null;
+  reviewed_at?: string | null;
+  version: number;
+  updated_at?: string | null;
+}
+
+export interface GlossaryTermListResponse {
+  items: GlossaryTerm[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface GlossarySettings {
+  collection_id: string;
+  is_enabled: boolean;
+  version: number;
+  updated_by?: string | null;
+  updated_at?: string | null;
+}

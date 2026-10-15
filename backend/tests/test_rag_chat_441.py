@@ -60,7 +60,7 @@ async def test_chat_bypasses_workflows_but_keeps_pii_policy_and_conversations(st
         req = ask.call_args.args[1]
         assert req.preferred_model_name == "configured-model"
         assert req.preferred_provider_id == "configured-provider" and req.max_tokens == 5000
-        assert req.tenant_id == "tenant-x" and req.workspace_id == "workspace-x"
+        assert "tenant_id" not in req.model_dump() and "workspace_id" not in req.model_dump()
         assert store.await_count == 2
 
 
@@ -132,10 +132,10 @@ def test_default_evidence_assistant_uses_rag_and_explicit_workflow_is_preserved(
 
 
 @pytest.mark.asyncio
-async def test_history_rejects_a_thread_from_another_tenant_before_reading_messages():
+async def test_history_rejects_a_thread_from_another_assistant_before_reading_messages():
     db = AsyncMock()
     result = MagicMock()
-    result.scalar_one_or_none.return_value = SimpleNamespace(tenant_id="other", assistant_code="custom")
+    result.scalar_one_or_none.return_value = SimpleNamespace(tenant_id="other", assistant_code="other-assistant")
     db.execute.return_value = result
     with pytest.raises(AppException) as error:
         await AssistantChatService._get_recent_conversation_history(db, "foreign-thread",

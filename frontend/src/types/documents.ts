@@ -74,8 +74,6 @@ export interface RepositoryDocumentFilter {
 
 export interface DocumentGroup {
   id: string;
-  tenant_id: string;
-  workspace_id: string;
   name: string;
   description?: string | null;
   created_by?: string | null;
@@ -249,4 +247,3 @@ export interface RepositoryFileRevisionResponse {
   items: RepositoryFileRevisionItem[];
   total: number;
 }
-

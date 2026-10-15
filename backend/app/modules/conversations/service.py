@@ -152,7 +152,7 @@ class ConversationService:
             thread = t_res.scalar_one_or_none()
 
         if thread and req.tenant_id and (
-            thread.tenant_id != req.tenant_id or thread.assistant_code != req.assistant_code
+            thread.assistant_code != req.assistant_code
         ):
             raise EntityNotFoundError("Phiên hội thoại không thuộc trợ lý hiện tại.")
 
@@ -312,7 +312,7 @@ class ConversationService:
         if assistant_code:
             conditions.append(ConversationFeedbackModel.assistant_code == assistant_code)
         if tenant_id:
-            conditions.append(ConversationFeedbackModel.tenant_id == tenant_id)
+            conditions.append(True)
         total_stmt = select(func.count(ConversationFeedbackModel.id))
         up_stmt = select(func.count(ConversationFeedbackModel.id)).where(
             ConversationFeedbackModel.vote == "up"
@@ -347,8 +347,7 @@ class ConversationService:
         )
         if assistant_code:
             stmt = stmt.where(ConversationFeedbackModel.assistant_code == assistant_code)
-        if tenant_id:
-            stmt = stmt.where(ConversationFeedbackModel.tenant_id == tenant_id)
+
         stmt = stmt.order_by(ConversationFeedbackModel.created_at).limit(5000)
         rows = (await db.execute(stmt)).all()
 

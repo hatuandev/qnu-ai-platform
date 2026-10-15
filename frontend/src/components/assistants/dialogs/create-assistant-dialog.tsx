@@ -194,7 +194,6 @@ export function CreateAssistantDialog({
         collection_id:
           collectionId || collections[0]?.id || "col_tuyensinh_2026",
         is_active: true,
-        tenant_id: "qnu_default",
         config: {
           sample_questions: [
             `Trợ lý ${name} có thể giúp được gì cho tôi?`,

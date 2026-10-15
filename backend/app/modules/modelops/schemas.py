@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.single_application import SingleApplicationModel
+
 
 class ChatMessage(BaseModel):
     role: Literal["system", "user", "assistant"] = Field(
@@ -17,9 +19,9 @@ class ChatMessage(BaseModel):
     content: str = Field(..., min_length=1, description="Nội dung tin nhắn")
 
 
-class LLMGenerateRequest(BaseModel):
+class LLMGenerateRequest(SingleApplicationModel):
     messages: list[ChatMessage] = Field(..., min_length=1, description="Danh sách ngữ cảnh tin nhắn")
-    tenant_id: str = Field("qnu-default", description="Mã định danh đơn vị / khoa phòng")
+
     assistant_code: str | None = Field(
         None, description="Mã trợ lý: admissions, regulations, library..."
     )
@@ -223,8 +225,8 @@ class ProviderTestResponse(BaseModel):
     message: str
 
 
-class TenantQuotaResponse(BaseModel):
-    tenant_id: str
+class ApplicationQuotaResponse(SingleApplicationModel):
+
     month_period: str
     monthly_token_limit: int = Field(ge=0, description="0 = không giới hạn; token đã dùng vẫn được ghi nhận")
     monthly_cost_limit_usd: float = Field(ge=0, description="0 = không giới hạn")
@@ -235,6 +237,9 @@ class TenantQuotaResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# Import compatibility only; the public schema now describes one application.
+TenantQuotaResponse = ApplicationQuotaResponse
 
 # ---------------- Predefined Provider Catalog Presets ----------------
 

@@ -91,7 +91,6 @@ export interface WorkflowVersion {
 export interface WorkflowExecutionRequest {
   workflow_id: string;
   inputs: Record<string, unknown>;
-  tenant_id?: string;
   conversation_id?: string;
 }
 

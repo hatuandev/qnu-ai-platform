@@ -1,8 +1,6 @@
 export interface AuthActor {
   username: string;
   display_name?: string;
-  tenant_id: string;
-  workspace_id: string;
   role: string;
   authenticated: boolean;
 }

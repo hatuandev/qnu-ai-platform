@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.single_application import SingleApplicationModel
 from app.modules.documents.schemas import DocumentGroupMinimalItem
 
 
@@ -28,14 +29,14 @@ class CollectionDataProcessingConfig(BaseModel):
     fallback_ocr_model: str | None = Field("mistral-ocr-latest", description="Mô hình OCR dự phòng")
 
 
-class CollectionCreateRequest(BaseModel):
+class CollectionCreateRequest(SingleApplicationModel):
     name: str = Field(..., min_length=2, max_length=255, description="Tên bộ sưu tập tri thức")
     description: str | None = Field(None, max_length=2000, description="Mô tả chi tiết")
     module_code: str = Field(
         ..., max_length=64, description="Mã phân hệ: admissions, regulations, library, drafting..."
     )
-    tenant_id: str = Field("tenant_qnu", max_length=64)
-    workspace_id: str = Field("workspace_qnu", max_length=64)
+
+
     metadata: dict[str, Any] = Field(default_factory=dict)
     data_processing: CollectionDataProcessingConfig | None = None
 
@@ -48,13 +49,13 @@ class CollectionUpdateRequest(BaseModel):
     data_processing: CollectionDataProcessingConfig | None = None
 
 
-class CollectionResponse(BaseModel):
+class CollectionResponse(SingleApplicationModel):
     id: str
     name: str
     description: str | None = None
     module_code: str
-    tenant_id: str
-    workspace_id: str
+
+
     is_active: bool
     metadata: dict[str, Any] = Field(default_factory=dict, alias="collection_metadata")
     created_at: datetime

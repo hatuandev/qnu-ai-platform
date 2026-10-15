@@ -68,7 +68,7 @@ class SemanticCache:
         model_part = preferred_model.replace(":", "_").replace("/", "_") if preferred_model else "default"
         hist_part = history_hash or "nohist"
         return (
-            f"rag:cache:{tenant_id}:{workspace_id}:{collection_id}:"
+            f"rag:cache:app-v1:{collection_id}:"
             f"e{collection_epoch}:{snapshot_fingerprint}:{model_part}:{policy_version}:{h}:{hist_part}"
         )
 
@@ -150,7 +150,7 @@ class SemanticCache:
             logger.warning("Failed to write to SemanticCache: %s", exc)
 
     async def invalidate_collection(self, collection_id: str) -> None:
-        """Invalidate all cached queries for a modified collection across all tenants and workspaces."""
+        """Invalidate this collection, including legacy keys during rollout."""
         try:
             pattern_v1 = f"rag:cache:*:*:{collection_id}:*"
             pattern_legacy = f"rag:cache:*:{collection_id}:*"

@@ -1,4 +1,4 @@
-"""Bound the durable backlog per tenant, serialized across collections."""
+"""Bound the application backlog, serialized across collections."""
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,9 +9,10 @@ from app.modules.jobs.models import JobRecord
 
 
 async def check_ingestion_capacity(db: AsyncSession, tenant_id: str, incoming: int) -> None:
-    await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:tenant, 376))"), {"tenant": tenant_id})
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:application, 376))"),
+                     {"application": "qnu-ai-platform"})
     pending = await db.scalar(select(func.count(JobRecord.id)).where(
-        JobRecord.tenant_id == tenant_id,
+
         JobRecord.job_type == "knowledge_source_ingestion",
         JobRecord.status.in_(["queued", "running"]),
     )) or 0

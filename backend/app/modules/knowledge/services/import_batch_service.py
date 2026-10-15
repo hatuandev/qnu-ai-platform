@@ -56,8 +56,8 @@ class ImportBatchService:
         coll_res = await db.execute(
             select(KnowledgeCollection).where(
                 KnowledgeCollection.id == collection_id,
-                KnowledgeCollection.tenant_id == tenant_id,
-                KnowledgeCollection.workspace_id == workspace_id,
+
+
             ).with_for_update()
         )
         coll = coll_res.scalar_one_or_none()
@@ -102,8 +102,8 @@ class ImportBatchService:
         docs_res = await db.execute(
             select(RepositoryDocument).where(
                 RepositoryDocument.id.in_(unique_doc_ids),
-                RepositoryDocument.tenant_id == tenant_id,
-                RepositoryDocument.workspace_id == workspace_id,
+
+
                 RepositoryDocument.is_active.is_(True),
             )
         )
@@ -267,8 +267,8 @@ class ImportBatchService:
             .where(
                 KnowledgeImportBatch.id == batch_id,
                 KnowledgeImportBatch.collection_id == collection_id,
-                KnowledgeImportBatch.tenant_id == tenant_id,
-                KnowledgeImportBatch.workspace_id == workspace_id,
+
+
             )
         )
         batch = res.scalar_one_or_none()
@@ -280,7 +280,7 @@ class ImportBatchService:
             )
         jobs = list((await db.scalars(select(JobRecord).where(
             JobRecord.collection_id == collection_id,
-            JobRecord.tenant_id == tenant_id, JobRecord.workspace_id == workspace_id,
+
             JobRecord.job_type == "knowledge_source_ingestion",
             JobRecord.payload["batch_id"].astext == batch_id,
         ).order_by(JobRecord.created_at.desc()))).all())

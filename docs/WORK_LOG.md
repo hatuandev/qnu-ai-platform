@@ -6,6 +6,28 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-16** | Codex | Migration/restart/Gitea | Upgrade glossary exit0, BE health200, worker Redis/cron đạt; không reset/deploy/GitHub | [Nhật ký486](./nhat_ky/2026-10-16_phien_486_migration_restart_git.md) |
+
+| **2026-10-16** | Codex | Single application và glossary | Bỏ phân vùng, giữ RBAC/nguồn/DB cũ; sửa5lỗi, full1666pass/11baselinefail/17skip; FE auth46pass | [Nhật ký485](./nhat_ky/2026-10-16_phien_485_single_application_va_sua_glossary.md) |
+
+| **2026-10-15** | Codex | Cập nhật skill/agent RAG | Tinh gọn AGENTS, cập nhật 7 skill, thêm evaluation và 5 role nạp thủ công; kiểm chứng tài liệu, không sửa runtime/DB/model | [Nhật ký483](./nhat_ky/2026-10-15_phien_483_cap_nhat_skills_agents_rag.md) |
+
+| **2026-10-15** | Qoder | Kiểm chứng quy đổi điểm trên dữ liệu thật | Engine đọc mã tổ hợp từ ô `row_context` đã duyệt (bỏ giả định `entity_name`), bọc lỗi snapshot thành RFC7807; 7rule/22mốc/50mapping suy từ publication sống, 634check 0lỗi nhưng **chưa kích hoạt** vì thiếu danh tính người duyệt thật; dry-run read-only26/26, oracle A01/780→21.21, midpoint777→21.13; focus68pass/Ruff đạt, full1604pass/11lỗinền/16skip/0errors | [Nhật ký482](./nhat_ky/2026-10-15_phien_482_kiem_chung_quy_doi_diem_du_lieu_that.md) |
+
+| **2026-10-15** | Codex | Phục hồi bảng quy đổi chờ duyệt | Header geometry, bảo toàn cột; revision3 review_required, 23cột/22hàng/50mapping, 556ô số đúng; active publication giữ nguyên; focus59pass/full1569pass11lỗinền | [Nhật ký481](./nhat_ky/2026-10-15_phien_481_khoi_phuc_bang_quy_doi_cho_duyet.md) |
+
+| **2026-10-15** | Codex | Weighted expansion và quy đổi điểm | Sửa4biên477; G1 trọng số/provenance/RRF; engine Decimal có guard, chưa kích hoạt bảng; focus108pass/Ruff đạt, full1556pass/11lỗinền/16skip | [Nhật ký480](./nhat_ky/2026-10-15_phien_480_weighted_expansion_va_quy_doi_diem.md) |
+
+| **2026-10-15** | Codex | Kế hoạch weighted query expansion | Đối chiếumã, provenance/scope/budgetnhóm/RRF, RM3gated/ablation vàroadmapG0–G4; chưa sửa runtime | [Nhật ký479](./nhat_ky/2026-10-15_phien_479_ke_hoach_weighted_expansion.md) |
+
+| **2026-10-15** | Codex | Review7promptRAG | Phân biệtđãcó/mới/rủiro; calculator/RM3 cần nguồn+benchmark, không áp .NET/approval từZIP; chỉdocs | [Nhật ký478](./nhat_ky/2026-10-15_phien_478_review_bo_prompt_rag.md) |
+
+| **2026-10-15** | Codex | Review agent-lite476 | Đối chiếu code/tests, tái hiện unknown2sources→1dòng;4biên cần sửa, chưa runtimefix/DB/model/fulltest | [Nhật ký477](./nhat_ky/2026-10-15_phien_477_review_agent_lite_476.md) |
+
+| **2026-10-15** | Codex | Điều phối hội thoại agent-lite | Resolver explain/reformat/filter + acts deterministic, guard tenant/client/injection; 22 chain tests; full1507pass11lỗinền; probe nội bộ 3 chuỗi đúng, config/publication unchanged | [Nhật ký476](./nhat_ky/2026-10-15_phien_476_dieu_phoi_hoi_thoai_agent_lite.md) |
+
+| **2026-10-15** | Codex | Sửa liệt kê tổ hợp/ngữ cảnh | Exhaustive/keyset/same-tuple/year-column, resolver trước search; live nội bộ34/34book, full1485pass11lỗinền; chưa20/82/UI | [Nhật ký475](./nhat_ky/2026-10-15_phien_475_sua_liet_ke_va_ngu_canh_hoi_thoai.md) |
+
 | **2026-10-15** | Codex | Chẩn đoán liệt kê tổ hợp/followup | Có33mã trong cẩm nang2025 nhưng trả7; lookup5/topK thiếu coverage, followup chưa resolve trước search; chỉ đọc, đề xuất chưa sửa | [Nhật ký474](./nhat_ky/2026-10-15_phien_474_chan_doan_liet_ke_to_hop_va_followup.md) |
 
 | **2026-10-15** | Codex | Sửa metric header/audit context | Header gốc/đa ngành đúng nguồn, context audit có kiểm soát; focus43pass/full1464pass11lỗinền/live2answered; còn dòng cũ/notes thừa | [Nhật ký473](./nhat_ky/2026-10-15_phien_473_sua_metric_header_va_audit_context.md) |

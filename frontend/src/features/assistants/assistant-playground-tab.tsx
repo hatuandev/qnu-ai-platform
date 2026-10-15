@@ -44,7 +44,6 @@ export function AssistantPlaygroundTab({
 
   const { messages, sendMessage, isStreaming, clearMessages } = useRAGStream({
     assistantCode,
-    tenantId: "tenant_qnu",
   });
 
   const sampleQuestions = React.useMemo(() => {

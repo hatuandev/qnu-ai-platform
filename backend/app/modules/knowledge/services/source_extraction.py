@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v10-source-context"
+EXTRACTION_VERSION = "layout-v11-native-headers"
 _native_pdf_lock = asyncio.Lock()
 
 

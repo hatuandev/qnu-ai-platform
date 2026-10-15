@@ -25,7 +25,7 @@ def request(**updates):
 
 
 @pytest.mark.asyncio
-async def test_rag_transmits_tenant_and_delegates_fallback_once():
+async def test_rag_omits_legacy_scope_and_delegates_fallback_once():
     req = request(fallback_model="configured-fallback")
     with patch("app.modules.rag.service.modelops_service.generate", AsyncMock(
             return_value=SimpleNamespace(content="grounded answer"))) as generate:
@@ -33,7 +33,7 @@ async def test_rag_transmits_tenant_and_delegates_fallback_once():
             AsyncMock(), req, [ChatMessage(role="user", content="question")], 0.2, None, [])
     assert answer == "grounded answer"
     llm_req = generate.call_args.args[1]
-    assert llm_req.tenant_id == "tenant_other"
+    assert "tenant_id" not in llm_req.model_dump()
     assert llm_req.preferred_provider_id == "configured-provider"
     assert llm_req.preferred_model_name == "configured-chat"
     assert llm_req.fallback_model_name == "configured-fallback"
@@ -113,7 +113,8 @@ async def test_neighbor_sql_supports_binding_only_with_pinned_scope():
     assert "JOIN knowledge_documents" not in sql
     assert "knowledge_chunks.binding_id = 'binding'" in sql
     assert "knowledge_chunks.index_revision_id = 'revision'" in sql
-    assert "workspace_other" in sql and "tenant_other" in sql
+    assert "workspace_other" not in sql and "tenant_other" not in sql
+    assert "knowledge_chunks.collection_id = 'col_test'" in sql
 
 
 @pytest.mark.asyncio
@@ -131,13 +132,17 @@ async def test_rag_router_uses_actor_not_body_scope():
 
 
 @pytest.mark.asyncio
-async def test_public_assistant_scope_comes_from_collection_and_rejects_cross_tenant():
+async def test_public_assistant_validates_collection_not_legacy_partitions():
     from app.modules.assistants.runtime import resolve_runtime_scope
 
     assistant = SimpleNamespace(collection_id="collection", tenant_id="tenant_owner")
     db = SimpleNamespace(get=AsyncMock(return_value=SimpleNamespace(tenant_id="tenant_owner", workspace_id="workspace_owner")))
-    assert await resolve_runtime_scope(db, assistant) == ("tenant_owner", "workspace_owner")
+    from app.core.single_application import LEGACY_TENANT, LEGACY_WORKSPACE
+
+    assert await resolve_runtime_scope(db, assistant) == (LEGACY_TENANT, LEGACY_WORKSPACE)
     db.get.return_value.tenant_id = "tenant_attacker"
+    assert await resolve_runtime_scope(db, assistant) == (LEGACY_TENANT, LEGACY_WORKSPACE)
+    db.get.return_value = None
     with pytest.raises(AppException) as error:
         await resolve_runtime_scope(db, assistant)
     assert error.value.code == "ASSISTANT_SCOPE_MISMATCH"
@@ -167,8 +172,9 @@ def test_published_specialist_facts_share_scope_and_revision_filter():
                                  tenant_id="tenant_other", workspace_id="workspace_other")
     sql = str(published_fact_query("col_test", snapshot).compile(
         dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
-    for expected in ["tenant_other", "workspace_other", "published_revision", "knowledge_bindings.status = 'active'"]:
+    for expected in ["col_test", "published_revision", "knowledge_bindings.status = 'active'"]:
         assert expected in sql
+    assert "tenant_other" not in sql and "workspace_other" not in sql
 
 
 def test_vllm_chat_provider_accepts_arbitrary_model_names():
@@ -211,7 +217,8 @@ async def test_lexical_search_matches_source_snapshot_metadata():
                                             tenant_id="tenant_other", workspace_id="workspace_other")
     sql = str(db.execute.call_args_list[0].args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
     assert "document_title" in sql and "document_number" in sql
-    assert "tenant_other" in sql and "workspace_other" in sql
+    assert "tenant_other" not in sql and "workspace_other" not in sql
+    assert "knowledge_chunks.collection_id = 'col_test'" in sql
 
 
 def test_policy_fingerprint_changes_with_provider_and_limits():

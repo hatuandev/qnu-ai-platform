@@ -35,8 +35,8 @@ async def queue_vector_load(
     for binding_id, revision_id in selected.items():
         binding = await db.scalar(select(KnowledgeBinding).where(
             KnowledgeBinding.id == binding_id, KnowledgeBinding.collection_id == collection_id,
-            KnowledgeBinding.tenant_id == collection.tenant_id,
-            KnowledgeBinding.workspace_id == collection.workspace_id,
+
+
         ).with_for_update())
         if not binding or binding.status != "active":
             raise AppException("Nguồn không thuộc kho hoặc không hoạt động.", code="SOURCE_NOT_FOUND", status_code=404)
@@ -47,8 +47,8 @@ async def queue_vector_load(
             raise AppException("Markdown chưa đủ điều kiện nạp vector.", code="SOURCE_REVISION_NOT_READY", status_code=409)
         existing = await db.scalar(select(JobRecord).where(
             JobRecord.collection_id == collection_id,
-            JobRecord.tenant_id == collection.tenant_id,
-            JobRecord.workspace_id == collection.workspace_id,
+
+
             JobRecord.job_type == "knowledge_index_build",
             JobRecord.status.in_(["queued", "running"]),
             JobRecord.payload["binding_id"].astext == binding_id,
@@ -87,14 +87,14 @@ async def get_vector_load_state(db: AsyncSession, collection_id: str, actor: Any
 
     col = await get_scoped_collection(db, collection_id, actor=actor)
     jobs = list((await db.scalars(select(JobRecord).where(
-        JobRecord.collection_id == col.id, JobRecord.tenant_id == col.tenant_id,
-        JobRecord.workspace_id == col.workspace_id, JobRecord.job_type == "knowledge_index_build",
+        JobRecord.collection_id == col.id,
+         JobRecord.job_type == "knowledge_index_build",
     ).order_by(JobRecord.created_at.desc()).limit(500))).all())
     indexes = list((await db.scalars(select(KnowledgeIndexRevision).join(
         KnowledgeBinding, KnowledgeIndexRevision.binding_id == KnowledgeBinding.id,
     ).where(
-        KnowledgeBinding.collection_id == col.id, KnowledgeBinding.tenant_id == col.tenant_id,
-        KnowledgeBinding.workspace_id == col.workspace_id, KnowledgeBinding.status == "active",
+        KnowledgeBinding.collection_id == col.id,
+         KnowledgeBinding.status == "active",
         KnowledgeIndexRevision.vector_generation_id.is_not(None),
         KnowledgeIndexRevision.status != "pruned",
     ).order_by((KnowledgeIndexRevision.id == KnowledgeBinding.active_index_revision_id).desc(),

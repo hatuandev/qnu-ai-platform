@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from functools import lru_cache
 
 from app.modules.rag.evidence_schemas import EvidenceBlock
+from app.modules.rag.query_expansion import lexical_weights
 
 
 def tokens(text: str) -> list[str]:
@@ -40,11 +41,11 @@ def rank_blocks(blocks: list[EvidenceBlock], queries: list[str], limit: int,
                        b.canonical_hash, f"{b.title}\n{b.section}\n{' / '.join(b.record_path)}", b.text) for b in blocks)
     lengths, average, postings = corpus_statistics(signature)
     scores = defaultdict(float)
-    for term in sorted({term for query in queries for term in tokens(query)}):
+    for term, query_weight in sorted(lexical_weights(queries, tokens).items()):
         hits = postings.get(term, [])
         idf = math.log(1 + (len(blocks) - len(hits) + 0.5) / (len(hits) + 0.5))
         for index, frequency in hits:
-            scores[index] += idf * (frequency * 2.2) / (
+            scores[index] += query_weight * idf * (frequency * 2.2) / (
                 frequency + 1.2 * (0.25 + 0.75 * lengths[index] / max(1, average)))
     wanted = set(years or [])
     ranked = []

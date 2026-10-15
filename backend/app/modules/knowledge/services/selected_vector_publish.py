@@ -53,8 +53,8 @@ async def resolve_selected_publication(
         raise AppException("Danh sách nguồn rỗng hoặc bị lặp.", code="INVALID_PUBLISH_SELECTION", status_code=422)
     bindings = list((await db.scalars(select(KnowledgeBinding).where(
         KnowledgeBinding.collection_id == collection.id,
-        KnowledgeBinding.tenant_id == collection.tenant_id,
-        KnowledgeBinding.workspace_id == collection.workspace_id,
+
+
         KnowledgeBinding.status == "active",
     ))).all())
     binding_map = {binding.id: binding for binding in bindings}
@@ -116,8 +116,8 @@ async def publish_selected_vectors(
     await db.refresh(col)
     current = list((await db.scalars(select(KnowledgeBinding).where(
         KnowledgeBinding.collection_id == col.id,
-        KnowledgeBinding.tenant_id == col.tenant_id,
-        KnowledgeBinding.workspace_id == col.workspace_id,
+
+
         KnowledgeBinding.status == "active",
     ).order_by(KnowledgeBinding.id).with_for_update().execution_options(populate_existing=True))).all())
     if (col.index_epoch != epoch or binding_fingerprint(current) != expected

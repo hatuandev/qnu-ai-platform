@@ -128,8 +128,8 @@ class SourceIngestionService:
             doc_res = await db.execute(
                 select(RepositoryDocument).where(
                     RepositoryDocument.id == item.origin_document_id,
-                    RepositoryDocument.tenant_id == batch.tenant_id,
-                    RepositoryDocument.workspace_id == batch.workspace_id,
+
+
                 )
             )
             doc = doc_res.scalar_one_or_none()
@@ -214,8 +214,8 @@ class SourceIngestionService:
                     KnowledgeSourceRevision.artifact_key == artifact_key,
                     KnowledgeSourceRevision.binding_id == binding.id,
                     KnowledgeSourceRevision.status == "ready",
-                    KnowledgeBinding.tenant_id == batch.tenant_id,
-                    KnowledgeBinding.workspace_id == batch.workspace_id,
+
+
                     KnowledgeBinding.status != "deleting",
                 )
             )
@@ -465,8 +465,8 @@ class SourceIngestionService:
             .where(
                 KnowledgeBinding.id == source_id,
                 KnowledgeBinding.collection_id == collection_id,
-                KnowledgeBinding.tenant_id == tenant_id,
-                KnowledgeBinding.workspace_id == workspace_id,
+
+
                 KnowledgeBinding.status.notin_(["detached", "deleting"]),
             )
         )

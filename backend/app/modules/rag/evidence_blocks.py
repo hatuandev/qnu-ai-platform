@@ -125,8 +125,8 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
         .where(KnowledgeIndexRevision.id.in_(snapshot.binding_revisions.values()),
                KnowledgeIndexRevision.status.in_(["active", "ready"] if candidate_mode else ["active"]),
                KnowledgeBinding.collection_id == snapshot.collection_id, KnowledgeBinding.status == "active",
-               KnowledgeBinding.tenant_id == snapshot.tenant_id, KnowledgeBinding.workspace_id == snapshot.workspace_id,
-               KnowledgeCollection.tenant_id == snapshot.tenant_id, KnowledgeCollection.workspace_id == snapshot.workspace_id,
+
+
                KnowledgeSourceRevision.status == "ready"))
     try:
         records = (await db.execute(query)).all()

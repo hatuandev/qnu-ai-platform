@@ -86,6 +86,7 @@ htmlcov/
 # Test artifacts & temporary QA outputs (Phiên 464)
 backend/storage/pytest*/
 backend/storage/pytest*.xml
+backend/storage/rag_enumeration_*/
 backend/storage/*.log
 !backend/storage/e2e_fixtures/**
 frontend-build*.log

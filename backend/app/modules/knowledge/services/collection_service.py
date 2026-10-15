@@ -99,14 +99,12 @@ class CollectionService:
         workspace_id: str | None = None,
         actor: Any | None = None,
     ) -> list[KnowledgeCollection]:
-        t_id = getattr(actor, "tenant_id", None) or tenant_id
-        w_id = getattr(actor, "workspace_id", None) or workspace_id
+
+
 
         query = select(KnowledgeCollection)
-        if t_id:
-            query = query.where(KnowledgeCollection.tenant_id == t_id)
-        if w_id:
-            query = query.where(KnowledgeCollection.workspace_id == w_id)
+
+
         query = query.order_by(KnowledgeCollection.created_at.desc())
 
         res = await db.execute(query)

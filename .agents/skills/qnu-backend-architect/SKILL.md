@@ -68,9 +68,7 @@ Nếu module có các logic phức tạp chuyên biệt, tách thành các file 
 3. **Structured JSON Logging & Correlation ID**:
    - Luôn sử dụng logger từ `app.core.logging`.
    - Luôn truyền `correlation_id` vào log context để dễ dàng trace request trên hệ thống giám sát tập trung.
-4. **Kiểm Thử & Đảm Bảo Chất Lượng**:
-   - Trước khi tạo commit hoặc kết thúc task, bắt buộc phải chạy thành công 100%:
-     ```bash
-     uv run ruff check .
-     uv run --extra dev pytest -v
-     ```
+4. **Kiểm thử theo phạm vi và rủi ro**:
+   - Dùng [bảng kiểm chứng chung](../../rules/verification.md): regression phù hợp, Ruff có phạm vi và full Pytest một lần cuối batch backend.
+   - Auth/tenant/secret cần test qua API/handler/adapter, không chỉ helper; lỗi nền vẫn báo FAIL với exact test IDs.
+   - Task chỉ sửa tài liệu/skill không chạy pytest hoặc khởi động backend.

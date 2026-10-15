@@ -364,7 +364,7 @@ async def test_audit_actor_identification() -> None:
 # 5. Test Tenant & Workspace Isolation in List Documents
 # =========================================================================
 @pytest.mark.asyncio
-async def test_list_documents_tenant_and_workspace_isolation() -> None:
+async def test_list_documents_filters_exact_group_without_legacy_partition() -> None:
     session = _fresh_session()
     actor_a = AuthActor(
         actor_id="act_a",
@@ -379,7 +379,7 @@ async def test_list_documents_tenant_and_workspace_isolation() -> None:
         permissions=["*"],
     )
 
-    # 1. Foreign workspace group filter is denied
+    # 1. An existing group remains accessible regardless of obsolete metadata.
     foreign_group = DocumentGroup(
         id="grp_medical",
         tenant_id="tenant_qnu",
@@ -389,14 +389,13 @@ async def test_list_documents_tenant_and_workspace_isolation() -> None:
     )
     session.get.return_value = foreign_group
 
-    with pytest.raises(AppException) as exc:
-        await document_repository_service.list_documents(
-            db=session,
-            group_id="grp_medical",
-            actor=actor_a,
-        )
-    assert exc.value.code == "DOCUMENT_GROUP_ACCESS_DENIED"
-    assert exc.value.status_code == 403
+    session.execute.side_effect = [_execute_result(scalar=0), _execute_result(scalars_list=[])]
+    items, total = await document_repository_service.list_documents(
+        db=session, group_id="grp_medical", actor=actor_a)
+    assert items == [] and total == 0
+    sql = str(session.execute.call_args_list[-1].args[0])
+    assert "document_group_memberships.group_id" in sql
+    assert "tenant_id =" not in sql and "workspace_id =" not in sql
 
     # 2. Listing documents with exclude_group_id works
     session.get.return_value = None

@@ -1,51 +1,19 @@
 ---
 name: qnu-modelops-resilience
-description: >-
-  Use this skill when configuring or extending LLM Provider Adapters (OpenAI, Gemini, Local vLLM/Ollama), Circuit Breaker resilience policies, dynamic fallback routing, token quota limits, or cost tracking. Do NOT use for general frontend UI styling or document parsing.
+description: Configure or review QNU AI providers, model selection, protected credentials, inference contracts, fallback, quotas and usage in the existing ModelOps subsystem. Use for model/runtime integrations, not general UI styling or parsing.
 ---
 
-# Hướng Dẫn ModelOps & Cơ Chế Chịu Lỗi Multi-LLM QNU AI Platform
+# ModelOps theo cấu hình thực tế
 
-Tài liệu hướng dẫn quản trị mô hình ngôn ngữ lớn (LLM), cơ chế tự phục hồi (Resilience) và giám sát chi phí tại **QNU AI Platform** ([backend/app/modules/modelops](backend/app/modules/modelops)).
+Đọc `backend/app/modules/modelops`, inference/adapters, schema và nơi runtime phân giải model; tìm file thực trước khi đặt tên lớp. Đọc [quy định bảo mật](../../rules/security-and-git.md) khi liên quan credential/network, và [gate](../../rules/verification.md) khi kiểm thử.
 
----
+1. Phân biệt provider/endpoint, credential, model/capability và task routing theo schema thật. Giữ model động từ DB/UI; chuyển preferred provider/model qua assistant/workflow/DAG đến adapter trong phạm vi quyền, không thay model cũ âm thầm.
+2. LLM credential đi qua ModelOps DB được bảo vệ và quy trình hiện có; không thêm .env key để override UI. DTO/log/error chỉ trả trạng thái an toàn; test ở API/handler/runtime, không chỉ helper masking. Tenant không được chọn tùy ý secret/config của máy chủ để gửi tới endpoint riêng.
+3. Discovery chỉ cho biết model được liệt kê. Verify cần request inference tối thiểu đúng capability và schema: vector số hợp lệ/dimension quan sát, rerank index/score hợp lệ, chat content theo protocol, OCR layout theo hợp đồng. Không seed verified/cost/dimension giả.
+4. Probe/discovery/runtime dùng nhất quán endpoint/path, auth scheme, timeout và egress. Chặn đổi host/redirect ngoài policy; quyền private-network lấy từ server, không từ prompt/boolean client hay loại adapter. Thiếu cấu hình/auth, response sai và timeout phải phân biệt; không trả danh sách rỗng hoặc đáp án giả thay lỗi.
+5. Connection/model disabled phải bị loại ở mọi tác vụ. Đổi endpoint/model/revision ảnh hưởng danh tính inference phải vô hiệu kết quả kiểm định liên quan; embedding phải tương thích active index generation, không repoint tức thì qua cờ do caller tự khai.
+6. Circuit breaker/retry/backoff/concurrency/timeout lấy từ chính sách vận hành thật. Giới hạn tổng budget và tránh retry nhân tầng. Không cố định ngưỡng lỗi/cửa sổ chung cho cloud chat, OCR và embedding batch.
+7. Fallback theo task/scope/capability đã được phép; phân biệt chuyển provider, template, bỏ rerank và no-answer. Lỗi quota/quyền/tenant/cancellation không được mở rộng quyền. Bảo toàn failure trace khi primary hỏng; nếu không còn lựa chọn hợp lệ, trả lỗi AppException/RFC7807 phù hợp.
+8. Quota kiểm tra trước thực thi; usage ghi token/latency/units từ quan sát. Giá và chi phí chỉ tính theo tariff có nguồn và thời điểm, không ghi 0 như thể đã đo khi thực tế chưa biết. Secret rotation audit actor/đối tượng/lý do/thời điểm, không ghi key hay tuyên bố thu hồi upstream nếu chưa làm.
 
-## 1. Kiến Trúc Adapter & Circuit Breaker Router
-
-```mermaid
-graph TD
-    ClientRequest[Yêu cầu sinh văn bản] --> Router[ModelOps Fallback Router]
-    
-    Router --> CheckCB1{Primary Circuit Breaker Closed?}
-    CheckCB1 -- YES --> CallPrimary[Gọi Primary Provider: OpenAI / GPT-4o-mini]
-    
-    CallPrimary -- Thành công --> RecordCost[CostTracker: Ghi nhận Token & USD]
-    CallPrimary -- Lỗi 429 / 500 / Timeout --> TripCB1[Mở Circuit Breaker 1]
-    
-    TripCB1 --> CheckCB2{Secondary Circuit Breaker Closed?}
-    CheckCB1 -- NO (Open) --> CheckCB2
-    
-    CheckCB2 -- YES --> CallSecondary[Gọi Secondary Provider: Gemini 1.5 Flash]
-    CallSecondary -- Thành công --> RecordCost
-    CallSecondary -- Thất bại --> CallLocal[Fallback cuối: Local vLLM Qwen2.5-7B]
-    
-    CallLocal --> RecordCost
-    RecordCost --> Response[Trả kết quả cho Trợ lý AI]
-```
-
----
-
-## 2. Các Quy Tắc ModelOps Bắt Buộc
-
-1. **Chuẩn Hóa Giao Tiếp (BaseLLMAdapter)**:
-   - Toàn bộ adapters (`OpenAIAdapter`, `GeminiAdapter`, `LocalVLLMAdapter`) phải kế thừa `BaseLLMAdapter`.
-   - Cung cấp 2 phương thức chuẩn:
-     - `async def generate(self, messages, **kwargs) -> LLMResponse`
-     - `async def stream(self, messages, **kwargs) -> AsyncIterator[str]`
-2. **Circuit Breaker Policy (Chống sập tầng)**:
-   - Nếu một nhà cung cấp gặp lỗi 3 lần liên tiếp trong vòng 60 giây, Circuit Breaker chuyển sang trạng thái **OPEN** (tạm ngưng gửi request trong 30 giây để tránh làm nghẽn thread và tốn timeout vô ích).
-   - Tự động chuyển hướng toàn bộ traffic sang nhà cung cấp dự phòng tiếp theo.
-3. **Theo Dõi Hạn Ngạch & Chi Phí (CostTracker)**:
-   - Tính toán chính xác giá USD/token dựa trên bảng giá định kỳ.
-   - Kiểm tra hạn mức tiêu thụ (Quota) của Tenant/Phòng ban trước khi gửi request. Nếu vượt hạn mức tháng, trả về lỗi mã `QUOTA_EXCEEDED` (RFC 7807).
-
+Kiểm chứng: adapter payload/auth, response malformed, disabled, wrong capability, expiry/quota, timeout/cancellation, fallback policy, secret không lộ, cross-tenant, probe/runtime parity và thay model không phá index. Live call chỉ khi môi trường/dữ liệu/provider được phép; dùng fake HTTP cho regression thông thường.

@@ -211,10 +211,8 @@ class FactLayer:
                                    if len(kw.strip().split()) >= 2)
             query = query.where(or_(*attr_conditions))
 
-        if tenant_id:
-            query = query.where(KnowledgeCollection.tenant_id == tenant_id)
-        if workspace_id:
-            query = query.where(KnowledgeCollection.workspace_id == workspace_id)
+
+
         if active_index_revision_ids is not None:
             query = query.where(
                 KnowledgeFact.index_revision_id.in_(active_index_revision_ids)

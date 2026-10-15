@@ -283,7 +283,7 @@ async def test_request_scope_must_match_pinned_snapshot_before_model_call():
     from app.modules.rag.row_answer import answer_from_rows
 
     rows, req, snapshot = context()
-    req.tenant_id = "other-tenant"
+    req.collection_id = "other-collection"
     with patch("app.modules.rag.row_answer.structured_call", AsyncMock()) as model, pytest.raises(AppException) as error:
         await answer_from_rows(AsyncMock(), req, snapshot, rows)
     assert error.value.code == "ROW_ANSWER_SCOPE_MISMATCH"

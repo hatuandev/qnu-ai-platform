@@ -31,8 +31,8 @@ async def pause_source(
     ).limit(1))
     job = await db.scalar(select(JobRecord.id).where(
         JobRecord.collection_id == collection.id,
-        JobRecord.tenant_id == collection.tenant_id,
-        JobRecord.workspace_id == collection.workspace_id,
+
+
         JobRecord.status.in_(["queued", "running"]),
         JobRecord.payload["binding_id"].astext == binding_id,
     ).limit(1))

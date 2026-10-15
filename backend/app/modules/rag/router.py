@@ -11,9 +11,21 @@ from app.modules.auth.schemas import AuthActor
 from app.modules.knowledge.schemas import FactItem
 from app.modules.rag.facts import fact_layer
 from app.modules.rag.schemas import AskRequest, AskResponse, SearchRequest, SearchResponse
+from app.modules.rag.score_conversion_schemas import ScoreConversionRequest, ScoreConversionResult
 from app.modules.rag.service import rag_service
 
 router = APIRouter(prefix="/rag", tags=["RAG & Retrieval Engine"])
+
+
+@router.post("/scores/convert", summary="Quy đổi điểm bằng bảng và công thức đã kiểm chứng")
+async def convert_score(
+    body: ScoreConversionRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(get_current_actor),
+) -> ScoreConversionResult:
+    from app.modules.rag.score_conversion import convert_admission_score
+
+    return await convert_admission_score(db, body, tenant_id=actor.tenant_id, workspace_id=actor.workspace_id)
 
 
 @router.post(

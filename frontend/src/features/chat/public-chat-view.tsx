@@ -330,7 +330,6 @@ export function PublicChatView({
     clearMessages,
   } = useRAGStream({
     assistantCode,
-    tenantId: "tenant_qnu",
   });
 
   // Load active thread messages into canvas on mount and when thread selection changes

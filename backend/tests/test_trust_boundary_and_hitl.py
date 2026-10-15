@@ -57,8 +57,8 @@ async def test_auth_session_cookie_actor_claims():
         assert payload["actor_id"] == "act_admin_qnu"
         assert payload["display_name"] == "Cán bộ Quản trị QNU"
         assert payload["session_version"] == "v1"
-        assert payload["tenant_id"] == "tenant_qnu"
-        assert payload["workspace_id"] == "workspace_qnu"
+        assert "tenant_id" not in payload
+        assert "workspace_id" not in payload
 
         # Verify /auth/me returns updated actor info
         me_resp = await client.get("/platform/v1alpha1/auth/me")

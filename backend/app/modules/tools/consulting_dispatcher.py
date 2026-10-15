@@ -39,8 +39,8 @@ def published_fact_query(collection_id: str, snapshot: RetrievalSnapshot):
             .join(KnowledgeCollection, KnowledgeFact.collection_id == KnowledgeCollection.id)
             .join(KnowledgeBinding, KnowledgeFact.binding_id == KnowledgeBinding.id)
             .where(KnowledgeFact.collection_id == collection_id,
-                   KnowledgeCollection.tenant_id == snapshot.tenant_id,
-                   KnowledgeCollection.workspace_id == snapshot.workspace_id,
+
+
                    KnowledgeBinding.status == "active",
                    KnowledgeFact.index_revision_id.in_(list(snapshot.binding_revisions.values()))))
 

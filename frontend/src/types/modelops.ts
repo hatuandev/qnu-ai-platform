@@ -202,7 +202,6 @@ export interface SystemModelDefaultsResponse {
 }
 
 export interface TokenQuota {
-  tenant_id: string;
   total_tokens: number;
   limit_tokens: number;
   usd_cost: number;

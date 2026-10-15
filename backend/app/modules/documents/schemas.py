@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.single_application import SingleApplicationModel
+
 
 class AttachedCollectionInfo(BaseModel):
     """Summary of a Knowledge Collection referencing this repository document."""
@@ -275,14 +277,14 @@ class DocumentGroupUpdate(BaseModel):
         return normalize_group_name(v)
 
 
-class DocumentGroupResponse(BaseModel):
+class DocumentGroupResponse(SingleApplicationModel):
     """Detailed response of a document group."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    tenant_id: str
-    workspace_id: str
+
+
     name: str
     description: str | None = None
     created_by: str | None = None
@@ -295,14 +297,14 @@ class DocumentGroupResponse(BaseModel):
     error_documents: int = 0
 
 
-class DocumentGroupListItem(BaseModel):
+class DocumentGroupListItem(SingleApplicationModel):
     """Summary item of a document group for lists and cards."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    tenant_id: str
-    workspace_id: str
+
+
     name: str
     description: str | None = None
     created_by: str | None = None

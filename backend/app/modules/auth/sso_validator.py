@@ -286,8 +286,6 @@ def parse_sso_claims(claims: dict[str, Any]) -> AuthActor:
         email=str(email) if email else None,
         user_type=raw_user_type,
         student_id=str(student_id) if student_id else None,
-        tenant_id="tenant_qnu",
-        workspace_id="workspace_qnu",
         role=primary_role,
         roles=ai_roles,
         permissions=clean_permissions,

@@ -36,7 +36,7 @@ async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None) ->
         raise AppException("Hãy ngừng dùng nguồn trước khi xóa.", code="SOURCE_NOT_PAUSED", status_code=409)
     existing = await db.scalar(select(JobRecord).where(
         JobRecord.job_type == PURGE_JOB, JobRecord.collection_id == collection.id,
-        JobRecord.tenant_id == binding.tenant_id, JobRecord.workspace_id == binding.workspace_id,
+
         JobRecord.payload["binding_id"].astext == binding_id,
     ).order_by(JobRecord.created_at.desc()).limit(1))
     if existing and existing.status in ("queued", "running"):
@@ -83,8 +83,8 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     binding = await db.scalar(select(KnowledgeBinding).where(
         KnowledgeBinding.id == job.payload["binding_id"],
         KnowledgeBinding.collection_id == job.collection_id,
-        KnowledgeBinding.tenant_id == job.tenant_id,
-        KnowledgeBinding.workspace_id == job.workspace_id,
+
+
     ).with_for_update())
     await db.refresh(job)
     if job.status == "completed":
@@ -126,8 +126,8 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     ))
     namespaces = set((await db.scalars(select(KnowledgeVectorGeneration.qdrant_collection_name).where(
         KnowledgeVectorGeneration.collection_id == collection.id,
-        KnowledgeVectorGeneration.tenant_id == job.tenant_id,
-        KnowledgeVectorGeneration.workspace_id == job.workspace_id,
+
+
     ))).all())
     # Legacy index artifacts can use the collection's default namespace.
     namespaces.add(vector_indexer._get_collection_name(collection.id))

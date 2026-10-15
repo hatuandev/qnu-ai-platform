@@ -63,11 +63,7 @@ class GroupSourcePublishService:
         col = await get_scoped_collection(db, collection_id, actor=actor)
         source = await db.get(KnowledgeGroupSource, source_id)
         if (
-            not source
-            or source.collection_id != col.id
-            or source.tenant_id != col.tenant_id
-            or (col.workspace_id and source.workspace_id != col.workspace_id)
-            or source.status == "detached"
+            (not source) or (source.collection_id != col.id) or (False) or (source.status == "detached")
         ):
             raise AppException(
                 message=f"Không tìm thấy nguồn nhóm tài liệu '{source_id}'.",
@@ -77,9 +73,7 @@ class GroupSourcePublishService:
 
         group = await db.get(DocumentGroup, source.document_group_id)
         if (
-            not group
-            or group.tenant_id != col.tenant_id
-            or (col.workspace_id and group.workspace_id != col.workspace_id)
+            (not group) or (False)
         ):
             raise AppException(
                 message=f"Nhóm tài liệu gốc '{source.document_group_id}' không tồn tại.",
@@ -97,10 +91,9 @@ class GroupSourcePublishService:
         b_stmt = select(KnowledgeBinding).where(
             KnowledgeBinding.group_source_id == source.id,
             KnowledgeBinding.status.in_(["active", "pending"]),
-            KnowledgeBinding.tenant_id == col.tenant_id,
+
         )
-        if col.workspace_id:
-            b_stmt = b_stmt.where(KnowledgeBinding.workspace_id == col.workspace_id)
+
 
         bindings = (await db.execute(b_stmt)).scalars().all()
 
@@ -251,10 +244,7 @@ class GroupSourcePublishService:
         col = await get_scoped_collection(db, collection_id, actor=actor)
         source = await db.get(KnowledgeGroupSource, source_id)
         if (
-            not source
-            or source.collection_id != col.id
-            or source.tenant_id != col.tenant_id
-            or (col.workspace_id and source.workspace_id != col.workspace_id)
+            (not source) or (source.collection_id != col.id) or (False)
         ):
             raise AppException(
                 message=f"Không tìm thấy nguồn nhóm tài liệu '{source_id}'.",
@@ -270,10 +260,9 @@ class GroupSourcePublishService:
             b_stmt = select(KnowledgeBinding).where(
                 KnowledgeBinding.group_source_id == source.id,
                 KnowledgeBinding.status.in_(["active", "pending"]),
-                KnowledgeBinding.tenant_id == col.tenant_id,
+
             )
-            if col.workspace_id:
-                b_stmt = b_stmt.where(KnowledgeBinding.workspace_id == col.workspace_id)
+
             bindings = (await db.execute(b_stmt)).scalars().all()
             for b in bindings:
                 b.status = "detached"

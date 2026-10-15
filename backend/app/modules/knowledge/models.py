@@ -332,6 +332,124 @@ class KnowledgeFact(Base):
 
 
 # =========================================================================
+# Collection Glossary Models — admin-curated search aliases with approval
+# =========================================================================
+
+
+class KnowledgeGlossaryTerm(Base):
+    """Directed alias: user_phrase helps retrieve target_term. Never bidirectional."""
+
+    __tablename__ = "knowledge_glossary_terms"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"glt_{uuid.uuid4().hex[:12]}"
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_phrase: Mapped[str] = mapped_column(Text, nullable=False)
+    phrase_normalized: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
+    target_term: Mapped[str] = mapped_column(String(512), nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    scope: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False, index=True)
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    collection: Mapped[KnowledgeCollection] = relationship("KnowledgeCollection")
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"glt_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "note", None) is None:
+            self.note = ""
+        if getattr(self, "scope", None) is None:
+            self.scope = {}
+        if getattr(self, "status", None) is None:
+            self.status = "pending"
+        if getattr(self, "version", None) is None:
+            self.version = 1
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+    __table_args__ = (
+        Index("ix_glossary_terms_col_status", "collection_id", "status"),
+    )
+
+
+class KnowledgeGlossaryAudit(Base):
+    """Append-only trail of glossary review decisions (approve/reject/revoke/toggle)."""
+
+    __tablename__ = "knowledge_glossary_audits"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: f"gla_{uuid.uuid4().hex[:12]}"
+    )
+    entry_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_glossary_terms.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not getattr(self, "id", None):
+            self.id = f"gla_{uuid.uuid4().hex[:12]}"
+        if getattr(self, "created_at", None) is None:
+            self.created_at = utcnow()
+
+
+class KnowledgeGlossarySetting(Base):
+    """Per-collection glossary feature flag and cache-busting version."""
+
+    __tablename__ = "knowledge_glossary_settings"
+
+    collection_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("knowledge_collections.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    updated_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if getattr(self, "is_enabled", None) is None:
+            self.is_enabled = False
+        if getattr(self, "version", None) is None:
+            self.version = 1
+        if getattr(self, "updated_at", None) is None:
+            self.updated_at = utcnow()
+
+
+# =========================================================================
 # V2 Knowledge Publishing & Safe Index Build Models (ADR-011)
 # =========================================================================
 

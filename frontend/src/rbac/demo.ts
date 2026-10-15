@@ -101,7 +101,7 @@ export const demoRoles: DemoRole[] = [
     id: "role-administrator",
     key: "administrator",
     name: "Administrator",
-    description: "Toàn quyền quản trị không gian làm việc.",
+    description: "Toàn quyền quản trị ứng dụng.",
     permissions: allPermissions,
     userCount: 1,
     isSystem: true,
@@ -111,7 +111,7 @@ export const demoRoles: DemoRole[] = [
     id: "role-manager",
     key: "manager",
     name: "Manager",
-    description: "Quản lý người dùng và hoạt động trong không gian làm việc.",
+    description: "Quản lý người dùng và hoạt động trong ứng dụng.",
     permissions: [
       "users.read",
       "users.create",

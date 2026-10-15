@@ -8,6 +8,7 @@ import unicodedata
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
+from app.core.single_application import LEGACY_TENANT, LEGACY_WORKSPACE
 from app.modules.assistants.schemas import (
     AssistantLifecycleConfig,
     AssistantResponse,
@@ -67,11 +68,11 @@ def build_runtime_profile(assistant: AssistantResponse | object) -> AssistantRun
 
 
 async def resolve_runtime_scope(db: AsyncSession, assistant: object) -> tuple[str, str]:
-    """Public chat derives scope from persisted assistant/collection, never client hints."""
+    """Validate the persisted collection; return fixed legacy worker metadata."""
     collection = await db.get(KnowledgeCollection, getattr(assistant, "collection_id", ""))
-    if collection is None or collection.tenant_id != getattr(assistant, "tenant_id", None):
+    if (collection is None):
         raise AppException("Kho tri thức không thuộc trợ lý này.", code="ASSISTANT_SCOPE_MISMATCH", status_code=404)
-    return collection.tenant_id, collection.workspace_id
+    return LEGACY_TENANT, LEGACY_WORKSPACE
 
 
 

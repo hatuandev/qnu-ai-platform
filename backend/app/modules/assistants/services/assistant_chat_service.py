@@ -110,7 +110,7 @@ class AssistantChatService:
             if tenant_id and assistant_code:
                 thread = (await db.execute(select(ConversationThreadModel).where(
                     ConversationThreadModel.id == conversation_id))).scalar_one_or_none()
-                if thread and (thread.tenant_id != tenant_id or thread.assistant_code != assistant_code):
+                if thread and (thread.assistant_code != assistant_code):
                     raise AppException("Phiên hội thoại không thuộc trợ lý hiện tại.",
                         code="conversation_not_found", status_code=404)
 

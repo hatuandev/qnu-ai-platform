@@ -56,8 +56,6 @@ async def login(req: DevLoginRequest, response: Response, request: Request) -> A
         actor_id="act_admin_qnu",
         username="admin",
         display_name="Cán bộ Quản trị QNU",
-        tenant_id="tenant_qnu",
-        workspace_id="workspace_qnu",
         role="AI.Admin",
         roles=["AI.Admin"],
         permissions=["ai.access.admin"],
@@ -69,8 +67,6 @@ async def login(req: DevLoginRequest, response: Response, request: Request) -> A
         claims={
             "actor_id": actor.actor_id,
             "display_name": actor.display_name,
-            "tenant_id": actor.tenant_id,
-            "workspace_id": actor.workspace_id,
             "role": actor.role,
             "session_version": actor.session_version,
         },

@@ -190,8 +190,8 @@ async def test_01_create_document_repository_group_success() -> None:
     )
 
     assert created.name == "Tuyển sinh 2026"  # Collapsed whitespace
-    assert created.tenant_id == "tenant_qnu"
-    assert created.workspace_id == "workspace_tuyensinh"
+    assert "tenant_id" not in created.model_dump()
+    assert "workspace_id" not in created.model_dump()
     assert created.created_by == "act_admissions_officer"
     assert created.total_documents == 0
     assert session.add.called
@@ -279,8 +279,8 @@ async def test_03_intake_nonexistent_group_raises_404_and_no_orphan_doc() -> Non
 
 
 @pytest.mark.asyncio
-async def test_04_intake_mismatched_tenant_workspace_raises_403_no_leak() -> None:
-    """4. Sai tenant/workspace: trả 403 RFC 7807 và không rò rỉ document."""
+async def test_04_intake_accepts_existing_group_with_legacy_scope_metadata() -> None:
+    """Legacy workspace values no longer partition an otherwise valid group."""
     session = _fresh_session()
     # Actor belongs to workspace_tuyensinh
     actor = _make_actor(workspace_id="workspace_tuyensinh")
@@ -296,19 +296,21 @@ async def test_04_intake_mismatched_tenant_workspace_raises_403_no_leak() -> Non
     session.get.return_value = foreign_group
 
     file_bytes = b"Unauthorized content"
+    existing = _make_doc("rep_doc_shared", "shared.pdf", file_bytes)
+    existing.current_revision = _make_rev("rev_shared", existing.id, "shared.pdf", file_bytes, status="ready")
+    session.execute.side_effect = [
+        _execute_result(scalar=existing),
+        _execute_result(scalar=DocumentGroupMembership(group_id=foreign_group.id, document_id=existing.id)),
+        _execute_result(scalar=None),
+    ]
 
     with patch("app.modules.documents.intake_service.storage_service.save", new_callable=AsyncMock) as mock_s3_save:
-        with pytest.raises(AppException) as exc_info:
-            await document_intake_service.intake_document(
-                db=session,
-                file_bytes=file_bytes,
-                file_name="unauthorized.pdf",
-                group_id="grp_foreign",
-                actor=actor,
-            )
-
-        assert exc_info.value.status_code == 403
-        assert exc_info.value.code == "DOCUMENT_GROUP_ACCESS_DENIED"
+        response = await document_intake_service.intake_document(
+            db=session, file_bytes=file_bytes, file_name="shared.pdf",
+            group_id=foreign_group.id, actor=actor)
+        assert response.deduplicated is True and response.document_id == existing.id
+        where = str(session.execute.call_args_list[0].args[0]).split("WHERE", 1)[1]
+        assert "tenant_id" not in where and "workspace_id" not in where
         mock_s3_save.assert_not_called()
         assert not session.add.called
 
@@ -811,7 +813,7 @@ async def test_scope_isolated_storage_key_generation():
         saved_key = mock_save.await_args.args[0]
 
         # Key must follow exact pattern: documents/{tenant_id}/{workspace_id}/originals/{file_hash}/{safe_file_name}
-        expected_prefix = f"documents/tenant_qnu_admissions/ws_2026/originals/{file_hash}/"
+        expected_prefix = f"documents/tenant_qnu/workspace_qnu/originals/{file_hash}/"
         assert saved_key.startswith(expected_prefix)
         # Safe filename must not contain spaces or diacritics
         assert " " not in saved_key
@@ -827,7 +829,7 @@ async def test_compensation_does_not_delete_other_tenant_storage_object():
     file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     tenant_a_key = f"documents/tenant_a/ws_a/originals/{file_hash}/file_chung.pdf"
-    tenant_b_key = f"documents/tenant_b/ws_b/originals/{file_hash}/file_chung.pdf"
+    tenant_b_key = f"documents/tenant_qnu/workspace_qnu/originals/{file_hash}/file_chung.pdf"
 
     # Tenant B attempts upload but DB commit fails
     session_b = _fresh_session()

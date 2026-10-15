@@ -188,11 +188,14 @@ async def test_membership_hash_order_independence():
 
 
 @pytest.mark.asyncio
-async def test_attach_new_binding_does_not_use_none_source_revision_id():
+@pytest.mark.parametrize("legacy_scope_differs", [False, True])
+async def test_attach_new_binding_does_not_use_none_source_revision_id(legacy_scope_differs):
     """Ca 1 & 2: Binding mới KHÔNG được dùng source_revision_id=None và phải khởi đầu ở trạng thái pending."""
     db = _fresh_session()
     col = _make_collection()
     group = _make_group()
+    if legacy_scope_differs:
+        group.workspace_id = "legacy_other_workspace"
     doc, rev = _make_doc_and_revision()
 
     db.get = AsyncMock(side_effect=lambda model, ident: col if model is KnowledgeCollection else (group if model is DocumentGroup else None))
@@ -754,13 +757,13 @@ async def test_second_group_cannot_steal_binding_from_first_group():
 
 
 @pytest.mark.asyncio
-async def test_same_tenant_different_workspace_rejected():
-    """Ca 14: Workspace isolation vẫn hoạt động chặt chẽ."""
+async def test_missing_group_is_rejected():
+    """A shared application still requires an existing document group."""
     db = _fresh_session()
     col = _make_collection(workspace_id="ws_finance")
     group = _make_group(workspace_id="ws_admissions")
 
-    db.get = AsyncMock(side_effect=lambda model, ident: col if model is KnowledgeCollection else (group if model is DocumentGroup else None))
+    db.get = AsyncMock(side_effect=lambda model, ident: col if model is KnowledgeCollection else None)
 
     service = GroupSourceService()
     req = AttachGroupSourceRequest(group_id=group.id)

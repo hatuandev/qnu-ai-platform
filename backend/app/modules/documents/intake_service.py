@@ -110,14 +110,7 @@ class DocumentIntakeService:
                     code="DOCUMENT_GROUP_NOT_FOUND",
                     status_code=404,
                 )
-            if group.tenant_id != resolved_tenant or (
-                resolved_workspace and group.workspace_id != resolved_workspace
-            ):
-                raise AppException(
-                    message="Không có quyền truy cập kho tài liệu này trong workspace hiện tại.",
-                    code="DOCUMENT_GROUP_ACCESS_DENIED",
-                    status_code=403,
-                )
+
 
         file_size = len(file_bytes)
         file_hash = compute_sha256(file_bytes)
@@ -151,8 +144,8 @@ class DocumentIntakeService:
                 .join(RepositoryDocument, DocumentRevision.document_id == RepositoryDocument.id)
                 .where(
                     DocumentRevision.idempotency_key == idempotency_key,
-                    RepositoryDocument.tenant_id == resolved_tenant,
-                    RepositoryDocument.workspace_id == resolved_workspace,
+
+
                 )
             )
             existing_row = (await db.execute(idem_stmt)).first()
@@ -213,13 +206,13 @@ class DocumentIntakeService:
                     created_at=existing_rev.created_at,
                 )
 
-        # 4. Scoped deduplication check: tenant_id + workspace_id + file_hash
+        # 4. Deduplicate across the application, including legacy partitions.
         stmt = select(RepositoryDocument).where(
             RepositoryDocument.file_hash == file_hash,
-            RepositoryDocument.tenant_id == resolved_tenant,
-            RepositoryDocument.workspace_id == resolved_workspace,
+
+
             RepositoryDocument.is_active.is_(True),
-        )
+        ).order_by(RepositoryDocument.created_at, RepositoryDocument.id).limit(1)
         existing = (await db.execute(stmt)).scalar_one_or_none()
         if existing:
             logger.info(
@@ -379,8 +372,8 @@ class DocumentIntakeService:
             # Concurrent race condition: another request committed the exact same document
             winner_stmt = select(RepositoryDocument).where(
                 RepositoryDocument.file_hash == file_hash,
-                RepositoryDocument.tenant_id == resolved_tenant,
-                RepositoryDocument.workspace_id == resolved_workspace,
+
+
                 RepositoryDocument.is_active.is_(True),
             )
             winner_doc = (await db.execute(winner_stmt)).scalar_one_or_none()
@@ -446,8 +439,6 @@ class DocumentIntakeService:
                             target_group = await db.get(DocumentGroup, group_id)
                             if (
                                 not target_group
-                                or target_group.tenant_id != resolved_tenant
-                                or target_group.workspace_id != resolved_workspace
                             ):
                                 raise AppException(
                                     message=f"Không tìm thấy nhóm tài liệu '{group_id}'.",

@@ -27,8 +27,7 @@ async def recover_ingestion_jobs(db: AsyncSession, redis, limit: int = 100, tena
         ),
         JobRecord.cancel_requested.is_(False),
     ).order_by(JobRecord.updated_at).limit(limit).with_for_update(skip_locked=True)
-    if tenant_id:
-        statement = statement.where(JobRecord.tenant_id == tenant_id)
+
     jobs = list((await db.scalars(statement)).all())
     recovered = 0
     batches: set[str] = set()
@@ -36,7 +35,7 @@ async def recover_ingestion_jobs(db: AsyncSession, redis, limit: int = 100, tena
         if await redis.exists(f"qnu:job-execution:{job.id}"):
             continue
         resource = job.document_id or (job.payload or {}).get("binding_id") or job.id
-        if await redis.exists(f"qnu:source-execution:{job.tenant_id}:{job.workspace_id}:{job.collection_id}:{resource}"):
+        if await redis.exists(f"qnu:source-execution:app-v1:{job.collection_id}:{resource}"):
             continue
         stale = job.status == "running" and (job.heartbeat_at or job.updated_at) < cutoff
         missing_broker = job.status == "queued" and not await redis.exists(f"arq:job:{job.arq_job_id}")
@@ -50,8 +49,8 @@ async def recover_ingestion_jobs(db: AsyncSession, redis, limit: int = 100, tena
             statement = select(KnowledgeIndexRevision).join(KnowledgeBinding).where(
                 KnowledgeIndexRevision.binding_id == (job.payload or {}).get("binding_id"),
                 KnowledgeBinding.collection_id == job.collection_id,
-                KnowledgeBinding.tenant_id == job.tenant_id,
-                KnowledgeBinding.workspace_id == job.workspace_id,
+
+
                 or_(
                     KnowledgeIndexRevision.source_revision_v2_id == (job.payload or {}).get("source_revision_id"),
                     KnowledgeIndexRevision.source_revision_id == (job.payload or {}).get("source_revision_id"),
@@ -78,7 +77,7 @@ async def recover_ingestion_jobs(db: AsyncSession, redis, limit: int = 100, tena
             KnowledgeImportItem.id == (job.payload or {}).get("item_id"),
         ).with_for_update())
         batch = await db.get(KnowledgeImportBatch, item.batch_id) if item else None
-        if not batch or batch.tenant_id != job.tenant_id or batch.workspace_id != job.workspace_id or batch.collection_id != job.collection_id:
+        if (not batch) or (batch.collection_id != job.collection_id):
             job.status, job.error = "failed", "Không tìm thấy mục nạp đúng phạm vi."
             continue
         if batch.status == "cancelled":

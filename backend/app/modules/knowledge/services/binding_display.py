@@ -33,8 +33,7 @@ async def load_binding_display_metadata(db: AsyncSession, bindings: list[Knowled
         .join(KnowledgeImportBatch, KnowledgeImportItem.batch_id == KnowledgeImportBatch.id)
         .join(KnowledgeBinding, KnowledgeImportItem.knowledge_binding_id == KnowledgeBinding.id)
         .where(KnowledgeBinding.id.in_(pending_ids),
-               KnowledgeImportBatch.collection_id == KnowledgeBinding.collection_id,
-               KnowledgeImportBatch.tenant_id == KnowledgeBinding.tenant_id)
+               KnowledgeImportBatch.collection_id == KnowledgeBinding.collection_id)
         .distinct(KnowledgeImportItem.knowledge_binding_id)
         .order_by(KnowledgeImportItem.knowledge_binding_id, KnowledgeImportItem.created_at.desc(), KnowledgeImportItem.id.desc())
     )).scalars().all()

@@ -264,17 +264,7 @@ class IndexBuildService:
                 code="SOURCE_REVISION_NOT_READY",
                 status_code=409,
             )
-        if (
-            binding.tenant_id != col.tenant_id
-            or (col.workspace_id and binding.workspace_id != col.workspace_id)
-            or rep_doc.tenant_id != col.tenant_id
-            or (col.workspace_id and rep_doc.workspace_id != col.workspace_id)
-        ):
-            raise AppException(
-                "Binding, tài liệu và bộ sưu tập không cùng tenant/workspace.",
-                code="KNOWLEDGE_SCOPE_MISMATCH",
-                status_code=409,
-            )
+
 
         # 3. Resolve active Vector Generation
         vector_gen = await self.get_or_create_vector_generation(db, col)

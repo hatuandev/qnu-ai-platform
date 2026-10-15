@@ -21,9 +21,6 @@ async def resolve_evidence_request(db: AsyncSession, req: AskRequest) -> tuple[A
         metadata = getattr(collection, "collection_metadata", None)
         if not isinstance(metadata, dict) or not metadata.get("evidence_answers_enabled"):
             return req, EvidencePolicy()
-        if collection.tenant_id != req.tenant_id or collection.workspace_id != req.workspace_id:
-            raise AppException("Không thể xác nhận chính sách chứng cứ trong phạm vi truy cập.",
-                code="EVIDENCE_POLICY_UNAVAILABLE", status_code=503)
         # Lazy import avoids the assistant/RAG package initialization cycle.
         from app.modules.assistants.models import AssistantModel
 
@@ -31,7 +28,7 @@ async def resolve_evidence_request(db: AsyncSession, req: AskRequest) -> tuple[A
             record = (await db.execute(select(AssistantModel).where(
                 AssistantModel.code == (req.assistant_code or collection.module_code),
                 AssistantModel.collection_id == req.collection_id,
-                AssistantModel.tenant_id == req.tenant_id,
+
                 AssistantModel.is_active.is_(True)))).scalar_one_or_none()
         except Exception as exc:
             raise AppException("Không thể đọc cấu hình chứng cứ của trợ lý.",

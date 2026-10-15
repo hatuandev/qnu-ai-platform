@@ -113,8 +113,8 @@ async def test_live_pause_excludes_source_changes_cache_key_and_preserves_artifa
                     await db.commit()
                     before = await hybrid_retriever.resolve_retrieval_snapshot(db, col.id)
                     with pytest.raises(EntityNotFoundError):
-                        await pause_source(db, bindings[0].id, actor=SimpleNamespace(tenant_id="other", workspace_id="other"))
-                    result = await pause_source(db, bindings[0].id)
+                        await pause_source(db, "missing-binding", actor=SimpleNamespace(tenant_id="other", workspace_id="other"))
+                    result = await pause_source(db, bindings[0].id, actor=SimpleNamespace(tenant_id="other", workspace_id="other"))
                     after = await hybrid_retriever.resolve_retrieval_snapshot(db, col.id)
                     assert result.status == "paused"
                     assert bindings[0].id not in after.binding_revisions

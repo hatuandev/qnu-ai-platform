@@ -127,7 +127,7 @@ class AssistantReadinessEngine:
         details = {"collection_id": collection_id, "ready_documents": 0}
         try:
             collection = await session.get(KnowledgeCollection, collection_id) if collection_id else None
-            if not collection or (tenant_id and collection.tenant_id != tenant_id):
+            if (not collection):
                 raise ValueError("Kho tri thức chưa tồn tại hoặc không thuộc trợ lý.")
             count = await count_ready_sources(session, collection)
             details["ready_documents"] = count

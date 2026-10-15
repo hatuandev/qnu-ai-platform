@@ -391,8 +391,8 @@ export const modelopsApi = {
     return await res.json();
   },
 
-  async getTokenQuota(tenantId = "tenant_qnu"): Promise<TokenQuota> {
-    const res = await fetch(`${BASE_URL}/modelops/quotas/${tenantId}`);
+  async getTokenQuota(): Promise<TokenQuota> {
+    const res = await fetch(`${BASE_URL}/modelops/quotas/current`);
     if (!res.ok) {
       throw new Error(
         `Không tải được thông tin hạn ngạch token (HTTP ${res.status}).`,
@@ -401,7 +401,6 @@ export const modelopsApi = {
     const raw = await res.json();
     const d = raw as Record<string, unknown>;
     return {
-      tenant_id: (d.tenant_id as string) || "tenant_qnu",
       total_tokens:
         typeof d.tokens_used === "number"
           ? d.tokens_used
@@ -430,16 +429,12 @@ export const modelopsApi = {
     };
   },
 
-  async getTokenQuotas(tenantId?: string): Promise<TokenQuota> {
-    return this.getTokenQuota(tenantId);
+  async getTokenQuotas(): Promise<TokenQuota> {
+    return this.getTokenQuota();
   },
 
-  async getModelOpsUsageStats(
-    days = 30,
-    tenantId?: string,
-  ): Promise<UsageStatsResponse> {
+  async getModelOpsUsageStats(days = 30): Promise<UsageStatsResponse> {
     const params = new URLSearchParams({ days: String(days) });
-    if (tenantId) params.append("tenant_id", tenantId);
 
     const res = await fetch(
       `${BASE_URL}/modelops/usage-stats?${params.toString()}`,

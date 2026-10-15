@@ -9,8 +9,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.core.single_application import SingleApplicationModel
 
-class RetrievalSnapshot(BaseModel):
+
+class RetrievalSnapshot(SingleApplicationModel):
     """Immutable snapshot pinning collection epochs and binding index revisions for session consistency."""
 
     snapshot_id: str = Field(..., description="Mã định danh duy nhất của snapshot")
@@ -21,8 +23,8 @@ class RetrievalSnapshot(BaseModel):
         description="Bản đồ khóa phiên bản {binding_id: active_index_revision_id}",
     )
     vector_generations: dict[str, str] = Field(default_factory=dict)
-    tenant_id: str | None = None
-    workspace_id: str | None = None
+
+
     created_at: str = Field(
         default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Thời điểm tạo snapshot ISO-8601",
@@ -35,15 +37,13 @@ class RetrievalSnapshot(BaseModel):
             "collection_epoch": self.collection_epoch,
             "binding_revisions": sorted(self.binding_revisions.items()),
             "vector_generations": sorted(self.vector_generations.items()),
-            "tenant_id": self.tenant_id,
-            "workspace_id": self.workspace_id,
         }
         return hashlib.sha256(
             json.dumps(payload, ensure_ascii=True, sort_keys=True).encode("utf-8")
         ).hexdigest()[:20]
 
 
-class SearchRequest(BaseModel):
+class SearchRequest(SingleApplicationModel):
     query: str = Field(
         ..., min_length=1, max_length=1000, description="Nội dung câu hỏi hoặc từ khóa tìm kiếm"
     )
@@ -56,8 +56,8 @@ class SearchRequest(BaseModel):
     filters: dict[str, Any] | None = Field(
         default_factory=dict, description="Bộ lọc payload metadata"
     )
-    tenant_id: str | None = Field(default=None, description="Mã tenant cô lập dữ liệu")
-    workspace_id: str | None = Field(default=None, description="Mã workspace cô lập dữ liệu")
+
+
     snapshot_id: str | None = Field(default=None, description="ID snapshot cố định phiên tra cứu")
     retrieval_snapshot: RetrievalSnapshot | None = Field(
         default=None, description="Chi tiết snapshot được pin cho phiên"
@@ -112,7 +112,7 @@ class Citation(BaseModel):
     revision_no: int | None = None
 
 
-class AskRequest(BaseModel):
+class AskRequest(SingleApplicationModel):
     original_question: str | None = Field(None, min_length=1, max_length=4000,
         description="Câu hỏi gốc được DAG giữ lại trước bước viết lại truy vấn")
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")
@@ -132,8 +132,8 @@ class AskRequest(BaseModel):
     assistant_revision: str | None = None
     runtime_policy: dict[str, Any] = Field(default_factory=dict)
     fallback_model: str | None = None
-    tenant_id: str = Field("tenant_qnu", min_length=2, max_length=100)
-    workspace_id: str = Field("workspace_qnu", min_length=2, max_length=100)
+
+
     history: list[dict[str, str]] | None = Field(
         default=None, description="Lịch sử các lượt hội thoại gần nhất [{'role': 'user'|'assistant', 'content': '...'}]"
     )

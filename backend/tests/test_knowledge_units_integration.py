@@ -112,7 +112,8 @@ async def test_staging_units_match_dense_lexical_bm25_and_exact_source_without_p
                     assert not any(b.temporal_scope.data_years for b in rank_blocks(blocks, [query], 5, [2026]))
                     assert not await vector_indexer.search_dense(collection.id, query, query_vector=vector,
                         tenant_id=tag, workspace_id=tag, snapshot=snapshot, qdrant_collection_name=tag, score_threshold=0.0)
-                    assert not await load_published_blocks(db, snapshot.model_copy(update={"tenant_id": "other"}), candidate_mode=True)
+                    assert await load_published_blocks(db, snapshot.model_copy(update={"tenant_id": "other"}), candidate_mode=True)
+                    assert not await load_published_blocks(db, snapshot.model_copy(update={"collection_id": "other"}), candidate_mode=True)
             finally:
                 await outer.rollback()
     finally:

@@ -4,20 +4,22 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from app.core.single_application import SingleApplicationModel
+
 
 class DevLoginRequest(BaseModel):
     access_key: str = Field(..., min_length=1, max_length=128, description="Mật khẩu truy cập môi trường Dev")
 
 
-class AuthActor(BaseModel):
+class AuthActor(SingleApplicationModel):
     username: str
     actor_id: str = "act_admin_qnu"
     display_name: str = "Cán bộ Quản trị QNU"
     email: str | None = None
     user_type: str = "staff"
     student_id: str | None = None
-    tenant_id: str = "tenant_qnu"
-    workspace_id: str = "workspace_qnu"
+
+
     role: str = "staff"
     roles: list[str] = Field(default_factory=lambda: ["staff"])
     permissions: list[str] = Field(default_factory=list)

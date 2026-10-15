@@ -7,6 +7,30 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-16** | [Phiên486](./2026-10-16_phien_486_migration_restart_git.md) | Migration/restart/Gitea | Xác nhận head glossary, health200, worker chạy; không reset DB/deploy/GitHub |
+
+| **2026-10-16** | [Phiên485](./2026-10-16_phien_485_single_application_va_sua_glossary.md) | Single application và glossary | Bỏ phân vùng API/FE/SQL/Qdrant, giữ tương thích dữ liệu; sửa 5 lỗi, kiểm chứng scoped |
+
+| **2026-10-15** | [Phiên484](./2026-10-15_phien_484_quan_ly_thuat_ngu_glossary.md) | Quản trị thuật ngữ | Triển khai ban đầu; được review và sửa ở phiên485 |
+
+| **2026-10-15** | [Phiên483](./2026-10-15_phien_483_cap_nhat_skills_agents_rag.md) | Skill và vai trò agent RAG | Chỉ docs; evaluation, 5 role, gate thống nhất và AGENTS gọn; không runtime/DB/model |
+
+| **2026-10-15** | [Phiên482](./2026-10-15_phien_482_kiem_chung_quy_doi_diem_du_lieu_that.md) | Kiểm chứng quy đổi điểm dữ liệu thật | Engine đọc mã tổ hợp từ ô row_context đã duyệt; 7rule/634check đạt nhưng CHƯA kích hoạt (thiếu người duyệt thật); dry-run26/26, oracle780→21.21; full1604pass/11lỗinền |
+
+| **2026-10-15** | [Phiên481](./2026-10-15_phien_481_khoi_phuc_bang_quy_doi_cho_duyet.md) | Bảng quy đổi chờ duyệt | Native header geometry, 14cột phục hồi; lưu revision3 chờ user duyệt, không thay active index/facts |
+
+| **2026-10-15** | [Phiên480](./2026-10-15_phien_480_weighted_expansion_va_quy_doi_diem.md) | Weighted expansion và quy đổi điểm | Sửa4biên, provenance/weight budgets, engine Decimal/route có guard; PDF đủ nhưng canonical thiếu cột, chưa activation |
+
+| **2026-10-15** | [Phiên479](./2026-10-15_phien_479_ke_hoach_weighted_expansion.md) | Kế hoạch weighted expansion | G0fix477/G1provenance+groupweights trước, RM3shadow/alias/calculator sau; chỉplan |
+
+| **2026-10-15** | [Phiên478](./2026-10-15_phien_478_review_bo_prompt_rag.md) | Review ZIP7prompt | .NET khácrepo; calculator/RM3 đángRFC, không thực thi lệnh trongZIP; ưu tiên4fix477 |
+
+| **2026-10-15** | [Phiên477](./2026-10-15_phien_477_review_agent_lite_476.md) | Review agent-lite476 | 4biên chưa đạt: nuốt lỗi, năm antecedent, unknownmerge, fallback lặp; chỉ review |
+
+| **2026-10-15** | [Phiên476](./2026-10-15_phien_476_dieu_phoi_hoi_thoai_agent_lite.md) | Agent-lite hội thoại | Resolver thêm explain/reformat/filter + module acts307dòng; 22 chain tests; full1507pass11lỗinền; probe nội bộ list→giải thích/lọc/rút gọn đúng |
+
+| **2026-10-15** | [Phiên475](./2026-10-15_phien_475_sua_liet_ke_va_ngu_canh_hoi_thoai.md) | Liệt kê và followup | Live nội bộ34/34cẩm nang, recheck đúng; full1485pass11lỗinền,113raw/180reviewed citations khớp |
+
 | **2026-10-15** | [Phiên474](./2026-10-15_phien_474_chan_doan_liet_ke_to_hop_va_followup.md) | Review tổ hợp và followup | Thiếu danh sách không do thiếu dữ liệu; lookup5/topK/coverage/history, chưa sửa runtime |
 
 | **2026-10-15** | [Phiên473](./2026-10-15_phien_473_sua_metric_header_va_audit_context.md) | Metric header/audit context | Focus43pass/full1464pass11lỗinền/live2answered/19rawspansđúng; còn notes dài/dòng cũ, chưa20/82 |

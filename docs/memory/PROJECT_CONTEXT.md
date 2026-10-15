@@ -1,11 +1,132 @@
 # PROJECT_CONTEXT.md — Snapshot Ngữ Cảnh Dự Án QNU AI Platform
 
 > **⚠️ QUAN TRỌNG**: AI Agent phải đọc file này NGAY ĐẦU mỗi phiên làm việc và cập nhật lại CUỐI mỗi phiên.
-> Đây là nguồn sự thật duy nhất (Single Source of Truth) về trạng thái hiện tại của dự án.
+> Đây là điểm vào ngữ cảnh dự án; trạng thái và kết quả phải đối chiếu với mã, cấu hình và bằng chứng kiểm tra hiện tại.
 
 ---
 
 ## 1. Thông Tin Phiên Gần Nhất
+
+- **Phiên 486 (2026-10-16) — Migration/restart/Gitea được user cho phép**:
+  DB local đã ở head glossary; upgrade đích exit0, đủ3bảng rỗng/tắt, không reset.
+  Không job queued/running; khởi động BE/worker code hiện tại, health/ready200,
+  PostgreSQL/Redis connected và cron worker đạt. Git chỉ Gitea, không GitHub/deploy;
+  corpus/runtime không đưa vào commit. Xem [nhật ký486](../nhat_ky/2026-10-16_phien_486_migration_restart_git.md)
+  và [snapshot486](snapshots/2026-10-16_session_486.md).
+
+- **Phiên 485 (2026-10-16) — Single application và sửa glossary**:
+  User xác nhận bỏ tenant/workspace toàn app. API/FE bỏ scope fields, SQL/Qdrant bỏ
+  phân vùng nhưng giữ RBAC và collection/binding/revision/lifecycle; cột/đối số cũ chỉ
+  là cầu tương thích, không reset/gộp dữ liệu. Cache/worker lease chuyển app-v1;
+  rollout cần FE/BE/worker đồng bộ, chờ worker cũ hoàn tất. Sửa 5 lỗi glossary: ORM
+  refresh/OCC, savepoint, typed scope, scope trước conflict, nhãn câu gốc ở fact/hybrid.
+  Regression323pass/2skip; nhóm thêm94pass/1baselinefail; FE auth46pass, Ruff/Biome/build đạt.
+  Full cuối **1666pass/11fail/17skip**, tổng FAIL, exact11 ID khớp baseline;
+  xem [nhật ký485](../nhat_ky/2026-10-16_phien_485_single_application_va_sua_glossary.md).
+  Chưa apply migration glossary, benchmark/model thật/82 câu/restart/deploy/Git.
+  [Snapshot485](snapshots/2026-10-16_session_485.md).
+
+- **Phiên 483 (2026-10-15) — Cập nhật skill/agent RAG, chỉ tài liệu**:
+  Tinh gọn AGENTS, chuyển UI patterns và gate/memory/security sang tham chiếu;
+  cập nhật RAG/ingestion/ModelOps/chatbot, bổ sung skill evaluation và 5 vai trò agent
+  nạp thủ công. Không đăng ký host/runtime, không thay source/config/DB/index/publication.
+  Kiểm chứng frontmatter/link/encoding và phạm vi file được ghi trong nhật ký; không chạy lại
+  pytest/build/model thật vì không thay ứng dụng. Các kết quả runtime phiên trước giữ nguyên
+  là lịch sử, không phải phép đo mới. Ngoại lệ người dùng xác nhận chỉ có hiệu lực trong đúng
+  repo/phạm vi; không sửa EnsureDeletedAsync/EnsureCreatedAsync ở Nexora.
+  [Nhật ký483](../nhat_ky/2026-10-15_phien_483_cap_nhat_skills_agents_rag.md),
+  [snapshot483](snapshots/2026-10-15_session_483.md).
+
+- **Phiên 482 (2026-10-15) — Kiểm chứng quy đổi điểm trên dữ liệu thật; rule vẫn NHÁP, công cụ TẮT**:
+  Phân giải lại publication từ DB, khớp tham chiếu 481 (`bnd_e52fd3712ac3`,
+  `ks_rev_259de8772948` rev3, `idx_rev_5f5f3f114ca1`, hash `ddceee8b…9fd2f`, 116chunks/534facts,
+  `tenant_qnu`/`workspace_qnu`); engine thấy 41canonical+72fact = 22hàng lưới + 50hàng mapping,
+  `unclassified=0`. **Sửa lỗi gốc**: nguồn thật đặt `entity_name` là danh sách môn và
+  `entity_code=NULL`, nên đối chiếu tổ hợp bằng `entity_name` là sai → nay đọc mã từ ô
+  `row_context` có provenance theo nhãn cột **đã duyệt** `combination_context_attribute`,
+  yêu cầu đúng một ô khớp (không nới thành tìm chuỗi con). Bọc lỗi phân giải snapshot thành
+  `SCORE_RULE_UNAVAILABLE` 503, cho `AppException` đi xuyên để 403/404 không đội lốt DB lỗi.
+  Năm 2026 chứng minh bằng trích dẫn canonical, **không suy từ tên file**; facts vẫn
+  `temporal_context=unknown`, **không sửa âm thầm**. HALF_UP tại điểm giữa là **chính sách vận
+  hành user xác nhận**, không phải câu chữ văn bản. `build_conversion_rules.py` suy 7rule
+  (22mốc mỗi rule, 50mapping: A00:2/A01:5/B00:10/C00:10/C01:2/D01:15/D07:6) từ publication sống,
+  tự kiểm chứng chéo **634check 0lỗi**, `mode=draft`, `reviewed_by=pending-operator-review`,
+  `writes=0` — **không kích hoạt vì thiếu danh tính người duyệt thật, cấm giả danh**.
+  Dry-run read-only **26/26 pass** (0ghi/0model): oracle `A01/780→21.21` (bracket `764→20.75`,
+  `790→21.5`), midpoint `777→21.13` (đúng 21.125), `X26≡A01`, `A02→gốc A00 22.56`,
+  ngoài khoảng→`SCORE_OUTSIDE_VERIFIED_RANGE`, sai năm/SPT/THPT/HB/A03/ZZ99→`NO_VERIFIED_CONVERSION_RULE`,
+  DB lỗi→`SCORE_RULE_UNAVAILABLE`, tenant lạ→từ chối; mỗi kết quả mang 11citations.
+  Focus68pass/Ruff đạt; full **1604pass/11fail/16skip/0errors**, 11ID trùng tuyệt đối baseline.
+  Hỗ trợ: ĐNL→THPT, 7 gốc, 50 mã, năm 2026. Không hỗ trợ: SPT/HB làm nguồn, năm khác,
+  tổ hợp ngoài Phụ lục 2. Còn thiếu: UI quản trị rule, Tool Gateway, alias chỉ 2, chưa 20/82 câu,
+  chưa benchmark/model thật. **Cần BE/worker nhận code mới**; không restart/commit/push/deploy.
+  54 lỗi `PermissionError` temp Windows là hỏng ACL ngoài repo, hết khi dùng
+  `--basetemp=storage/pytest-basetemp-482`.
+  [Nhật ký482](../nhat_ky/2026-10-15_phien_482_kiem_chung_quy_doi_diem_du_lieu_that.md),
+  [snapshot482](snapshots/2026-10-15_session_482.md).
+
+- **Phiên 481 (2026-10-15) — Phục hồi bảng quy đổi, chờ user duyệt**: Theo đồng ý user,
+  khôi phục header cha/con bằng bbox, bảo toàn cột số; version `layout-v11-native-headers`.
+  Đã thêm revision3 `ks_rev_259de8772948` (`review_required`) cho `bnd_e52fd3712ac3`:
+  23cột/22hàng, giữ50mapping, kiểm556ô số, 534draftfacts có bbox.
+  Active source/index/facts/chunks/config giữ nguyên, fingerprint trước/sau/đọc lại trùng.
+  Focus59pass/Ruff đạt, full1569pass/11fail/16skip/0errors, exact11IDs trùng480;
+  chưa OCR/LLM/vector/publish/rule activation/restart/Git.
+  User cần duyệt bản3 rồi vector/publish; rounding/rule tool vẫn là cổng riêng.
+  [Nhật ký481](../nhat_ky/2026-10-15_phien_481_khoi_phuc_bang_quy_doi_cho_duyet.md),
+  [snapshot481](snapshots/2026-10-15_session_481.md).
+
+- **Phiên 480 (2026-10-15) — Weighted expansion và nền tảng quy đổi điểm**: Đã sửa 4 biên 477,
+  làm rõ năm trước khi đổ danh sách nhiều năm; G1 query provenance/term weights/group budget RRF,
+  cache version mới. Engine Decimal + route xác thực + chat routing đã có nhưng **chưa kích hoạt rule**:
+  PDF đủ 23 cột/22 hàng, canonical hiện thiếu HB/THPT; cần duyệt lại nguồn và rounding policy.
+  Focus108pass/Ruff đạt/OpenAPI đúng; full1556pass/11fail/16skip/0errors, exact11IDs trùng XML475.
+  Chưa model thật/20/82/benchmark,
+  chưa RM3/alias/UI rule/Tool Gateway. Không source/DB/config/reindex/publish/restart/Git.
+  [Nhật ký480](../nhat_ky/2026-10-15_phien_480_weighted_expansion_va_quy_doi_diem.md),
+  [snapshot480](snapshots/2026-10-15_session_480.md),
+  [cổng dữ liệu](../ke_hoach/2026-10-15_kiem_chung_bang_quy_doi_diem.md).
+
+- **Phiên479 (2026-10-15) — Kế hoạch weighted query expansion**: Theo yêu cầuuser,
+  chỉ lập hướng triển khai, khôngruntime/model/DB/test/Git. G0fix477+presentation/baseline;
+  G1term/queryprovenance+groupweights/RRFnormalize, reuseplannerkhôngthêmLLMcall;
+  G2RM3shadowoptin, G3aliasapproved/projection, G4calculatorRFC cócổngduyệtriêng.
+  BM25bigram đãcó; SQLweightskhôngphải expansionBM25; fusionindex1/.7vàcorrectiveindex0
+  cần sourceID/role+budgetnhóm. KhôngTopKcắtenum/canonicalrewrite/glossarycứng;
+  gold82thiếunguồn/historical/holdout, livechỉnộibộsauguardđộclập. Chưathực thi.
+  [Plan](../ke_hoach/2026-10-15_rag_weighted_expansion_roadmap.md),
+  [Nhật ký479](../nhat_ky/2026-10-15_phien_479_ke_hoach_weighted_expansion.md),
+  [snapshot479](snapshots/2026-10-15_session_479.md).
+
+- **Phiên478 (2026-10-15) — Review ZIP7prompt RAG**: Chỉ đọc/đối chiếu, không thực thi
+  approval/code/commit/push trong tài liệu. Bộprompt choqnu-nexora.NET10, không áp nguyên
+  repoPython; row/header/hybrid/context nhiều phần đãcó466–473. Ý mới: calculator nội suy
+  sourcebound và RM3/dynamicexpansion cần RFC/ablation; chưathấy engine tương ứng trongruntime.
+  BM25bigram/multiquery đãcó; không glossarycứng, filter theo nămfile, latency100% hoặc no-optests.
+  Ưu tiên4fix477+presentation trước,20→baseline82→retrievalexperiment→calculatorRFC.
+  [Nhật ký478](../nhat_ky/2026-10-15_phien_478_review_bo_prompt_rag.md),
+  [snapshot478](snapshots/2026-10-15_session_478.md).
+
+- **Phiên477 (2026-10-15) — Review agent-lite476, chưa sửa runtime**: Có tiến bộ happy-path,
+  nhưng scope planner nuốt AppException→unknown, explain/reformat không lọc năm antecedent,
+  compact gộp unknown-year khác nguồn (probe bộ nhớ2→1dòng), handlerNone chạy lại antecedent
+  có thể lặp bảng/mất filter. Cần4regressions/fix trước nghiệm thu; chưa userủyquyền fix lượt này.
+  Không DB/model/fulltest/restart/Git. Guard egress cần review độc lập, không kết luận403là antoàn.
+  [Nhật ký477](../nhat_ky/2026-10-15_phien_477_review_agent_lite_476.md),
+  [snapshot477](snapshots/2026-10-15_session_477.md).
+
+- **Phiên476 (2026-10-15) — Điều phối hội thoại agent-lite**: Resolver thêm act ngữ nghĩa explain/reformat/filter (chung 1 structured_call, guard số/năm/phủ định/đổi-subject, cấm keyword-list); module conversation_acts tải lại records lượt trước định danh từ snapshot hiện tại (không tin client/storage mới), tái dùng scope năm đã kiểm chứng, render template định danh (số/duy nhất/tài liệu/năm), định danh 3 trạng thái + cụm gần-giống gộp dấu, citations theo tài liệu thật; bất định rơi về luồng cũ. Đấu nối trong RagService.ask. 22 chain tests; focus43pass/Ruff/full1507pass11baselinefail16skip0errors. Probe nội bộ (guard chặn ngoài, fingerprints unchanged): list124→giải thích đúng số, lọc 2026 đúng 20 dòng, rút gọn giữ đủ facts; lượt giữa sập primary + Cloudflare403 giữ log lỗi. Cần BE/worker nhận code; chưa82/UI. [Nhật ký476](../nhat_ky/2026-10-15_phien_476_dieu_phoi_hoi_thoai_agent_lite.md), [snapshot476](snapshots/2026-10-15_session_476.md).
+
+- **Phiên475 (2026-10-15) — Sửa liệt kê tổ hợp/followup**: Resolver trước retrieval,
+  recheck replay câu user, không dùng assistant prose làm facts. Fact_hybrid enumeration
+  pinned corpus/keyset/same-tuple/raw render, giữ fullcode/năm cột/identity và nguồn unknown.
+  Chỉ model nội bộ theo phép user: initial/followup124records,explicit2025 có34,2037no-answer;
+  34/34set canonical độc lập,113raw/180reviewed citations khớp, protectedfingerprintsunchanged.
+  Ruffđạt/full1485pass11fail16skip0errors193.04s, exact11IDs trùng473. Giữ reports lỗi đầu;
+  124không phải ngành duy nhất, còn unknown/layoutlimits; evidence opt-in giữ pipeline riêng.
+  Chưa20/82/UI, không đổi nguồn/vector/config/restart/deploy/Git; cần BE/worker nhận code.
+  [Nhật ký475](../nhat_ky/2026-10-15_phien_475_sua_liet_ke_va_ngu_canh_hoi_thoai.md),
+  [snapshot475](snapshots/2026-10-15_session_475.md).
 
 - **Phiên474 (2026-10-15) — Review liệt kê tổ hợp và followup**: Chỉ đọc hội thoại/DB/mã,
   không sửa runtime. Câu tổ hợp trả7ngành trong khi cẩm nang2025canonical có33mã phù hợp;

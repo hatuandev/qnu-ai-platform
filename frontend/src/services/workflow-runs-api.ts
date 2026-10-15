@@ -79,7 +79,6 @@ export const workflowRunsApi = {
       body: JSON.stringify({
         workflow_id: payload.workflow_id,
         inputs: payload.inputs,
-        tenant_id: payload.tenant_id || "tenant_qnu",
         conversation_id: payload.conversation_id,
       }),
     });

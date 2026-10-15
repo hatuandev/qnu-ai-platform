@@ -11,7 +11,7 @@ export const permissionCatalog = [
     label: "Mời người dùng",
     resource: "users",
     resourceLabel: "Người dùng",
-    description: "Tạo lời mời người dùng mới trong không gian làm việc.",
+    description: "Tạo lời mời người dùng mới trong ứng dụng.",
   },
   {
     key: "users.update",
@@ -25,7 +25,7 @@ export const permissionCatalog = [
     label: "Xóa người dùng",
     resource: "users",
     resourceLabel: "Người dùng",
-    description: "Xóa người dùng khỏi không gian làm việc.",
+    description: "Xóa người dùng khỏi ứng dụng.",
   },
   {
     key: "roles.read",
@@ -462,7 +462,7 @@ export const permissionCatalog = [
     label: "Xem hoạt động",
     resource: "activity",
     resourceLabel: "Hoạt động",
-    description: "Xem nhật ký hoạt động trong không gian làm việc.",
+    description: "Xem nhật ký hoạt động trong ứng dụng.",
   },
   {
     key: "ktx.assignments.view",
@@ -616,14 +616,14 @@ export const permissionCatalog = [
     label: "Xem cài đặt",
     resource: "settings",
     resourceLabel: "Cài đặt",
-    description: "Xem các thiết lập của không gian làm việc.",
+    description: "Xem các thiết lập của ứng dụng.",
   },
   {
     key: "settings.update",
     label: "Cập nhật cài đặt",
     resource: "settings",
     resourceLabel: "Cài đặt",
-    description: "Thay đổi các thiết lập của không gian làm việc.",
+    description: "Thay đổi các thiết lập của ứng dụng.",
   },
   {
     key: "profile.read",

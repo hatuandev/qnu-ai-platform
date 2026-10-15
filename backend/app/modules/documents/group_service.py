@@ -63,19 +63,19 @@ class DocumentGroupService:
         workspace_id: str | None = None,
         actor: Any | None = None,
     ) -> DocumentGroupResponse:
-        """Create a new logical document group with tenant/workspace scoping."""
+        """Create a logical document group in the shared application."""
         r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         # Check name conflict
         existing_stmt = select(DocumentGroup).where(
-            DocumentGroup.tenant_id == r_tenant,
-            DocumentGroup.workspace_id == r_workspace,
+
+
             func.lower(DocumentGroup.name) == req.name.strip().lower(),
-        )
+        ).limit(1)
         existing = (await db.execute(existing_stmt)).scalar_one_or_none()
         if existing:
             raise AppException(
-                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
+                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong ứng dụng.",
                 code="DOCUMENT_GROUP_NAME_CONFLICT",
                 status_code=status.HTTP_409_CONFLICT,
             )
@@ -100,7 +100,7 @@ class DocumentGroupService:
         except IntegrityError:
             await db.rollback()
             raise AppException(
-                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong workspace này.",
+                message=f"Tên kho tài liệu '{req.name.strip()}' đã tồn tại trong ứng dụng.",
                 code="DOCUMENT_GROUP_NAME_CONFLICT",
                 status_code=status.HTTP_409_CONFLICT,
             )
@@ -131,7 +131,7 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> DocumentGroupResponse:
         """Get group details including document counts and status breakdown."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         group = await db.get(DocumentGroup, group_id)
         if not group:
@@ -141,12 +141,7 @@ class DocumentGroupService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
-            raise AppException(
-                message="Không có quyền truy cập kho tài liệu này.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         # Compute document KPIs for this group
         # Join memberships with documents and their current revisions
@@ -161,8 +156,8 @@ class DocumentGroupService:
             .where(
                 DocumentGroupMembership.group_id == group.id,
                 RepositoryDocument.is_active.is_(True),
-                RepositoryDocument.tenant_id == r_tenant,
-                RepositoryDocument.workspace_id == r_workspace,
+
+
             )
             .group_by(DocumentRevision.status)
         )
@@ -211,13 +206,10 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> DocumentGroupListResponse:
         """List document groups in scope with summary KPIs."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
-        stmt = select(DocumentGroup).where(
-            DocumentGroup.tenant_id == r_tenant,
-        )
-        if r_workspace:
-            stmt = stmt.where(DocumentGroup.workspace_id == r_workspace)
+        stmt = select(DocumentGroup)
+
 
         if search and search.strip():
             term = f"%{search.strip()}%"
@@ -254,8 +246,8 @@ class DocumentGroupService:
             .where(
                 DocumentGroupMembership.group_id.in_(group_ids),
                 RepositoryDocument.is_active.is_(True),
-                RepositoryDocument.tenant_id == r_tenant,
-                RepositoryDocument.workspace_id == r_workspace,
+
+
             )
             .group_by(DocumentGroupMembership.group_id, DocumentRevision.status)
         )
@@ -322,8 +314,8 @@ class DocumentGroupService:
             update(DocumentGroup)
             .where(
                 DocumentGroup.id == group_id,
-                DocumentGroup.tenant_id == r_tenant,
-                DocumentGroup.workspace_id == r_workspace,
+
+
                 DocumentGroup.lock_version == req.expected_lock_version,
             )
             .values(**update_values)
@@ -340,14 +332,7 @@ class DocumentGroupService:
                         code="DOCUMENT_GROUP_NOT_FOUND",
                         status_code=status.HTTP_404_NOT_FOUND,
                     )
-                if check_group.tenant_id != r_tenant or (
-                    r_workspace and check_group.workspace_id != r_workspace
-                ):
-                    raise AppException(
-                        message="Không có quyền truy cập kho tài liệu này.",
-                        code="DOCUMENT_GROUP_ACCESS_DENIED",
-                        status_code=status.HTTP_403_FORBIDDEN,
-                    )
+
                 raise AppException(
                     message=f"Xung đột phiên bản: Kho tài liệu đã bị sửa đổi bởi phiên khác (hiện tại: lock={check_group.lock_version}, yêu cầu: {req.expected_lock_version}).",
                     code="OPTIMISTIC_LOCK_CONFLICT",
@@ -375,7 +360,7 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> None:
         """Delete group and its memberships. Repository documents and bindings remain untouched."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         group = await db.get(DocumentGroup, group_id)
         if not group:
@@ -385,12 +370,7 @@ class DocumentGroupService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
-            raise AppException(
-                message="Không có quyền truy cập kho tài liệu này.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         # Delete memberships explicitly (and cascade helps as well)
         await db.execute(
@@ -412,7 +392,7 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> GroupDocumentsResponse:
         """List documents contained within a group with revision statuses."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         group = await db.get(DocumentGroup, group_id)
         if not group:
@@ -422,12 +402,7 @@ class DocumentGroupService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
-            raise AppException(
-                message="Không có quyền truy cập kho tài liệu này.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         stmt = (
             select(
@@ -442,8 +417,8 @@ class DocumentGroupService:
             .where(
                 DocumentGroupMembership.group_id == group_id,
                 RepositoryDocument.is_active.is_(True),
-                RepositoryDocument.tenant_id == r_tenant,
-                RepositoryDocument.workspace_id == r_workspace,
+
+
             )
         )
 
@@ -519,7 +494,7 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> AddGroupDocumentsResponse:
         """Batch add documents to a group idempotently with individual outcome reporting."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         group = await db.get(DocumentGroup, group_id)
         if not group:
@@ -529,12 +504,7 @@ class DocumentGroupService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
-            raise AppException(
-                message="Không có quyền truy cập kho tài liệu này.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         user_id = _resolve_actor_id(actor)
         results: list[AddGroupDocumentsResultItem] = []
@@ -584,16 +554,7 @@ class DocumentGroupService:
                 failed_count += 1
                 continue
 
-            if doc.tenant_id != r_tenant or (r_workspace and doc.workspace_id != r_workspace):
-                results.append(
-                    AddGroupDocumentsResultItem(
-                        document_id=doc_id,
-                        status="failed",
-                        message="Tài liệu không thuộc tenant/workspace của kho tài liệu này.",
-                    )
-                )
-                failed_count += 1
-                continue
+
 
             # Add membership
             membership = DocumentGroupMembership(
@@ -634,7 +595,7 @@ class DocumentGroupService:
         actor: Any | None = None,
     ) -> None:
         """Remove a single document membership from a group."""
-        r_tenant, r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
+        _r_tenant, _r_workspace = await self._resolve_scope(tenant_id, workspace_id, actor)
 
         group = await db.get(DocumentGroup, group_id)
         if not group:
@@ -644,12 +605,7 @@ class DocumentGroupService:
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if group.tenant_id != r_tenant or (r_workspace and group.workspace_id != r_workspace):
-            raise AppException(
-                message="Không có quyền truy cập kho tài liệu này.",
-                code="DOCUMENT_GROUP_ACCESS_DENIED",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+
 
         del_stmt = delete(DocumentGroupMembership).where(
             DocumentGroupMembership.group_id == group_id,

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, FolderGit2, Table2 } from "lucide-react";
+import { Activity, BookOpenText, FolderGit2, Table2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { CollectionExcelImportDialog } from "@/components/knowledge/dialogs/coll
 import { TaskLogDialog } from "@/components/knowledge/dialogs/task-log-dialog";
 import { CollectionBindingsTab } from "@/components/knowledge/tabs/collection-bindings-tab";
 import { CollectionFactsTab } from "@/components/knowledge/tabs/collection-facts-tab";
+import { CollectionGlossaryTab } from "@/components/knowledge/tabs/collection-glossary-tab";
 import { CollectionTasksTab } from "@/components/knowledge/tabs/collection-tasks-tab";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,8 +23,8 @@ import { CollectionEditDialog } from "./components/collection-edit-dialog";
 
 export interface CollectionDetailPageProps {
   collectionId: string;
-  initialTab?: "sources" | "facts" | "tasks" | "models";
-  onTabChange: (tab: "sources" | "facts" | "tasks") => void;
+  initialTab?: "sources" | "facts" | "tasks" | "glossary" | "models";
+  onTabChange: (tab: "sources" | "facts" | "tasks" | "glossary") => void;
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
@@ -256,6 +257,14 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               <Activity className="size-3.5" />
               <span>Hoạt động</span>
             </TabsTrigger>
+
+            <TabsTrigger
+              value="glossary"
+              className="text-xs h-7 px-3 sm:px-4 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs shrink-0 whitespace-nowrap"
+            >
+              <BookOpenText className="size-3.5" />
+              <span>Thuật ngữ</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -275,6 +284,11 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
             onRefresh={() => factsQuery.refetch()}
             onOpenExcelImport={() => setIsExcelImportOpen(true)}
           />
+        </TabsContent>
+
+        {/* Tab 4: Thuật Ngữ (Glossary) */}
+        <TabsContent value="glossary" className="mt-0 focus-visible:ring-0">
+          <CollectionGlossaryTab collectionId={collection.id} />
         </TabsContent>
 
         {/* Tab 3: Hoạt Động (Tasks) */}

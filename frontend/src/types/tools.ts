@@ -15,7 +15,6 @@ export interface ToolItem {
 export interface ToolExecuteRequest {
   tool_name: string;
   parameters: Record<string, unknown>;
-  tenant_id?: string;
   assistant_code?: string;
   conversation_id?: string;
 }
