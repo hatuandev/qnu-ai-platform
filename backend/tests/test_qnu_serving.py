@@ -140,7 +140,7 @@ def test_old_unit_manifest_seal_remains_compatible():
     manifest = build_unit_manifest("Old paragraph")
     old = manifest.model_dump()
     for unit in old["units"]:
-        for key in ("qnu_block_id", "source_locations", "context_refs"):
+        for key in ("qnu_block_id", "source_locations", "context_refs", "field_context_refs"):
             unit.pop(key)
     assert manifest_digest(UnitManifest.model_validate(old)) == digest(old)
 

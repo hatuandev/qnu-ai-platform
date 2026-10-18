@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v17-docx-source"
+EXTRACTION_VERSION = "layout-v18-semantic-evidence"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -278,6 +278,10 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
 
             source_evidence = {**parsed.docx_source_evidence, "render_pages": {
                 page["page_number"]: page.get("alignment_text", "") for page in result.pages}}
+            from app.modules.knowledge.parsers.docx_evidence import preview_image_locations
+
+            source_evidence["preview_images"] = await asyncio.to_thread(
+                preview_image_locations, preview, parsed.docx_source_evidence.get("resources", []))
             result.office_resources = parsed.docx_source_evidence.get("resources", [])
             result.qnu_document = await asyncio.to_thread(
                 build_qnu_structured_document,

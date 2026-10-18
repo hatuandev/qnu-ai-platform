@@ -23,6 +23,7 @@ from app.modules.knowledge.services.source_artifact import (
     get_source_artifact,
     get_structured_review_state,
 )
+from app.modules.knowledge.services.source_links import unit_context_ids
 from app.modules.rag.evidence_bm25 import rank_blocks, tokens  # noqa: F401
 from app.modules.rag.evidence_context import model_block
 from app.modules.rag.evidence_dependencies import (
@@ -165,6 +166,9 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             source_context=markdown[:1200],
             canonical_hash=source.canonical_hash, temporal_scope=unit.temporal,
             fact_context={"source_kind": unit.kind, **({"qnu_block_id": unit.qnu_block_id,
+                "shared_context_unit_ids": unit_context_ids(manifest, unit.id, include_fields=False),
+                "field_context_unit_ids": {column: unit_context_ids(manifest, unit.id, column)
+                                           for column in unit.field_context_refs},
                 "source_locations": unit.source_locations, "context_unit_ids": source_artifact.get("context_graph", {}).get("links", {}).get(unit.id, [])}
                 if unit.qnu_block_id else {})},
             scope_years=unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else [],

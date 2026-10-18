@@ -116,7 +116,7 @@ def _full_line_match(markdown: str, hit: re.Match) -> bool:
     left = markdown[markdown.rfind("\n", 0, hit.start()) + 1:hit.start()]
     stop = markdown.find("\n", hit.end())
     right = markdown[hit.end():stop if stop >= 0 else len(markdown)]
-    return bool(re.fullmatch(r"[\s#>*`_~]*(?:(?:\d+[.)]|[-+*])\s+)?", left)
+    return bool(re.fullmatch(r"[\s#>*`_~]*(?:(?:\d+[.)]|[^\W\d_][.)]|[-+*])\s+)?", left)
                 and re.fullmatch(r"\W*", right))
 
 
@@ -139,7 +139,7 @@ def _locations(index: int, pages: list[int], suffix: str = "") -> list[QnuSource
 
 
 class _Builder:
-    def __init__(self, has_page_mapping: bool = False) -> None:
+    def __init__(self, has_page_mapping: bool = False, render_pages: dict[int, str] | None = None) -> None:
         self.blocks: list[QnuBlock] = []
         self.counters: dict[str, int] = {}
         self.headings: list[tuple[int, str, str]] = []
@@ -148,6 +148,7 @@ class _Builder:
         self.unit_states: dict[str, int] = {}
         self.has_page_mapping = has_page_mapping
         self.note_tables: set[str] = set()
+        self.render_pages = render_pages or {}
 
     def next_id(self, prefix: str) -> str:
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
@@ -172,6 +173,12 @@ class _Builder:
         *, full_lines: bool = False,
     ) -> tuple[list[int], int]:
         pages, cursor, state = map_unit_to_page(text, page_ranges, cursor, markdown, full_lines=full_lines)
+        if not pages and self.render_pages:
+            pattern = _unit_pattern(text)
+            native = [page for page, body in self.render_pages.items() if pattern and any(
+                not full_lines or _full_line_match(body, hit) for hit in pattern.finditer(body))]
+            if len(native) == 1:
+                pages, state = native, "native_matched"
         if state == "unavailable" and not self.has_page_mapping:
             return pages, cursor
         self.unit_states[state] = self.unit_states.get(state, 0) + 1
@@ -354,6 +361,15 @@ def _add_table(
     for row in grid:
         pages, cursor = builder.map_unit(_row_unit_text(row), page_ranges, cursor, markdown)
         row_pages.append(pages)
+    # Ordered DOCX rows bracketed by independently located rows on the same
+    # physical page cannot cross a page boundary. Never infer across two pages.
+    for row, located in enumerate(row_pages):
+        if located:
+            continue
+        left = next((p for p in reversed(row_pages[:row]) if p), [])
+        right = next((p for p in row_pages[row + 1:] if p), [])
+        if left and right and left[-1] == right[0]:
+            row_pages[row] = [left[-1]]
     header_pages = row_pages[:header_rows] or row_pages[:1]
     pages = sorted({page for located in header_pages for page in located}) if all(header_pages) else []
     single_page = all(row_pages) and len({page for located in row_pages for page in located}) == 1
@@ -520,7 +536,8 @@ def build_qnu_structured_document(
 ) -> QnuStructuredDocument:
     """Walk a Docling document in reading order and build the QNU v1.0 model."""
     ranges = page_ranges or []
-    builder = _Builder(has_page_mapping=bool(ranges))
+    render_pages = (source_evidence or {}).get("render_pages") or {}
+    builder = _Builder(has_page_mapping=bool(ranges or render_pages), render_pages=render_pages)
     builder.note_tables = {str(p["table"]["table"]) for p in (source_evidence or {}).get("paragraphs", [])
                            if p.get("notes") and p.get("table")}
     indexed = [
@@ -714,16 +731,17 @@ def build_qnu_structured_document(
             ),
         },
     }
-    mapping_status = "aligned" if ranges and not builder.unmapped else "partial" if ranges else "unavailable"
+    has_mapping = bool(ranges or render_pages)
+    mapping_status = "aligned" if has_mapping and not builder.unmapped else "partial" if has_mapping else "unavailable"
     document_meta: dict[str, Any] = {
         "source_format": "docx",
         "locator_scheme": LOCATOR_SCHEME,
         "page_mapping": {
             "status": mapping_status,
-            "kind": "pdf_preview_render" if ranges else None,
+            "kind": "pdf_preview_render" if has_mapping else None,
             "render_sha256": render_sha256,
             "render_page_count": render_page_count,
-            "method": "token_match_on_aligned_preview" if ranges else None,
+            "method": "aligned_tokens_unique_native_units_and_same_page_row_brackets" if has_mapping else None,
             "note": (
                 "DOCX không có số trang vật lý; page là trang của bản PDF render xem trước, "
                 "không phải trang in của DOCX."

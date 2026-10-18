@@ -35,6 +35,7 @@ class UnitAnnotationPolicy(BaseModel):
     enabled: bool = False
     model_name: str | None = Field(None, min_length=1, max_length=255)
     provider_id: str | None = Field(None, min_length=1, max_length=64)
+    semantic_enabled: bool = True
 
 
 INSTRUCTION = """Classify temporal roles of supplied document units, never answer a question.
@@ -220,10 +221,20 @@ async def enrich_source_units(markdown: str, artifact: dict[str, Any], tenant_id
     except (AppException, ValueError, TimeoutError) as exc:
         artifact["unit_annotation"] = {"status": "unavailable", "error_code": getattr(exc, "code", type(exc).__name__)}
         logger.warning("unit_context_annotation_unavailable tenant=%s code=%s", tenant_id, artifact["unit_annotation"]["error_code"])
-        return
-    artifact["retrieval_units"] = manifest.model_dump()
-    artifact["unit_manifest_hash"] = manifest_digest(manifest)
-    artifact["unit_annotation"] = {"status": "proposed", "unit_ids": unit_ids}
-    if unit_ids:
-        artifact["issues"].append({"code": "UNIT_TEMPORAL_REVIEW", "unit_ids": unit_ids})
-        artifact["review"] = {"status": "required"}
+    else:
+        artifact["retrieval_units"] = manifest.model_dump()
+        artifact["unit_manifest_hash"] = manifest_digest(manifest)
+        artifact["unit_annotation"] = {"status": "proposed", "unit_ids": unit_ids}
+        if unit_ids:
+            artifact["issues"].append({"code": "UNIT_TEMPORAL_REVIEW", "unit_ids": unit_ids})
+            artifact["review"] = {"status": "required"}
+    if artifact.get("input_format") == "qnu-rag-projection/v1" and parsed_policy.semantic_enabled:
+        from app.modules.knowledge.services.semantic_annotations import propose_source_semantics
+
+        try:
+            async with asyncio.timeout(120), AsyncSessionFactory() as model_db:
+                await propose_source_semantics(model_db, artifact, tenant_id,
+                                               parsed_policy.model_name, parsed_policy.provider_id)
+        except (AppException, ValueError, KeyError, TypeError, TimeoutError) as exc:
+            artifact["semantic_annotations"] = {"status": "unavailable", "error_code": getattr(exc, "code", type(exc).__name__)}
+            artifact["review"] = {"status": "required"}

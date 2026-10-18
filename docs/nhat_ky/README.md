@@ -7,6 +7,10 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên544](./2026-10-18_phien_544_de_xuat_ngu_nghia_co_duyet.md) | Đề xuất ngữ nghĩa có duyệt | ModelOps chỉ đề xuất, người dùng đối chiếu rồi áp dụng vào nháp; mapping9→1, BM25draft20/20. ModelOps thật lỗi provider; chưa duyệt nguồn |
+
+| **2026-10-18** | [Phiên543](./2026-10-18_phien_543_kiem_thu_docx_den_rag_offline.md) | DOCX đến RAG offline | NOT READY: đủ text/rows/footnotes/image/citation, thiếu5note deps/2state; BM25draft17/20Hit5; gate chặn3ambiguous. Không sửa app/nạp lại |
+
 | **2026-10-18** | [Phiên542](./2026-10-18_phien_542_sua_ba_loi_review_rag.md) | Sửa ba finding review RAG | Căn cứ năm đúng cột/ô, fact hiệu đính có audit, escape một lần;25test mới,158PASS/RuffPASS;full13FAIL/2163PASS exact baseline13. Chưa nạp lại/duyệt/publish |
 
 | **2026-10-18** | [Phiên541](./2026-10-18_phien_541_review_tich_hop_rag_parser.md) | Review RAG sau batch 540 | CHANGES REQUESTED: 2P1 scope năm/correction fact, 1P2 escape;80PASS/Ruff21PASS, probe4FAIL. Không sửa app hoặc nạp lại |

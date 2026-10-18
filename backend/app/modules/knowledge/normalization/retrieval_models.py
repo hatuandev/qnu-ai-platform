@@ -46,6 +46,7 @@ class SourceUnit(BaseModel):
     qnu_block_id: str | None = None
     source_locations: list[dict] = Field(default_factory=list)
     context_refs: list[str] = Field(default_factory=list)
+    field_context_refs: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class UnitManifest(BaseModel):

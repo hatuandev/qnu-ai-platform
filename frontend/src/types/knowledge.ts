@@ -217,6 +217,30 @@ export interface FactItem {
 }
 
 export interface SourceArtifact {
+  input_format?: string;
+  semantic_annotations?: {
+    status: "proposed" | "verified" | "empty" | "unavailable" | "rejected";
+    proposal_hash?: string;
+    error_code?: string;
+    annotations?: {
+      notes: {
+        note_unit_id: string;
+        evidence_quote: string;
+        table_id: string;
+        scope: "table" | "row" | "group" | "column";
+        row_unit_ids: string[];
+        column_ids: string[];
+      }[];
+      cells: {
+        row_unit_id: string;
+        column_id: string;
+        raw: string;
+        state: "not_stated" | "not_applicable" | "ambiguous" | "unreadable";
+        evidence_unit_id: string;
+        evidence_quote: string;
+      }[];
+    };
+  };
   content_integrity?: ContentIntegrityReport;
   temporal_metadata?: {
     issued_date: {
@@ -244,6 +268,8 @@ export interface SourceArtifact {
   >[];
   tables: {
     id: string;
+    columns?: { id: string; header_path: string[] }[];
+    row_unit_ids?: string[];
     page_number: number | null;
     headers: string[];
     rows: string[][];
@@ -1052,6 +1078,7 @@ export interface SourceContextEditRequest {
 export interface ReviewSourceRevisionRequest {
   decision: "approved" | "rejected";
   comment?: string;
+  expected_semantic_proposal_hash?: string;
 }
 
 // ==============================================================================

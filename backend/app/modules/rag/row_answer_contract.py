@@ -173,7 +173,8 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
             field_origin=field.get("field_origin") if field else None,
             column_id=field.get("column_id") if field else None,
             header_path=field.get("header_path") if field else None,
-            temporal=temporal, standard=bool(field), state_source=state_source)
+            temporal=temporal, standard=bool(field),
+            state_source=field.get("state_source", state_source) if field else state_source)
         catalog.cells[key] = cell
         cells.append(_cell_payload(key, cell))
     if cells:

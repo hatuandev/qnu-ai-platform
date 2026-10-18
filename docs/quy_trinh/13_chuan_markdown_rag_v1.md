@@ -670,3 +670,29 @@ nhận. Xóa năm giữ unknown/[], không phục hồi từ năm trong header h
 Header/raw/origin giữ để truy vết; giá trị trả lời thêm nhãn cell state rồi escape
 đúng một lần khi dựng Markdown. Đổi adapter không tự cập nhật artifact đã lưu,
 không cấp quyền nạp lại, duyệt, lập chỉ mục hoặc xuất bản nguồn cũ.
+
+### 11.6. Đề xuất ngữ nghĩa và đối chiếu bản nháp — phiên 544
+
+Với revision chuẩn đang `review_required`, mở hộp thoại kiểm duyệt ở trang chi
+tiết nguồn và chọn **Tạo đề xuất đối chiếu qua ModelOps**. Model được phân giải
+qua cấu hình DB hiện hành, không nhập API key hoặc ép model trong parser. Policy
+annotation opt-in hiện có cũng có thể tạo đề xuất sau khi projection chuẩn hoàn tất;
+thay đổi này không tự bật policy trên các nguồn đang chạy.
+
+Đề xuất gồm trích đoạn nguyên văn, bảng/dòng/cột và scope, hoặc raw cell cùng
+trạng thái được đề nghị. Model không cấp quyền duyệt. Server kiểm tọa độ/quote,
+giữ hash input/proposal, bảo toàn nguồn và chỉ lưu đề xuất. Ô trống, số 0 và mã
+có số 0 đầu không được model đổi nghĩa; thiếu căn cứ giữ unknown/ambiguous.
+
+Sau khi đối chiếu, xác nhận checkbox và ghi lý do, chọn **Áp dụng đề xuất vào bản
+nháp** hoặc **Bỏ đề xuất**. Server kiểm quyền cập nhật, đúng collection/revision,
+pair/hash, khóa nguồn và idle. Hash cũ hoặc dữ liệu đã đổi bị từ chối. Áp dụng chỉ
+cập nhật metadata dẫn xuất của bản nháp, giữ audit; không chuyển active revision,
+lập chỉ mục hoặc xuất bản. Duyệt toàn nguồn vẫn cần qua gate unknown cell và quy
+trình phê duyệt riêng. Bulk không được âm thầm chấp nhận proposal pending.
+
+Note scope theo cột chỉ đi vào dependencies của fact đúng cột; context toàn dòng
+có thể chứa đủ chú thích để đọc bảng. Không mở rộng scope năm từ nội dung model.
+Lỗi provider, output sai schema hoặc thiếu bằng chứng phải báo lỗi; không giả
+proposal rỗng, không tự dùng nhãn benchmark thay output model. Phiên 544 gọi thật
+gặp `ALL_PROVIDERS_UNAVAILABLE`; chưa có proposal được người dùng duyệt cho DOCX thử.

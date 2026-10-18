@@ -1825,22 +1825,71 @@ export const knowledgeApi = {
     return res.json();
   },
 
+  async generateSemanticProposals(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const response = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/semantic-proposals`,
+      { method: "POST", headers: getAuthHeaders() },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(error, "Không tạo được đề xuất ngữ nghĩa."),
+      );
+    }
+    return response.json();
+  },
+
+  async reviewSemanticProposals(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    proposalHash: string,
+    comment: string,
+    decision: "approved" | "rejected" = "approved",
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const response = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/semantic-review`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          decision,
+          comment,
+          expected_semantic_proposal_hash: proposalHash,
+        }),
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(error, "Không áp dụng được đề xuất ngữ nghĩa."),
+      );
+    }
+    return response.json();
+  },
+
   async reviewSourceRevision(
     collectionId: string,
     sourceId: string,
     revisionId: string,
     decision: "approved" | "rejected",
     comment?: string,
+    expectedSemanticProposalHash?: string,
   ): Promise<KnowledgeSourceRevisionResponse> {
     const res = await fetch(
       `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/review`,
       {
         method: "POST",
-        headers: {
-          ...getAuthHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ decision, comment }),
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          decision,
+          comment,
+          expected_semantic_proposal_hash: expectedSemanticProposalHash,
+        }),
       },
     );
     if (!res.ok) {

@@ -1044,6 +1044,14 @@ class ReviewSourceRevisionRequest(BaseModel):
 
     decision: str = Field(..., description="Quyết định duyệt: approved hoặc rejected")
     comment: str | None = Field(None, description="Ghi chú phản hồi duyệt")
+    expected_semantic_proposal_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
+
+
+class SemanticProposalReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["approved", "rejected"]
+    expected_semantic_proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    comment: str = Field(min_length=3, max_length=2000)
 
 
 class BulkReviewSourceRevisionItem(BaseModel):

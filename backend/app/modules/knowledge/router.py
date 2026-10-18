@@ -83,6 +83,7 @@ from app.modules.knowledge.schemas import (
     ReparseSourceRequest,
     ReviewSourceRevisionRequest,
     RollbackIndexRevisionRequest,
+    SemanticProposalReviewRequest,
     ShadowRetrievalReport,
     ShadowRetrievalRequest,
     SourceContextEditRequest,
@@ -1484,8 +1485,38 @@ async def review_source_revision(
         tenant_id=actor.tenant_id,
         workspace_id=actor.workspace_id,
         actor_id=actor.actor_id,
+        expected_semantic_proposal_hash=payload.expected_semantic_proposal_hash,
     )
     return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+@router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/semantic-proposals",
+             response_model=KnowledgeSourceRevisionResponse,
+             summary="Tạo đề xuất ngữ nghĩa cho bản nháp qua ModelOps, chưa áp dụng")
+async def propose_source_semantics(
+    collection_id: str, source_id: str, revision_id: str,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    from app.modules.knowledge.services.semantic_annotations import generate_semantic_proposals
+
+    revision = await generate_semantic_proposals(db, collection_id, source_id, revision_id, actor)
+    return KnowledgeSourceRevisionResponse.model_validate(revision)
+
+
+@router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/semantic-review",
+             response_model=KnowledgeSourceRevisionResponse,
+             summary="Đối chiếu và áp dụng đề xuất ngữ nghĩa vào bản nháp, không xuất bản")
+async def review_source_semantics(
+    collection_id: str, source_id: str, revision_id: str,
+    payload: SemanticProposalReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    from app.modules.knowledge.services.semantic_annotations import review_semantic_proposals
+
+    revision = await review_semantic_proposals(db, collection_id, source_id, revision_id, payload, actor)
+    return KnowledgeSourceRevisionResponse.model_validate(revision)
 
 
 @router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/clean-preview",

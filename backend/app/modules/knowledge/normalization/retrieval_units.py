@@ -136,6 +136,8 @@ def _digest(payload: dict[str, Any]) -> str:
 def manifest_digest(manifest: UnitManifest) -> str:
     payload = manifest.model_dump()
     for unit in payload["units"]:
+        if not unit.get("field_context_refs"):
+            unit.pop("field_context_refs", None)
         if not unit.get("qnu_block_id"):
             for key in ("qnu_block_id", "source_locations", "context_refs"):
                 unit.pop(key, None)  # Historical v1 manifests retain their exact seal.
@@ -150,6 +152,8 @@ def legacy_manifest_digest(manifest: UnitManifest) -> str:
     """
     payload = manifest.model_dump()
     for unit in payload["units"]:
+        if not unit.get("field_context_refs"):
+            unit.pop("field_context_refs", None)
         temporal = unit.get("temporal") or {}
         for key, default in _TEMPORAL_ADDITIONS.items():
             if temporal.get(key) == default:
@@ -172,6 +176,8 @@ def validate_manifest(manifest: UnitManifest, markdown: str) -> None:
     if len(ids) != len(manifest.units):
         raise ValueError("Duplicate source unit ID")
     for unit in manifest.units:
+        if any(ref not in ids or ref == unit.id for refs in unit.field_context_refs.values() for ref in refs):
+            raise ValueError("Invalid field-scoped source context")
         if unit.end <= unit.start or markdown[unit.start:unit.end] != unit.text:
             raise ValueError("Source unit does not match its original span")
         if unit.parent_id and unit.parent_id not in ids:

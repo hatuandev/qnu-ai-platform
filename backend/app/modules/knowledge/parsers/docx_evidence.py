@@ -159,6 +159,41 @@ def _resources(archive: ZipFile, root: Any, document: Any) -> list[dict]:
     return resources
 
 
+def preview_image_locations(preview: bytes, resources: list[dict]) -> dict[str, dict]:
+    """Locate only a unique, pixel-identical source image in the PDF preview."""
+    import pymupdf
+
+    if not resources:
+        return {}
+    assets = defaultdict(list)
+    for resource in resources:
+        with Image.open(BytesIO(resource["data"])) as image:
+            assets[_pixel_key(image)].append(resource["source_ref"])
+    positions = defaultdict(dict)
+    try:
+        document = pymupdf.open(stream=preview, filetype="pdf")
+    except (ValueError, RuntimeError):
+        return {}
+    with document:
+        for number, page in enumerate(document, 1):
+            for entry in page.get_images(full=True):
+                xref = entry[0]
+                try:
+                    payload = document.extract_image(xref)["image"]
+                    with Image.open(BytesIO(payload)) as image:
+                        refs = assets.get(_pixel_key(image), [])
+                    if len(refs) != 1:
+                        continue
+                    for rect in page.get_image_rects(xref):
+                        positions[refs[0]][(number, *rect)] = {
+                            "page": number, "bbox": list(rect), "bbox_space": "points",
+                            "basis": "exact_render_image_pixels",
+                        }
+                except (OSError, ValueError, RuntimeError):
+                    continue  # No proof: retain the DOCX locator and unresolved page.
+    return {ref: next(iter(items.values())) for ref, items in positions.items() if len(items) == 1}
+
+
 def apply_docx_evidence(model: QnuStructuredDocument, evidence: dict[str, Any]) -> None:
     """Only source-owned note IDs create dependencies; prose proximity is not scope."""
     if not evidence:
@@ -260,6 +295,13 @@ def apply_docx_evidence(model: QnuStructuredDocument, evidence: dict[str, Any]) 
             block.attributes["resource"].update(
                 {k: resource[k] for k in ("member", "sha256", "media_type")}
             )
+            position = evidence.get("preview_images", {}).get(ref)
+            if position:
+                block.source_locations = [QnuSourceLocation(
+                    page=position["page"], bbox=position["bbox"], bbox_space=position["bbox_space"],
+                    locator=block.source_locations[0].locator if block.source_locations else None)]
+                block.attributes["page_mapping_basis"] = position["basis"]
+                block.quality_flags = [f for f in block.quality_flags if f.code != "page_unresolved"]
             block.quality_flags = [f for f in block.quality_flags if f.code != "missing_content"]
             block.quality_flags.append(
                 QnuQualityFlag(

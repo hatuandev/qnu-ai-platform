@@ -131,7 +131,8 @@ def _standard_fact(raw: dict, index: dict, fact: KnowledgeFact,
     block_id = raw.get("qnu_block_id")
     if not isinstance(block_id, str) or block_id != row.fact_context.get("qnu_block_id"):
         return None
-    recorded = row.fact_context.get("context_unit_ids")
+    recorded = row.fact_context.get("field_context_unit_ids", {}).get(raw.get("column_id"),
+        row.fact_context.get("shared_context_unit_ids", row.fact_context.get("context_unit_ids")))
     if not isinstance(recorded, list) or list(recorded) != list(refs):
         return None
     locations = raw.get("source_locations")

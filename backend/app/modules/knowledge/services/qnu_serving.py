@@ -140,6 +140,10 @@ async def prepare_standard_revision(revision: Any) -> None:
             raise _invalid("standard_projection_invalid") from exc
         if not canonical.strip():
             raise _invalid("empty_projection")
+        from app.modules.knowledge.services.unit_annotation import enrich_source_units
+
+        await enrich_source_units(canonical, artifact, getattr(revision, "tenant_id", "tenant_qnu"),
+                                  (revision.snapshot_metadata or {}).get("unit_temporal_annotation"))
         revision.canonical_markdown = canonical
         revision.canonical_hash = hashlib.sha256(canonical.encode()).hexdigest()
         revision.parse_provenance = {**revision.parse_provenance, "canonical_format": VERSION,

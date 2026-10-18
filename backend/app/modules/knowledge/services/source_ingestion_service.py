@@ -331,7 +331,8 @@ class SourceIngestionService:
                 temporal_metadata = extract_temporal_metadata(clean_md, item.origin_file_name)
                 structured_artifact["temporal_metadata"] = temporal_metadata
                 refresh_unit_metadata(clean_md, structured_artifact)
-                await enrich_source_units(clean_md, structured_artifact, batch.tenant_id, annotation_policy)
+                if (item.origin_file_type or "").lower().lstrip(".") not in {"docx", "pdf"}:
+                    await enrich_source_units(clean_md, structured_artifact, batch.tenant_id, annotation_policy)
                 citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
                 add_layout_issues(structured_artifact, page_manifest)
                 attach_content_integrity(structured_artifact, clean_md, parsed_page_count)
@@ -778,12 +779,16 @@ class SourceIngestionService:
         decision: str,
         comment: str | None,
         actor_id: str | None,
+        expected_semantic_proposal_hash: str | None = None,
     ) -> None:
         artifact = copy.deepcopy(artifact)
         reviewed_at = datetime.now(UTC)
         if decision == "approved" and (rev.parse_provenance or {}).get("standard_required"):
             if artifact.get("input_format") != "qnu-rag-projection/v1":
                 raise AppException("Chưa có bản chuẩn hợp lệ để duyệt.", code="QNU_STANDARD_INVALID", status_code=409)
+            from app.modules.knowledge.services.semantic_annotations import apply_reviewed_semantics
+
+            artifact = apply_reviewed_semantics(artifact, expected_semantic_proposal_hash, actor_id, comment)
             if artifact.get("unresolved_cell_count"):
                 raise AppException("Cần xử lý rõ các ô mơ hồ/không đọc được trước khi duyệt bản chuẩn.",
                                    code="QNU_UNRESOLVED_CELLS", status_code=409)
@@ -846,6 +851,7 @@ class SourceIngestionService:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         actor_id: str | None = None,
+        expected_semantic_proposal_hash: str | None = None,
     ) -> KnowledgeSourceRevision:
         """Approve or reject a review_required source revision."""
         from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
@@ -857,7 +863,7 @@ class SourceIngestionService:
         from app.modules.knowledge.services.qnu_serving import verify_approval_pair
 
         await verify_approval_pair(rev, decision)
-        self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id)
+        self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id, expected_semantic_proposal_hash)
         await db.commit()
         await db.refresh(rev)
         return rev
@@ -1309,8 +1315,9 @@ class SourceIngestionService:
         attach_content_integrity(structured_artifact, clean_md, parsed_page_count)
         structured_artifact["temporal_metadata"] = temporal_metadata
         refresh_unit_metadata(clean_md, structured_artifact)
-        await enrich_source_units(clean_md, structured_artifact, tenant_id,
-            (current_rev.snapshot_metadata or {}).get("unit_temporal_annotation"))
+        if (file_type or "").lower().lstrip(".") not in {"docx", "pdf"}:
+            await enrich_source_units(clean_md, structured_artifact, tenant_id,
+                (current_rev.snapshot_metadata or {}).get("unit_temporal_annotation"))
         quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
         snapshot_metadata = {**dict(current_rev.snapshot_metadata or {}), "preview_pdf_path": preview_path}

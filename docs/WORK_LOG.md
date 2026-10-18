@@ -6,6 +6,10 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-18** | Codex | Đề xuất ngữ nghĩa có duyệt | Proposal/review nháp có hash/actor/quote; field scope, mapping9→1, BM25draft20/20.175 focused/4frontend PASS, full13FAIL/2194PASS exact baseline; ModelOps thật FAIL ALL_PROVIDERS_UNAVAILABLE, nguồn vẫn NOT_READY | [Nhật ký544](./nhat_ky/2026-10-18_phien_544_de_xuat_ngu_nghia_co_duyet.md) |
+
+| **2026-10-18** | Codex | Kiểm DOCX đến RAG offline | NOT READY: giữ183đoạn/103dòng/645ô/3footnote/ảnh/261citation; thiếu5scope note deps và2state sai. BM25draft17/20Hit5;3ô ambiguous bị gate chặn. Không sửa app/nạp lại/model/live | [Nhật ký543](./nhat_ky/2026-10-18_phien_543_kiem_thu_docx_den_rag_offline.md) |
+
 | **2026-10-18** | Codex | Sửa ba finding review RAG | Căn cứ năm đúng cột/ô; hiệu đính có audit dùng chung fact/row; escape một lần giữ đúng bảng.25regression mới,focused158PASS/Ruff6PASS; full13FAIL/2163PASS/17skip/23subtests, exact baseline13. Không nạp lại/duyệt/publish/Git | [Nhật ký542](./nhat_ky/2026-10-18_phien_542_sua_ba_loi_review_rag.md) |
 
 | **2026-10-18** | Codex | Review RAG sau batch 540 | CHANGES REQUESTED: 2 P1 về căn cứ năm sai cột và fact hiệu đính bị loại; 1 P2 escape hai lần làm vỡ bảng trả lời. Focused80PASS/Ruff21PASS, probe4FAIL. Chỉ review, chưa nạp lại hoặc sửa app | [Nhật ký541](./nhat_ky/2026-10-18_phien_541_review_tich_hop_rag_parser.md) |

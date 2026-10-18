@@ -351,6 +351,9 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
             if parent.kind == "heading":
                 unit.parent_id = parent.id
         refs = list(block.context_refs)
+        if unit.parent_id in by_id and by_id[unit.parent_id].is_container \
+                and not unit.is_container and unit.id != f"{unit.parent_id}:header":
+            unit.context_refs.append(f"{unit.parent_id}:header")
         if block.parent_id and block.type not in {"table_row", "table"}:
             parent_ref = f"qnu:{block.parent_id}"
             if parent_ref in by_id and by_id[parent_ref].kind != "heading":
@@ -406,6 +409,7 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
             field_state=field.get("state"), page_number=_page(block),
             source_unit_id=row_unit_ids[(raw["table_id"], raw["row_index"])],
             projection_version=VERSION, unit_manifest_hash=manifest_hash)
+        raw["column_id"] = field["column_id"]
         if scope:
             years = list(scope.get("data_years") or [])
             raw["temporal_context"] = {

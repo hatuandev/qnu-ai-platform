@@ -30,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,7 @@ import type {
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
 import { QnuStandardEditor } from "./components/qnu-standard-editor";
+import { SemanticReviewPreview } from "./components/semantic-review-preview";
 import { SourceContextEditor } from "./components/source-context-editor";
 import { refreshSourceQueries } from "./utils/source-query-cache";
 
@@ -100,6 +102,9 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
     "approved",
   );
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewedSemanticKey, setReviewedSemanticKey] = useState<string | null>(
+    null,
+  );
 
   // 1. Fetch Collection Info
   const { data: collection } = useQuery({
@@ -132,6 +137,21 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
     source?.revisions.find((r) => r.id === revisionId) ||
     source?.revisions?.[0] ||
     source?.active_source_revision;
+
+  const semanticReview = useQuery({
+    queryKey: ["source-semantic-review", collectionId, sourceId, activeRev?.id],
+    queryFn: () =>
+      knowledgeApi.getSourceStudioView(
+        collectionId,
+        sourceId,
+        activeRev?.id ?? "",
+      ),
+    enabled: isReviewDialogOpen && !!activeRev?.id,
+  });
+  const semanticProposal =
+    semanticReview.data?.structured_artifact?.semantic_annotations;
+  const semanticReviewKey = `${activeRev?.id}:${semanticProposal?.proposal_hash}`;
+  const hasReviewedSemantics = reviewedSemanticKey === semanticReviewKey;
 
   // Sync markdown content when revision loads
   useEffect(() => {
@@ -177,15 +197,86 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
   });
 
   // 5. Mutation Review Revision
+  const proposalMutation = useMutation({
+    mutationFn: () => {
+      if (!activeRev?.id) throw new Error("Chưa có bản nháp để đối chiếu.");
+      return knowledgeApi.generateSemanticProposals(
+        collectionId,
+        sourceId,
+        activeRev.id,
+      );
+    },
+    onSuccess: async () => {
+      await refreshSourceQueries(queryClient, collectionId, sourceId);
+      await queryClient.invalidateQueries({
+        queryKey: ["source-semantic-review", collectionId, sourceId],
+      });
+      toast.success("Đã tạo đề xuất. Hãy đối chiếu trước khi áp dụng.");
+    },
+    onError: (error: unknown) =>
+      toast.error(extractErrorMessage(error, "Tạo đề xuất thất bại.")),
+  });
+  const semanticMutation = useMutation({
+    mutationFn: (decision: "approved" | "rejected") => {
+      if (
+        !activeRev?.id ||
+        !semanticProposal?.proposal_hash ||
+        !hasReviewedSemantics ||
+        reviewComment.trim().length < 3
+      )
+        throw new Error(
+          "Hãy đối chiếu đề xuất và ghi chú trước khi áp dụng vào bản nháp.",
+        );
+      return knowledgeApi.reviewSemanticProposals(
+        collectionId,
+        sourceId,
+        activeRev.id,
+        semanticProposal.proposal_hash,
+        reviewComment.trim(),
+        decision,
+      );
+    },
+    onSuccess: async (_revision, decision) => {
+      await refreshSourceQueries(queryClient, collectionId, sourceId);
+      await queryClient.invalidateQueries({
+        queryKey: ["source-semantic-review", collectionId, sourceId],
+      });
+      toast.success(
+        decision === "approved"
+          ? "Đã áp dụng đề xuất đã duyệt vào bản nháp. Tài liệu chưa được xuất bản."
+          : "Đã bỏ đề xuất. Dữ liệu trong bản nháp được giữ nguyên.",
+      );
+    },
+    onError: (error: unknown) =>
+      toast.error(extractErrorMessage(error, "Đối chiếu đề xuất thất bại.")),
+  });
   const reviewMutation = useMutation({
     mutationFn: () => {
       if (!activeRev?.id) throw new Error("Chưa có bản sửa đổi để duyệt.");
+      if (
+        reviewDecision === "approved" &&
+        (semanticReview.isFetching ||
+          semanticReview.isPending ||
+          semanticReview.isError)
+      )
+        throw new Error("Cần tải đầy đủ nội dung đối chiếu trước khi duyệt.");
+      if (
+        reviewDecision === "approved" &&
+        semanticProposal?.status === "proposed" &&
+        !hasReviewedSemantics
+      )
+        throw new Error(
+          "Hãy đối chiếu và xác nhận đề xuất ngữ nghĩa trước khi duyệt.",
+        );
       return knowledgeApi.reviewSourceRevision(
         collectionId,
         sourceId,
         activeRev.id,
         reviewDecision,
         reviewComment.trim() || undefined,
+        semanticProposal?.status === "proposed"
+          ? semanticProposal.proposal_hash
+          : undefined,
       );
     },
     onSuccess: async () => {
@@ -880,8 +971,8 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
       {/* Review Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(820px,calc(100vh-2rem))] flex-col gap-0 p-0 sm:max-w-2xl">
+          <DialogHeader className="border-b bg-muted/20 p-4">
             <DialogTitle className="text-base font-bold text-foreground">
               Kiểm Duyệt Nguồn Tri Thức
             </DialogTitle>
@@ -891,7 +982,82 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 text-xs">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 text-sm">
+            {semanticReview.isPending && (
+              <p role="status">Đang tải nội dung đối chiếu...</p>
+            )}
+            {semanticReview.isError && (
+              <p role="alert" className="text-destructive">
+                Không tải được đề xuất. Hãy đóng và mở lại hộp thoại.
+              </p>
+            )}
+            {semanticProposal?.status === "unavailable" && (
+              <p role="alert" className="text-destructive">
+                Chưa tạo được đề xuất ngữ nghĩa. Cần xử lý lỗi bóc tách trước
+                khi duyệt.
+              </p>
+            )}
+            {semanticReview.data?.structured_artifact?.input_format ===
+              "qnu-rag-projection/v1" &&
+              activeRev?.status === "review_required" &&
+              !["proposed", "verified"].includes(
+                semanticProposal?.status ?? "",
+              ) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    proposalMutation.isPending ||
+                    semanticMutation.isPending ||
+                    reviewMutation.isPending ||
+                    semanticReview.isFetching
+                  }
+                  onClick={() => proposalMutation.mutate()}
+                >
+                  {proposalMutation.isPending
+                    ? "Đang đọc ngữ nghĩa..."
+                    : "Tạo đề xuất đối chiếu qua ModelOps"}
+                </Button>
+              )}
+            {semanticReview.data?.structured_artifact && (
+              <SemanticReviewPreview
+                artifact={semanticReview.data.structured_artifact}
+              />
+            )}
+            {semanticProposal?.status === "proposed" && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={
+                  semanticMutation.isPending ||
+                  reviewMutation.isPending ||
+                  proposalMutation.isPending ||
+                  semanticReview.isFetching ||
+                  !hasReviewedSemantics ||
+                  reviewComment.trim().length < 3
+                }
+                onClick={() => semanticMutation.mutate("rejected")}
+              >
+                Bỏ đề xuất
+              </Button>
+            )}
+            {semanticProposal?.status === "proposed" && (
+              <label
+                htmlFor="review-semantic-proposals"
+                className="flex items-start gap-2"
+              >
+                <Checkbox
+                  id="review-semantic-proposals"
+                  checked={hasReviewedSemantics}
+                  onCheckedChange={(checked) =>
+                    setReviewedSemanticKey(
+                      checked === true ? semanticReviewKey : null,
+                    )
+                  }
+                />
+                Tôi đã đối chiếu các trích đoạn và phạm vi áp dụng ở trên.
+              </label>
+            )}
             <div className="space-y-1.5">
               <div className="font-medium text-foreground block">
                 Quyết định phê duyệt
@@ -940,7 +1106,26 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="border-t bg-card p-4">
+            {semanticProposal?.status === "proposed" && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  semanticMutation.isPending ||
+                  reviewMutation.isPending ||
+                  proposalMutation.isPending ||
+                  semanticReview.isFetching ||
+                  !hasReviewedSemantics ||
+                  reviewComment.trim().length < 3
+                }
+                onClick={() => semanticMutation.mutate("approved")}
+              >
+                {semanticMutation.isPending
+                  ? "Đang áp dụng..."
+                  : "Áp dụng đề xuất vào bản nháp"}
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -950,7 +1135,18 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
             </Button>
             <Button
               type="button"
-              disabled={reviewMutation.isPending}
+              disabled={
+                reviewMutation.isPending ||
+                semanticMutation.isPending ||
+                proposalMutation.isPending ||
+                (reviewDecision === "approved" &&
+                  (semanticReview.isFetching ||
+                    semanticReview.isPending ||
+                    semanticReview.isError ||
+                    semanticProposal?.status === "unavailable" ||
+                    (semanticProposal?.status === "proposed" &&
+                      !hasReviewedSemantics)))
+              }
               onClick={() => reviewMutation.mutate()}
             >
               {reviewMutation.isPending

@@ -30,22 +30,31 @@ def _same_family(previous: list[SourceUnit], current: list[SourceUnit], between:
         and len(current) > 1 and _ordinal(current[1]) == _ordinal(previous[-1]) + 1)
 
 
+def unit_context_ids(manifest: UnitManifest, unit_id: str, column_id: str | None = None,
+                     *, include_fields: bool = True) -> list[str]:
+    """Close shared dependencies and only the requested field's dependencies."""
+    by_id = {unit.id: unit for unit in manifest.units}
+    unit = by_id[unit_id]
+    pending = list(unit.context_refs)
+    if include_fields:
+        pending.extend(ref for key, refs in unit.field_context_refs.items()
+                       if column_id is None or key == column_id for ref in refs)
+    seen = set()
+    while pending:
+        ref = pending.pop()
+        if ref not in by_id or ref == unit_id:
+            raise ValueError("Invalid or cyclic standard context reference")
+        if ref in seen:
+            continue
+        seen.add(ref)
+        pending.extend(by_id[ref].context_refs)
+    return sorted(seen, key=lambda ref: by_id[ref].start)
+
+
 def build_context_graph(manifest: UnitManifest) -> dict[str, Any]:
     units = manifest.units
     if any(unit.qnu_block_id for unit in units):
-        by_id = {unit.id: unit for unit in units}
-        links = {}
-        for unit in units:
-            pending, seen = list(unit.context_refs), set()
-            while pending:
-                ref = pending.pop()
-                if ref not in by_id or ref == unit.id:
-                    raise ValueError("Invalid or cyclic standard context reference")
-                if ref in seen:
-                    continue
-                seen.add(ref)
-                pending.extend(by_id[ref].context_refs)
-            links[unit.id] = sorted(seen, key=lambda ref: by_id[ref].start)
+        links = {unit.id: unit_context_ids(manifest, unit.id) for unit in units}
         graph = {"version": VERSION, "canonical_hash": manifest.canonical_hash, "status": "context_only",
                  "links": links, "row_projections": {}}
         graph["digest"] = graph_digest(graph)
