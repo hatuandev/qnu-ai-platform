@@ -21,6 +21,7 @@ from app.modules.modelops.providers.chat_contract import (
 )
 from app.modules.modelops.providers.context_budget import fit_rejected_context
 from app.modules.modelops.schemas import ChatMessage
+from app.modules.modelops.services.inference_policy import retry_transient_response
 
 
 class OpenAIAdapter(BaseLLMAdapter):
@@ -133,13 +134,17 @@ class OpenAIAdapter(BaseLLMAdapter):
         endpoint = f"{(self.base_url or 'https://api.openai.com/v1').rstrip('/')}/chat/completions"
         self.stream_usage = {}
         context_retried = False
+        deadline = time.monotonic() + self.timeout_seconds
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
             for attempt in range(MAX_NEGOTIATIONS + 1):
                 async with client.stream(
-                    "POST", endpoint, headers=self._headers(), json=payload
+                    "POST", endpoint, headers=self._headers(), json=payload,
+                    timeout=max(0.001, deadline - time.monotonic()),
                 ) as response:
                     if response.status_code >= 400:
                         await response.aread()
+                        if attempt < MAX_NEGOTIATIONS and await retry_transient_response(response, deadline):
+                            continue  # Headers rejected: no content has been emitted.
                         if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
                             response, payload, self.request_capabilities
                         ):

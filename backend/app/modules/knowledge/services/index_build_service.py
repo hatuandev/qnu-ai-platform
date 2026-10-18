@@ -534,6 +534,15 @@ class IndexBuildService:
 
         col = await get_scoped_collection(db, binding.collection_id, actor=actor)
 
+        from app.modules.knowledge.services.revision_publish_service import (
+            is_sealed_revision,
+            swap_sealed_revision,
+        )
+
+        if await is_sealed_revision(db, target_rev):
+            return await swap_sealed_revision(db, binding.id, target_rev.id, expected_epoch,
+                                              actor, rollback=False, reason=reason)
+
         from app.modules.rag.vector_indexer import vector_indexer
 
         await vector_indexer.activate_index_revision(
@@ -634,6 +643,15 @@ class IndexBuildService:
             )
 
         col = await get_scoped_collection(db, binding.collection_id, actor=actor)
+
+        from app.modules.knowledge.services.revision_publish_service import (
+            is_sealed_revision,
+            swap_sealed_revision,
+        )
+
+        if await is_sealed_revision(db, target_rev):
+            return await swap_sealed_revision(db, binding.id, target_rev.id, expected_epoch,
+                                              actor, rollback=True, reason=reason)
 
         from app.modules.rag.vector_indexer import vector_indexer
 

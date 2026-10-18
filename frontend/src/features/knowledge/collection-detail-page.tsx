@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, BookOpenText, FolderGit2, Table2 } from "lucide-react";
+import {
+  Activity,
+  BookOpenText,
+  Calculator,
+  FolderGit2,
+  Table2,
+} from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -20,11 +26,14 @@ import { jobsApi } from "@/services/jobs-api";
 import { knowledgeApi } from "@/services/knowledge-api";
 import type { IngestionTask } from "@/types/knowledge";
 import { CollectionEditDialog } from "./components/collection-edit-dialog";
+import { ScoreRuleList } from "./score-rule-list";
 
 export interface CollectionDetailPageProps {
   collectionId: string;
-  initialTab?: "sources" | "facts" | "tasks" | "glossary" | "models";
-  onTabChange: (tab: "sources" | "facts" | "tasks" | "glossary") => void;
+  initialTab?: "sources" | "facts" | "tasks" | "glossary" | "scores" | "models";
+  onTabChange: (
+    tab: "sources" | "facts" | "tasks" | "glossary" | "scores",
+  ) => void;
 }
 
 export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
@@ -228,7 +237,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
       <Tabs
         value={activeTab}
         onValueChange={(val) =>
-          onTabChange(val as "sources" | "facts" | "tasks")
+          onTabChange(
+            val as "sources" | "facts" | "tasks" | "glossary" | "scores",
+          )
         }
         className="space-y-4"
       >
@@ -265,6 +276,13 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
               <BookOpenText className="size-3.5" />
               <span>Thuật ngữ</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="scores"
+              className="shrink-0 gap-1.5 whitespace-nowrap text-xs"
+            >
+              <Calculator className="size-3.5" />
+              Quy đổi điểm
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -289,6 +307,9 @@ export const CollectionDetailPage: React.FC<CollectionDetailPageProps> = ({
         {/* Tab 4: Thuật Ngữ (Glossary) */}
         <TabsContent value="glossary" className="mt-0 focus-visible:ring-0">
           <CollectionGlossaryTab collectionId={collection.id} />
+        </TabsContent>
+        <TabsContent value="scores" className="mt-0 focus-visible:ring-0">
+          <ScoreRuleList collectionId={collection.id} />
         </TabsContent>
 
         {/* Tab 3: Hoạt Động (Tasks) */}

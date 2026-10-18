@@ -95,7 +95,7 @@ async def evaluate(args: argparse.Namespace) -> None:
             response = await client.get(base + "/assistants/admissions")
             response.raise_for_status()
             assistant = response.json()
-            report["assistant"] = {k: assistant[k] for k in ("collection_id", "tenant_id", "updated_at")}
+            report["assistant"] = {k: assistant[k] for k in ("collection_id", "updated_at")}
             report["configuration_fingerprint"] = hashlib.sha256(
                 json.dumps(assistant["config"], sort_keys=True).encode()).hexdigest()
             report["model_policy"] = (assistant["config"] or {}).get("model_policy")
@@ -103,7 +103,7 @@ async def evaluate(args: argparse.Namespace) -> None:
             report["provider_inventory"] = await provider_inventory()
             async with AsyncSessionFactory() as db:
                 snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
-                    db, assistant["collection_id"], tenant_id=assistant["tenant_id"])
+                    db, assistant["collection_id"])
                 blocks = await load_published_blocks(db, snapshot)
                 report["publication"] = {
                     "snapshot_id": snapshot.snapshot_id,
@@ -116,6 +116,16 @@ async def evaluate(args: argparse.Namespace) -> None:
                 "git_dirty": len(report["git_dirty_files"])}}, ensure_ascii=True), flush=True)
             completed = {r["id"] for r in report["results"]}
             save_result(output, report)
+            jsonl_path = output.with_suffix(".jsonl") if output.suffix == ".json" else Path(str(output) + ".jsonl")
+            if not args.resume or not jsonl_path.exists():
+                with jsonl_path.open("w", encoding="utf-8") as handle:
+                    handle.write(json.dumps({"run_meta": {
+                        "started_at": report["started_at"], "phase": report["phase"],
+                        "requested_ids": report["requested_ids"],
+                        "configuration_fingerprint": report["configuration_fingerprint"],
+                        "snapshot_fingerprint": report["publication"]["fingerprint"]}},
+                        ensure_ascii=False) + "\n")
+            consecutive_connection_errors = 0
             for case in cases:
                 if case["id"] in completed:
                     continue
@@ -135,22 +145,37 @@ async def evaluate(args: argparse.Namespace) -> None:
                     payload = item["response"] if isinstance(item["response"], dict) else {}
                     item["rag_direct"] = payload.get("execution_id") is None
                 except httpx.ConnectError as exc:
+                    consecutive_connection_errors += 1
                     item.update(error=f"{type(exc).__name__}: {exc}", failure_kind="infrastructure-connection")
                     item["ended_at"] = datetime.now(UTC).isoformat()
                     item["elapsed_seconds"] = round(time.monotonic() - started, 2)
                     report["results"].append(item)
-                    report.update(finished_at=datetime.now(UTC).isoformat(),
-                        interruption_reason="Connection lost; checkpoint saved, remaining questions not attempted.")
+                    with jsonl_path.open("a", encoding="utf-8") as handle:
+                        handle.write(json.dumps({"id": item["id"], "http": None,
+                            "status": None, "error": item["error"]}, ensure_ascii=False) + "\n")
                     save_result(output, report)
-                    print(json.dumps({"stopped": True, "id": case["id"], "error": item["error"]}), flush=True)
-                    await engine.dispose()
-                    return
+                    print(json.dumps({"id": case["id"], "connection_error": True,
+                        "consecutive": consecutive_connection_errors,
+                        "error": item["error"]}), flush=True)
+                    if consecutive_connection_errors >= 3:
+                        report.update(finished_at=datetime.now(UTC).isoformat(),
+                            interruption_reason="Three consecutive connection errors; checkpoint saved, remaining questions NOT RUN.")
+                        save_result(output, report)
+                        print(json.dumps({"stopped": True, "id": case["id"],
+                            "not_run_from_here": True}), flush=True)
+                        await engine.dispose()
+                        return
+                    continue
                 except httpx.TimeoutException as exc:
                     item.update(error=f"{type(exc).__name__}: {exc}", failure_kind="infrastructure-timeout")
                 except Exception as exc:
                     item.update(error=f"{type(exc).__name__}: {exc}", failure_kind="technical")
+                consecutive_connection_errors = 0
                 item["ended_at"] = datetime.now(UTC).isoformat()
                 item["elapsed_seconds"] = round(time.monotonic() - started, 2)
+                payload_resp = item.get("response") if isinstance(item.get("response"), dict) else {}
+                diagnostics = payload_resp.get("retrieval_diagnostics") or {}
+                item["cache_hit"] = diagnostics.get("branch") == "cache"
                 try:
                     async with AsyncSessionFactory() as db:
                         usage = (await db.execute(select(LLMUsageLog).where(
@@ -162,11 +187,19 @@ async def evaluate(args: argparse.Namespace) -> None:
                 except Exception as exc:
                     item["usage_error"] = f"{type(exc).__name__}: {exc}"
                 report["results"].append(item)
+                with jsonl_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({"id": item["id"], "http": item.get("http"),
+                        "status": payload_resp.get("status"),
+                        "decision": (payload_resp.get("answer_decision") or {}).get("status"),
+                        "reason": (payload_resp.get("answer_decision") or {}).get("reason"),
+                        "cache_hit": item["cache_hit"], "error": item.get("error"),
+                        "elapsed_seconds": item["elapsed_seconds"]}, ensure_ascii=False) + "\n")
                 save_result(output, report)
-                decision = ((item.get("response") or {}) if isinstance(item.get("response"), dict) else {}).get("answer_decision") or {}
+                decision = payload_resp.get("answer_decision") or {}
                 print(json.dumps({"id": case["id"], "http": item.get("http"),
-                    "status": ((item.get("response") or {}) if isinstance(item.get("response"), dict) else {}).get("status"),
+                    "status": payload_resp.get("status"),
                     "decision": decision.get("status"), "reason": decision.get("reason"),
+                    "cache_hit": item["cache_hit"],
                     "rag_direct": item.get("rag_direct"), "error": item.get("error"),
                     "seconds": item["elapsed_seconds"]}, ensure_ascii=True), flush=True)
             final = await client.get(base + "/assistants/admissions")
@@ -175,7 +208,7 @@ async def evaluate(args: argparse.Namespace) -> None:
                 json.dumps(final.json()["config"], sort_keys=True).encode()).hexdigest() == report["configuration_fingerprint"]
             async with AsyncSessionFactory() as db:
                 after = await hybrid_retriever.resolve_retrieval_snapshot(
-                    db, assistant["collection_id"], tenant_id=assistant["tenant_id"])
+                    db, assistant["collection_id"])
                 report["publication_unchanged"] = after.cache_fingerprint() == report["publication"]["fingerprint"]
             report["code_unchanged"] = code_fingerprint() == report["code_fingerprint"]
             report["finished_at"] = datetime.now(UTC).isoformat()

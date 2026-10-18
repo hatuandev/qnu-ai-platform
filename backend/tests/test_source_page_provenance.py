@@ -2,6 +2,7 @@
 
 from app.modules.knowledge.chunker import get_chunker
 from app.modules.knowledge.facts import FactExtractor
+from app.modules.knowledge.normalization.clean_content import VERSION, digest
 from app.modules.knowledge.services.source_pages import (
     canonical_pages,
     chunk_source_pages,
@@ -28,7 +29,9 @@ def test_structured_ocr_pages_keep_real_char_counts_and_fact_pages():
 
 def test_unmapped_multipage_text_never_invents_page_one():
     markdown, manifest = normalize_source_pages("Không có ranh giới trang", 3)
-    assert manifest == [{"page": None, "chars": len(markdown)}]
+    assert manifest == [{"page": None, "chars": len(markdown), "extracted_markdown": markdown,
+                         "normalization": {"version": VERSION, "input_hash": digest(markdown), "output_hash": digest(markdown)},
+                         "margin_candidates": []}]
     assert canonical_pages(markdown, 3)[0]["page_number"] is None
     assert canonical_pages(markdown, manifest_page_count(manifest))[0]["page_number"] is None
     chunks = chunk_source_pages(get_chunker("SemanticChunker"), markdown, manifest_page_count(manifest))
@@ -37,7 +40,9 @@ def test_unmapped_multipage_text_never_invents_page_one():
 
 def test_edit_rebuilds_manifest_and_preserves_page_markers():
     markdown, manifest = normalize_source_pages("<!-- Trang 2 -->\nNội dung sửa lại", 3)
-    assert manifest == [{"page": 2, "chars": len("Nội dung sửa lại")}]
+    assert manifest == [{"page": 2, "chars": len("Nội dung sửa lại"), "extracted_markdown": "Nội dung sửa lại",
+                         "normalization": {"version": VERSION, "input_hash": digest("Nội dung sửa lại"), "output_hash": digest("Nội dung sửa lại")},
+                         "margin_candidates": []}]
     assert canonical_pages(markdown)[0]["page_number"] == 2
 
 
@@ -46,5 +51,7 @@ def test_blank_first_page_does_not_shift_second_page():
         {"page_number": 1, "extracted_text": ""},
         {"page_number": 2, "extracted_text": "Nội dung trang hai"},
     ])
-    assert manifest[0] == {"page": 1, "chars": 0}
+    assert manifest[0] == {"page": 1, "chars": 0, "extracted_markdown": "",
+                           "normalization": {"version": VERSION, "input_hash": digest(""), "output_hash": digest("")},
+                           "margin_candidates": []}
     assert canonical_pages(markdown)[1]["page_number"] == 2

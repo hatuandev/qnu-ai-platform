@@ -12,49 +12,9 @@ from app.modules.rag.schemas import Citation
 logger = logging.getLogger(__name__)
 
 NO_ANSWER_MESSAGES = {
-    "admissions": (
-        "Chào bạn! Thông tin này hiện chưa có trong Đề án tuyển sinh chính thức của Trường Đại học Quy Nhơn mà mình được cung cấp.\n\n"
-        "Bạn có thể thử hỏi mình các chủ đề phổ biến như:\n"
-        "- **Phương thức xét tuyển**: Phương thức xét tuyển và điều kiện nộp hồ sơ\n"
-        "- **Điểm chuẩn**: Điểm chuẩn trúng tuyển các ngành đào tạo\n"
-        "- **Học phí & Học bổng**: Mức học phí và chính sách học bổng của trường\n\n"
-        "Nếu cần hỗ trợ trực tiếp, bạn vui lòng liên hệ Ban Tư vấn Tuyển sinh QNU qua Hotline: **0256.3846.156** hoặc Email: **tuyensinh@qnu.edu.vn** nhé!"
-    ),
-    "regulations": (
-        "Chào bạn! Nội dung này hiện chưa được quy định cụ thể trong các văn bản Quy chế đào tạo của Trường ĐH Quy Nhơn có trong hệ thống.\n\n"
-        "Bạn có thể thử tra cứu các chủ đề như:\n"
-        "- **Tín chỉ & Học phần**: Đăng ký học phần, số tín chỉ tối đa, rút bớt học phần\n"
-        "- **Xử lý học vụ**: Cảnh báo học tập, buộc thôi học, cách tính điểm tích lũy GPA\n"
-        "- **Chuẩn đầu ra & Tốt nghiệp**: Chứng chỉ ngoại ngữ VSTEP, tin học và điều kiện xét tốt nghiệp\n\n"
-        "Nếu cần giải quyết trường hợp cụ thể, bạn vui lòng liên hệ trực tiếp **Phòng Đào tạo** (Bàn tiếp sinh viên) để được hướng dẫn chi tiết nhé!"
-    ),
-    "library": (
-        "Chào bạn! Hiện tại chưa tìm thấy giáo trình hoặc tài liệu này trong cơ sở dữ liệu Thư viện số Trường ĐH Quy Nhơn.\n\n"
-        "Bạn có thể thử tra cứu:\n"
-        "- **Giáo trình & Sách chuyên khảo**: Tìm kiếm theo tên học phần, tác giả hoặc chuyên ngành\n"
-        "- **Cơ sở dữ liệu số**: Hướng dẫn truy cập tài liệu quốc tế (ScienceDirect, IEEE Xplore, Springer)\n"
-        "- **Mượn trả & Lưu chiểu**: Thời hạn mượn sách, quy trình nộp khóa luận tốt nghiệp bản điện tử\n\n"
-        "Bạn vui lòng liên hệ **Trung tâm Thông tin - Thư viện QNU** qua Hotline: **0256.3846.888** hoặc Email: **thuvien@qnu.edu.vn** để được hỗ trợ bạn đọc nhé!"
-    ),
-    "drafting": (
-        "Chào Thầy/Cô! Hiện tại hệ thống chưa tìm thấy biểu mẫu hoặc căn cứ pháp lý phù hợp trong kho văn bản hành chính của Trường ĐH Quy Nhơn.\n\n"
-        "Thầy/Cô có thể yêu cầu soạn thảo các thể thức văn bản theo Nghị định 30/2020/NĐ-CP như:\n"
-        "- **Tờ trình**: Xin phê duyệt kinh phí, mua sắm trang thiết bị, tổ chức hội nghị khoa học\n"
-        "- **Thông báo & Kế hoạch**: Kế hoạch công tác năm học, thông báo triển khai nhiệm vụ\n"
-        "- **Quyết định & Giấy mời**: Kiện toàn ban tổ chức, giấy mời đại biểu dự lễ khai giảng\n\n"
-        "Nếu cần cung cấp thêm biểu mẫu đặc thù, Thầy/Cô vui lòng liên hệ **Phòng Hành chính - Tổng hợp** để được hỗ trợ."
-    ),
-    "question_bank": (
-        "Chào Thầy/Cô! Hiện chưa đủ dữ liệu chuẩn đầu ra (CLO/PLO) hoặc nội dung học phần để thiết kế câu hỏi hoặc ma trận đề thi này.\n\n"
-        "Thầy/Cô có thể cung cấp thêm đề cương chi tiết học phần hoặc thử các yêu cầu như:\n"
-        "- **Thiết kế ma trận đề thi**: Phân bổ 4 mức độ nhận thức Bloom (Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao)\n"
-        "- **Soạn câu hỏi trắc nghiệm / tự luận**: Kèm đáp án, biểu điểm và hướng dẫn chấm chi tiết\n"
-        "- **Xuất file ma trận đề**: Định dạng bảng tính Excel chuẩn khảo thí ĐH Quy Nhơn\n\n"
-        "Để được hướng dẫn chuẩn hóa ngân hàng câu hỏi, Thầy/Cô vui lòng liên hệ **Phòng Khảo thí & Đảm bảo chất lượng giáo dục**."
-    ),
     "general": (
-        "Thông tin bạn yêu cầu hiện không có trong cơ sở dữ liệu tri thức của Trường Đại học Quy Nhơn. "
-        "Vui lòng liên hệ bộ phận phụ trách để được giải đáp chính xác nhất."
+        "Mình chưa xác minh được thông tin đủ phù hợp để trả lời câu hỏi này từ các nguồn đang xuất bản. "
+        "Bạn có thể nói rõ thêm phạm vi hoặc năm cần tra cứu."
     ),
 }
 
@@ -201,26 +161,16 @@ class CitationGuard:
         system_context: str | None = None,
         candidate_texts: list[str] | None = None,
     ) -> tuple[bool, list[str]]:
-        """Check that multi-digit figures in the answer exist in evidence text, query, or valid reasoning.
+        """Compare complete numeric values against evidence, not prompts or substrings.
 
-        Single digits are skipped (too noisy: list indices, counts). Comparison is
-        separator-insensitive so "112,3" matches "112.3". Returns (grounded, ungrounded).
+        This is a numeric presence gate, not proof of metric/year entailment.
+        query/system_context remain compatibility arguments, never evidence.
         """
+        from app.modules.rag.evidence_validation import number_values
+
         if not (answer or "").strip():
             return True, []
-        targets = {
-            re.sub(r"\D", "", n)
-            for n in re.findall(r"\d+(?:[.,]\d+)*", answer)
-        }
-        targets = {t for t in targets if len(t) >= 2}
-        if not targets:
-            return True, []
-
         evidence_parts: list[str] = []
-        if query and query.strip():
-            evidence_parts.append(query)
-        if system_context and system_context.strip():
-            evidence_parts.append(system_context)
         if candidate_texts:
             for text in candidate_texts:
                 if text and text.strip():
@@ -234,36 +184,15 @@ class CitationGuard:
                     if fact.get(key):
                         evidence_parts.append(str(fact[key]))
 
-        evidence_numbers = {
-            re.sub(r"\D", "", n)
-            for n in re.findall(r"\d+(?:[.,]\d+)*", " ".join(evidence_parts))
-        }
+        def values(text: str) -> set:
+            # All-zero decimal spellings are the same number, not a new fact.
+            return number_values(re.sub(r"(?<![\w.,])0[.,]0+\b", "0", text))
 
-        # Standard national scoring scales, MOET priority scales, and year bounds
-        standard_scales = {
-            "025", "05", "050", "075", "10", "125", "15", "150", "175", "20", "200",
-            "225", "30", "300", "75", "100",
-        }
-
-        ungrounded: list[str] = []
-        for t in sorted(targets):
-            # 1. Exact match in evidence
-            if t in evidence_numbers:
-                continue
-            # 2. Substring of an evidence number (e.g. 235 or 35 in 2359)
-            if any(t in ev for ev in evidence_numbers):
-                continue
-            # 3. Evidence number is a substring of target
-            if any(ev in t for ev in evidence_numbers if len(ev) >= 2):
-                continue
-            # 4. Standard national priority constants / admission scales
-            if t in standard_scales:
-                continue
-            # 5. Subject combination suffixes or rank indices (e.g., '01', '02', '07')
-            if len(t) == 2 and t.startswith("0"):
-                continue
-            ungrounded.append(t)
-
+        evidence_numbers = set().union(*(values(part) for part in evidence_parts))
+        # Preserve the existing multi-digit gate boundary: small list ordinals
+        # and word-to-digit counts are not proof of a new numeric measurement.
+        targets = {value for value in values(answer) if len(re.sub(r"\D", "", str(value))) >= 2}
+        ungrounded = sorted(str(value) for value in targets - evidence_numbers)
         return (not ungrounded), ungrounded
 
     def get_no_answer_response(
@@ -271,22 +200,7 @@ class CitationGuard:
         module_code: str = "general",
         assistant_name: str | None = None,
     ) -> str:
-        """Return friendly rejection response when context is insufficient.
-
-        Reusable for any new assistant: known modules use curated templates,
-        unknown modules fall back to a generic template optionally naming
-        the assistant.
-        """
-        normalized = (module_code or "general").strip().lower()
-        if normalized in NO_ANSWER_MESSAGES:
-            return NO_ANSWER_MESSAGES[normalized]
-        if assistant_name and assistant_name.strip():
-            return (
-                f"Chào bạn! Thông tin này hiện chưa có trong kho tri thức của "
-                f"Trợ lý {assistant_name.strip()} (Trường Đại học Quy Nhơn).\n"
-                "Bạn vui lòng thử diễn đạt lại câu hỏi cụ thể hơn hoặc liên hệ "
-                "bộ phận phụ trách để được hỗ trợ chính xác nhất."
-            )
+        """Report verification limits, not source absence or unsourced contacts."""
         return NO_ANSWER_MESSAGES["general"]
 
     def audit_claim_citations(

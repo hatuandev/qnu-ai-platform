@@ -107,6 +107,59 @@ async def test_purge_removes_knowledge_only_and_waits_for_external_cleanup(purge
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("metadata_field", ["snapshot_metadata", "parse_provenance"])
+async def test_purge_removes_standard_sidecars_but_preserves_shared_files(purge_db, metadata_field):
+    db = purge_db
+    _, _, binding, revision, _ = await seed_source(db)
+    _, _, other, other_revision, _ = await seed_source(db, status="active")
+    base = revision.snapshot_storage_path
+    standard = {"path": base + ".qnu-rag-v1.md", "structured_path": base + ".qnu-doc-v1.json",
+                "raw_evidence": {"path": base + ".pdf-evidence-v1.json"}}
+    setattr(revision, metadata_field, {"qnu_markdown": standard})
+    other_revision.parse_provenance = {"qnu_markdown": {"raw_evidence": standard["raw_evidence"]}}
+    await db.commit()
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="fixture-no-dispatch")):
+        job = await source_purge.request_purge(db, binding.id)
+    with (
+        patch.object(source_purge.vector_indexer, "delete_source_points", AsyncMock()),
+        patch.object(source_purge.storage_service, "delete_confirmed", AsyncMock()) as storage,
+    ):
+        await source_purge.run_purge(db, job)
+    assert {call.args[0] for call in storage.await_args_list} == {
+        base, standard["path"], standard["structured_path"],
+    }
+    assert await db.get(KnowledgeBinding, other.id) is not None
+
+
+@pytest.mark.asyncio
+async def test_purge_validates_all_sidecar_paths_before_any_external_delete(purge_db):
+    db = purge_db
+    _, doc, binding, revision, _ = await seed_source(db)
+    revision.snapshot_metadata = {"qnu_markdown": {"path": doc.storage_path}}
+    await db.commit()
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock(return_value="fixture-no-dispatch")):
+        job = await source_purge.request_purge(db, binding.id)
+    with (
+        patch.object(source_purge.vector_indexer, "delete_source_points", AsyncMock()) as vectors,
+        patch.object(source_purge.storage_service, "delete_confirmed", AsyncMock()) as storage,
+        pytest.raises(AppException) as error,
+    ):
+        await source_purge.run_purge(db, job)
+    assert error.value.code == "UNSAFE_PURGE_PATH"
+    vectors.assert_not_awaited()
+    storage.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_operator_purge_reservation_can_skip_dispatch_without_skipping_guards(purge_db):
+    _, _, binding, _, _ = await seed_source(purge_db)
+    with patch.object(source_purge, "enqueue_arq_job", AsyncMock()) as enqueue:
+        job = await source_purge.request_purge(purge_db, binding.id, dispatch=False)
+    assert job.status == "queued" and binding.status == "deleting"
+    enqueue.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("published", [False, True])
 async def test_storage_failure_keeps_plan_for_retry(purge_db, published):
     db = purge_db

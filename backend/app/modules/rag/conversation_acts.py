@@ -112,6 +112,7 @@ def summarize_records(records: list[CombinationRecord], scopes: dict[str, Enumer
                                    {"title": record.block.title, "records": 0})
         entry["records"] += 1
     return {"records": len(listed), "unique": len(identities), "broken": broken,
+            "missing_codes": sum(not record.code for record in listed),
             "ambiguous": ambiguous, "diacritic_variants": diacritic_variants,
             "ambiguous_examples": examples, "years": years, "sources": sources}
 
@@ -194,6 +195,9 @@ def render_explanation(antecedent: str, summary: dict, citations: list[Citation]
     if near:
         lines.append(f"- Có {near} nhóm mã/tên gần giống nhau (kể cả khác dấu); giữ riêng từng mục, chưa gộp.")
     lines.append(_coverage_note(summary))
+    if summary.get("missing_codes"):
+        lines.append(f"Có {summary['missing_codes']} bản ghi chưa đối chiếu được mã. "
+                     "Vì vậy, số cách ghi khác nhau không có nghĩa là có thêm từng ấy ngành; mình chưa tự gộp hay sửa tên OCR.")
     clarifier = _clarifier(summary)
     if clarifier:
         lines.append(clarifier)
@@ -269,10 +273,15 @@ async def resolve_act_scopes(db: AsyncSession, scoped: AskRequest, subjects: lis
         plan = await structured_call(db, scoped, EnumerationPlan, ENUM_INSTRUCTION,
             {"question": scoped.question, "assistant_scope": assistant_scope(scoped),
              "subjects": subjects, "sources": catalog}, max_tokens=1600)
+        from app.modules.rag.enumeration_scope import audit_scope_candidates
+
+        catalog = await audit_scope_candidates(db, scoped, plan, catalog)
         return validated_scopes(plan, catalog, proofs, scoped.question)
     except ValueError as exc:
-        raise AppException("Chưa xác minh được phạm vi của kết quả hội thoại.",
-                           code="CONVERSATION_SCOPE_INVALID", status_code=422) from exc
+        # Scope uncertainty is not a broken HTTP request/provider failure.
+        # Keep unknown; requested-year filtering below cannot promote it.
+        logger.info("conversation_scope_unverified reason=%s", exc)
+        return {item["source_id"]: EnumerationScope(source_id=item["source_id"]) for item in catalog}
 
 
 async def _handle_act(db: AsyncSession, req: AskRequest, resolution: dict,
@@ -284,8 +293,7 @@ async def _handle_act(db: AsyncSession, req: AskRequest, resolution: dict,
     antecedent = ((resolution or {}).get("antecedent_question") or "").strip()
     if mode not in ("explain", "reformat", "filter") or not antecedent:
         return None
-    if candidate_snapshot is not None and (
-            (candidate_snapshot.collection_id != req.collection_id)):
+    if candidate_snapshot is not None and candidate_snapshot.collection_id != req.collection_id:
         logger.warning("conversation_act_foreign_snapshot mode=%s", mode)
         return None
     subjects = query_subjects(antecedent)
@@ -305,11 +313,22 @@ async def _handle_act(db: AsyncSession, req: AskRequest, resolution: dict,
         if requested_years:
             records = [record for record in records if effective_year(record, scopes) in requested_years]
         if not records:
-            return missing(snapshot, "NO_MATCHING_RECORDS")
+            response = missing(snapshot, "CONVERSATION_SCOPE_UNVERIFIED")
+            response.answer = ("Mình chưa chốt được danh sách ở lượt trước nên chưa thể giải thích số lượng nhiều hay ít. "
+                               "Phạm vi năm vẫn cần đối chiếu; mình không lấy toàn bộ tài liệu để đếm thay.")
+            return response
     summary = summarize_records(records, scopes)
     if mode == "explain":
         years = {year for year in summary["years"] if year is not None}
-        citations = _scope_proofs(proofs, years)
+        # Only citations from the actual retained records/scopes, never an
+        # arbitrary passage elsewhere that happens to mention the same year.
+        actual_proofs = {key: proofs[key] for scope in scopes.values() for key in scope.proof_ids
+                         if key in proofs and scope.source_id in summary["sources"]}
+        for record in records:
+            actual_proofs.setdefault(record.block.id, record.block)
+        citations = _scope_proofs(actual_proofs, years)
+        if not citations:
+            citations = [_proof_citation(record.block) for record in records[:MAX_CITED_PROOFS]]
         answer = render_explanation(antecedent, summary, citations)
         return AskResponse(status="answered", answer=answer, answer_format="paragraph",
             citations=citations, retrieval_snapshot=snapshot, snapshot=snapshot,

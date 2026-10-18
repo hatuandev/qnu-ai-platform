@@ -178,5 +178,8 @@ async def test_real_adapter_failover_only_calls_configured_chat_routes(monkeypat
         else:
             result = await service.generate(db, request)
             assert result.provider_id == "fixture-backup" and result.is_fallback
-    assert calls == [("fixture-router", "alias[1m]"), ("fixture-backup", "backup-alias")]
+    # One bounded transient retry on the configured primary, then only its
+    # configured backup. No embedding/default model may enter the cascade.
+    assert calls == [("fixture-router", "alias[1m]"), ("fixture-router", "alias[1m]"),
+                     ("fixture-backup", "backup-alias")]
     assert facade.record_usage_log.call_args.kwargs["model_name"] == "served-backup"

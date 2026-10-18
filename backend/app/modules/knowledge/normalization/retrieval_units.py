@@ -117,7 +117,12 @@ def table_children(parent: SourceUnit) -> list[SourceUnit]:
 
 
 def manifest_digest(manifest: UnitManifest) -> str:
-    return hashlib.sha256(json.dumps(manifest.model_dump(), sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    payload = manifest.model_dump()
+    for unit in payload["units"]:
+        if not unit.get("qnu_block_id"):
+            for key in ("qnu_block_id", "source_locations", "context_refs"):
+                unit.pop(key, None)  # Historical v1 manifests retain their exact seal.
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def validate_manifest(manifest: UnitManifest, markdown: str) -> None:

@@ -106,6 +106,8 @@ async def test_revision_creation_is_isolated_review_required_and_fails_closed(er
         origin_document_id="doc", origin_file_hash=hashlib.sha256(content).hexdigest(),
         snapshot_storage_path="original.pdf", canonical_markdown=markdown,
         canonical_hash=hashlib.sha256(markdown.encode()).hexdigest(), page_manifest=[{"page": 1, "chars": len(markdown)}],
+        snapshot_metadata={"qnu_markdown": {"document_id": "binding", "revision_id": "base", "status": "ready",
+                                            "path": "snapshots/collection/binding/hash.docx.aa.qnu-rag-v1.md"}},
         status="ready")
     binding = SimpleNamespace(id="binding", active_source_revision_id="base", active_index_revision_id="index")
     db = AsyncMock()
@@ -137,4 +139,10 @@ async def test_revision_creation_is_isolated_review_required_and_fails_closed(er
             assert revision.canonical_hash != base.canonical_hash
             assert base.canonical_markdown == markdown and base.status == "ready"
             assert binding.active_source_revision_id == "base" and binding.active_index_revision_id == "index"
+            # The base standard file must not be served as this draft's artifact.
+            marker = revision.snapshot_metadata["qnu_markdown"]
+            assert marker["status"] == "unavailable" and marker["reason"] == "superseded_revision_content"
+            assert marker["revision_id"] == revision.id and marker["superseded_revision_id"] == "base"
+            assert "path" not in marker and revision.parse_provenance["qnu_markdown"] == marker
+            assert base.snapshot_metadata["qnu_markdown"]["status"] == "ready"
         db.commit.assert_not_awaited()  # The caller controls commit/rollback.

@@ -133,7 +133,9 @@ async def convert_admission_score(db: AsyncSession, request: ScoreConversionRequ
         raise AppException("Không thể tải quy tắc quy đổi điểm.", code="SCORE_RULE_UNAVAILABLE", status_code=503) from exc
     if (collection is None):
         raise AppException("Không có quyền đọc quy tắc quy đổi.", code="SCORE_SCOPE_FORBIDDEN", status_code=403)
-    raw_rules = (collection.collection_metadata or {}).get("score_conversion_rules", [])
+    from app.modules.knowledge.services.score_rule_service import active_rules
+
+    raw_rules = active_rules(collection.collection_metadata or {})
     try:
         rules = [ConversionRule.model_validate(rule) for rule in raw_rules]
     except (ValidationError, TypeError) as exc:
@@ -148,10 +150,25 @@ async def convert_admission_score(db: AsyncSession, request: ScoreConversionRequ
     pinned = snapshot.model_copy(update={"binding_revisions": {rule.binding_id: rule.index_revision_id}})
     if snapshot.binding_revisions.get(rule.binding_id) != rule.index_revision_id:
         raise AppException("Bảng quy đổi không còn thuộc nguồn đang xuất bản.", code="SCORE_RULE_STALE", status_code=409)
-    blocks = await load_published_blocks(db, pinned)
-    req = AskRequest(question="Score conversion", collection_id=request.collection_id, tenant_id=tenant_id, workspace_id=workspace_id)
-    blocks += await reviewed_fact_blocks(db, req, pinned, QueryPlan(query=req.question), blocks, exhaustive=True)
+    blocks = await load_rule_blocks(db, request.collection_id, rule, pinned)
     try:
-        return calculate_verified_score(request, rule, {block.id: block for block in blocks}, snapshot)
+        return calculate_verified_score(request, rule, blocks, snapshot)
     except ValueError as exc:
         raise AppException("Bảng hoặc bằng chứng quy đổi không còn khớp bản đã duyệt.", code="SCORE_EVIDENCE_INVALID", status_code=422) from exc
+
+
+async def load_rule_blocks(db: AsyncSession, collection_id: str, rule: ConversionRule,
+                           snapshot: RetrievalSnapshot) -> dict[str, EvidenceBlock]:
+    """Same source/hash checks for administrator preview and runtime calculation."""
+    pinned = snapshot.model_copy(update={"binding_revisions": {rule.binding_id: rule.index_revision_id}})
+    if snapshot.binding_revisions.get(rule.binding_id) != rule.index_revision_id:
+        raise AppException("Nguồn của quy tắc không còn được xuất bản.", code="SCORE_RULE_STALE", status_code=409)
+    try:
+        blocks = await load_published_blocks(db, pinned)
+        req = AskRequest(question="Score conversion", collection_id=collection_id)
+        blocks += await reviewed_fact_blocks(db, req, pinned, QueryPlan(query=req.question), blocks, exhaustive=True)
+        return {block.id: block for block in blocks}
+    except AppException:
+        raise
+    except Exception as exc:
+        raise AppException("Không thể tải bằng chứng quy đổi.", code="SCORE_RULE_UNAVAILABLE", status_code=503) from exc

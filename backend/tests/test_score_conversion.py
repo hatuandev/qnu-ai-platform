@@ -81,6 +81,14 @@ def fixture_rule():
     return percentile_rule((("700", "20"), ("750", "22"), ("800", "24")))
 
 
+def managed_metadata(rule):
+    """Runtime rules now require a distinct server-owned activation state."""
+    return {"score_conversion_registry": {"items": [{
+        "definition": rule.model_dump(mode="json", exclude={"status", "reviewed_by", "reviewed_at"}),
+        "status": "active", "created_by": "operator", "created_at": rule.reviewed_at.isoformat(),
+        "reviewed_by": rule.reviewed_by, "reviewed_at": rule.reviewed_at.isoformat()}]}}
+
+
 def annex_rule(**over):
     return percentile_rule(ANNEX_ROWS, combination="A02", base="A01", source_attribute="ĐNL",
                            target_attribute="A01 / THPT", source_method="ĐNL", target_method="THPT", **over)
@@ -384,7 +392,10 @@ async def test_stale_rule_cannot_load_old_published_blocks():
     rule.index_revision_id = "old"
     db = AsyncMock()
     db.get.return_value = SimpleNamespace(tenant_id="tt", workspace_id="ww",
-        collection_metadata={"score_conversion_rules": [rule.model_dump(mode="json")]})
+        collection_metadata={"score_conversion_registry": {"items": [{
+            "definition": rule.model_dump(mode="json", exclude={"status", "reviewed_by", "reviewed_at"}),
+            "status": "active", "created_by": "operator", "created_at": rule.reviewed_at.isoformat(),
+            "reviewed_by": rule.reviewed_by, "reviewed_at": rule.reviewed_at.isoformat()}]}})
     with (patch("app.modules.rag.retriever.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot())),
           patch("app.modules.rag.score_conversion.load_published_blocks", AsyncMock()) as load,
           pytest.raises(AppException) as error):
@@ -403,7 +414,7 @@ async def test_verified_tool_loads_current_facts_and_returns_deterministic_resul
     rule, blocks = fixture_rule()
     db = AsyncMock()
     db.get.return_value = SimpleNamespace(tenant_id="tt", workspace_id="ww",
-        collection_metadata={"score_conversion_rules": [rule.model_dump(mode="json")]})
+        collection_metadata=managed_metadata(rule))
     with (patch("app.modules.rag.retriever.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot())),
           patch("app.modules.rag.score_conversion.load_published_blocks", AsyncMock(return_value=list(blocks.values()))),
           patch("app.modules.rag.score_conversion.reviewed_fact_blocks", AsyncMock(return_value=[]))):
@@ -442,7 +453,7 @@ async def test_chat_renders_only_server_computed_numbers():
     rule, blocks = annex_rule()
     db = AsyncMock()
     db.get.return_value = SimpleNamespace(tenant_id="tt", workspace_id="ww",
-        collection_metadata={"score_conversion_rules": [rule.model_dump(mode="json")]})
+        collection_metadata=managed_metadata(rule))
     intent = ConversionIntent(intent="calculate", score="780", year=2026, source_method="ĐNL", combination="A02")
     question = "ĐNL 780 điểm tổ hợp A02 năm 2026 quy đổi sang THPT được bao nhiêu?"
     with (patch("app.modules.rag.retriever.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot())),

@@ -2,7 +2,19 @@
 
 Tài liệu này đặc tả cơ chế tìm kiếm hỗn hợp (Dense Vector + Sparse Lexical), thuật toán dung hợp thứ hạng Reciprocal Rank Fusion ($k=60$), tái xếp hạng Cross-Encoder và chốt chặn bảo vệ trích dẫn (Citation Guardrail).
 
+**Sơ đồ trực quan hiện trạng sau phiên502:** [Luồng RAG — định tuyến, Hybrid và
+phục hồi canonical](../diagrams/rag-current-2026-10-16.html). Sơ đồ đối chiếu mã
+ngày16/10/2026, không phải mô tả DAG cũ hoặc xác nhận runtime đã deploy mã mới.
+
 ## Liệt kê tổ hợp và câu hỏi tiếp nối — phiên475
+
+**Cập nhật phiên526:** nguồn mới có `canonical_format=qnu-rag-projection/v1` sử dụng
+projection của cặp QNU MD/JSON đã kiểm, không embed YAML/comment/raw JSON. Units giữ
+block/cell locations và context refs; packing tuân phụ thuộc có hướng cùng revision.
+Canonical table units không bị bỏ toàn bộ vì chỉ mục có facts. Liệt kê loại trùng hai
+biểu diễn canonical/fact theo chính source row và năm, không gộp khác nguồn/năm;
+follow-up dùng cùng luồng snapshot hiện có. Corpus đang phục vụ chưa được chuyển;
+chưa đo chất lượng chat thật từ batch code này. Xem [chuẩn và vòng đời](./13_chuan_markdown_rag_v1.md#112-bản-chuẩn-làm-đầu-vào-rag--phiên-526).
 
 Trước retrieval, câu phụ thuộc ngắn được phân giải từ câu hỏi user trước; assistant prose không phải evidence. Hợp đồng recheck chạy lại nguyên yêu cầu trước, không để model suy đoán lý do trả ít. Rewrite đổi/bịa số, làm mất năm hiện tại hoặc antecedent không rõ thì yêu cầu làm rõ. Chủ đề độc lập giữ nguyên.
 
@@ -445,4 +457,81 @@ và refresh ORM trước kiểm tra phiên bản, không duyệt bằng đối t
 Không cần reset DB/reindex để bỏ phân vùng. Khi rollout phải thay FE/BE/worker đồng bộ
 và chờ job worker cũ hoàn tất vì lease nguồn cũng chuyển sang app-v1. Xóa cột legacy
 vật lý là đợt migration/backup riêng, không nằm trong lần thay đổi này.
+
+## Session truy hồi và chất lượng hiển thị — phiên 499
+
+Trong `HybridRetriever.retrieve`, truy vấn SQL lexical gốc, biến thể và glossary
+phải tuần tự khi dùng cùng AsyncSession của caller. Vector I/O độc lập vẫn được
+chạy song song; khi SQL gốc lỗi hoặc request bị hủy, thu hồi task vector trước
+khi thoát. Không commit/rollback/close session của caller; mọi nhánh giữ snapshot
+đã phân giải và chính sách phạm vi/ranking hiện tại.
+
+Playground chỉ hiển thị điểm chất lượng khi có phép đo thực. Hiện chưa có kết quả
+Faithfulness theo lượt, nên hiển thị **Chưa đo**; có trích dẫn không đồng nghĩa với
+đạt ngưỡng Faithfulness. Không dùng readiness hoặc số retrieval hits thay thế.
+
+Xem [nhật ký499](../nhat_ky/2026-10-16_phien_499_session_db_va_nhan_chat_luong.md).
+
+## Phục hồi canonical prose — phiên 502
+
+Khi draft không qua audit, phục hồi không có nghĩa chuyển sang provider khác.
+Luồng đọc đúng snapshot xuất bản, lập topic/facets từ câu gốc, ghép candidate BM25
+và đoạn con của heading; lọc lại năm trước rerank/packing. Heading và filename
+chỉ giúp tìm kiếm, không tự làm bằng chứng cho năm hoặc nội dung câu trả lời.
+
+Context dùng ngân sách cấu hình, không có min6.000 riêng. Giữ nguyên nhóm list,
+header/điều kiện; loại candidate text trùng khít chỉ trong cùng nguồn và scope.
+Compact payload chỉ bỏ lặp metadata và biểu diễn whole-passage bằng alias cùng
+catalog server; không làm sạch/sửa nguồn hay quote để kiểm chứng đạt.
+
+Số ký tự không phải số token. Nếu provider từ chối context ở proposal, chỉ có
+một lần repack nhóm chứng cứ ưu tiên nguyên vẹn với cùng question/plan/output
+budget. Không vừa hoặc vẫn lỗi thì báo lỗi; không đổi thành “không có dữ liệu”.
+Mọi kết quả vẫn phải qua binding, verifier độc lập và coverage audit; nhóm nhỏ
+hơn không chứng minh đã bao phủ tất cả nguồn hay đủ mọi câu so sánh.
+
+Audit hiển thị tách lỗi ID, lỗi trích dẫn/span và verdict ngữ nghĩa. Whitespace
+reflow không được đổi chữ, dấu, số, phủ định hoặc chuyển verdict false thành true.
+Xem [nhật ký502](../nhat_ky/2026-10-16_phien_502_chon_va_dong_goi_chung_cu_rag.md).
+
+## Recovery khi hybrid/CE rỗng — phiên505
+
+Hybrid rỗng sau reranker không chứng minh kho thiếu dữ liệu. Luồng thử canonical
+prose trong cùng snapshot trước khi trả thiếu căn cứ. Nếu CE của recovery lọc hết,
+giữ candidate lexical đã giới hạn để binding/verifier quyết định; không giả điểm
+rerank hoặc coi candidate là fact. Trace ghi retrieval đã thực hiện, dù trả0hits.
+
+Trong compact-mode, reference_catalog giữ quote và scope một lần, claims trỏ ID
+theo đúng thứ tự (reference đầu là primary proof). Bản bound đầy đủ giữ server-side.
+Selector có thể chọn tối đa12passages, tách thành claims cùng nguồn tối đa4references;
+không bỏ đoạn thứ5 của một danh sách. Mọi claim vẫn qua scope/binding/verifier/audit.
+Coverage của mỗi chủ đề phải được model đánh giá tường minh; không suy true từ
+complete hoặc tự điền khóa bị thiếu. JSON root envelope đơn nghĩa là lỗi biểu diễn,
+không là quyền di chuyển trường sai cấp hay đổi verdict.
+
+years=[] nghĩa là câu hỏi không hạn chế niên vụ; không tự gán năm máy hoặc coi mọi
+nguồn có năm là không phù hợp. Năm đã hỏi giữ nguyên. Thiếu kiểm chứng thì mẫu trả
+lời nói rõ giới hạn, không khẳng định kho không có hoặc chèn hotline/email cố định.
+Xem [nhật ký505](../nhat_ky/2026-10-16_phien_505_review_82_va_sua_rag.md).
+
+## Liên kết kiểm chứng và logical proof units — phiên507
+
+Visible audit dùng answer_span_id do server cấp, phủ mọi đoạn công khai; model
+không chép/sửa answer_quote. Mọi span cần verdict đúng ID, quote nguồn và điều kiện
+ngữ nghĩa; source-quote containment không tự chứng minh relevance hoặc tính đúng.
+
+Recovery focused rerank dùng topic+câu gốc, CE scores thực khi có, không trộn RRF
+thêm để đảo lại ưu tiên lexical. Planner phải ghi entity/intent/event/round hoặc
+null thật; không bỏ trường rồi giả định scope. Enumeration vẫn giữ set coverage.
+
+Riêng recovery cho phép1atomic group đầu tiên gồm nhiều physical blocks hơnK,
+giữ cả nhóm trong hard character budget rồi dừng không thêm body khác. Telemetry
+ghi whole_group_exceeds_block_k; không đổi K/config hoặc cắt nguyên nhóm cho vừa.
+Vẫn có thể vượt token window và phải báo lỗi thật. Focused không tự gom sibling
+list; structural dependencies và year proof vẫn giữ.
+
+Trong compact recovery, evidence_ids là public sentences còn context_ids chỉ là
+proof phụ. Context không được biến thành public fact hoặc thay essential qualifier
+trong answer. Dữ liệu/raw spans giữ nguyên; mọi claim vẫn bind cùng source và qua
+verifier/coverage. Không dùng format sạch làm bằng chứng OCR đã đúng.
 

@@ -153,7 +153,8 @@ def _execute_result(scalar: Any = None, scalars_list: list[Any] | None = None, a
 # ==============================================================================
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reimport,needs_review", [(False, False), (True, False), (True, True)])
-async def test_process_import_item_clean_source_ready_and_zero_writeback(reimport, needs_review) -> None:
+@pytest.mark.parametrize("standard_required", [False, True])
+async def test_process_import_item_clean_source_ready_and_zero_writeback(reimport, needs_review, standard_required) -> None:
     """Verify clean document ingestion reaches 'ready' and respects zero-writeback invariant."""
     coll = KnowledgeCollection(
         id="col_tuyensinh_2026",
@@ -163,6 +164,8 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback(reimpor
     )
     raw_pdf_bytes = b"%PDF-1.4 Mock document bytes for admissions scheme."
     doc = _make_doc("doc_de_an_01", "Đề án Tuyển sinh 2026", "de_an_2026.pdf", raw_pdf_bytes)
+    if not standard_required:
+        doc.file_type = "md"  # Legacy text import still exercises the automatic-ready contract.
 
     batch = KnowledgeImportBatch(
         id="batch_01",
@@ -247,17 +250,21 @@ async def test_process_import_item_clean_source_ready_and_zero_writeback(reimpor
             item_id=item.id,
         )
 
-        assert source_rev.status == ("review_required" if needs_review else "ready")
+        requires_review = needs_review or standard_required
+        assert source_rev.status == ("review_required" if requires_review else "ready")
         assert source_rev.revision_no == 1
         assert "QUY CHẾ TUYỂN SINH" in (source_rev.canonical_markdown or "")
-        assert source_rev.quality_report.get("overall_status") == ("warning" if needs_review else "passed")
-        assert item.status == ("review_required" if needs_review else "succeeded")
-        assert item.phase == ("validate" if needs_review else "completed")
-        assert batch.succeeded_count == (0 if needs_review else 1)
-        assert batch.status == ("review_required" if needs_review else "completed")
+        assert source_rev.quality_report.get("overall_status") == ("warning" if requires_review else "passed")
+        assert item.status == ("review_required" if requires_review else "succeeded")
+        assert item.phase == ("validate" if requires_review else "completed")
+        assert batch.succeeded_count == (0 if requires_review else 1)
+        assert batch.status == ("review_required" if requires_review else "completed")
+        if standard_required:
+            mock_chunk_set_call.assert_not_awaited()
+            assert any(issue["code"] == "QNU_STANDARD_UNAVAILABLE" for issue in source_rev.parse_provenance["structured_artifact"]["issues"])
         if reimport:
             assert source_rev.binding_id == previous_binding.id
-            assert previous_binding.status == ("pending" if needs_review else "active")
+            assert previous_binding.status == ("pending" if requires_review else "active")
 
         # ADR-012 CRITICAL INVARIANT: Zero Writeback to RepositoryDocument
         assert doc.parse_status == "stored", "ADR-012 Violation: doc.parse_status must remain 'stored'!"
@@ -391,7 +398,8 @@ async def test_process_import_item_artifact_reuse_parse_once_embed_many() -> Non
 
         # Invariant: parser was NOT called because artifact was reused!
         assert not mock_get_parser.called
-        assert source_rev.status == "ready"
+        assert source_rev.status == "review_required"  # No standard companion: never promote a legacy reuse to ready.
+        mock_chunk_set_call.assert_not_awaited()
         assert source_rev.canonical_markdown == "# Nội dung đã bóc tách từ trước"
         assert source_rev.parse_provenance.get("reused_artifact") is True
 
@@ -431,6 +439,7 @@ async def test_source_content_editing_and_human_review() -> None:
         source_id=binding.id,
         revision_id=source_rev.id,
         new_markdown="Nội dung sau khi được cán bộ hiệu đính kỹ lưỡng.",
+        actor_id="editor", change_reason="Đã đối chiếu nguồn",
     )
     assert updated_rev.canonical_markdown == "Nội dung sau khi được cán bộ hiệu đính kỹ lưỡng."
     assert updated_rev.id != source_rev.id

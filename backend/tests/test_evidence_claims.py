@@ -155,6 +155,130 @@ async def test_structured_model_repairs_once_and_fails_closed_after_two_invalid_
         assert error.value.code == "EVIDENCE_MODEL_CONTRACT_INVALID" and generate.await_count == 2
 
 
+@pytest.mark.asyncio
+async def test_structured_model_repair_budget_accounts_for_input_growth():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.rag.evidence_model import structured_call
+    from app.modules.rag.evidence_schemas import QueryPlan
+    from app.modules.rag.schemas import AskRequest
+
+    req = AskRequest(question="Điểm chuẩn năm 2026?", collection_id="test",
+                     preferred_model_name="configured-model", preferred_provider_id="configured-provider")
+    def result(content):
+        return SimpleNamespace(content=content, provider="configured-provider", model="configured-model")
+    # Long wrong output: the old formula kept ~full budget while input grew.
+    oversized_invalid = '{"unexpected": true, "padding": "' + "x" * 4000 + '"}'
+    with patch("app.modules.rag.evidence_model.modelops_service.generate", AsyncMock(side_effect=[
+            result(oversized_invalid), result('{"query":"Điểm?"}')])) as generate:
+        repaired = await structured_call(None, req, QueryPlan, "Plan only",
+                                         {"câu": "Nội dung tiếng Việt có dấu"}, max_tokens=1600)
+        assert repaired.query == "Điểm?"
+        first_budget = generate.call_args_list[0].args[1].max_tokens
+        second = generate.call_args_list[1].args[1]
+        assert first_budget == 1600
+        assert second.max_tokens == first_budget
+        # Evidence payload is never cut to make room.
+        assert second.messages[1].content == generate.call_args_list[0].args[1].messages[1].content
+
+
+@pytest.mark.asyncio
+async def test_structured_model_repair_preserves_provider_context_rejection():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.core.exceptions import AppException
+    from app.modules.rag.evidence_model import structured_call
+    from app.modules.rag.evidence_schemas import QueryPlan
+    from app.modules.rag.schemas import AskRequest
+
+    req = AskRequest(question="Điểm chuẩn các ngành năm 2026?", collection_id="test",
+                     preferred_model_name="configured-model", preferred_provider_id="configured-provider")
+    def result(content):
+        return SimpleNamespace(content=content, provider="configured-provider", model="configured-model")
+    # A character estimate cannot prove overflow. Keep the requested contract
+    # budget and propagate the authoritative provider window rejection.
+    large_payload = {"bằng_chứng": "Trích dẫn tiếng Việt có dấu. " * 600}
+    with patch("app.modules.rag.evidence_model.modelops_service.generate", AsyncMock(side_effect=[
+            result('{"unexpected": true}'), AppException("Context exceeded", code="MODEL_CONTEXT_EXCEEDED", status_code=502)])) as generate:
+        with pytest.raises(AppException) as error:
+            await structured_call(None, req, QueryPlan, "Plan only", large_payload, max_tokens=400)
+        assert error.value.code == "MODEL_CONTEXT_EXCEEDED"
+        assert generate.await_count == 2
+        assert generate.call_args_list[1].args[1].max_tokens == 400
+        # Evidence was never cut to make room.
+        assert "Trích dẫn tiếng Việt có dấu." in generate.call_args_list[0].args[1].messages[1].content
+
+
+@pytest.mark.asyncio
+async def test_structured_model_large_input_with_room_still_repairs():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.rag.evidence_model import structured_call
+    from app.modules.rag.evidence_schemas import QueryPlan
+    from app.modules.rag.schemas import AskRequest
+
+    req = AskRequest(question="Điểm?", collection_id="test", preferred_model_name="configured-model",
+                     preferred_provider_id="configured-provider")
+    def result(content):
+        return SimpleNamespace(content=content, provider="configured-provider", model="configured-model")
+    # Strict track with room: large input but a base budget that still leaves
+    # viable output after input growth and reserve.
+    large_payload = {"bằng_chứng": "Trích dẫn tiếng Việt có dấu. " * 600}
+    with patch("app.modules.rag.evidence_model.modelops_service.generate", AsyncMock(side_effect=[
+            result('{"unexpected": true}'), result('{"query":"Điểm?"}')])) as generate:
+        assert (await structured_call(None, req, QueryPlan, "Plan only", large_payload,
+                                      max_tokens=1600)).query == "Điểm?"
+        assert generate.await_count == 2
+        repair_budget = generate.call_args_list[1].args[1].max_tokens
+        assert repair_budget == 1600
+
+
+@pytest.mark.asyncio
+async def test_structured_model_short_wrong_output_still_repairs_with_room():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.rag.evidence_model import structured_call
+    from app.modules.rag.evidence_schemas import QueryPlan
+    from app.modules.rag.schemas import AskRequest
+
+    req = AskRequest(question="Điểm?", collection_id="test", preferred_model_name="configured-model",
+                     preferred_provider_id="configured-provider")
+    def result(content):
+        return SimpleNamespace(content=content, provider="configured-provider", model="configured-model")
+    # Short field-missing output: the valid object may need MORE room, and the
+    # budget rule still grants the fitting remainder instead of the old size.
+    with patch("app.modules.rag.evidence_model.modelops_service.generate", AsyncMock(side_effect=[
+            result('{"unexpected": true}'), result('{"query":"Điểm?"}')])) as generate:
+        assert (await structured_call(None, req, QueryPlan, "Plan only", {}, max_tokens=1000)).query == "Điểm?"
+        assert generate.await_count == 2
+        assert generate.call_args_list[1].args[1].max_tokens >= 256
+
+
+@pytest.mark.asyncio
+async def test_structured_model_repair_names_schema_echo_explicitly():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.modules.rag.evidence_model import structured_call
+    from app.modules.rag.evidence_schemas import QueryPlan
+    from app.modules.rag.schemas import AskRequest
+
+    req = AskRequest(question="Điểm?", collection_id="test", preferred_model_name="configured-model",
+                     preferred_provider_id="configured-provider")
+    def result(content):
+        return SimpleNamespace(content=content, provider="configured-provider", model="configured-model")
+    schema_echo = '{"properties": {"query": {"type": "string"}}, "$defs": {}}'
+    with patch("app.modules.rag.evidence_model.modelops_service.generate", AsyncMock(side_effect=[
+            result(schema_echo), result('{"query":"Điểm?"}')])) as generate:
+        assert (await structured_call(None, req, QueryPlan, "Plan only", {}, max_tokens=1000)).query == "Điểm?"
+        repair_note = generate.call_args_list[1].args[1].messages[-1].content
+        assert "schema keys" in repair_note
+
+
 def test_decision_integrity_rejects_swapped_revision_digest_or_unsupported_numbers():
     from app.modules.rag.evidence_validation import (
         VERSION,

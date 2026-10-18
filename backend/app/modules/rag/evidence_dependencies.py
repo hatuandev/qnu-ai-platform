@@ -74,10 +74,19 @@ def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlo
         if block.origin == "canonical" and not block.is_container:
             sources[source_identity(block)].append(block)
     groups = []
+    explicit = {}
     for source in sources.values():
         ordered = sorted(source, key=lambda block: (block.start, block.end))
         groups.extend(_numbered_groups(ordered))
         by_unit = {block.unit_id: block for block in ordered if block.unit_id}
+        for block in ordered:
+            refs = block.fact_context.get("context_unit_ids", [])
+            if refs:
+                if any(ref not in by_unit for ref in refs):
+                    from app.core.exceptions import AppException
+
+                    raise AppException("Thiếu khối điều kiện của bản chuẩn.", code="EVIDENCE_CONTEXT_MISSING", status_code=409)
+                explicit[block.id] = [block, *[by_unit[ref] for ref in refs]]
         children = defaultdict(list)
         for block in ordered:
             if block.parent_id in by_unit:
@@ -93,6 +102,8 @@ def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlo
         for member in group:
             existing = result.get(member.id, [])
             result[member.id] = sorted({b.id: b for b in [*existing, *group]}.values(), key=lambda b: b.start)
+    # Explicit refs are directed: selecting a shared note must not pull every row using it.
+    result.update(explicit)
     return result
 
 

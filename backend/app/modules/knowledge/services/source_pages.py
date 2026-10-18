@@ -5,23 +5,45 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.core.exceptions import AppException
 from app.modules.knowledge.chunker import BaseChunker, ChunkDraft
-from app.modules.knowledge.cleaner import clean_markdown_text
+from app.modules.knowledge.normalization.clean_content import (
+    VERSION,
+    digest,
+    mark_repeated_margins,
+    normalize_content,
+)
 
 _PAGE_MARKER = re.compile(r"<!--\s*(?:Trang|Page)\s+(\d+)\s*-->", re.IGNORECASE)
 
 
 def merge_edited_manifest(original: list[dict[str, Any]], edited: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Layout belongs to the binary snapshot, not manually corrected text."""
-    by_page = {entry["page"]: entry for entry in original if entry.get("page") is not None}
+    by_page = {entry.get("page"): entry for entry in original}
     merged = []
     for entry in edited:
         result = dict(by_page.get(entry.get("page"), {}))
         result.update(entry)
+        original_page = by_page.get(entry.get("page"), {})
+        if "extracted_markdown" in original_page:
+            result["extracted_markdown"] = original_page["extracted_markdown"]
+        else:
+            result.pop("extracted_markdown", None)
         if result.get("blocks"):
             result["layout_text_alignment"] = "stale"
         merged.append(result)
     return merged
+
+
+def validate_edit_pages(markdown: str, manifest: list[dict[str, Any]]) -> None:
+    """An editor cannot manufacture, reorder or silently drop source page labels."""
+    expected = [entry["page"] for entry in manifest if entry.get("page") is not None]
+    observed = [int(match.group(1)) for match in _PAGE_MARKER.finditer(markdown)]
+    if not observed and len(expected) <= 1:
+        return
+    if observed != expected or (observed and markdown[:_PAGE_MARKER.search(markdown).start()].strip()):
+        raise AppException("Ranh giới trang không khớp nguồn; không tự tạo hoặc đổi số trang.",
+                           code="SOURCE_PAGE_BOUNDARIES_CHANGED", status_code=409)
 
 
 def manifest_page_count(manifest: list[dict[str, Any]] | None) -> int:
@@ -52,12 +74,12 @@ def canonical_pages(markdown: str | None, page_count: int = 1) -> list[dict[str,
     if not markers:
         return [{"page_number": 1 if page_count == 1 else None, "markdown_content": markdown}]
     pages: list[dict[str, Any]] = []
-    prefix = markdown[:markers[0].start()].strip()
-    if prefix:
+    prefix = markdown[:markers[0].start()].strip("\n")
+    if prefix.strip():
         pages.append({"page_number": None, "markdown_content": prefix})
     for idx, marker in enumerate(markers):
         end = markers[idx + 1].start() if idx + 1 < len(markers) else len(markdown)
-        pages.append({"page_number": int(marker.group(1)), "markdown_content": markdown[marker.end():end].strip()})
+        pages.append({"page_number": int(marker.group(1)), "markdown_content": markdown[marker.end():end].strip("\n")})
     return pages
 
 
@@ -86,12 +108,15 @@ def normalize_source_pages(
     manifest = []
     marked = bool(pages or _PAGE_MARKER.search(raw_text))
     for record in records:
-        content = clean_markdown_text(record["markdown_content"])
+        raw = record["markdown_content"]
+        content = normalize_content(raw)
         page = record["page_number"]
         parts.append(f"<!-- Trang {page} -->\n{content}" if marked and page is not None else content)
         manifest_item: dict[str, Any] = {
             "page": page,
             "chars": len(content),
+            "extracted_markdown": raw,
+            "normalization": {"version": VERSION, "input_hash": digest(raw), "output_hash": digest(content)},
         }
         if record.get("dimensions"):
             manifest_item["dimensions"] = record["dimensions"]
@@ -108,4 +133,5 @@ def normalize_source_pages(
         if record.get("blank_detection"):
             manifest_item["blank_detection"] = record["blank_detection"]
         manifest.append(manifest_item)
-    return "\n\n".join(parts).strip(), manifest
+    mark_repeated_margins(manifest)
+    return "\n\n".join(parts).strip("\n"), manifest

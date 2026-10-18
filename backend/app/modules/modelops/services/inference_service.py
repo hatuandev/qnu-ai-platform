@@ -6,10 +6,10 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
@@ -20,16 +20,18 @@ from app.core.exceptions import AppException
 from app.modules.modelops.circuit_breaker import circuit_breaker_registry
 from app.modules.modelops.models import LLMUsageLog, ModelProviderConfig, TenantQuota
 from app.modules.modelops.providers import get_llm_adapter
-from app.modules.modelops.providers.chat_contract import safe_error_message
 from app.modules.modelops.schemas import LLMGenerateRequest, LLMGenerateResponse
 from app.modules.modelops.services.chat_capabilities import (
     load_chat_capabilities,
     save_chat_capabilities,
 )
 from app.modules.modelops.services.chat_routes import VALID_CHAT_PROVIDER_TYPES, plan_chat_routes
+from app.modules.modelops.services.inference_policy import filter_chat_routes, transient_retry_scope
 from app.modules.modelops.services.key_rotation import (
     classify_key_failure,
     describe_provider_failure,
+    is_context_overflow_error,
+    provider_failure_diagnostics,
 )
 from app.modules.modelops.services.key_status import normalize_provider_key_status
 from app.modules.modelops.services.provider_key_rotation_service import (
@@ -211,6 +213,10 @@ class InferenceService:
         return failure.state
 
     async def generate(self, db: AsyncSession, req: LLMGenerateRequest) -> LLMGenerateResponse:
+        with transient_retry_scope():
+            return await self._generate(db, req)
+
+    async def _generate(self, db: AsyncSession, req: LLMGenerateRequest) -> LLMGenerateResponse:
         """Execute chat completion with Key Pool rotation, Circuit Breaker, Dynamic Fallback and Quota logging."""
         # 1. Quota Pre-check
         estimated_tokens = self._estimate_request_tokens(req)
@@ -227,14 +233,17 @@ class InferenceService:
             and "routing" not in str(p.get("id", "")).lower()
         ]
 
-        routes = plan_chat_routes(providers, req)
+        routes = filter_chat_routes(plan_chat_routes(providers, req))
 
         # 3. Traverse Providers with Circuit Breaker and Key Pool Rotation
         fallback_reasons: list[str] = []
+        attempted_overflow = False
+        attempted_other_error = False
         for idx, (p, chosen_model) in enumerate(routes):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
             provider_error: Exception | None = None
+            provider_overflow = False
 
             if not cb.can_execute():
                 fallback_reasons.append(f"{p['id']}: circuit_breaker_open")
@@ -277,8 +286,15 @@ class InferenceService:
                         {"id": "default", "name": "Default", "api_key": p["api_key"]}
                     ]
             if not available_keys:
-                fallback_reasons.append(f"{p['id']}: no_available_credentials")
-                logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                if relational_managed:
+                    skip_reason = "key_lease_unavailable"
+                elif not keys_pool:
+                    skip_reason = "no_credentials_configured"
+                else:
+                    skip_reason = "no_available_credentials"
+                fallback_reasons.append(f"{p['id']}: {skip_reason}")
+                logger.warning("Provider [%s] skipped: %s (keys_in_pool=%d)",
+                               p_name, skip_reason, len(keys_pool))
                 continue
 
             # Try available keys in rotation
@@ -394,10 +410,24 @@ class InferenceService:
                     raise
                 except Exception as exc:
                     provider_error = exc
-                    detail = safe_error_message(exc.response, used_api_key) if isinstance(exc, httpx.HTTPStatusError) else describe_provider_failure(exc)
+                    if is_context_overflow_error(exc):
+                        # Our request exceeds the serving window: retrying the
+                        # same prompt on sibling keys cannot succeed. Fall
+                        # through to the next route, but never charge the
+                        # circuit breaker for a healthy provider.
+                        provider_overflow = True
+                        detail = describe_provider_failure(exc)
+                        logger.warning('model_context_exceeded provider_id=%s requested_model=%s detail=%s',
+                                       p['id'], chosen_model, detail)
+                        fallback_reasons.append(f"{p['id']}: model_context_exceeded")
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey):
+                            await provider_key_rotation_service.release(db, lease)
+                        break
+                    detail = describe_provider_failure(exc)
                     fallback_reasons.append(f"{p['id']}: {detail}")
-                    logger.warning('model_inference_failed provider_id=%s requested_model=%s detail=%s',
-                                   p['id'], chosen_model, detail)
+                    logger.warning('model_inference_failed provider_id=%s requested_model=%s stage=generate diagnostics=%s',
+                                   p['id'], chosen_model, provider_failure_diagnostics(exc))
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
                         failure = await provider_key_rotation_service.complete_failure(
@@ -437,13 +467,33 @@ class InferenceService:
                     continue
 
             if provider_error:
-                cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
-                logger.warning(
-                    "All available keys for provider [%s] failed. Initiating fallback...",
-                    p_name,
-                )
+                if provider_overflow:
+                    attempted_overflow = True
+                    logger.warning(
+                        "Provider [%s] rejected the request context window; "
+                        "circuit breaker not charged. Initiating fallback...",
+                        p_name,
+                    )
+                else:
+                    attempted_other_error = True
+                    cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
+                    logger.warning(
+                        "All available keys for provider [%s] failed. Initiating fallback...",
+                        p_name,
+                    )
 
         # 4. If all providers exhausted
+        if attempted_overflow and not attempted_other_error:
+            raise AppException(
+                status_code=502,
+                title="Yêu cầu vượt giới hạn ngữ cảnh của model",
+                detail=(
+                    "Nội dung truy vấn kèm bằng chứng vượt quá cửa sổ ngữ cảnh "
+                    "của model phục vụ. Mọi route đã thử đều báo tràn ngữ cảnh; "
+                    "không có lỗi hạ tầng provider nào khác."
+                ),
+                code="MODEL_CONTEXT_EXCEEDED",
+            )
         raise AppException(
             status_code=503,
             title="Dịch vụ AI đang gián đoạn",
@@ -455,6 +505,14 @@ class InferenceService:
         )
 
     async def generate_stream(
+        self, db: AsyncSession, req: LLMGenerateRequest
+    ) -> AsyncIterator[str]:
+        with transient_retry_scope():
+            async with aclosing(self._generate_stream(db, req)) as stream:
+                async for chunk in stream:
+                    yield chunk
+
+    async def _generate_stream(
         self, db: AsyncSession, req: LLMGenerateRequest
     ) -> AsyncIterator[str]:
         """Stream chat tokens with Key Pool rotation, Preferred Model priority, Quota tracking and Dynamic Fallback."""
@@ -473,12 +531,15 @@ class InferenceService:
             and "routing" not in str(p.get("id", "")).lower()
         ]
 
-        routes = plan_chat_routes(providers, req)
+        routes = filter_chat_routes(plan_chat_routes(providers, req))
 
+        attempted_overflow = False
+        attempted_other_error = False
         for idx, (p, chosen_model) in enumerate(routes):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
             provider_error: Exception | None = None
+            provider_overflow = False
             if not cb.can_execute():
                 continue
 
@@ -515,7 +576,14 @@ class InferenceService:
                         {"id": "default", "name": "Default", "api_key": p["api_key"]}
                     ]
             if not available_keys:
-                logger.info("Provider [%s] has no credentials configured, skipping to next fallback", p_name)
+                if relational_managed:
+                    skip_reason = "key_lease_unavailable"
+                elif not keys_pool:
+                    skip_reason = "no_credentials_configured"
+                else:
+                    skip_reason = "no_available_credentials"
+                logger.warning("Provider [%s] skipped: %s (keys_in_pool=%d)",
+                               p_name, skip_reason, len(keys_pool))
                 continue
 
             for active_key_entry in available_keys:
@@ -631,6 +699,20 @@ class InferenceService:
                     raise
                 except Exception as ex:
                     provider_error = ex
+                    if is_context_overflow_error(ex):
+                        provider_overflow = True
+                        logger.warning('model_context_exceeded provider_id=%s requested_model=%s detail=%s',
+                                       p['id'], chosen_model, describe_provider_failure(ex))
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey):
+                            await provider_key_rotation_service.release(db, lease)
+                        if yielded_any:
+                            # A started stream is never continued from another
+                            # key/provider/model: surfacing the failure keeps
+                            # the emitted prefix intact instead of appending
+                            # fallback text to it, like other mid-stream errors.
+                            raise
+                        break
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
                         failure = await provider_key_rotation_service.complete_failure(
@@ -654,12 +736,8 @@ class InferenceService:
                         key_state = await self._record_key_failure(
                             db, cfg_obj, keys_pool, active_key_entry, ex
                         )
-                    logger.warning(
-                        "Stream failed for key [%s] of provider [%s]: %s",
-                        active_key_entry.get("name"),
-                        p_name,
-                        describe_provider_failure(ex),
-                    )
+                    logger.warning("model_inference_failed provider_id=%s requested_model=%s stage=stream diagnostics=%s",
+                                   p['id'], chosen_model, provider_failure_diagnostics(ex))
                     if yielded_any:
                         raise
                     if key_state is not None:
@@ -672,8 +750,27 @@ class InferenceService:
                     continue
 
             if provider_error:
-                cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
+                if provider_overflow:
+                    attempted_overflow = True
+                    logger.warning(
+                        "Provider [%s] rejected the stream context window; "
+                        "circuit breaker not charged.",
+                        p_name,
+                    )
+                else:
+                    attempted_other_error = True
+                    cb.record_failure(RuntimeError(describe_provider_failure(provider_error)))
 
+        if attempted_overflow and not attempted_other_error:
+            raise AppException(
+                status_code=502,
+                title="Yêu cầu vượt giới hạn ngữ cảnh của model",
+                detail=(
+                    "Nội dung truy vấn kèm bằng chứng vượt quá cửa sổ ngữ cảnh "
+                    "của model phục vụ cho luồng trực tuyến."
+                ),
+                code="MODEL_CONTEXT_EXCEEDED",
+            )
         raise AppException(
             status_code=503,
             title="Dịch vụ AI đang gián đoạn",

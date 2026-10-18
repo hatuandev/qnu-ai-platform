@@ -926,6 +926,14 @@ class KnowledgeSourceRevision(Base):
 
         return get_structured_review_state(self)[2]
 
+    @property
+    def canonical_format(self) -> str:
+        return (self.parse_provenance or {}).get("canonical_format", "legacy")
+
+    @property
+    def qnu_markdown_status(self) -> str | None:
+        return ((self.snapshot_metadata or {}).get("qnu_markdown") or {}).get("status")
+
     __table_args__ = (
         Index("uq_knowledge_source_rev_binding_rev_no", "binding_id", "revision_no", unique=True),
         Index("ix_knowledge_source_rev_status", "status"),

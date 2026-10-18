@@ -294,6 +294,7 @@ class PaddleOCRVLAdapter(BaseOCRAdapter):
 
         return {
             "engine_used": "paddleocr_vl",
+            "raw_payload": data,
             "total_pages": len(pages_data),
             "overall_confidence": 0.0,
             "confidence_source": "unavailable",

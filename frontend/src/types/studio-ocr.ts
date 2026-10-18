@@ -23,6 +23,7 @@ export interface StudioOCRPage {
   imageUrl: string;
   markdown: string;
   rawText: string;
+  rawTextAvailable?: boolean;
   regions: StudioOCRRegion[];
   dimensions: { width: number; height: number };
   wordCount: number;
@@ -36,6 +37,12 @@ export interface StudioOCRPage {
 }
 
 export interface StudioOCRDocument {
+  paginationKnown?: boolean;
+  canonicalHash?: string | null;
+  canonicalFormat?: string;
+  unmappedMarkdown?: string;
+  contentIntegrity?: import("./knowledge").ContentIntegrityReport;
+  contentReview?: import("./knowledge").DocumentVerificationData["content_review"];
   citationMetadata?: Record<string, string | null>;
   structuredArtifact?: import("./knowledge").SourceArtifact;
   layoutTextAlignment?: string;

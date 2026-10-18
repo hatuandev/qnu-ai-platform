@@ -53,6 +53,7 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
         return {**decision, "status": "ambiguous", "reason": "INTERVAL_REQUIRES_PERIOD_EVIDENCE",
                 "answer": "Câu hỏi yêu cầu một khoảng năm. Cần đối chiếu đầy đủ các kỳ trong khoảng; mình chưa có đủ căn cứ để trả lời toàn khoảng."}
     matches = []
+    unscoped = []
     for original in facts:
         fact = _record(original)
         raw = fact.get("raw_data") or {}
@@ -76,8 +77,6 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
             except InvalidOperation:
                 continue
             context = {**context, "attribute_code": "converted_score"}
-        if years and (temporal.get("type") != "year" or temporal.get("year") not in years):
-            continue
         if context.get("attribute_code") not in attributes:
             continue
         name = (fact.get("entity_name") or "").casefold()
@@ -93,8 +92,18 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
             # Never bind a metric from an unrelated row on attribute similarity alone.
             if len(name.split()) < 2 or name not in question.casefold():
                 continue
+        if years and (temporal.get("type") != "year" or temporal.get("year") not in years):
+            if temporal.get("type") in {None, "unknown"}:
+                unscoped.append(fact["id"])
+            continue
         matches.append({**fact, "raw_data": context})
     if not matches:
+        if unscoped:
+            return {**decision, "status": "missing", "reason": "DATA_YEAR_UNVERIFIED",
+                    "unscoped_fact_ids": unscoped,
+                    "answer": "Mình tìm thấy dữ liệu liên quan, nhưng chưa xác minh được năm áp dụng "
+                              "của các bản ghi này. Vì vậy, mình chưa thể khẳng định chúng đúng cho năm "
+                              + ", ".join(map(str, years)) + "."}
         return {**decision, "status": "missing", "reason": "NO_COMPATIBLE_FACT_EVIDENCE",
                 "answer": "Trong kho tài liệu đã xuất bản, mình chưa tìm thấy căn cứ đủ rõ cho số liệu và ngữ cảnh được hỏi. Không thể dùng số liệu năm hoặc điều kiện khác thay thế."}
     tuples: dict[tuple[str, str, int | None, str], set[str]] = {}

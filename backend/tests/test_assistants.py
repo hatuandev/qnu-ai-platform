@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -103,7 +104,12 @@ async def test_seed_adds_missing_assistants_and_workflows_once():
 
 @pytest.mark.asyncio
 async def test_seed_preserves_existing_user_configuration():
-    existing_assistants = [SimpleNamespace(code=item["code"]) for item in STANDARD_ASSISTANTS]
+    existing_assistants = [SimpleNamespace(
+        code=item["code"], name="User title", description="User description",
+        system_prompt="User-reviewed prompt", config={"knowledge_policy": {"context_top_k": 17}},
+        is_active=False, collection_id="custom-collection",
+    ) for item in STANDARD_ASSISTANTS]
+    before = [deepcopy(vars(record)) for record in existing_assistants]
     existing_workflows = [SimpleNamespace(id=item["workflow_id"]) for item in STANDARD_ASSISTANTS]
     mock_db = AsyncMock()
     mock_db.add = MagicMock()
@@ -119,6 +125,7 @@ async def test_seed_preserves_existing_user_configuration():
 
     assert result.assistants_added == 0
     assert result.workflows_added == 0
+    assert [vars(record) for record in existing_assistants] == before
     mock_db.add.assert_not_called()
     mock_db.commit.assert_awaited_once()
 

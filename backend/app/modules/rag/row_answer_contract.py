@@ -2,6 +2,7 @@
 
 import html
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -11,6 +12,7 @@ from app.core.exceptions import AppException
 from app.modules.knowledge.facts import detect_column_role
 from app.modules.knowledge.normalization.retrieval_models import SourceUnit
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
+from app.modules.knowledge.services.source_artifact import cell_context
 from app.modules.knowledge.services.table_context import extract_context_tables, row_identities
 from app.modules.rag.evidence_dependencies import dependency_groups, sentence_continuations
 from app.modules.rag.evidence_schemas import EvidenceBlock, QuoteReference, StrictContract
@@ -94,7 +96,7 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
     identities = row_identities(values, table)
     if len(identities) != 1 or len(values) != len(table["headers"]):
         return
-    identity, _, entity, _ = identities[0]
+    identity, _, entity, entity_code = identities[0]
     headers = [SourceUnit.model_validate(header) for header in row.metadata.get("row_headers", [])]
     if not headers or any(header.text != unit.header_context for header in headers):
         return  # No invented offsets or header citations when provenance is absent.
@@ -115,7 +117,7 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
         catalog.cells[key] = SourceCell(row_id, entity, label, value, refs)
         cells.append({"id": key, "header": label, "value": value})
     if cells:
-        catalog.rows[row_id] = {"id": row_id, "entity": entity, "title": body.title,
+        catalog.rows[row_id] = {"id": row_id, "entity": entity, "entity_code": entity_code, "title": body.title,
             "source_revision_id": body.source_revision_id, "cells": cells, "context_ids": context_ids,
             "scope_candidates": [key for key in context_ids if catalog.contexts[key].start < unit.start],
             "note_candidates": [key for key in context_ids if catalog.contexts[key].start > unit.start]}
@@ -157,6 +159,72 @@ def validate_selection(selection: RowSelection, catalog: RowCatalog, question: s
         scope_text = cell.header + "\n" + "\n".join(catalog.contexts[ref].text for ref in row_context)
         if years and not years.issubset(set(re.findall(r"\b(?:19|20)\d{2}\b", scope_text))):
             raise ValueError("No same-source scope for requested year")
+
+
+def retain_scoped_cells(selection: RowSelection, catalog: RowCatalog, question: str) -> RowSelection:
+    """Prune unsupported years before independent audit, never invent a scope.
+
+    The auditor still receives the full question/candidate set and must verify
+    complete coverage, so dropping a requested entity cannot become success.
+    Unknown IDs, duplicate IDs and foreign context remain hard validation errors.
+    """
+    if (any(key not in catalog.cells for key in selection.cell_ids)
+            or len(set(selection.cell_ids)) != len(selection.cell_ids)
+            or any(key not in catalog.contexts for key in [*selection.scope_ids, *selection.note_ids])):
+        return selection  # Let the ordinary strict validator reject malformed IDs.
+    selected_rows = {catalog.cells[key].row_id for key in selection.cell_ids}
+    allowed = {key for row in selected_rows for key in catalog.rows[row]["context_ids"]}
+    if not set(selection.scope_ids + selection.note_ids).issubset(allowed):
+        return selection
+    kept = []
+    for key in selection.cell_ids:
+        row_contexts = set(catalog.rows[catalog.cells[key].row_id]["context_ids"])
+        single = selection.model_copy(update={"cell_ids": [key],
+            "scope_ids": [ref for ref in selection.scope_ids if ref in row_contexts],
+            "note_ids": [ref for ref in selection.note_ids if ref in row_contexts]})
+        try:
+            validate_selection(single, catalog, question)
+        except ValueError:
+            continue
+        kept.append(key)
+    remaining = {ref for key in kept for ref in catalog.rows[catalog.cells[key].row_id]["context_ids"]}
+    return selection.model_copy(update={"cell_ids": kept,
+        "scope_ids": [ref for ref in selection.scope_ids if ref in remaining],
+        "note_ids": [ref for ref in selection.note_ids if ref in remaining]})
+
+
+def source_value_variants(selection: RowSelection, catalog: RowCatalog, question: str) -> bool:
+    """A same-year tuple cannot silently hide divergent source values/OCR.
+
+    NFC is only representation normalization. Different accents remain different;
+    this flags textual disagreement, not an automatic OCR correction.
+    """
+    years = set(re.findall(r"\b(?:19|20)\d{2}\b", question))
+    if len(years) != 1:
+        return False  # Do not mistake historical comparisons for conflicts.
+
+    def normalized(text: str) -> str:
+        return " ".join(unicodedata.normalize("NFC", text).casefold().split())
+
+    groups: dict[tuple, list[tuple[str, tuple | str]]] = {}
+    for key in selection.cell_ids:
+        cell = catalog.cells[key]
+        value: tuple | str = normalized(cell.value)
+        metric = normalized(cell.header)
+        if detect_column_role(cell.header)[0] == "combos":
+            tuples = re.findall(r"\(([^)]+)\)", cell.value)
+            if tuples:
+                value = tuple(sorted(tuple(sorted(normalized(part) for part in item.split(","))) for item in tuples))
+            context = cell_context(cell.header)
+            # Reuse the existing metric/method classifier; retain structural
+            # identifiers such as channel codes so methods are not conflated.
+            metric = (context["attribute_code"], normalized((context.get("qualifiers") or {}).get("method") or ""),
+                      tuple(re.findall(r"\b[a-z]+\d+\b", normalized(cell.header))))
+        identity = (normalized(cell.entity), metric)
+        code = catalog.rows[cell.row_id].get("entity_code", "") or ""
+        groups.setdefault(identity, []).append((code, value))
+    return any(left_value != right_value and (not left_code or not right_code or left_code == right_code)
+        for values in groups.values() for left_code, left_value in values for right_code, right_value in values)
 
 
 def complete_audit_context(selection: RowSelection, audit: RowAudit, catalog: RowCatalog) -> RowSelection:

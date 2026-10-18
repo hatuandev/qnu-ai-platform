@@ -13,6 +13,7 @@ from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException, EntityNotFoundError
+from app.core.retrieval_policy import RetrievalPolicy
 from app.core.stopwords import (
     extract_collection_domain_stopwords,
     get_vietnamese_stopwords,
@@ -48,8 +49,11 @@ def filter_unit_years(hits: list[dict[str, Any]], years: list[int]) -> list[dict
     """Apply the same unit contract to dense/lexical hits; unknown remains searchable."""
     result = []
     for hit in hits:
-        raw = (hit.get("metadata") or {}).get("source_unit")
-        if raw is None or temporal_is_compatible(SourceUnit.model_validate(raw).temporal, years):
+        metadata = hit.get("metadata") or {}
+        raw = metadata.get("source_units") or ([metadata["source_unit"]] if metadata.get("source_unit") else [])
+        # A grouped formula/list must not hide an incompatible verified child
+        # behind the first unit's unknown scope. Do not widen an explicit year.
+        if all(temporal_is_compatible(SourceUnit.model_validate(unit).temporal, years) for unit in raw):
             result.append(hit)
     return result
 
@@ -609,8 +613,20 @@ class HybridRetriever:
         read_mode_override: str | None = None,
         candidate_mode: bool = False,
         data_years: list[int] | None = None,
+        retrieval_policy: RetrievalPolicy | None = None,
+        diagnostics: dict[str, Any] | None = None,
+        return_candidates: bool = False,
     ) -> list[FusionCandidate]:
         """Run full Hybrid Retrieval pipeline: Dense + Sparse FTS + RRF + Reranker with Snapshot Isolation."""
+        from time import perf_counter
+
+        started = perf_counter()
+        degradations = []
+        dense_k = retrieval_policy.dense_top_k if retrieval_policy else top_k
+        lexical_k = retrieval_policy.lexical_top_k if retrieval_policy else top_k
+        final_k = retrieval_policy.context_top_k if retrieval_policy else int((reranker_policy or {}).get("top_k", rerank_top_k))
+        if retrieval_policy and return_candidates:
+            final_k = retrieval_policy.fusion_top_k
         active_snapshot = snapshot
         if active_snapshot is None and pin_snapshot:
             active_snapshot = await self.resolve_retrieval_snapshot(
@@ -625,13 +641,14 @@ class HybridRetriever:
                 return await vector_indexer.search_dense(
                     collection_id=collection_id,
                     query=query,
-                    top_k=top_k,
+                    top_k=dense_k,
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
                     snapshot=active_snapshot,
                     **({"candidate_mode": True} if candidate_mode else {}),
                 )
             except Exception as exc:
+                degradations.append({"stage": "dense", "error_type": type(exc).__name__})
                 logger.warning("Dense search encountered error, falling back to sparse degraded: %s", exc)
                 return []
 
@@ -641,17 +658,19 @@ class HybridRetriever:
                     db=db,
                     collection_id=collection_id,
                     query=variant,
-                    top_k=max(4, top_k // 2),
+                    top_k=max(1 if retrieval_policy else 4, lexical_k // 2),
                     tenant_id=tenant_id,
                     workspace_id=workspace_id,
                     snapshot=active_snapshot,
                     read_mode_override=read_mode_override,
                 )
             except Exception as exc:
+                degradations.append({"stage": "lexical_variant", "error_type": type(exc).__name__})
                 logger.debug("Variant sparse search skipped for '%s': %s", variant[:30], exc)
                 return []
 
-        # 1. Concurrent Dense & Sparse Search (Non-blocking asyncio.gather)
+        # 1. Vector I/O can overlap SQL, but all lexical queries must use the
+        # caller-owned AsyncSession sequentially (including query expansions).
         variant_queries = list({normalized_query(variant): variant for variant in (sparse_variants or [])
                                 if variant and variant.strip() and normalized_query(variant) != normalized_query(query)}.values())[:2]
         authority = getattr(query, "original", str(query))
@@ -659,21 +678,28 @@ class HybridRetriever:
         glossary_search = [query if isinstance(query, SearchQuery) else
                            SearchQuery(str(query), authority, "glossary")
                            for query in (glossary_queries or [])[:2]]
-        dense_hits, sparse_hits, *variant_hits = await asyncio.gather(
-            _safe_dense_search(),
-            self.search_sparse_fts(
+        dense_task = asyncio.create_task(_safe_dense_search())
+        try:
+            sparse_hits = await self.search_sparse_fts(
                 db=db,
                 collection_id=collection_id,
                 query=query,
-                top_k=top_k,
+                top_k=lexical_k,
                 tenant_id=tenant_id,
                 workspace_id=workspace_id,
                 snapshot=active_snapshot,
                 read_mode_override=read_mode_override,
-            ),
-            *(_safe_variant_search(v) for v in [*variant_queries[:2], *glossary_search]),
-        )
+            )
+            variant_hits = [await _safe_variant_search(v) for v in [*variant_queries[:2], *glossary_search]]
+            dense_hits = await dense_task
+        finally:
+            # Do not leave vector requests running after a primary SQL failure
+            # or cancellation. The caller's transaction/session remains theirs.
+            if not dense_task.done():
+                dense_task.cancel()
+            await asyncio.gather(dense_task, return_exceptions=True)
 
+        retrieval_ms = round((perf_counter() - started) * 1000, 2)
         # 2. Reciprocal Rank Fusion (RRF) with discounted variant lists
         dense_hits = filter_unit_years(dense_hits, data_years or [])
         sparse_hits = filter_unit_years(sparse_hits, data_years or [])
@@ -691,21 +717,38 @@ class HybridRetriever:
             extra_lists=extra_lists or None,
         )
 
+        fused_count = len(fused)
+        if retrieval_policy:
+            fused = fused[:retrieval_policy.fusion_top_k]
+        rerank_started = perf_counter()
         # 3. Cross-Encoder Reranking
         rp = reranker_policy or {}
         reranker_enabled = rp.get("enabled", True)
         if not reranker_enabled:
-            reranked = fused[:rerank_top_k]
+            reranked = fused[:final_k if retrieval_policy else rerank_top_k]
         else:
             reranked = await reranker_client.rerank(
                 query=query,
                 candidates=fused,
-                top_k=int(rp.get("top_k", rerank_top_k)),
+                top_k=final_k,
                 preferred_provider_id=rp.get("provider_id"),
                 preferred_model_name=rp.get("model_name"),
                 score_threshold=float(rp.get("score_threshold", 0.0)),
             )
 
+        if diagnostics is not None:
+            diagnostics.update(profile="configured" if retrieval_policy else "legacy", fusion="weighted_rrf",
+                lexical_engine="postgresql_fts", dense_top_k=dense_k, lexical_top_k=lexical_k,
+                fusion_top_k=retrieval_policy.fusion_top_k if retrieval_policy else None,
+                context_top_k=final_k if reranker_enabled or retrieval_policy else rerank_top_k,
+                dense_hits=len(dense_hits), lexical_hits=len(sparse_hits),
+                variant_hits=sum(map(len, variant_hits)), fused_count=fused_count, rerank_input=len(fused),
+                reranker_enabled=reranker_enabled, returned_count=len(reranked),
+                rerank_scores_observed=all(c.relevance_score is not None for c in reranked) if reranked and reranker_enabled else None,
+                degradations=degradations,
+                unique_documents=len({c.document_id for c in reranked}),
+                retrieval_ms=retrieval_ms, rerank_ms=round((perf_counter() - rerank_started) * 1000, 2),
+                total_ms=round((perf_counter() - started) * 1000, 2))
         logger.debug(
             "Hybrid retrieval completed: query='%s', dense=%d, sparse=%d, fused=%d, reranked=%d",
             query[:40],

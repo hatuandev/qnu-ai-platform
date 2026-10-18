@@ -597,14 +597,15 @@ class AnswerFormatPlanner:
                 "QUY TẮC ĐỐI SOÁT TỌA ĐỘ SỐ LIỆU (BẮT BUỘC):\n"
                 "- Đối chiếu chính xác [Năm áp dụng], [Tên cột] và [Tên hàng] của số liệu.\n"
                 "- Trả lời trực diện con số chính xác kèm đơn vị tính, không lấy số liệu của năm khác thay thế.\n\n"
-                "THỨ TỰ ƯU TIÊN BẰNG CHỨNG (khi mâu thuẫn, tầng trên thắng tầng dưới):\n"
-                "TẦNG 1 - BẢNG SỐ LIỆU, TẦNG 2 - ĐOẠN TRÍCH, TẦNG 3 - LỊCH SỬ TRAO ĐỔI.\n"
+                "Bảng và đoạn văn đều là ứng viên chứng cứ, không có loại nào tự động thắng.\n"
+                "Chỉ dùng khi đúng thực thể, loại chỉ số, đơn vị, năm, phương thức và điều kiện.\n"
+                "Nếu mâu thuẫn cùng phạm vi mà chưa có căn cứ thay thế, nêu mâu thuẫn; không tự chọn.\n"
                 "Lịch sử chỉ dùng để hiểu đại từ, không phải bằng chứng.\n"
             )
 
         # 4. Tier 1: Fact table
         if fact_markdown:
-            tier_label = "TẦNG 1 - BẢNG SỐ LIỆU ĐÃ XÁC THỰC" if is_fact_query else "BẢNG SỐ LIỆU ĐÃ XÁC THỰC"
+            tier_label = "FACT TRUY HỒI — CHƯA XÁC MINH TÍNH PHÙ HỢP VỚI CÂU HỎI"
             sections.append(f"{tier_label}:\n{fact_markdown}\n")
 
         # 5. Tier 2: Knowledge chunks
@@ -637,7 +638,7 @@ class AnswerFormatPlanner:
         """Assemble full prompt with context and format instructions (legacy fallback)."""
         context_block = "\n\n---\n\n".join(context_chunks)
         if fact_table:
-            context_block = f"### BẢNG SỰ THẬT CHÍNH XÁC (ƯU TIÊN TUYỆT ĐỐI):\n{fact_table}\n\n### TÀI LIỆU THAM KHẢO:\n{context_block}"
+            context_block = f"### FACT ỨNG VIÊN (CẦN KIỂM CHỨNG ĐÚNG PHẠM VI):\n{fact_table}\n\n### TÀI LIỆU THAM KHẢO:\n{context_block}"
 
         prompt = (
             f"{custom_system_prompt or SYSTEM_PROMPT_TEMPLATE}\n\n"

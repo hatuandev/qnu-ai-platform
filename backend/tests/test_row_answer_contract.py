@@ -279,6 +279,34 @@ async def test_auditor_cannot_add_unknown_cells_or_see_first_selection():
 
 
 @pytest.mark.asyncio
+async def test_invalid_cells_report_id_kinds_and_catalog_size_without_document_text():
+    from app.modules.rag.row_answer import answer_from_rows
+    from app.modules.rag.row_answer_contract import RowAudit, RowSelection, build_catalog
+
+    rows, req, snapshot = context()
+    catalog = build_catalog(rows, snapshot)
+    ids = [key for key, cell in catalog.cells.items() if cell.value in {"15", "18", "600"}]
+    scope = [key for key, block in catalog.contexts.items() if "năm 2026" in block.text]
+    context_shaped = next(iter(catalog.contexts))
+    assert "p" in context_shaped
+    with patch("app.modules.rag.row_answer.structured_call", AsyncMock(side_effect=[
+        MetricScope(context_ids=scope),
+        RowSelection(status="selected", cell_ids=ids, scope_ids=scope),
+        RowAudit(compatible=True, complete=True, scope_supported=True,
+                 required_cell_ids=[context_shaped, "r9c9"], required_context_ids=scope)])):
+        response = await answer_from_rows(AsyncMock(), req, snapshot, rows)
+    assert response.answer_decision["reason"] == "ROW_AUDIT_INVALID_CELLS"
+    assert response.citations == []
+    diagnostics = req._retrieval_diagnostics["row_audit"]
+    assert diagnostics["invalid_cell_ids"] == [context_shaped, "r9c9"]
+    assert sorted(diagnostics["invalid_id_kinds"]) == ["context_shaped", "non_cell_id"]
+    assert diagnostics["cell_count"] == len(catalog.cells)
+    assert diagnostics["context_count"] == len(catalog.contexts)
+    assert diagnostics["table_count"] == len(catalog.rows)
+    assert "15" not in response.answer  # no source values leak into the refusal
+
+
+@pytest.mark.asyncio
 async def test_request_scope_must_match_pinned_snapshot_before_model_call():
     from app.modules.rag.row_answer import answer_from_rows
 

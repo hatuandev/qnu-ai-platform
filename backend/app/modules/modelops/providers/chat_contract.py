@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
+import time
 from typing import Any
 
 import httpx
 
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.context_budget import fit_rejected_context
+from app.modules.modelops.services.inference_policy import (
+    minimum_chat_output,
+    retry_transient_response,
+)
 
 TOKEN_PARAMETERS = frozenset({"max_tokens", "max_completion_tokens", "max_output_tokens"})
 MAX_NEGOTIATIONS = 3
@@ -117,17 +123,34 @@ async def post_chat(
     *,
     probe: bool = False,
 ) -> httpx.Response:
+    timeout = client.timeout.read
+    deadline = time.monotonic() + timeout if isinstance(timeout, (int, float)) else float("inf")
+    try:
+        async with asyncio.timeout_at(deadline):
+            return await _post_chat(client, endpoint, headers, payload, capabilities, probe=probe, deadline=deadline)
+    except TimeoutError as exc:
+        raise httpx.ReadTimeout("Chat transport deadline exceeded") from exc
+
+
+async def _post_chat(
+    client: httpx.AsyncClient, endpoint: str, headers: dict[str, str],
+    payload: dict[str, Any], capabilities: dict[str, Any], *, probe: bool, deadline: float,
+) -> httpx.Response:
     budget_retried = False
     context_retried = False
     for attempt in range(MAX_NEGOTIATIONS + 1):
         response = await client.post(endpoint, headers=headers, json=payload)
+        if not probe and await retry_transient_response(response, deadline):
+            response = await client.post(endpoint, headers=headers, json=payload)
         if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
             response, payload, capabilities, probe=probe
         ):
             continue
-        if (attempt < MAX_NEGOTIATIONS and not context_retried and not probe
+        requested_output = next((payload[k] for k in TOKEN_PARAMETERS if k in payload), 1)
+        minimum_output = minimum_chat_output(requested_output, int(capabilities.get("minimum_output_tokens", 1)))
+        if (attempt < MAX_NEGOTIATIONS and not context_retried and not probe and minimum_output < requested_output
                 and await fit_rejected_context(client, endpoint, headers, payload, response,
-                                               int(capabilities.get("minimum_output_tokens", 1)))):
+                                               minimum_output)):
             context_retried = True
             continue
         response.raise_for_status()

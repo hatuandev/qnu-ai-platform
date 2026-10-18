@@ -48,6 +48,7 @@ class ImportBatchService:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         db: AsyncSession | None = None,
+        dispatch: bool = True,
     ) -> KnowledgeImportBatch:
         """Create a new snapshot import batch with items for each requested document."""
         assert db is not None, "Database session is required"
@@ -215,8 +216,12 @@ class ImportBatchService:
 
         batch.items = items
         jobs = self._create_jobs(db, batch, items)
+        if not dispatch:
+            for job in jobs:
+                job.dispatch_status = "operator"
         await db.commit()
-        await self._dispatch_jobs(db, jobs)
+        if dispatch:
+            await self._dispatch_jobs(db, jobs)
 
         return batch
 
@@ -300,6 +305,7 @@ class ImportBatchService:
         tenant_id: str = "tenant_qnu",
         workspace_id: str = "workspace_qnu",
         db: AsyncSession | None = None,
+        dispatch: bool = True,
     ) -> KnowledgeImportBatch:
         """Reset failed items in a batch to queued for reprocessing."""
         batch = await self.get_import_batch(
@@ -330,8 +336,12 @@ class ImportBatchService:
 
         assert db is not None
         jobs = self._create_jobs(db, batch, failed_items)
+        if not dispatch:
+            for job in jobs:
+                job.dispatch_status = "operator"
         await db.commit()
-        await self._dispatch_jobs(db, jobs)
+        if dispatch:
+            await self._dispatch_jobs(db, jobs)
 
         return batch
 

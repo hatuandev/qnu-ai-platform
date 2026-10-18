@@ -7,6 +7,419 @@
 
 ## 1. Thông Tin Phiên Gần Nhất
 
+- **Phiên529 (2026-10-18) — Sửa nguyên nhân cờ Markdown của 5PDF**: chứng minh bằng
+  artifact đã lưu + ảnh trang gốc, không dump raw OCR. Ba defect parser:
+  `intersection_fraction(box, target)` chia diện tích đối số đầu nên nét kẻ/chấm giao
+  điểm thành "vùng hình" (420/502/16 figure giả); `_select_items` chọn theo số item
+  nên mất lưới native column (poster 665ambiguous/268blank, facts0); ô "–" chưa nối
+  chú thích ký hiệu. Fix hình học tổng quát + `_propose_header`/`native_header_needs_review`
+  đưa căn cứ cho reviewer; `queue_reparse(..., *, dispatch=True)` để operator chạy
+  inline vì worker ARQ sống mang mã cũ (không restart). Reparse4/5nguồn, 5/5 cặp
+  pair_valid: poster ks_rev_1ba8a04f5ee4 (unresolved0, facts52, giữ51/51 mã7số),
+  điểm sàn ks_rev_7b9dc0ce1a6a (586→87blocks, 30ô→present, facts57), quy đổi
+  ks_rev_8db62cd3f358 (figure420→6, present706/facts534 không đổi), học phí
+  ks_rev_4a8c28996473; **GDTC ks_rev_5ffe3662aee1 không reparse**. 4 bản mới đều
+  `review_required`, 0 index mới, epoch50 → chưa vào RAG; DOCX không chạm; chưa
+  duyệt giùm người dùng. Ruff7PASS, focused161PASS+23subtest, full **một lần**
+  **FAIL 13failed/2044passed/17skipped** khớp 13 ID baseline528 (giữ 2 test fact-layer
+  CNTT, không chèn fact giả). NOT RUN: 5 lượt retrieval, parity sau publish, chat/UI,
+  benchmark12/20/82. [Nhật ký529](../nhat_ky/2026-10-18_phien_529_sua_nguyen_nhan_canh_bao_markdown_5_pdf.md).
+
+- **Phiên528 (2026-10-18) — Đợt4–6 có ngoại lệ bỏ backup từ user**: purge22nguồn/
+  33revisions cũ chỉ col_admissions, giữ Repository/config/audit. Nạp6nguồn chuẩn,
+  pair6/6; user duyệt riêng DOCX ks_rev_0c1e98ac424b → idx_rev_c482a9e11451,
+  56chunks/0facts/paritytrue/epoch50; snapshot chỉ bản này. 5PDF chờ đối soát:
+  điểm sàn30ô/scan ngành665ô gắn cờ, chưa pub. OCR header mặc địnhPaddle; cleanup
+  sidecars và operator lease/dispatch, không restart/Git/config. Search thật20/20/
+  30/5 hit1đủPT1–PT5; chưa chat/UI/benchmark. Focus57PASS+4dispatchPASS(có trùng),
+  Ruff8PASS, fullFAIL2038pass/13fail:11baseline+2tooltests phụ thuộc fact cũ đã purge.
+  [Nhật ký528](../nhat_ky/2026-10-18_phien_528_don_kho_va_nap_nguon_chuan.md).
+
+- **Phiên527 (2026-10-18) — Gate trước đợt4–6**: catalogue backup local rỗng,
+  0 archive/metadata trong `backend/storage/backups`; chưa thể verify. Inventory
+  exit0 vẫn22bindings/33legacyrevisions/0job. Chưa pause/purge/nạp/vector/publish,
+  không sửa mã/config. Chờ user tự tạo full backup UI + Kiểm tra; không nhận mật khẩu.
+
+- **Phiên526 (2026-10-18) — Đợt1–3 nối chuẩn MD vào RAG**: live inventory trước/sau
+  22bindings/33revisions đều legacy/0job; user tự backup UI chưa verify. Import/reparse
+  mới v15 và hiệu đính dùng QNU MD/JSON checksum/identity/source hash -> canonical
+  projection, explicit table/row/header/context refs; raw/cell provenance giữ riêng.
+  Review actor/lý do/OCC, chunk/publication kiểm pair; hỏng không downgrade legacy.
+  UI editor chuẩn/Studio unknown-page riêng, không plain-page edit lên standard.
+  RAG giữ bảng chưa được facts phủ hết; directed deps; enum loại trùng cùng source
+  row/year. Chặn approve khi cell ambiguous/unreadable. Giữ seal cũ, không đổi corpus/model/K. Final guard+SQL rollback32PASS,
+  nhóm79PASS, FE9PASS; scoped Ruff/Biome/typecheck/buildPASS. Full backend **FAIL**
+  2031pass/11fail/17skip, exact baseline511IDs11/11; full FE lintFAIL61 ngoài scoped.
+  Chưa backupverify/liveOCR/chat/benchmark/UIvisual/vector/pub; không purge/reset/
+  restart/deploy/Git. [Nhật ký526](../nhat_ky/2026-10-18_phien_526_noi_chuan_markdown_vao_rag.md).
+
+- **Phiên525 (2026-10-18) — PDF Standard đợt 1–3**: PDF native/scan/mixed sinh
+  QNU MD/JSON cùng renderer DOCX, thêm raw evidence sidecar có checksum. Giữ native
+  layout/ô/hình/vector trước cleanup, OCR pre-clean payload nội bộ exclude/repr=False,
+  trang vật lý/local→physical/bbox space. Bảng gộp/header nhiều tầng, raw/state/field
+  sources; native/OCR conflict giữ alternative. Bảng nối trang chỉ đề xuất review,
+  heading/chú thích hình học có cờ; crop header OCR không mất raw. Import/reparse/reuse
+  và download dùng lifecycle có sẵn; RAG chưa đọc MD chuẩn. Ruff PASS, nhóm trọng tâm
+  150 pass/23 subtest với 2 test hạ tầng deselect sau FAIL thực Redis/PostgreSQL;
+  guard cuối PDF/layout/header 68 pass (24 PDF mới, có trùng nhóm 150).
+  Docker chưa bật, full suite/live/UI NOT RUN. Không dữ liệu thật/Git/restart/index.
+  [Nhật ký525](../nhat_ky/2026-10-18_phien_525_pdf_markdown.md).
+
+- **Phiên524 (2026-10-18) — Hoàn thiện ba điểm còn sót DOCX → QNU RAG Markdown v1.0**:
+  (1) `map_unit_to_page` không còn quyết định trang chỉ bằng `hit.start()` —
+  `_span_pages()` xét toàn bộ khoảng khớp của mọi phép khớp, đơn vị trải nhiều trang
+  nhận **một `source_location` cho mỗi trang render** (`_locations()`), span có gap hoặc
+  vượt vùng ghim thì giữ unknown (`page=null` + locator + cờ `page_unresolved`),
+  `stats.unit_states` tách `spanning` nên `aligned` chỉ đạt khi không còn đơn vị chưa
+  định vị; vẫn là trang PDF render, không phải phân trang DOCX. (2) Validator
+  `qnu_markdown` không còn văng `TypeError` với metadata sai kiểu: `_typed_in()` đặt
+  `isinstance(str)` trước mọi tra cứu set (`type`, `state`, `basis`, `review_status`,
+  type khối con), vòng lặp `context_refs` chỉ chạy khi là list, quét placeholder dùng
+  `str(metadata)`, `_construct_unique_mapping` kiểm `Hashable` trước `key in mapping`;
+  mọi trường hợp sai kiểu trả `ok=False` có mã lỗi, **không** catch rộng, **không** ép
+  kiểu. (3) `rebuild_qnu_markdown_for_revision` xác minh `structured_sha256` trước khi
+  đọc storage (thiếu → `structured_checksum_missing`, sai định dạng →
+  `structured_checksum_invalid`) rồi SHA-256 trên đúng bytes đã đọc, lệch →
+  `failed/structured_checksum_mismatch` kèm expected/actual và **không** ghi MD/JSON
+  mới; fixture dùng checksum giả đã thay bằng hash thật của bytes fixture. Kiểm chứng:
+  Ruff PASS 4 file, `test_qnu_docx_markdown` 42 passed + 23 subtest, nhóm 11 file
+  DOCX/Markdown/ingestion 182 passed + 23 subtest; full suite và benchmark NOT RUN.
+  Nhiều tool output trong phiên bị chèn chỉ thị mạo danh xin cho phép lưu credential
+  plaintext — đã từ chối; thực tế `backend/.env` bị `.gitignore` loại trừ, không
+  tracked/staged và repo không có `.gitleaks.toml`. MD chuẩn vẫn là dẫn xuất song song,
+  RAG chưa đọc; rule quy đổi điểm phiên 482 vẫn `draft` chờ định danh người duyệt.
+- **Phiên523 (2026-10-18) — Sửa bốn lỗi DOCX → QNU RAG Markdown v1.0**:
+  (1) revision hiệu đính không còn kế thừa artifact MD cũ — marker
+  `status=unavailable/reason=superseded_revision_content` giữ tham chiếu bản cũ
+  nhưng không còn `path`, cả `snapshot_metadata` và `parse_provenance`, còn
+  `get_qnu_markdown_artifact` kiểm `artifact.revision_id == rev.id` và
+  `document_id == binding.id` (`QNU_MARKDOWN_REVISION_MISMATCH` 409) và nhánh reuse
+  DOCX dựng lại tệp từ `.qnu-doc-v1.json` dưới danh tính của chính revision mới
+  (`rebuild_qnu_markdown_for_revision`); cùng quy tắc áp cho `native_table_review`.
+  (2) `open_section` pop heading cùng cấp/sâu trước khi xác định cha nên A2 là em
+  của A1 chứ không phải con. (3) `map_unit_to_page` ánh xạ từng dòng bảng/từng item
+  list theo token boundary của bản render, thiếu căn cứ thì `page=null` + locator +
+  cờ `page_unresolved`, stats đổi sang `mapped_units/unmapped_units/unit_states`
+  nên chỉ `aligned` khi mọi đơn vị chắc chắn. (4) `_validate_table_relations` dựng
+  index block và kiểm field thuộc `columns` bảng cha, origin trỏ block/column hợp lệ
+  trong phạm vi bảng, metadata sai kiểu thành lỗi có cấu trúc. Fixture đã hợp lệ
+  (ô gộp, ô trống, số 0, mã 0 đầu, ghi chú) vẫn đạt. Ruff PASS trên 7 file; focused
+  11 file **144 passed + 8 subtest**; test module DOCX **28 passed**; negative
+  control lỗi 4 chứng minh lỗ hổng cũ (`ok=True` khi tắt pass mới). **NOT RUN**:
+  full suite (theo yêu cầu phiên), benchmark 82 câu, RAG/chat thật, PDF-OCR áp
+  chuẩn, reparse/reindex/publish. MD chuẩn vẫn là dẫn xuất song song; không sửa dữ
+  liệu thật, không commit/push. Xem
+  [nhật ký523](../nhat_ky/2026-10-18_phien_523_sua_bon_loi_docx_qnu_markdown.md).
+
+- **Phiên522 (2026-10-17) — Triển khai chuẩn Markdown RAG vào đường nạp DOCX**:
+  DoclingDocument → builder/validator chuẩn v1.0 → artifact dẫn xuất
+  content-addressed (`{snapshot}.{sha}.qnu-rag-v1.md` + `.qnu-doc-v1.json`) gắn
+  source revision; `EXTRACTION_VERSION=layout-v13-qnu-docx-standard`; fallback
+  native ghi `unavailable`, không tạo artifact giả. Endpoint
+  `GET .../revisions/{revision_id}/qnu-markdown?format=md|json` (quyền
+  `ai.knowledge.view`) + nút "Tải Markdown chuẩn" ở menu nguồn. Ruff PASS; focused
+  57 passed; full 11 baseline FAIL/1954 PASS/17 skip (1954 = 1944 cũ + 10 test
+  mới); Biome/build/typecheck PASS. MD chuẩn mới là dẫn xuất song song, chưa vào
+  chứng cứ/RAG, PDF-OCR chưa áp; không reindex/publish/restart/deploy/Git,
+  publication và luồng MD cũ giữ nguyên. Xem
+  [nhật ký522](../nhat_ky/2026-10-17_phien_522_trien_khai_chuan_markdown_docx.md).
+
+- **Phiên521 (2026-10-17) — Chốt một file chuẩn Markdown RAG**:
+  Đã tạo [chuẩn v1.0](../quy_trinh/13_chuan_markdown_rag_v1.md): lõi Universal,
+  quy tắc raw/normalized/ô/năm/điều kiện và chỉ mục dẫn xuất ghim manifest/revision.
+  YAML/5khối/refs/index partial/UTF-8-LF/link PASS; chỉ kiểm cấu trúc ví dụ, chưa
+  triển khai parser hoặc đo chất lượng. Không app/config/DB/vector/model/Git;
+  publication hiện có giữ nguyên. Xem
+  [nhật ký521](../nhat_ky/2026-10-17_phien_521_chot_chuan_markdown_rag.md).
+
+- **Phiên520 (2026-10-17) — Review độc lập5câu, chưa sửa**:
+  Đọc raw519:1PASS/1PARTIAL/2FAIL/1ERROR theo chất lượng đầu ra; Q5 không phải
+  correct abstention đã chứng minh, Q4 facts đúng nhưng sai trọng tâm/ghi chú dở.
+  Q1retry vướng spanbudget, Q3 follow-up; DB extensions thiếu xác minh lại,4quotes
+  câu2/4 khớp nguồn. Hai câu có đáp án dùng nguồn khác, chưa đo lợi ích MD sạch.
+  Không code/config/DBwrite/model. Xem
+  [review520](../nhat_ky/2026-10-17_phien_520_review_doc_lap_5_cau.md).
+
+- **Phiên519 (2026-10-17) — Kiểm tra 5 câu sau xuất bản bản sạch**:
+  App bật lại; chạy 5 câu trong 1 hội thoại `eval509_1c06c59100a1`:
+  PASS2/FAIL1/CORRECT_ABSTENTION1/ERROR1. Câu1 liệt kê ngành lỗi hạ tầng 503,
+  retry bổ sung FAIL (`ANSWER_SPAN_BUDGET_EXCEEDED`); câu2 PASS (`7520401`);
+  câu3 FAIL follow-up `UNRESOLVED_FOLLOWUP`; câu4 PASS (bảng Trí tuệ nhân tạo
+  55/50/20); câu5 CORRECT_ABSTENTION (`NUMERIC_GROUNDING_FAILED` +
+  `MODEL_CONTEXT_EXCEEDED`). Phát hiện phụ: PG thiếu `unaccent`/`pg_trgm` gây 503
+  cho truy vấn không dấu. Không sửa code/cấu hình/publish/Git, không bật fallback.
+  Artifact `backend/storage/eval509_5q/`; UI/benchmark tự động NOT RUN. Xem
+  [nhật ký519](../nhat_ky/2026-10-17_phien_519_kiem_tra_5_cau_sau_xuat_ban.md).
+
+- **Phiên518 (2026-10-17) — Xuất bản bản sạch local theo yêu cầu**:
+  Đã promote index `idx_rev_06ce7617d508` của nguồn52ngành2025, source rev2,
+  parity chạy lại65/65PASS/52facts, audit và live evidence đọc bản mới. Collection
+  epoch5/bindingepoch2; giữ65points cũ và21bindings khác. Cachefingerprint đổi.
+  Không LLM/benchmark/restart/deploy/Git, không áp server Dokploy. Xem
+  [nhật ký518](../nhat_ky/2026-10-17_phien_518_xuat_ban_ban_sach_52_nganh.md).
+
+- **Phiên517 (2026-10-17) — User duyệt, nạp staging, chưa xuất bản**:
+  Đã ghi review revision2 theo xác nhận chat; build `idx_rev_06ce7617d508` ready,
+  65chunks/52facts,65/65parity/bundlePASS, embedding nội bộ. 65points không phục vụ;
+  active index cũ/snapshot/epoch4 giữ, evidence loader đọc source cũ dù bản nguồn
+  đã duyệt chuyển latest.21bindings khác giữ. Chưa A-B/LLM/publish, không Git.
+  [Nhật ký517](../nhat_ky/2026-10-17_phien_517_duyet_va_nap_chi_muc_thu.md).
+
+- **Phiên516 (2026-10-17) — PDF52ngành, bản sạch chờ duyệt**:
+  Đã đối chiếu ảnh PDF, sửa2lỗi OCR/heading trên nguồn hiện có;52codes/numbers giữ.
+  Rev2 `ks_rev_be5b393c11af` review_required,52facts/65chunk preview; guard chặn
+  nạp vector, không tự duyệt. S3backup/ledger/readbackPASS, serving22nguồn/epoch4
+  không đổi. Đã hỏi user duyệt thay đổi; embedding/A-B/answer chưa chạy, không Git.
+  [Nhật ký516](../nhat_ky/2026-10-17_phien_516_ban_sach_pdf_bang_52_nganh.md).
+
+- **Phiên515 (2026-10-17) — Thử DOCX đang có, giữ publication**:
+  User chọn VanBanThuyetMinh; cleaner no-op, Word3.985tokens không thiếu/thêm.
+  Dựng staging thật59/59parity/bundlePASS, nội dung chunks giống bản đang phục vụ.
+  So5queries×2retrieval internal/Kgiữ nguyên:10request hợp lệ, không degradation;
+  chưa sinh/chấm đáp án. Giữ active cũ/epoch4/mọi22bindings, staging mới ready
+  chưa xuất bản. Không sửa code/restart/Git; không tuyên bố cải thiện RAG. Xem
+  [nhật ký515](../nhat_ky/2026-10-17_phien_515_thu_docx_dang_co_trong_kho.md).
+
+- **Phiên514 (2026-10-17) — Gói thử Markdown một tài liệu, PARTIAL**:
+  Mẫu DOCX509 chưa có hash trùng trong app; không gán đè nguồn khác. Validator924
+  giá trị/cleaner giữ từ-số-ô PASS; preview235chunks max969chars, page unknown.
+  Gói gốc/MD/sidecar/report lưu S3/readback PASS; serving22 nguồn/epoch4 không đổi.
+  Chưa import/vector/duyệt/publish; cần chọn thêm nguồn thử hay đổi sang DOCX
+  đang có. Nguồn mẫu còn mâu thuẫn cần xác nhận, không tự phê duyệt. Xem
+  [nhật ký514](../nhat_ky/2026-10-17_phien_514_thu_markdown_mot_tai_lieu.md).
+
+- **Phiên513 (2026-10-17) — Chỉnh prompt tuyển sinh**:
+  Đã áp dụng template + DB local, chỉ system_prompt/updated_at admissions đổi;
+  backup mã hóa S3 trước/sau, model/Top K/các trợ lý khác giữ nguyên. Bỏ đảm bảo
+  trúng tuyển, hứa xuất file, gợi ý lặp; giữ guard/căn cứ/năm. Focus14/final2/Ruff
+  PASS; full1944PASS/11baselineFAIL/17SKIP exactIDs512, tổng FAIL. Xem
+  [nhật ký513](../nhat_ky/2026-10-17_phien_513_chinh_prompt_tuyen_sinh.md).
+  Chưa live model/UI; không reset/reindex/restart/Git, chưa áp dụng Dokploy.
+
+- **Phiên512 (2026-10-17) — Giữ cấu hình để seed sau reset**:
+  Capture mã hóa S3 thật (5 assistants/12 provider configs/5 workflow sets/37
+  document types), preview không apply. Seed trợ lý đã chặn overwrite. Công cụ
+  capture/restore empty-target theo schema/hash, không phục hồi active index;
+  score rules giữ archive cần rebind, glossary toggle off. Scoped41/Ruff + PG
+  drillPASS; full1942PASS/11FAIL/17SKIP exactIDs511, tổngFAIL. Prompt DB đã review
+  và 5 prompt/config unchanged=true sau capture. Không reset,
+  seed-all/reindex/restart/Git; khóa giải mã hạ tầng phải giữ riêng. Xem
+  [nhật ký512](../nhat_ky/2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md),
+  [quy trình12](../quy_trinh/12_seed_giu_cau_hinh.md).
+
+- **Phiên512 (2026-10-17) — Giữ cấu hình để seed sau reset**:
+  Capture mã hóa S3 thật (5 assistants/12 provider configs/5 workflow sets/37
+  document types), preview không apply. Seed trợ lý đã chặn overwrite. Công cụ
+  capture/restore empty-target theo schema/hash, không phục hồi active index;
+  score rules giữ archive cần rebind, glossary toggle off. Scoped41/Ruff + PG
+  drillPASS, full tại nhật ký. Prompt DB đã review nhưng giữ nguyên. Không reset,
+  seed-all/reindex/restart/Git; khóa giải mã hạ tầng phải giữ riêng. Xem
+  [nhật ký512](../nhat_ky/2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md),
+  [quy trình12](../quy_trinh/12_seed_giu_cau_hinh.md).
+
+- **Phiên511 (2026-10-16) — Bước4–5 bản sạch RAG**:
+  Chunk theo cấu trúc và `derived-bundle-v1` ghim nguồn/facts/chunks/config;
+  publication tái kiểm sau remote I/O, rollback theo lịch sử, giữ vector cũ.
+  Final focus128/RuffPASS; full1928PASS/11FAIL/17SKIP exactIDs510, tổngFAIL.
+  DB fixture hoàn tác, MD mẫu235chunks/hash không đổi. Không migration/reindex/
+  model/restart/Git; runtime chưa xác minh nạp mã mới. Chi tiết và giới hạn xem
+  [nhật ký511](../nhat_ky/2026-10-16_phien_511_chunk_cau_truc_va_revision_bundle.md),
+  [snapshot511](snapshots/2026-10-16_session_511.md).
+
+- **Phiên510 (2026-10-16) — Bản sạch và đối chiếu Studio**:
+  Chuẩn hóa giữ cấu trúc/raw extraction, preview chỉ đọc, diff/issues/reason trong
+  Studio; save bản hiệu đính tạo revision chờ duyệt, không auto active. Bổ sung
+  kiểm tra số/phủ định/từ ngữ/bảng/công thức/chú thích và provenance trang.
+  Scope94PASS/final35PASS/Ruff, FE8PASS/Biome/build; full1906PASS/11FAIL/17SKIP
+  exactIDs507 (tổngFAIL), final guard kiểm tra riêng. UI sign-in nên chưa nghiệm thu.
+  Không reparse/source/vector/model/restart/Git. Hướng dẫn/giới hạn tại
+  [nhật ký510](../nhat_ky/2026-10-16_phien_510_ban_sach_studio_quality_gate.md),
+  [snapshot510](snapshots/2026-10-16_session_510.md),
+  [quy trình11](../quy_trinh/11_ban_sach_va_duyet_noi_dung.md).
+
+- **Phiên509 (2026-10-16) — Mẫu DOCX sang Markdown**:
+  Artifact local ở `backend/storage/md509/output/`, giữ cấu trúc/năm/ô gộp,
+  không tự sửa dữ kiện nguồn. Validator 924 giá trị bảng/1.035 source units,
+  source hash unchanged, UTF8/LF PASS; render/trang/bbox chưa xác minh.
+  Bản mẫu cần duyệt, sidecar chưa tích hợp upload; không app/DB/vector/model/Git.
+  [Nhật ký509](../nhat_ky/2026-10-16_phien_509_mau_docx_sang_markdown.md),
+  [snapshot509](snapshots/2026-10-16_session_509.md).
+
+- **Phiên507 (2026-10-16) — Audit, packing và public proof roles**:
+  Server-owned answer span IDs thay copy đáp án, strict ID/quote/semantic checks;
+  recovery scope required, focused CE thật và original question, không ép sibling
+  list, opt-in giữ1atomic proof group>K nếu vừa hard chars. Tách evidence_ids công
+  khai/context_ids supporting; không tự xuất parent thành fact. Q62 có công thức
+  trong nguồn9blocks bịK5 loại: không coi thiếu retrieval là correct abstention.
+  Final6/6answered có nguồn0error, chưa đồng nghĩa6PASS (Q62layout/Q40dài);
+  scoped148/final55/RuffPASS; full1877PASS/11FAIL/17SKIP exactIDs505, tổngFAIL.
+  Probe nội bộ giữ intermediates và limitations; không config/source/vector/
+  restart/Git/82. Gate/acceptance tại
+  [nhật ký507](../nhat_ky/2026-10-16_phien_507_sua_audit_packing_trinh_bay.md),
+  [snapshot507](snapshots/2026-10-16_session_507.md).
+
+- **Phiên505 (2026-10-16) — Review82, sửa lỗi hợp đồng và recovery**:
+  Artifact eval498:27PASS/7PARTIAL/24FAIL/24ERROR; phân biệt5root-envelope,
+  1sai cấp/1quá4IDs thay vì gọi cả7echo. Q23 không có năm trong input thật.
+  Sửa root-format strict/topic coverage required, compact bound references,
+  split proof IDs cùng nguồn, recovery khi CE/hybrid rỗng, scope không năm và
+  mẫu từ chối không contact bịa. Live nội bộ đã có answered Q18/Q9/Q5/Q43/Q3;
+  Q2 còn JSON/providererror; không suy accuracy toàn82. Snapshot/config unchanged;
+  Scoped124/final25PASS/Ruff sạch; full1866PASS/11FAIL/17SKIP, exact11 IDs502,
+  tổng FAIL, không sửa lỗi nền. Có intermediate failures được giữ và giải thích.
+  không restart/reindex/DB config/Git. Gate và giới hạn tại
+  [nhật ký505](../nhat_ky/2026-10-16_phien_505_review_82_va_sua_rag.md),
+  [snapshot505](snapshots/2026-10-16_session_505.md).
+
+- **Phiên504 (2026-10-16) — Áp dụng Top K admissions local**:
+  User yêu cầu áp dụng ngay: configured20/20/30/5, chars36000 không đổi, thay
+  legacy; chỉ admissions/col_admissions. Qua lifecycle service, row lock/revision
+  check, readback toàn config và runtime resolver PASS. Search thật nội bộ:
+  dense20/lexical20/fused36/rerank30/returned5,0degradation, snapshot không đổi.
+  Không generation/benchmark, không khẳng định optimal/accuracy; không đổi
+  model/source/vector/code hoặc restart/deploy/Git; chưa áp dụng server demo.
+  [Nhật ký504](../nhat_ky/2026-10-16_phien_504_ap_dung_top_k_20_20_30_5.md),
+  [Snapshot504](snapshots/2026-10-16_session_504.md).
+
+- **Phiên503 (2026-10-16) — Sơ đồ RAG hiện tại**:
+  [Ba flowchart](../diagrams/rag-current-2026-10-16.html) bám code sau502: routing,
+  fact_hybrid và canonical prose recovery; phân biệt FTS/BM25, không DAG/tenant.
+  Self-check và render/xem3 hình PASS. Chỉ tài liệu, không sửa runtime hay gọi model.
+  [Nhật ký503](../nhat_ky/2026-10-16_phien_503_so_do_luong_rag_hien_tai.md),
+  [Snapshot503](snapshots/2026-10-16_session_503.md).
+
+- **Phiên502 (2026-10-16) — Chọn/đóng gói chứng cứ prose RAG**:
+  BM25 + heading children trong snapshot; dùng budget cấu hình thay trần6.000,
+  compact metadata/câu nguồn giữ ID, không nới kiểm chứng. Chỉ khi proposal bị
+  MODEL_CONTEXT_EXCEEDED mới repack một nhóm nguyên vẹn một lần, không cắt list.
+  Full hybrid/cache-bypassed/internal-only live: answered PT1–PT5 năm2026 + xét
+  tuyển thẳng,6citations/1source,0missing/errors; draft chính còn bị audit bác.
+  Focus132/Ruff PASS; full cuối1846PASS/11FAIL/17SKIP, exact11 IDs501, tổng FAIL.
+  Không UI/benchmark/model ngoài/DB config/source/vector/restart/deploy/Git.
+  [Nhật ký502](../nhat_ky/2026-10-16_phien_502_chon_va_dong_goi_chung_cu_rag.md),
+  [Snapshot502](snapshots/2026-10-16_session_502.md).
+
+- **Phiên501 (2026-10-16) — WebUI và lựa chọn provider**:
+  User mở lại LLM provider khác: mode server modelops thay giới hạn nội bộ498;
+  giữ allowlist và guard ModelOps, không tự đổi model DB. UI báo draft chưa lưu.
+  Sửa full-path guide/alias $.field cấp root, không đổi giá trị/quote/verdict.
+  Focus133/Ruff/FE7/Biome PASS; full1829PASS/11FAIL/17SKIP, exact IDs500, tổng FAIL.
+  Live3nộibộ: nesting lỗi → root key lỗi → insufficient_context/0citation;
+  **chưa nghiệm thu câu hỏi**, không cloud/benchmark/restart/deploy/Git.
+  [Nhật ký501](../nhat_ky/2026-10-16_phien_501_webui_modelops_va_loi_cau_truc.md),
+  [Snapshot501](snapshots/2026-10-16_session_501.md).
+
+- **Phiên500 (2026-10-16) — Hợp đồng JSON và verdict ID**:
+  Structured prompt mô tả trường dữ liệu thay schema blob; validation strict giữ.
+  Verifier/indexed audit yêu cầu đủ/duy nhất ID ngay trong contract, tận dụng hai
+  attempt có sẵn. Không tự điền verdict hoặc đổi thứ tự-ID, sai hết lượt vẫn lỗi502.
+  Focus128/Ruff PASS; full1815PASS/11FAIL/17SKIP, exact IDs499, tổng FAIL. Chưa model thật,
+  benchmark/UI/DB config/source/vector/restart/deploy/Git; chưa chứng minh hết echo.
+  [Nhật ký500](../nhat_ky/2026-10-16_phien_500_hop_dong_json_va_verdict_id.md),
+  [Snapshot500](snapshots/2026-10-16_session_500.md).
+
+- **Phiên499 (2026-10-16) — Session DB và nhãn chất lượng**:
+  Hybrid lexical gốc/variants/glossary dùng session caller tuần tự; vector vẫn
+  song song, được hủy/thu hồi khi SQL lỗi hoặc request bị hủy. Giữ snapshot/scope.
+  UI thay Faithfulness ≥ 0.90 cố định bằng “Chưa đo”, không suy điểm từ citation.
+  Focus57/Ruff/Biome/FE build PASS; UI desktop/light kiểm tra, không gọi model.
+  Full1799PASS/11FAIL/17SKIP, exact IDs498, tổng FAIL. Không DB/config/reindex/
+  restart/deploy/Git. Schema echo/verdict IDs/completeness/hội thoại còn ngoài batch.
+  [Nhật ký499](../nhat_ky/2026-10-16_phien_499_session_db_va_nhan_chat_luong.md),
+  [Snapshot499](snapshots/2026-10-16_session_499.md).
+
+- **Phiên498 (2026-10-16) — Provider RAG, repair và retry**:
+  User xác nhận chỉ prov_rtx5090_vllm cho LLM RAG; server policy JSON, scope trước
+  resolver và filter route tại ModelOps. Repair giữ ngân sách contract, không ép
+  4000/256 hoặc cắt proof; context rejection báo lỗi riêng. Log metadata an toàn,
+  một retry 502/503 dùng chung, không retry sau token; aclosing dọn stream.
+  Regression148PASS/RuffPASS; full1795PASS/11FAIL/17SKIP, exact IDs492, tổng FAIL.
+  Không gọi model thật,
+  benchmark/DB config/migration/restart/reindex/deploy/Git; không nghiệm thu accuracy.
+  [Nhật ký498](../nhat_ky/2026-10-16_phien_498_rag_provider_repair_retry.md),
+  [snapshot498](snapshots/2026-10-16_session_498.md).
+
+- **Phiên493 (2026-10-16) — Lưu phân tích RAG**:
+  Báo cáo read-only: shared AsyncSession chạy đồng thời, ID ô bảng, completeness
+  khác nhau giữa nhánh, nhiều lượt gọi model/trạng thái chờ, liệt kê/hội thoại và
+  nhãn Faithfulness UI cố định. Đối chiếu artifact490/492; không coi log cũ là
+  nghiệm thu mã đang vibe. Chỉ tài liệu/memory, không test/model/DB/restart/Git.
+  [Báo cáo493](../nhat_ky/2026-10-16_phien_493_phan_tich_danh_gia_rag.md),
+  [snapshot493](snapshots/2026-10-16_session_493.md).
+
+- **Phiên492 (2026-10-16) — Batch năm luồng RAG**:
+  Fact truy hồi không tự thành verified; thêm whole-answer atomic audit và source-bound
+  recovery theo topic/facet, closure số/tham chiếu để không bỏ đoạn cập nhật; scope
+  năm trong prose intro được audit riêng. Bảng có diagnostics/alias tọa độ, chỉ trả
+  phần đồng thuận dưới nhãn partial khi đủ scope, không bỏ guard thiếu ô/conflict.
+  Sửa diagnostic reason300 ở cả model contract và projection; schema repair không
+  nhân đôi completion lỗi. Liệt kê nêu riêng mã/tên chưa chuẩn hóa; citations hội thoại
+  chỉ từ records/scopes thật.183focus gần cuối/45batch-prose cuối; full trước packing
+  cuối1748pass/11baselinefail/17skip (exactIDs491), chưa full mã chốt. Live acceptance
+  4completed/6upstreamerror, Q17 vẫn invalidcell, Q15partial; nghiệm thu chưa đạt.
+  Giữ3lượt×10; phiên bị ngắt, benchmark đã kết thúc, không tiếp tục gọi model.
+  Không đổi tài liệu/vector/config DB/model/preset/rule, không restart/Git/deploy.
+  [Nhật ký492](../nhat_ky/2026-10-16_phien_492_batch_5_luong_rag.md),
+  [snapshot492](snapshots/2026-10-16_session_492.md).
+
+- **Phiên491 (2026-10-16) — Sửa luồng rồi test10câu**:
+  User chọn batch nhỏ/test10, không82. Thêm canonical prose fallback cùng snapshot,
+  binding+independent audit; numeric so số đầy đủ, không substring/allowlist/promptproof,
+  reason truthful khi chưa chốt số, cacheversion mới. Không override conflict/partial.
+  Recovery riêng3body/6000chars/1600output sau lỗi8192context, không đổi DBmax_tokens5000.
+  Live10cuối3đạt/1partial/4fail/2error, qualityFAIL; Q09 cải thiện, Q05/Q08/Q11 còn
+  lỗi ngữ nghĩa, Q03provider/Q10auditcontracterror, Q17rowauditfail. Giữ đủ3lượt×10
+  artifacts, không chọn kết quả đẹp. Config/metadata/22nguồn/snapshot unchanged.
+  Ruff/115focuspass; full cuối1726pass/11fail/17skip, tổngFAIL, exactIDs=baseline489;
+  2fixture mới ở gate đầu đã sửa, giữ assertion số/sai năm.
+  Không source/vector/DBpolicy/restart/Git/deploy; không tuyên bố4nhóm490 đã hoàn tất.
+  [Nhật ký491](../nhat_ky/2026-10-16_phien_491_sua_luong_rag_va_test_10_cau.md),
+  [snapshot491](snapshots/2026-10-16_session_491.md).
+
+- **Phiên 490 (2026-10-16) — Chấm chất lượng20câu RAG**:
+  20câu đại diện×2profile=40attempts ở RagService, model nội bộ, không HTTP/UI;
+  cache bypass, preset30/30/30/5 chỉ trong RAM. AI source-review: legacy5đạt/5partial/
+  9fail/1error; configured6/5/8/1, không suy chất lượng toànapp hay TopK thắng.
+  Q03/Q09/Q17 có nguồn nhưng từ chối; Q11 numeric gate; Q08 nhầm metric, Q12 phí/hạn,
+  Q18 lẫn năm; Q15 scopeunverified, Q16 CONVERSATION_SCOPE_INVALID. Q14 cảnh báoTin/Tín
+  an toàn; Q19/Q20 từ chối đúng (ruleactive0). Config/metadata/snapshot/22nguồn unchanged;
+  không appcode/source/vector/restart/Git. Raw/labels ở storage/quality_490, không commit corpus.
+  [Nhật ký490](../nhat_ky/2026-10-16_phien_490_cham_chat_luong_20_cau_rag.md),
+  [snapshot490](snapshots/2026-10-16_session_490.md).
+
+- **Phiên 489 (2026-10-16) — Configurable Top K RAG**:
+  UI/DB/runtime policy legacy/configured, dense/lexical/fusion/context riêng,
+  fallback retrieval_limit, telemetry JSON/SSE và inspector search-only; không
+  migration/tự bật preset. Scoped69pass; full1706pass/11baselinefail/17skip, tổng
+  FAIL, exact IDs bằng488. FE policy3/auth46, Biome/build đạt. Retrieval nội bộ
+  20câu×2profile=40/40;18câu có hits ở mỗi profile, chưa chấm đúng/sai; config,
+  metadata/publication unchanged. Không sinh đáp án82câu/reindex/restart/push.
+  [Nhật ký489](../nhat_ky/2026-10-16_phien_489_configurable_top_k_rag.md),
+  [snapshot489](snapshots/2026-10-16_session_489.md),
+  [quy trình09](../quy_trinh/09_cau_hinh_top_k_rag.md).
+
+- **Phiên 488 (2026-10-16) — Quản trị quy đổi điểm và sửa RAG**:
+  UI/API xem/preview/duyệt/kích hoạt/ngừng dùng/thu hồi; registry/audit JSONB,
+  quyền/OCC/idempotency, runtime active-only, không tự bật rule thật/không migration.
+  Preview readonly780→21.21 và777→21.13 có11citation. Follow-up thường đã bullet;
+  kiểm chứng năm từ header/đoạn applicability cùng nguồn, cảnh báo khác Tin/Tín,
+  không sửa nguồn hoặc gán năm DB. Còn lỗi synthesis nhầm loại chỉ số ở một probe;
+  không coi answered/citation là đúng toàn bộ. Full1687pass/11baselinefail/17skip
+  (tổng FAIL, exact11IDs trùng485), FE build/typecheck/Biome/import3test đạt;
+  metadata writer cùng khóa/refresh, chưa restart worker hoặc bật rule. Gate cuối xem
+  [nhật ký488](../nhat_ky/2026-10-16_phien_488_quan_tri_quy_doi_va_sua_rag.md),
+  [snapshot488](snapshots/2026-10-16_session_488.md),
+  [quy trình08](../quy_trinh/08_quan_tri_quy_doi_diem.md).
+
+- **Phiên 487 (2026-10-16) — Smoke 3 câu nội bộ, không sửa code**:
+  Phương thức2026 answered18.48s có5trích dẫn/2nguồn; follow-up rút gọn clarify0.54s
+  dù resolver nhận đúng antecedent, vì handler mới hỗ trợ enumeration tổ hợp.
+  Tổ hợp Sư phạm Toán2026 missing0.40s: có4fact nhưng year=NULL, không phải không có dữ liệu.
+  Lượt sandbox lỗi network giữ riêng; lượt có quyền Tailscale hoàn tất, không gửi provider ngoài.
+  Không source/config/vector/restart/Git; không suy chất lượng82câu.
+  [Nhật ký487](../nhat_ky/2026-10-16_phien_487_smoke_3_cau_rag.md),
+  [snapshot487](snapshots/2026-10-16_session_487.md).
+
 - **Phiên 486 (2026-10-16) — Migration/restart/Gitea được user cho phép**:
   DB local đã ở head glossary; upgrade đích exit0, đủ3bảng rỗng/tắt, không reset.
   Không job queued/running; khởi động BE/worker code hiện tại, health/ready200,

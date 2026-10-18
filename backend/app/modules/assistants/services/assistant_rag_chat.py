@@ -75,6 +75,7 @@ async def chat_with_rag(db: AsyncSession, assistant: AssistantResponse, request:
         conversation_id=conversation_id, answer=result.answer, status=result.status,
         citations=[citation.model_dump() for citation in result.citations],
         answer_decision=result.answer_decision, latency_ms=result.latency_ms,
+        retrieval_diagnostics=result.retrieval_diagnostics,
         suggested_questions=result.suggested_questions or assistant.sample_questions[:3],
         execution_id=None, artifacts=[])
 

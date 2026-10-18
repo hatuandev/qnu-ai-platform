@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field, create_model
 
+from app.modules.rag.evidence_context import omit_empty_fields
 from app.modules.rag.evidence_dependencies import dependency_intros, sentence_continuations
 from app.modules.rag.evidence_schemas import (
     AnswerProposal,
@@ -33,7 +34,8 @@ def context_only(block: EvidenceBlock) -> bool:
 class PassageClaim(StrictContract):
     id: str
     text: str = Field(min_length=3, max_length=2000)
-    evidence_ids: list[str] = Field(min_length=1, max_length=4)
+    evidence_ids: list[str] = Field(min_length=1, max_length=12)
+    context_ids: list[str] = Field(default_factory=list, max_length=3)
 
 
 class PassageProposal(StrictContract):
@@ -45,7 +47,8 @@ class PassageProposal(StrictContract):
 def proposal_contract(catalog):
     allowed = Literal[tuple(catalog)]
     claim = create_model("SourcePassageClaim", __base__=PassageClaim,
-        evidence_ids=(list[allowed], Field(min_length=1, max_length=4)))
+        evidence_ids=(list[allowed], Field(min_length=1, max_length=12)),
+        context_ids=(list[allowed], Field(default_factory=list, max_length=3)))
     return create_model("SourcePassageProposal", __base__=PassageProposal,
         claims=(list[claim], Field(default_factory=list, max_length=12)))
 
@@ -76,9 +79,42 @@ def passage_payload(blocks, catalog):
              "temporal_scope": by_id[ref.block_id].temporal_scope.model_dump()} for pid, ref in catalog.items()]
 
 
-def resolve_proposal(proposal: PassageProposal, catalog, blocks: list[EvidenceBlock] | None = None) -> AnswerProposal:
+def compact_passage_payload(blocks, catalog):
+    """Same IDs and exact sentences; whole-body ID is an alias, not copied text."""
+    grouped, whole_quotes = {}, {}
+    for passage in passage_payload(blocks, catalog):
+        block_id = catalog[passage["id"]].block_id
+        entry = grouped.setdefault(block_id, {key: value for key, value in passage.items()
+            if key not in {"id", "text"}} | {"passages": []})
+        if "." not in passage["id"]:
+            entry["whole_passage_id"] = passage["id"]
+            whole_quotes[block_id] = passage["text"]
+        else:
+            entry["passages"].append({"id": passage["id"], "text": passage["text"]})
+    for block_id, quote in whole_quotes.items():
+        entry = grouped[block_id]
+        parts = " ".join(part["text"] for part in entry["passages"])
+        if re.sub(r"\s+", " ", quote).strip() != re.sub(r"\s+", " ", parts).strip():
+            # The catalog intentionally omits sentence fragments shorter than
+            # three characters. Never lose those characters from a whole ID.
+            entry["whole_text"] = quote
+    return omit_empty_fields(list(grouped.values()))
+
+
+def resolve_proposal(proposal: PassageProposal, catalog, blocks: list[EvidenceBlock] | None = None,
+                     *, separate_context: bool = False) -> AnswerProposal:
     claims = []
     for claim in proposal.claims:
+        if separate_context:
+            # A public sentence and its context are different roles. Never turn
+            # a cited heading/date/adjacent event into another public assertion.
+            valid = all(pid in catalog for pid in [*claim.evidence_ids, *claim.context_ids])
+            context = [catalog[pid] for pid in dict.fromkeys(claim.context_ids)] if valid else []
+            for index, pid in enumerate(dict.fromkeys(claim.evidence_ids)):
+                body = catalog[pid] if valid else QuoteReference(block_id="invalid", quote="unknown passage")
+                refs = [body, *[ref for ref in context if ref != body]]
+                claims.append(EvidenceClaim(id=f"{claim.id}.body{index}", text=body.quote, references=refs))
+            continue
         if any(pid not in catalog for pid in claim.evidence_ids):
             # Never silently bind an unknown ID to arbitrary evidence.
             references = [QuoteReference(block_id="invalid", quote="unknown passage")]
@@ -93,9 +129,15 @@ def resolve_proposal(proposal: PassageProposal, catalog, blocks: list[EvidenceBl
                 block = by_block[ref.block_id]
                 identity = (block.binding_id, block.index_revision_id, block.source_revision_id, block.canonical_hash)
                 groups.setdefault(identity, []).append(ref)
-            if len(groups) > 1:
-                claims.extend(EvidenceClaim(id=f"{claim.id}.source{index}", text=refs[0].quote, references=refs)
-                              for index, refs in enumerate(groups.values(), 1))
+            if len(groups) > 1 or len(references) > 4:
+                # The selector may identify a whole multi-item list. Preserve
+                # EVERY selected proof, splitting extractive claims into bounded
+                # same-source reference groups instead of dropping a fifth ID.
+                for index, refs in enumerate(groups.values(), 1):
+                    for offset in range(0, len(refs), 4):
+                        group = refs[offset:offset + 4]
+                        claims.append(EvidenceClaim(id=f"{claim.id}.source{index}.part{offset // 4}",
+                            text=group[0].quote, references=group))
                 continue
         # Draft prose is not evidence and is never published. Binding checks the
         # actual selected sentence; invented numbers in a label cannot reject or
@@ -104,7 +146,7 @@ def resolve_proposal(proposal: PassageProposal, catalog, blocks: list[EvidenceBl
     return AnswerProposal(status=proposal.status, claims=claims, missing_constraints=proposal.missing_constraints)
 
 
-def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock]) -> list[dict]:
+def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock], *, primary_only: bool = False) -> list[dict]:
     """Publish selected source sentences, not a lossy paraphrase of conditions."""
     by_id = {block.id: block for block in blocks}
     intros = dependency_intros(blocks)
@@ -118,6 +160,8 @@ def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock]) -> l
         references = list({(ref["block_id"], ref["start"], ref["end"], ref["quote"]): ref
                            for ref in [*parents, *claim["references"], *continuations]}.values())
         for part, reference in enumerate(references, 1):
+            if primary_only and reference != claim["references"][0]:
+                continue
             block = by_id[reference["block_id"]]
             if context_only(block):
                 continue

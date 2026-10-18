@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { KnowledgeBinding } from "@/types/knowledge";
 import { DeleteSourceButton } from "./delete-source-button";
+import { DownloadQnuMarkdownButton } from "./download-qnu-markdown-button";
 import { PauseSourceButton } from "./pause-source-button";
 import { VectorLoadControls } from "./vector-load-controls";
 
@@ -94,6 +95,12 @@ export function SourceActionsMenu({
                     >
                       <FileText /> Chi tiết
                     </DropdownMenuItem>
+                    <DownloadQnuMarkdownButton
+                      collectionId={collectionId}
+                      sourceId={source.id}
+                      revisionId={source.active_source_revision_id ?? null}
+                      disabled={!source.active_source_revision_id}
+                    />
                     <DropdownMenuSeparator />
                     {pauseItem}
                     {deleteItem}

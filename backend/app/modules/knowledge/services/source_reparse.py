@@ -44,6 +44,8 @@ async def queue_reparse(
     ocr_engine: str | None,
     tenant_id: str,
     workspace_id: str,
+    *,
+    dispatch: bool = True,
 ) -> KnowledgeSourceRevision:
     from app.modules.knowledge.services.source_ingestion_service import source_ingestion_service
 
@@ -99,8 +101,12 @@ async def queue_reparse(
     )
     db.add(job)
     await db.commit()
-    broker_id = await enqueue_arq_job(
-        "task_knowledge_source_reparse", job.id, broker_job_id=f"reparse_{job.id}"
+    broker_id = (
+        await enqueue_arq_job(
+            "task_knowledge_source_reparse", job.id, broker_job_id=f"reparse_{job.id}"
+        )
+        if dispatch
+        else None
     )
     if broker_id:
         job.arq_job_id, job.dispatch_status = broker_id, "dispatched"

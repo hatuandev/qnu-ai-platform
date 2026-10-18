@@ -8,6 +8,7 @@ from app.modules.rag.evidence_blocks import scope_headers
 from app.modules.rag.evidence_lists import uncovered_list_members
 from app.modules.rag.evidence_model import PROPOSE_INSTRUCTION, structured_call
 from app.modules.rag.evidence_passages import (
+    compact_passage_payload,
     passage_catalog,
     passage_payload,
     proposal_contract,
@@ -83,10 +84,23 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         "question are optional unless omission changes the answer. Counts of different "
         "rounds are not additive. Do not infer conflicts across different years."
     )
-    payload = {key: value for key, value in payload.items() if key != "evidence"}
-    payload["passages"] = passage_payload(blocks, catalog)
+    compact = payload.get("compact_passages", False)
+    payload = {key: value for key, value in payload.items() if key not in {"evidence", "compact_passages"}}
+    if compact:
+        # Same catalog/IDs/quotes, metadata once per block rather than once per
+        # sentence. No evidence loss and no guessed character-to-token ratio.
+        payload["passages"] = compact_passage_payload(blocks, catalog)
+        instruction += "\nWithin each group, whole_passage_id selects whole_text if present, otherwise ALL its passage texts in source order."
+        instruction += (" evidence_ids selects ONLY sentences that directly answer the question and will be public. "
+            "Put supporting season/subject headings in context_ids instead: those are proof only, NOT displayed. "
+            "Essential conditions must remain in public evidence_ids, not merely in context_ids. "
+            "Do not select fees/dates/other rounds unless asked or essential to the answer. "
+            "Choose a complete sentence, not a lowercase continuation without its preceding sentence. "
+            "The total number of selected public sentences across all claims must not exceed twelve.")
+    else:
+        payload["passages"] = passage_payload(blocks, catalog)
     draft = await structured_call(db, req, contract, instruction, payload, max_tokens=4000)
-    proposal = resolve_proposal(draft, catalog, blocks)
+    proposal = resolve_proposal(draft, catalog, blocks, separate_context=compact)
     claims, rejected = bind_claims(proposal, blocks)
     repaired = False
     requested = payload.get("requested", {})
@@ -100,9 +114,9 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
             "expected answers from validation errors. If unsupported, return missing/partial.",
             {**payload, "previous_proposal": draft.model_dump(), "binding_errors": rejected,
              "uncovered_list_block_ids": coverage_missing}, max_tokens=4000)
-        proposal = resolve_proposal(draft, catalog, blocks)
+        proposal = resolve_proposal(draft, catalog, blocks, separate_context=compact)
         claims, rejected = bind_claims(proposal, blocks)
-    projected = source_grounded_claims(claims, blocks)
+    projected = source_grounded_claims(claims, blocks, primary_only=compact)
     by_block = {block.id: block for block in blocks}
     for claim in projected:
         body = by_block[claim["references"][0]["block_id"]]

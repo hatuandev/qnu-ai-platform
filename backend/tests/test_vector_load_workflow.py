@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.exceptions import AppException
+from app.modules.knowledge.models import KnowledgeSourceRevision
 from app.modules.knowledge.schemas import VectorLoadItem, VectorLoadRequest
 from app.modules.knowledge.services import vector_load_service as loader
 from app.modules.knowledge.services.vector_generation_service import vector_generation_service
@@ -45,7 +46,8 @@ def session():
     db = AsyncMock()
     db.add = MagicMock()
     db.scalar.side_effect = [SimpleNamespace(status="active", active_source_revision_id="revision", chunk_strategy="ClauseBasedChunker"), None]
-    db.get.return_value = SimpleNamespace(binding_id="source", status="ready")
+    db.get.return_value = KnowledgeSourceRevision(id="revision", binding_id="source", status="ready",
+                                                canonical_markdown="Fixture source.")
 
     async def commit():
         for call in db.add.call_args_list:
@@ -81,6 +83,7 @@ async def test_selected_source_job_pins_revision_and_never_publishes(queue_depen
     ("stale", "SOURCE_REVISION_CHANGED"), ("review", "SOURCE_REVISION_NOT_READY"),
     ("scope", "SOURCE_NOT_FOUND"), ("duplicate", "DUPLICATE_SOURCE_SELECTION"),
     ("busy", "SOURCE_INDEX_BUSY"),
+    ("structured_review", "FACT_SET_REVIEW_REQUIRED"),
 ])
 async def test_invalid_selection_never_dispatches(invalid, code, queue_dependencies):
     db = session()
@@ -89,6 +92,14 @@ async def test_invalid_selection_never_dispatches(invalid, code, queue_dependenc
         db.get.return_value = None
     elif invalid == "review":
         db.get.return_value.status = "review_required"
+    elif invalid == "structured_review":
+        from app.modules.knowledge.services.source_artifact import build_source_artifact
+
+        source = db.get.return_value
+        artifact = build_source_artifact(source.canonical_markdown, 0, {})
+        source.canonical_hash = artifact["content_hash"]
+        artifact["review"] = {"status": "required"}
+        source.parse_provenance = {"structured_artifact": artifact}
     elif invalid == "scope":
         db.scalar.side_effect = [None]
     elif invalid == "duplicate":

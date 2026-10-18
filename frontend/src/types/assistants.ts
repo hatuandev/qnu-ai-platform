@@ -1,4 +1,5 @@
 /** Types for Assistants / Chatbots */
+import type { RetrievalPolicy } from "@/features/assistants/retrieval-policy";
 
 export interface AssistantLifecycleConfig {
   execution_mode?: "rag" | "workflow" | null;
@@ -9,6 +10,7 @@ export interface AssistantLifecycleConfig {
     out_of_scope_policy: string;
   };
   knowledge_policy: {
+    retrieval_policy?: RetrievalPolicy;
     chunking_strategy?: "ClauseBasedChunker" | "SemanticChunker";
     require_structured_facts?: boolean;
     retrieval_limit?: number;

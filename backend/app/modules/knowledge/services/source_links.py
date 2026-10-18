@@ -32,6 +32,24 @@ def _same_family(previous: list[SourceUnit], current: list[SourceUnit], between:
 
 def build_context_graph(manifest: UnitManifest) -> dict[str, Any]:
     units = manifest.units
+    if any(unit.qnu_block_id for unit in units):
+        by_id = {unit.id: unit for unit in units}
+        links = {}
+        for unit in units:
+            pending, seen = list(unit.context_refs), set()
+            while pending:
+                ref = pending.pop()
+                if ref not in by_id or ref == unit.id:
+                    raise ValueError("Invalid or cyclic standard context reference")
+                if ref in seen:
+                    continue
+                seen.add(ref)
+                pending.extend(by_id[ref].context_refs)
+            links[unit.id] = sorted(seen, key=lambda ref: by_id[ref].start)
+        graph = {"version": VERSION, "canonical_hash": manifest.canonical_hash, "status": "context_only",
+                 "links": links, "row_projections": {}}
+        graph["digest"] = graph_digest(graph)
+        return graph
     containers = [unit for unit in units if unit.is_container and unit.kind == "table"]
     families: list[list[SourceUnit]] = []
     for container in containers:

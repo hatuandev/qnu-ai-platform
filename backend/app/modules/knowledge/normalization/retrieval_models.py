@@ -31,6 +31,10 @@ class SourceUnit(BaseModel):
     header_context: str = ""
     is_container: bool = False
     temporal: TemporalScope = Field(default_factory=TemporalScope)
+    # Explicit standard provenance stays server-side, outside embedding text.
+    qnu_block_id: str | None = None
+    source_locations: list[dict] = Field(default_factory=list)
+    context_refs: list[str] = Field(default_factory=list)
 
 
 class UnitManifest(BaseModel):

@@ -7,8 +7,9 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
+from app.core.retrieval_policy import RetrievalPolicy
 from app.core.single_application import SingleApplicationModel
 
 
@@ -44,6 +45,8 @@ class RetrievalSnapshot(SingleApplicationModel):
 
 
 class SearchRequest(SingleApplicationModel):
+    assistant_code: str | None = Field(None, min_length=1, max_length=50)
+    retrieval_policy: RetrievalPolicy | None = None
     query: str = Field(
         ..., min_length=1, max_length=1000, description="Nội dung câu hỏi hoặc từ khóa tìm kiếm"
     )
@@ -84,6 +87,7 @@ class SearchResultItem(BaseModel):
 
 
 class SearchResponse(BaseModel):
+    retrieval_diagnostics: dict[str, Any] | None = None
     query: str
     collection_id: str
     total_found: int
@@ -113,6 +117,7 @@ class Citation(BaseModel):
 
 
 class AskRequest(SingleApplicationModel):
+    _retrieval_diagnostics: dict[str, Any] = PrivateAttr(default_factory=dict)
     original_question: str | None = Field(None, min_length=1, max_length=4000,
         description="Câu hỏi gốc được DAG giữ lại trước bước viết lại truy vấn")
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")
@@ -153,6 +158,7 @@ class AskRequest(SingleApplicationModel):
 
 
 class AskResponse(BaseModel):
+    retrieval_diagnostics: dict[str, Any] | None = None
     answer_decision: dict[str, Any] | None = None
     status: str = Field(..., description="Trạng thái: answered hoặc insufficient_context")
     answer: str = Field(..., description="Nội dung câu trả lời")

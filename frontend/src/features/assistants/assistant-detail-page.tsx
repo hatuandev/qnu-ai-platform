@@ -40,6 +40,7 @@ import type { AssistantItem } from "@/types/assistants";
 import { AssistantPlaygroundTab } from "./assistant-playground-tab";
 import { AssistantWorkflowTab } from "./assistant-workflow-tab";
 import { buildAssistantModelOptions } from "./model-options";
+import { hasPendingModelPolicy } from "./model-policy-state";
 import { buildAssistantPolicyUpdate } from "./policy-update";
 
 interface AssistantDetailPageProps {
@@ -88,6 +89,8 @@ function toEditForm(item: AssistantItem): AssistantEditForm {
       cfg?.guardrails?.no_answer_message ||
       "Thông tin này chưa có trong nguồn văn bản chính thức của Trường Đại học Quy Nhơn. Vui lòng liên hệ đơn vị phụ trách.",
     reranker_enabled: cfg?.knowledge_policy?.reranker_policy?.enabled ?? true,
+    retrieval_policy: cfg?.knowledge_policy?.retrieval_policy,
+    retrieval_limit: cfg?.knowledge_policy?.retrieval_limit ?? 10,
     reranker_provider_id:
       cfg?.knowledge_policy?.reranker_policy?.provider_id ?? "",
     reranker_model: cfg?.knowledge_policy?.reranker_policy?.model_name ?? "",
@@ -452,6 +455,9 @@ export function AssistantDetailPage({
               form={form}
               onChange={setForm}
               availableModels={availableModels}
+              hasUnsavedChanges={hasPendingModelPolicy(form, toEditForm(item))}
+              savedPrimaryModel={item.config?.model_policy?.primary_model}
+              isSaving={updateMutation.isPending}
             />
             <AssistantGuardrailsSection
               form={form}

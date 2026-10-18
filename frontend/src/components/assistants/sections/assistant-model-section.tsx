@@ -1,6 +1,7 @@
 import { Field } from "@/components/admin/field";
 import { OptionSelect } from "@/components/admin/option-select";
 import type { AssistantEditForm } from "@/components/assistants/types";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -18,12 +19,18 @@ interface AssistantModelSectionProps {
   form: AssistantEditForm;
   onChange: (updated: AssistantEditForm) => void;
   availableModels: AssistantModelOption[];
+  hasUnsavedChanges?: boolean;
+  savedPrimaryModel?: string | null;
+  isSaving?: boolean;
 }
 
 export function AssistantModelSection({
   form,
   onChange,
   availableModels,
+  hasUnsavedChanges = false,
+  savedPrimaryModel,
+  isSaving = false,
 }: AssistantModelSectionProps) {
   return (
     <Card>
@@ -37,6 +44,30 @@ export function AssistantModelSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
+        <p className="col-span-full text-xs text-muted-foreground">
+          Chọn LLM từ các provider đang hoạt động trong ModelOps. Lựa chọn chỉ
+          có hiệu lực với lượt chat mới sau khi lưu. Khi dùng provider ngoài,
+          câu hỏi và các đoạn tài liệu liên quan sẽ được gửi đến provider đó.
+        </p>
+        {hasUnsavedChanges && (
+          <div
+            role="status"
+            className="col-span-full flex flex-col items-start gap-2 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p>
+              Chưa lưu thay đổi model. Model chính đã lưu:{" "}
+              {savedPrimaryModel || "Mặc định"}.
+            </p>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSaving}
+              className="shrink-0"
+            >
+              {isSaving ? "Đang lưu…" : "Lưu thay đổi"}
+            </Button>
+          </div>
+        )}
         {availableModels.length === 0 && (
           <div className="col-span-full rounded-control border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning-foreground">
             Chưa có Nhà cung cấp AI nào đang hoạt động. Vui lòng bật ít nhất một

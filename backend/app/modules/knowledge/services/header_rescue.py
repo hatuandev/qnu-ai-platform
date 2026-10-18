@@ -83,6 +83,8 @@ async def rescue_header(_db: AsyncSession, page: dict[str, Any], prepared: dict[
                 tenant_id=tenant_id)
         if not response.success or len(response.pages) != 1:
             raise AppException("OCR vùng đầu không trả đúng một trang.", code="HEADER_OCR_INVALID", status_code=422)
+        # Transient internal evidence; source_extraction moves it into the protected PDF sidecar.
+        page["_header_raw_evidence"] = getattr(response, "raw_evidence", None)
         audit["ocr_text"] = response.pages[0].extracted_text
         found = _field_lines(response.pages[0].extracted_text)
         # Compare only standalone header fields. A date inside a cited legal basis

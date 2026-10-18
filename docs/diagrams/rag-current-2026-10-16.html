@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luồng RAG hiện tại — QNU AI Platform</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box}
+    :root{--paper:#fff;--paper2:#f8fafc;--ink:#0f172a;--muted:#475569;--soft:#64748b;--rule:#cbd5e1;--accent:#0f766e;--tint:rgba(15,118,110,.08);--link:#0284c7;--sans:'Geist',Arial,sans-serif;--serif:'Instrument Serif','Noto Serif',Georgia,serif;--mono:'Geist Mono',Consolas,monospace}
+    body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans)}
+    main{max-width:1328px;margin:auto;padding:48px 24px 32px}
+    header{max-width:960px;margin-bottom:32px}.eyebrow{font:11px var(--mono);letter-spacing:.16em;color:var(--accent);text-transform:uppercase}
+    h1{font:400 clamp(32px,4vw,48px)/1.15 var(--serif);margin:12px 0 16px}h2{font:600 22px/1.35 var(--sans);margin:0 0 8px}
+    p{margin:8px 0;color:var(--muted)}.lead{font-size:18px}.scope{border-left:3px solid var(--accent);padding:8px 20px;margin:24px 0}
+    section{border-top:1px solid var(--rule);padding-top:28px;margin-top:40px;break-inside:avoid}
+    .section-no{font:11px var(--mono);color:var(--soft);letter-spacing:.12em}.scroll{overflow-x:auto}svg{display:block;width:100%;min-width:960px;height:auto;background:var(--paper)}
+    svg .edge{fill:none;stroke:var(--muted);stroke-width:1.5;marker-end:url(#route-arrow)}
+    svg .box{fill:#fff;stroke:var(--ink);stroke-width:1.2;rx:6}
+    svg .input{fill:var(--paper2);stroke:var(--soft);stroke-width:1.2}
+    svg .focal{fill:var(--tint);stroke:var(--accent);stroke-width:1.5}
+    svg .optional{fill:var(--paper2);stroke:var(--soft);stroke-width:1.2;stroke-dasharray:4 3}
+    svg .decision{fill:#fff;stroke:var(--ink);stroke-width:1.2}
+    svg rect[rx="20"]{rx:20}
+    svg .name{font:600 16px var(--sans);fill:var(--ink);text-anchor:middle}
+    svg .sub{font:400 12px var(--sans);fill:var(--muted);text-anchor:middle}
+    svg .tech{font:400 12px var(--mono);fill:var(--muted);text-anchor:middle}
+    svg .label{font:500 12px var(--sans);fill:var(--muted);text-anchor:middle}
+    svg .mask{fill:var(--paper)}svg .legend{font:400 12px var(--sans);fill:var(--soft)}
+    .notes{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;margin:8px 40px 24px}.notes article{border-left:1px solid var(--rule);padding-left:16px}.notes h3{font-size:15px;margin:0 0 6px}.notes p{font-size:14px;margin:0}
+    .plain-note{max-width:1120px;margin:8px 40px 24px;font-size:14px}code{font:12px var(--mono);background:var(--paper2);padding:2px 4px}details{margin:20px 40px}summary{cursor:pointer;font-weight:600}details li{font-size:14px;color:var(--muted);margin:8px 0}
+    a{color:var(--accent)}footer{border-top:1px solid var(--rule);margin-top:40px;padding-top:16px;font-size:12px;color:var(--soft)}
+    @media(max-width:700px){main{padding:28px 16px}.notes{grid-template-columns:1fr;margin:12px 0}.plain-note,details{margin:12px 0}.lead{font-size:16px}}
+    @media print{main{padding:0}section{page-break-before:always}section:first-of-type{page-break-before:auto}.scroll{overflow:visible}svg{min-width:0}.notes{margin-top:0}details{display:none}a{color:var(--ink)}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">QNU AI Platform · Hiện trạng mã nguồn · 16/10/2026</div>
+    <h1>Một câu hỏi đi qua RAG như thế nào?</h1>
+    <p class="lead">Không phải câu nào cũng cần tìm vector rồi gọi LLM. Hệ thống chọn nhánh theo hội thoại, loại câu hỏi, chứng cứ và cấu hình của trợ lý.</p>
+    <div class="scope"><strong>Phạm vi sơ đồ:</strong> luồng hỏi đáp trong mã hiện tại, sau phiên502. Không chạy DAG/workflow trong chatbot này; không phân vùng tenant/workspace. Quyền vẫn được kiểm tra ở server, chứng cứ phải thuộc đúng collection và revision được phép dùng.</div>
+    <p>Nguồn đầu vào được chuẩn bị trước: tài liệu → bóc tách/OCR → duyệt → nạp vector → xuất bản. Sơ đồ bên dưới bắt đầu khi người dùng đặt câu hỏi, không mô tả chi tiết ingestion.</p>
+  </header>
+
+  <section aria-labelledby="routing-heading">
+    <div class="section-no">01 / TỔNG QUAN</div>
+    <h2 id="routing-heading">Định tuyến trước khi truy xuất</h2>
+    <p>API kiểm tra quyền, lấy cấu hình assistant và chuẩn bị câu hỏi/lịch sử trước khi gọi RAG.</p>
+    <div class="scroll">
+    <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="rag-route-title rag-route-desc">
+      <title id="rag-route-title">Định tuyến RAG hiện tại</title>
+      <desc id="rag-route-desc">Câu hỏi được giải nghĩa theo hội thoại, pin nguồn xuất bản rồi chọn tính điểm, evidence hoặc fact hybrid, với nhánh trả lời tiếp nối hay hỏi làm rõ.</desc>
+      <defs>
+        <marker id="route-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#475569"/></marker>
+        <marker id="route-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0f766e"/></marker>
+        <marker id="route-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0284c7"/></marker>
+      </defs>
+      <path class="edge" d="M640 104 V144"/>
+      <path class="edge" d="M640 208 V248"/>
+      <path class="edge" d="M480 176 H320"/>
+      <path class="edge" d="M800 176 H1224 Q1232 176 1232 184 V616 Q1232 624 1224 624 H800"/>
+      <path class="edge" d="M640 312 V344"/>
+      <path class="edge" d="M560 384 H248 Q240 384 240 392 V464"/>
+      <path class="edge" d="M640 424 V464"/>
+      <path class="edge" d="M720 384 H1032 Q1040 384 1040 392 V464"/>
+      <path class="edge" d="M240 528 V552 Q240 560 248 560 H448 Q456 560 456 568 V600 Q456 608 464 608 H480"/>
+      <path class="edge" d="M640 528 V584"/>
+      <path class="edge" d="M1040 528 V552 Q1040 560 1032 560 H840 Q832 560 832 568 V600 Q832 608 824 608 H800"/>
+      <rect class="mask" x="348" y="146" width="104" height="20"/><text class="label" x="400" y="160">Ý chưa rõ</text>
+      <rect class="mask" x="908" y="146" width="256" height="20"/><text class="label" x="1036" y="160">Giải thích / rút gọn / lọc đã xác minh</text>
+      <rect class="mask" x="340" y="352" width="128" height="20"/><text class="label" x="404" y="366">Câu tính điểm</text>
+      <rect class="mask" x="656" y="432" width="104" height="20"/><text class="label" x="708" y="446">Policy bật</text>
+      <rect class="mask" x="820" y="352" width="128" height="20"/><text class="label" x="884" y="366">Còn lại</text>
+      <rect class="input" x="520" y="40" width="240" height="64" rx="20"/><text class="name" x="640" y="68">Câu hỏi từ WebUI / API</text><text class="sub" x="640" y="88">Cấu hình assistant đã phân giải</text>
+      <rect class="box" x="480" y="144" width="320" height="64"/><text class="name" x="640" y="172">Hiểu hội thoại và ý định tiếp nối</text><text class="sub" x="640" y="192">Lịch sử giúp hiểu ý, không làm bằng chứng</text>
+      <rect class="box" x="480" y="248" width="320" height="64"/><text class="name" x="640" y="276">Kiểm tra an toàn + pin snapshot</text><text class="sub" x="640" y="296">Đúng collection, binding, revision</text>
+      <path class="decision" d="M640 344 L720 384 L640 424 L560 384 Z"/><text class="name" x="640" y="380">Chọn</text><text class="name" x="640" y="400">nhánh</text>
+      <rect class="box" x="80" y="464" width="320" height="64"/><text class="name" x="240" y="492">Công cụ quy đổi điểm</text><text class="sub" x="240" y="512">Chỉ tính bằng rule hợp lệ đã kích hoạt</text>
+      <rect class="box" x="480" y="464" width="320" height="64"/><text class="name" x="640" y="492">Nhánh Evidence</text><text class="sub" x="640" y="512">Chọn chứng cứ → claim → kiểm chứng</text>
+      <rect class="box focal" x="880" y="464" width="320" height="64"/><text class="name" x="1040" y="492">Nhánh Fact / Hybrid</text><text class="sub" x="1040" y="512">Chi tiết ở sơ đồ 02</text>
+      <rect class="box focal" x="480" y="584" width="320" height="64" rx="20"/><text class="name" x="640" y="612">Trả kết quả + trạng thái + nguồn</text><text class="sub" x="640" y="632">Đủ căn cứ / một phần / chưa đủ / hỏi rõ</text>
+      <rect class="box" x="80" y="144" width="240" height="64" rx="20"/><text class="name" x="200" y="172">Hỏi lại để làm rõ</text><text class="sub" x="200" y="192">Không tự đoán phạm vi</text>
+      <line x1="40" y1="672" x2="1240" y2="672" stroke="#cbd5e1"/>
+      <text class="legend" x="40" y="700">Chữ nhật: xử lý · Hình thoi: chọn nhánh · Ô bo tròn: đầu vào / kết quả · Lỗi hạ tầng được trả thành lỗi riêng.</text>
+    </svg>
+    </div>
+    <div class="notes">
+      <article><h3>Nhánh đang dùng ở lần kiểm tra gần nhất</h3><p>Admissions chạy <code>fact_hybrid</code>, sau đó phục hồi bằng <code>canonical_prose</code> cho câu phương thức xét tuyển. Đây là kết quả phiên502, không phải lời khẳng định mọi assistant đều dùng cùng nhánh.</p></article>
+      <article><h3>Nhánh Evidence không phải DAG</h3><p>Khi policy bật: lập QueryPlan → chọn chứng cứ → đề xuất claim → binding/verifier/audit. Có truy xuất bổ sung có giới hạn khi thiếu ý; không có vòng agent tự chạy vô hạn.</p></article>
+    </div>
+    <p class="plain-note">Giải thích/rút gọn/lọc chỉ trả sớm khi tái xác minh được chứng cứ của lượt trước. Nếu không xử lý được, hệ thống có thể truy hồi lại câu trước để trình bày ngắn hoặc yêu cầu làm rõ. Rule tính điểm thiếu, chưa kích hoạt hoặc ngoài phạm vi không được thay bằng số do LLM tự tính.</p>
+  </section>
+
+  <section aria-labelledby="hybrid-heading">
+    <div class="section-no">02 / NHÁNH FACT_HYBRID</div>
+    <h2 id="hybrid-heading">Từ tìm kiếm đến câu trả lời có kiểm chứng</h2>
+    <p>Các lối trả sớm được vẽ bên trái; nhánh đọc lại canonical nằm bên phải.</p>
+    <div class="scroll">
+    <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="rag-hybrid-title rag-hybrid-desc">
+      <title id="rag-hybrid-title">Nhánh Fact và Hybrid RAG</title>
+      <desc id="rag-hybrid-desc">Hệ thống thử liệt kê, cache và bảng có nguồn trước khi tìm dense cùng FTS, tổng hợp rồi audit, phục hồi canonical khi có điều kiện phù hợp.</desc>
+      <defs>
+        <marker id="hybrid-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#475569"/></marker>
+        <marker id="hybrid-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0f766e"/></marker>
+        <marker id="hybrid-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0284c7"/></marker>
+      </defs>
+      <g fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#hybrid-arrow)">
+        <path d="M640 104 V144"/><path d="M480 72 H152 Q144 72 144 80 V552"/>
+        <path d="M640 208 V248"/><path d="M480 176 H216 Q208 176 208 184 V552"/>
+        <path d="M640 312 V352"/><path d="M480 280 H280 Q272 280 272 288 V552"/>
+        <path d="M800 280 H1112 Q1120 280 1120 288 V552"/>
+        <path d="M640 416 V456"/><path d="M640 520 V552"/>
+        <path d="M560 592 H400"/><path d="M720 592 H880"/>
+        <path d="M1040 632 V640 Q1040 648 1032 648 H248 Q240 648 240 640 V632"/>
+      </g>
+      <rect class="mask" x="300" y="44" width="144" height="20"/><text class="label" x="372" y="58">Khớp nhánh liệt kê</text>
+      <rect class="mask" x="320" y="146" width="112" height="20"/><text class="label" x="376" y="160">Cache hợp lệ</text>
+      <rect class="mask" x="312" y="250" width="136" height="20"/><text class="label" x="380" y="264">Có quyết định bảng</text>
+      <rect class="mask" x="840" y="250" width="224" height="20"/><text class="label" x="952" y="264">Thiếu chứng cứ, đủ điều kiện phục hồi</text>
+      <rect class="mask" x="652" y="322" width="176" height="20"/><text class="label" x="740" y="336">Chưa có quyết định bảng</text>
+      <rect class="mask" x="436" y="562" width="88" height="20"/><text class="label" x="480" y="576">Đạt</text>
+      <rect class="mask" x="744" y="562" width="112" height="20"/><text class="label" x="800" y="576">Chưa đạt</text>
+      <rect class="mask" x="748" y="620" width="128" height="20"/><text class="label" x="812" y="634">Đạt / chưa đủ</text>
+      <rect class="box" x="480" y="40" width="320" height="64"/><text class="name" x="640" y="68">Thử nhánh liệt kê tổ hợp</text><text class="sub" x="640" y="88">Tập bản ghi có phạm vi, không cắt theo Top K</text>
+      <rect class="box" x="480" y="144" width="320" height="64"/><text class="name" x="640" y="172">Thuật ngữ đã duyệt + semantic cache</text><text class="sub" x="640" y="192">Cache chỉ dùng khi truy vấn đủ điều kiện</text>
+      <rect class="box" x="480" y="248" width="320" height="64"/><text class="name" x="640" y="276">Đối soát facts, bảng và dòng nguồn</text><text class="sub" x="640" y="296">Đúng metric, thực thể, năm và revision</text>
+      <rect class="box focal" x="480" y="352" width="320" height="64"/><text class="name" x="640" y="380">Dense + FTS → RRF → rerank</text><text class="sub" x="640" y="400">Ghép thứ hạng, rồi xếp lại độ liên quan</text>
+      <rect class="box" x="480" y="456" width="320" height="64"/><text class="name" x="640" y="484">Đóng gói context → LLM tạo nháp</text><text class="sub" x="640" y="504">Thêm ngữ cảnh lân cận, giữ ranh giới nguồn</text>
+      <path class="decision focal" d="M640 552 L720 592 L640 632 L560 592 Z"/><text class="name" x="640" y="588">Kiểm chứng</text><text class="sub" x="640" y="608">số + ý + trích dẫn</text>
+      <rect class="box optional" x="880" y="552" width="320" height="80"/><text class="name" x="1040" y="584">Phục hồi canonical prose</text><text class="sub" x="1040" y="608">Đọc lại nguồn đã xuất bản · xem sơ đồ 03</text>
+      <rect class="box" x="80" y="552" width="320" height="80" rx="20"/><text class="name" x="240" y="584">Trả kết quả và trạng thái</text><text class="sub" x="240" y="608">Có nguồn / thiếu ý / thiếu căn cứ / hỏi rõ</text>
+      <line x1="40" y1="672" x2="1240" y2="672" stroke="#cbd5e1"/>
+      <text class="legend" x="40" y="700">FTS: tìm từ khóa PostgreSQL · Dense: tìm nghĩa qua Qdrant · Ô nét đứt: phục hồi có điều kiện, không phải đổi model.</text>
+    </svg>
+    </div>
+    <div class="notes">
+      <article><h3>BM25 nằm ở đâu?</h3><p>Nhánh Hybrid chính dùng PostgreSQL FTS, không phải BM25. BM25 được dùng để xếp hạng các block chứng cứ canonical ở nhánh Evidence và nhánh phục hồi. Không có căn cứ để gọi nhánh chính là “Qdrant sparse BM25”.</p></article>
+      <article><h3>Top K không phải một con số duy nhất</h3><p>Có K_dense, K_lexical, K_fusion, K_rerank và K_context. Profile <code>configured</code> dùng cấu hình riêng; <code>legacy</code> theo intent và reranker policy. Lần test502: dense12 + lexical12 → fused21 → context ứng viên5.</p></article>
+    </div>
+    <p class="plain-note">Nhánh fact-first còn có một lần kiểm tra row anchors sau hybrid; đã gộp vào ô “facts, bảng và dòng nguồn” để tránh lặp. Quyết định bảng có thể là supported/partial/missing; chỉ một số lý do thiếu chứng cứ được thử prose recovery. Không phải mọi trường hợp thiếu hoặc xung đột đều được chạy lại. Không có candidate/fact sẽ trả chưa đủ căn cứ trước khi gọi LLM. Cache hit không chạy lại audit; cache được ràng buộc theo snapshot/policy/model/lịch sử. Chỉ câu trả lời hybrid đạt và có trích dẫn mới được lưu cache ở cuối nhánh.</p>
+  </section>
+
+  <section aria-labelledby="prose-heading">
+    <div class="section-no">03 / PHỤC HỒI CANONICAL_PROSE</div>
+    <h2 id="prose-heading">Khi tìm thấy tài liệu nhưng bản nháp chưa được xác minh</h2>
+    <p>Đây là nhánh đã giúp câu hỏi về phương thức xét tuyển trả lời được ở phiên502.</p>
+    <div class="scroll">
+    <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="rag-prose-title rag-prose-desc">
+      <title id="rag-prose-title">Phục hồi câu trả lời từ canonical prose</title>
+      <desc id="rag-prose-desc">Nhánh phục hồi đọc nguồn chuẩn, tìm block theo BM25 và heading, giữ nhóm chứng cứ rồi kiểm chứng claim, với một lần repack khi model báo vượt ngữ cảnh.</desc>
+      <defs>
+        <marker id="prose-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#475569"/></marker>
+        <marker id="prose-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0f766e"/></marker>
+        <marker id="prose-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0284c7"/></marker>
+      </defs>
+      <g fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#prose-arrow)">
+        <path d="M640 104 V144"/><path d="M640 208 V248"/><path d="M640 312 V352"/>
+        <path d="M640 416 V448"/><path d="M640 512 V552"/>
+        <path d="M560 592 H400"/><path d="M720 592 H880"/>
+        <path d="M800 372 H880"/>
+        <path d="M1040 416 V424 Q1040 432 1032 432 H728 Q720 432 720 424 V416" stroke-dasharray="4 3"/>
+      </g>
+      <rect class="mask" x="804" y="340" width="72" height="24"/><text class="label" x="840" y="356">Tràn context</text>
+      <rect class="mask" x="808" y="404" width="64" height="20"/><text class="label" x="840" y="418">Một lần</text>
+      <rect class="mask" x="496" y="420" width="128" height="20"/><text class="label" x="560" y="434">Claim hợp lệ</text>
+      <rect class="mask" x="428" y="562" width="104" height="20"/><text class="label" x="480" y="576">Đạt</text>
+      <rect class="mask" x="736" y="562" width="128" height="20"/><text class="label" x="800" y="576">Chưa đạt</text>
+      <rect class="box" x="480" y="40" width="320" height="64"/><text class="name" x="640" y="68">Đọc canonical + hiểu phạm vi</text><text class="sub" x="640" y="88">Đúng snapshot/hash; chủ đề, năm từ câu gốc</text>
+      <rect class="box focal" x="480" y="144" width="320" height="64"/><text class="name" x="640" y="172">BM25 + đoạn con của tiêu đề mục</text><text class="sub" x="640" y="192">Lọc năm; loại trùng khít cùng nguồn/scope</text>
+      <rect class="box" x="480" y="248" width="320" height="64"/><text class="name" x="640" y="276">Rerank → đóng gói nguyên nhóm</text><text class="sub" x="640" y="296">Ngân sách cấu hình; giữ list và điều kiện</text>
+      <rect class="box" x="480" y="352" width="320" height="64"/><text class="name" x="640" y="380">LLM chọn ID đoạn trích có sẵn</text><text class="sub" x="640" y="400">Không tự tạo nguồn hoặc câu trích</text>
+      <rect class="box optional" x="880" y="352" width="320" height="64"/><text class="name" x="1040" y="380">Repack nhóm ưu tiên nguyên vẹn</text><text class="sub" x="1040" y="400">Chỉ sau MODEL_CONTEXT_EXCEEDED</text>
+      <rect class="box focal" x="480" y="448" width="320" height="64"/><text class="name" x="640" y="476">Binding → verifier → coverage audit</text><text class="sub" x="640" y="496">Quote/span/số + đúng ý + đủ điều kiện</text>
+      <path class="decision" d="M640 552 L720 592 L640 632 L560 592 Z"/><text class="name" x="640" y="588">Đủ căn cứ</text><text class="name" x="640" y="608">trả lời?</text>
+      <rect class="box" x="80" y="552" width="320" height="80" rx="20"/><text class="name" x="240" y="584">Câu trả lời có trích dẫn</text><text class="sub" x="240" y="608">Dùng câu nguồn đã được kiểm chứng</text>
+      <rect class="box" x="880" y="552" width="320" height="80" rx="20"/><text class="name" x="1040" y="584">Không công bố đáp án chưa chắc</text><text class="sub" x="1040" y="608">Trả về nhánh gọi để báo thiếu / làm rõ</text>
+      <line x1="40" y1="672" x2="1240" y2="672" stroke="#cbd5e1"/>
+      <text class="legend" x="40" y="700">Nét đứt: thử lại tối đa một lần khi vượt cửa sổ model · Không có claim hợp lệ thì không chạy verifier để “hợp thức hóa”.</text>
+    </svg>
+    </div>
+    <div class="notes">
+      <article><h3>Không còn trần riêng 6.000 ký tự</h3><p>Prose recovery dùng ngân sách cấu hình. Nhưng cửa sổ token của model vẫn có giới hạn thật; ký tự ≠ token. Repack không cắt một phần danh sách, không giảm output contract và không tự đổi provider. Nếu vẫn vượt hoặc có lỗi hạ tầng, trả lỗi riêng, không nói “không có dữ liệu”.</p></article>
+      <article><h3>Ví dụ kiểm chứng gần nhất</h3><p>Câu phương thức xét tuyển → tìm đúng đoạn PT1–PT5 → provider từ chối context ban đầu → giữ nhóm chứng cứ ưu tiên → kiểm chứng đạt → trả năm2026, PT1–PT5 và xét tuyển thẳng; 6 trích dẫn từ 1 văn bản. Không suy từ đây rằng mọi câu hỏi đều đã ổn.</p></article>
+    </div>
+    <p class="plain-note">“Phục hồi” là chọn lại chứng cứ và kiểm chứng lại, không bỏ guard để model trả lời bằng trí nhớ. Thiếu claim, conflict hoặc cần clarify sẽ trả về caller mà không công bố đáp án mới. Bước repack chỉ áp dụng ở proposal; không phải cơ chế tự động cứu mọi lỗi context trong toàn pipeline. Nhánh này không tự chứng minh đã quét hết mọi tài liệu cho mọi câu liệt kê.</p>
+  </section>
+
+  <details>
+    <summary>Đối chiếu với mã nguồn và phần đã giản lược</summary>
+    <ul>
+      <li><code>assistant_rag_chat.py</code>: chuẩn bị câu hỏi/lịch sử, truyền cấu hình ModelOps; không gọi workflow. SSE gửi câu trả lời sau khi xử lý xong, không phát bản nháp chưa kiểm chứng.</li>
+      <li><code>rag/service.py</code>: thứ tự resolve hội thoại → input guardrail → snapshot → score tool → evidence policy → enumeration → glossary/cache → facts/table → hybrid/row anchors → generate → numeric + visible audit → recovery.</li>
+      <li><code>retriever.py</code>: dense và PostgreSQL FTS; hợp thứ hạng weighted RRF rồi rerank. Variants/glossary được gộp vào ô tìm kiếm, không vẽ từng truy vấn phụ.</li>
+      <li><code>evidence_pipeline.py</code>: nhánh Evidence có chọn context, binding, verifier, audit và một lượt corrective retrieval có điều kiện. Không đồng nhất nhánh này với prose fallback.</li>
+      <li><code>prose_fallback.py</code> và <code>prose_selection.py</code>: BM25 + section children; topic ordering; compact source passages; một lần repack sau lỗi context ở proposal.</li>
+      <li><code>response_audit.py</code>, <code>evidence_claims.py</code>, <code>evidence_verification.py</code>: kiểm chứng ID, quote/span, số, ngữ nghĩa và độ phủ. Không dùng số citations làm điểm Faithfulness.</li>
+      <li>Gộp: an toàn/snapshot thành một ô; expansion/fusion/rerank thành một ô; binding/verifier/audit thành một ô. Đưa ra chú thích: ingestion, logging, cache write, retry/fallback theo policy. Không vẽ tenant/workspace hoặc DAG như các bước chatbot đang dùng.</li>
+      <li>Đây là sơ đồ mã nguồn, không phải cam kết BE đang chạy đã reload/deploy mã mới. Không chạy lại inference hay benchmark để tạo sơ đồ này.</li>
+    </ul>
+  </details>
+  <footer>Profile: QNU Academic Teal · 3 sơ đồ 1280×720 · Tĩnh, không JavaScript · Giữ serif/sans/mono theo profile; khi offline trình duyệt dùng font dự phòng. Nội dung bám mã nguồn ngày16/10/2026, sau phiên502.</footer>
+</main>
+</body>
+</html>

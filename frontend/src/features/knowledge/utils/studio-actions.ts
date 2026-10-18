@@ -6,6 +6,7 @@ interface RevisionActions {
     source: string,
     revision: string,
     markdown: string,
+    review?: { change_reason: string; expected_canonical_hash?: string },
   ) => Promise<KnowledgeSourceRevisionResponse>;
   reviewSourceRevision: (
     collection: string,
@@ -27,6 +28,7 @@ export async function saveStudioRevision(
   },
   markdown: string | undefined,
   approve: boolean,
+  review?: { reason: string; expectedHash?: string | null },
 ): Promise<string> {
   let target = revision;
   if (markdown !== undefined)
@@ -35,6 +37,12 @@ export async function saveStudioRevision(
       source,
       target.id,
       markdown,
+      review
+        ? {
+            change_reason: review.reason,
+            expected_canonical_hash: review.expectedHash ?? undefined,
+          }
+        : undefined,
     );
   if (approve) {
     if (
@@ -47,7 +55,7 @@ export async function saveStudioRevision(
       source,
       target.id,
       "approved",
-      "Phê duyệt qua Studio",
+      review?.reason || "Phê duyệt qua Studio",
     );
   }
   return target.id;

@@ -1,6 +1,10 @@
 import type { AssistantEditForm } from "@/components/assistants/types";
 import type { AssistantLifecycleConfig } from "@/types/assistants";
 import type { AssistantModelOption } from "./model-options.ts";
+import {
+  defaultRetrievalPolicy,
+  retrievalPolicySchema,
+} from "./retrieval-policy";
 
 function uniqueProvider(options: AssistantModelOption[], model: string) {
   const matches = options.filter((m) => m.model === model);
@@ -29,6 +33,11 @@ export function buildAssistantPolicyUpdate(
     },
     knowledge_policy: {
       ...current.knowledge_policy,
+      retrieval_policy: retrievalPolicySchema.parse(
+        value.retrieval_policy ??
+          current.knowledge_policy.retrieval_policy ??
+          defaultRetrievalPolicy,
+      ),
       reranker_policy: {
         ...current.knowledge_policy.reranker_policy,
         enabled: value.reranker_enabled ?? true,

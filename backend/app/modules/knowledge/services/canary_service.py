@@ -493,7 +493,7 @@ class CanaryService:
         actor: Any | None = None,
     ) -> CanaryPolicyResponse:
         """Update per-collection Canary RAG serving mode and retention window."""
-        col = await get_scoped_collection(db, collection_id, actor=actor)
+        col = await get_scoped_collection(db, collection_id, actor=actor, for_update=True)
 
         meta = dict(col.collection_metadata or {})
         policy = dict(meta.get("canary_policy") or {})

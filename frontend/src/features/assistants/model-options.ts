@@ -20,6 +20,8 @@ export function buildAssistantModelOptions(
     .flatMap((p) =>
       p.models
         .filter((m) => {
+          const capability = p.model_capabilities?.[m];
+          if (capability) return capability.probe_role === role;
           const kind = p.model_specs?.[m]?.type ?? "text";
           return role === "reranker"
             ? kind === "reranker"

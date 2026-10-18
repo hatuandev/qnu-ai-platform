@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v11-native-headers"
+EXTRACTION_VERSION = "layout-v15-qnu-serving"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -38,6 +38,11 @@ class SourceExtraction:
     engine_used: str = "native"
     preview_pdf: bytes | None = None
     canonical_tables: list[dict[str, Any]] = field(default_factory=list)
+    # In-memory QNU RAG Markdown structured model (DOCX/PDF). Never serialized directly;
+    # the ingestion pipeline renders/validates and stores artifacts with hashes.
+    qnu_document: Any | None = None
+    pdf_evidence: dict[str, Any] | None = None
+    qnu_build_error: str | None = None
 
 
 def merge_evidenced_text(primary: str, secondary: str) -> str:
@@ -73,7 +78,7 @@ def normalize_layout_block(block: dict[str, Any], page: int, index: int) -> dict
     return result
 
 
-def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict[str, Any]], list[int], bytes]:
+def build_native_pages(content: bytes, parsed: ParsedContent, include_evidence: bool = False) -> tuple[list[dict[str, Any]], list[int], bytes]:
     """Use actual page content, not document-wide emptiness, to route scan pages."""
     texts = {p["page_number"]: p["markdown_content"] for p in canonical_pages(parsed.raw_text, parsed.page_count)}
     records, selected = [], []
@@ -102,6 +107,13 @@ def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict
                             "blocks": blocks, "has_tables": any(b.get("type") == "table" for b in blocks),
                             "engine_used": "native", "visual_coverage": image_coverage,
                             "uncovered_visual_coverage": uncovered_visual})
+            if include_evidence:
+                from app.modules.knowledge.parsers.pdf_evidence import capture_native_page
+
+                try:
+                    records[-1]["native_evidence"] = capture_native_page(page)
+                except Exception as exc:
+                    records[-1]["native_evidence"] = {"page": number, "capture_error": type(exc).__name__}
             if needs_ocr:
                 selected.append(number)
                 scan.insert_pdf(document, from_page=index, to_page=index)
@@ -110,11 +122,15 @@ def build_native_pages(content: bytes, parsed: ParsedContent) -> tuple[list[dict
 
 
 async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: str,
-                      engine: str | None, tenant_id: str) -> SourceExtraction:
+                      engine: str | None, tenant_id: str, *, build_standard: bool = True) -> SourceExtraction:
     # MuPDF is not thread-safe: serialize native work, not remote OCR requests.
     async with _native_pdf_lock:
         parsed = await get_document_parser("pdf").parse(content, filename)
-        pages, selected, scan_bytes = await asyncio.to_thread(build_native_pages, content, parsed)
+        pages, selected, scan_bytes = await asyncio.to_thread(build_native_pages, content, parsed, build_standard)
+    evidence_pages = [{"page": page["page_number"], "page_label": (page.get("native_evidence") or {}).get("page_label"),
+                       "native": page.get("native_evidence"), "engine_used": "native", "ocr_selected": False}
+                      for page in pages] if build_standard else []
+    raw_ocr: dict[str, Any] = {}
     explicit = engine and engine not in {"auto", "native", "pymupdf_ocr"}
     if profile == "layout_analysis" or explicit:
         selected, scan_bytes = list(range(1, len(pages) + 1)), content
@@ -124,10 +140,23 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
         if len(response.pages) != len(selected) or not response.success:
             raise AppException("OCR không trả đủ các trang yêu cầu.", code="OCR_PAGE_COUNT_MISMATCH", status_code=422)
         by_number = {p.page_number: p for p in response.pages}
+        raw_ocr = response.raw_evidence
         for local, original in enumerate(selected, 1):
             if local not in by_number:
                 raise AppException("OCR trả số trang không hợp lệ.", code="OCR_PAGE_COUNT_MISMATCH", status_code=422)
             record = by_number[local].model_dump()
+            if build_standard:
+                provider_pages = ((raw_ocr.get("provider_response") or {}).get("result") or {}).get("layoutParsingResults") or []
+                raw_pages = raw_ocr.get("pages") or []
+                original_raw = provider_pages[local - 1] if local <= len(provider_pages) else (
+                    raw_pages[local - 1] if local <= len(raw_pages) else record)
+                markdown_raw = original_raw.get("markdown") or {}
+                evidence_pages[original - 1].update(
+                    ocr_selected=True, ocr_raw_page=original_raw,
+                    ocr_text=markdown_raw.get("text", original_raw.get("extracted_text", record["extracted_text"])),
+                    ocr_dimensions=record.get("dimensions"), engine_used=response.engine_used,
+                    raw_ocr_available=bool(raw_ocr),
+                )
             if not record["extracted_text"].strip():
                 async with _native_pdf_lock:
                     evidence = await asyncio.to_thread(inspect_empty_pdf_page, content, original)
@@ -149,7 +178,11 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
         async with _native_pdf_lock:
             prepared = await asyncio.to_thread(prepare_header_rescue, content, pages[0])
         if prepared:
-            await rescue_header(db, pages[0], prepared, engine, tenant_id)
+            await rescue_header(db, pages[0], prepared, engine or "paddleocr", tenant_id)
+    if pages:
+        header_raw = pages[0].pop("_header_raw_evidence", None)
+        if build_standard and pages[0].get("metadata_rescue"):
+            evidence_pages[0]["header_rescue"] = {"audit": pages[0]["metadata_rescue"], "raw": header_raw}
     if not any(p["extracted_text"].strip() for p in pages):
         raise AppException("Tài liệu không có nội dung văn bản để nạp tri thức.",
                            code="EMPTY_EXTRACTED_TEXT", status_code=422)
@@ -157,11 +190,28 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
     result = SourceExtraction(raw_text, len(pages), pages, parsed.tables or [], used)
     if parsed.canonical_document:
         result.canonical_tables = [t.model_dump(mode="json") for t in parsed.canonical_document.tables]
+    if build_standard:
+        from app.modules.knowledge.parsers.pdf_structure import build_pdf_document
+
+        result.pdf_evidence = {"version": "pdf-evidence/v1", "source_sha256": hashlib.sha256(content).hexdigest(),
+                               "pages": evidence_pages, "ocr": raw_ocr,
+                               "ocr_page_map": [{"local": local, "physical": number} for local, number in enumerate(selected, 1)],
+                               "inspection": parsed.metadata}
+        try:
+            result.qnu_document = await asyncio.to_thread(build_pdf_document, result.pdf_evidence,
+                filename=filename, sha256=hashlib.sha256(content).hexdigest())
+        except Exception as exc:
+            # A derivative failure must not certify a partial artifact or break legacy serving.
+            result.qnu_build_error = type(exc).__name__
     return result
 
 
-def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> None:
-    """Transfer only evidenced token boundaries; reject unrelated render output."""
+def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> list[tuple[int, int, int]]:
+    """Transfer only evidenced token boundaries; reject unrelated render output.
+
+    Returns the (page_number, start, end) character ranges of the projection
+    markdown assigned to each render page so later consumers can derive page hints.
+    """
     tokens = list(re.finditer(r"\w+", markdown))
     native_tokens, native_pages = [], []
     for page in pages:
@@ -182,8 +232,10 @@ def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> None:
             matched_pages.add(number)
             starts.setdefault(number, tokens[match.a + offset].start())
     ordered = sorted(starts.items())
+    ranges: list[tuple[int, int, int]] = []
     for index, (number, start) in enumerate(ordered):
         end = ordered[index + 1][1] if index + 1 < len(ordered) else len(markdown)
+        ranges.append((number, start, end))
         pages[number - 1]["extracted_text"] = markdown[start:end].strip()
     for page in pages:
         if page.get("engine_used") != "native" and page["page_number"] in matched_pages:
@@ -192,6 +244,7 @@ def align_office_markdown(markdown: str, pages: list[dict[str, Any]]) -> None:
             page["extracted_text"] = originals[page["page_number"]]
         if page["page_number"] not in starts and page.get("engine_used") == "native":
             page["extracted_text"] = ""
+    return ranges
 
 
 async def extract_source(db: AsyncSession, content: bytes, filename: str, file_type: str,
@@ -205,8 +258,8 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
         parsed = await get_document_parser(extension).parse(content, filename)
         parsed.raw_text = unicodedata.normalize("NFC", parsed.raw_text)
         preview = await IngestionService()._convert_office_to_pdf(content, filename)
-        result = await extract_pdf(db, preview, "preview.pdf", profile, engine, tenant_id)
-        await asyncio.to_thread(align_office_markdown, parsed.raw_text, result.pages)
+        result = await extract_pdf(db, preview, "preview.pdf", profile, engine, tenant_id, build_standard=False)
+        page_ranges = await asyncio.to_thread(align_office_markdown, parsed.raw_text, result.pages)
         for page in result.pages:
             accepted = (page.get("metadata_rescue") or {}).get("accepted_lines", [])
             missing = [line for line in accepted if line not in page["extracted_text"]]
@@ -217,6 +270,21 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
         if parsed.canonical_document:
             result.canonical_tables = [t.model_dump(mode="json") for t in parsed.canonical_document.tables]
         result.engine_used = f"{parsed.metadata.get('parser', 'docling')}+{result.engine_used}"
+        if parsed.docling_document is not None:
+            from app.modules.knowledge.parsers.docling_structure import (
+                build_qnu_structured_document,
+            )
+
+            result.qnu_document = await asyncio.to_thread(
+                build_qnu_structured_document,
+                parsed.docling_document,
+                filename=filename,
+                sha256=hashlib.sha256(content).hexdigest(),
+                projection_markdown=parsed.raw_text,
+                page_ranges=page_ranges,
+                render_sha256=hashlib.sha256(preview).hexdigest(),
+                render_page_count=len(result.pages),
+            )
         result.preview_pdf = preview
         return result
     if extension in {"png", "jpg", "jpeg", "webp", "bmp"}:

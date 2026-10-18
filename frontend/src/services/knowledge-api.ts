@@ -1687,6 +1687,11 @@ export const knowledgeApi = {
     sourceId: string,
     revisionId: string,
     markdown: string,
+    review?: {
+      change_reason: string;
+      expected_canonical_hash?: string;
+      content_format?: "qnu-rag-markdown/1.0";
+    },
   ): Promise<KnowledgeSourceRevisionResponse> {
     const res = await fetch(
       `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/content`,
@@ -1696,7 +1701,7 @@ export const knowledgeApi = {
           ...getAuthHeaders(),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ canonical_markdown: markdown }),
+        body: JSON.stringify({ canonical_markdown: markdown, ...review }),
       },
     );
     if (!res.ok) {
@@ -1709,6 +1714,63 @@ export const knowledgeApi = {
       );
     }
     return res.json();
+  },
+
+  async downloadSourceQnuMarkdown(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    format: "md" | "json" = "md",
+  ): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(
+        `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/qnu-markdown?format=${format}`,
+        { headers: getAuthHeaders() },
+      );
+    } catch {
+      throw new Error(
+        "Không kết nối được máy chủ Backend (kiểm tra service port 8001).",
+      );
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Tải tệp QNU RAG Markdown thất bại (HTTP ${res.status}).`,
+        ),
+      );
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download =
+      format === "json"
+        ? `${revisionId}.qnu-doc-v1.json`
+        : `${revisionId}.qnu-rag-v1.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async getSourceQnuMarkdown(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+  ): Promise<string> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/qnu-markdown?format=md`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không đọc được bản QNU Markdown.",
+        ),
+      );
+    return res.text();
   },
 
   async editSourceContext(
@@ -1730,6 +1792,34 @@ export const knowledgeApi = {
         extractErrorMessage(
           await res.json().catch(() => ({})),
           "Không lưu được ngữ cảnh.",
+        ),
+      );
+    return res.json();
+  },
+
+  async previewCleanContent(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    markdown: string,
+    expectedHash?: string | null,
+  ): Promise<import("@/types/knowledge").CleanContentPreview> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/clean-preview`,
+      {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          canonical_markdown: markdown,
+          expected_canonical_hash: expectedHash,
+        }),
+      },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không thể chuẩn hóa nội dung.",
         ),
       );
     return res.json();
@@ -1842,6 +1932,9 @@ export const knowledgeApi = {
       );
     }
     const v = (await res.json()) as {
+      canonical_hash?: string | null;
+      content_integrity?: DocumentVerificationData["content_integrity"];
+      content_review?: DocumentVerificationData["content_review"];
       citation_metadata?: DocumentVerificationData["citation_metadata"];
       structured_artifact?: DocumentVerificationData["structured_artifact"];
       layout_text_alignment?: string;
@@ -1854,12 +1947,17 @@ export const knowledgeApi = {
       status?: string;
       index_status?: string;
       total_pages: number;
+      structured_review_status?: string;
+      requires_structured_review?: boolean;
+      structured_issue_count?: number;
+      pagination_known?: boolean;
       file_size_bytes?: number;
       total_chunks?: number;
       pages: {
         page_number: number;
         markdown_content: string;
         raw_text: string;
+        raw_text_available?: boolean;
         word_count: number;
         line_count: number;
         image_url: string | null;
@@ -1877,6 +1975,9 @@ export const knowledgeApi = {
       typeof v.file_size_bytes === "number" ? v.file_size_bytes : 0;
     return {
       document_id: v.document_id,
+      canonical_hash: v.canonical_hash,
+      content_integrity: v.content_integrity,
+      content_review: v.content_review,
       citation_metadata: v.citation_metadata,
       structured_artifact: v.structured_artifact,
       layout_text_alignment: v.layout_text_alignment,
@@ -1886,6 +1987,10 @@ export const knowledgeApi = {
       filename: v.filename,
       status: v.status,
       index_status: v.index_status,
+      structured_review_status: v.structured_review_status,
+      requires_structured_review: v.requires_structured_review,
+      structured_issue_count: v.structured_issue_count,
+      pagination_known: v.pagination_known,
       file_size_mb: Math.round((sizeBytes / 1048576) * 100) / 100,
       total_pages: v.total_pages,
       engine: v.engine,
@@ -1900,6 +2005,7 @@ export const knowledgeApi = {
         has_tables: p.has_tables,
         markdown_content: p.markdown_content,
         raw_text: p.raw_text,
+        raw_text_available: p.raw_text_available,
         bounding_boxes: p.bounding_boxes || [],
         regions: p.regions || [],
       })),
@@ -2075,7 +2181,12 @@ export const knowledgeApi = {
 
   async listGlossaryTerms(
     collectionId: string,
-    params: { search?: string; status?: string; page?: number; page_size?: number } = {},
+    params: {
+      search?: string;
+      status?: string;
+      page?: number;
+      page_size?: number;
+    } = {},
   ): Promise<GlossaryTermListResponse> {
     const query = new URLSearchParams();
     if (params.search) query.set("search", params.search);
@@ -2088,23 +2199,41 @@ export const knowledgeApi = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Tải danh sách thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Tải danh sách thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },
 
   async createGlossaryTerm(
     collectionId: string,
-    payload: { user_phrase: string; target_term: string; note?: string; scope?: Record<string, unknown> },
+    payload: {
+      user_phrase: string;
+      target_term: string;
+      note?: string;
+      scope?: Record<string, unknown>;
+    },
   ): Promise<GlossaryTerm> {
-    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary`, {
-      method: "POST",
-      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary`,
+      {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Thêm thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Thêm thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },
@@ -2112,16 +2241,30 @@ export const knowledgeApi = {
   async updateGlossaryTerm(
     collectionId: string,
     termId: string,
-    payload: { user_phrase?: string; target_term?: string; note?: string; scope?: Record<string, unknown>; expected_version: number },
+    payload: {
+      user_phrase?: string;
+      target_term?: string;
+      note?: string;
+      scope?: Record<string, unknown>;
+      expected_version: number;
+    },
   ): Promise<GlossaryTerm> {
-    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary/${termId}`, {
-      method: "PUT",
-      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary/${termId}`,
+      {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Sửa thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Sửa thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },
@@ -2129,7 +2272,11 @@ export const knowledgeApi = {
   async reviewGlossaryTerm(
     collectionId: string,
     termId: string,
-    payload: { action: "approve" | "reject" | "revoke"; reason?: string; expected_version: number },
+    payload: {
+      action: "approve" | "reject" | "revoke";
+      reason?: string;
+      expected_version: number;
+    },
   ): Promise<GlossaryTerm> {
     const res = await fetch(
       `${BASE_URL}/knowledge/collections/${collectionId}/glossary/${termId}/review`,
@@ -2141,18 +2288,31 @@ export const knowledgeApi = {
     );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Duyệt thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Duyệt thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },
 
   async getGlossarySettings(collectionId: string): Promise<GlossarySettings> {
-    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`, {
-      headers: getAuthHeaders(),
-    });
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`,
+      {
+        headers: getAuthHeaders(),
+      },
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Tải cấu hình thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Tải cấu hình thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },
@@ -2161,14 +2321,22 @@ export const knowledgeApi = {
     collectionId: string,
     payload: { is_enabled: boolean; expected_version: number },
   ): Promise<GlossarySettings> {
-    const res = await fetch(`${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`, {
-      method: "PUT",
-      headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/glossary-settings`,
+      {
+        method: "PUT",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(err, `Bật/tắt thuật ngữ thất bại (HTTP ${res.status}).`));
+      throw new Error(
+        extractErrorMessage(
+          err,
+          `Bật/tắt thuật ngữ thất bại (HTTP ${res.status}).`,
+        ),
+      );
     }
     return res.json();
   },

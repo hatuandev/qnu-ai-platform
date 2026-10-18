@@ -315,7 +315,8 @@ async def test_rag_service_ask_includes_snapshot_even_on_no_answer():
     assert resp.status == "insufficient_context"
     assert resp.retrieval_snapshot is not None
     assert resp.retrieval_snapshot.snapshot_id == "snap_empty_col_1"
-    assert "0256.3846.156" in resp.answer
+    assert "chưa xác minh" in resp.answer
+    assert not resp.citations and "@" not in resp.answer
 
 
 @pytest.mark.asyncio

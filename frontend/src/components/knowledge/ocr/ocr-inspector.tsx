@@ -51,26 +51,7 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
 
   const currentMarkdown = editableMarkdown;
 
-  const formattedMarkdown = useMemo(() => {
-    if (!currentMarkdown) return "";
-    return currentMarkdown
-      .split("\n")
-      .map((line) => {
-        const trimmed = line.trim();
-        if (
-          !trimmed ||
-          trimmed.startsWith("|") ||
-          trimmed.startsWith("#") ||
-          trimmed.startsWith("---") ||
-          trimmed.startsWith("```") ||
-          trimmed.endsWith("  ")
-        ) {
-          return line;
-        }
-        return `${line}  `;
-      })
-      .join("\n");
-  }, [currentMarkdown]);
+  const formattedMarkdown = currentMarkdown;
 
   // Read revision metadata from the backend; never invent entities from display geometry.
   const extractedEntities = useMemo(() => {

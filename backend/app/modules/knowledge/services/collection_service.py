@@ -27,12 +27,21 @@ from app.modules.knowledge.services.scope_helper import (
 logger = logging.getLogger(__name__)
 
 
+def reject_rule_metadata(metadata: dict[str, Any] | None) -> None:
+    from app.modules.knowledge.services.score_rule_service import PROTECTED_KEYS
+
+    if PROTECTED_KEYS.intersection(metadata or {}):
+        raise AppException("Quy tắc tính điểm phải được quản lý qua luồng duyệt riêng.",
+                           code="SCORE_RULE_MANAGED_METADATA", status_code=403)
+
+
 class CollectionService:
     """Service managing Knowledge Collections and their stats."""
 
     async def create_collection(
         self, db: AsyncSession, req: CollectionCreateRequest, actor: Any | None = None
     ) -> KnowledgeCollection:
+        reject_rule_metadata(req.metadata)
         tenant_id = getattr(actor, "tenant_id", None) or req.tenant_id
         workspace_id = getattr(actor, "workspace_id", None) or req.workspace_id
 
@@ -161,7 +170,13 @@ class CollectionService:
         req: CollectionUpdateRequest,
         actor: Any | None = None,
     ) -> KnowledgeCollection:
+        reject_rule_metadata(req.metadata)
         col = await self.get_collection(db, collection_id, actor=actor)
+        if req.metadata is not None or req.data_processing is not None:
+            # A normal metadata edit must not overwrite a concurrent rule approval.
+            result = await db.execute(select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
+                .with_for_update().execution_options(populate_existing=True))
+            col = result.scalar_one()
         updates = req.model_dump(exclude_unset=True)
         if "metadata" in updates:
             merged = dict(col.collection_metadata or {})

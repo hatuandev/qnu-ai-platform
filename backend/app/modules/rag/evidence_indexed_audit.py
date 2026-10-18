@@ -1,19 +1,27 @@
 """Whole-claim semantic audit with server-resolved proof and qualifier IDs."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, create_model
 
 from app.modules.rag.evidence_audit import AtomicCheck, RequiredQualifier, SemanticAudit
 from app.modules.rag.evidence_constraints import ConstraintRole
-from app.modules.rag.evidence_passages import passage_catalog, passage_payload
+from app.modules.rag.evidence_context import compact_claim_context
+from app.modules.rag.evidence_contracts import exact_id_items
+from app.modules.rag.evidence_passages import (
+    compact_passage_payload,
+    passage_catalog,
+    passage_payload,
+)
 from app.modules.rag.evidence_schemas import StrictContract
 
 
 class AuditedClaim(StrictContract):
     claim_id: str
     all_assertions_supported: bool
-    reason: str = Field(max_length=300)
+    # Diagnostic only, not the semantic verdict or a quotable claim. Omitting it
+    # cannot turn a false verdict true. Avoid making long prose a schema failure.
+    reason: str = ""
 
 
 class AuditedCondition(StrictContract):
@@ -31,20 +39,26 @@ class IndexedAudit(StrictContract):
 
 
 def audit_contract(claims, catalog):
-    ids = Literal[tuple(claim["id"] for claim in claims)]
+    expected = tuple(claim["id"] for claim in claims)
+    ids = Literal[expected]
     passages = Literal[tuple(catalog)]
     verdict = create_model("SourceClaimAudit", __base__=AuditedClaim, claim_id=(ids, ...))
     condition = create_model("SourceConditionAudit", __base__=AuditedCondition,
         evidence_id=(passages, ...), retained_by=(list[ids], Field(default_factory=list, max_length=12)))
     return create_model("SourceAnswerAudit", __base__=IndexedAudit,
-        claims=(list[verdict], Field(max_length=48)),
+        claims=(Annotated[list[verdict], exact_id_items(expected, "claim_id")],
+                Field(min_length=len(expected), max_length=len(expected),
+                      description="Exactly one check per supplied claim ID; no duplicates or omissions.")),
         essential_conditions=(list[condition], Field(default_factory=list, max_length=20)))
 
 
 def audit_payload(payload, blocks):
     catalog = passage_catalog(blocks)
-    compact = {key: value for key, value in payload.items() if key != "evidence"}
-    return {**compact, "passages": passage_payload(blocks, catalog)}, catalog
+    compact = {key: value for key, value in payload.items() if key not in {"evidence", "compact_passages"}}
+    passages = compact_passage_payload(blocks, catalog) if payload.get("compact_passages") else passage_payload(blocks, catalog)
+    if payload.get("compact_passages"):
+        compact = compact_claim_context(compact, payload.get("claims", []))
+    return {**compact, "passages": passages}, catalog
 
 
 def resolve_audit(indexed: IndexedAudit, claims, catalog) -> SemanticAudit:
@@ -73,6 +87,12 @@ def resolve_audit(indexed: IndexedAudit, claims, catalog) -> SemanticAudit:
 
 
 INDEXED_AUDIT_INSTRUCTION = """Independently verify ALL assertions in each COMPLETE claim.
+When reference_catalog is supplied, each claim.references item is an exact catalog
+ID. Resolve ALL of them in that table; the FIRST remains the primary body proof.
+Audit source faithfulness, not agreement with training knowledge. An address or
+contact is not false because you remember another one; conflicts need supplied
+applicable evidence. Do not invent a requested season when requested.years is empty.
+In grouped passages, whole_passage_id refers to whole_text if present, otherwise ALL passage texts in that group in source order.
 Reject a primary body from another record, qualification level or requested attribute.
 An additional reference with the right subject cannot rescue that unrelated body.
 Only use essential_conditions passages applicable to requested.entity and education_level.

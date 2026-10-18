@@ -28,7 +28,36 @@ from app.modules.rag.vector_indexer import vector_indexer
 PURGE_JOB = "knowledge_source_purge"
 
 
-async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None) -> JobRecord:
+def snapshot_paths(revision: KnowledgeSourceRevision) -> set[str]:
+    """Enumerate only owned snapshot artifacts, never Repository or arbitrary JSON paths."""
+    paths = {revision.snapshot_storage_path}
+    for metadata in (revision.snapshot_metadata or {}, revision.parse_provenance or {}):
+        paths.add(metadata.get("preview_pdf_path"))
+        standard = metadata.get("qnu_markdown") or {}
+        paths.update((standard.get("path"), standard.get("structured_path")))
+        paths.add((standard.get("raw_evidence") or {}).get("path"))
+    return {path for path in paths if path}
+
+
+def validate_snapshot_paths(paths: set[str], collection_id: str, binding_id: str) -> None:
+    prefix = f"snapshots/{collection_id}/{binding_id}/"
+    for path in paths:
+        if (not isinstance(path, str) or not path.startswith(prefix)
+                or any(part in ("", ".", "..") for part in path.split("/")) or "\\" in path):
+            raise AppException("Đường dẫn snapshot ngoài phạm vi nguồn.", code="UNSAFE_PURGE_PATH", status_code=409)
+
+
+def _path_references(path: str) -> Any:
+    clauses = [KnowledgeSourceRevision.snapshot_storage_path == path]
+    for metadata in (KnowledgeSourceRevision.snapshot_metadata, KnowledgeSourceRevision.parse_provenance):
+        clauses.extend((metadata["preview_pdf_path"].astext == path,
+                        metadata["qnu_markdown"]["path"].astext == path,
+                        metadata["qnu_markdown"]["structured_path"].astext == path,
+                        metadata["qnu_markdown"]["raw_evidence"]["path"].astext == path))
+    return or_(*clauses)
+
+
+async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None, *, dispatch: bool = True) -> JobRecord:
     binding = await get_scoped_binding(db, binding_id, actor=actor, allow_deleting=True)
     collection = await get_scoped_collection(db, binding.collection_id, actor=actor, for_update=True)
     binding = await get_scoped_binding(db, binding_id, actor=actor, for_update=True, allow_deleting=True)
@@ -66,8 +95,8 @@ async def request_purge(db: AsyncSession, binding_id: str, actor: Any = None) ->
                     payload={"binding_id": binding_id})
     db.add(job)
     await db.commit()
-    broker_id = await enqueue_arq_job("task_knowledge_source_purge", job.id,
-                                     broker_job_id=jobs_service._broker_job_id(job))
+    broker_id = (await enqueue_arq_job("task_knowledge_source_purge", job.id,
+                                     broker_job_id=jobs_service._broker_job_id(job))) if dispatch else None
     if broker_id:
         job.arq_job_id, job.dispatch_status = broker_id, "dispatched"
         await db.commit()
@@ -124,6 +153,8 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     history_count = await db.scalar(select(func.count()).select_from(KnowledgeIndexActivation).where(
         KnowledgeIndexActivation.binding_id == binding.id,
     ))
+    paths = set().union(*(snapshot_paths(revision) for revision in revisions))
+    validate_snapshot_paths(paths, collection.id, binding.id)
     namespaces = set((await db.scalars(select(KnowledgeVectorGeneration.qdrant_collection_name).where(
         KnowledgeVectorGeneration.collection_id == collection.id,
 
@@ -134,15 +165,9 @@ async def run_purge(db: AsyncSession, job: JobRecord) -> None:
     for namespace in sorted(namespaces):
         await vector_indexer.delete_source_points(collection.id, binding.id, namespace,
                                                  tenant_id=job.tenant_id, workspace_id=job.workspace_id)
-    prefix = f"snapshots/{collection.id}/{binding.id}/"
-    paths = {r.snapshot_storage_path for r in revisions if r.snapshot_storage_path}
-    paths.update((r.snapshot_metadata or {}).get("preview_pdf_path") for r in revisions)
-    for path in sorted(p for p in paths if p):
-        if not path.startswith(prefix) or ".." in path.split("/") or "\\" in path:
-            raise AppException("Đường dẫn snapshot ngoài phạm vi nguồn.", code="UNSAFE_PURGE_PATH", status_code=409)
+    for path in sorted(paths):
         referenced = await db.scalar(select(func.count()).select_from(KnowledgeSourceRevision).where(
-            or_(KnowledgeSourceRevision.snapshot_storage_path == path,
-                KnowledgeSourceRevision.snapshot_metadata["preview_pdf_path"].astext == path),
+            _path_references(path),
             KnowledgeSourceRevision.binding_id != binding.id,
         ))
         if not referenced:

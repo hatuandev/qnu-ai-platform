@@ -147,7 +147,8 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
         if total_chars > 2_000_000:
             raise AppException("Kho vượt ngân sách đối soát; cần phân vùng nguồn.", code="EVIDENCE_SOURCE_BUDGET", status_code=422)
         try:
-            manifest = resolve_unit_manifest(markdown, get_source_artifact(source))
+            source_artifact = get_source_artifact(source)
+            manifest = resolve_unit_manifest(markdown, source_artifact)
             digest = manifest_digest(manifest)
             pinned_hash = (index.parity_report or {}).get("unit_manifest_hash")
             if pinned_hash and pinned_hash != digest:
@@ -162,10 +163,13 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             header_context="\n".join([*unit.heading_path, unit.header_context]), start=unit.start, end=unit.end,
             source_context=markdown[:1200],
             canonical_hash=source.canonical_hash, temporal_scope=unit.temporal,
+            fact_context={"source_kind": unit.kind, **({"qnu_block_id": unit.qnu_block_id,
+                "source_locations": unit.source_locations, "context_unit_ids": source_artifact.get("context_graph", {}).get("links", {}).get(unit.id, [])}
+                if unit.qnu_block_id else {})},
             scope_years=unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else [],
             unit_id=unit.id, parent_id=unit.parent_id, unit_manifest_hash=digest,
             is_container=unit.is_container) for unit in manifest.units]
-        if (index.parity_report or {}).get("fact_set_hash"):
+        if (index.parity_report or {}).get("fact_set_hash") and not any(unit.qnu_block_id for unit in manifest.units):
             # Materialized reviewed facts take precedence over original table cells.
             source_blocks = [b for b in source_blocks if not (
                 re.search(r"(?m)^\s*\|", b.text) or re.search(r"<table\b", b.text, re.IGNORECASE))]
@@ -196,7 +200,8 @@ def scope_headers(blocks: list[EvidenceBlock], selected: list[EvidenceBlock], ye
 def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], years: list[int],
                  limit: int, max_chars: int, *, atomic_lists: bool = True,
                  enumeration_subject: str | None = None, diagnostics: dict | None = None,
-                 coverage_goals: list[str] | None = None, priority_ids: set[str] | None = None) -> list[EvidenceBlock]:
+                 coverage_goals: list[str] | None = None, priority_ids: set[str] | None = None,
+                 allow_first_whole_group: bool = False) -> list[EvidenceBlock]:
     """Admit whole body/same-source-heading pairs, never truncate off their proof."""
     headers = {source_identity(b): b for b in scope_headers(blocks, ordered, years)}
     groups = {member.id: group for group in list_groups(blocks) if matches_subject(group, enumeration_subject)
@@ -223,6 +228,7 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
     if priority_ids:
         ordered = sorted(ordered, key=lambda b: b.id not in priority_ids)
     selected, seen, used = [], set(), 40  # Payload field names and brackets.
+    whole_group_admitted = False
     intro_sources = set()
     dropped = []
     for body in ordered:
@@ -238,16 +244,25 @@ def pack_context(blocks: list[EvidenceBlock], ordered: list[EvidenceBlock], year
         size += len(json.dumps(intros, ensure_ascii=False)) if intros else 0
         body_count = sum(not re.fullmatch(r"\s*#{1,6}\s+[^\n]+\s*", b.text)
                          and b.id not in {h.id for h in headers.values()} for b in [*selected, *pair])
-        if body_count > limit or used + size > max_chars:
+        # One atomic proof unit can consist of more physical blocks than K.
+        # Opt-in recovery may admit that FIRST unit whole, never a partial formula
+        # or list. No further unrelated body can then enter; byte budget is hard.
+        oversized_first = allow_first_whole_group and not selected and len(bodies) > 1
+        if (body_count > limit and not oversized_first) or used + size > max_chars:
             dropped.append({"block_id": body.id, "reason": "block_limit" if body_count > limit else "character_budget",
                             "group_size": len(pair), "characters": size})
             continue
         selected.extend(pair)
+        whole_group_admitted = whole_group_admitted or (oversized_first and body_count > limit)
         seen.update(b.id for b in pair)
         used += size
         intro_sources.update(intros)
+        if whole_group_admitted:
+            break
     if diagnostics is not None:
         diagnostics.update(packed_characters=used, packed_blocks=len(selected), dropped=dropped)
+        if whole_group_admitted:
+            diagnostics["whole_group_exceeds_block_k"] = True
     return selected
 
 

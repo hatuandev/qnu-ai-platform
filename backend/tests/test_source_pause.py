@@ -138,6 +138,7 @@ async def test_live_pause_excludes_source_changes_cache_key_and_preserves_artifa
                         await source_ingestion_service.update_revision_content(
                             db, col.id, bindings[0].id, bindings[0].active_source_revision_id,
                             "Updated fixture content that must remain paused.",
+                            actor_id="fixture-editor", change_reason="Verify paused draft stays isolated",
                         )
                     await db.refresh(bindings[0])
                     assert bindings[0].status == "paused"

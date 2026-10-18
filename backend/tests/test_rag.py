@@ -218,10 +218,11 @@ def test_fit_dim_strict_dimension_invariant():
 
 
 def test_citation_guard_no_answer():
-    """Verify CitationGuard returns polite rejection policy when context is insufficient."""
+    """A failed lookup must not publish unsourced contacts or claim source absence."""
     msg_admissions = citation_guard.get_no_answer_response("admissions")
-    assert "0256.3846.156" in msg_admissions
-    assert "tuyensinh@qnu.edu.vn" in msg_admissions
+    assert "chưa xác minh" in msg_admissions
+    assert not any(char.isdigit() for char in msg_admissions)
+    assert "@" not in msg_admissions and "hiện chưa có" not in msg_admissions
 
 
 def test_citation_guard_strict_filtering_zero_false_positive():
@@ -300,10 +301,13 @@ async def test_api_rag_ask_no_context():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "insufficient_context"
-    assert "0256.3846.156" in data["answer"]  # Returns polite QNU admissions hotline
+    assert "chưa xác minh" in data["answer"]
+    assert not data["citations"] and "@" not in data["answer"]
 
 
 @pytest.mark.asyncio
+@patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+    {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_api_rag_ask_with_modelops_synthesis():
     """Verify RagService.ask calls ModelOps generate and returns synthesized answer with citations."""
     from unittest.mock import AsyncMock, patch
@@ -370,6 +374,8 @@ async def test_api_rag_ask_with_modelops_synthesis():
 
 
 @pytest.mark.asyncio
+@patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+    {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_rag_ask_dynamic_fallback_model():
     """Verify RagService invokes fallback_model when primary_model generation fails."""
     from unittest.mock import AsyncMock, patch

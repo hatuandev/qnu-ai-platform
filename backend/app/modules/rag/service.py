@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.core.guardrails import input_guardrail, output_guardrail
 from app.core.redis import semantic_cache
+from app.core.retrieval_policy import configured_policy
 from app.modules.modelops.schemas import ChatMessage, LLMGenerateRequest
 from app.modules.modelops.service import modelops_service
 from app.modules.rag.citation_guard import citation_guard
@@ -30,6 +31,7 @@ from app.modules.rag.query_router import (
     query_classifier,
     scope_history_by_topic,
 )
+from app.modules.rag.retrieval_diagnostics import attach_diagnostics, pack_hybrid_context
 from app.modules.rag.retriever import hybrid_retriever
 from app.modules.rag.row_answer import answer_from_rows
 from app.modules.rag.schemas import (
@@ -67,6 +69,26 @@ class RagService:
 
     async def search(self, db: AsyncSession, req: SearchRequest) -> SearchResponse:
         start_time = time.perf_counter()
+        rp = None
+        policy = req.retrieval_policy
+        if req.assistant_code:
+            from sqlalchemy import select
+
+            from app.modules.assistants.models import AssistantModel
+
+            record = (await db.execute(select(AssistantModel).where(
+                AssistantModel.code == req.assistant_code, AssistantModel.collection_id == req.collection_id,
+                AssistantModel.is_active.is_(True)))).scalar_one_or_none()
+            if record is None:
+                raise AppException("Không tìm thấy trợ lý hoạt động trong kho này.", code="ASSISTANT_NOT_FOUND", status_code=404)
+            knowledge = (record.config or {}).get("knowledge_policy") or {}
+            policy = configured_policy(record.config or {})
+            rp = knowledge.get("reranker_policy")
+        if policy is not None and policy.profile == "legacy":
+            policy = None
+        if policy is not None:
+            policy = configured_policy({"knowledge_policy": {"retrieval_policy": policy.model_dump()}})
+        trace = {}
 
         snapshot = await hybrid_retriever.resolve_retrieval_snapshot(
             db,
@@ -85,6 +107,9 @@ class RagService:
             tenant_id=req.tenant_id,
             workspace_id=req.workspace_id,
             snapshot=snapshot,
+            **({"reranker_policy": rp} if rp is not None else {}),
+            **({"retrieval_policy": policy} if policy is not None else {}),
+            diagnostics=trace,
         )
 
         items = [
@@ -113,12 +138,20 @@ class RagService:
             retrieval_snapshot=snapshot,
             snapshot=snapshot,
             execution_time_ms=exec_ms,
+            retrieval_diagnostics=trace,
         )
 
     async def ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
+        from app.modules.modelops.services.inference_policy import rag_chat_scope
+
+        async with rag_chat_scope():
+            return await self._ask_conversation(db, req, candidate_snapshot=candidate_snapshot)
+
+    async def _ask_conversation(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
         from app.modules.rag.conversation_resolution import resolve_followup
 
         started = time.perf_counter()
+        req._retrieval_diagnostics = {}
         effective, resolution = await resolve_followup(db, req)
         if resolution and resolution["mode"] == "clarify":
             return AskResponse(status="insufficient_context",
@@ -133,7 +166,23 @@ class RagService:
             if handled is not None:
                 handled.answer_decision = {**(handled.answer_decision or {}), "question_resolution": resolution}
                 handled.latency_ms = round((time.perf_counter() - started) * 1000, 2)
-                return handled
+                return attach_diagnostics(effective, handled)
+            if resolution["mode"] in {"explain", "reformat"}:
+                # History is not evidence. Re-resolve the antecedent against the
+                # current publication, with presentation-only instructions.
+                antecedent = resolution.get("antecedent_question", "").strip()
+                prior_analysis = query_classifier.analyze(antecedent, module_code=effective.module_code)
+                if antecedent and "subject_combinations" not in prior_analysis.fact_attributes:
+                    styled = effective.model_copy(update={"question": antecedent, "original_question": antecedent, "history": [],
+                        "system_prompt": (effective.system_prompt or "") +
+                        "\nYÊU CẦU TRÌNH BÀY: Người dùng muốn lời giải thích ngắn, dễ hiểu hơn cho câu hỏi này. "
+                        "Dùng đoạn ngắn hoặc gạch đầu dòng thay bảng dài. Giữ điều kiện, ngoại lệ và năm từ nguồn. "
+                        "Không thêm dữ kiện, không hỏi lại chủ đề đã rõ; lịch sử chỉ giúp hiểu ý định, không là bằng chứng."})
+                    result = await self._ask(db, styled, candidate_snapshot=candidate_snapshot, presentation_mode="brief")
+                    result.answer_decision = {**(result.answer_decision or {}), "question_resolution": resolution,
+                                              "presentation_revalidated": True}
+                    result.latency_ms = round((time.perf_counter() - started) * 1000, 2)
+                    return attach_diagnostics(styled, result)
             return AskResponse(status="insufficient_context",
                 answer="Mình chưa xác định chắc phần bạn muốn giải thích, rút gọn hoặc lọc. Bạn nhắc lại chủ đề và phạm vi cần xem nhé.",
                 answer_decision={"version": "conversation-resolution-v2", "status": "clarify",
@@ -142,9 +191,10 @@ class RagService:
         if resolution:
             result.answer_decision = {**(result.answer_decision or {}), "question_resolution": resolution}
         result.latency_ms = round((time.perf_counter() - started) * 1000, 2)
-        return result
+        return attach_diagnostics(effective, result)
 
-    async def _ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
+    async def _ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None,
+                   presentation_mode: str | None = None) -> AskResponse:
         start_time = time.perf_counter()
 
         # 1. Input Guardrail safety check (Prompt Injection)
@@ -172,14 +222,18 @@ class RagService:
         from app.modules.rag.evidence_runtime import resolve_evidence_request
 
         req, evidence_policy = await resolve_evidence_request(db, req)
+        retrieval_policy = configured_policy(req.runtime_policy)
+        req._retrieval_diagnostics.update(profile="configured" if retrieval_policy else "legacy")
         from app.modules.rag.score_conversion_chat import maybe_convert_score
 
         converted = await maybe_convert_score(db, req)
         if converted is not None:
+            req._retrieval_diagnostics.update(branch="score_conversion", retrieval_executed=False)
             return converted
         logger.info("rag_execution_branch assistant=%s snapshot=%s branch=%s", req.assistant_code,
                     snapshot.snapshot_id, "evidence" if evidence_policy.enabled else "fact_hybrid")
         if evidence_policy.enabled:
+            req._retrieval_diagnostics.update(branch="evidence", retrieval_executed=True)
             return await answer_with_evidence(db, req, snapshot, evidence_policy,
                                               candidate_mode=candidate_snapshot is not None)
         from app.modules.rag.combination_enumeration import enumerate_combinations
@@ -188,6 +242,8 @@ class RagService:
         enumeration = await enumerate_combinations(db, req, snapshot, analysis,
             candidate_mode=candidate_snapshot is not None)
         if enumeration is not None:
+            req._retrieval_diagnostics.update(branch="enumeration", retrieval_executed=False,
+                budget_note="Exhaustive enumeration is not truncated by context_top_k")
             return enumeration
         from app.modules.rag.glossary_expansion import resolve_glossary_queries
 
@@ -195,7 +251,7 @@ class RagService:
             db, req.collection_id, req.question,
             plan_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)])
         glossary_version = glossary_trace.get("settings_version", 0) if glossary_trace.get("enabled") else 0
-        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1" + (
+        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1:verified-answer-v2" + (
             f":glossary-v{glossary_version}" if glossary_version else ":glossary-off")
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
@@ -224,6 +280,7 @@ class RagService:
                 policy_version=policy_version,
             )
         if cached:
+            req._retrieval_diagnostics.update(branch="cache", retrieval_executed=False)
             logger.info("Semantic cache HIT for query='%s'", req.question[:30])
             cached["latency_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
             cached["answer"] = sanitize_rag_answer(cached.get("answer", ""))
@@ -252,11 +309,36 @@ class RagService:
 
             table_evidence = await load_snapshot_table_evidence(db, snapshot)
             if table_evidence:
-                decision = decide_table_answer(req.question, table_evidence, module_code=req.module_code)
+                fallback = decide_table_answer(req.question, table_evidence, module_code=req.module_code)
+                if fallback and (fallback["status"] != "missing" or not decision.get("unscoped_fact_ids")):
+                    decision = fallback
+        if (decision and decision["status"] == "missing" and not decision.get("claim_bindings")
+                and decision.get("reason") == "DATA_YEAR_UNVERIFIED"):
+            # Unknown cell years may have exact applicability in the linked table
+            # introduction. Use the existing independent selector/auditor; never
+            # promote a filename or issue date into a data year.
+            rows = await load_row_anchors(db, snapshot, req.question, candidate_mode=candidate_snapshot is not None)
+            if rows:
+                row_answer = await answer_from_rows(db, req, snapshot, rows)
+                if row_answer is not None and (row_answer.status == "answered"
+                        or (row_answer.answer_decision or {}).get("reason") == "SOURCE_VALUE_VARIANTS"):
+                    row_answer.latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                    return row_answer
+                if row_answer is not None:
+                    decision["row_scope_check"] = row_answer.answer_decision
         if decision is not None:
+            from app.modules.rag.prose_fallback import answer_from_prose, can_check_prose
+
+            if can_check_prose(decision):
+                prose_answer = await answer_from_prose(db, req, snapshot, evidence_policy, decision["reason"],
+                    candidate_mode=candidate_snapshot is not None)
+                if prose_answer is not None:
+                    return prose_answer
             matched = decision.pop("facts", [])
-            if decision["status"] != "supported" and not matched:
-                decision["answer"] += "\n\n" + citation_guard.get_no_answer_response(req.module_code)
+            if (not facts and not matched and decision.get("reason") == "NO_COMPATIBLE_FACT_EVIDENCE"):
+                # A genuinely empty result keeps the configured contact policy,
+                # without appending a second refusal/greeting to scope warnings.
+                decision["answer"] = citation_guard.get_no_answer_response(req.module_code)
             citations = [Citation(source_id=f.get("binding_id") or str(f["id"]),
                                   title=f.get("source_title") or f["entity_name"] + " — " + f["attribute_name"],
                                   page_number=f["raw_data"].get("page_number"),
@@ -271,6 +353,10 @@ class RagService:
                                facts_used=matched, contexts=[decision["answer"]] if matched else [],
                                retrieval_snapshot=snapshot, snapshot=snapshot,
                                latency_ms=round((time.perf_counter() - start_time) * 1000, 2))
+        # An untyped policy question must not inherit arbitrary numeric rows.
+        # Typed table decisions above retain their own coordinate/provenance gate.
+        if not analysis.fact_attributes:
+            facts = []
         fact_markdown = fact_layer.format_facts_as_markdown(facts)
 
         # 4. Hybrid Retrieval with Intent-tailored Top-K and RRF weights.
@@ -327,27 +413,44 @@ class RagService:
             glossary_queries=glossary_queries,
             reranker_policy=req.reranker_policy,
             snapshot=snapshot,
+            **({"retrieval_policy": retrieval_policy} if retrieval_policy else {}),
+            diagnostics=req._retrieval_diagnostics,
             **({"candidate_mode": True, "read_mode_override": "revisioned"} if candidate_snapshot is not None else {}),
         )
+        req._retrieval_diagnostics.update(branch="fact_hybrid", retrieval_executed=True)
 
         # 5. No-Answer Policy if context is empty
         rows = await load_row_anchors(db, snapshot, req.question, candidate_mode=candidate_snapshot is not None)
         if rows and analysis.is_fact_first:
             row_answer = await answer_from_rows(db, req, snapshot, rows)
-            if row_answer is not None:
+            if row_answer is not None and (row_answer.answer_decision or {}).get("reason") != "ROW_SELECTION_NOT_APPLICABLE":
+                from app.modules.rag.prose_fallback import answer_from_prose, can_check_prose
+
+                if can_check_prose(row_answer.answer_decision):
+                    prose_answer = await answer_from_prose(db, req, snapshot, evidence_policy,
+                        row_answer.answer_decision["reason"], candidate_mode=candidate_snapshot is not None)
+                    if prose_answer is not None:
+                        return prose_answer
                 row_answer.latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
                 return row_answer
-        row_limit = int((req.reranker_policy or {}).get("top_k") or rerank_top_k)
+        row_limit = retrieval_policy.context_top_k if retrieval_policy else int((req.reranker_policy or {}).get("top_k") or rerank_top_k)
         candidates = merge_row_anchors(candidates, rows, row_limit)
         if rows and not analysis.fact_attributes:
             # Same entity does not prove the requested metric. Untyped fee/quota
             # cells must not outrank the full source row as 'verified' numbers.
             facts, fact_markdown = [], ""
         if not candidates and not facts:
+            from app.modules.rag.prose_fallback import answer_from_prose
+
+            recovered = await answer_from_prose(db, req, snapshot, evidence_policy, "NO_HYBRID_CONTEXT",
+                candidate_mode=candidate_snapshot is not None)
+            if recovered is not None:
+                return recovered
             no_answer_text = citation_guard.get_no_answer_response(req.module_code)
             return AskResponse(
                 status="insufficient_context",
                 answer=no_answer_text,
+                answer_decision={"status": "missing", "reason": "NO_VERIFIED_CONTEXT"},
                 answer_format="paragraph",
                 citations=[],
                 retrieval_snapshot=snapshot,
@@ -372,6 +475,8 @@ class RagService:
                 facts or any("table" in (c.content or "").lower() for c in candidates)
             ),
         )
+        if presentation_mode == "brief":
+            chosen_format = "bullet_list"
 
         # 7. Assemble Prompt & Generate Answer via ModelOps LLM Runtime
         context_texts = [c.content for c in candidates]
@@ -379,6 +484,20 @@ class RagService:
             for n_text in neighbors:
                 if n_text and n_text not in context_texts:
                     context_texts.append(n_text)
+
+        if retrieval_policy:
+            candidates, context_texts, packing = pack_hybrid_context(
+                candidates, neighbor_context or {}, fact_markdown, retrieval_policy.max_context_chars)
+            # Neighbors are already packed. Do not append dropped groups again in the composer.
+            neighbor_context = {}
+            req._retrieval_diagnostics.update(packing=packing)
+            if packing["budget_exceeded"] or (not context_texts and not facts):
+                return AskResponse(status="insufficient_context",
+                    answer="Các đoạn chứng cứ không vừa ngân sách ngữ cảnh đã cấu hình; chưa thể trả lời an toàn.",
+                    answer_decision={"reason": "CONTEXT_BUDGET_INSUFFICIENT"})
+        req._retrieval_diagnostics.update(branch="fact_hybrid", retrieval_executed=True,
+            context_count=len(context_texts), context_characters=sum(map(len, context_texts)),
+            supplemental_context=True, facts_count=len(facts))
 
         citations = citation_guard.build_citations(candidates)
         system_instruction = build_generic_system_instruction(req.module_code, req.system_prompt)
@@ -408,6 +527,10 @@ class RagService:
             context_texts=context_texts,
             neighbor_context=neighbor_context,
         )
+        if presentation_mode == "brief":
+            user_content += ("\nYêu cầu hiện tại: giải thích lại NGẮN GỌN, DỄ HIỂU bằng gạch đầu dòng, không dùng bảng. "
+                "Mỗi ý một câu ngắn; giữ điều kiện và ngoại lệ quan trọng từ bằng chứng. "
+                "Không lặp lời chào, không hỏi lại chủ đề đã rõ, không thêm dữ kiện.")
         if rows:
             user_content += (
                 "\nĐỐI SOÁT HÀNG VÀ NGỮ CẢNH NGUỒN:\n"
@@ -475,10 +598,41 @@ class RagService:
                     req.question[:50],
                     ungrounded_numbers,
                 )
-                status = "insufficient_context"
-                clean_answer = citation_guard.get_no_answer_response(req.module_code)
-                final_citations = []
-                suggested_questions = []
+                from app.modules.rag.prose_fallback import answer_from_prose
+
+                recovered = await answer_from_prose(db, req, snapshot, evidence_policy, "NUMERIC_GROUNDING_FAILED",
+                    candidate_mode=candidate_snapshot is not None)
+                if recovered is not None:
+                    return recovered
+                return AskResponse(status="insufficient_context",
+                    answer="Mình tìm thấy tài liệu liên quan, nhưng chưa đối chiếu chắc chắn được các con số trong câu trả lời. Mình chưa thể chốt số liệu này.",
+                    citations=[], facts_used=[], retrieval_snapshot=snapshot, snapshot=snapshot,
+                    answer_decision={"reason": "NUMERIC_GROUNDING_FAILED", "unsupported_numbers": ungrounded_numbers},
+                    latency_ms=round((time.perf_counter() - start_time) * 1000, 2))
+
+            from app.modules.rag.response_audit import audit_visible_answer
+
+            verdict = await audit_visible_answer(db, req, snapshot, clean_answer, candidates)
+            req._retrieval_diagnostics["visible_answer_audit"] = verdict
+            if not verdict["accepted"]:
+                from app.modules.rag.prose_fallback import answer_from_prose
+
+                recovered = await answer_from_prose(db, req, snapshot, evidence_policy,
+                    "VISIBLE_ANSWER_NOT_SUPPORTED", candidate_mode=candidate_snapshot is not None)
+                if recovered is not None:
+                    return recovered
+                return AskResponse(status="insufficient_context",
+                    answer="Mình tìm thấy tài liệu liên quan nhưng chưa xác minh đủ nội dung để trả lời chắc chắn câu hỏi này.",
+                    retrieval_snapshot=snapshot, snapshot=snapshot,
+                    answer_decision={"reason": "VISIBLE_ANSWER_NOT_SUPPORTED", "verification": verdict},
+                    latency_ms=round((time.perf_counter() - start_time) * 1000, 2))
+            # Cite the exact excerpts the semantic reader accepted, not a separate
+            # word-overlap heuristic (which may miss paraphrases or keep an extra).
+            used_ids = set(verdict["candidate_ids"])
+            used_candidates = list({c.chunk_id: c for c in candidates if c.chunk_id in used_ids}.values())
+            final_citations = citation_guard.build_citations(used_candidates)
+            for citation, candidate in zip(final_citations, used_candidates, strict=True):
+                citation.quote = candidate.content
 
         exec_ms = round((time.perf_counter() - start_time) * 1000, 2)
         resp = AskResponse(
@@ -492,7 +646,8 @@ class RagService:
             snapshot=snapshot,
             latency_ms=exec_ms,
             contexts=[c.content for c in candidates],
-            answer_decision={"glossary_expansion": glossary_trace},
+            answer_decision={"glossary_expansion": glossary_trace,
+                             "verification": req._retrieval_diagnostics.get("visible_answer_audit")},
         )
 
         # 9. Save to Semantic Cache (Only cache valid answered queries with citations)

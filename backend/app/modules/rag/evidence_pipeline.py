@@ -106,6 +106,12 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
                          policy: EvidencePolicy, *, candidate_mode: bool,
                          missing: list[str] | None = None,
                          glossary_queries: list | None = None) -> list[EvidenceBlock]:
+    from app.core.retrieval_policy import configured_policy
+
+    retrieval = configured_policy(req.runtime_policy)
+    if retrieval:
+        policy = policy.model_copy(update={"candidate_limit": retrieval.fusion_top_k,
+            "context_limit": retrieval.context_top_k, "max_context_chars": retrieval.max_context_chars})
     # First retrieval establishes semantic page anchors. Supplement is read-only and bounded.
     queries = search_queries(req.question, plan, missing, glossary_queries=glossary_queries)
     # Each hybrid query owns a separate DB session and the same pinned snapshot.
@@ -144,7 +150,8 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
         fused = [FusionCandidate(b.id, b.binding_id, f"{b.title}\n{b.section}\n{b.text}\n{b.header_context[:900]}", 1 / (60 + i),
             page_number=b.page_number, binding_id=b.binding_id, index_revision_id=b.index_revision_id)
             for i, b in enumerate(shortlist, 1)]
-        reranked = await bounded_rerank(plan.query, fused, min(policy.context_limit, rp.get("top_k", 5)), req, policy)
+        rerank_k = policy.context_limit if retrieval else min(policy.context_limit, rp.get("top_k", 5))
+        reranked = await bounded_rerank(plan.query, fused, rerank_k, req, policy)
         by_id = {b.id: b for b in shortlist}
         shortlist = [by_id[c.chunk_id] for c in reranked]
     # Cover one authoritative table row even when the paragraph shortlist dominates.
@@ -178,6 +185,13 @@ async def select_context(db: AsyncSession, req: AskRequest, snapshot: RetrievalS
                             atomic_lists=plan.coverage == "enumeration", enumeration_subject=plan.enumeration_subject or plan.entity,
                             diagnostics=packing, coverage_goals=[*plan.requested_topics, req.question, plan.attribute or "", plan.method or "", *(missing or [])],
                             priority_ids={b.id for b in record_hits})
+    req._retrieval_diagnostics.setdefault("context_stages", []).append({
+        "candidate_limit": policy.candidate_limit, "context_limit": policy.context_limit,
+        "max_context_chars": policy.max_context_chars, "corpus_blocks": len(blocks),
+        "shortlist_count": len(shortlist), "packed_count": len(selected),
+        "packed_characters": packing["packed_characters"], "dropped": packing["dropped"],
+        "unique_sources": len({b.source_revision_id for b in selected}),
+        "lexical_engine": "evidence_bm25", "atomic_lists": plan.coverage == "enumeration"})
     logger.info("evidence_selection conversation=%s snapshot=%s corpus=%d candidates=%d packed=%d chars=%d dropped=%s ids=%s",
                 req.conversation_id, snapshot.snapshot_id, len(blocks), len(shortlist), len(selected), packing["packed_characters"],
                 packing["dropped"], [b.id for b in selected])
@@ -324,6 +338,12 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
 
 async def answer_with_evidence(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot, policy: EvidencePolicy,
                               *, candidate_mode: bool = False) -> AskResponse:
+    from app.core.retrieval_policy import configured_policy
+
+    retrieval = configured_policy(req.runtime_policy)
+    if retrieval:
+        policy = policy.model_copy(update={"candidate_limit": retrieval.fusion_top_k,
+            "context_limit": retrieval.context_top_k, "max_context_chars": retrieval.max_context_chars})
     started = time.perf_counter()
     progress = {}
     try:

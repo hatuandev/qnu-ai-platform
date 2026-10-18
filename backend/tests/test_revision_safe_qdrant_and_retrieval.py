@@ -175,6 +175,10 @@ class TestRevisionSafeQdrantIndexing:
         assert isinstance(filter_selector, qmodels.FilterSelector)
 
 
+# Routing/temperature/citation tests isolate generation; semantic audit behavior
+# (including rejection and provider errors) is exercised in test_rag_batch_492.
+@patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+    {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 class TestCitationGroundingAndFactFirst:
     """Test suite for Citation Guard extraction and Fact-First RAG flow."""
 
@@ -308,7 +312,8 @@ class TestCitationGroundingAndFactFirst:
         _, exact_retrieve, exact_llm = await run_ask("Mã ngành 7480107 có chỉ tiêu bao nhiêu?", 0.9)
         assert (exact_retrieve["dense_weight"], exact_retrieve["sparse_weight"]) == (1.0, 1.2)
         assert exact_llm.temperature == 0.2
-        assert any("TẦNG 1" in m.content for m in exact_llm.messages if m.role == "user")
+        assert any("không có loại nào tự động thắng" in m.content for m in exact_llm.messages if m.role == "user")
+        assert all("khi mâu thuẫn, tầng trên thắng" not in m.content for m in exact_llm.messages)
 
         _, narrative_retrieve, narrative_llm = await run_ask(
             "Quy định về bảo hiểm y tế cho sinh viên như thế nào?", 0.9
@@ -419,7 +424,7 @@ class TestCitationGroundingAndFactFirst:
 
     @pytest.mark.asyncio
     async def test_rag_ask_rejects_hallucinated_figures_via_numeric_gate(self):
-        """Answers with figures absent from evidence fall back to No-Answer policy."""
+        """Unproven figures stay rejected when no canonical recovery exists."""
         req = AskRequest(
             question="Điểm chuẩn ngành CNTT là bao nhiêu?",
             collection_id="col_admissions",
@@ -440,6 +445,7 @@ class TestCitationGroundingAndFactFirst:
             metadata={},
         )
         with (
+            patch("app.modules.rag.prose_fallback.load_published_blocks", new=AsyncMock(return_value=[])),
             patch("app.modules.rag.service.semantic_cache.get", new_callable=AsyncMock) as mock_get,
             patch("app.modules.rag.service.semantic_cache.set", new_callable=AsyncMock),
             patch("app.modules.rag.service.fact_layer.lookup_facts", new_callable=AsyncMock) as mock_lookup,
@@ -458,3 +464,4 @@ class TestCitationGroundingAndFactFirst:
             assert resp.status == "insufficient_context"
             assert "29.9" not in resp.answer
             assert resp.citations == []
+            assert resp.answer_decision["reason"] == "NUMERIC_GROUNDING_FAILED"

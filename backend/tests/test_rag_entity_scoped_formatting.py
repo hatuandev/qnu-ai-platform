@@ -103,6 +103,8 @@ def test_format_planner_instructions():
 
 
 @pytest.mark.asyncio
+@patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+    {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_rag_service_entity_scoped_prompt_assembly():
     """Verify RagService injects entity-scoped constraint when a major is identified."""
     from unittest.mock import AsyncMock, MagicMock, patch

@@ -199,6 +199,8 @@ async def test_get_recent_conversation_history_fetches_and_formats_in_chronologi
 
 
 @pytest.mark.asyncio
+@patch("app.modules.rag.response_audit.audit_visible_answer", new=AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+    {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]}))
 async def test_rag_service_injects_history_into_llm_messages():
     """Verify rag_service.ask prepends conversation history before current user query in LLM prompt."""
     mock_db = AsyncMock()

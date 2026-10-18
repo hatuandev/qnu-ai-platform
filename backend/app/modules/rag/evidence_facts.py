@@ -84,6 +84,7 @@ async def reviewed_fact_blocks(db: AsyncSession, req: AskRequest, snapshot: Retr
                 evidence_quote=text if fact_year else None), canonical_hash=source.canonical_hash,
             origin="reviewed_fact", fact_id=first.id,
             fact_context={"entity_name": first.entity_name, "entity_code": getattr(first, "entity_code", None), "source_sections": sections,
+                "source_unit_id": raw.get("source_unit_id"),
                 "location_ambiguous": len(sections) != 1, "row_context": raw.get("row_context") or [],
                 "cells": [{"fact_id": f.id, "attribute": f.attribute_name, "value": f.attribute_value,
                 **{k: (f.raw_data or {}).get(k) for k in ("temporal_context", "qualifiers", "attribute_code", "relation")}}

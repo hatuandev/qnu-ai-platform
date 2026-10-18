@@ -5,7 +5,15 @@ import { CollectionDetailPage } from "@/features/knowledge/collection-detail-pag
 const searchSchema = z.object({
   docId: z.string().optional(),
   tab: z
-    .enum(["sources", "documents", "facts", "tasks", "glossary", "models"])
+    .enum([
+      "sources",
+      "documents",
+      "facts",
+      "tasks",
+      "glossary",
+      "scores",
+      "models",
+    ])
     .optional()
     .catch(undefined),
 });

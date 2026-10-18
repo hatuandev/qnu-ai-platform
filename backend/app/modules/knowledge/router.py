@@ -43,6 +43,7 @@ from app.modules.knowledge.schemas import (
     CandidateGroupListResponse,
     CandidateListResponse,
     CandidateQueryRequest,
+    CleanContentPreviewResponse,
     CollectionCreateRequest,
     CollectionResponse,
     CollectionSummaryMetrics,
@@ -95,6 +96,7 @@ from app.modules.knowledge.schemas import (
     UpdateSourceContentRequest,
     VectorLoadRequest,
 )
+from app.modules.knowledge.score_rule_router import router as score_rule_router
 from app.modules.knowledge.service import knowledge_service
 from app.modules.knowledge.services.backfill_service import BackfillV3Report, backfill_v3_service
 from app.modules.knowledge.services.candidate_service import candidate_service
@@ -1373,6 +1375,63 @@ async def list_source_revisions(
     return [KnowledgeSourceRevisionResponse.model_validate(r) for r in revs]
 
 
+@router.get(
+    "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/qnu-markdown",
+    summary="Tải tệp QNU RAG Markdown v1.0 (md) hoặc mô hình cấu trúc (json) của bản bóc tách",
+    response_class=Response,
+)
+async def download_source_qnu_markdown(
+    collection_id: str,
+    source_id: str,
+    revision_id: str,
+    format: str = Query("md", pattern="^(md|json)$", description="md: tệp chuẩn; json: mô hình cấu trúc"),
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
+) -> Response:
+    from urllib.parse import quote
+
+    from app.core.exceptions import AppException
+    from app.core.storage import storage_service
+
+    artifact = await source_ingestion_service.get_qnu_markdown_artifact(
+        db=db,
+        collection_id=collection_id,
+        source_id=source_id,
+        revision_id=revision_id,
+        tenant_id=actor.tenant_id,
+        workspace_id=actor.workspace_id,
+    )
+    if artifact.get("status") != "ready":
+        raise AppException(
+            f"Tệp QNU RAG Markdown chưa sẵn sàng (status={artifact.get('status')}).",
+            code="QNU_MARKDOWN_NOT_READY",
+            status_code=409 if artifact.get("status") == "failed" else 404,
+        )
+    if format == "json":
+        path = artifact.get("structured_path")
+        media_type = "application/json"
+        suffix = ".qnu-doc-v1.json"
+    else:
+        path = artifact.get("path")
+        media_type = "text/markdown"
+        suffix = ".qnu-rag-v1.md"
+    content = await storage_service.get(path) if path else None
+    if not content:
+        raise AppException(
+            "Không đọc được tệp QNU RAG Markdown từ kho lưu trữ.",
+            code="QNU_MARKDOWN_FILE_MISSING",
+            status_code=404,
+        )
+    safe_ascii = f"{revision_id}{suffix}"
+    return Response(
+        content=content,
+        media_type=f"{media_type}; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename=\"{safe_ascii}\"; filename*=UTF-8''{quote(safe_ascii)}"
+        },
+    )
+
+
 @router.patch(
     "/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/content",
     response_model=KnowledgeSourceRevisionResponse,
@@ -1392,6 +1451,10 @@ async def update_source_revision_content(
         source_id=source_id,
         revision_id=revision_id,
         new_markdown=payload.canonical_markdown,
+        actor_id=actor.actor_id,
+        change_reason=payload.change_reason,
+        expected_canonical_hash=payload.expected_canonical_hash,
+        content_format=payload.content_format,
         tenant_id=actor.tenant_id,
         workspace_id=actor.workspace_id,
     )
@@ -1423,6 +1486,19 @@ async def review_source_revision(
         actor_id=actor.actor_id,
     )
     return KnowledgeSourceRevisionResponse.model_validate(rev)
+
+
+@router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/clean-preview",
+             response_model=CleanContentPreviewResponse,
+             summary="Xem trước chuẩn hóa và kiểm tra toàn vẹn, không lưu")
+async def preview_source_clean_content(
+    collection_id: str, source_id: str, revision_id: str, payload: UpdateSourceContentRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> dict[str, Any]:
+    return await source_ingestion_service.preview_clean_content(
+        db, collection_id, source_id, revision_id, payload.canonical_markdown, payload.expected_canonical_hash,
+    )
 
 
 @router.post(
@@ -1876,3 +1952,6 @@ async def update_glossary_settings(
 ) -> GlossarySettingsResponse:
     settings = await glossary_service.update_settings(db, actor, collection_id, body)
     return GlossarySettingsResponse.model_validate(settings, from_attributes=True)
+
+
+router.include_router(score_rule_router)

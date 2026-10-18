@@ -7,9 +7,11 @@ and strictly reused across multiple vector spaces without re-chunking or re-pars
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
+from copy import deepcopy
 from typing import Any
 
 from sqlalchemy import select
@@ -26,9 +28,18 @@ from app.modules.knowledge.models import (
 from app.modules.knowledge.normalization.retrieval_units import (
     manifest_digest,
     resolve_unit_manifest,
-    unit_chunks,
 )
-from app.modules.knowledge.services.source_artifact import get_source_artifact
+from app.modules.knowledge.normalization.structure_chunks import CHUNK_VERSION, structure_chunks
+from app.modules.knowledge.services.derived_bundle import (
+    digest,
+    make_bundle,
+    source_fingerprint,
+    validate_chunk_set,
+)
+from app.modules.knowledge.services.source_artifact import (
+    get_source_artifact,
+    get_structured_review_state,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +94,19 @@ class ChunkSetService:
                 status_code=409,
             )
 
+        canonical_md = source_rev.canonical_markdown or ""
+        if not canonical_md.strip():
+            raise AppException("Bản nguồn không có Markdown chuẩn hóa.", code="EMPTY_CANONICAL_CONTENT", status_code=422)
         clean_config = {k: v for k, v in (chunk_config or {}).items() if not k.startswith("_")}
         artifact = get_source_artifact(source_rev)
+        if (source_rev.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
+            from app.modules.knowledge.services.qnu_serving import verify_revision_pair
+
+            await verify_revision_pair(source_rev)
+        if get_structured_review_state(source_rev)[1]:
+            raise AppException("Cần duyệt bản sạch và dữ liệu cấu trúc trước khi chia đoạn.",
+                               code="FACT_SET_REVIEW_REQUIRED", status_code=409)
+        fingerprint = source_fingerprint(source_rev, artifact)
         try:
             units = resolve_unit_manifest(source_rev.canonical_markdown or "", artifact)
             graph = artifact.get("context_graph")
@@ -95,8 +117,8 @@ class ChunkSetService:
         except (TypeError, ValueError) as exc:
             raise AppException("Đơn vị nguồn không khớp bản Markdown đã lưu.", code="SOURCE_UNIT_INVALID", status_code=422) from exc
         units_hash = manifest_digest(units)
-        context_hash = ":" + graph["digest"] if graph else ""
-        conf_hash = hashlib.sha256(f"{compute_config_hash(chunk_strategy, clean_config)}:{units_hash}{context_hash}".encode()).hexdigest()
+        reusable = {key: value for key, value in fingerprint.items() if key not in {"source_revision_id"}}
+        conf_hash = digest([CHUNK_VERSION, compute_config_hash(chunk_strategy, clean_config), reusable])
         set_key = compute_chunk_set_key(source_rev.canonical_hash, conf_hash)
 
         # 2. Check for existing ChunkSet with same (source_revision_id, config_hash)
@@ -107,6 +129,7 @@ class ChunkSetService:
         existing_res = await db.execute(chk_stmt)
         existing_set = existing_res.scalar_one_or_none()
         if existing_set and existing_set.status == "ready" and existing_set.chunk_set_key == set_key:
+            validate_chunk_set(source_rev, artifact, existing_set)
             logger.info(
                 "Reusing existing chunk set %s for source revision %s (strategy=%s)",
                 existing_set.id,
@@ -131,11 +154,11 @@ class ChunkSetService:
                 key_match.id,
                 set_key,
             )
-            # Create a shallow pointer or reuse
+            # Content is reusable, but provenance is always rebound to this revision.
             chunk_set = KnowledgeChunkSet(
                 source_revision_id=source_revision_id,
                 chunk_strategy=chunk_strategy,
-                chunk_config=key_match.chunk_config,
+                chunk_config=deepcopy(key_match.chunk_config),
                 config_hash=conf_hash,
                 chunk_set_key=set_key,
                 chunk_count=key_match.chunk_count,
@@ -143,23 +166,23 @@ class ChunkSetService:
                 manifest_hash=key_match.manifest_hash,
                 status="ready",
             )
+            if (chunk_set.manifest_hash != digest(chunk_set.chunk_config["_manifest"])
+                    or key_match.chunk_config.get("_bundle_hash") != digest(key_match.chunk_config.get("_bundle"))):
+                raise AppException("Tập đoạn tái sử dụng không còn toàn vẹn.", code="DERIVED_BUNDLE_INVALID", status_code=409)
+            chunk_set.chunk_config["_bundle"] = make_bundle(source_rev, artifact, chunk_set)
+            chunk_set.chunk_config["_bundle_hash"] = digest(chunk_set.chunk_config["_bundle"])
+            validate_chunk_set(source_rev, artifact, chunk_set)
             db.add(chunk_set)
             await db.commit()
             await db.refresh(chunk_set)
             return chunk_set
 
         # 4. Generate new chunks
-        canonical_md = source_rev.canonical_markdown or ""
-        if not canonical_md.strip():
-            raise AppException(
-                message=f"Bản sửa đổi nguồn '{source_revision_id}' không có nội dung Markdown chuẩn hóa.",
-                code="EMPTY_CANONICAL_CONTENT",
-                status_code=422,
-            )
-
         chunker = get_chunker(chunk_strategy)
-        chunks_data = unit_chunks(units, max_chars=clean_config.get("max_chars", 6000),
-                                 chunker=chunker, chunk_config=clean_config, context_graph=graph)
+        chunks_data = await asyncio.to_thread(
+            structure_chunks, canonical_md, units, max_chars=clean_config.get("max_chars", 6000),
+            chunker=chunker, chunk_config=clean_config, context_graph=graph,
+        )
         if not chunks_data:
             raise AppException(
                 message=f"Chiến lược cắt đoạn '{chunk_strategy}' trả về 0 chunks từ nội dung tài liệu.",
@@ -190,9 +213,7 @@ class ChunkSetService:
                 }
             )
 
-        manifest_hash = hashlib.sha256(
-            json.dumps([item["chunk_hash"] for item in manifest_items], sort_keys=True).encode("utf-8")
-        ).hexdigest()
+        manifest_hash = digest(manifest_items)
 
         # Save chunk set record
         saved_config = {**clean_config, "_manifest": manifest_items, "_unit_manifest_hash": units_hash}
@@ -208,6 +229,10 @@ class ChunkSetService:
             manifest_hash=manifest_hash,
             status="ready",
         )
+        saved_config["_bundle"] = make_bundle(source_rev, artifact, chunk_set)
+        saved_config["_bundle_hash"] = digest(saved_config["_bundle"])
+        chunk_set.chunk_config = saved_config
+        validate_chunk_set(source_rev, artifact, chunk_set)
         db.add(chunk_set)
         await db.commit()
         await db.refresh(chunk_set)

@@ -1,9 +1,13 @@
+import type { RetrievalPolicy } from "@/features/assistants/retrieval-policy";
+
 export interface SampleQuestionItem {
   id: string;
   text: string;
 }
 
 export interface AssistantEditForm {
+  retrieval_policy?: RetrievalPolicy;
+  retrieval_limit?: number;
   name: string;
   description: string;
   category: string;

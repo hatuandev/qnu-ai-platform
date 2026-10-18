@@ -207,8 +207,6 @@ class FactLayer:
             attr_conditions.append(KnowledgeFact.attribute_code.in_(fact_attributes))
             # Legacy human-readable headers remain candidates, then the context gate
             # checks their actual attribute/year. Do not relabel the stored record.
-            attr_conditions.extend(KnowledgeFact.attribute_name.ilike(f"%{kw}%") for kw in (keywords or [])
-                                   if len(kw.strip().split()) >= 2)
             query = query.where(or_(*attr_conditions))
 
 
@@ -285,17 +283,19 @@ class FactLayer:
                     if not _is_major_specific_fact(f):
                         return True
                     ent_name = _fact_entity_text(f).lower()
-                    attr_val = (getattr(f, "attribute_value", "") or "").lower()
                     raw = getattr(f, "raw_data", {}) or {}
-                    raw_str = str(raw).lower() if isinstance(raw, dict) else ""
+                    # Identity fields only: a year/value in arbitrary raw JSON is
+                    # not evidence that this row belongs to the requested entity.
+                    identity = " ".join(str(raw.get(key) or "") for key in (
+                        "entity_code", "entity_name", "major_code", "major_name", "program_code"
+                    )).lower() if isinstance(raw, dict) else ""
                     explicit_match = any(
                         marker in ent_name
-                        or marker in attr_val
-                        or marker in raw_str
+                        or marker in identity
                         for marker in explicit_entity_markers
                     )
                     keyword_entity_match = any(
-                        marker in ent_name or marker in raw_str
+                        marker in ent_name or marker in identity
                         for marker in compound_keyword_markers
                     )
                     return explicit_match or keyword_entity_match

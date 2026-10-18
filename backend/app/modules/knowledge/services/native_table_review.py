@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import re
+import uuid
 from datetime import UTC, datetime
 
 import pymupdf
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.modules.knowledge.models import KnowledgeSourceRevision
 from app.modules.knowledge.parsers.native_headers import native_header_matrix
+from app.modules.knowledge.services.qnu_docx_artifacts import superseded_qnu_markdown_artifact
 from app.modules.knowledge.services.source_artifact import build_source_artifact
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.knowledge.services.table_context import extract_context_tables
@@ -110,6 +112,9 @@ async def create_native_table_draft(db: AsyncSession, *, collection_id: str, sou
     digest = hashlib.sha256(content).hexdigest()
     if base is None or base.binding_id != binding.id or base.origin_file_hash != digest:
         raise AppException("Tệp/bản nguồn không khớp phạm vi đã chọn.", code="NATIVE_REVIEW_SOURCE_MISMATCH", status_code=409)
+    if (base.parse_provenance or {}).get("standard_required"):
+        raise AppException("Hiệu đính bảng trong bản QNU MD chuẩn để giữ đồng bộ JSON và chứng cứ.",
+                           code="QNU_STANDARD_EDIT_REQUIRED", status_code=409)
     if binding.active_source_revision_id != base.id:
         raise AppException("Bản nguồn hiện tại đã thay đổi.", code="NATIVE_REVIEW_BASE_CHANGED", status_code=409)
     # Native PDF work is local; no OCR, model, storage write or publication calls.
@@ -158,6 +163,15 @@ async def create_native_table_draft(db: AsyncSession, *, collection_id: str, sou
             page["layout_text_alignment"] = "stale"
             page["chars"] = len(next(item["markdown_content"] for item in canonical_pages(markdown, len(base.page_manifest))
                                      if item["page_number"] == page["page"]))
+    inherited_qnu = ((values.get("snapshot_metadata") or {}).get("qnu_markdown")
+                     or (values.get("parse_provenance") or {}).get("qnu_markdown"))
+    if inherited_qnu:
+        # The cells changed, so the base standard file is reference only, never this revision's evidence.
+        revision_id = f"ks_rev_{uuid.uuid4().hex[:12]}"
+        marker = superseded_qnu_markdown_artifact(inherited_qnu, revision_id)
+        values.update(id=revision_id,
+                      snapshot_metadata={**values["snapshot_metadata"], "qnu_markdown": marker},
+                      parse_provenance={**values["parse_provenance"], "qnu_markdown": marker})
     revision = KnowledgeSourceRevision(**values, revision_no=number + 1)
     db.add(revision)
     await db.flush()

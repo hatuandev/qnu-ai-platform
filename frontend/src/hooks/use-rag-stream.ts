@@ -24,6 +24,7 @@ export interface ChatAttachment {
 }
 
 export interface ChatMessageItem {
+  retrievalDiagnostics?: Record<string, unknown>;
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
@@ -190,6 +191,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
           const finalCitations: ChatCitation[] = [];
           const finalArtifacts: ChatAttachment[] = [];
           let finalSuggestions: string[] = [];
+          let finalRetrievalDiagnostics: Record<string, unknown> | undefined;
 
           const parser = createParser({
             onEvent: (event: EventSourceMessage) => {
@@ -285,6 +287,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                 try {
                   const doneData = JSON.parse(event.data);
                   streamCompleted = true;
+                  finalRetrievalDiagnostics = doneData.retrieval_diagnostics;
                   if (
                     doneData.suggested_questions &&
                     Array.isArray(doneData.suggested_questions)
@@ -352,6 +355,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
               minute: "2-digit",
             }),
             citations: finalCitations,
+            retrievalDiagnostics: finalRetrievalDiagnostics,
             artifacts: finalArtifacts,
             suggestedQuestions: finalSuggestions,
             latencyMs,
@@ -421,6 +425,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
               minute: "2-digit",
             }),
             citations,
+            retrievalDiagnostics: data.retrieval_diagnostics,
             artifacts,
             suggestedQuestions: data.suggested_questions || [],
             latencyMs,

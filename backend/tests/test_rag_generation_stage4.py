@@ -37,6 +37,10 @@ async def test_status_and_cache_follow_visible_answer_not_citation_presence(answ
           patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.semantic_cache.get", AsyncMock(return_value=None)),
           patch("app.modules.rag.service.semantic_cache.set", AsyncMock()) as cache,
+          # This test isolates status/cache presentation; the independent semantic
+          # boundary has its own real contract tests in test_rag_batch_492.
+          patch("app.modules.rag.response_audit.audit_visible_answer", AsyncMock(
+              return_value={"accepted": True, "candidate_ids": ["chunk"]})),
           patch.object(service, "_generate_answer_with_fallback", AsyncMock(return_value=answer))):
         from app.modules.rag.schemas import Citation
 

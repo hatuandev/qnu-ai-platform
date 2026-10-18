@@ -5,6 +5,12 @@ export function mapVerificationDataToStudioDoc(
   data: DocumentVerificationData,
 ): StudioOCRDocument {
   return {
+    canonicalHash: data.canonical_hash,
+    canonicalFormat: data.canonical_format,
+    unmappedMarkdown: data.unmapped_markdown,
+    paginationKnown: data.pagination_known,
+    contentIntegrity: data.content_integrity,
+    contentReview: data.content_review,
     citationMetadata: data.citation_metadata,
     structuredArtifact: data.structured_artifact,
     layoutTextAlignment: data.layout_text_alignment,
@@ -29,6 +35,7 @@ export function mapVerificationDataToStudioDoc(
       imageUrl: p.image_url || "",
       markdown: p.markdown_content,
       rawText: p.raw_text,
+      rawTextAvailable: p.raw_text_available,
       dimensions: p.dimensions || { width: 0, height: 0 },
       wordCount: p.word_count,
       lineCount: p.line_count,

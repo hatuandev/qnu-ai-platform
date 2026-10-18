@@ -1,6 +1,6 @@
 """Derive reviewed score-conversion rules from the publication that is serving right now.
 
-Read-only unless both --activate and --reviewed-by are supplied. No mark, combination list,
+Read-only draft preparation; approval and activation now require authenticated UI/API. No mark, combination list,
 fact id or answer is typed here: every value is read from the live index revision, and each
 generated rule is re-verified through the production engine before it is emitted.
 """
@@ -19,7 +19,6 @@ from typing import Any
 from sqlalchemy import text
 
 from app.core.database import AsyncSessionFactory
-from app.modules.knowledge.models import KnowledgeCollection
 from app.modules.rag.evidence_blocks import load_published_blocks
 from app.modules.rag.evidence_facts import reviewed_fact_blocks
 from app.modules.rag.evidence_schemas import EvidenceBlock, QueryPlan
@@ -264,21 +263,20 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--policy", type=Path, default=OUTPUT_DIR / "reviewed_policy.json")
     parser.add_argument("--activate", action="store_true",
-                        help="Ghi rule vào collection_metadata; mặc định chỉ sinh bản nháp read-only")
+                        help="Đã ngừng hỗ trợ; dùng luồng duyệt và kích hoạt trên giao diện")
     parser.add_argument("--reviewed-by", default=None,
                         help="Danh tính người có quyền quản trị đã duyệt cấu hình công cụ")
     args = parser.parse_args()
 
-    if args.activate and not args.reviewed_by:
-        raise SystemExit("--activate bắt buộc phải có --reviewed-by là danh tính người duyệt thật")
+    if args.activate:
+        raise SystemExit("Không kích hoạt bằng CLI. Nhập bản nháp trong Kho tri thức → Quy đổi điểm, duyệt và kích hoạt bằng tài khoản có quyền.")
     policy = json.loads(args.policy.read_text(encoding="utf-8"))
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    report: dict[str, Any] = {"generated_at": datetime.now(UTC).isoformat(), "mode": "activate" if args.activate else "draft",
+    report: dict[str, Any] = {"generated_at": datetime.now(UTC).isoformat(), "mode": "draft",
                               "policy": {k: v for k, v in policy.items() if not k.startswith("_")}, "writes": 0}
 
     async with AsyncSessionFactory() as db:
-        if not args.activate:
-            await db.execute(text("SET TRANSACTION READ ONLY"))
+        await db.execute(text("SET TRANSACTION READ ONLY"))
         snapshot, target = await resolve_publication(db, policy)
         report["publication"] = {"binding_id": target["binding_id"], "index_revision_id": target["index_id"],
                                  "source_revision_id": target["source_id"], "revision_no": target["revision_no"],
@@ -332,23 +330,8 @@ async def main() -> None:
         (OUTPUT_DIR / "conversion_rules.json").write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        if args.activate:
-            collection = await db.get(KnowledgeCollection, policy["collection_id"])
-            if collection is None or (collection.tenant_id, collection.workspace_id) != (snapshot.tenant_id, snapshot.workspace_id):
-                raise Abort("Không có quyền ghi cấu hình cho bộ sưu tập này")
-            merged = dict(collection.collection_metadata or {})
-            merged["score_conversion_rules"] = payload
-            collection.collection_metadata = merged
-            await db.commit()
-            report["writes"] = 1
-            report["metadata_keys_after"] = sorted(merged)
-        else:
-            report["activation"] = {
-                "status": "not_activated",
-                "reason": "reviewed_by chưa được người có quyền quản trị xác nhận",
-                "command": ("python -m scripts.build_conversion_rules --activate "
-                            '--reviewed-by "<danh tính người duyệt>"'),
-            }
+        report["activation"] = {"status": "not_activated",
+            "reason": "Nhập conversion_rules.json vào Kho tri thức → Quy đổi điểm; duyệt và kích hoạt qua tài khoản có quyền."}
         (OUTPUT_DIR / "verification_report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 

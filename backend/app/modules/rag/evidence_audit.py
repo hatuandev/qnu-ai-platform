@@ -15,7 +15,7 @@ class AtomicCheck(StrictContract):
     claim_quote: str = Field(min_length=1, max_length=4000)
     supporting_quote: str = Field(max_length=4000)
     entailed: bool
-    reason: str = Field(max_length=300)
+    reason: str = ""  # Diagnostic text only, never a claim or support verdict.
 
 
 class RequiredQualifier(StrictContract):

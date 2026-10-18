@@ -23,6 +23,7 @@ export type ComboboxOption = {
 };
 
 type ComboboxProps = {
+  id?: string;
   options: ComboboxOption[];
   value?: string;
   onValueChange?: (value: string | undefined) => void;
@@ -37,6 +38,7 @@ type ComboboxProps = {
 };
 
 function Combobox({
+  id,
   options,
   value,
   onValueChange,
@@ -57,6 +59,7 @@ function Combobox({
       <div className="relative">
         <PopoverTrigger asChild>
           <Button
+            id={id}
             type="button"
             variant="outline"
             role="combobox"

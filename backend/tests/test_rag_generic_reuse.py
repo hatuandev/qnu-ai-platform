@@ -122,15 +122,12 @@ def test_scope_history_by_topic_drops_stale_turns() -> None:
 
 
 def test_citation_guard_generic_no_answer_for_new_modules() -> None:
-    """New modules get polite generic refusal; known modules keep curated templates."""
-    assert "0256.3846.156" in citation_guard.get_no_answer_response("admissions")
-    assert "Thư viện" in citation_guard.get_no_answer_response("library")
-
-    generic_msg = citation_guard.get_no_answer_response("ktx_dormitory")
-    assert "Trường Đại học Quy Nhơn" in generic_msg
-
-    named_msg = citation_guard.get_no_answer_response("ktx_dormitory", assistant_name="Ký túc xá")
-    assert "Ký túc xá" in named_msg
+    """Every domain reports a verification limit without invented contact facts."""
+    for module in ("admissions", "library", "ktx_dormitory"):
+        message = citation_guard.get_no_answer_response(module, assistant_name="Ký túc xá")
+        assert "chưa xác minh" in message
+        assert not any(char.isdigit() for char in message) and "@" not in message
+        assert "hiện chưa có" not in message and "hiện không có" not in message
 
 
 def test_generic_system_instruction_uses_module_contact() -> None:

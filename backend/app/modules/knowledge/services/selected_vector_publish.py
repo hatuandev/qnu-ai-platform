@@ -102,6 +102,7 @@ async def publish_selected_vectors(
     epoch = col.index_epoch
     previous_id = (col.collection_metadata or {}).get("active_vector_generation_id")
     expected = binding_fingerprint(plan.bindings)
+    expected_sources = {binding_id: index.source_revision_v2_id for binding_id, index in plan.indexes.items()}
     if previous_id == gen.id and all(expected[key][1] == index.id for key, index in plan.indexes.items()):
         return ActivateVectorGenerationResponse(
             collection_id=col.id, activated_generation_id=gen.id,
@@ -128,15 +129,24 @@ async def publish_selected_vectors(
     if gen.status not in ("building", "ready", "active"):
         await db.rollback()
         raise AppException("Chỉ mục đã lưu trữ.", code="GENERATION_RETIRED", status_code=409)
-    for index in plan.indexes.values():
+    for binding_id, index in plan.indexes.items():
         await db.refresh(index)
         source = await db.get(KnowledgeSourceRevision, index.source_revision_v2_id)
         if source:
             await db.refresh(source)
-        if (index.status not in ("ready", "active") or not source or source.status != "ready"
+        if (index.binding_id != binding_id or index.vector_generation_id != gen.id
+                or index.source_revision_v2_id != expected_sources[binding_id]
+                or index.status not in ("ready", "active") or not source or source.status != "ready"
                 or get_structured_review_state(source)[1]):
             await db.rollback()
             raise AppException("Nguồn không còn đủ điều kiện xuất bản.", code="SOURCE_NOT_READY", status_code=409)
+    from app.modules.knowledge.services.generation_candidate import validate_candidate_artifacts
+
+    try:
+        await validate_candidate_artifacts(db, list(plan.indexes.values()))
+    except AppException:
+        await db.rollback()
+        raise
     if previous_id and previous_id != gen.id:
         previous = await db.get(KnowledgeVectorGeneration, previous_id)
         if previous:

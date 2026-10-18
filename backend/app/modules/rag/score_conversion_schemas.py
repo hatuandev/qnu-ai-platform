@@ -51,11 +51,8 @@ class CombinationMapping(StrictContract):
     proof: SourceCell
 
 
-class ConversionRule(StrictContract):
-    id: str = Field(min_length=1)
-    status: Literal["verified"]
-    reviewed_by: str = Field(min_length=1)
-    reviewed_at: datetime
+class ConversionDefinition(StrictContract):
+    id: str = Field(min_length=1, max_length=128, pattern=r"^[\w.:-]+$")
     binding_id: str
     index_revision_id: str
     source_revision_id: str
@@ -77,6 +74,21 @@ class ConversionRule(StrictContract):
     rule_proofs: list[QuoteReference] = Field(min_length=1, max_length=8)
 
     @model_validator(mode="after")
+    def check_methods(self) -> "ConversionDefinition":
+        if self.source_method == self.target_method:
+            raise ValueError("Conversion source and target methods must differ")
+        codes = [item.combination.strip().casefold() for item in self.mappings]
+        if len(codes) != len(set(codes)):
+            raise ValueError("Duplicate combination mappings")
+        return self
+
+
+class ConversionRule(ConversionDefinition):
+    status: Literal["verified"]
+    reviewed_by: str = Field(min_length=1)
+    reviewed_at: datetime
+
+    @model_validator(mode="after")
     def check_review(self) -> "ConversionRule":
         if self.reviewed_at.tzinfo is None:
             raise ValueError("Review timestamp must include timezone")
@@ -86,6 +98,7 @@ class ConversionRule(StrictContract):
 
 
 class ScoreConversionResult(StrictContract):
+    is_preview: bool = False
     status: Literal["calculated", "missing", "clarify"]
     reason: str
     message: str

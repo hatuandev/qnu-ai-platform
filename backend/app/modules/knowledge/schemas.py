@@ -187,6 +187,7 @@ class StudioPageView(BaseModel):
     markdown_content: str
     raw_text: str
     word_count: int
+    raw_text_available: bool = False
     line_count: int
     image_url: str | None = None
     dimensions: dict[str, float] | None = None
@@ -201,6 +202,12 @@ class ReparseSourceRequest(BaseModel):
 
 
 class StudioViewResponse(BaseModel):
+    canonical_format: str = "legacy"
+    unmapped_markdown: str = ""
+    pagination_known: bool = False
+    content_integrity: dict[str, Any] = Field(default_factory=dict)
+    content_review: dict[str, Any] = Field(default_factory=dict)
+    canonical_hash: str | None = None
     source_metadata: dict[str, Any] = Field(default_factory=dict)
     citation_metadata: dict[str, Any] = Field(default_factory=dict)
     structured_artifact: dict[str, Any] = Field(default_factory=dict)
@@ -953,6 +960,8 @@ class KnowledgeSourceRevisionResponse(BaseModel):
     origin_file_hash: str
     canonical_hash: str | None = None
     canonical_markdown: str | None = None
+    canonical_format: str = "legacy"
+    qnu_markdown_status: str | None = None
     page_manifest: list[dict[str, Any]] = Field(default_factory=list)
     citation_metadata: dict[str, Any] = Field(default_factory=dict)
     quality_report: dict[str, Any] = Field(default_factory=dict)
@@ -1017,7 +1026,17 @@ class SourceContextEditRequest(BaseModel):
 class UpdateSourceContentRequest(BaseModel):
     """Payload to update and re-evaluate canonical Markdown content."""
 
-    canonical_markdown: str = Field(..., min_length=1, description="Nội dung Markdown đã hiệu đính")
+    canonical_markdown: str = Field(..., min_length=1, max_length=2_000_000, description="Nội dung Markdown đã hiệu đính")
+    change_reason: str | None = Field(default=None, max_length=2000)
+    expected_canonical_hash: str | None = Field(default=None, max_length=64)
+    content_format: Literal["qnu-rag-markdown/1.0"] | None = None
+
+
+class CleanContentPreviewResponse(BaseModel):
+    revision_id: str
+    base_hash: str | None = None
+    canonical_markdown: str
+    report: dict[str, Any]
 
 
 class ReviewSourceRevisionRequest(BaseModel):

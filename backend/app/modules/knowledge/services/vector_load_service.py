@@ -15,6 +15,7 @@ from app.modules.knowledge.models import (
 )
 from app.modules.knowledge.schemas import VectorLoadRequest
 from app.modules.knowledge.services.scope_helper import get_scoped_collection
+from app.modules.knowledge.services.source_artifact import get_structured_review_state
 from app.modules.knowledge.services.vector_generation_service import vector_generation_service
 
 
@@ -45,6 +46,8 @@ async def queue_vector_load(
             raise AppException("Markdown đã thay đổi; hãy tải lại.", code="SOURCE_REVISION_CHANGED", status_code=409)
         if revision.status != "ready":
             raise AppException("Markdown chưa đủ điều kiện nạp vector.", code="SOURCE_REVISION_NOT_READY", status_code=409)
+        if get_structured_review_state(revision)[1]:
+            raise AppException("Cần duyệt bản sạch trước khi nạp vector.", code="FACT_SET_REVIEW_REQUIRED", status_code=409)
         existing = await db.scalar(select(JobRecord).where(
             JobRecord.collection_id == collection_id,
 

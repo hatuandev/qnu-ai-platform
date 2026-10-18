@@ -3,6 +3,17 @@ import { describe, test } from "node:test";
 import type { DocumentVerificationData } from "@/types/knowledge";
 import { mapVerificationDataToStudioDoc } from "./studio-mapper";
 
+test("standard input and unmapped text remain explicit for Studio", () => {
+  const data = {
+    ...fixture(),
+    canonical_format: "qnu-rag-projection/v1",
+    unmapped_markdown: "Khối chưa rõ trang",
+  };
+  const doc = mapVerificationDataToStudioDoc(data);
+  assert.equal(doc.canonicalFormat, "qnu-rag-projection/v1");
+  assert.equal(doc.unmappedMarkdown, "Khối chưa rõ trang");
+});
+
 function fixture(): DocumentVerificationData {
   return {
     document_id: "source",

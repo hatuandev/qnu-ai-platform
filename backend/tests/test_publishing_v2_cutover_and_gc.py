@@ -302,6 +302,7 @@ async def test_garbage_collection_execution_pruning() -> None:
     res_f5 = _execute_result(scalar=0)
 
     session.execute.side_effect = [
+        _execute_result(scalar=col),  # Lock/refresh precedes metadata writes (not dry-run).
         res_bindings,
         res_revs,
         res_c4, res_f4, res_del_c4, res_del_f4,
@@ -327,6 +328,9 @@ async def test_garbage_collection_execution_pruning() -> None:
         assert rev3.status == "superseded"
         session.commit.assert_awaited_once()
         assert mock_del.call_count == 2
+        lock_stmt = session.execute.await_args_list[0].args[0]
+        assert lock_stmt._for_update_arg is not None
+        assert lock_stmt.get_execution_options()["populate_existing"] is True
 
 
 # ==============================================================================

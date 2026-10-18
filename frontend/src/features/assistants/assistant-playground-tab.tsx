@@ -2,7 +2,7 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
-  CheckCircle2,
+  CircleHelp,
   Clock,
   Download,
   Layers,
@@ -26,6 +26,10 @@ import {
   formatConversationToMarkdown,
 } from "@/lib/export-markdown";
 import type { AssistantItem } from "@/types/assistants";
+import {
+  RetrievalDiagnostics,
+  RetrievalInspector,
+} from "./retrieval-inspector";
 
 interface AssistantPlaygroundTabProps {
   assistant: AssistantItem;
@@ -277,15 +281,19 @@ export function AssistantPlaygroundTab({
               Trạng thái kiểm định câu trả lời:
             </span>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Chuẩn TM-08:</span>
+              <span className="text-muted-foreground">Faithfulness:</span>
               <Badge
                 variant="outline"
-                className="text-success border-success/30 font-medium"
+                className="text-muted-foreground border-border font-medium"
               >
-                <CheckCircle2 className="size-3 mr-1" />
-                Faithfulness ≥ 0.90
+                <CircleHelp className="size-3 mr-1" />
+                Chưa đo
               </Badge>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Chưa có phép đo cho lượt trả lời này. Trích dẫn không đồng nghĩa
+              với điểm chất lượng.
+            </p>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Thời gian phản hồi:</span>
               <span className="font-mono text-foreground font-medium flex items-center gap-1">
@@ -303,6 +311,14 @@ export function AssistantPlaygroundTab({
             </div>
           </div>
 
+          <RetrievalDiagnostics
+            value={latestAssistantMessage?.retrievalDiagnostics}
+          />
+          <RetrievalInspector
+            key={assistant.code}
+            assistantCode={assistant.code}
+            collectionId={assistant.collection_id}
+          />
           {/* Citations Inspector */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

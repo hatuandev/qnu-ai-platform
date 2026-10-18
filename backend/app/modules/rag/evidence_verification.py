@@ -8,6 +8,8 @@ from app.core.exceptions import AppException
 from app.modules.rag.evidence_audit import SemanticAudit, audit_coverage
 from app.modules.rag.evidence_bm25 import tokens
 from app.modules.rag.evidence_constraints import location_pointer_gap
+from app.modules.rag.evidence_context import compact_claim_context
+from app.modules.rag.evidence_contracts import verification_contract
 from app.modules.rag.evidence_hierarchy import scope_error
 from app.modules.rag.evidence_indexed_audit import (
     INDEXED_AUDIT_INSTRUCTION,
@@ -68,8 +70,12 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     if not claims:
         return VerifiedAnswer([], False, plan.requested_topics or [plan.attribute or req.question],
                               scope_errors, VerificationResult(complete=False), None, [])
-    verifier = await structured_call(db, req, VerificationResult, VERIFY_INSTRUCTION,
-                                    {**payload, "claims": claims}, max_tokens=2400)
+    contract = verification_contract(claims, plan.requested_topics)
+    verification_payload = (compact_claim_context(payload, claims) if payload.get("compact_passages")
+                            else {**payload, "claims": claims})
+    verifier = await structured_call(db, req, contract, VERIFY_INSTRUCTION,
+                                    verification_payload, max_tokens=2400,
+                                    error_code="EVIDENCE_VERIFICATION_INVALID")
     verdicts = {v.claim_id: v for v in verifier.verdicts}
     if len(verdicts) != len(verifier.verdicts) or set(verdicts) != {c["id"] for c in claims}:
         raise AppException("Kiểm chứng mệnh đề không đầy đủ.", code="EVIDENCE_VERIFICATION_INVALID", status_code=502)
@@ -90,11 +96,12 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
         if not valid:
             invalid_supersession.append(claim["id"])
     if invalid_supersession:
-        verifier = await structured_call(db, req, VerificationResult, VERIFY_INSTRUCTION +
+        verifier = await structured_call(db, req, contract, VERIFY_INSTRUCTION +
             "\nThe previous audit proposed invalid superseded_by references for claim IDs "
             + ", ".join(invalid_supersession) + ". Re-evaluate those claims from their own attached quotes. "
             "Leave superseded_by empty unless one exact preferred-source quote proves the same applicability tuple.",
-            {**payload, "claims": claims, "invalid_supersession_claims": invalid_supersession}, max_tokens=2400)
+            {**verification_payload, "invalid_supersession_claims": invalid_supersession}, max_tokens=2400,
+            error_code="EVIDENCE_VERIFICATION_INVALID")
         verdicts = {v.claim_id: v for v in verifier.verdicts}
         if len(verdicts) != len(verifier.verdicts) or set(verdicts) != {c["id"] for c in claims}:
             raise AppException("Kiểm chứng mệnh đề sau sửa chữa không đầy đủ.", code="EVIDENCE_VERIFICATION_INVALID", status_code=502)
@@ -109,7 +116,8 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     if accepted and not verifier.conflict:
         indexed_payload, catalog = audit_payload({**payload, "claims": accepted}, blocks)
         indexed = await structured_call(db, req, audit_contract(accepted, catalog), INDEXED_AUDIT_INSTRUCTION,
-                                        indexed_payload, max_tokens=2400)
+                                        indexed_payload, max_tokens=2400,
+                                        error_code="EVIDENCE_VERIFICATION_INVALID")
         audit = resolve_audit(indexed, accepted, catalog)
         accepted, audit_errors, missing, complete = audit_coverage(audit, accepted, blocks,
             sorted(set(plan.years + plan.document_years + plan.event_years)), question=req.question)

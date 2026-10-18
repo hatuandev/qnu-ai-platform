@@ -281,7 +281,8 @@ async def test_candidate_service_state_classification_all_combinations() -> None
 # Unit Tests for ImportBatchService
 # ==============================================================================
 @pytest.mark.asyncio
-async def test_import_batch_service_lifecycle_and_idempotency() -> None:
+@pytest.mark.parametrize("dispatch", [True, False])
+async def test_import_batch_service_lifecycle_and_idempotency(dispatch: bool) -> None:
     """Test creating an import batch, per-item provenance, and strict idempotency replay."""
     coll = KnowledgeCollection(
         id="col_tuyensinh_2026",
@@ -324,6 +325,7 @@ async def test_import_batch_service_lifecycle_and_idempotency() -> None:
         tenant_id="tenant_qnu",
         workspace_id="workspace_tuyensinh",
         db=mock_db,
+        dispatch=dispatch,
     )
 
     assert batch.id.startswith("imp_batch_")
@@ -332,6 +334,12 @@ async def test_import_batch_service_lifecycle_and_idempotency() -> None:
     assert batch.status == "queued"
     assert batch.idempotency_key == "idem_batch_key_999"
     assert len(batch.items) == 2
+    if not dispatch:
+        from app.modules.jobs.models import JobRecord
+
+        jobs = [call.args[0] for call in mock_db.add.call_args_list if isinstance(call.args[0], JobRecord)]
+        assert len(jobs) == 2
+        assert all(job.dispatch_status == "operator" for job in jobs)
 
     # Check items provenance
     item1 = next(it for it in batch.items if it.origin_document_id == "doc_01")
@@ -362,7 +370,8 @@ async def test_import_batch_service_lifecycle_and_idempotency() -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_batch_retry_and_cancellation() -> None:
+@pytest.mark.parametrize("dispatch", [True, False])
+async def test_import_batch_retry_and_cancellation(dispatch: bool) -> None:
     """Test retry_failed_items resets failed items, cancel_import_batch marks items skipped."""
     coll = KnowledgeCollection(
         id="col_tuyensinh_2026",
@@ -413,12 +422,18 @@ async def test_import_batch_retry_and_cancellation() -> None:
         tenant_id="tenant_qnu",
         workspace_id="workspace_tuyensinh",
         db=mock_db,
+        dispatch=dispatch,
     )
     assert item_failed.status == "queued"
     assert item_failed.phase == "snapshot"
     assert item_failed.failure_code is None
     assert item_failed.retry_count == 1
     assert retried_batch.status == "queued"
+    if not dispatch:
+        from app.modules.jobs.models import JobRecord
+
+        jobs = [call.args[0] for call in mock_db.add.call_args_list if isinstance(call.args[0], JobRecord)]
+        assert len(jobs) == 1 and jobs[0].dispatch_status == "operator"
 
     # 2. Cancel batch
     cancelled_batch = await import_batch_service.cancel_import_batch(

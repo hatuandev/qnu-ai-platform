@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, Literal
+from uuid import UUID
 
 import httpx
 
@@ -190,3 +191,65 @@ def describe_provider_failure(exc: Exception) -> str:
     failure = classify_key_failure(exc)
     status = f" HTTP {failure.status_code}" if failure.status_code is not None else ""
     return f"{type(exc).__name__}{status} ({failure.reason})"
+
+
+def provider_failure_diagnostics(exc: Exception) -> dict[str, str | int | None]:
+    """Allowlisted metadata only; provider bodies may echo private evidence."""
+    response = _extract_response(exc)
+    request_id = None
+    if response is not None:
+        candidate = response.headers.get("x-request-id", "")
+        try:
+            request_id = str(UUID(candidate))
+        except ValueError:
+            pass  # Non-UUID identifiers can contain arbitrary echoed input.
+    return {"error_type": type(exc).__name__, "http_status": response.status_code if response is not None else None,
+            "reason": classify_key_failure(exc).reason, "upstream_request_id": request_id}
+
+
+_CONTEXT_OVERFLOW_MARKERS = (
+    "maximum context length",
+    "context_length_exceeded",
+    "context length exceeded",
+    "requested more tokens than",
+)
+
+# Official structured overflow codes. Matching is exact on dedicated
+# code/type fields only — never a generic "context" substring search over
+# the whole payload or prompt.
+_CONTEXT_OVERFLOW_CODES = frozenset({"context_length_exceeded"})
+
+
+def _structured_overflow_code(body: Any) -> bool:
+    error = body.get("error", {}) if isinstance(body, dict) else {}
+    if not isinstance(error, dict):
+        return False
+    for key in ("code", "type"):
+        value = error.get(key)
+        if isinstance(value, str) and value.strip().lower() in _CONTEXT_OVERFLOW_CODES:
+            return True
+    return False
+
+
+def is_context_overflow_error(exc: Exception) -> bool:
+    """Detect our request exceeding the serving model's context window.
+
+    This is a client-side budget error, not a provider outage: the same prompt
+    will fail on every retry against the same window. Only explicit HTTP400
+    window evidence counts — a structured overflow code or an explicit message
+    marker. Vague messages, malformed payloads, quota/auth/rate-limit states
+    and non-400 statuses stay normal provider failures.
+    """
+    response = _extract_response(exc)
+    if response is None or response.status_code != 400:
+        return False
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if _structured_overflow_code(body):
+        return True
+    error = body.get("error", {}) if isinstance(body, dict) else {}
+    message = error.get("message", "") if isinstance(error, dict) else ""
+    corpus = str(message).lower()
+    return any(marker in corpus for marker in _CONTEXT_OVERFLOW_MARKERS)

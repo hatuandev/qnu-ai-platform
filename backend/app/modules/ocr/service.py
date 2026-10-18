@@ -792,6 +792,13 @@ class OCRService:
         if not isinstance(raw_text, str) or not raw_text.strip():
             raise AppException("OCR không trả về văn bản hợp lệ.", code="OCR_CONTENT_EMPTY", status_code=422)
         pages_in = result_dict.get("pages", [])
+        from copy import deepcopy
+
+        raw_evidence = {
+            "provider_response": deepcopy(result_dict.get("raw_payload")),
+            "pages": deepcopy(pages_in), "raw_text": raw_text,
+            "engine_used": result_dict.get("engine_used"),
+        }
         if raw_text and raw_text.strip():
             from app.modules.ocr.cleaner import post_process_ocr_output
 
@@ -849,6 +856,7 @@ class OCRService:
             latency_ms=latency_ms,
             raw_text=result_dict.get("raw_text", ""),
             pages=pages,
+            raw_evidence=raw_evidence,
         )
 
     # --- Studio OCR Interactive Methods ---

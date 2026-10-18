@@ -231,7 +231,7 @@ async def test_real_verification_and_span_guard_preserve_only_relevant_historica
     plan = QueryPlan(query=req.question, years=[2025], entity="Alpha")
 
     async def infer(_db, _req, contract, _instruction, _payload, **_kwargs):
-        if contract is VerificationResult:
+        if issubclass(contract, VerificationResult):
             return contract.model_validate({"complete": entailed, "verdicts": [{"claim_id": "claim",
                 "entailed": entailed, "relevant": entailed, "scope_compatible": True, "reason": "Test verdict"}]})
         return contract.model_validate({"claims": [{"claim_id": "claim", "all_assertions_supported": True,

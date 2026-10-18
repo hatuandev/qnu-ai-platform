@@ -1,6 +1,7 @@
 """Scope and revision coherence gates shared by candidate preview and publication."""
 
 import json
+from collections import Counter
 from typing import Any
 
 from sqlalchemy import select
@@ -22,19 +23,27 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
     """
     for index in revisions:
         report = index.parity_report or {}
-        if not report.get("fact_set_hash"):
+        if not report.get("fact_set_hash") and not index.chunk_set_id:
             continue
         source = await db.get(KnowledgeSourceRevision, index.source_revision_v2_id)
         if not source or source.status != "ready":
             raise AppException("Nguồn chưa sẵn sàng để xuất bản.", code="SOURCE_NOT_READY", status_code=409)
         artifact = get_source_artifact(source)
+        if source.binding_id != index.binding_id:
+            raise AppException("Nguồn không thuộc bản chỉ mục.", code="SOURCE_REVISION_CHANGED", status_code=409)
+        from app.modules.knowledge.services.derived_bundle import validate_index_bundle
+
+        bundle_collection_id = await validate_index_bundle(db, index, source, artifact)
+        artifact = get_source_artifact(source)
+        if not report.get("fact_set_hash"):
+            continue
         _, requires_structured_review, _ = get_structured_review_state(source)
         if requires_structured_review:
             raise AppException("Cần duyệt dữ liệu có cấu trúc.", code="FACT_SET_REVIEW_REQUIRED", status_code=409)
         facts = list((await db.execute(select(KnowledgeFact).where(
             KnowledgeFact.index_revision_id == index.id,
             KnowledgeFact.binding_id == index.binding_id,
-        ))).scalars().all())
+        ).with_for_update().execution_options(populate_existing=True))).scalars().all())
         actual_count = len(facts)
         if (report.get("source_content_hash") != source.canonical_hash
                 or report["fact_set_hash"] != artifact["fact_set_hash"]
@@ -44,9 +53,15 @@ async def validate_candidate_artifacts(db: AsyncSession, revisions: list[Any]) -
         identity_fields = ("entity_key", "entity_label", "entity_text")
         if all(all(field in fact for field in identity_fields) for fact in artifact["facts"]):
             fields += identity_fields
-        expected = {tuple(f[field] for field in fields) + (json.dumps(f["raw_data"], sort_keys=True),) for f in artifact["facts"]}
-        actual = {tuple(getattr(f, field) for field in fields) + (json.dumps({key: value for key, value in f.raw_data.items()
-                  if key not in {"source_revision_id", "fact_set_hash"}}, sort_keys=True),) for f in facts}
+        expected = Counter(tuple(f[field] for field in fields) + (json.dumps(f["raw_data"], sort_keys=True),) for f in artifact["facts"])
+        actual = Counter(tuple(getattr(f, field) for field in fields) + (json.dumps({key: value for key, value in f.raw_data.items()
+                  if key not in {"source_revision_id", "fact_set_hash"}}, sort_keys=True),) for f in facts)
+        if report.get("derived_bundle_hash") and any(
+            f.raw_data.get("source_revision_id") != source.id or f.raw_data.get("fact_set_hash") != artifact["fact_set_hash"]
+            or f.collection_id != bundle_collection_id
+            for f in facts
+        ):
+            raise AppException("Facts trỏ sai revision.", code="FACT_SET_PARITY_FAILED", status_code=409)
         if actual != expected:
             raise AppException("Nội dung facts khác tập đã duyệt.", code="FACT_SET_PARITY_FAILED", status_code=409)
 

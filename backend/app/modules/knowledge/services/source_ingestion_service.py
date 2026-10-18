@@ -11,6 +11,7 @@ Responsible for:
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import hashlib
 import json
@@ -19,7 +20,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,7 +36,17 @@ from app.modules.knowledge.models import (
     KnowledgeImportItem,
     KnowledgeSourceRevision,
 )
+from app.modules.knowledge.normalization.clean_content import (
+    attach_content_integrity,
+    inspect_content,
+    normalize_content,
+)
 from app.modules.knowledge.normalization.retrieval_units import refresh_unit_metadata
+from app.modules.knowledge.services.qnu_docx_artifacts import (
+    build_qnu_markdown_artifact,
+    rebuild_qnu_markdown_for_revision,
+    superseded_qnu_markdown_artifact,
+)
 from app.modules.knowledge.services.source_artifact import (
     add_layout_issues,
     build_source_artifact,
@@ -52,6 +63,7 @@ from app.modules.knowledge.services.source_pages import (
     manifest_page_count,
     merge_edited_manifest,
     normalize_source_pages,
+    validate_edit_pages,
 )
 from app.modules.knowledge.services.temporal_metadata import extract_temporal_metadata
 from app.modules.knowledge.services.unit_annotation import enrich_source_units
@@ -181,6 +193,8 @@ class SourceIngestionService:
                 await db.flush()
 
             item.knowledge_binding_id = binding.id
+            # Identifiers exist before rendering so the standard artifact can carry them.
+            source_rev_id = f"ks_rev_{uuid.uuid4().hex[:12]}"
 
             # Store independent snapshot in knowledge domain storage
             snapshot_path = f"snapshots/{batch.collection_id}/{binding.id}/{item.origin_file_hash}_{item.origin_file_name}"
@@ -234,6 +248,18 @@ class SourceIngestionService:
                 citation_metadata = dict(existing_artifact.citation_metadata or {})
                 quality_report = dict(existing_artifact.quality_report or {})
                 structured_artifact = get_source_artifact(existing_artifact)
+                qnu_markdown_artifact = None
+                if (item.origin_file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
+                    shared_qnu_artifact = (
+                        (existing_artifact.snapshot_metadata or {}).get("qnu_markdown")
+                        or (existing_artifact.parse_provenance or {}).get("qnu_markdown")
+                    )
+                    qnu_markdown_artifact = await rebuild_qnu_markdown_for_revision(
+                        shared_qnu_artifact,
+                        document_id=binding.id,
+                        revision_id=source_rev_id,
+                        snapshot_path=snapshot_path,
+                    )
                 reused_artifact = True
                 ocr_engine = (existing_artifact.parse_provenance or {}).get("ocr_engine") or "native"
                 preview_path = (existing_artifact.snapshot_metadata or {}).get("preview_pdf_path")
@@ -307,13 +333,22 @@ class SourceIngestionService:
                 refresh_unit_metadata(clean_md, structured_artifact)
                 await enrich_source_units(clean_md, structured_artifact, batch.tenant_id, annotation_policy)
                 citation_metadata["issued_date"] = temporal_metadata["issued_date"]["value"]
-                add_layout_issues(structured_artifact, ocr_pages)
+                add_layout_issues(structured_artifact, page_manifest)
+                attach_content_integrity(structured_artifact, clean_md, parsed_page_count)
+                qnu_markdown_artifact = None
+                if (item.origin_file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
+                    qnu_markdown_artifact = await build_qnu_markdown_artifact(
+                        extraction=extraction,
+                        document_id=binding.id,
+                        revision_id=source_rev_id,
+                        title=item.origin_title,
+                        snapshot_path=snapshot_path,
+                    )
 
             quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
             # 6. Instantiate KnowledgeSourceRevision
-            await report_progress("chunk", 85)
-            source_rev_id = f"ks_rev_{uuid.uuid4().hex[:12]}"
+            await report_progress("validate", 85)
             source_rev = KnowledgeSourceRevision(
                 id=source_rev_id,
                 binding_id=binding.id,
@@ -324,7 +359,8 @@ class SourceIngestionService:
                 snapshot_metadata={**dict(item.origin_metadata or {}), "title": item.origin_title,
                                    "unit_temporal_annotation": annotation_policy,
                                    "file_name": item.origin_file_name, "file_type": item.origin_file_type,
-                                   "preview_pdf_path": preview_path},
+                                   "preview_pdf_path": preview_path,
+                                   **({"qnu_markdown": qnu_markdown_artifact} if qnu_markdown_artifact else {})},
                 canonical_markdown=clean_md,
                 canonical_hash=canonical_hash,
                 page_manifest=page_manifest,
@@ -336,6 +372,7 @@ class SourceIngestionService:
                     "ingested_at": datetime.now(UTC).isoformat(),
                     "structured_artifact": structured_artifact,
                     "ocr_config_hash": ocr_config_hash,
+                    **({"qnu_markdown": qnu_markdown_artifact} if qnu_markdown_artifact else {}),
                 },
                 quality_report=quality_report,
                 parser_profile_hash=compute_sha256(parser_profile),
@@ -346,6 +383,11 @@ class SourceIngestionService:
                 finished_at=datetime.now(UTC),
             )
 
+            if (item.origin_file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
+                from app.modules.knowledge.services.qnu_serving import prepare_standard_revision
+
+                await prepare_standard_revision(source_rev)
+                quality_report = source_rev.quality_report
             # Persist before queries/flushes of dependent artifacts.
             db.add(source_rev)
             await db.flush()
@@ -361,6 +403,7 @@ class SourceIngestionService:
                 # 7a. Materialize Chunks via ChunkSetService
                 from app.modules.knowledge.services.chunk_set_service import chunk_set_service
 
+                await report_progress("chunk", 85)
                 await chunk_set_service.get_or_create_chunk_set(
                     db=db,
                     source_revision_id=source_rev.id,
@@ -496,6 +539,49 @@ class SourceIngestionService:
         )
         return list(res.scalars().all())
 
+    async def get_qnu_markdown_artifact(
+        self,
+        db: AsyncSession,
+        collection_id: str,
+        source_id: str,
+        revision_id: str,
+        tenant_id: str = "tenant_qnu",
+        workspace_id: str = "workspace_qnu",
+    ) -> dict[str, Any]:
+        """Resolve the QNU RAG Markdown artifact metadata of a revision (ownership enforced)."""
+        binding = await self.get_source(db, collection_id, source_id, tenant_id, workspace_id)
+        rev_res = await db.execute(
+            select(KnowledgeSourceRevision).where(
+                KnowledgeSourceRevision.id == revision_id,
+                KnowledgeSourceRevision.binding_id == binding.id,
+            )
+        )
+        rev = rev_res.scalar_one_or_none()
+        if not rev:
+            raise AppException(
+                message=f"Không tìm thấy bản sửa đổi nguồn {revision_id}",
+                code="SOURCE_REVISION_NOT_FOUND",
+                status_code=404,
+            )
+        artifact = (rev.snapshot_metadata or {}).get("qnu_markdown") or (rev.parse_provenance or {}).get("qnu_markdown")
+        if not artifact:
+            raise AppException(
+                "Bản bóc tách này chưa có tệp QNU RAG Markdown v1.0.",
+                code="QNU_MARKDOWN_NOT_AVAILABLE",
+                status_code=404,
+            )
+        if artifact.get("revision_id") != rev.id or artifact.get("document_id") != binding.id:
+            raise AppException(
+                "Tệp QNU RAG Markdown được lưu không thuộc đúng danh tính bản sửa đổi này.",
+                code="QNU_MARKDOWN_REVISION_MISMATCH",
+                status_code=409,
+            )
+        if (rev.parse_provenance or {}).get("standard_required") and artifact.get("status") == "ready":
+            from app.modules.knowledge.services.qnu_serving import verify_revision_pair
+
+            await verify_revision_pair(rev)
+        return artifact
+
     async def update_revision_content(
         self,
         db: AsyncSession,
@@ -507,6 +593,9 @@ class SourceIngestionService:
         workspace_id: str = "workspace_qnu",
         context_edits: Any | None = None,
         actor_id: str | None = None,
+        change_reason: str | None = None,
+        expected_canonical_hash: str | None = None,
+        content_format: str | None = None,
     ) -> KnowledgeSourceRevision:
         """Update and re-evaluate canonical Markdown content for a source revision."""
         from app.modules.knowledge.services.source_reparse import ensure_source_idle, lock_source
@@ -527,9 +616,23 @@ class SourceIngestionService:
                 status_code=404,
             )
 
+        if expected_canonical_hash is not None and expected_canonical_hash != rev.canonical_hash:
+            raise AppException("Bản nguồn đã thay đổi; tải lại trước khi lưu.", code="SOURCE_CONTENT_CHANGED", status_code=409)
+        change_reason = change_reason or (context_edits.reason if context_edits is not None else None)
+        if not actor_id or not change_reason or not change_reason.strip():
+            raise AppException("Cần người sửa và lý do hiệu đính.", code="CONTENT_REVIEW_REASON_REQUIRED", status_code=422)
+
         if context_edits is not None and get_source_artifact(rev)["fact_set_hash"] != context_edits.expected_fact_set_hash:
             raise AppException("Facts đã thay đổi; hãy tải lại bản nguồn.", code="SOURCE_CONTEXT_CHANGED", status_code=409)
 
+        if ((rev.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1"
+                or content_format == "qnu-rag-markdown/1.0"):
+            from app.modules.knowledge.services.qnu_revision import update_standard_revision
+
+            return await update_standard_revision(db, binding, rev, new_markdown, actor_id=actor_id,
+                reason=change_reason.strip(), expected_hash=expected_canonical_hash, context_edits=context_edits)
+
+        validate_edit_pages(new_markdown, rev.page_manifest or [])
         clean_md, page_manifest = normalize_source_pages(new_markdown, manifest_page_count(rev.page_manifest))
         quality_report = evaluate_revision_quality(
             markdown=clean_md,
@@ -554,6 +657,14 @@ class SourceIngestionService:
         new_rev = KnowledgeSourceRevision(
             **values, id=f"ks_rev_{uuid.uuid4().hex[:12]}", revision_no=revision_no + 1,
         )
+        # Editing content invalidates the previous standard file: it is not evidence for this revision.
+        inherited_qnu = (rev.snapshot_metadata or {}).get("qnu_markdown") or (rev.parse_provenance or {}).get("qnu_markdown")
+        qnu_markdown_artifact = superseded_qnu_markdown_artifact(inherited_qnu, new_rev.id) if inherited_qnu else None
+        new_rev.snapshot_metadata = {
+            key: value for key, value in (rev.snapshot_metadata or {}).items() if key != "qnu_markdown"
+        }
+        if qnu_markdown_artifact:
+            new_rev.snapshot_metadata["qnu_markdown"] = qnu_markdown_artifact
         new_rev.artifact_key = compute_sha256(f"{new_rev.origin_file_hash}:edited:{compute_sha256(clean_md)}")
         new_rev.canonical_markdown = clean_md
         new_rev.page_manifest = merge_edited_manifest(list(rev.page_manifest or []), page_manifest)
@@ -570,6 +681,7 @@ class SourceIngestionService:
         new_rev.citation_metadata["signer_name"] = new_rev.citation_metadata.pop("signer", None)
         artifact = build_source_artifact(clean_md, manifest_page_count(new_rev.page_manifest), new_rev.citation_metadata)
         add_layout_issues(artifact, new_rev.page_manifest)
+        attach_content_integrity(artifact, clean_md, manifest_page_count(new_rev.page_manifest), rev.canonical_markdown or "")
         artifact["temporal_metadata"] = extract_temporal_metadata(clean_md, (new_rev.snapshot_metadata or {}).get("file_name", ""))
         refresh_unit_metadata(clean_md, artifact)
         new_rev.citation_metadata["issued_date"] = artifact["temporal_metadata"]["issued_date"]["value"]
@@ -584,11 +696,18 @@ class SourceIngestionService:
             new_rev.artifact_key = compute_sha256(f"{new_rev.origin_file_hash}:context:{artifact['fact_set_hash']}:{new_rev.id}")
         quality_report = evaluate_revision_quality(markdown=clean_md, page_count=manifest_page_count(new_rev.page_manifest) or 1,
                                                    tables_count=len(artifact["tables"]), file_size_bytes=len(clean_md.encode("utf-8")))
-        new_rev.parse_provenance = {**(rev.parse_provenance or {}), "structured_artifact": artifact,
-                                    "edited_from_revision_id": rev.id}
+        new_rev.parse_provenance = {
+            **{key: value for key, value in (rev.parse_provenance or {}).items() if key != "qnu_markdown"},
+            "structured_artifact": artifact,
+            "edited_from_revision_id": rev.id,
+            "content_review": {"actor_id": actor_id, "reason": change_reason.strip(),
+                               "at": datetime.now(UTC).isoformat(), "base_revision_id": rev.id,
+                               "base_hash": rev.canonical_hash, "content_hash": new_rev.canonical_hash},
+            **({"qnu_markdown": qnu_markdown_artifact} if qnu_markdown_artifact else {}),
+        }
         if artifact["issues"] and quality_report.get("overall_status") != "failed":
             quality_report = {**quality_report, "overall_status": "warning", "structured_issues": artifact["issues"]}
-        if context_edits is not None and quality_report.get("overall_status") != "failed":
+        if quality_report.get("overall_status") != "failed":
             quality_report = {**quality_report, "overall_status": "warning", "context_review_required": True}
         new_rev.quality_report = quality_report
         new_rev.updated_at = datetime.now(UTC)
@@ -604,16 +723,6 @@ class SourceIngestionService:
         db.add(new_rev)
         await db.flush()
 
-        if overall_status == "passed":
-            await db.execute(
-                update(KnowledgeBinding)
-                .where(KnowledgeBinding.id == binding.id)
-                .values(
-                    active_source_revision_id=new_rev.id,
-                    status="paused" if binding.status == "paused" else "active",
-                    updated_at=datetime.now(UTC),
-                )
-            )
         await db.commit()
         await db.refresh(new_rev)
         return new_rev
@@ -672,6 +781,18 @@ class SourceIngestionService:
     ) -> None:
         artifact = copy.deepcopy(artifact)
         reviewed_at = datetime.now(UTC)
+        if decision == "approved" and (rev.parse_provenance or {}).get("standard_required"):
+            if artifact.get("input_format") != "qnu-rag-projection/v1":
+                raise AppException("Chưa có bản chuẩn hợp lệ để duyệt.", code="QNU_STANDARD_INVALID", status_code=409)
+            if artifact.get("unresolved_cell_count"):
+                raise AppException("Cần xử lý rõ các ô mơ hồ/không đọc được trước khi duyệt bản chuẩn.",
+                                   code="QNU_UNRESOLVED_CELLS", status_code=409)
+            if not actor_id or not comment or not comment.strip():
+                raise AppException("Cần người duyệt và ghi chú đối chiếu bản chuẩn.",
+                                   code="CONTENT_REVIEW_REASON_REQUIRED", status_code=422)
+        if (rev.parse_provenance or {}).get("content_review") and (not actor_id or not comment or not comment.strip()):
+            raise AppException("Cần người duyệt và ghi chú xác nhận đối chiếu nội dung.",
+                               code="CONTENT_REVIEW_REASON_REQUIRED", status_code=422)
         if decision == "approved":
             rev.status = "ready"
             rev.failure_code = None
@@ -729,6 +850,9 @@ class SourceIngestionService:
         binding, rev, artifact = await self._get_review_target(
             db, collection_id, source_id, revision_id, tenant_id, workspace_id, actor_id
         )
+        from app.modules.knowledge.services.qnu_serving import verify_approval_pair
+
+        await verify_approval_pair(rev, decision)
         self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id)
         await db.commit()
         await db.refresh(rev)
@@ -775,6 +899,10 @@ class SourceIngestionService:
             )
 
         revisions = []
+        from app.modules.knowledge.services.qnu_serving import verify_approval_pair
+
+        for _, revision, _ in targets:
+            await verify_approval_pair(revision, decision)
         for binding, revision, artifact in targets:
             self._apply_review_decision(
                 binding, revision, artifact, decision, comment, actor_id
@@ -831,6 +959,12 @@ class SourceIngestionService:
 
         manifest = list(rev.page_manifest or [])
         pages_content = canonical_pages(rev.canonical_markdown or "", len(manifest) or 1)
+        unmapped_markdown = ""
+        standard = (rev.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1"
+        if standard:
+            from app.modules.knowledge.services.qnu_serving import serving_pages
+
+            pages_content, unmapped_markdown = serving_pages(rev)
 
         pages_views: list[StudioPageView] = []
         for idx, entry in enumerate(manifest):
@@ -892,10 +1026,11 @@ class SourceIngestionService:
                 StudioPageView(
                     page_number=page_num,
                     markdown_content=content,
-                    raw_text=content,
+                    raw_text=entry.get("extracted_markdown", ""),
+                    raw_text_available="extracted_markdown" in entry,
                     word_count=words,
                     line_count=lines,
-                    image_url=image_url,
+                    image_url=image_url if entry.get("page") is not None else None,
                     dimensions=entry.get("dimensions"),
                     has_tables=bool(entry.get("has_tables", False)),
                     bounding_boxes=boxes,
@@ -912,6 +1047,12 @@ class SourceIngestionService:
         review_status, requires_review, issue_count = get_structured_review_state(rev)
 
         return StudioViewResponse(
+            pagination_known=manifest_page_count(rev.page_manifest) > 0 and not unmapped_markdown,
+            unmapped_markdown=unmapped_markdown,
+            content_integrity=get_source_artifact(rev).get("content_integrity") or inspect_content(rev.canonical_markdown or "", page_count=manifest_page_count(rev.page_manifest)),
+            content_review=(rev.parse_provenance or {}).get("content_review") or {},
+            canonical_hash=rev.canonical_hash,
+            canonical_format=(rev.parse_provenance or {}).get("canonical_format", "legacy"),
             document_id=source_id,
             revision_id=rev.id,
             collection_id=collection_id,
@@ -929,9 +1070,33 @@ class SourceIngestionService:
             structured_artifact=get_source_artifact(rev),
             source_metadata=rev.snapshot_metadata or {},
             citation_metadata=rev.citation_metadata or {},
-            layout_text_alignment="stale" if any(p.get("layout_text_alignment") == "stale" for p in manifest) else "original",
+            layout_text_alignment="stale" if standard or any(p.get("layout_text_alignment") == "stale" for p in manifest) else "original",
             pages=pages_views,
         )
+
+    async def preview_clean_content(self, db: AsyncSession, collection_id: str, source_id: str,
+                                    revision_id: str, markdown: str, expected_hash: str | None = None) -> dict[str, Any]:
+        """Read-only, exact-revision preview; no inference or publication."""
+        await self.get_source(db, collection_id, source_id)
+        rev = (await db.execute(select(KnowledgeSourceRevision).where(
+            KnowledgeSourceRevision.id == revision_id, KnowledgeSourceRevision.binding_id == source_id,
+        ))).scalar_one_or_none()
+        if rev is None:
+            raise AppException("Không tìm thấy bản nguồn.", code="SOURCE_REVISION_NOT_FOUND", status_code=404)
+        if expected_hash is not None and expected_hash != rev.canonical_hash:
+            raise AppException("Bản nguồn đã thay đổi; tải lại trước khi chuẩn hóa.", code="SOURCE_CONTENT_CHANGED", status_code=409)
+        # Snapshot scalar values before crossing the CPU worker boundary.
+        base, count, content_hash = rev.canonical_markdown or "", manifest_page_count(rev.page_manifest), rev.canonical_hash
+        manifest = copy.deepcopy(rev.page_manifest or [])
+        def build_preview() -> dict[str, Any]:
+            validate_edit_pages(markdown, manifest)
+            clean = normalize_content(markdown)
+            artifact = build_source_artifact(clean, count, {})
+            add_layout_issues(artifact, manifest)
+            attach_content_integrity(artifact, clean, count, base)
+            return {"revision_id": revision_id, "base_hash": content_hash, "canonical_markdown": clean,
+                    "report": artifact["content_integrity"]}
+        return await asyncio.to_thread(build_preview)
 
     async def get_source_page_image(
         self,
@@ -1088,6 +1253,7 @@ class SourceIngestionService:
         )
         latest_no = latest_rev_no_res.scalars().first() or current_rev.revision_no
         next_rev_no = latest_no + 1
+        new_rev_id = reserved_revision_id or f"ks_rev_{uuid.uuid4().hex[:12]}"
 
         # 4. Perform extraction
         extraction = await extract_source(db, file_bytes, filename, file_type,
@@ -1135,14 +1301,28 @@ class SourceIngestionService:
         citation_metadata["subject"] = admin_meta.get("title")
         citation_metadata["signer_name"] = admin_meta.get("signer")
         structured_artifact = build_source_artifact(clean_md, parsed_page_count, citation_metadata, extraction.canonical_tables)
-        add_layout_issues(structured_artifact, extraction.pages)
+        add_layout_issues(structured_artifact, page_manifest)
+        attach_content_integrity(structured_artifact, clean_md, parsed_page_count)
         structured_artifact["temporal_metadata"] = temporal_metadata
         refresh_unit_metadata(clean_md, structured_artifact)
         await enrich_source_units(clean_md, structured_artifact, tenant_id,
             (current_rev.snapshot_metadata or {}).get("unit_temporal_annotation"))
         quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
-        new_rev_id = reserved_revision_id or f"ks_rev_{uuid.uuid4().hex[:12]}"
+        snapshot_metadata = {**dict(current_rev.snapshot_metadata or {}), "preview_pdf_path": preview_path}
+        qnu_markdown_artifact = None
+        if (file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
+            qnu_markdown_artifact = await build_qnu_markdown_artifact(
+                extraction=extraction,
+                document_id=binding.id,
+                revision_id=new_rev_id,
+                title=snapshot_metadata.get("title"),
+                snapshot_path=current_rev.snapshot_storage_path,
+            )
+            snapshot_metadata["qnu_markdown"] = qnu_markdown_artifact
+        else:
+            snapshot_metadata.pop("qnu_markdown", None)
+
         new_rev = KnowledgeSourceRevision(
             id=new_rev_id,
             binding_id=binding.id,
@@ -1150,7 +1330,7 @@ class SourceIngestionService:
             origin_document_id=current_rev.origin_document_id,
             origin_file_hash=current_rev.origin_file_hash,
             snapshot_storage_path=current_rev.snapshot_storage_path,
-            snapshot_metadata={**dict(current_rev.snapshot_metadata or {}), "preview_pdf_path": preview_path},
+            snapshot_metadata=snapshot_metadata,
             canonical_markdown=clean_md,
             canonical_hash=canonical_hash,
             page_manifest=page_manifest,
@@ -1160,6 +1340,7 @@ class SourceIngestionService:
                 "ocr_engine": ocr_engine or "auto",
                 "reparsed_at": datetime.now(UTC).isoformat(),
                 "structured_artifact": structured_artifact,
+                **({"qnu_markdown": qnu_markdown_artifact} if qnu_markdown_artifact else {}),
             },
             quality_report=quality_report,
             parser_profile_hash=compute_sha256(parser_profile),
@@ -1170,6 +1351,11 @@ class SourceIngestionService:
             finished_at=datetime.now(UTC),
         )
 
+        if (file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
+            from app.modules.knowledge.services.qnu_serving import prepare_standard_revision
+
+            await prepare_standard_revision(new_rev)
+            quality_report = new_rev.quality_report
         if reserved_revision_id:
             reserved = await db.get(KnowledgeSourceRevision, reserved_revision_id)
             for col in KnowledgeSourceRevision.__table__.columns:

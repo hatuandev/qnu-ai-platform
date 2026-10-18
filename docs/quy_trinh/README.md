@@ -7,6 +7,27 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [13 — Chuẩn Markdown RAG v1.0](./13_chuan_markdown_rag_v1.md): file chuẩn và mẫu
+  dùng lại, lõi Universal + quy tắc dữ liệu chọn lọc + chỉ mục dẫn xuất; parser
+  DOCX/PDF mới có luồng serving chuẩn có duyệt (phiên526), revision cũ không tự chuyển; không nạp nguyên tài
+  liệu chuẩn này làm kiến thức.
+
+- [12 — Seed giữ cấu hình](./12_seed_giu_cau_hinh.md): capture mã hóa qua StorageDriver,
+  preview và restore vào cấu hình rỗng trước bootstrap; không tự reset hoặc hồi sinh publication.
+
+- [11 — Bản sạch và duyệt nội dung nguồn](./11_ban_sach_va_duyet_noi_dung.md): chuẩn hóa
+  bảo toàn cấu trúc, preview/diff trong Studio, actor/lý do và revision chờ duyệt;
+  chunk theo cấu trúc, bundle nguồn/facts/vector và xuất bản/rollback có đối soát.
+
+- [10 — Inference RAG an toàn](./10_rag_inference_an_toan.md): danh sách provider máy
+  chủ, bảo toàn ngân sách JSON, log metadata và một retry dùng chung có giới hạn.
+
+- [09 — Cấu hình Top K và chẩn đoán RAG](./09_cau_hinh_top_k_rag.md): cấu hình
+  đối chứng/tùy chỉnh, tìm kiếm không sinh đáp án và giới hạn phép đo.
+
+- [08 — Quản trị quy đổi điểm có kiểm chứng](./08_quan_tri_quy_doi_diem.md): xem nguồn,
+  tính thử, duyệt/kích hoạt/thu hồi và runtime chỉ dùng quy tắc đang hoạt động.
+
 | STT | Tên Quy Trình Nghiệp Vụ | Tệp Tài Liệu Chi Tiết | Trọng Tâm Kỹ Thuật |
 | :---: | :--- | :--- | :--- |
 | **01** | **Khởi Động & Vòng Đời Nền Tảng** | [`01_khoi_dong_nen_tang.md`](./01_khoi_dong_nen_tang.md) | Docker Compose, thứ tự nạp container, healthchecks, kết nối Connection Pool |

@@ -46,6 +46,53 @@ def test_key_failure_classifier_uses_retry_after() -> None:
     assert "provider.example" not in describe_provider_failure(error)
 
 
+def test_context_overflow_detected_only_on_explicit_window_evidence() -> None:
+    from app.modules.modelops.services.key_rotation import is_context_overflow_error
+
+    window = _http_error(400, {"error": {"message": (
+        "This model's maximum context length is 8192 tokens. However, you requested "
+        "1600 output tokens and your prompt contains at least 6593 input tokens.")}})
+    assert is_context_overflow_error(window) is True
+    # A 400 without window evidence stays a normal provider failure.
+    assert is_context_overflow_error(
+        _http_error(400, {"error": {"message": "Invalid parameter: temperature"}})) is False
+    # Window text on a non-400 status is not an overflow verdict.
+    assert is_context_overflow_error(
+        _http_error(502, {"error": {"message": "maximum context length is 8192 tokens"}})) is False
+    assert is_context_overflow_error(RuntimeError("ReadError")) is False
+    # The serving layer wraps adapter errors; the cause chain still counts.
+    try:
+        raise RuntimeError("service wrap") from window
+    except RuntimeError as wrapped:
+        assert is_context_overflow_error(wrapped) is True
+    # Overflow never penalizes the key itself.
+    assert classify_key_failure(window).state is None
+
+
+def test_context_overflow_detected_from_structured_code_without_marker() -> None:
+    from app.modules.modelops.services.key_rotation import is_context_overflow_error
+
+    coded = _http_error(400, {"error": {"code": "context_length_exceeded", "message": "Input is too long"}})
+    assert is_context_overflow_error(coded) is True
+
+
+@pytest.mark.parametrize("payload,status", [
+    ({"error": {"code": "invalid_api_key"}}, 401),
+    ({"error": {"code": "insufficient_quota"}}, 403),
+    ({"error": {"code": "rate_limit_exceeded"}}, 429),
+    ({"error": {"code": "context_length_exceeded"}}, 502),
+    ({"error": {"message": "Something went wrong"}}, 400),
+    ({"error": {"message": "context window unavailable"}}, 400),
+    ({"error": "backend overloaded"}, 400),
+    ({"detail": "maximum context length is 8192 tokens"}, 400),
+    ([{"code": "context_length_exceeded"}], 400),
+])
+def test_context_overflow_rejects_non_overflow_and_malformed_payloads(payload, status) -> None:
+    from app.modules.modelops.services.key_rotation import is_context_overflow_error
+
+    assert is_context_overflow_error(_http_error(status, payload)) is False
+
+
 def test_key_failure_classifier_distinguishes_hard_quota_and_invalid_key() -> None:
     quota_failure = classify_key_failure(
         _http_error(429, {"error": {"code": "insufficient_quota"}})

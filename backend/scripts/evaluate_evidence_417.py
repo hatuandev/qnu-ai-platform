@@ -53,7 +53,7 @@ async def evaluate(args):
         assistant = response.json()
         report["assistant"] = assistant
         async with AsyncSessionFactory() as db:
-            snapshot = await hybrid_retriever.resolve_retrieval_snapshot(db, assistant["collection_id"], tenant_id=assistant["tenant_id"])
+            snapshot = await hybrid_retriever.resolve_retrieval_snapshot(db, assistant["collection_id"])
             blocks = await load_published_blocks(db, snapshot)
             report["publication"] = {"snapshot": snapshot.model_dump(mode="json"), "fingerprint": snapshot.cache_fingerprint(),
                 "sources": list({b.source_revision_id: {"binding": b.binding_id, "index": b.index_revision_id,
@@ -117,7 +117,7 @@ async def evaluate(args):
         final.raise_for_status()
         report["configuration_unchanged"] = final.json()["updated_at"] == assistant["updated_at"]
         async with AsyncSessionFactory() as db:
-            final_snapshot = await hybrid_retriever.resolve_retrieval_snapshot(db, assistant["collection_id"], tenant_id=assistant["tenant_id"])
+            final_snapshot = await hybrid_retriever.resolve_retrieval_snapshot(db, assistant["collection_id"])
             report["publication_unchanged"] = final_snapshot.cache_fingerprint() == snapshot.cache_fingerprint()
         report["finished_at"] = datetime.now(UTC).isoformat()
         report["code_unchanged"] = code_fingerprint == hashlib.sha256(b"".join(p.read_bytes() for p in code_files)).hexdigest()

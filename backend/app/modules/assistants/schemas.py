@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.evidence_policy import EvidencePolicy
+from app.core.retrieval_policy import RetrievalPolicy
 from app.core.single_application import SingleApplicationModel
 
 
@@ -34,6 +35,7 @@ class AssistantRerankerPolicy(BaseModel):
 
 
 class AssistantKnowledgePolicy(BaseModel):
+    retrieval_policy: RetrievalPolicy = Field(default_factory=RetrievalPolicy)
     evidence_policy: EvidencePolicy = Field(default_factory=EvidencePolicy)
     chunking_strategy: Literal["ClauseBasedChunker", "SemanticChunker"] = "SemanticChunker"
     require_structured_facts: bool = False
@@ -274,6 +276,7 @@ class AssistantChatRequest(SingleApplicationModel):
 
 
 class AssistantChatResponse(BaseModel):
+    retrieval_diagnostics: dict[str, Any] | None = None
     answer_decision: dict[str, Any] | None = None
     assistant_code: str
     assistant_name: str

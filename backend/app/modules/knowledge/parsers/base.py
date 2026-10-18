@@ -30,6 +30,9 @@ class ParsedContent:
     # Canonical representation is retained in memory for quality validation and
     # record-aware chunking. It is intentionally not serialized into document metadata.
     canonical_document: Any | None = None
+    # Raw DoclingDocument retained in memory so the QNU RAG Markdown builder can read
+    # cells/reading order without re-parsing. Never serialized into document metadata.
+    docling_document: Any | None = None
 
 
 class BaseDocumentParser(ABC):

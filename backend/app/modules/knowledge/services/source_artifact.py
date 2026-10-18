@@ -47,14 +47,15 @@ def _tables(markdown: str, page_count: int) -> list[dict[str, Any]]:
     return extract_context_tables(markdown, page_count)
 
 def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, Any],
-                          parser_tables: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                          parser_tables: list[dict[str, Any]] | None = None, *,
+                          context_tables: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Extract draft cell facts once, preserving nulls, headers and exact evidence.
 
     No inferred major/type/unit: row identity and attribute are copied from the table.
     Ambiguous width/header/conflicts require review, never coerce empty cells to zero.
     """
     content_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
-    tables = _tables(markdown, page_count)
+    tables = _tables(markdown, page_count) if context_tables is None else context_tables
     facts, issues = [], []
     data_tables = [table for table in (parser_tables or []) if len(table.get("headers", [])) >= 2]
     if data_tables and not tables:
@@ -135,6 +136,11 @@ def build_source_artifact(markdown: str, page_count: int, metadata: dict[str, An
 def get_source_artifact(revision: Any) -> dict[str, Any]:
     """Legacy compatibility computes a read-only draft, never mutates published data."""
     stored = (revision.parse_provenance or {}).get("structured_artifact")
+    if (revision.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
+        from app.modules.knowledge.services.qnu_serving import validate_projection_binding
+
+        validate_projection_binding(revision, stored)
+        return stored
     if stored and stored.get("content_hash") == revision.canonical_hash:
         return stored
     from app.modules.knowledge.services.source_pages import manifest_page_count
@@ -157,7 +163,8 @@ def get_structured_review_state(revision: Any) -> tuple[str, bool, int]:
     issues = list(artifact.get("issues") or [])
     review_status = str((artifact.get("review") or {}).get("status") or "auto_ready")
     approved = review_status == "approved"
-    requires_review = not approved and (review_status == "required" or bool(issues))
+    unresolved_standard_cells = artifact.get("input_format") == "qnu-rag-projection/v1" and bool(artifact.get("unresolved_cell_count"))
+    requires_review = unresolved_standard_cells or (not approved and (review_status == "required" or bool(issues)))
     effective_status = "required" if requires_review else review_status
     return effective_status, requires_review, len(issues)
 
@@ -166,6 +173,15 @@ def add_layout_issues(artifact: dict[str, Any], pages: list[dict[str, Any]]) -> 
     """Retain visual uncertainty instead of making chart numbers into facts."""
     for page in pages:
         number = page.get("page_number", page.get("page"))
+        for text in page.get("margin_candidates", []):
+            artifact["issues"].append({"code": "REPEATED_MARGIN_REVIEW", "page_number": number,
+                                       "message": "Chữ lặp ở mép trang được giữ nguyên; kiểm tra header/footer.",
+                                       "candidate_text": text})
+        orders = [b.get("order", b.get("reading_order")) for b in page.get("blocks", [])]
+        orders = [order for order in orders if isinstance(order, int)]
+        if len(set(orders)) != len(orders):
+            artifact["issues"].append({"code": "READING_ORDER_REVIEW", "page_number": number,
+                                       "message": "Thứ tự khối bị lặp; kiểm tra bố cục, không tự đảo khối."})
         rescue = page.get("metadata_rescue")
         if rescue:
             artifact["issues"].append({"code": "METADATA_OCR_REVIEW", "page_number": number,

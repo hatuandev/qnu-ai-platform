@@ -81,7 +81,8 @@ async def test_short_followup_resolves_before_retrieval_instead_of_empty_no_answ
           patch("app.modules.rag.service.hybrid_retriever.resolve_retrieval_snapshot", AsyncMock(return_value=snapshot())),
           patch("app.modules.rag.service.fact_layer.lookup_facts", AsyncMock(return_value=[])),
           patch("app.modules.rag.service.hybrid_retriever.retrieve", AsyncMock(return_value=[])) as retrieve,
-          patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=[]))):
+          patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=[])),
+          patch("app.modules.rag.prose_fallback.answer_from_prose", AsyncMock(return_value=None))):
         result = await RagService().ask(db, req)
     assert standalone in retrieve.call_args.kwargs["query"]
     assert result.answer_decision["question_resolution"]["current_question"] == "sao ít thế"
@@ -216,6 +217,29 @@ def test_unproven_year_is_rejected_but_omitted_source_remains_unknown():
     assert validated_scopes(plan, catalog, {}, "Các ngành")["source"].year is None
     assert render_records(records, validated_scopes(plan, catalog, {}, "Các ngành năm 2026"), {},
                           snapshot(), requested_years={2026}).status == "insufficient_context"
+
+
+def test_uncertain_records_leave_main_list_but_stay_cited_for_review():
+    from app.modules.rag.combination_records import CombinationRecord
+
+    verified = CombinationRecord("7123456", "Alpha", ["(Toán, Lý, Hóa)"],
+                                     block("Ngành Alpha mã 7123456 xét tổ hợp Toán Lý Hóa."), (2026,))
+    missing_code = CombinationRecord("", "Tên chưa rõ mã", ["(Toán, Lý, Hóa)"],
+                                     block("Ngành chưa rõ mã xét tổ hợp Toán Lý Hóa.", 1), (2026,))
+    code_as_name = CombinationRecord("7520201TA", "7520201TA", ["(Toán, Lý, Hóa)"],
+                                     block("Mã 7520201TA xét tổ hợp Toán Lý Hóa.", 2), (2026,))
+    scopes = {"source": EnumerationScope(source_id="source", year=2026)}
+    result = render_records([verified, missing_code, code_as_name], scopes, {}, snapshot())
+    assert result.status == "insufficient_context"
+    assert result.answer_decision["status"] == "partial"
+    assert result.answer_decision["missing_code_count"] == 1
+    assert result.answer_decision["unresolved_name_count"] == 1
+    main, review = result.answer.split("**Cần đối chiếu thêm**")
+    assert "Alpha" in main and "Tên chưa rõ mã" not in main and "7520201TA" not in main
+    assert "Tên chưa rõ mã" in review and "7520201TA" in review and "Source" in review
+    assert "1 ngành đã xác minh" in main and "2 mục cần đối chiếu thêm" in main
+    assert len(result.answer_decision["records"]) == 3  # nothing dropped from trace
+    assert len(result.citations) >= 3
 
 
 def test_historical_combination_columns_never_inherit_another_column_or_document_year():

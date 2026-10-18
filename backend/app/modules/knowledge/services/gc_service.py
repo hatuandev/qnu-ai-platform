@@ -75,7 +75,7 @@ class KnowledgeArtifactGCService:
             get_scoped_collection,
         )
 
-        col = await get_scoped_collection(db, collection_id, actor=actor)
+        col = await get_scoped_collection(db, collection_id, actor=actor, for_update=not dry_run)
 
         # Checkpoint: Cancel check before start
         if job_id and await is_job_cancelled(job_id, db=db):

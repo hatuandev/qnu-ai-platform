@@ -152,6 +152,17 @@ export interface ApproveDocumentResult {
 }
 
 export interface DocumentVerificationData {
+  canonical_format?: string;
+  unmapped_markdown?: string;
+  pagination_known?: boolean;
+  canonical_hash?: string | null;
+  content_integrity?: ContentIntegrityReport;
+  content_review?: {
+    actor_id?: string;
+    reason?: string;
+    at?: string;
+    base_revision_id?: string;
+  };
   citation_metadata?: Record<string, string | null>;
   source_metadata?: Record<string, unknown>;
   structured_artifact?: SourceArtifact;
@@ -179,6 +190,7 @@ export interface DocumentVerificationData {
     image_url?: string;
     markdown_content: string;
     raw_text: string;
+    raw_text_available?: boolean;
     bounding_boxes: DocumentBoundingBox[];
     regions: DocumentRegion[];
     dimensions?: {
@@ -205,6 +217,7 @@ export interface FactItem {
 }
 
 export interface SourceArtifact {
+  content_integrity?: ContentIntegrityReport;
   temporal_metadata?: {
     issued_date: {
       value: string | null;
@@ -932,6 +945,8 @@ export interface KnowledgeImportBatchResponse {
 // ==============================================================================
 
 export interface KnowledgeSourceRevisionResponse {
+  canonical_format?: string;
+  qnu_markdown_status?: string | null;
   id: string;
   binding_id: string;
   revision_no: number;
@@ -990,6 +1005,34 @@ export interface KnowledgeSourceDetailResponse {
 
 export interface UpdateSourceContentRequest {
   canonical_markdown: string;
+  change_reason?: string;
+  expected_canonical_hash?: string;
+}
+
+export interface ContentIntegrityIssue {
+  id: string;
+  code: string;
+  severity: "info" | "warning";
+  message: string;
+  page_number: number | null;
+  line_number: number | null;
+}
+
+export interface ContentIntegrityReport {
+  version: string;
+  content_hash: string;
+  baseline_hash?: string | null;
+  issues: ContentIntegrityIssue[];
+  changes: Record<string, unknown>;
+  requires_review: boolean;
+  semantic_correctness: "not_measured";
+}
+
+export interface CleanContentPreview {
+  revision_id: string;
+  base_hash: string | null;
+  canonical_markdown: string;
+  report: ContentIntegrityReport;
 }
 
 export interface SourceContextEditRequest {

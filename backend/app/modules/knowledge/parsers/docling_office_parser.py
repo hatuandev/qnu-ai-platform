@@ -91,6 +91,7 @@ class DoclingOfficeParser(BaseDocumentParser):
                 "parser_backend": backend_name,
                 "source_format": self.extension,
             },
+            docling_document=document,
         )
 
     @staticmethod

@@ -5,6 +5,7 @@ import logging
 
 from app.core.database import AsyncSessionFactory
 from app.core.evidence_policy import EvidencePolicy
+from app.core.retrieval_policy import configured_policy
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.reranker import reranker_client
 from app.modules.rag.retriever import hybrid_retriever
@@ -17,16 +18,23 @@ async def retrieve_anchors(req: AskRequest, snapshot: RetrievalSnapshot, query: 
                            policy: EvidencePolicy, candidate_mode: bool,
                            data_years: list[int] | None = None) -> list[FusionCandidate]:
     try:
+        retrieval = configured_policy(req.runtime_policy)
+        trace = {}
         async with asyncio.timeout(policy.retrieval_timeout_seconds):
             # Cancelling slow dense/FTS anchors must not invalidate the parent
             # transaction used to read canonical source spans and reviewed facts.
             async with AsyncSessionFactory() as anchor_db:
-                return await hybrid_retriever.retrieve(db=anchor_db, collection_id=req.collection_id,
+                result = await hybrid_retriever.retrieve(db=anchor_db, collection_id=req.collection_id,
                     query=query, top_k=12, rerank_top_k=5, tenant_id=req.tenant_id, workspace_id=req.workspace_id,
                     snapshot=snapshot, reranker_policy={**(req.reranker_policy or {}), "enabled": False},
                     data_years=data_years,
+                    **({"retrieval_policy": retrieval, "return_candidates": True} if retrieval else {}),
+                    diagnostics=trace,
                     **({"candidate_mode": True, "read_mode_override": "revisioned"} if candidate_mode else {}))
+                req._retrieval_diagnostics.setdefault("anchor_stages", []).append(trace)
+                return result
     except TimeoutError:
+        req._retrieval_diagnostics.setdefault("anchor_stages", []).append({"status": "timeout"})
         logger.warning("evidence_anchors_timeout snapshot=%s; using published canonical/facts ranking", snapshot.snapshot_id)
         return []
 

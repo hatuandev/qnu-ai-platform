@@ -46,6 +46,8 @@ class OCRExtractResponse(BaseModel):
     latency_ms: float
     raw_text: str
     pages: list[OCRPageResult] = Field(default_factory=list)
+    # Internal evidence only: never inline provider payloads in public API responses/logs.
+    raw_evidence: dict[str, Any] = Field(default_factory=dict, exclude=True, repr=False)
 
 
 class StudioOCRRegion(BaseModel):

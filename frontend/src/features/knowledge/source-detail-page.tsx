@@ -61,6 +61,7 @@ import type {
   KnowledgeSourceDetailResponse,
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
+import { QnuStandardEditor } from "./components/qnu-standard-editor";
 import { SourceContextEditor } from "./components/source-context-editor";
 import { refreshSourceQueries } from "./utils/source-query-cache";
 
@@ -91,6 +92,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
   // Editing state
   const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
   const [editedMarkdown, setEditedMarkdown] = useState("");
+  const [editReason, setEditReason] = useState("");
 
   // Review modal state
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -149,16 +151,23 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
   const updateContentMutation = useMutation({
     mutationFn: () => {
       if (!activeRev?.id) throw new Error("Chưa có bản sửa đổi để cập nhật.");
+      if (!editReason.trim())
+        throw new Error("Hãy ghi lý do hiệu đính trước khi lưu.");
       return knowledgeApi.updateSourceRevisionContent(
         collectionId,
         sourceId,
         activeRev.id,
         editedMarkdown,
+        {
+          change_reason: editReason.trim(),
+          expected_canonical_hash: activeRev.canonical_hash ?? undefined,
+        },
       );
     },
     onSuccess: async (revision) => {
       toast.success("Đã lưu hiệu đính nội dung Markdown chuẩn thành công.");
       setIsEditingMarkdown(false);
+      setEditReason("");
       await refreshSourceQueries(queryClient, collectionId, sourceId);
       setSelectedRevisionId(revision.id);
     },
@@ -551,75 +560,103 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
         {/* Tab 1: Canonical Markdown Content */}
         <TabsContent value="content" className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-xs text-muted-foreground">
-              {isEditingMarkdown
-                ? "Chế độ hiệu đính Markdown: Bạn có thể chỉnh sửa cấu trúc văn bản hoặc tiêu đề trước khi lập chỉ mục."
-                : "Nội dung Markdown đã được chuẩn hóa qua tầng bóc tách và làm sạch Unicode NFC."}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {isEditingMarkdown ? (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => {
-                      setIsEditingMarkdown(false);
-                      setEditedMarkdown(activeRev?.canonical_markdown || "");
-                    }}
-                  >
-                    Hủy
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-8 text-xs gap-1.5"
-                    disabled={updateContentMutation.isPending}
-                    onClick={() => updateContentMutation.mutate()}
-                  >
-                    {updateContentMutation.isPending ? (
-                      <RefreshCw className="size-3.5 animate-spin" />
-                    ) : (
-                      <Save className="size-3.5" />
-                    )}
-                    <span>Lưu Thay Đổi</span>
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5"
-                  onClick={() => setIsEditingMarkdown(true)}
-                >
-                  <Pencil className="size-3.5" />
-                  <span>Hiệu đính Markdown</span>
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <Card className="border border-border">
-            <CardContent className="p-4">
-              {isEditingMarkdown ? (
-                <Textarea
-                  value={editedMarkdown}
-                  onChange={(e) => setEditedMarkdown(e.target.value)}
-                  rows={20}
-                  className="font-mono text-xs leading-relaxed resize-y bg-background"
-                />
-              ) : activeRev?.canonical_markdown ? (
-                <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap max-h-[600px] overflow-y-auto p-2">
-                  {activeRev.canonical_markdown}
-                </pre>
-              ) : (
-                <div className="py-12 text-center text-xs text-muted-foreground">
-                  Chưa có nội dung Markdown cho bản sửa đổi này.
+          {activeRev?.qnu_markdown_status === "ready" ? (
+            <QnuStandardEditor
+              key={activeRev.id}
+              collectionId={collectionId}
+              sourceId={sourceId}
+              revision={activeRev}
+              onSaved={setSelectedRevisionId}
+            />
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">
+                  {isEditingMarkdown
+                    ? "Chế độ hiệu đính Markdown: Bạn có thể chỉnh sửa cấu trúc văn bản hoặc tiêu đề trước khi lập chỉ mục."
+                    : "Nội dung Markdown đã được chuẩn hóa qua tầng bóc tách và làm sạch Unicode NFC."}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                <div className="flex items-center gap-2">
+                  {isEditingMarkdown ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs"
+                        onClick={() => {
+                          setIsEditingMarkdown(false);
+                          setEditedMarkdown(
+                            activeRev?.canonical_markdown || "",
+                          );
+                        }}
+                      >
+                        Hủy
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs gap-1.5"
+                        disabled={updateContentMutation.isPending}
+                        onClick={() => updateContentMutation.mutate()}
+                      >
+                        {updateContentMutation.isPending ? (
+                          <RefreshCw className="size-3.5 animate-spin" />
+                        ) : (
+                          <Save className="size-3.5" />
+                        )}
+                        <span>Lưu Thay Đổi</span>
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5"
+                      onClick={() => setIsEditingMarkdown(true)}
+                    >
+                      <Pencil className="size-3.5" />
+                      <span>Hiệu đính Markdown</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Card className="border border-border">
+                <CardContent className="p-4">
+                  {isEditingMarkdown ? (
+                    <div className="space-y-3">
+                      <Textarea
+                        aria-label="Lý do hiệu đính"
+                        value={editReason}
+                        maxLength={2000}
+                        onChange={(e) => setEditReason(e.target.value)}
+                        placeholder="Lý do hiệu đính sau khi đối chiếu nguồn…"
+                        rows={2}
+                      />
+                      <Textarea
+                        value={editedMarkdown}
+                        onChange={(e) => setEditedMarkdown(e.target.value)}
+                        rows={20}
+                        className="font-mono text-xs leading-relaxed resize-y bg-background"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Tạo revision chờ duyệt; không thay nguồn/vector đang
+                        xuất bản. Dùng Studio để đối chiếu và kiểm tra chi tiết.
+                      </p>
+                    </div>
+                  ) : activeRev?.canonical_markdown ? (
+                    <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap max-h-[600px] overflow-y-auto p-2">
+                      {activeRev.canonical_markdown}
+                    </pre>
+                  ) : (
+                    <div className="py-12 text-center text-xs text-muted-foreground">
+                      Chưa có nội dung Markdown cho bản sửa đổi này.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* Tab 2: Quality Gate */}
@@ -890,7 +927,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                 htmlFor="source-review-comment"
                 className="font-medium text-foreground block"
               >
-                Ghi chú phê duyệt (Tùy chọn)
+                Ghi chú đối chiếu (bắt buộc với bản hiệu đính)
               </label>
               <Textarea
                 id="source-review-comment"

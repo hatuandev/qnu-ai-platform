@@ -46,7 +46,7 @@ async def get_scoped_collection(
     stmt = select(KnowledgeCollection).where(KnowledgeCollection.id == collection_id)
     stmt = apply_actor_scope(stmt, KnowledgeCollection, actor)
     if for_update:
-        stmt = stmt.with_for_update()
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
 
     res = await db.execute(stmt)
     if inspect.isawaitable(res):

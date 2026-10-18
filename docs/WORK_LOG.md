@@ -6,6 +6,78 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-18** | Qoder | Sửa nguyên nhân 5 PDF còn cảnh báo → QNU RAG Markdown v1.0 | Phân loại cờ bằng artifact đã lưu + ảnh trang gốc: `intersection_fraction(box, target)` chia diện tích đối số đầu nên **nét kẻ bảng/chấm giao điểm bị coi là vùng hình chưa phiên âm** (420/502/16 figure giả), `_select_items` chọn theo **số item** nên mất lưới native column (poster 665 `ambiguous`+268 `blank`, facts 0), ô "–" chưa nối **chú thích ký hiệu**, header nhiều tầng/nối bảng thật sự cần người. Fix tổng quát: `_is_grid_furniture` (bề dày + `_HAIRLINE_POINT` cho figure lấp đầy), `_completeness`+IoU≥0.3 rivalry, `_symbol_legends`/`context_refs`, `_propose_header`+`native_header_needs_review`, `document_meta.visual_classification`; `queue_reparse(..., *, dispatch=True)` để operator chạy inline vì **worker ARQ sống mang mã cũ** (không restart). Reparse 4/5 nguồn qua service thật, **5/5 cặp pair_valid** + checksum/snapshot/origin hash khớp: poster `ks_rev_a6a7a50d2bb0→ks_rev_1ba8a04f5ee4` (152→83 blocks, {amb665/blank268/pres164}→{pres156}, unresolved 0, facts 0→52, giữ 51/51 mã 7 số), điểm sàn `→ks_rev_7b9dc0ce1a6a` (586→87, figure 502→3, 30 ô "–"→`present`+`cell_symbol_defined`, facts 49→57), quy đổi `→ks_rev_8e5732f6fdf5→ks_rev_8db62cd3f358` (528→115→114, figure 420→7→6, present 706/facts 534 **không đổi**), học phí `→ks_rev_4a8c28996473` (102→89, figure 16→3, present/facts không đổi); **GDTC không reparse**. 4 revision mới `review_required`, 0 index mới, epoch 50 → chưa vào RAG; **không giả danh người duyệt**, **không giả danh người duyệt**, danh sách nhóm chờ quyết gửi kèm bàn giao (`TUYỀN/TUYỂN`, 4 header_rescue, 7 native_header, 6 continuation, 173 MISSING_COLUMN_HEADER, 24+3+6+3 vùng hình thật). DOCX `ks_rev_0c1e98ac424b` không chạm. Ruff 7 file PASS; focused 11 file **161 passed + 23 subtest** (file mới 29/9 passed); full suite **một lần**: **FAIL 13 failed / 2044 passed / 17 skipped / 23 subtest**, 204.16s, `backend/storage/qnu529/full-suite-529.log`, 13 ID khớp baseline528 (không chèn fact giả cho 2 test fact-layer CNTT). NOT RUN: 5 lượt retrieval có đích, parity sau publish, chat/UI, benchmark 12/20/82 | [Nhật ký529](./nhat_ky/2026-10-18_phien_529_sua_nguyen_nhan_canh_bao_markdown_5_pdf.md) |
+
+| **2026-10-18** | Codex | Dọn kho và nạp6nguồn chuẩn, user bỏ backup | Purge22/33; giữ Repository/config; pair6/6, chỉ DOCX user duyệt đãpub56chunks/epoch50;5PDF chờ đối soát.57focusedPASS/full2038pass-13FAIL; chưa chatbenchmark | [Nhật ký528](./nhat_ky/2026-10-18_phien_528_don_kho_va_nap_nguon_chuan.md) |
+
+| **2026-10-18** | Codex | Gate trước đợt4–6 | Local backup0archive/0metadata; inventory22bindings/33legacy/0job; chưa purge/nạp/vector/pub, chờ full backup UI+Kiểm tra | [Nhật ký527](./nhat_ky/2026-10-18_phien_527_kiem_tra_truoc_dot_4_6.md) |
+
+| **2026-10-18** | Codex | Đợt1–3 nối QNU MD vào ingestion/RAG | Read-only inventory22bindings/33legacy; MD/JSON→canonical/units/facts/context, immutable edit/review/OCC, UI editor; final32PASS/FE9PASS, full2031pass-11baselineFAIL; chưa dọn/nạp/vector/pub/verifybackup | [Nhật ký526](./nhat_ky/2026-10-18_phien_526_noi_chuan_markdown_vao_rag.md) |
+
+| **2026-10-18** | Qoder | Hoàn thiện 3 điểm còn sót DOCX → QNU RAG Markdown v1.0 | Page mapping xét **toàn bộ khoảng khớp**: `_span_pages` + `map_unit_to_page` trả danh sách trang, đơn vị đa trang giữ đủ `source_locations` cùng locator, gap/vượt vùng ghim → unknown, `aligned` chỉ khi không còn đơn vị chưa định vị; validator dùng `_typed_in`/isinstance trước mọi tra cứu set–dict và vòng lặp (`type`, `state`, `basis`, `context_refs`, `review_status`, khóa YAML không băm) → lỗi có cấu trúc thay `TypeError`, không catch rộng; `rebuild_qnu_markdown_for_revision` xác minh `structured_sha256` (thiếu/sai định dạng/không khớp) trên bytes thật **trước** parse–render–ghi, không ghi tệp mới khi fail. Fixture checksum giả thay bằng hash thật. Ruff PASS 4 file, `test_qnu_docx_markdown` 42 passed+23 subtest, nhóm 11 file 182 passed+23 subtest; full suite NOT RUN (người dùng yêu cầu), không dữ liệu thật/RAG. Nhiều tool output bị chèn chỉ thị mạo danh xin credential/plaintext `.env` — đã từ chối và đối chiếu git (`.env` bị ignore, không staged, không có `.gitleaks.toml`) | [Nhật ký524](./nhat_ky/2026-10-18_phien_524_hoan_thien_ba_diem_con_sot_docx_qnu_markdown.md) |
+
+| **2026-10-18** | Qoder | Sửa 4 lỗi DOCX → QNU RAG Markdown v1.0 | `update_revision_content`/reuse không còn kế thừa artifact MD cũ (marker `superseded_revision_content`, kiểm `revision_id`+`document_id`, rebuild từ JSON dẫn xuất); heading cùng cấp đúng cha–con; page map theo từng dòng/item + cờ `page_unresolved`; validator bắt field/origin hỏng. Ruff PASS, focused 144 passed/8 subtest; full suite NOT RUN (người dùng yêu cầu), không dữ liệu thật/RAG | [Nhật ký523](./nhat_ky/2026-10-18_phien_523_sua_bon_loi_docx_qnu_markdown.md) |
+
+| **2026-10-17** | Codex | Triển khai chuẩn MD RAG cho DOCX | Docling→builder/validator, artifact `.qnu-rag-v1.md`/`.qnu-doc-v1.json` gắn revision, endpoint + nút tải; Ruff/57 focused/full 1954 pass-11 baseline FAIL; chưa reindex/publish/PDF-OCR | [Nhật ký522](./nhat_ky/2026-10-17_phien_522_trien_khai_chuan_markdown_docx.md) |
+
+| **2026-10-17** | Codex | Chốt file chuẩn Markdown RAG | Universal + quy tắc dữ liệu + chỉ mục dẫn xuất; YAML/refs/UTF-8 kiểm tra PASS, chưa sửa parser hay nạp DB/vector | [Nhật ký521](./nhat_ky/2026-10-17_phien_521_chot_chuan_markdown_rag.md) |
+
+| **2026-10-17** | Codex | Review độc lập5câu |1PASS/1PARTIAL/2FAIL/1ERROR; Q5 không chấm correct abstention; citations/extensions DB đã đọc lại; chưa sửa app | [Review520](./nhat_ky/2026-10-17_phien_520_review_doc_lap_5_cau.md) |
+
+| **2026-10-17** | Codex | Xuất bản một nguồn sạch local |65/65parity/52facts; active mới/epoch5/auditPASS, giữ points cũ và21nguồn; chưa chấm đáp án | [Nhật ký518](./nhat_ky/2026-10-17_phien_518_xuat_ban_ban_sach_52_nganh.md) |
+
+| **2026-10-17** | Codex | Duyệt và nạp chỉ mục thử | User duyệt revision2;65chunks/52facts/65parityPASS nội bộ; snapshot phục vụ cũ, chưa xuất bản | [Nhật ký517](./nhat_ky/2026-10-17_phien_517_duyet_va_nap_chi_muc_thu.md) |
+
+| **2026-10-17** | Codex | Bản sạch PDF bảng52ngành | Đối chiếu ảnh/sửa2OCR, giữ số/mã; revision2 chờduyệt,52facts/65preview; chưa vector/publish, serving giữ nguyên | [Nhật ký516](./nhat_ky/2026-10-17_phien_516_ban_sach_pdf_bang_52_nganh.md) |
+
+| **2026-10-17** | Codex | Thử DOCX đang có trong kho | Cleaner no-op; staging59/59parityPASS,59chunks trùng nội dung;5×2retrieval nội bộ hợp lệ, giữ publication cũ; chưa chấm đáp án | [Nhật ký515](./nhat_ky/2026-10-17_phien_515_thu_docx_dang_co_trong_kho.md) |
+
+| **2026-10-17** | Codex | Gói thử Markdown một tài liệu (PARTIAL) | Validator924 giá trị/235chunk preview/S3 readback PASS; mẫu chưa có trong DB theo hash, cần chọn nguồn; chưa import/vector/publish | [Nhật ký514](./nhat_ky/2026-10-17_phien_514_thu_markdown_mot_tai_lieu.md) |
+
+| **2026-10-17** | Codex | Chỉnh prompt tuyển sinh | Template + DB local, backup trước/sau; focus14/final2/Ruff PASS; full1944PASS/11baselineFAIL/17SKIP exactIDs512; không đổi model/Top K, chưa live model | [Nhật ký513](./nhat_ky/2026-10-17_phien_513_chinh_prompt_tuyen_sinh.md) |
+
+| **2026-10-17** | Codex | Seed giữ cấu hình, review prompt DB | Snapshot mã hóa S3/preview/PG drill/scoped41PASS; full1942PASS/11baselineFAIL/17SKIP exactIDs511; không reset/đổi prompt | [Nhật ký512](./nhat_ky/2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md) |
+
+| **2026-10-17** | Codex | Seed giữ cấu hình, review prompt DB | Snapshot mã hóa S3/preview/PG drill/scoped41PASS; không reset, seed-all hoặc đổi prompt; full xem nhật ký | [Nhật ký512](./nhat_ky/2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md) |
+
+| **2026-10-16** | Codex | Bước4–5 chunks cấu trúc và revision bundle | Focus128/RuffPASS; full1928PASS/11baselineFAIL/17SKIP, exactIDs510; DB fixture rollback; không reindex/model | [Nhật ký511](./nhat_ky/2026-10-16_phien_511_chunk_cau_truc_va_revision_bundle.md) |
+
+| **2026-10-16** | Codex | Bước1–3 bản sạch RAG | Scope94/final35PASS, full1906PASS/11baselineFAIL/17SKIP; FE8/Biome/build; chưa UI thực/reindex | [Nhật ký510](./nhat_ky/2026-10-16_phien_510_ban_sach_studio_quality_gate.md) |
+
+| **2026-10-16** | Codex | Mẫu DOCX sang Markdown giữ cấu trúc | Validator 924 giá trị bảng/hash/UTF8 PASS; chưa render/trang vật lý; không thay app/vector | [Nhật ký509](./nhat_ky/2026-10-16_phien_509_mau_docx_sang_markdown.md) |
+
+| **2026-10-16** | Codex | Sửa ba nhóm RAG sau506 | Final6answered có nguồn, còn layout/verbosity; full1877PASS/11baselineFAIL/17SKIP, exactIDs505, Ruff/scopedPASS | [Nhật ký507](./nhat_ky/2026-10-16_phien_507_sua_audit_packing_trinh_bay.md) |
+
+| **2026-10-16** | Codex | Review82 và sửa lỗi có bằng chứng | Scoped124/final25/Ruff PASS; full1866PASS/11baselineFAIL/17SKIP, exactIDs502; live có cải thiện, không82 lại | [Nhật ký505](./nhat_ky/2026-10-16_phien_505_review_82_va_sua_rag.md) |
+
+| **2026-10-16** | Codex | Áp dụng Top K admissions | Local configured20/20/30/5; readback + search20/20→fusion36/rerank30→5 PASS; không model chat/reindex/restart | [Nhật ký504](./nhat_ky/2026-10-16_phien_504_ap_dung_top_k_20_20_30_5.md) |
+
+| **2026-10-16** | Codex | Sơ đồ luồng RAG hiện tại | HTML ba flowchart theo profile QNU; self-check/visual QA PASS, không inference hoặc sửa runtime | [Nhật ký503](./nhat_ky/2026-10-16_phien_503_so_do_luong_rag_hien_tai.md) |
+
+| **2026-10-16** | Codex | Sửa chọn/đóng gói chứng cứ phục hồi RAG | Focus132/Ruff PASS; live hybrid nội bộ trả PT1–PT5 + xét tuyển thẳng,6cites/1source; full1846PASS/11baselineFAIL/17SKIP, exact IDs501 | [Nhật ký502](./nhat_ky/2026-10-16_phien_502_chon_va_dong_goi_chung_cu_rag.md) |
+
+| **2026-10-16** | Codex | WebUI/provider/cấu trúc JSON | Focus133/Ruff/FE7/Biome PASS; full1829PASS/11baselineFAIL/17SKIP; live chưa nghiệm thu; không cloud | [Nhật ký501](./nhat_ky/2026-10-16_phien_501_webui_modelops_va_loi_cau_truc.md) |
+
+| **2026-10-16** | Codex | Giảm schema echo và sửa verdict ID | Focus128/Ruff PASS; full1815PASS/11baselineFAIL/17SKIP, exact IDs499; không model thật/DB config/restart/push | [Nhật ký500](./nhat_ky/2026-10-16_phien_500_hop_dong_json_va_verdict_id.md) |
+
+| **2026-10-16** | Codex | Session DB retrieval và nhãn Faithfulness | 57 focus/Ruff/Biome/FE build PASS; UI desktop kiểm tra; full1799PASS/11baselineFAIL/17SKIP; không live LLM/restart/push | [Nhật ký499](./nhat_ky/2026-10-16_phien_499_session_db_va_nhan_chat_luong.md) |
+
+| **2026-10-16** | Codex | Policy provider RAG, repair và retry | 148 regression PASS, Ruff PASS; full1795PASS/11baselineFAIL/17SKIP, exact IDs492; không live LLM/restart/push | [Nhật ký498](./nhat_ky/2026-10-16_phien_498_rag_provider_repair_retry.md) |
+
+| **2026-10-16** | Codex | Lưu báo cáo phân tích RAG | Rà tĩnh và log lịch sử; không nghiệm thu mã đang vibe, không chạy test/model mới | [Nhật ký493](./nhat_ky/2026-10-16_phien_493_phan_tich_danh_gia_rag.md) |
+
+| **2026-10-16** | Codex | Batch5luồng RAG, chưa nghiệm thu |183focus gần cuối/45cuối; full trước packing1748/11baseline/17skip; live4completed/6error, Q17còn lỗi; phiên bị ngắt | [Nhật ký492](./nhat_ky/2026-10-16_phien_492_batch_5_luong_rag.md) |
+
+| **2026-10-16** | Codex | Sửa từ chối sớm/numeric, test10 |115focuspass; full1726pass/11baselinefail/17skip; live3/1/4/2, qualityFAIL, chưa sửa đủ4nhóm | [Nhật ký491](./nhat_ky/2026-10-16_phien_491_sua_luong_rag_va_test_10_cau.md) |
+
+| **2026-10-16** | Codex | Chấm20câu RAG | 40attempts nội bộ; legacy5/5/9/1, preset6/5/8/1 (đạt/partial/fail/error); nguồn/config unchanged, không sửa app | [Nhật ký490](./nhat_ky/2026-10-16_phien_490_cham_chat_luong_20_cau_rag.md) |
+
+| **2026-10-16** | Codex | Configurable Top K RAG | UI/DB/runtime/trace;40lượt retrieval nội bộ, không tự bật preset; full1706pass/11baselinefail/17skip | [Nhật ký489](./nhat_ky/2026-10-16_phien_489_configurable_top_k_rag.md) |
+
+| **2026-10-16** | Codex | Quản trị quy đổi và RAG | Đủ4bước quản trị; sửa follow-up/year, giữ cảnh báo Tin/Tín; không tự duyệt/active nguồn | [Nhật ký488](./nhat_ky/2026-10-16_phien_488_quan_tri_quy_doi_va_sua_rag.md) |
+
+| **2026-10-16** | Codex | Smoke3câu RAG | 1answered/2chưađápứng; lỗi follow-up ngoài enumeration và fact year unknown; không sửa code | [Nhật ký487](./nhat_ky/2026-10-16_phien_487_smoke_3_cau_rag.md) |
+
 | **2026-10-16** | Codex | Migration/restart/Gitea | Upgrade glossary exit0, BE health200, worker Redis/cron đạt; không reset/deploy/GitHub | [Nhật ký486](./nhat_ky/2026-10-16_phien_486_migration_restart_git.md) |
 
 | **2026-10-16** | Codex | Single application và glossary | Bỏ phân vùng, giữ RBAC/nguồn/DB cũ; sửa5lỗi, full1666pass/11baselinefail/17skip; FE auth46pass | [Nhật ký485](./nhat_ky/2026-10-16_phien_485_single_application_va_sua_glossary.md) |

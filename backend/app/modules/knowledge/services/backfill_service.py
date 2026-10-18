@@ -49,7 +49,7 @@ class BackfillV3Service:
         collection_id: str,
         actor: Any | None = None,
     ) -> BackfillV3Report:
-        col = await get_scoped_collection(db, collection_id, actor=actor)
+        col = await get_scoped_collection(db, collection_id, actor=actor, for_update=True)
 
         # 1. Ensure a default active VectorGeneration exists
         gen_stmt = (

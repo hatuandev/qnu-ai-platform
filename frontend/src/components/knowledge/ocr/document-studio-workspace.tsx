@@ -12,7 +12,12 @@ import { toast } from "sonner";
 import { BackButton } from "@/components/admin/back-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CleanContentReview } from "@/features/knowledge/components/clean-content-review";
 import { VectorLoadControls } from "@/features/knowledge/components/vector-load-controls";
+import {
+  buildStudioMarkdown,
+  mapCleanPages,
+} from "@/features/knowledge/utils/clean-content";
 import { refreshSourceQueries } from "@/features/knowledge/utils/source-query-cache";
 import { saveStudioRevision } from "@/features/knowledge/utils/studio-actions";
 import { mapVerificationDataToStudioDoc } from "@/features/knowledge/utils/studio-mapper";
@@ -25,6 +30,7 @@ import {
   type StudioOCRRegion,
 } from "@/services/api-client";
 import { knowledgeApi } from "@/services/knowledge-api";
+import type { ContentIntegrityIssue } from "@/types/knowledge";
 import { OcrCanvas } from "./ocr-canvas";
 import { OcrInspector } from "./ocr-inspector";
 import { OcrToolbar } from "./ocr-toolbar";
@@ -65,6 +71,8 @@ export const DocumentStudioWorkspace: React.FC<
 
   // Editable markdown state per page
   const [editedPages, setEditedPages] = useState<Record<number, string>>({});
+  const [isReviewVisible, setIsReviewVisible] = useState(false);
+  const [reviewReason, setReviewReason] = useState("");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRescanning, setIsRescanning] = useState<boolean>(false);
@@ -145,6 +153,7 @@ export const DocumentStudioWorkspace: React.FC<
       }
       const studioDoc = mapVerificationDataToStudioDoc(verificationData);
       setDoc(studioDoc);
+      setReviewReason("");
       setCurrentPage(1);
 
       const initialEdits: Record<number, string> = {};
@@ -242,6 +251,19 @@ export const DocumentStudioWorkspace: React.FC<
 
   const handleSaveRevision = async (approve = false) => {
     if (!doc) return;
+    if (hasEdits && doc.canonicalFormat === "qnu-rag-projection/v1") {
+      toast.error(
+        "Hiệu đính tại bản QNU Markdown trong trang chi tiết nguồn để giữ đồng bộ cấu trúc. Studio dùng để đối chiếu và duyệt.",
+      );
+      return;
+    }
+    if ((hasEdits || approve) && !reviewReason.trim()) {
+      setIsReviewVisible(true);
+      toast.error(
+        "Hãy ghi lý do hiệu đính hoặc xác nhận đối chiếu trước khi lưu/duyệt.",
+      );
+      return;
+    }
     setIsApproving(true);
     setIndexingStage(approve ? "Đang duyệt..." : "Đang lưu...");
     try {
@@ -250,12 +272,11 @@ export const DocumentStudioWorkspace: React.FC<
         if (!doc.revisionId)
           throw new Error("Không xác định được bản đang hiển thị.");
         const markdown = hasEdits
-          ? doc.pages
-              .map(
-                (p) =>
-                  `<!-- Trang ${p.pageNumber} -->\n\n${editedPages[p.pageNumber] ?? p.markdown}`,
-              )
-              .join("\n\n")
+          ? buildStudioMarkdown(
+              doc.pages,
+              editedPages,
+              doc.paginationKnown !== false,
+            )
           : undefined;
         const targetId = await saveStudioRevision(
           knowledgeApi,
@@ -268,6 +289,7 @@ export const DocumentStudioWorkspace: React.FC<
           },
           markdown,
           approve,
+          { reason: reviewReason.trim(), expectedHash: doc.canonicalHash },
         );
         await refreshSourceQueries(queryClient, collection.id, documentId);
         const verified = await knowledgeApi.getSourceStudioView(
@@ -278,6 +300,7 @@ export const DocumentStudioWorkspace: React.FC<
         const refreshed = mapVerificationDataToStudioDoc(verified);
         savedRevisionId = refreshed.revisionId;
         setDoc(refreshed);
+        setReviewReason("");
         setEditedPages(
           Object.fromEntries(
             refreshed.pages.map((p) => [p.pageNumber, p.markdown]),
@@ -318,13 +341,11 @@ export const DocumentStudioWorkspace: React.FC<
 
   const handleDownloadResults = () => {
     if (!doc) return;
-    const fullMarkdown = doc.pages
-      .map((p) =>
-        editedPages[p.pageNumber] !== undefined
-          ? editedPages[p.pageNumber]
-          : p.markdown,
-      )
-      .join("\n\n---\n\n");
+    const fullMarkdown = buildStudioMarkdown(
+      doc.pages,
+      editedPages,
+      doc.paginationKnown !== false,
+    );
     const blob = new Blob([fullMarkdown], {
       type: "text/markdown;charset=utf-8",
     });
@@ -335,6 +356,14 @@ export const DocumentStudioWorkspace: React.FC<
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Đã tải xuống tệp Markdown bóc tách!");
+  };
+
+  const handleLocateIssue = (issue: ContentIntegrityIssue) => {
+    if (issue.page_number) handlePageChange(issue.page_number);
+    else
+      toast.info(
+        "Vị trí trang chưa xác minh; xem dòng Markdown trong bản toàn văn.",
+      );
   };
 
   if (isLoading) {
@@ -431,6 +460,13 @@ export const DocumentStudioWorkspace: React.FC<
         {/* Right Actions */}
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           <Button
+            size="sm"
+            variant={isReviewVisible ? "secondary" : "outline"}
+            onClick={() => setIsReviewVisible((value) => !value)}
+          >
+            Đối chiếu
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={handleRescanLayout}
@@ -514,7 +550,7 @@ export const DocumentStudioWorkspace: React.FC<
               ? "MD sẵn sàng"
               : "Chờ duyệt / xử lý"}
         </Badge>
-        <span>Lưu Markdown → Duyệt nếu cần → Nạp vector → Xuất bản</span>
+        <span>Lưu bản sạch → Duyệt → Nạp vector → Xuất bản</span>
       </div>
 
       {/* Indexing Progress Banner */}
@@ -542,6 +578,14 @@ export const DocumentStudioWorkspace: React.FC<
           >
             Đóng
           </Button>
+        </div>
+      )}
+
+      {doc.unmappedMarkdown && (
+        <div className="border-b bg-warning/10 px-4 py-2 text-sm text-foreground shrink-0">
+          Một số khối chưa xác định được trang duy nhất. Chúng không được gán
+          vào trang đầu; xem đầy đủ trong bản QNU Markdown ở trang chi tiết
+          nguồn trước khi duyệt.
         </div>
       )}
 
@@ -586,27 +630,66 @@ export const DocumentStudioWorkspace: React.FC<
 
           {/* Right: Inspector Tabs */}
           <div className="flex flex-col min-h-0 overflow-hidden">
-            <OcrInspector
-              citationMetadata={doc?.citationMetadata}
-              structuredArtifact={doc?.structuredArtifact}
-              layoutTextAlignment={doc?.layoutTextAlignment}
-              pageData={currentPageData}
-              allPages={doc?.pages || []}
-              documentTitle={doc?.filename}
-              documentFilename={doc?.filename}
-              rightTab={rightTab}
-              onTabChange={setRightTab}
-              markdownViewMode={markdownViewMode}
-              onMarkdownViewModeChange={setMarkdownViewMode}
-              editableMarkdown={currentEditableMarkdown}
-              onMarkdownChange={handleMarkdownChange}
-              selectedRegion={selectedRegion}
-              onSelectRegion={setSelectedRegion}
-              onCopyContent={handleCopyContent}
-              isCopied={isCopied}
-              isEditable={true}
-              onJumpToPage={handlePageChange}
-            />
+            {isReviewVisible && currentPageData ? (
+              <CleanContentReview
+                key={doc.revisionId || documentId}
+                collectionId={collection.id}
+                sourceId={documentId}
+                doc={doc}
+                page={currentPageData}
+                draft={buildStudioMarkdown(
+                  doc.pages,
+                  editedPages,
+                  doc.paginationKnown !== false,
+                )}
+                pageDraft={currentEditableMarkdown}
+                hasEdits={hasEdits}
+                disabled={isApproving}
+                reason={reviewReason}
+                onReasonChange={setReviewReason}
+                onChange={handleMarkdownChange}
+                onLocate={handleLocateIssue}
+                onApply={(markdown) => {
+                  try {
+                    setEditedPages(
+                      mapCleanPages(
+                        markdown,
+                        doc.pages,
+                        doc.paginationKnown !== false,
+                      ),
+                    );
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Không thể ánh xạ trang.",
+                    );
+                  }
+                }}
+              />
+            ) : (
+              <OcrInspector
+                citationMetadata={doc?.citationMetadata}
+                structuredArtifact={doc?.structuredArtifact}
+                layoutTextAlignment={doc?.layoutTextAlignment}
+                pageData={currentPageData}
+                allPages={doc?.pages || []}
+                documentTitle={doc?.filename}
+                documentFilename={doc?.filename}
+                rightTab={rightTab}
+                onTabChange={setRightTab}
+                markdownViewMode={markdownViewMode}
+                onMarkdownViewModeChange={setMarkdownViewMode}
+                editableMarkdown={currentEditableMarkdown}
+                onMarkdownChange={handleMarkdownChange}
+                selectedRegion={selectedRegion}
+                onSelectRegion={setSelectedRegion}
+                onCopyContent={handleCopyContent}
+                isCopied={isCopied}
+                isEditable={true}
+                onJumpToPage={handlePageChange}
+              />
+            )}
           </div>
         </div>
       </div>

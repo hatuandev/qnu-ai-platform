@@ -71,3 +71,35 @@ test("saved alias remains visible even if provider catalog no longer lists it", 
     options[0].value,
   );
 });
+test("declared capabilities keep embedding and reranking out of LLM choices", () => {
+  const providers = [
+    {
+      id: "multi",
+      name: "Multi-purpose provider",
+      code: "multi",
+      type: "custom",
+      circuit_breaker_status: "CLOSED",
+      latency_ms: 0,
+      failure_rate: 0,
+      is_active: true,
+      models: ["opaque-a", "opaque-b", "opaque-c"],
+      model_capabilities: {
+        "opaque-a": { probe_role: "chat", vision: false, reasoning: false },
+        "opaque-b": {
+          probe_role: "embedding",
+          vision: false,
+          reasoning: false,
+        },
+        "opaque-c": { probe_role: "reranker", vision: false, reasoning: false },
+      },
+    },
+  ] as ModelProvider[];
+  assert.deepEqual(
+    buildAssistantModelOptions(providers, "chat").map((m) => m.model),
+    ["opaque-a"],
+  );
+  assert.deepEqual(
+    buildAssistantModelOptions(providers, "reranker").map((m) => m.model),
+    ["opaque-c"],
+  );
+});

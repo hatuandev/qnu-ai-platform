@@ -22,6 +22,7 @@ import {
   type AssistantModelOption,
   selectedModelValue,
 } from "@/features/assistants/model-options";
+import { RetrievalPolicyCard } from "@/features/assistants/retrieval-policy-card";
 import type { KnowledgeCollection } from "@/types";
 
 interface AssistantKnowledgeSectionProps {
@@ -103,6 +104,7 @@ export function AssistantKnowledgeSection({
         </CardContent>
       </Card>
 
+      <RetrievalPolicyCard form={form} onChange={onChange} />
       {/* CARD 2: Cấu Hình Cross-Encoder Reranker */}
       <Card>
         <CardHeader>
@@ -174,11 +176,16 @@ export function AssistantKnowledgeSection({
                 <Field
                   htmlFor="detail-reranker-top-k"
                   label="Top K Chunks Sau Khi Rerank"
-                  hint="Số lượng đoạn văn bản điểm cao nhất được giữ lại để trả lời"
+                  hint={
+                    form.retrieval_policy?.profile === "configured"
+                      ? "Chế độ Tùy chỉnh dùng Đoạn ngữ cảnh chính ở trên thay cho ô này."
+                      : "Số lượng đoạn văn bản điểm cao nhất được giữ lại để trả lời"
+                  }
                 >
                   <Input
                     id="detail-reranker-top-k"
                     type="number"
+                    disabled={form.retrieval_policy?.profile === "configured"}
                     min={1}
                     max={20}
                     value={form.reranker_top_k ?? 5}

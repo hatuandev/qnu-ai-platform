@@ -7,6 +7,80 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên529](./2026-10-18_phien_529_sua_nguyen_nhan_canh_bao_markdown_5_pdf.md) | Sửa nguyên nhân cờ Markdown 5PDF | F1 nét kẻ/chấm không thành figure, F2 native table theo độ đầy đủ ô, F3 điển ký hiệu cho ô "–", F4 căn cứ header cho reviewer; reparse inline 4nguồn, 5cặp pair_valid, điểm sàn586→87blocks/30ô→present, poster665cờ→0unresolved+52facts, quy đổi/học phí giữ nguyên present/facts; 4revision `review_required`, epoch50; Ruff7PASS, focused161PASS, full **13fail/2044pass** khớp baseline528 |
+
+| **2026-10-18** | [Phiên528](./2026-10-18_phien_528_don_kho_va_nap_nguon_chuan.md) | Đợt4–6, user bỏ backup | Purge22/33, nạp6pair chuẩn; DOCX duyệt riêng đãpub56chunks,5PDFchờ;57focusedPASS/full13FAIL; [12câu chưa chạy](./2026-10-18_phien_528_kich_ban_12_cau.md) |
+
+| **2026-10-18** | [Phiên527](./2026-10-18_phien_527_kiem_tra_truoc_dot_4_6.md) | Gate trước đợt4–6 | Backup local rỗng; inventory22nguồn/33legacy/0job; chưa purge/nạp/vector/pub, chờ full backup UI+Kiểm tra |
+
+| **2026-10-18** | [Phiên526](./2026-10-18_phien_526_noi_chuan_markdown_vao_rag.md) | Đợt1–3 nối chuẩn MD vào RAG | Inventory22nguồn/33legacy; pair/edit/review/chunks/context/citation, UI editor; final32PASS/FE9PASS; full2031pass-11baselineFAIL; chưa corpus/vector/pub/backupverify |
+
+| **2026-10-18** | [Phiên524](./2026-10-18_phien_524_hoan_thien_ba_diem_con_sot_docx_qnu_markdown.md) | Hoàn thiện 3 điểm còn sót DOCX→MD chuẩn | Page map xét toàn bộ khoảng khớp (đơn vị đa trang giữ đủ source_locations), validator chặn kiểu sai bằng kiểm tra isinstance thay exception, reuse dựng lại phải xác minh `structured_sha256` trước khi ghi tệp; Ruff PASS, focused 182 passed, full suite NOT RUN |
+
+| **2026-10-18** | [Phiên523](./2026-10-18_phien_523_sua_bon_loi_docx_qnu_markdown.md) | Sửa4lỗi DOCX→MD chuẩn | Artifact stale sau hiệu đính + danh tính revision, heading cùng cấp, page mapping theo từng dòng/item, validator field/origin; Ruff PASS, focused 144 passed; full suite NOT RUN theo yêu cầu |
+
+| **2026-10-17** | [Phiên522](./2026-10-17_phien_522_trien_khai_chuan_markdown_docx.md) | Triển khai chuẩn MD RAG cho DOCX | Docling→builder/validator, artifact content-addressed + endpoint/nút tải; full suite 11 baseline FAIL/1954 PASS; PDF/OCR chưa áp |
+
+| **2026-10-17** | [Phiên521](./2026-10-17_phien_521_chot_chuan_markdown_rag.md) | Chốt file chuẩn MD RAG | Universal + quy tắc dữ liệu + chỉ mục dẫn xuất; chỉ tài liệu, chưa triển khai parser |
+
+| **2026-10-17** | [Phiên520](./2026-10-17_phien_520_review_doc_lap_5_cau.md) | Review độc lập5câu |Chấm lại Q4/Q5 theo đáp án gốc, kiểm citations/extensions; không sửa runtime |
+
+| **2026-10-17** | [Phiên518](./2026-10-17_phien_518_xuat_ban_ban_sach_52_nganh.md) | Xuất bản bản sạch local |65/65parity,52facts; snapshot đọc bản mới, giữ index cũ/21nguồn khác |
+
+| **2026-10-17** | [Phiên517](./2026-10-17_phien_517_duyet_va_nap_chi_muc_thu.md) | Duyệt và nạp staging |65/65parity,52facts; chỉ mục thử chưa xuất bản, chatbot giữ bản cũ |
+
+| **2026-10-17** | [Phiên516](./2026-10-17_phien_516_ban_sach_pdf_bang_52_nganh.md) | Bản sạch PDF52ngành | Rev2 chờduyệt, sửa OCR theo ảnh, giữ số/mã; chưa vector hoặc xuất bản |
+
+| **2026-10-17** | [Phiên515](./2026-10-17_phien_515_thu_docx_dang_co_trong_kho.md) | Thử DOCX hiện có |59/59staging parity, nội dung trùng; giữ bản đang phục vụ, chưa chấm đáp án |
+
+| **2026-10-17** | [Phiên514](./2026-10-17_phien_514_thu_markdown_mot_tai_lieu.md) | Gói thử Markdown, PARTIAL | Bản mẫu/preview lưu S3, giữ nguyên serving; cần chọn nguồn trước nhập/xuất bản |
+
+| **2026-10-17** | [Phiên513](./2026-10-17_phien_513_chinh_prompt_tuyen_sinh.md) | Chỉnh prompt tuyển sinh | Đã áp dụng DB local, backup mã hóa trước/sau; model/Top K giữ nguyên; chưa live model |
+
+| **2026-10-17** | [Phiên512](./2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md) | Seed giữ cấu hình và review prompt | Capture mã hóa/preview thực; seed không overwrite; không reset hoặc thay prompt |
+
+| **2026-10-17** | [Phiên512](./2026-10-17_phien_512_seed_giu_cau_hinh_va_review_prompt.md) | Seed giữ cấu hình và review prompt | Capture mã hóa/preview thực; seed không overwrite; không reset hoặc thay prompt |
+
+| **2026-10-16** | [Phiên511](./2026-10-16_phien_511_chunk_cau_truc_va_revision_bundle.md) | Bước4–5 bản sạch RAG | Chunk theo cấu trúc, bundle revision, publication/rollback có đối soát; không tự reindex |
+
+| **2026-10-16** | [Phiên510](./2026-10-16_phien_510_ban_sach_studio_quality_gate.md) | Bản sạch và Studio | Chuẩn hóa/raw/diff/quality gates; bản sửa chờ duyệt; UI thực chưa đăng nhập |
+
+| **2026-10-16** | [Phiên509](./2026-10-16_phien_509_mau_docx_sang_markdown.md) | Mẫu DOCX sang Markdown | Giữ cấu trúc/năm/ô gộp, lỗi nguồn cần duyệt; 924 giá trị bảng đối chiếu; không nạp vector |
+
+| **2026-10-16** | [Phiên507](./2026-10-16_phien_507_sua_audit_packing_trinh_bay.md) | Audit/packing/trình bày | Server-owned span IDs, whole proof groups và public/context roles; giữ guard/scope |
+
+| **2026-10-16** | [Phiên505](./2026-10-16_phien_505_review_82_va_sua_rag.md) | Review82 và sửa RAG | Hợp đồng/coverage/compact proof/recovery rỗng; probe nội bộ có cải thiện, chưa toàn82 |
+
+| **2026-10-16** | [Phiên504](./2026-10-16_phien_504_ap_dung_top_k_20_20_30_5.md) | Áp dụng Top K | DB local admissions configured20/20/30/5; service/readback/search thật PASS; không chấm lại đáp án |
+
+| **2026-10-16** | [Phiên503](./2026-10-16_phien_503_so_do_luong_rag_hien_tai.md) | Sơ đồ RAG hiện tại | Ba flowchart bám code: routing, hybrid, prose recovery; self-check và visual QA PASS; không đổi runtime |
+
+| **2026-10-16** | [Phiên502](./2026-10-16_phien_502_chon_va_dong_goi_chung_cu_rag.md) | Chọn/đóng gói prose RAG | Câu phương thức đạt với hybrid thật; budget cấu hình, nguyên nhóm, kiểm chứng giữ nguyên |
+
+| **2026-10-16** | [Phiên502](./2026-10-16_phien_502_chon_va_dong_goi_chung_cu_rag.md) | Chọn/đóng gói prose RAG | Câu phương thức đạt với hybrid thật; budget cấu hình, nguyên nhóm, kiểm chứng giữ nguyên |
+
+| **2026-10-16** | [Phiên501](./2026-10-16_phien_501_webui_modelops_va_loi_cau_truc.md) | WebUI/provider | Mode ModelOps, draft chưa lưu, sửa định dạng JSON; live nội bộ vẫn insufficient_context |
+
+| **2026-10-16** | [Phiên500](./2026-10-16_phien_500_hop_dong_json_va_verdict_id.md) | Hợp đồng JSON và verdict ID | Hướng dẫn data-only, ID đủ/duy nhất trong repair hữu hạn; không model thật |
+
+| **2026-10-16** | [Phiên499](./2026-10-16_phien_499_session_db_va_nhan_chat_luong.md) | Session DB và nhãn chất lượng | SQL lexical tuần tự, vector vẫn song song; UI Faithfulness chưa đo; 57 focus PASS, 11 baseline FAIL |
+
+| **2026-10-16** | [Phiên498](./2026-10-16_phien_498_rag_provider_repair_retry.md) | Inference RAG an toàn | Provider được duyệt ở server, giữ budget JSON, log metadata, retry hữu hạn; không live benchmark |
+
+| **2026-10-16** | [Phiên493](./2026-10-16_phien_493_phan_tich_danh_gia_rag.md) | Lưu phân tích RAG | Sáu nhóm rủi ro, đối chiếu log490/492; chỉ tài liệu, không test/model mới |
+
+| **2026-10-16** | [Phiên492](./2026-10-16_phien_492_batch_5_luong_rag.md) | Batch5luồng RAG | Chọn/kiểm chứng nguồn, năm, bảng/model, liệt kê/hội thoại; không sửa nguồn/vector/DBpolicy |
+
+| **2026-10-16** | [Phiên491](./2026-10-16_phien_491_sua_luong_rag_va_test_10_cau.md) | Sửa luồng và test10 | Prose recovery/numeric; cuối3đạt/1partial/4fail/2error, chưa đạt nghiệm thu; không đổi nguồn/DBpolicy |
+
+| **2026-10-16** | [Phiên490](./2026-10-16_phien_490_cham_chat_luong_20_cau_rag.md) | Chấm20câu RAG | 40attempts nội bộ; legacy5đạt/5partial/9fail/1error, preset6/5/8/1; không sửa app/config |
+
+| **2026-10-16** | [Phiên489](./2026-10-16_phien_489_configurable_top_k_rag.md) | Configurable Top K RAG | Policy dùng chung, telemetry/inspector,40retrieval-only; không tự bật preset hoặc coi hit là accuracy |
+
+| **2026-10-16** | [Phiên488](./2026-10-16_phien_488_quan_tri_quy_doi_va_sua_rag.md) | Quản trị quy đổi và RAG | Rule active-only; preview/duyệt/audit; follow-up ngắn, year theo nguồn và cảnh báo khác OCR |
+
+| **2026-10-16** | [Phiên487](./2026-10-16_phien_487_smoke_3_cau_rag.md) | Smoke3câu RAG nội bộ | 1answered/2chưađápứng; follow-up và year unknown, chỉ ghi nhận |
+
 | **2026-10-16** | [Phiên486](./2026-10-16_phien_486_migration_restart_git.md) | Migration/restart/Gitea | Xác nhận head glossary, health200, worker chạy; không reset DB/deploy/GitHub |
 
 | **2026-10-16** | [Phiên485](./2026-10-16_phien_485_single_application_va_sua_glossary.md) | Single application và glossary | Bỏ phân vùng API/FE/SQL/Qdrant, giữ tương thích dữ liệu; sửa 5 lỗi, kiểm chứng scoped |

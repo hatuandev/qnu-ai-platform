@@ -173,6 +173,8 @@ async def test_untyped_metric_does_not_promote_all_same_entity_facts_over_the_ro
          patch("app.modules.rag.service.hybrid_retriever.expand_with_neighbors", AsyncMock(return_value={})), \
          patch("app.modules.rag.service.load_row_anchors", AsyncMock(return_value=rows)), \
          patch("app.modules.rag.service.answer_from_rows", AsyncMock(return_value=None)), \
+         patch("app.modules.rag.response_audit.audit_visible_answer", AsyncMock(side_effect=lambda db, req, snap, answer, candidates:
+             {"accepted": True, "candidate_ids": [c.chunk_id for c in candidates]})), \
          patch.object(RagService, "_generate_answer_with_fallback", AsyncMock(return_value="15 / 18 / 600 / 15")) as generation:
         await RagService().ask(db, AskRequest(question="Điểm sàn Quản lý giáo dục 2026?", collection_id="c", module_code="admissions"))
     prompt = generation.call_args.kwargs["llm_messages"][-1].content

@@ -251,6 +251,11 @@ class VectorGenerationService:
         )
         existing_idx = (await db.execute(idx_stmt)).scalars().first()
         if existing_idx:
+            from app.modules.knowledge.services.generation_candidate import (
+                validate_candidate_artifacts,
+            )
+
+            await validate_candidate_artifacts(db, [existing_idx])
             logger.info("Reusing existing index revision %s for generation %s", existing_idx.id, gen.id)
             return existing_idx
 
@@ -417,6 +422,11 @@ class VectorGenerationService:
             "expected_count": db_count,
             "checked_at": utcnow().isoformat(),
         }
+        if chunk_set.chunk_config.get("_bundle"):
+            from app.modules.knowledge.services.derived_bundle import BUNDLE_VERSION
+
+            parity_report.update(derived_bundle_version=BUNDLE_VERSION,
+                                 derived_bundle_hash=chunk_set.chunk_config["_bundle_hash"])
 
         idx_rev.point_ids = point_ids
         idx_rev.parity_report = parity_report

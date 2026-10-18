@@ -30,7 +30,8 @@ async def create_context_revision(db: AsyncSession, collection_id: str, source_i
         raise AppException("Không tìm thấy bản nguồn.", code="SOURCE_REVISION_NOT_FOUND", status_code=404)
     return await source_ingestion_service.update_revision_content(
         db, collection_id, source_id, revision_id, revision.canonical_markdown or "",
-        actor.tenant_id, actor.workspace_id, context_edits=request, actor_id=actor.actor_id)
+        actor.tenant_id, actor.workspace_id, context_edits=request, actor_id=actor.actor_id,
+        expected_canonical_hash=revision.canonical_hash)
 
 
 def review_context_artifact(artifact: dict[str, Any], decision: str, actor_id: str, comment: str | None) -> dict[str, Any]:

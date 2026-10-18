@@ -53,8 +53,9 @@ All records have already been filtered deterministically: all subjects occur in 
 Select source scopes compatible with the requested data year. If no year was specified, include
 EVERY supplied source, separately labelled by the year actually applying to its combination
 records. Do not infer the current year. If actual applicability is unknown use year=null.
-Known years MUST use an allowed_year_proofs entry or verified_years supplied by the server.
-Sources with no allowed year proof and no verified_years must stay year=null. For an explicit
+Known years MUST use an allowed_year_proofs entry, verified_years, or exact proof_ids of
+an explicit prose statement establishing applicability to ALL supplied list records.
+Proposed prose applicability will be independently verified. Issue dates are not proof. For an explicit
 requested year, omit sources with unknown or different applicability. An absent season does NOT
 change the intent: enumerate_entities stays true but scopes=[] when no compatible source exists.
 For a known year give proof_ids of SAME-source passages establishing applicability to the
@@ -77,7 +78,16 @@ async def load_records(db: AsyncSession, req: AskRequest, snapshot: RetrievalSna
         records.extend(record for block in [*blocks, *reviewed] for record in records_from_block(block, subjects))
         # Only exact small source units are scope candidates. No cropped quote or filename.
         proofs.update({b.id: b for b in blocks if not b.is_container and len(b.text) <= 1500 and YEAR.search(b.text)})
-    unique = {(r.block.id, r.code, r.name, tuple(r.combinations)): r for r in records}
+    unique = {}
+    for record in records:
+        block = record.block
+        unit_id = block.unit_id or block.fact_context.get("source_unit_id")
+        if unit_id and unit_id.startswith("qnu:"):
+            identity = (block.binding_id, block.index_revision_id, block.source_revision_id, block.canonical_hash, unit_id)
+            key = (*identity, record.code, record.name, tuple(record.combinations), record.years)
+        else:
+            key = (block.id, record.code, record.name, tuple(record.combinations))
+        unique[key] = record
     return list(unique.values()), proofs
 
 
@@ -99,6 +109,7 @@ def scope_catalog(records: list[CombinationRecord], proofs: dict[str, EvidenceBl
         verified = set.intersection(*(set(r.years or r.block.scope_years) for r in members))
         result.append({"source_id": source_id, "title": members[0].block.title,
             "record_count": len(members), "header_contexts": list(dict.fromkeys(r.block.header_context for r in members)),
+            "record_examples": [r.block.text for r in (members[:1] + members[-1:])],
             "allowed_year_proofs": allowed, "verified_years": sorted(verified),
             "proofs": [{"id": b.id, "text": b.text} for b in selected]})
     return result
@@ -160,26 +171,57 @@ def render_records(records: list[CombinationRecord], scopes: dict[str, Enumerati
     def cell(value: str) -> str:
         return html.escape(clean(value)).replace("|", "\\|")
 
+    def needs_review(row: dict) -> bool:
+        # A code-shaped name (the table put the code where the name belongs) or a
+        # missing code means the identity is not yet reconciled. Never auto-fixed
+        # or fuzzy-merged here; such rows leave the main list for review below.
+        return not row["code"] or clean(row["name"]) == clean(row["code"])
+
     titles = {record.block.source_revision_id: record.block.title for record in records}
-    lines = [f"Tìm thấy **{len(rows)} bản ghi ngành/chương trình** trong các phạm vi nguồn đã đối chiếu.",
-        "Các năm được trình bày riêng; không mặc định dữ liệu cũ áp dụng cho năm hiện tại.",
-        "Một ngành có thể xuất hiện ở nhiều nguồn/năm; số bản ghi không phải số ngành duy nhất.",
-        "| Năm trong nguồn | Mã | Ngành/chương trình | Tổ hợp phù hợp | Nguồn |", "| --- | --- | --- | --- | --- |"]
-    for row in sorted(rows.values(), key=lambda r: (r["year"] or 0, r["code"], r["name"])):
-        lines.append("| " + " | ".join(cell(str(value)) for value in (
+    unique = len({(row["code"], row["name"]) for row in rows.values()})
+    missing_codes = sum(not row["code"] for row in rows.values())
+    unresolved_names = sum(clean(row["name"]) == clean(row["code"]) for row in rows.values() if row["code"])
+    verified = [row for row in rows.values() if not needs_review(row)]
+    review = [row for row in rows.values() if needs_review(row)]
+    source_labels = {source: str(i) for i, source in enumerate(sorted({
+        source for row in rows.values() for source in row["source_ids"]}), 1)}
+
+    def table(rows_subset: list[dict]) -> list[str]:
+        header = ["| Năm trong nguồn | Mã | Ngành/chương trình | Tổ hợp phù hợp | Nguồn |",
+                  "| --- | --- | --- | --- | --- |"]
+        body = ["| " + " | ".join(cell(str(value)) for value in (
             row["year"] or "Chưa xác định", row["code"] or "—", row["name"], "; ".join(row["combinations"]),
-            "; ".join(titles[source] for source in row["source_ids"]))) + " |")
+            ", ".join(source_labels[source] for source in row["source_ids"]))) + " |"
+            for row in sorted(rows_subset, key=lambda r: (r["year"] or 0, r["code"], r["name"]))]
+        return header + body
+
+    lines = [(f"Mình đối chiếu được **{len(records)} bản ghi nguồn**: **{len(verified)} ngành đã xác minh mã+tên**, "
+              f"**{unique} cách ghi mã+tên phân biệt**, và **{len(review)} mục cần đối chiếu thêm**"
+              " (liệt kê riêng bên dưới, không tính vào danh sách chính)."),
+        ("Các mục trùng khít trong cùng năm đã được gộp nguồn; khác năm hoặc chưa rõ năm vẫn giữ riêng. "
+         "Tổng số mục KHÔNG phải số ngành duy nhất.")]
+    lines += table(verified) if verified else ["(Chưa có ngành nào đối chiếu đủ mã+tên.)"]
+    if review:
+        lines += [("\n**Cần đối chiếu thêm** — giữ nguyên cách ghi trong nguồn, chưa tự sửa OCR hay gộp gần giống; "
+                   "mỗi mục kèm nguồn để kiểm tra lại:"),
+                  *table(review)]
+    lines.append("\nNguồn: " + "; ".join(f"{label}. {titles[source]}" for source, label in source_labels.items()))
+    if missing_codes or unresolved_names:
+        lines.append(f"\nTrong phần cần đối chiếu: {missing_codes} mục chưa có mã trong phần trích và "
+                     f"{unresolved_names} mục có tên đang trùng mã.")
     answer = "\n".join(lines)
     if output_guardrail.check(answer).sanitized_text != answer:
         return missing(snapshot, "OUTPUT_GUARDRAIL_CHANGED_RECORDS")
-    return AskResponse(status="answered", answer=answer, answer_format="markdown_table", citations=list(citations.values()),
+    uncertain = bool(missing_codes or unresolved_names)
+    return AskResponse(status="insufficient_context" if uncertain else "answered", answer=answer, answer_format="markdown_table", citations=list(citations.values()),
         retrieval_snapshot=snapshot, snapshot=snapshot, answer_decision={"version": "combination-enumeration-v1",
-            "status": "supported", "reason": "EXHAUSTIVE_TUPLE_FILTER", "records": list(rows.values()),
+            "status": "partial" if uncertain else "supported", "reason": "EXHAUSTIVE_TUPLE_FILTER", "records": list(rows.values()),
+            "missing_code_count": missing_codes, "unresolved_name_count": unresolved_names,
             "count": len(rows), "coverage": "all_matching_records_in_selected_published_scopes"})
 
 
 def missing(snapshot: RetrievalSnapshot, reason: str) -> AskResponse:
-    return AskResponse(status="insufficient_context", answer="Chưa xác minh được danh sách đầy đủ cho tổ hợp và phạm vi năm được hỏi. Bạn có thể chỉ rõ năm hoặc nguồn cần đối chiếu.",
+    return AskResponse(status="insufficient_context", answer="Mình chưa xác minh được danh sách đầy đủ cho tổ hợp và phạm vi năm bạn hỏi. Đây là giới hạn đối chiếu hiện tại, không có nghĩa là không có ngành phù hợp.",
         retrieval_snapshot=snapshot, snapshot=snapshot, answer_decision={"version": "combination-enumeration-v1",
             "status": "missing", "reason": reason})
 
@@ -203,6 +245,9 @@ async def enumerate_combinations(db: AsyncSession, req: AskRequest, snapshot: Re
          "sources": catalog}, max_tokens=1600)
     if not plan.enumerate_entities:
         return None
+    from app.modules.rag.enumeration_scope import audit_scope_candidates
+
+    catalog = await audit_scope_candidates(db, req, plan, catalog)
     try:
         scopes = validated_scopes(plan, catalog, proofs, req.question)
     except ValueError as exc:

@@ -1,0 +1,400 @@
+"""PDF native/OCR evidence → QNU model, independent of the serving Markdown projection."""
+
+from __future__ import annotations
+
+import math
+import re
+from collections import Counter
+from itertools import pairwise
+from typing import Any
+
+from app.modules.knowledge.normalization.qnu_markdown import (
+    QnuBlock,
+    QnuQualityFlag,
+    QnuSourceInfo,
+    QnuSourceLocation,
+    QnuStructuredDocument,
+)
+from app.modules.knowledge.parsers.pdf_evidence import intersection_fraction, reading_order
+from app.modules.knowledge.parsers.pdf_tables import native_table, ocr_table, table_blocks
+
+PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v1"
+# Anything no thicker than this carries a rule, not readable content, whatever painted it.
+_HAIRLINE_POINT = 2.0
+
+
+def _compact(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+def _percent(box: list[float], width: float, height: float) -> list[float]:
+    return [box[0] / width * 100, box[1] / height * 100, box[2] / width * 100, box[3] / height * 100]
+
+
+def _valid_box(box: Any) -> bool:
+    return (isinstance(box, (list, tuple)) and len(box) == 4
+            and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in box)
+            and box[2] > box[0] and box[3] > box[1])
+
+
+def _is_grid_furniture(drawing: dict[str, Any], page_width: float, page_height: float) -> bool:
+    """Ruling strokes and sub-point junction dots carry no letters; a readable image region does."""
+    box = drawing["rect"]
+    short, long_side = min(box[2] - box[0], box[3] - box[1]), max(box[2] - box[0], box[3] - box[1])
+    stroke = drawing.get("width")
+    # A filled rectangle has no stroke width, so its own short side is the thickness.
+    limit = max(2.0 * stroke, _HAIRLINE_POINT) if isinstance(stroke, (int, float)) and stroke > 0 else _HAIRLINE_POINT
+    dot = long_side <= max(limit, 0.002 * min(page_width, page_height))
+    ruling = short <= limit and long_side >= 10 * max(short, 0.1) and long_side <= 2 * max(page_width, page_height)
+    return dot or ruling
+
+
+def _count_rulings(pages: list[dict[str, Any]]) -> int:
+    """Meta count of ruling strokes; the raw evidence JSON still keeps every drawing."""
+    return sum(1 for page in pages for drawing in (page["native"].get("drawings") or [])
+               if _valid_box(drawing.get("rect")) and "rect" in drawing
+               and _is_grid_furniture(drawing, page["native"]["width"], page["native"]["height"]))
+
+
+def _native_spans(page: dict[str, Any]) -> list[tuple[str, list[float]]]:
+    """Blocks of the digital text layer as (compacted text, percent box); used to cross-check OCR structure."""
+    width, height = page["width"], page["height"]
+    spans = []
+    for block in page.get("layout", {}).get("blocks", []):
+        text = "\n".join("".join(span.get("text", "") for span in line.get("spans", [])) for line in block.get("lines", []))
+        if text.strip() and _valid_box(block.get("bbox")):
+            spans.append((_compact(text), _percent(list(block["bbox"]), width, height)))
+    return spans
+
+
+def _native_items(page: dict[str, Any]) -> list[dict[str, Any]]:
+    width, height = page["width"], page["height"]
+    items = []
+    tables = page.get("tables") or []
+    for index, raw in enumerate(tables):
+        items.append({"kind": "table", "table": native_table(raw), "bbox": _percent(raw["bbox"], width, height),
+                      "source_bbox": raw["bbox"], "space": page["bbox_space"], "engine": "native",
+                      "locator": f"pdf:page:{page['page']}/native/table/{index}", "raw": raw})
+    for index, block in enumerate(page.get("layout", {}).get("blocks", [])):
+        lines = ["".join(span.get("text", "") for span in line.get("spans", [])) for line in block.get("lines", [])]
+        text = "\n".join(lines)
+        if not text.strip():
+            continue
+        box = list(block["bbox"])
+        # Suppress only a spatially contained, identical table projection. Raw layout stays intact.
+        if any(intersection_fraction(box, table["bbox"]) >= 0.9 and _compact(text).replace(" ", "") in
+               _compact(" ".join(str(cell or "") for row in table["matrix"] for cell in row)).replace(" ", "")
+               for table in tables):
+            continue
+        spans = [span for line in block.get("lines", []) for span in line.get("spans", [])]
+        items.append({"kind": "text", "text": text, "bbox": _percent(box, width, height),
+                      "source_bbox": box, "space": page["bbox_space"], "engine": "native", "raw": block,
+                      "font_size": max((span.get("size", 0) for span in spans), default=0),
+                      "locator": f"pdf:page:{page['page']}/native/block/{index}"})
+    for index, image in enumerate(page.get("images", [])):
+        items.append({"kind": "figure", "text": "", "bbox": _percent(image["bbox"], width, height),
+                      "source_bbox": image["bbox"], "space": page["bbox_space"], "engine": "native", "raw": image,
+                      "locator": f"pdf:page:{page['page']}/native/image/{index}"})
+    for index, drawing in enumerate(page.get("drawings", [])):
+        box = drawing.get("rect")
+        if not _valid_box(box) or _is_grid_furniture(drawing, width, height) or any(
+                intersection_fraction(box, t["bbox"]) >= 0.9 for t in tables):
+            continue
+        items.append({"kind": "figure", "text": "", "bbox": _percent(box, width, height),
+                      "source_bbox": box, "space": page["bbox_space"], "engine": "native", "raw": drawing,
+                      "locator": f"pdf:page:{page['page']}/native/drawing/{index}"})
+    return items
+
+
+def _ocr_items(page: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = page.get("ocr_raw_page") or {}
+    pruned = raw.get("prunedResult") or raw.get("layout_pruned") or {}
+    blocks = pruned.get("parsing_res_list") or raw.get("blocks") or []
+    dimensions = page.get("ocr_dimensions") or {}
+    width, height = pruned.get("width") or dimensions.get("width"), pruned.get("height") or dimensions.get("height")
+    items = []
+    for index, block in enumerate(blocks):
+        if not isinstance(block, dict):
+            continue
+        text = block.get("block_content", block.get("text", ""))
+        if not isinstance(text, str):
+            continue
+        label = block.get("block_label", block.get("type", "text"))
+        coordinates = block.get("coordinates") or {}
+        box = block.get("block_bbox")
+        if _valid_box(box) and isinstance(width, (int, float)) and isinstance(height, (int, float)) and width > 0 and height > 0:
+            box = _percent(box, width, height)
+        elif coordinates.get("is_valid") and all(k in coordinates for k in ("left", "top", "width", "height")):
+            box = [coordinates["left"], coordinates["top"], coordinates["left"] + coordinates["width"],
+                   coordinates["top"] + coordinates["height"]]
+        else:
+            box = None
+        if not _valid_box(box):
+            box = None
+        table = ocr_table(text) if label == "table" else None
+        items.append({"kind": "table" if table else label, "table": table, "text": text, "bbox": box,
+                      "source_bbox": box, "space": "normalized_percent" if box else None,
+                      "engine": page["engine_used"], "raw": block, "order": block.get("block_order", block.get("order")),
+                      "locator": f"pdf:page:{page['page']}/ocr/block/{index}"})
+    if not items and page.get("ocr_text", "").strip():
+        items.append({"kind": "text", "text": page["ocr_text"], "bbox": None, "source_bbox": None,
+                      "space": None, "engine": page["engine_used"], "raw": raw, "unstructured": True,
+                      "locator": f"pdf:page:{page['page']}/ocr/page"})
+    return items
+
+
+def _item_text(item: dict[str, Any]) -> str:
+    if item.get("table"):
+        return " ".join(cell["raw"] for row in item["table"]["grid"] for cell in row)
+    return item.get("text", "")
+
+
+def _overlap_ratio(a: list[float], b: list[float]) -> float:
+    """Symmetric intersection over union; containment alone cannot compare boxes of very different size."""
+    inter = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _completeness(item: dict[str, Any]) -> float:
+    """Rank two reconstructions of one region by evidence carried, never by source order or engine."""
+    grid = item["table"]["grid"]
+    cells = [cell for row in grid for cell in row]
+    if not cells:
+        return 0.0
+    filled = sum(1 for cell in cells if cell["raw"].strip()) / len(cells)
+    geometry = sum(1 for cell in cells if not cell.get("unresolved")) / len(cells)
+    return (filled + geometry) / 2
+
+
+def _select_items(native: list[dict[str, Any]], ocr: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not ocr:
+        return native
+    chosen = list(ocr)
+    for item in native:
+        if item.get("table") and item.get("bbox"):
+            rivals = [(index, other) for index, other in enumerate(chosen)
+                      if other.get("table") and other.get("bbox") and _overlap_ratio(item["bbox"], other["bbox"]) >= 0.3]
+            if rivals:
+                index, rival = max(rivals, key=lambda pair: _overlap_ratio(item["bbox"], pair[1]["bbox"]))
+                if _completeness(item) > _completeness(rival):
+                    item.setdefault("alternatives", []).append(rival)
+                    chosen[index] = item
+                else:
+                    rival.setdefault("alternatives", []).append(item)
+                continue
+        matches = [other for other in ocr if item.get("bbox") and other.get("bbox") and
+                   intersection_fraction(item["bbox"], other["bbox"]) >= 0.8]
+        if matches:
+            primary = max(matches, key=lambda other: intersection_fraction(item["bbox"], other["bbox"]))
+            if _compact(_item_text(item)) != _compact(_item_text(primary)) and item["kind"] != "figure":
+                primary.setdefault("alternatives", []).append(item)
+            continue
+        # Without geometry, a complete OCR page cannot establish which native span duplicates it.
+        if any(other.get("unstructured") for other in ocr):
+            ocr[0].setdefault("alternatives", []).append(item)
+        else:
+            chosen.append(item)
+    return chosen
+
+
+def _location(item: dict[str, Any], page: dict[str, Any]) -> QnuSourceLocation:
+    return QnuSourceLocation(page=page["page"], page_label=page.get("page_label"), locator=item["locator"],
+                             bbox=item.get("source_bbox"), bbox_space=item.get("space"))
+
+
+def _flags(item: dict[str, Any]) -> list[QnuQualityFlag]:
+    flags = []
+    if item.get("bbox") is None:
+        flags.append(QnuQualityFlag(code="source_geometry_unavailable", detail="Có trang và locator, chưa có tọa độ vùng đáng tin cậy."))
+    if item.get("alternatives"):
+        flags.append(QnuQualityFlag(code="native_ocr_conflict", detail="Hai bản trích xuất không khớp; giữ đối chiếu trong JSON."))
+    if item.get("unstructured"):
+        flags.append(QnuQualityFlag(code="ocr_structure_unavailable", detail="OCR chỉ có văn bản trang; chưa xác minh cấu trúc."))
+    if item.get("kind") == "table" and not item.get("table"):
+        flags.append(QnuQualityFlag(code="table_structure_unresolved", detail="Giữ nguyên nội dung bảng OCR để đối soát."))
+    return flags
+
+
+def _propose_header(item: dict[str, Any], spans: list[tuple[str, list[float]]]) -> None:
+    """Read an OCR table's first row as a header only when the digital text layer repeats every label there."""
+    table, box = item.get("table"), item.get("bbox")
+    if not table or not box or table["header_depth"] or table.get("external_headers") or not table.get("raw_html"):
+        return
+    if len(table["grid"]) < 2:
+        return
+    labels = [cell["raw"] for cell in table["grid"][0] if cell["raw"].strip()]
+    if len(labels) < 2:
+        return
+    band = [box[0], box[1], box[2], box[1] + (box[3] - box[1]) * 0.2]
+    in_band = [text for text, span in spans if intersection_fraction(span, band) >= 0.5]
+    if len([label for label in labels if any(_compact(label) in text for text in in_band)]) != len(labels):
+        return
+    table["header_depth"] = 1
+    table["header_proposal"] = {"basis": "native_text_layer_corroboration", "labels": labels}
+
+
+_SYMBOL_LEGEND = re.compile(r"[\"“”»']\s*(?P<symbol>[^\s\"“”»']{1,3})\s*[\"“”»']\s*[:–—-]\s*(?P<definition>\S.{7,})")
+
+
+def _symbol_legends(pages: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Collect symbol meanings the document itself defines, from its digital text layer only."""
+    found: dict[str, dict[str, Any]] = {}
+    for page in pages:
+        for block in page["native"].get("layout", {}).get("blocks", []):
+            text = "\n".join("".join(span.get("text", "") for span in line.get("spans", [])) for line in block.get("lines", []))
+            for line in text.splitlines():
+                match = _SYMBOL_LEGEND.search(line)
+                if not match:
+                    continue
+                symbol = match["symbol"]
+                if any(character.isalnum() for character in symbol):
+                    continue
+                found.setdefault(symbol, {"symbol": symbol, "page": page["native"]["page"], "line": line.strip()})
+    return found
+
+
+def _link_symbol_legends(blocks: list[QnuBlock]) -> None:
+    """Point every legend-defined cell at the block that carries the defining sentence."""
+    for block in blocks:
+        for field_id, entry in (block.attributes.get("symbol_definitions") or {}).items():
+            legend = next((other for other in blocks if other.id != block.id and other.type in {"text", "note", "list"}
+                           and entry["page"] in {loc.page for loc in other.source_locations}
+                           and _compact(entry["line"]) in _compact(other.body)), None)
+            if legend is None:
+                continue
+            if legend.id not in block.context_refs:
+                block.context_refs.append(legend.id)
+            for flag in block.quality_flags:
+                if flag.code == "cell_symbol_defined" and flag.field_id == field_id and legend.id not in flag.related_block_ids:
+                    flag.related_block_ids.append(legend.id)
+
+
+def _link_continuations(blocks: list[QnuBlock]) -> None:
+    """Propose links using page adjacency and geometry; never silently merge header schemas."""
+    tables = [block for block in blocks if block.type == "table"]
+    for previous, current in pairwise(tables):
+        a, b = previous.source_locations[0], current.source_locations[0]
+        if a.page is None or b.page != a.page + 1:
+            continue
+        left, right = previous.attributes.get("comparison_bbox"), current.attributes.get("comparison_bbox")
+        if not left or not right or left[3] < 80 or right[1] > 25:
+            continue
+        if abs(left[0] - right[0]) > 2 or abs(left[2] - right[2]) > 2:
+            continue
+        if len(previous.attributes["columns"]) != len(current.attributes["columns"]):
+            continue
+        current.attributes["continuation_candidate"] = {"block_id": previous.id, "basis": "inferred_geometry"}
+        current.quality_flags.append(QnuQualityFlag(code="table_continuation_needs_review",
+            detail="Bảng ở biên hai trang có bố cục tương thích; chưa gộp hoặc kế thừa header khi chưa duyệt.",
+            related_block_ids=[previous.id]))
+
+
+def _link_explicit_notes(blocks: list[QnuBlock]) -> None:
+    for note in (block for block in blocks if block.type == "note"):
+        marker = re.match(r"^\s*(\[\d+\]|\[\*+\]|[†‡])", note.body)
+        if not marker:
+            continue
+        same_notes = [other for other in blocks if other.type == "note" and other.body.lstrip().startswith(marker[1])
+                      and other.source_locations[0].page == note.source_locations[0].page]
+        if len(same_notes) != 1:
+            continue
+        for block in blocks:
+            if block.type != "note" and block.source_locations[0].page == note.source_locations[0].page and marker[1] in block.body:
+                block.context_refs.append(note.id)
+
+
+def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) -> QnuStructuredDocument:
+    pages = evidence["pages"]
+    if any(page["native"].get("capture_error") for page in pages):
+        raise ValueError("Native evidence capture incomplete")
+    result = QnuStructuredDocument(title=filename, source=QnuSourceInfo(filename=filename, sha256=sha256,
+                                      page_count=len(pages)), language="und", document_meta={"builder_version": PDF_STRUCTURE_VERSION,
+                                      "page_mapping": {"kind": "physical_pdf", "status": "direct"}})
+    font_counts: Counter[float] = Counter()
+    for page in pages:
+        for item in _native_items(page["native"]):
+            if item.get("text") and item["bbox"][1] < 80:
+                font_counts[item.get("font_size", 0)] += len(item["text"])
+    body_size = font_counts.most_common(1)[0][0] if font_counts else 0
+    sizes = sorted((size for size in font_counts if size > body_size), reverse=True)
+    legends = _symbol_legends(pages)
+    sections: list[tuple[int, str, str]] = []
+    for page in pages:
+        native = _native_items(page["native"])
+        spans = _native_spans(page["native"])
+        items = _select_items(native, _ocr_items(page) if page.get("ocr_selected") else [])
+        ordered = reading_order(items)
+        for index, item in enumerate(ordered):
+            block_id = f"p{page['page']:04d}_b{index + 1:04d}"
+            location, flags = _location(item, page), _flags(item)
+            path, parent = [s[1] for s in sections], sections[-1][2] if sections else None
+            if item.get("table"):
+                _propose_header(item, spans)
+                emitted = table_blocks(item["table"], block_id=block_id, parent_id=parent,
+                    location=location, section_path=path, engine=item["engine"], symbol_definitions=legends)
+                if emitted:
+                    emitted[0].quality_flags.extend(flags)
+                    emitted[0].attributes["comparison_bbox"] = item.get("bbox")
+                    emitted[0].source_data = {"table": item["table"], "alternatives": item.get("alternatives", [])}
+                result.blocks.extend(emitted)
+                continue
+            text, kind = item.get("text", ""), "text"
+            if item["kind"] == "table" and not item.get("table"):
+                fence = "`" * max(3, max((len(run) for run in re.findall(r"`+", text)), default=0) + 1)
+                text = f"{fence}text\n{text}\n{fence}"
+            size = item.get("font_size", 0)
+            if size > body_size and size in sizes and text.strip() and len(text.splitlines()) <= 2:
+                level = sizes.index(size) + 1
+                while sections and sections[-1][0] >= level:
+                    sections.pop()
+                parent = sections[-1][2] if sections else None
+                sections.append((level, text, block_id))
+                path, kind = [s[1] for s in sections], "section"
+                text = f"{'#' * min(level + 1, 6)} {text}"
+                flags.append(QnuQualityFlag(code="heading_inferred_typography", detail="Cấp mục dựa trên cỡ chữ; cần đối soát."))
+            elif item["kind"] in {"title", "section_header"}:
+                flags.append(QnuQualityFlag(code="heading_level_unresolved", detail="OCR có tiêu đề nhưng chưa xác định cấp mục."))
+            elif item["kind"] in {"figure", "image", "chart"}:
+                kind = "figure"
+                flags.append(QnuQualityFlag(code="visual_content_untranscribed", detail="Giữ vùng hình; không suy số liệu từ hình."))
+            elif item["kind"] in {"formula", "equation"} and text.strip():
+                kind = "formula"
+            elif item["kind"] in {"footnote", "header", "footer", "signature", "stamp"}:
+                kind = "note"
+            elif size and size < body_size and item.get("bbox") and item["bbox"][1] > 80:
+                kind = "note"
+                flags.append(QnuQualityFlag(code="footnote_needs_review", detail="Chú thích nhỏ cuối trang; chỉ liên kết khi có ký hiệu rõ ràng."))
+            elif re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", text):
+                kind = "list"
+            if not text.strip() and kind != "figure":
+                continue
+            result.blocks.append(QnuBlock(id=block_id, parent_id=parent, type=kind, source_locations=[location],
+                section_path=path, attributes={"engine_used": item["engine"], "source_role": item["kind"]},
+                quality_flags=flags, body=text, source_data={"raw": item["raw"], "alternatives": item.get("alternatives", [])}))
+        if page["native"].get("table_errors"):
+            result.document_meta.setdefault("extraction_warnings", []).append({"page": page["page"], "code": "native_tables_unavailable"})
+        if page.get("ocr_selected") and not page.get("raw_ocr_available"):
+            result.document_meta.setdefault("extraction_warnings", []).append({"page": page["page"], "code": "raw_ocr_unavailable"})
+        rescue = page.get("header_rescue") or {}
+        audit = rescue.get("audit") or {}
+        if audit.get("accepted_lines"):
+            result.blocks.append(QnuBlock(id=f"p{page['page']:04d}_header_rescue", type="note",
+                source_locations=[QnuSourceLocation(page=page["page"], locator=f"pdf:page:{page['page']}/header-rescue",
+                    bbox=audit.get("bbox"), bbox_space="pymupdf_render_crop_points")],
+                attributes={"source_role": "header_rescue_proposal", "engine_used": audit.get("engine"),
+                            "location_precision": "crop_region"},
+                quality_flags=[QnuQualityFlag(code="header_rescue_needs_review",
+                    detail="Dòng số/ngày được OCR vùng đầu đề xuất; JSON giữ raw và phép biến đổi, chưa xác nhận đúng.")],
+                source_data=rescue, body="\n\n".join(audit["accepted_lines"])))
+    _link_continuations(result.blocks)
+    _link_explicit_notes(result.blocks)
+    _link_symbol_legends(result.blocks)
+    result.stats = {"pages": len(pages), "blocks": len(result.blocks),
+                    "quality_flags": sum(len(block.quality_flags) for block in result.blocks)}
+    result.document_meta["visual_classification"] = {
+        "ruling_strokes_in_source": _count_rulings(pages),
+        "visual_regions_retained": sum(1 for block in result.blocks if block.type == "figure"),
+        "symbol_legend_definitions": len(legends)}
+    result.document_meta["content_status"] = "needs_review" if result.stats["quality_flags"] or result.document_meta.get("extraction_warnings") else "unreviewed"
+    return result

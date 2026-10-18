@@ -85,6 +85,55 @@ async def test_queue_persists_revision_and_job_when_broker_is_down():
 
 
 @pytest.mark.asyncio
+async def test_operator_can_reserve_reparse_without_broker_dispatch():
+    """A worker running older parser code must not win the job an operator executes inline."""
+    db = AsyncMock()
+    db.add = MagicMock()
+    result = MagicMock()
+    result.scalar.return_value = 4
+    db.execute.return_value = result
+    binding = SimpleNamespace(
+        active_source_revision=SimpleNamespace(
+            origin_document_id="doc",
+            origin_file_hash="hash",
+            snapshot_storage_path="snapshot.pdf",
+            snapshot_metadata={},
+        )
+    )
+
+    async def assign_ids():
+        for call in db.add.call_args_list:
+            if isinstance(call.args[0], KnowledgeSourceRevision):
+                call.args[0].id = "revision_new"
+
+    db.flush.side_effect = assign_ids
+    with (
+        patch("app.modules.knowledge.services.source_reparse.lock_source", new_callable=AsyncMock),
+        patch(
+            "app.modules.knowledge.services.source_reparse.ensure_source_idle",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.knowledge.services.source_ingestion_service.source_ingestion_service.get_source",
+            new_callable=AsyncMock,
+            return_value=binding,
+        ),
+        patch(
+            "app.modules.knowledge.services.source_reparse.enqueue_arq_job",
+            new_callable=AsyncMock,
+        ) as dispatch,
+    ):
+        revision = await queue_reparse(
+            db, "col", "source", "standard", "paddleocr_vl", "tenant", "workspace", dispatch=False
+        )
+    job = next(c.args[0] for c in db.add.call_args_list if isinstance(c.args[0], JobRecord))
+    assert revision.revision_no == 5 and job.payload["revision_id"] == revision.id
+    assert job.payload["ocr_engine"] == "paddleocr_vl"
+    db.commit.assert_awaited_once()
+    dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_failed_reparse_is_persisted_without_changing_active_source():
     revision = KnowledgeSourceRevision(id="new", binding_id="source", status="queued")
     db = AsyncMock()
