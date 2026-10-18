@@ -10,6 +10,7 @@ from pydantic import Field
 
 from app.core.exceptions import AppException
 from app.modules.knowledge.facts import detect_column_role
+from app.modules.knowledge.normalization.qnu_markdown import QNU_CELL_STATES
 from app.modules.knowledge.normalization.retrieval_models import SourceUnit
 from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.source_artifact import cell_context
@@ -50,6 +51,15 @@ class SourceCell:
     header: str
     value: str
     references: list[dict]
+    state: str = "legacy"
+    normalized: object | None = None
+    field_source: dict | None = None
+    field_origin: dict | None = None
+    column_id: str | None = None
+    header_path: list[str] | None = None
+    temporal: dict | None = None
+    standard: bool = False
+    state_source: str = "legacy"
 
 
 @dataclass
@@ -75,7 +85,7 @@ def _block(row: FusionCandidate, unit: SourceUnit, key: str) -> EvidenceBlock:
         source_revision_id=meta["source_revision_id"], canonical_hash=meta["canonical_hash"],
         title=meta["document_title"], text=unit.text, start=unit.start, end=unit.end,
         page_number=unit.page_number, temporal_scope=unit.temporal, unit_id=unit.id,
-        fact_context={"source_kind": unit.kind})
+        fact_context={"source_kind": unit.kind, "source_locations": unit.source_locations})
 
 
 def _reference(block: EvidenceBlock) -> dict:
@@ -83,7 +93,44 @@ def _reference(block: EvidenceBlock) -> dict:
 
 
 def _display(text: str) -> str:
-    return html.escape(re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)).replace("|", "\\|").replace("\n", " ")
+    return html.escape(re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _same_cell(raw: str, parsed: str) -> bool:
+    canonical = re.sub(r"<br\s*/?>", "\n", raw, flags=re.IGNORECASE).replace("\r\n", "\n")
+    return canonical.strip() == parsed.strip()
+
+
+def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str]) -> list[dict] | None:
+    """Exact declared cell metadata, or None for artifacts published without it."""
+    fields, columns = row.metadata.get("row_fields"), row.metadata.get("row_columns")
+    if not isinstance(fields, list) or not isinstance(columns, list):
+        return None
+    if len(fields) != len(values) or len(columns) != len(values):
+        raise ValueError("Standard row fields do not match its emitted cells")
+    state_source = row.metadata.get("cell_state_source") or "legacy"
+    for column, (cell_field, label, value) in enumerate(zip(fields, headers, values, strict=True)):
+        if not isinstance(cell_field, dict) or not isinstance(cell_field.get("raw"), str) or not _same_cell(cell_field["raw"], value):
+            raise ValueError("Standard row field disagrees with its canonical cell")
+        if cell_field.get("column_index") is not None and cell_field["column_index"] != column:
+            raise ValueError("Standard row field coordinates disagree")
+        path = columns[column].get("header_path") if isinstance(columns[column], dict) else None
+        if path and " / ".join(path) != label:
+            raise ValueError("Standard row header disagrees with its column path")
+        if cell_field.get("state") not in QNU_CELL_STATES:
+            raise ValueError("Standard row cell state is unavailable")
+        if state_source == "declared" and cell_field.get("state") in {"ambiguous", "unreadable"}:
+            raise ValueError("Unresolved standard cell cannot answer")
+    return fields
+
+
+def _cell_payload(key: str, cell: SourceCell) -> dict:
+    payload = {"id": key, "header": cell.header, "value": cell.value,
+               "state": cell.state, "standard": cell.standard, "state_source": cell.state_source}
+    if cell.standard:
+        payload.update(column_id=cell.column_id, header_path=cell.header_path, normalized=cell.normalized,
+                       field_source=cell.field_source, field_origin=cell.field_origin, temporal=cell.temporal)
+    return payload
 
 
 def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
@@ -109,13 +156,26 @@ def _add_row(catalog: RowCatalog, row: FusionCandidate, index: int) -> None:
         catalog.contexts[key] = _block(row, context, key)
         context_ids.append(key)
     refs = [_reference(body), _reference(catalog.contexts[context_ids[0]])]
+    standard_fields = _standard_fields(row, table["headers"], values)
+    state_source = row.metadata.get("cell_state_source") or "legacy"
     cells = []
     for column, (label, value) in enumerate(zip(table["headers"], values, strict=True)):
         if column == identity or detect_column_role(label)[0] == "code" or column < identity:
             continue
         key = f"{row_id}c{column}"
-        catalog.cells[key] = SourceCell(row_id, entity, label, value, refs)
-        cells.append({"id": key, "header": label, "value": value})
+        field = standard_fields[column] if standard_fields else None
+        temporal = (field.get("temporal") or field.get("header_temporal")) if field else None
+        cell = SourceCell(row_id, entity,
+            " / ".join(field.get("header_path") or [label]) if field else label,
+            field["raw"] if field else value, refs,
+            state=field["state"] if field else "legacy", normalized=field.get("normalized") if field else None,
+            field_source=field.get("field_source") if field else None,
+            field_origin=field.get("field_origin") if field else None,
+            column_id=field.get("column_id") if field else None,
+            header_path=field.get("header_path") if field else None,
+            temporal=temporal, standard=bool(field), state_source=state_source)
+        catalog.cells[key] = cell
+        cells.append(_cell_payload(key, cell))
     if cells:
         catalog.rows[row_id] = {"id": row_id, "entity": entity, "entity_code": entity_code, "title": body.title,
             "source_revision_id": body.source_revision_id, "cells": cells, "context_ids": context_ids,
@@ -149,15 +209,28 @@ def validate_selection(selection: RowSelection, catalog: RowCatalog, question: s
     allowed = {key for row_id in selected_rows for key in catalog.rows[row_id]["context_ids"]}
     if not set(context_ids).issubset(allowed):
         raise ValueError("Context belongs to another source row")
-    years = set(re.findall(r"\b(?:19|20)\d{2}\b", question))
+    years = {int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", question)}
     for key in selection.cell_ids:
         cell = catalog.cells[key]
-        column_years = set(re.findall(r"\b(?:19|20)\d{2}\b", cell.header))
+        if cell.standard and cell.state_source == "declared" and cell.state in {"ambiguous", "unreadable"}:
+            raise ValueError("Unresolved standard cell is not answer-bearing")
+        temporal = cell.temporal or {}
+        if temporal.get("review_basis") == "human_review" and temporal.get("status") == "verified":
+            corrected_years = set(temporal.get("data_years") or [])
+            if years and not years.issubset(corrected_years):
+                raise ValueError("Requested year does not match the reviewed cell correction")
+            continue  # A source-bound human correction overrides the extracted header year.
+        column_years = {int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", cell.header)}
         if years and column_years and not column_years.issubset(years):
             raise ValueError("Requested year does not match this column")
+        verified_years = {year for year in temporal.get("data_years") or []
+                          if isinstance(year, int) and not isinstance(year, bool)} if (
+            temporal.get("status") == "verified" and temporal.get("role", "data") == "data") else set()
+        if years and verified_years and not years.intersection(verified_years):
+            raise ValueError("Requested year does not match this cell's verified scope")
         row_context = set(catalog.rows[cell.row_id]["context_ids"]).intersection(selection.scope_ids)
         scope_text = cell.header + "\n" + "\n".join(catalog.contexts[ref].text for ref in row_context)
-        if years and not years.issubset(set(re.findall(r"\b(?:19|20)\d{2}\b", scope_text))):
+        if years and not years.issubset({int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", scope_text)}):
             raise ValueError("No same-source scope for requested year")
 
 
@@ -220,6 +293,8 @@ def source_value_variants(selection: RowSelection, catalog: RowCatalog, question
             # identifiers such as channel codes so methods are not conflated.
             metric = (context["attribute_code"], normalized((context.get("qualifiers") or {}).get("method") or ""),
                       tuple(re.findall(r"\b[a-z]+\d+\b", normalized(cell.header))))
+        if cell.standard:
+            value = (cell.state, value)  # Same raw marker with a different declared state is not one datum.
         identity = (normalized(cell.entity), metric)
         code = catalog.rows[cell.row_id].get("entity_code", "") or ""
         groups.setdefault(identity, []).append((code, value))
@@ -285,9 +360,24 @@ def close_empty_cells(selection: RowSelection, catalog: RowCatalog) -> RowSelect
         if len(prefix) < 2:
             continue
         for cell in siblings[min(positions):max(positions) + 1]:
-            if not any(char.isalnum() for char in cell["value"]) and cell["header"].split()[:len(prefix)] == prefix:
+            declared = cell.get("standard") and cell.get("state_source") == "declared"
+            empty = (cell["state"] in {"blank", "not_stated", "not_applicable"} if declared
+                     else not any(char.isalnum() for char in cell["value"]))
+            if empty and cell["header"].split()[:len(prefix)] == prefix:
                 selected.add(cell["id"])
     return selection.model_copy(update={"cell_ids": [key for key in catalog.cells if key in selected]})
+
+
+_STATE_LABELS = {"blank": "ô trống trong nguồn", "not_stated": "nguồn không nêu",
+                 "not_applicable": "nguồn ghi không áp dụng"}
+
+
+def _value_display(cell: SourceCell) -> str:
+    value = cell.value
+    label = _STATE_LABELS.get(cell.state) if cell.standard and cell.state_source == "declared" else None
+    if not label:
+        return value
+    return f"{value} ({label})" if value else f"({label})"
 
 
 def render_cells(selection: RowSelection, catalog: RowCatalog) -> tuple[str, list[dict], list[dict]]:
@@ -296,9 +386,13 @@ def render_cells(selection: RowSelection, catalog: RowCatalog) -> tuple[str, lis
     cells, refs = [], []
     for key in selection.cell_ids:
         cell = catalog.cells[key]
-        lines.append("| " + " | ".join(_display(text) for text in (cell.entity, cell.header, cell.value)) + " |")
-        cells.append({"id": key, "entity": cell.entity, "header": cell.header, "value": cell.value,
-                      "references": cell.references})
+        lines.append("| " + " | ".join(_display(text) for text in (cell.entity, cell.header, _value_display(cell))) + " |")
+        entry = {"id": key, "entity": cell.entity, "header": cell.header, "value": cell.value,
+                 "state": cell.state, "standard": cell.standard, "references": cell.references}
+        if cell.standard:
+            entry.update(normalized=cell.normalized, column_id=cell.column_id,
+                         header_path=cell.header_path, temporal=cell.temporal)
+        cells.append(entry)
         refs.extend(cell.references)
     context_ids = list(dict.fromkeys([*selection.scope_ids, *selection.note_ids]))
     if context_ids:

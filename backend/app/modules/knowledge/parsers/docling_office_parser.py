@@ -118,6 +118,9 @@ class DoclingOfficeParser(BaseDocumentParser):
             raise RuntimeError(f"Docling rejected Office document: {file_name}")
 
         document = input_document._backend.convert()
+        from app.modules.knowledge.parsers.docx_evidence import read_docx_evidence
+
+        evidence = read_docx_evidence(file_bytes, document) if format_name in {"DOCX", "DOC"} else {}
         markdown = self._preserve_table_spans(document, document.export_to_markdown().strip())
         pages = self._page_count(document)
         tables = self._extract_markdown_tables(markdown)
@@ -132,6 +135,7 @@ class DoclingOfficeParser(BaseDocumentParser):
             },
             docling_document=document,
             docx_header_evidence=_docx_header_evidence(file_bytes, document) if format_name in {"DOCX", "DOC"} else {},
+            docx_source_evidence=evidence,
         )
 
     @staticmethod

@@ -7,6 +7,18 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên542](./2026-10-18_phien_542_sua_ba_loi_review_rag.md) | Sửa ba finding review RAG | Căn cứ năm đúng cột/ô, fact hiệu đính có audit, escape một lần;25test mới,158PASS/RuffPASS;full13FAIL/2163PASS exact baseline13. Chưa nạp lại/duyệt/publish |
+
+| **2026-10-18** | [Phiên541](./2026-10-18_phien_541_review_tich_hop_rag_parser.md) | Review RAG sau batch 540 | CHANGES REQUESTED: 2P1 scope năm/correction fact, 1P2 escape;80PASS/Ruff21PASS, probe4FAIL. Không sửa app hoặc nạp lại |
+
+| **2026-10-18** | [Phiên540](./2026-10-18_phien_540_sua_bon_finding_review536.md) | Sửa 4 finding review 536 | Row giữ cell state/provenance, fact đóng deps header/note, temporal đúng cấp có căn cứ, citation giữ source_pages trải trang;12test mới;focused94/164/105+23subtest,RuffPASS;full13FAIL/2138PASS khớp baseline;chưa reparse/duyệt/publish |
+
+| **2026-10-18** | [Phiên539](./2026-10-18_phien_539_sua_parser_docx_doc_lap.md) | Parser DOCX độc lập | Giữ notes/ảnh/anchors, inventory gate và mapping;168PASS+23subtest/Ruff7PASS, full13FAIL khớp baseline. Offline page flags130→9; chưa xử lý prose scope/state hoặc nạp lại |
+
+| **2026-10-18** | [Phiên538](./2026-10-18_phien_538_phan_tich_nguyen_nhan_thieu_noi_dung_docx.md) | Phân tích nguyên nhân DOCX | Parser/mapping chạy RAM tái hiện đúng537; footnote part bị bỏ, refs/state/mapping chưa đủ; không sửa app hoặc nạp lại |
+
+| **2026-10-18** | [Phiên537](./2026-10-18_phien_537_nap_docx_phuc_tap_kiem_thu_chuan_md.md) | Thử nạp DOCX phức tạp | PairPASS/18trang/10bảng/103dòng; review_required vì mấtfootnotes, refs0, mappingpartial/states; không sửa app hoặc xuất bản |
+
 | **2026-10-18** | [Phiên536](./2026-10-18_phien_536_review_rag_theo_chuan_markdown.md) | Review RAG theo chuẩn MD | CHANGES REQUESTED:2P1 cell state/context deps,2P2 temporal/multipage citation;69PASS+39JUnit không lỗi,4probeFAIL. Không sửa app/nguồn thật |
 
 | **2026-10-18** | [Phiên535](./2026-10-18_phien_535_sua_header_docx_va_cell_state_gfm.md) | Khép hai finding header DOCX/GFM | Word source-role evidence, GFM cell states/guard duyệt;201PASS+23subtest/Ruff9PASS/6pair valid; full cuối13FAIL/2115PASS khớp baseline; không tác động PDF cũ |

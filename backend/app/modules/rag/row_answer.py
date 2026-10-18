@@ -10,7 +10,7 @@ from app.core.exceptions import AppException
 from app.core.guardrails import output_guardrail
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_runtime import assistant_scope
-from app.modules.rag.evidence_validation import evidence_digest
+from app.modules.rag.evidence_validation import citation_locations, citation_pages, evidence_digest
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.row_answer_contract import (
     MetricScope,
@@ -67,6 +67,10 @@ A colloquial term can match the definition in the source; do not require identic
 Application floor, admission cutoff, quota and fees are different metrics. Same entity is insufficient.
 If no particular method is asked, select ALL columns of the requested metric across its methods,
 including dashes/empty cells. Do not add unrelated combinations/quota or years outside the request.
+When a cell's state_source is "declared", the server-supplied state is part of the answer: present with
+value "0" is a real zero; blank/not_stated/not_applicable must never be rendered as 0, re-derived from a
+dash, or replaced by a normalized value. Declared ambiguous/unreadable cells are not answer-bearing;
+use missing/clarify, never guess. A derived state is a structural hint, not a new source declaration.
 For a relative period, use the data years explicitly carried by available columns, not the clock
 or document issue year. Preserve their exact year labels; do not demand a numeric year in the
 question or a newer result that is not published. Cover every requested entity and keep methods separate.
@@ -112,6 +116,9 @@ define it as a threshold, amount or other measurement BY that method. Interpret 
 row against this actual context, not the header in isolation. Symbols have the meaning
 given by this table's notes. If a symbol says a channel is unavailable, it is still an
 answer-bearing cell, not a missing number to invent or a reason to reject the full row.
+Audit a cell's declared server state too: present zero is valid; blank/not_stated/not_applicable
+keep their source meaning and are never numeric zero; declared ambiguous/unreadable cannot be required
+as an answer coordinate. Do not re-derive state from a dash or symbol when a declared state exists.
 A document's publication year/filename/cited law is not a data-year override. Check column years;
 an unknown year cannot be declared current. complete means all requested cells AND mandatory
 conditions/legends are selected; a related source is not an answer.
@@ -194,7 +201,7 @@ def _response(selection: RowSelection, catalog: RowCatalog, snapshot: RetrievalS
     citations = [Citation(source_id=ref["binding_id"], title=ref["title"], quote=ref["quote"],
         binding_id=ref["binding_id"], index_revision_id=ref["index_revision_id"],
         source_revision_id=ref["source_revision_id"], page_number=ref["page_number"],
-        source_pages=[ref["page_number"]] if ref["page_number"] else [],
+        source_pages=citation_pages(ref), source_locations=citation_locations(ref),
         canonical_hash=ref["canonical_hash"], span_start=ref["start"], span_end=ref["end"],
         evidence_origin="canonical") for ref in refs]
     decision = {"version": "source-cells-v1", "status": "supported", "reason": "VERIFIED_ROW_COORDINATES",

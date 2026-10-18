@@ -43,6 +43,8 @@ from app.modules.rag.evidence_search import fuse_blocks, search_queries
 from app.modules.rag.evidence_validation import (
     VERSION,
     YEAR,
+    citation_locations,
+    citation_pages,
     evidence_digest,
     validate_plan_years,
 )
@@ -85,7 +87,7 @@ def decision_response(req: AskRequest, snapshot: RetrievalSnapshot, status: str,
     citations = [Citation(source_id=r["binding_id"], binding_id=r["binding_id"],
         index_revision_id=r["index_revision_id"], source_revision_id=r["source_revision_id"],
         title=r["title"], section=r["section"], page_number=r["page_number"], quote=r["quote"],
-        source_pages=[r["page_number"]] if r["page_number"] is not None else None,
+        source_pages=citation_pages(r), source_locations=citation_locations(r),
         evidence_origin=r["origin"], fact_id=r["fact_id"],
         span_start=r["start"], span_end=r["end"], canonical_hash=r["canonical_hash"])
         for r in unique.values()]

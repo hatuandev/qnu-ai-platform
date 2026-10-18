@@ -823,9 +823,13 @@ class SourceIngestionService:
             "actor_id": actor_id,
         }
         if decision == "approved":
-            from app.modules.knowledge.services.unit_annotation import approve_unit_annotations
+            from app.modules.knowledge.services.unit_annotation import (
+                approve_temporal_scopes,
+                approve_unit_annotations,
+            )
 
             approve_unit_annotations(artifact)
+            approve_temporal_scopes(artifact)
         rev.parse_provenance = {
             **(rev.parse_provenance or {}),
             "structured_artifact": artifact,

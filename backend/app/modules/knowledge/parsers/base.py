@@ -35,6 +35,8 @@ class ParsedContent:
     docling_document: Any | None = None
     # Source-backed DOCX table roles. Engine flags in the raw document stay unchanged.
     docx_header_evidence: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Original note anchors/resources supplement engine coverage; resource bytes stay in memory.
+    docx_source_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 class BaseDocumentParser(ABC):

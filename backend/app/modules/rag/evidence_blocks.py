@@ -16,6 +16,7 @@ from app.modules.knowledge.models import (
 )
 from app.modules.knowledge.normalization.retrieval_units import (
     manifest_digest,
+    manifest_hash_matches,
     resolve_unit_manifest,
 )
 from app.modules.knowledge.services.source_artifact import (
@@ -151,7 +152,7 @@ async def load_published_blocks(db: AsyncSession, snapshot: RetrievalSnapshot, *
             manifest = resolve_unit_manifest(markdown, source_artifact)
             digest = manifest_digest(manifest)
             pinned_hash = (index.parity_report or {}).get("unit_manifest_hash")
-            if pinned_hash and pinned_hash != digest:
+            if pinned_hash and not manifest_hash_matches(pinned_hash, manifest):
                 raise ValueError("Index and source have different unit manifests")
         except ValueError as exc:
             raise AppException("Đơn vị nguồn không khớp chứng cứ hoặc bản chỉ mục.",

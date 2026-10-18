@@ -26,7 +26,7 @@ from app.modules.rag.evidence_schemas import (
     QuoteReference,
     StrictContract,
 )
-from app.modules.rag.evidence_validation import bind_quote
+from app.modules.rag.evidence_validation import bind_quote, citation_locations, citation_pages
 from app.modules.rag.query_router import QueryAnalysis
 from app.modules.rag.schemas import AskRequest, AskResponse, Citation, RetrievalSnapshot
 
@@ -141,7 +141,8 @@ def _citation(block: EvidenceBlock) -> Citation:
     ref = bind_quote(QuoteReference(block_id=block.id, quote=block.text), {block.id: block})
     return Citation(source_id=block.binding_id, binding_id=block.binding_id, index_revision_id=block.index_revision_id,
         source_revision_id=block.source_revision_id, title=block.title, quote=ref["quote"],
-        page_number=block.page_number, evidence_origin=block.origin, fact_id=block.fact_id,
+        page_number=block.page_number, source_pages=citation_pages(ref),
+        source_locations=citation_locations(ref), evidence_origin=block.origin, fact_id=block.fact_id,
         canonical_hash=block.canonical_hash, span_start=ref["start"], span_end=ref["end"])
 
 

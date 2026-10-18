@@ -51,7 +51,7 @@ def _unit_pattern(text: str) -> re.Pattern | None:
     tokens = [token.casefold() for token in _WORD.findall(text)]
     if not tokens:
         return None
-    body = r"(?:[\W\d]+)".join(re.escape(token) for token in tokens)
+    body = r"(?:\W+)".join(re.escape(token) for token in tokens)
     return re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE)
 
 
@@ -76,6 +76,8 @@ def map_unit_to_page(
     page_ranges: list[tuple[int, int, int]],
     cursor: int,
     markdown: str,
+    *,
+    full_lines: bool = False,
 ) -> tuple[list[int], int, str]:
     """Render pages for one unit, forward-only and only when the projection pins every token.
 
@@ -89,6 +91,10 @@ def map_unit_to_page(
     if pattern is None or not page_ranges or not markdown:
         return [], cursor, "unavailable"
     hits = list(pattern.finditer(markdown))
+    if full_lines:
+        # Heading/paragraph occurrences must occupy their own source lines. A TOC
+        # prefix or a word inside another paragraph is not that source occurrence.
+        hits = [hit for hit in hits if _full_line_match(markdown, hit)]
     if not hits:
         return [], cursor, "absent"
     spans = [(_span_pages(hit.start(), hit.end(), page_ranges), hit) for hit in hits]
@@ -104,6 +110,14 @@ def map_unit_to_page(
             state = "matched" if len(certain) == 1 else "spanning"
             return certain, max(cursor, hit.end()), state
     return [], cursor, "out_of_order"
+
+
+def _full_line_match(markdown: str, hit: re.Match) -> bool:
+    left = markdown[markdown.rfind("\n", 0, hit.start()) + 1:hit.start()]
+    stop = markdown.find("\n", hit.end())
+    right = markdown[hit.end():stop if stop >= 0 else len(markdown)]
+    return bool(re.fullmatch(r"[\s#>*`_~]*(?:(?:\d+[.)]|[-+*])\s+)?", left)
+                and re.fullmatch(r"\W*", right))
 
 
 def _row_unit_text(row: list[Any]) -> str:
@@ -133,6 +147,7 @@ class _Builder:
         self.unmapped = 0
         self.unit_states: dict[str, int] = {}
         self.has_page_mapping = has_page_mapping
+        self.note_tables: set[str] = set()
 
     def next_id(self, prefix: str) -> str:
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
@@ -153,9 +168,10 @@ class _Builder:
         return parent_id
 
     def map_unit(
-        self, text: str, page_ranges: list[tuple[int, int, int]], cursor: int, markdown: str
+        self, text: str, page_ranges: list[tuple[int, int, int]], cursor: int, markdown: str,
+        *, full_lines: bool = False,
     ) -> tuple[list[int], int]:
-        pages, cursor, state = map_unit_to_page(text, page_ranges, cursor, markdown)
+        pages, cursor, state = map_unit_to_page(text, page_ranges, cursor, markdown, full_lines=full_lines)
         if state == "unavailable" and not self.has_page_mapping:
             return pages, cursor
         self.unit_states[state] = self.unit_states.get(state, 0) + 1
@@ -216,8 +232,13 @@ def _header_paths(data: Any, header_rows: int) -> list[list[str]]:
     paths: list[list[str]] = []
     for col in range(num_cols):
         path: list[str] = []
+        origins = set()
         for row in range(header_rows):
             cell = grid[row][col] if row < len(grid) and col < len(grid[row]) else None
+            origin = (getattr(cell, "start_row_offset_idx", row), getattr(cell, "start_col_offset_idx", col))
+            if origin in origins:
+                continue
+            origins.add(origin)
             path.append(clean_text(getattr(cell, "text", "") if cell is not None else ""))
         while path and not path[-1].strip():
             path.pop()
@@ -344,6 +365,9 @@ def _add_table(
         "columns": _table_columns(header_paths),
         "source_ref": getattr(item, "self_ref", None),
     }
+    table_number = proof.get("locator", "").rsplit("/", 1)[-1]
+    if table_number in builder.note_tables and header_rows < len(grid):
+        attributes["representation"] = "records"  # Anchor coordinates need independently identifiable rows.
     if attributes["representation"] == "records":
         table_block = QnuBlock(
             id=table_id,
@@ -492,10 +516,13 @@ def build_qnu_structured_document(
     title: str | None = None,
     document_type: str | None = None,
     header_evidence: dict[str, dict[str, Any]] | None = None,
+    source_evidence: dict[str, Any] | None = None,
 ) -> QnuStructuredDocument:
     """Walk a Docling document in reading order and build the QNU v1.0 model."""
     ranges = page_ranges or []
     builder = _Builder(has_page_mapping=bool(ranges))
+    builder.note_tables = {str(p["table"]["table"]) for p in (source_evidence or {}).get("paragraphs", [])
+                           if p.get("notes") and p.get("table")}
     indexed = [
         (index + 1, item, int(level or 0))
         for index, (item, level) in enumerate(document.iterate_items())
@@ -506,6 +533,9 @@ def build_qnu_structured_document(
         block_index, item, level = indexed[position]
         label = _label(item)
         text = _item_text(item)
+        if _is_materialized_cell_text(item, document, text):
+            position += 1
+            continue
         if label == "list_item":
             run: list[tuple[int, Any, int]] = []
             while position < len(indexed) and _label(indexed[position][1]) == "list_item":
@@ -526,7 +556,7 @@ def build_qnu_structured_document(
                 else:
                     lines.append(f"{indent}- {item_text}")
                 # Each item is located on its own: a run can cross a page boundary.
-                item_pages, cursor = builder.map_unit(item_text, ranges, cursor, projection_markdown)
+                item_pages, cursor = builder.map_unit(item_text, ranges, cursor, projection_markdown, full_lines=True)
                 if not item_pages:
                     unknown_items.append(str(item_index))
                 locations.extend(_locations(item_index, item_pages))
@@ -561,7 +591,7 @@ def build_qnu_structured_document(
                 depth = 1 if label == "title" else min(max(level, 1), 6)
                 section_id = builder.next_id("s")
                 parent_id = builder.open_section(level, text, section_id)
-                pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
+                pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown, full_lines=True)
                 builder.add(
                     QnuBlock(
                         id=section_id,
@@ -606,7 +636,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if label == "formula":
-            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown, full_lines=True)
             flags = (
                 []
                 if text.strip()
@@ -631,7 +661,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if label == "code":
-            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown, full_lines=True)
             fence = _fence_for(text)
             language = clean_text(getattr(item, "code_language", "") or "")
             builder.add(
@@ -648,7 +678,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if text.strip():
-            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown, full_lines=True)
             block_type = "note" if label in {"caption", "footnote"} else "text"
             builder.add(
                 QnuBlock(
@@ -708,7 +738,7 @@ def build_qnu_structured_document(
         ),
         None,
     )
-    return QnuStructuredDocument(
+    model = QnuStructuredDocument(
         title=document_title or filename.rsplit(".", 1)[0] or filename,
         document_type=document_type,
         source=QnuSourceInfo(filename=filename, sha256=sha256, page_count=None),
@@ -716,3 +746,24 @@ def build_qnu_structured_document(
         blocks=builder.blocks,
         stats=stats,
     )
+    from app.modules.knowledge.parsers.docx_evidence import apply_docx_evidence
+
+    apply_docx_evidence(model, source_evidence or {})
+    return model
+
+
+def _is_materialized_cell_text(item: Any, document: Any, text: str) -> bool:
+    """Rich-cell children already preserved in the table must not become duplicate prose."""
+    if not text.strip() or _label(item) not in {"text", "section_header", "list_item", "code"}:
+        return False
+    parent = getattr(item, "parent", None)
+    seen = set()
+    while parent is not None and getattr(parent, "cref", None) not in seen:
+        seen.add(getattr(parent, "cref", None))
+        ancestor = parent.resolve(document)
+        if _label(ancestor) == "table":
+            wanted = " ".join(text.split())
+            return any(wanted in " ".join(clean_text(getattr(cell, "text", "")).split())
+                       for cell in getattr(getattr(ancestor, "data", None), "table_cells", []))
+        parent = getattr(ancestor, "parent", None)
+    return False

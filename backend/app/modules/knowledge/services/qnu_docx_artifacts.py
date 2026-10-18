@@ -14,7 +14,9 @@ import json
 import logging
 import re
 from datetime import UTC, datetime
+from io import BytesIO
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from app.core.storage import storage_service
 from app.modules.knowledge.normalization.qnu_markdown import (
@@ -60,6 +62,7 @@ async def _render_and_save(
 ) -> dict[str, Any]:
     """Render, validate and persist the two content-addressed files for one revision identity."""
     try:
+        _validate_office_inventory(document)
         markdown = render_qnu_markdown(document, document_id=document_id, revision_id=revision_id)
         report = validate_qnu_markdown(markdown)
         artifact["validation"] = {
@@ -108,6 +111,23 @@ async def _render_and_save(
         return artifact
 
 
+def _validate_office_inventory(document: QnuStructuredDocument) -> None:
+    inventory = document.document_meta.get("source_inventory")
+    if not inventory:
+        return
+    notes = [block for block in document.blocks if block.type == "note"
+             and block.attributes.get("role") in {"footnote", "endnote"}]
+    if len(notes) != inventory.get("note_count"):
+        raise ValueError("Office note inventory mismatch")
+    resources = [block.attributes["resource"] for block in document.blocks if block.type == "figure"
+                 and (block.attributes.get("resource") or {}).get("sha256")]
+    raw = document.document_meta.get("raw_evidence") or {}
+    if len(resources) != inventory.get("image_resources") or any(
+            not raw.get("path") or resource.get("storage_path") != raw["path"]
+            or resource.get("archive_member") != resource.get("member") for resource in resources):
+        raise ValueError("Office resource inventory mismatch")
+
+
 async def build_qnu_markdown_artifact(
     *,
     extraction: SourceExtraction,
@@ -139,6 +159,13 @@ async def build_qnu_markdown_artifact(
         return artifact
     artifact["schema_version"] = document.schema_version
     document = document.model_copy(deep=True)
+    if extraction.office_resources:
+        try:
+            artifact["raw_evidence"] = await _save_office_resources(document, extraction.office_resources, snapshot_path)
+            document.document_meta["raw_evidence"] = artifact["raw_evidence"]
+        except Exception as exc:
+            artifact.update(status="failed", reason="office_resource_save_failed", error=type(exc).__name__)
+            return artifact
     if extraction.pdf_evidence is not None:
         document.document_meta["raw_evidence"] = artifact["raw_evidence"]
         artifact["content_status"] = document.document_meta.get("content_status", "unreviewed")
@@ -147,6 +174,37 @@ async def build_qnu_markdown_artifact(
     return await _render_and_save(
         document, document_id=document_id, revision_id=revision_id, snapshot_path=snapshot_path, artifact=artifact
     )
+
+
+async def _save_office_resources(document: QnuStructuredDocument, resources: list[dict], snapshot_path: str) -> dict:
+    """Store only verified original bytes; no external URI or filesystem reference is fetched."""
+    members = {}
+    for resource in resources:
+        payload = resource["data"]
+        checksum = hashlib.sha256(payload).hexdigest()
+        member = resource["member"]
+        if (checksum != resource["sha256"] or not member.startswith("word/media/")
+                or any(p in {"", ".", ".."} for p in member.split("/")) or "\\" in member):
+            raise ValueError("Office resource identity mismatch")
+        if member in members and members[member] != payload:
+            raise ValueError("Conflicting Office resource member")
+        members[member] = payload
+    stream = BytesIO()
+    with ZipFile(stream, "w", compression=ZIP_DEFLATED) as archive:
+        for member, payload in sorted(members.items()):
+            archive.writestr(ZipInfo(member, date_time=(1980, 1, 1, 0, 0, 0)), payload)
+    data = stream.getvalue()
+    checksum = hashlib.sha256(data).hexdigest()
+    path = f"{snapshot_path}.{checksum}.docx-resources-v1.zip"
+    if not await storage_service.exists(path):
+        await storage_service.save(path, data)
+    for resource in resources:
+        for block in document.blocks:
+            ref = block.attributes.get("resource") or {}
+            if ref.get("ref") == resource["source_ref"] and ref.get("sha256") == resource["sha256"]:
+                ref["storage_path"] = path
+                ref["archive_member"] = resource["member"]
+    return {"path": path, "sha256": checksum, "format": "docx-resources/1.0"}
 
 
 def _evidence_bytes(evidence: dict[str, Any]) -> bytes:
@@ -204,6 +262,7 @@ async def rebuild_qnu_markdown_for_revision(
         return artifact
     if document.document_meta.get("builder_version", "").startswith("pdf-"):
         artifact["renderer_version"] = "qnu-pdf-render/v1"
+    if document.document_meta.get("raw_evidence"):
         reference = document.document_meta.get("raw_evidence") or {}
         expected_raw = reference.get("sha256")
         raw = await storage_service.get(reference["path"]) if reference.get("path") else None

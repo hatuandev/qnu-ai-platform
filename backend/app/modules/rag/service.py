@@ -23,6 +23,7 @@ from app.modules.rag.composer import (
     extract_suggested_questions,
     sanitize_rag_answer,
 )
+from app.modules.rag.evidence_validation import citation_locations, location_pages
 from app.modules.rag.facts import fact_layer
 from app.modules.rag.fusion import FusionCandidate
 from app.modules.rag.query_router import (
@@ -343,7 +344,8 @@ class RagService:
                                   title=f.get("source_title") or f["entity_name"] + " — " + f["attribute_name"],
                                   page_number=f["raw_data"].get("page_number"),
                                   quote=f"{f['entity_name']} · {f['raw_data'].get('header_path') or f['attribute_name']} = {f['attribute_value']}",
-                                  source_pages=sorted({p for p in (f["raw_data"].get("page_number"), f["raw_data"].get("header_page_number")) if isinstance(p, int)}),
+                                  source_pages=location_pages(f["raw_data"].get("source_locations")) or sorted({p for p in (f["raw_data"].get("page_number"), f["raw_data"].get("header_page_number")) if isinstance(p, int)}),
+                                  source_locations=citation_locations(f["raw_data"]),
                                   binding_id=f.get("binding_id"), index_revision_id=f.get("index_revision_id"),
                                   source_revision_id=f["raw_data"].get("source_revision_id")) for f in matched]
             decision["glossary_expansion"] = glossary_trace

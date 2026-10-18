@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v16-qnu-evidence"
+EXTRACTION_VERSION = "layout-v17-docx-source"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -43,6 +43,7 @@ class SourceExtraction:
     qnu_document: Any | None = None
     pdf_evidence: dict[str, Any] | None = None
     qnu_build_error: str | None = None
+    office_resources: list[dict[str, Any]] = field(default_factory=list)
 
 
 def merge_evidenced_text(primary: str, secondary: str) -> str:
@@ -275,10 +276,14 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
                 build_qnu_structured_document,
             )
 
+            source_evidence = {**parsed.docx_source_evidence, "render_pages": {
+                page["page_number"]: page.get("alignment_text", "") for page in result.pages}}
+            result.office_resources = parsed.docx_source_evidence.get("resources", [])
             result.qnu_document = await asyncio.to_thread(
                 build_qnu_structured_document,
                 parsed.docling_document,
                 header_evidence=parsed.docx_header_evidence,
+                source_evidence=source_evidence,
                 filename=filename,
                 sha256=hashlib.sha256(content).hexdigest(),
                 projection_markdown=parsed.raw_text,

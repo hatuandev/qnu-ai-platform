@@ -3,6 +3,7 @@
 import re
 from collections import defaultdict
 
+from app.core.exceptions import AppException
 from app.modules.rag.evidence_lists import MARKER, family
 from app.modules.rag.evidence_schemas import EvidenceBlock
 
@@ -67,6 +68,60 @@ def _branch_groups(parent: EvidenceBlock, children: list[EvidenceBlock]) -> list
     return [[parent, *children]]
 
 
+def _missing_context() -> AppException:
+    return AppException("Thiếu khối điều kiện của bản chuẩn.", code="EVIDENCE_CONTEXT_MISSING", status_code=409)
+
+
+def _fact_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
+    """Reviewed facts stay attached to their exact row's verified dependency closure.
+
+    A missing, ambiguous or cross-revision target raises instead of publishing the
+    fact without its mandatory header/condition/note. Shared notes remain directed:
+    they are pulled into each fact, never expanded back into every table row.
+    """
+    canonical = defaultdict(dict)
+    for block in blocks:
+        if block.origin == "canonical" and block.unit_id:
+            canonical[(block.index_revision_id, block.unit_id)][block.id] = block
+
+    def exact(index_id: str, unit_id: object, identity: tuple[str, str, str, str]) -> EvidenceBlock:
+        matches = canonical.get((index_id, unit_id), {}) if isinstance(unit_id, str) and unit_id else {}
+        if len(matches) != 1:
+            raise _missing_context()
+        block = next(iter(matches.values()))
+        if source_identity(block) != identity:
+            raise _missing_context()
+        return block
+
+    result = {}
+    for block in blocks:
+        if block.origin != "reviewed_fact" or not block.fact_context.get("verified_dependencies"):
+            continue
+        identity = source_identity(block)
+        unit_id = block.fact_context.get("source_unit_id")
+        exact(block.index_revision_id, unit_id, identity)
+        refs = block.fact_context.get("context_unit_ids")
+        if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
+            raise _missing_context()
+        pending, seen, members = list(dict.fromkeys(refs)), set(), {}
+        while pending:
+            ref = pending.pop(0)
+            if ref in seen or ref == unit_id:
+                continue
+            seen.add(ref)
+            dependency = exact(block.index_revision_id, ref, identity)
+            key = (dependency.binding_id, dependency.index_revision_id, dependency.source_revision_id,
+                   dependency.canonical_hash, dependency.unit_id or dependency.id)
+            members[key] = dependency
+            extra = dependency.fact_context.get("context_unit_ids") if isinstance(dependency.fact_context, dict) else None
+            if extra is not None:
+                if not isinstance(extra, list) or any(not isinstance(item, str) for item in extra):
+                    raise _missing_context()
+                pending.extend(item for item in extra if item not in seen)
+        result[block.id] = [block, *members.values()]
+    return result
+
+
 def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
     """Never cross binding/index/hash; all members retain their original raw spans."""
     sources = defaultdict(list)
@@ -83,9 +138,7 @@ def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlo
             refs = block.fact_context.get("context_unit_ids", [])
             if refs:
                 if any(ref not in by_unit for ref in refs):
-                    from app.core.exceptions import AppException
-
-                    raise AppException("Thiếu khối điều kiện của bản chuẩn.", code="EVIDENCE_CONTEXT_MISSING", status_code=409)
+                    raise _missing_context()
                 explicit[block.id] = [block, *[by_unit[ref] for ref in refs]]
         children = defaultdict(list)
         for block in ordered:
@@ -104,6 +157,7 @@ def dependency_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlo
             result[member.id] = sorted({b.id: b for b in [*existing, *group]}.values(), key=lambda b: b.start)
     # Explicit refs are directed: selecting a shared note must not pull every row using it.
     result.update(explicit)
+    result.update(_fact_groups(blocks))
     return result
 
 

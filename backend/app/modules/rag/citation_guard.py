@@ -100,6 +100,7 @@ class CitationGuard:
                     page_number=c.page_number,
                     quote=quote,
                     source_pages=source_pages,
+                    source_locations=meta.get("source_locations") or None,
                     entity_key=entity_key,
                     binding_id=str(binding_id) if binding_id else None,
                     index_revision_id=str(index_revision_id) if index_revision_id else None,

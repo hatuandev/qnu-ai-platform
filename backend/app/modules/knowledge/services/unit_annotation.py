@@ -1,6 +1,7 @@
 """Generic semantic year roles with exact quotes, never model-authored source text."""
 
 import asyncio
+import hashlib
 import json
 import logging
 from typing import Any, Literal
@@ -59,6 +60,95 @@ def approve_unit_annotations(artifact: dict[str, Any]) -> None:
     artifact["retrieval_units"] = manifest.model_dump()
     artifact["unit_manifest_hash"] = manifest_digest(manifest)
     artifact["unit_annotation"] = {**annotation, "status": "verified"}
+
+
+def _verified_scope(scope: Any, field: dict[str, Any] | None = None,
+                    line_text: str = "", header_text: str = "", block_text: str = "") -> dict[str, Any] | None:
+    """Verify a proposed scope only when its exact basis exists in the same evidence."""
+    if not isinstance(scope, dict) or scope.get("status") != "proposed":
+        return None
+    basis = scope.get("basis_quote")
+    if not isinstance(basis, str) or not basis.strip():
+        return None
+    years = [int(year) for year in scope.get("data_years") or []]
+    if years and not set(years).issubset({int(year) for year in YEAR.findall(basis)}):
+        return None
+    candidates = [line_text, header_text, (field or {}).get("header") or "", (field or {}).get("raw") or ""]
+    if field is not None:
+        header_years = {int(year) for year in YEAR.findall(field.get("header") or "")}
+        if scope.get("scope_level") in {"column", "field"} and years and header_years \
+                and not set(years).issubset(header_years):
+            return None
+        # A sibling cell/header is not evidence for this field's declaration.
+        candidates = {"column": [field.get("header") or ""],
+                      "field": [field.get("raw") or "", field.get("header") or ""],
+                      "row": [line_text], "block": [block_text]}.get(scope.get("scope_level"), [])
+    elif scope.get("scope_level") == "block":
+        candidates.append(block_text)  # A table-level basis need not repeat inside every row.
+    if not any(basis in text for text in candidates if text):
+        return None
+    return {**scope, "status": "verified", "evidence_quote": basis}
+
+
+def _fact_temporal(scope: dict[str, Any]) -> dict[str, Any]:
+    years = list(scope.get("data_years") or [])
+    return {"type": "year" if len(years) == 1 else "years" if years else "unknown",
+        "year": years[0] if len(years) == 1 else None, "years": years,
+        "status": "verified", "role": scope.get("role", "data"),
+        "scope_level": scope.get("scope_level", "unknown"), "basis_quote": scope.get("basis_quote"),
+        "evidence": "review_verified", "unsupported": scope.get("unsupported") or {},
+        **{key: scope[key] for key in ("effective_from", "effective_to", "event_from", "event_to")
+           if scope.get(key)}}
+
+
+def approve_temporal_scopes(artifact: dict[str, Any]) -> None:
+    """Review approval verifies typed scopes; cell values can never self-certify."""
+    if artifact.get("input_format") != "qnu-rag-projection/v1":
+        return
+    from app.modules.knowledge.normalization.qnu_projection import _apply_scope
+
+    manifest = UnitManifest.model_validate(artifact["retrieval_units"])
+    by_id = {unit.id: unit for unit in manifest.units}
+    human_edits = set((artifact.get("context_audit") or {}).get("unit_ids") or [])
+    verified_cells: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
+    for table in artifact.get("tables") or []:
+        if not isinstance(table, dict):
+            continue
+        header_text = "\n".join(table.get("headers") or [])
+        row_ids = list(table.get("row_unit_ids") or [])
+        container = by_id.get(str(table.get("id")))
+        block_text = container.text if container else ""
+        for row_index, fields in enumerate(table.get("row_fields") or []):
+            unit_id = row_ids[row_index] if row_index < len(row_ids) else ""
+            unit = by_id.get(unit_id)
+            line_text = unit.text if unit else "\n".join(str(field.get("raw") or "") for field in fields)
+            for field in fields:
+                scope = _verified_scope(field.get("temporal"), field, line_text, header_text, block_text)
+                if scope:
+                    field["temporal"] = scope
+                    verified_cells[(table.get("id"), row_index, field.get("column_index"))] = scope
+    for unit in manifest.units:
+        if unit.id in human_edits or unit.temporal.status != "proposed":
+            continue
+        scope = _verified_scope(unit.temporal.model_dump(), line_text=unit.text,
+                                header_text=unit.header_context, block_text=unit.text)
+        if scope:
+            _apply_scope(unit.temporal, scope)
+    manifest_hash = manifest_digest(manifest)
+    for fact in artifact.get("facts") or []:
+        raw = fact.get("raw_data") or {}
+        if raw.get("projection_version") != "qnu-rag-projection/v1":
+            continue
+        raw["unit_manifest_hash"] = manifest_hash
+        if raw.get("context_review") and (raw.get("temporal_context") or {}).get("evidence") == "human_correction":
+            continue  # Human context edits keep their own reviewed scope.
+        scope = verified_cells.get((raw.get("table_id"), raw.get("row_index"), raw.get("column_index")))
+        if scope:
+            raw["temporal_context"] = _fact_temporal(scope)
+    artifact["retrieval_units"] = manifest.model_dump()
+    artifact["unit_manifest_hash"] = manifest_hash
+    artifact["fact_set_hash"] = hashlib.sha256(
+        json.dumps(artifact.get("facts") or [], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
 def apply_annotations(manifest: UnitManifest, annotations: UnitAnnotations) -> list[str]:

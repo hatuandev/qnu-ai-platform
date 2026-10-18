@@ -111,6 +111,41 @@ def row_entities_supported(claim: str, references: list[dict]) -> bool:
     return True
 
 
+def _source_locations(block: EvidenceBlock) -> list[dict]:
+    raw = block.fact_context.get("source_locations") if isinstance(block.fact_context, dict) else None
+    if raw is None:
+        return []
+    from app.modules.knowledge.normalization.qnu_markdown import QnuSourceLocation
+
+    if not isinstance(raw, list):
+        raise TypeError("Source locations must be a list")
+    locations, seen = [], set()
+    for item in raw:
+        if isinstance(item, dict) and isinstance(item.get("page"), bool):
+            raise TypeError("Boolean is not a source page")
+        location = QnuSourceLocation.model_validate(item).model_dump()
+        if not any(location.get(key) is not None for key in ("page", "page_label", "locator", "bbox")):
+            continue
+        if location["page"] is not None and location["page"] < 1:
+            raise ValueError("Source page must be a positive integer")
+        key = json.dumps(location, sort_keys=True, ensure_ascii=False)
+        if key not in seen:
+            seen.add(key)
+            locations.append(location)
+    return locations
+
+
+def _source_pages(locations: list[dict], page_number: int | None) -> list[int]:
+    pages = []
+    for location in locations:
+        page = location.get("page")
+        if isinstance(page, int) and not isinstance(page, bool) and page >= 1 and page not in pages:
+            pages.append(page)
+    if pages:
+        return pages
+    return [page_number] if isinstance(page_number, int) and page_number >= 1 else []
+
+
 def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> dict:
     block = blocks.get(reference.block_id)
     if not block:
@@ -128,6 +163,7 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
         match = matches[0]
         quote = block.text[pieces[match.start()].start():pieces[match.end() - 1].end()]
     local = block.text.index(quote)
+    locations = _source_locations(block)
     return {"block_id": block.id, "quote": quote,
             "binding_id": block.binding_id, "index_revision_id": block.index_revision_id,
             "source_revision_id": block.source_revision_id, "page_number": block.page_number,
@@ -137,6 +173,7 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
             "temporal_scope": block.temporal_scope.model_dump(),
             "entity_name": block.fact_context.get("entity_name") if block.origin == "reviewed_fact" else None,
             "record_label": block.record_label, "record_path": block.record_path,
+            "source_locations": locations, "source_pages": _source_pages(locations, block.page_number),
             "start": block.start + local if block.origin == "canonical" else None,
             "end": block.start + local + len(quote) if block.origin == "canonical" else None}
 
@@ -162,6 +199,28 @@ def validate_plan_years(plan: QueryPlan, question: str, history: list, default_y
 
 def evidence_digest(bindings: list[dict]) -> str:
     return hashlib.sha256(json.dumps(bindings, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def location_pages(locations: list[dict] | None) -> list[int] | None:
+    pages = [location["page"] for location in locations or [] if isinstance(location, dict)
+             and isinstance(location.get("page"), int) and not isinstance(location["page"], bool)
+             and location["page"] >= 1]
+    return list(dict.fromkeys(pages)) or None
+
+
+def citation_pages(reference: dict) -> list[int] | None:
+    """Bound pages win; locator-only sources never get an invented page."""
+    pages = reference.get("source_pages")
+    if pages is None:
+        locations = reference.get("source_locations")
+        pages = location_pages(locations) or []
+        if not pages and not locations and reference.get("page_number") is not None:
+            pages = [reference["page_number"]]
+    return list(pages) or None
+
+
+def citation_locations(reference: dict) -> list[dict] | None:
+    return list(reference.get("source_locations") or []) or None
 
 
 def temporal_references_supported(claim: dict, years: list[int]) -> bool:

@@ -1,6 +1,6 @@
 """Versioned source units shared by indexing, search and source verification."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,11 +8,22 @@ UNIT_VERSION = "source-units-v1"
 
 
 class TemporalScope(BaseModel):
+    """Typed, source-qualified time metadata; declarations are never approvals."""
+
     model_config = ConfigDict(extra="forbid")
     issued_date: str | None = None
     mentioned_years: list[int] = Field(default_factory=list)
     heading_years: list[int] = Field(default_factory=list)
     data_years: list[int] = Field(default_factory=list)
+    academic_year: Any | None = None
+    effective_from: dict[str, Any] | None = None
+    effective_to: dict[str, Any] | None = None
+    event_from: dict[str, Any] | None = None
+    event_to: dict[str, Any] | None = None
+    recurrence: Any | None = None
+    basis_quote: str | None = None
+    scope_level: Literal["unknown", "block", "row", "column", "field"] = "unknown"
+    unsupported: dict[str, Any] = Field(default_factory=dict)
     status: Literal["unknown", "proposed", "verified", "ambiguous"] = "unknown"
     role: Literal["data", "effective", "event", "unknown"] = "unknown"
     evidence_quote: str | None = None

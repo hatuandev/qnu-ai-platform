@@ -6,6 +6,18 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-18** | Codex | Sửa ba finding review RAG | Căn cứ năm đúng cột/ô; hiệu đính có audit dùng chung fact/row; escape một lần giữ đúng bảng.25regression mới,focused158PASS/Ruff6PASS; full13FAIL/2163PASS/17skip/23subtests, exact baseline13. Không nạp lại/duyệt/publish/Git | [Nhật ký542](./nhat_ky/2026-10-18_phien_542_sua_ba_loi_review_rag.md) |
+
+| **2026-10-18** | Codex | Review RAG sau batch 540 | CHANGES REQUESTED: 2 P1 về căn cứ năm sai cột và fact hiệu đính bị loại; 1 P2 escape hai lần làm vỡ bảng trả lời. Focused80PASS/Ruff21PASS, probe4FAIL. Chỉ review, chưa nạp lại hoặc sửa app | [Nhật ký541](./nhat_ky/2026-10-18_phien_541_review_tich_hop_rag_parser.md) |
+
+| **2026-10-18** | Qoder | Sửa 4 finding review 536 theo chuẩn MD v1.0 | F1 giữ cell state xuyên projection→row catalog; F2 fact resolve đúng row/header/note và đóng deps; F3 temporal đúng cấp, basis bắt buộc, chỉ verified mới filter; F4 citation giữ source_pages trải trang, không bịa page.12test mới,focused94/164/105+23subtest,RuffPASS; full13FAIL/2138PASS/17skip/23subtest exact13ID baseline. Không commit/reparse/duyệt/publish/live | [Nhật ký540](./nhat_ky/2026-10-18_phien_540_sua_bon_finding_review536.md) |
+
+| **2026-10-18** | Codex | Sửa parser DOCX độc lập | OOXML notes/anchors/resources, inventory gate, mapping trọn dòng và header origin; offline3notes/ảnh đủ/10bảng103dòng, page flags130→9.168PASS+23subtest/Ruff7PASS; full13FAIL/2137PASS khớp baseline. Không sửa batch RAG/nạp lại | [Nhật ký539](./nhat_ky/2026-10-18_phien_539_sua_parser_docx_doc_lap.md) |
+
+| **2026-10-18** | Codex | Truy nguyên DOCX thiếu nội dung | Probe offline đạt, stats khớp537: notes mất ngay Docling; adapter thiếu quan hệ chú thích; state dựa trên biểu diễn; mapping gặp text lặp và cursor; gate chỉ kiểm cấu trúc. Chỉ phân tích, không sửa app/nguồn | [Nhật ký538](./nhat_ky/2026-10-18_phien_538_phan_tich_nguyen_nhan_thieu_noi_dung_docx.md) |
+
+| **2026-10-18** | Codex | Nạp DOCX phức tạp thử chuẩn MD | Review_required;18trang/299blocks/10bảng/103dòng/45NV, pair+validatorPASS. Chưa đạt: mất3footnotes, contextrefs0, mapping130unknown, states thiếu nghĩa. Serving56chunks/0facts không đổi; không duyệt/index/publish | [Nhật ký537](./nhat_ky/2026-10-18_phien_537_nap_docx_phuc_tap_kiem_thu_chuan_md.md) |
+
 | **2026-10-18** | Codex | Review RAG theo Markdown chuẩn | CHANGES REQUESTED: mất cell state ở row catalog, fact mất explicit note deps, temporal metadata bị bỏ, citation nối trang mất pages. Existing69PASS+39JUnit không lỗi;4probeFAIL tái hiện4gap. Chỉ review, không sửa app/nguồn thật | [Review536](./nhat_ky/2026-10-18_phien_536_review_rag_theo_chuan_markdown.md) |
 
 | **2026-10-18** | Codex | Sửa hai P1 header DOCX/GFM state | Header bằng Word XML+unique grid, GFM states/fact/guard như records;15regression mới, focused201PASS+23subtest/Ruff9PASS,6pair valid. Sửa2regression version quá dài; full cuối **13FAIL/2115PASS/17skip** exact baseline529. Không commit/push/reparse/duyệt | [Nhật ký535](./nhat_ky/2026-10-18_phien_535_sua_header_docx_va_cell_state_gfm.md) |

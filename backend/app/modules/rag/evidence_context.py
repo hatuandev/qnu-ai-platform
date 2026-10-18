@@ -39,7 +39,8 @@ def compact_claim_context(payload: dict, claims: list[dict]) -> dict:
     negation or number is shortened, and unknown temporal status remains explicit.
     """
     catalog, identities, projected = {}, {}, []
-    server_fields = {"binding_id", "index_revision_id", "canonical_hash", "start", "end"}
+    server_fields = {"binding_id", "index_revision_id", "canonical_hash", "start", "end",
+                     "source_locations", "source_pages"}
     for claim in claims:
         refs = []
         for reference in claim["references"]:

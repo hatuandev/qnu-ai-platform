@@ -50,6 +50,10 @@ def review_context_artifact(artifact: dict[str, Any], decision: str, actor_id: s
             if raw.get("context_review"):
                 raw["context_review"] = {**raw["context_review"], "status": "verified", "review": review}
                 raw["temporal_context"]["status"] = "verified"
+                corrected = reviewed_human_temporal(raw)
+                if corrected is not None:
+                    raw["temporal_context"] = corrected
+                    _reviewed_cell_scope(revised, raw, corrected)
         for field in ("issued_date", "issued_year", "subject_years"):
             evidence = revised["temporal_metadata"][field].get("evidence")
             if isinstance(evidence, dict) and evidence.get("actor_id"):
@@ -64,11 +68,67 @@ def fact_set_hash(facts: list[dict[str, Any]]) -> str:
     return hashlib.sha256(json.dumps(facts, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
-def query_projection(raw: dict[str, Any]) -> dict[str, Any]:
-    temporal, qualifiers = raw.get("temporal_context") or {}, raw.get("qualifiers") or {}
+def reviewed_human_temporal(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """Adapt the server's audited correction contract, including older year-only facts.
+
+    This is review evidence, not a fabricated quote from the source. Projection
+    never copies this audit structure from document metadata.
+    """
+    temporal, audit = raw.get("temporal_context"), raw.get("context_review")
+    if not isinstance(temporal, dict) or not isinstance(audit, dict):
+        return None
+    review = audit.get("review")
+    if (temporal.get("evidence") != "human_correction" or temporal.get("status") != "verified"
+            or audit.get("status") != "verified" or not isinstance(review, dict)
+            or review.get("decision") != "approved"
+            or any(not isinstance(value, str) or not value.strip()
+                   for value in (audit.get("actor_id"), audit.get("reason"), audit.get("at"),
+                                 review.get("actor_id"), review.get("at")))):
+        return None
     year = temporal.get("year")
+    if year is not None and (not isinstance(year, int) or isinstance(year, bool) or not 1900 <= year <= 2099):
+        return None
+    if temporal.get("type") != ("year" if year is not None else "unknown"):
+        return None
+    return {**temporal, "years": [year] if year is not None else [],
+            "role": "data" if year is not None else "unknown", "scope_level": "field",
+            "review_basis": "human_review"}
+
+
+def fact_temporal_context(raw: dict[str, Any]) -> dict[str, Any]:
+    temporal = dict(raw.get("temporal_context") or {})
+    if temporal.get("evidence") != "human_correction":
+        return temporal
+    return reviewed_human_temporal(raw) or {**temporal, "status": "ambiguous", "role": "unknown", "years": []}
+
+
+def _reviewed_cell_scope(artifact: dict[str, Any], raw: dict[str, Any], scope: dict[str, Any]) -> None:
+    """Keep row-answer coordinates on the same reviewed fact scope as evidence."""
+    for table in artifact.get("tables") or []:
+        if table.get("id") != raw.get("table_id"):
+            continue
+        row, column = raw.get("row_index"), raw.get("column_index")
+        rows, ids = table.get("row_fields") or [], table.get("row_unit_ids") or []
+        if (not isinstance(row, int) or not isinstance(column, int) or not 0 <= row < len(rows)
+                or not 0 <= column < len(rows[row]) or row >= len(ids)
+                or ids[row] != raw.get("source_unit_id")):
+            return
+        field = rows[row][column]
+        if field.get("column_index") != column:
+            return
+        field["temporal"] = {**scope, "data_years": list(scope["years"])}
+        return
+
+
+def query_projection(raw: dict[str, Any]) -> dict[str, Any]:
+    temporal, qualifiers = fact_temporal_context(raw), raw.get("qualifiers") or {}
+    year = temporal.get("year")
+    # Only a review-verified data year is an applicability constraint. A header
+    # mention or proposed declaration must not silently filter other years.
+    verified = temporal.get("status") == "verified" and temporal.get("role", "data") == "data"
     return {"entity_code": raw.get("entity_code"), "attribute_code": raw.get("attribute_code"),
-            "applicability_year": year if temporal.get("type") == "year" and isinstance(year, int) else None,
+            "applicability_year": year if verified and temporal.get("type") == "year"
+            and isinstance(year, int) and not isinstance(year, bool) else None,
             "temporal_type": temporal.get("type"), "admission_method": qualifiers.get("method"), "unit": qualifiers.get("unit")}
 
 
@@ -101,6 +161,8 @@ def apply_context_edits(artifact: dict[str, Any], request: SourceContextEditRequ
         if "year" in changes:
             year = changes["year"]
             raw["temporal_context"] = {"type": "year" if year else "unknown", "year": year,
+                                       "years": [year] if year is not None else [],
+                                       "role": "data" if year is not None else "unknown", "scope_level": "field",
                                        "status": "proposed", "evidence": "human_correction"}
             raw["year"] = str(year) if year else None
         raw["qualifiers"] = {**raw.get("qualifiers", {}),

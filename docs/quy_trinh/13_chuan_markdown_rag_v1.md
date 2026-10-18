@@ -637,3 +637,36 @@ cloud chain. Không đổi cấu hình ModelOps, embedding hay Top K khi chuyể
 
 Kết quả528:6pair hợp lệ, chỉ1DOCX đã xuất bản theo xác nhận user,5PDF vẫn chờ đối
 soát. Không coi nạp thành công là bằng chứng OCR/chất lượng trả lời đã đạt.
+
+### 11.4. Adapter DOCX có bằng chứng nguồn — phiên 539
+
+Parser đọc footnotes/endnotes và anchor theo ID từ OOXML bên cạnh cây Docling.
+Chỉ liên kết `context_refs` khi đích nguồn được xác minh duy nhất; thiếu/trùng giữ
+nội dung, locator và cờ. Prose note vẫn cần annotation phạm vi, không nối bằng
+độ gần hay từ điển. Style nguồn được giữ riêng; ô gộp/header dùng origin.
+
+Ảnh embedded lưu theo bytes gốc trong archive có checksum qua StorageDriver,
+ghim bằng `raw_evidence` và resource member/hash trong JSON. Không nhúng Base64
+vào MD/JSON hoặc tự tải linked image ngoài. Giữ ảnh không chứng minh đã phiên âm
+đúng; quality flag vẫn yêu cầu kiểm chứng nội dung hình.
+
+Inventory notes/resources kiểm trước lưu; thiếu đối tượng không im lặng trả
+ready. Mapping từ preview giữ null/locator khi chưa chắc. Fingerprint parser
+`layout-v17-docx-source` áp dụng cho lần xử lý mới; không tự reparse, duyệt hoặc
+xuất bản artifact cũ.
+
+### 11.5. Scope thời gian và hiệu đính có audit — phiên 542
+
+Căn cứ temporal cấp column/field chỉ được kiểm trên header/raw thuộc chính
+column/field. Chữ có trong cột khác không chứng minh scope. Mâu thuẫn năm với
+header giữ ambiguous; row/table scope chỉ kế thừa từ khai báo rõ ở cấp đó.
+
+Hiệu đính year do người dùng thực hiện qua vòng đời revision/review được chuẩn
+hóa dùng chung cho materialization, evidence và row-answer. Nhận contract cũ
+year-only chỉ khi có audit người sửa, lý do, thời điểm và quyết định approved của
+người duyệt. Không tạo quote giả từ nguồn cho nhận định đã được người duyệt xác
+nhận. Xóa năm giữ unknown/[], không phục hồi từ năm trong header hay tên file.
+
+Header/raw/origin giữ để truy vết; giá trị trả lời thêm nhãn cell state rồi escape
+đúng một lần khi dựng Markdown. Đổi adapter không tự cập nhật artifact đã lưu,
+không cấp quyền nạp lại, duyệt, lập chỉ mục hoặc xuất bản nguồn cũ.

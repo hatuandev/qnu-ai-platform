@@ -116,13 +116,52 @@ def table_children(parent: SourceUnit) -> list[SourceUnit]:
     return result
 
 
+_TEMPORAL_ADDITIONS = {
+    "academic_year": None,
+    "effective_from": None,
+    "effective_to": None,
+    "event_from": None,
+    "event_to": None,
+    "recurrence": None,
+    "basis_quote": None,
+    "scope_level": "unknown",
+    "unsupported": {},
+}
+
+
+def _digest(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def manifest_digest(manifest: UnitManifest) -> str:
     payload = manifest.model_dump()
     for unit in payload["units"]:
         if not unit.get("qnu_block_id"):
             for key in ("qnu_block_id", "source_locations", "context_refs"):
                 unit.pop(key, None)  # Historical v1 manifests retain their exact seal.
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return _digest(payload)
+
+
+def legacy_manifest_digest(manifest: UnitManifest) -> str:
+    """Accept pre-provenance seals without rewriting an old revision's hash.
+
+    Only newly added keys at their neutral defaults are removed, so a manifest
+    carrying actual typed temporal metadata still needs its current digest.
+    """
+    payload = manifest.model_dump()
+    for unit in payload["units"]:
+        temporal = unit.get("temporal") or {}
+        for key, default in _TEMPORAL_ADDITIONS.items():
+            if temporal.get(key) == default:
+                temporal.pop(key, None)
+        if not unit.get("qnu_block_id"):
+            for key in ("qnu_block_id", "source_locations", "context_refs"):
+                unit.pop(key, None)
+    return _digest(payload)
+
+
+def manifest_hash_matches(stored: str | None, manifest: UnitManifest) -> bool:
+    return bool(stored) and stored in {manifest_digest(manifest), legacy_manifest_digest(manifest)}
 
 
 def validate_manifest(manifest: UnitManifest, markdown: str) -> None:
@@ -144,16 +183,19 @@ def validate_manifest(manifest: UnitManifest, markdown: str) -> None:
             if unit.parent_id == unit.id or not (heading_parent or table_parent):
                 raise ValueError("Source unit parent is not a containing structural node")
         scope = unit.temporal
-        if scope.status == "verified" and (not scope.evidence_quote or scope.evidence_quote not in unit.text
-                or not set(scope.data_years).issubset({int(year) for year in YEAR.findall(scope.evidence_quote)})):
-            raise ValueError("Verified temporal scope lacks exact same-unit evidence")
+        if scope.status == "verified":
+            basis = scope.evidence_quote or ""
+            header_basis = unit.kind == "table" and bool(unit.header_context) and basis in unit.header_context
+            if (not basis or not (basis in unit.text or header_basis)
+                    or not set(scope.data_years).issubset({int(year) for year in YEAR.findall(basis)})):
+                raise ValueError("Verified temporal scope lacks exact same-unit evidence")
 
 
 def resolve_unit_manifest(markdown: str, artifact: dict[str, Any]) -> UnitManifest:
     stored = artifact.get("retrieval_units")
     manifest = UnitManifest.model_validate(stored) if stored else build_unit_manifest(markdown, artifact.get("temporal_metadata"))
     validate_manifest(manifest, markdown)
-    if stored and artifact.get("unit_manifest_hash") != manifest_digest(manifest):
+    if stored and not manifest_hash_matches(artifact.get("unit_manifest_hash"), manifest):
         raise ValueError("Source unit manifest digest mismatch")
     return manifest
 

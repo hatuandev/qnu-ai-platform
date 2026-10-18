@@ -109,6 +109,7 @@ class Citation(BaseModel):
     page_number: int | None = None
     quote: str | None = None
     source_pages: list[int] | None = None
+    source_locations: list[dict] | None = None
     entity_key: str | None = None
     binding_id: str | None = None
     index_revision_id: str | None = None

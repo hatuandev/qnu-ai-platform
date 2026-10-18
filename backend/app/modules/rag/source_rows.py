@@ -17,7 +17,7 @@ from app.modules.knowledge.models import (
     KnowledgeSourceRevision,
 )
 from app.modules.knowledge.normalization.retrieval_units import (
-    manifest_digest,
+    manifest_hash_matches,
     resolve_unit_manifest,
 )
 from app.modules.knowledge.services.source_artifact import (
@@ -37,6 +37,48 @@ logger = logging.getLogger(__name__)
 
 def _key(text: str) -> str:
     return " ".join(term for term in tokens(text) if " " not in term)
+
+
+def _pages_from_locations(locations: list[dict] | None, fallback: int | None = None) -> list[int]:
+    pages = []
+    for location in locations or []:
+        page = location.get("page") if isinstance(location, dict) else None
+        if isinstance(page, int) and not isinstance(page, bool) and page >= 1 and page not in pages:
+            pages.append(page)
+    if not pages and isinstance(fallback, int) and not isinstance(fallback, bool) and fallback >= 1:
+        pages.append(fallback)
+    return pages
+
+
+def _standard_row_fields(artifact: dict, unit, manifest) -> dict:
+    """Exact table/row/column identity for standard cell state; legacy stays legacy."""
+    if artifact.get("input_format") != "qnu-rag-projection/v1":
+        return {}
+    for table in artifact.get("tables") or []:
+        row_ids = list(table.get("row_unit_ids") or [])
+        fields_by_row = table.get("row_fields") or []
+        index = row_ids.index(unit.id) if unit.id in row_ids else None
+        if index is None:
+            # Artifacts created before row_unit_ids keep deterministic row order.
+            rows = [row for row in manifest.units if row.parent_id == table.get("id") and row.kind == "table"
+                    and not row.is_container and row.text != row.header_context]
+            if len(rows) != len(fields_by_row):
+                continue
+            matches = [position for position, row in enumerate(rows) if row.id == unit.id]
+            if not matches:
+                continue
+            index = matches[0]
+        if index >= len(fields_by_row):
+            continue
+        headers = list(table.get("headers") or [])
+        paths = list(table.get("header_paths") or [])
+        columns = table.get("columns") or [
+            {"id": None, "header_path": paths[position] if position < len(paths) else [header]}
+            for position, header in enumerate(headers)]
+        return {"row_fields": fields_by_row[index], "row_columns": columns,
+                "row_table_id": table.get("id"),
+                "cell_state_source": table.get("cell_state_source")}
+    return {}
 
 
 def _matches_row(header: str, text: str, question: str) -> bool:
@@ -61,7 +103,8 @@ def source_rows(source: KnowledgeSourceRevision, index: KnowledgeIndexRevision,
             raise ValueError("Source hash/review/parity mismatch")
         artifact = get_source_artifact(source)
         manifest = resolve_unit_manifest(markdown, artifact)
-        if index.parity_report.get("unit_manifest_hash", manifest_digest(manifest)) != manifest_digest(manifest):
+        pinned_hash = index.parity_report.get("unit_manifest_hash")
+        if pinned_hash and not manifest_hash_matches(pinned_hash, manifest):
             raise ValueError("Source/index manifest mismatch")
         graph = artifact.get("context_graph") or build_context_graph(manifest)
         validate_context_graph(graph, manifest)
@@ -82,15 +125,18 @@ def source_rows(source: KnowledgeSourceRevision, index: KnowledgeIndexRevision,
             raise AppException("Nội dung hàng không khớp chunk đã xuất bản.", code="SOURCE_ROW_INVALID", status_code=503)
         context = [by_id[ref] for ref in graph["links"].get(unit.id, []) if by_id[ref].kind != "table"]
         verified_years = unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else []
+        table_refs = [unit.id, *graph["links"].get(unit.id, [])]
+        fallback_pages = sorted({by_id[ref].page_number for ref in table_refs
+                                 if by_id[ref].kind == "table" and isinstance(by_id[ref].page_number, int)})
+        row_meta = _standard_row_fields(artifact, unit, manifest)
         metadata.update(source_revision_id=source.id, document_title=source.snapshot_metadata.get("title") or binding.id,
             source_unit_id=unit.id, canonical_hash=source.canonical_hash, data_years=verified_years,
-            citation_quote=unit.text,
+            citation_quote=unit.text, source_locations=list(unit.source_locations),
+            source_pages=_pages_from_locations(unit.source_locations, unit.page_number) or fallback_pages,
             row_headers=[by_id[ref].model_dump() for ref in graph["links"].get(unit.id, [])
                          if by_id[ref].kind == "table" and by_id[ref].text == unit.header_context],
-            source_pages=sorted({by_id[ref].page_number for ref in [unit.id, *graph["links"].get(unit.id, [])]
-                                 if by_id[ref].kind == "table" and isinstance(by_id[ref].page_number, int)}),
             row_context=[{"unit_id": item.id, "text": item.text, "page_number": item.page_number,
-                          "source_unit": item.model_dump()} for item in context])
+                          "source_unit": item.model_dump()} for item in context], **row_meta)
         result.append(FusionCandidate(chunk_id=chunk.id, document_id=binding.id, content=chunk.content,
             rrf_score=0.0, page_number=unit.page_number, section=chunk.section,
             binding_id=binding.id, index_revision_id=index.id, metadata=metadata))
@@ -170,8 +216,10 @@ def merge_row_anchors(candidates: list[FusionCandidate], rows: list[FusionCandid
         for item in row.metadata["row_context"]:
             metadata = {key: value for key, value in row.metadata.items() if key != "row_context"}
             scope = item["source_unit"]["temporal"]
+            locations = list(item["source_unit"].get("source_locations") or [])
             metadata.update(source_unit_id=item["unit_id"], source_unit=item["source_unit"],
-                            citation_quote=item["text"], source_pages=[item["page_number"]] if item["page_number"] else [],
+                            citation_quote=item["text"], source_locations=locations,
+                            source_pages=_pages_from_locations(locations, item["page_number"]),
                             data_years=scope["data_years"] if scope["status"] == "verified" and scope["role"] == "data" else [],
                             context_only=True)
             context.append(FusionCandidate(chunk_id=row.metadata["source_revision_id"] + ":" + item["unit_id"],
