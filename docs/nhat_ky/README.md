@@ -7,6 +7,10 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên535](./2026-10-18_phien_535_sua_header_docx_va_cell_state_gfm.md) | Khép hai finding header DOCX/GFM | Word source-role evidence, GFM cell states/guard duyệt;201PASS+23subtest/Ruff9PASS/6pair valid; full cuối13FAIL/2115PASS khớp baseline; không tác động PDF cũ |
+
+| **2026-10-18** | [Phiên534](./2026-10-18_phien_534_review_lai_chuan_docx_pdf.md) | Review lại sau fix4 | Còn2P1:headerless DOCX mất dòng dữ liệu đầu và GFM mất cell states/không chặn marker;164PASS+23subtest/Ruff5PASS; chỉ review, không sửa app |
+
 | **2026-10-18** | [Phiên533](./2026-10-18_phien_533_sua_bon_loi_chuan_docx_pdf.md) | Sửa bốn lỗi review chuẩn DOCX/PDF | Mapping toàn đơn vị/row, không suy ô gộp thành note, explicit scope, gate GFM/location/flags; focused164PASS+23subtest, Ruff5PASS,6pair valid; full13FAIL/2100PASS khớp baseline;5PDF chưa reparse/duyệt |
 
 | **2026-10-18** | [Phiên532](./2026-10-18_phien_532_review_chuan_docx_pdf.md) | Review cấu trúc DOCX/PDF | Chưa đạt đầy đủ:4finding mapping trang/role hàng/note scope/validator; focused122PASS+23subtest, READ ONLY6pair valid;5PDF vẫn chờ đối soát; không sửa app |

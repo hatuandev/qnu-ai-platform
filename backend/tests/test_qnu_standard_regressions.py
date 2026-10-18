@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import docx
 import pytest
+from docx.oxml import OxmlElement
 
 from app.modules.knowledge.normalization.qnu_markdown import (
     QnuBlock,
@@ -33,6 +34,7 @@ async def _model(document, split=None, gap=False):
         ranges = [(1, 0, len(markdown))]
     return build_qnu_structured_document(
         parsed.docling_document, filename="fixture.docx", sha256="a" * 64,
+        header_evidence=parsed.docx_header_evidence,
         projection_markdown=markdown, page_ranges=ranges, render_page_count=len(ranges),
     )
 
@@ -90,6 +92,7 @@ async def test_nonlexical_content_cannot_make_page_mapping_look_aligned():
 async def test_simple_table_has_correct_row_pages_without_borrowing_the_header_page(split):
     document = docx.Document()
     table = document.add_table(rows=3, cols=2)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     for row, values in zip(table.rows, [["Name", "Value"], ["Alpha", "0"], ["Beta", "2"]]):
         for cell, value in zip(row.cells, values):
             cell.text = value
@@ -108,6 +111,7 @@ async def test_simple_table_has_correct_row_pages_without_borrowing_the_header_p
 async def test_single_column_records_keep_data_and_zero_as_rows():
     document = docx.Document()
     table = document.add_table(rows=3, cols=1)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     for row, value in zip(table.rows, ["Item", "entry " * 26, "0"]):
         row.cells[0].text = value
     model = await _model(document)
@@ -123,6 +127,7 @@ async def test_single_column_records_keep_data_and_zero_as_rows():
 async def test_spanning_body_cell_keeps_row_fields_and_origin_until_role_is_known():
     document = docx.Document()
     table = document.add_table(rows=3, cols=2)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     table.cell(0, 0).text, table.cell(0, 1).text = "Group", "Value"
     table.cell(1, 0).merge(table.cell(1, 1)).text = "Only applies to group A."
     table.cell(2, 0).text, table.cell(2, 1).text = "B", "2"

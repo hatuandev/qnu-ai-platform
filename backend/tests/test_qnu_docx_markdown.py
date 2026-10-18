@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import docx
+from docx.oxml import OxmlElement
 
 from app.core.exceptions import AppException
 from app.modules.knowledge.models import KnowledgeBinding, KnowledgeSourceRevision
@@ -56,6 +57,7 @@ async def _parse_docx_async(content: bytes, name: str = "fixture.docx"):
 def _model(parsed, page_ranges=None):
     return build_qnu_structured_document(
         parsed.docling_document,
+        header_evidence=parsed.docx_header_evidence,
         filename="fixture.docx",
         sha256=SHA,
         projection_markdown=parsed.raw_text,
@@ -83,6 +85,7 @@ def _fixture_tables() -> bytes:
     doc = docx.Document()
     doc.add_heading("Bảng chỉ tiêu tuyển sinh", level=1)
     table = doc.add_table(rows=6, cols=4)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     headers = ["TT", "Mã ngành", "Tên ngành", "Chỉ tiêu"]
     for index, value in enumerate(headers):
         table.rows[0].cells[index].text = value
@@ -381,6 +384,7 @@ def _fixture_multi_page_table() -> bytes:
     doc = docx.Document()
     doc.add_heading("Bang chi tieu nhieu trang", level=1)
     table = doc.add_table(rows=11, cols=3)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     for index, value in enumerate(["Ma", "Ten nganh", "Chi tieu"]):
         table.rows[0].cells[index].text = value
     for row_index in range(1, 10):

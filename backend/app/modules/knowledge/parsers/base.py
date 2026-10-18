@@ -33,6 +33,8 @@ class ParsedContent:
     # Raw DoclingDocument retained in memory so the QNU RAG Markdown builder can read
     # cells/reading order without re-parsing. Never serialized into document metadata.
     docling_document: Any | None = None
+    # Source-backed DOCX table roles. Engine flags in the raw document stay unchanged.
+    docx_header_evidence: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 class BaseDocumentParser(ABC):

@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v15-qnu-serving"
+EXTRACTION_VERSION = "layout-v16-qnu-evidence"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -278,6 +278,7 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
             result.qnu_document = await asyncio.to_thread(
                 build_qnu_structured_document,
                 parsed.docling_document,
+                header_evidence=parsed.docx_header_evidence,
                 filename=filename,
                 sha256=hashlib.sha256(content).hexdigest(),
                 projection_markdown=parsed.raw_text,

@@ -10,6 +10,7 @@ from typing import Any
 from app.modules.knowledge.normalization.qnu_markdown import (
     QnuBlock,
     QnuStructuredDocument,
+    cell_state,
     parse_qnu_gfm_table,
 )
 from app.modules.knowledge.normalization.retrieval_models import SourceUnit, UnitManifest
@@ -68,6 +69,7 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
     units: list[SourceUnit] = []
     tables: list[dict] = []
     row_sources: dict[tuple[str, int], QnuBlock] = {}
+    row_cells: dict[tuple[str, int], list[dict]] = {}
     blocks = {block.id: block for block in document.blocks}
     offset = 0
 
@@ -113,8 +115,12 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
                 heading_path=block.section_path, header_context=header, qnu_block_id=source.id,
                 source_locations=[loc.model_dump() for loc in source.source_locations]))
             row_sources[(parent.id, index)] = source
+            row_cells[(parent.id, index)] = (
+                [source.attributes["fields"][column["id"]] for column in block.attributes["columns"]] if rows
+                else [{"raw": value, "state": cell_state(value), "normalized": None} for value in values[index]])
         tables.append({"id": parent.id, "headers": headers, "header_paths": paths, "header_rows": [headers],
             "rows": values, "page_number": _page(block), "header_page_number": _page(block),
+            "row_fields": [row_cells[(parent.id, index)] for index in range(len(values))],
             "evidence": VERSION})
     canonical = "\n\n".join(parts)
     by_id = {unit.id: unit for unit in units}
@@ -156,7 +162,11 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
     artifact = build_source_artifact(canonical, document.source.page_count or 0, metadata, context_tables=tables)
     artifact["input_format"] = VERSION
     artifact["unresolved_cell_count"] = sum(field.get("state") in {"ambiguous", "unreadable"}
-        for block in document.blocks for field in block.attributes.get("fields", {}).values())
+        for fields in row_cells.values() for field in fields)
+    artifact["issues"].extend({"code": "ambiguous_cell", "table_id": table_id, "row_index": index,
+                               "column_index": column}
+        for (table_id, index), fields in row_cells.items() if row_sources[(table_id, index)].type == "table"
+        for column, field in enumerate(fields) if field["state"] in {"ambiguous", "unreadable"})
     artifact["qnu_input"] = {**reference, "projection_hash": manifest.canonical_hash, "version": VERSION}
     graph = build_context_graph(manifest)
     attach_fact_context(artifact["facts"], manifest, graph)
@@ -171,9 +181,14 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
                 field_origin=block.attributes.get("field_origins", {}).get(key),
                 field_state=block.attributes["fields"][key]["state"], page_number=_page(block),
                 source_unit_id=f"qnu:{block.id}")
-            raw["context_unit_ids"] = graph["links"].get(raw["source_unit_id"], [])
-            raw["context_graph_hash"] = graph["digest"]
-    artifact["facts"] = [fact for fact in artifact["facts"] if fact["raw_data"].get("field_state", "present") == "present"]
+        else:
+            raw.update(qnu_block_id=block.id, source_locations=[loc.model_dump() for loc in block.source_locations],
+                field_state=row_cells[(raw["table_id"], raw["row_index"])][raw["column_index"]]["state"],
+                source_unit_id=f"qnu:{block.id}:row:{raw['row_index']}", page_number=_page(block),
+                field_source=None, field_origin=None)
+        raw["context_unit_ids"] = graph["links"].get(raw["source_unit_id"], [])
+        raw["context_graph_hash"] = graph["digest"]
+    artifact["facts"] = [fact for fact in artifact["facts"] if fact["raw_data"].get("field_state") == "present"]
     artifact["retrieval_units"] = manifest.model_dump()
     artifact["unit_manifest_hash"] = manifest_digest(manifest)
     artifact["context_graph"] = graph

@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import unicodedata
+from collections import defaultdict
 from io import BytesIO
 from typing import Any
 
@@ -26,6 +28,43 @@ _BACKEND_CONFIG: dict[str, tuple[str, str]] = {
     "pptx": ("MsPowerpointDocumentBackend", "PPTX"),
     "ppt": ("MsPowerpointDocumentBackend", "PPT"),
 }
+
+
+def _docx_header_evidence(content: bytes, document: Any) -> dict[str, dict[str, Any]]:
+    """Use original Word row roles only when the entire source grid matches uniquely."""
+    from docx import Document
+    from docx.oxml.ns import qn
+
+    def signature(rows):
+        return tuple(tuple(" ".join(unicodedata.normalize("NFC", cell.text).split()) for cell in row) for row in rows)
+
+    originals = defaultdict(list)
+    for index, table in enumerate(Document(BytesIO(content)).tables):
+        flags = []
+        for row in table.rows:
+            props = row._tr.trPr
+            flag = props.find(qn("w:tblHeader")) if props is not None else None
+            flags.append(flag is not None and flag.get(qn("w:val"), "1") not in {"0", "false", "off"})
+        depth = 0
+        for enabled in flags:
+            if not enabled:
+                break
+            depth += 1
+        originals[signature([row.cells for row in table.rows])].append({
+            "basis": "docx_tblHeader", "locator": f"word/document.xml/table/{index + 1}",
+            "leading_header_rows": depth, "row_header_flags": flags,
+        })
+    converted = defaultdict(list)
+    for table in getattr(document, "tables", []):
+        grid = getattr(getattr(table, "data", None), "grid", None) or []
+        if grid:
+            converted[signature(grid)].append(table)
+    evidence = {}
+    for key, tables in converted.items():
+        matches = originals.get(key, [])
+        if len(tables) == len(matches) == 1:
+            evidence[tables[0].self_ref] = matches[0]
+    return evidence
 
 
 class DoclingOfficeParser(BaseDocumentParser):
@@ -92,6 +131,7 @@ class DoclingOfficeParser(BaseDocumentParser):
                 "source_format": self.extension,
             },
             docling_document=document,
+            docx_header_evidence=_docx_header_evidence(file_bytes, document) if format_name in {"DOCX", "DOC"} else {},
         )
 
     @staticmethod

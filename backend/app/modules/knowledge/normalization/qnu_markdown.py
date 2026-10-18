@@ -36,6 +36,16 @@ QNU_REVIEW_STATUSES = frozenset({"unreviewed", "reviewed", "needs_review"})
 QNU_CELL_STATES = frozenset(
     {"present", "blank", "not_stated", "not_applicable", "unreadable", "ambiguous"}
 )
+_CELL_MARKERS = {"-", "--", "–", "—", "/", "\\", "x", "X", "n/a", "N/A", "na", "không", "Không"}
+
+
+def cell_state(raw: str) -> str:
+    """Conservative default shared by DOCX records and GFM's internal cells."""
+    if not raw.strip():
+        return "blank"
+    return "ambiguous" if raw.strip() in _CELL_MARKERS else "present"
+
+
 BODY_REQUIRED_TYPES = frozenset(
     {"section", "text", "list", "table_row", "note", "code", "formula"}
 )

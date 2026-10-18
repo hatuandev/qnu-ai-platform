@@ -26,10 +26,10 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuSourceInfo,
     QnuSourceLocation,
     QnuStructuredDocument,
+    cell_state,
 )
 
 LOCATOR_SCHEME = "docx_body_reading_order/v1"
-_MARKER_SET = {"-", "--", "–", "—", "/", "\\", "x", "X", "n/a", "N/A", "na", "không", "Không"}
 _WORD = re.compile(r"\w+")
 _BLANK_DISPLAY = "[Ô trống trong nguồn]"
 
@@ -39,14 +39,6 @@ def clean_text(value: Any) -> str:
     if value is None:
         return ""
     return unicodedata.normalize("NFC", str(value).replace("\r\n", "\n").replace("\r", "\n"))
-
-
-def cell_state(raw: str) -> str:
-    if not raw.strip():
-        return "blank"
-    if raw.strip() in _MARKER_SET:
-        return "ambiguous"
-    return "present"
 
 
 def _fence_for(text: str) -> str:
@@ -204,7 +196,7 @@ def _caption_text(item: Any, document: Any) -> str:
     return "\n".join(parts)
 
 
-def _table_header_rows(data: Any) -> int:
+def _proposed_header_rows(data: Any) -> int:
     grid = getattr(data, "grid", None) or []
     count = 0
     for row in grid:
@@ -297,6 +289,7 @@ def _add_table(
     page_ranges: list[tuple[int, int, int]],
     cursor: int,
     markdown: str,
+    header_evidence: dict[str, dict[str, Any]],
 ) -> int:
     data = getattr(item, "data", None)
     section_path = builder.section_path()
@@ -325,7 +318,15 @@ def _add_table(
             )
         )
         return cursor
-    header_rows = _table_header_rows(data)
+    proposal_depth = _proposed_header_rows(data)
+    proof = header_evidence.get(getattr(item, "self_ref", ""), {})
+    depth = proof.get("leading_header_rows")
+    header_rows = depth if (proof.get("basis") == "docx_tblHeader" and isinstance(depth, int)
+                            and not isinstance(depth, bool) and 0 <= depth <= len(grid)) else 0
+    source_data = _table_source_data(data, header_rows)
+    source_data.update(header_evidence=proof, proposed_header_rows=proposal_depth)
+    flags = [] if header_rows else [QnuQualityFlag(code="table_header_unresolved",
+        detail="Header do engine đề xuất chưa có vai trò được xác minh từ DOCX; giữ mọi hàng dữ liệu.")]
     # Locate each row once. Only a table whose entire grid is on the same known page
     # can share one GFM location; records retain independent locations otherwise.
     row_pages = []
@@ -338,7 +339,8 @@ def _add_table(
     header_paths = _header_paths(data, header_rows)
     table_id = builder.next_id("t")
     attributes: dict[str, Any] = {
-        "representation": "records" if _uses_records(data, header_rows) or (page_ranges and not single_page) else "gfm",
+        "representation": "records" if header_rows < len(grid) and (
+            not header_rows or _uses_records(data, header_rows) or (page_ranges and not single_page)) else "gfm",
         "columns": _table_columns(header_paths),
         "source_ref": getattr(item, "self_ref", None),
     }
@@ -350,8 +352,9 @@ def _add_table(
             source_locations=_locations(block_index, pages),
             section_path=section_path,
             attributes=attributes,
+            quality_flags=flags,
             body="",
-            source_data=_table_source_data(data, header_rows),
+            source_data=source_data,
         )
         builder.add(table_block)
         return _add_table_rows(
@@ -379,8 +382,9 @@ def _add_table(
             source_locations=_locations(block_index, pages),
             section_path=section_path,
             attributes=attributes,
+            quality_flags=flags,
             body=_render_gfm(headers, rows),
-            source_data=_table_source_data(data, header_rows),
+            source_data=source_data,
         )
     )
     return cursor
@@ -487,6 +491,7 @@ def build_qnu_structured_document(
     render_page_count: int | None = None,
     title: str | None = None,
     document_type: str | None = None,
+    header_evidence: dict[str, dict[str, Any]] | None = None,
 ) -> QnuStructuredDocument:
     """Walk a Docling document in reading order and build the QNU v1.0 model."""
     ranges = page_ranges or []
@@ -570,7 +575,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if label == "table":
-            cursor = _add_table(builder, item, block_index, ranges, cursor, projection_markdown)
+            cursor = _add_table(builder, item, block_index, ranges, cursor, projection_markdown, header_evidence or {})
             position += 1
             continue
         if label == "picture":

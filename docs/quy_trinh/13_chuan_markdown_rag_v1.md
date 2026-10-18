@@ -501,6 +501,15 @@ dung lặp xuất hiện ở nhiều trang khác nhau vẫn là mơ hồ, và vi
 `aligned` khi mọi đơn vị đã định vị chắc chắn; số đơn vị đa trang nhìn thấy qua
 `stats.unit_states` (`matched`/`spanning`/`ambiguous`/`absent`/`out_of_order`).
 
+**Bằng chứng header DOCX** (phiên 535): backend đọc `w:tblHeader` trong DOCX gốc
+và chỉ gắn vai trò cho bảng Docling khi toàn bộ lưới nội dung khớp duy nhất.
+Các hàng header liên tiếp từ đầu bảng giữ đầy đủ đường dẫn cột, kể cả nhãn số/năm.
+Nhãn `column_header` do engine mặc định cho hàng đầu chỉ là đề xuất. Thiếu bằng
+chứng hoặc bảng trùng nội dung không gắn nguồn duy nhất thì giữ mọi hàng trong
+records, header chưa rõ và cờ đối soát. JSON giữ cả bằng chứng Word và cờ engine
+gốc; không sửa chúng để làm đúng vai trò suy đoán. Bảng chỉ có header vẫn giữ
+header paths và không tạo dòng dữ liệu giả.
+
 **Hợp đồng xác minh dẫn xuất khi reuse** (phiên 524): `.qnu-doc-v1.json` của bản dùng
 chung chỉ được dựng lại dưới danh tính revision mới sau khi checksum đã lưu đạt.
 `structured_sha256` thiếu hoặc không đúng dạng hex 64 ký tự thì dừng ở
@@ -553,7 +562,8 @@ thật hoặc nghiệm thu OCR server. Các trường hợp layout khó có th�
 
 ### 11.2. Bản chuẩn làm đầu vào RAG — phiên 526
 
-- Import/reparse DOCX/PDF mới dùng `layout-v15-qnu-serving`. Kiểm hai checksum,
+- Import/reparse DOCX/PDF mới dùng `layout-v16-qnu-evidence` từ phiên535
+  (thay fingerprint v15 cho lần bóc tách mới, không sửa revision cũ). Kiểm hai checksum,
   schema, binding/revision, hash nguồn và parity ngữ nghĩa MD↔JSON trước khi tạo
   serving projection `qnu-rag-projection/v1`. Thứ tự key JSON không ảnh hưởng parity;
   thứ tự khối, nội dung và metadata phải tương ứng. PDF raw sidecar được kiểm riêng.
@@ -561,6 +571,10 @@ thật hoặc nghiệm thu OCR server. Các trường hợp layout khó có th�
   Bảng records chuyển thành bảng có header đầy đủ và các row units chính xác;
   source locations, field state/origin/source giữ trong metadata, không đưa raw JSON
   vào embedding. Ô trống/ambiguous không thành số 0 hoặc fact số chắc chắn.
+  GFM cũng sinh trạng thái ô nội bộ trong `tables.row_fields`; unresolved count
+  và chặn duyệt dùng cùng quy tắc với records. Fact giữ `field_state`, vị trí và
+  source row-unit ID; chỉ state `present` mới được giữ, không mặc định thiếu state
+  thành present. Trạng thái đã có căn cứ của records vẫn được bảo toàn.
 - `context_refs` và quan hệ cấu trúc giữ header/chú thích/cha danh sách; closure cùng
   revision được kiểm. Liên kết có hướng: chọn một ghi chú dùng chung không mở rộng
   ngược thành toàn bộ bảng. Context quá ngân sách phải báo thiếu/loại có lý do,
