@@ -104,3 +104,12 @@ frontend/dist/
 frontend2/playwright-report/
 frontend2/test-results/
 frontend2/dist/
+
+# Local orchestration, runtime data and generated QA evidence (never source code)
+.antigravity-bridge/
+backend/.pytest*/
+backend/pytest_temp_dir/
+backend/storage/*
+!backend/storage/.gitkeep
+!backend/storage/e2e_fixtures/
+!backend/storage/e2e_fixtures/**
