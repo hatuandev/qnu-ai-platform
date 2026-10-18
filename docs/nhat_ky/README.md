@@ -7,6 +7,8 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên536](./2026-10-18_phien_536_review_rag_theo_chuan_markdown.md) | Review RAG theo chuẩn MD | CHANGES REQUESTED:2P1 cell state/context deps,2P2 temporal/multipage citation;69PASS+39JUnit không lỗi,4probeFAIL. Không sửa app/nguồn thật |
+
 | **2026-10-18** | [Phiên535](./2026-10-18_phien_535_sua_header_docx_va_cell_state_gfm.md) | Khép hai finding header DOCX/GFM | Word source-role evidence, GFM cell states/guard duyệt;201PASS+23subtest/Ruff9PASS/6pair valid; full cuối13FAIL/2115PASS khớp baseline; không tác động PDF cũ |
 
 | **2026-10-18** | [Phiên534](./2026-10-18_phien_534_review_lai_chuan_docx_pdf.md) | Review lại sau fix4 | Còn2P1:headerless DOCX mất dòng dữ liệu đầu và GFM mất cell states/không chặn marker;164PASS+23subtest/Ruff5PASS; chỉ review, không sửa app |

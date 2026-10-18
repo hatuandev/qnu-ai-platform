@@ -6,6 +6,8 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-18** | Codex | Review RAG theo Markdown chuẩn | CHANGES REQUESTED: mất cell state ở row catalog, fact mất explicit note deps, temporal metadata bị bỏ, citation nối trang mất pages. Existing69PASS+39JUnit không lỗi;4probeFAIL tái hiện4gap. Chỉ review, không sửa app/nguồn thật | [Review536](./nhat_ky/2026-10-18_phien_536_review_rag_theo_chuan_markdown.md) |
+
 | **2026-10-18** | Codex | Sửa hai P1 header DOCX/GFM state | Header bằng Word XML+unique grid, GFM states/fact/guard như records;15regression mới, focused201PASS+23subtest/Ruff9PASS,6pair valid. Sửa2regression version quá dài; full cuối **13FAIL/2115PASS/17skip** exact baseline529. Không commit/push/reparse/duyệt | [Nhật ký535](./nhat_ky/2026-10-18_phien_535_sua_header_docx_va_cell_state_gfm.md) |
 
 | **2026-10-18** | Codex | Review lại chuẩn DOCX/PDF | CHANGES REQUESTED:2P1, DOCX engine mặc định row0 thành header làm mất data-row role; GFM thiếu cell states nên “–” thành fact và không bị chặn duyệt.164PASS+23subtest/Ruff5PASS, probes RAM tái hiện; không sửa app/DB/Git write | [Review534](./nhat_ky/2026-10-18_phien_534_review_lai_chuan_docx_pdf.md) |
