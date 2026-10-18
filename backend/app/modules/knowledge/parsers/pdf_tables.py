@@ -118,10 +118,6 @@ def native_table(table: dict[str, Any]) -> dict[str, Any]:
     width = max((len(row) for row in matrix), default=0)
     header = table.get("header") or {}
     names = header.get("names") or []
-    depth = int(bool(matrix and names and list(matrix[0]) == names and not header.get("external")))
-    proposed = table.get("proposed_header_depth", 1)
-    if depth and isinstance(proposed, int) and 1 < proposed < len(matrix):
-        depth = proposed
     x_edges = sorted({box[x] for row in boxes for box in row if box for x in (0, 2)})
     y_edges = sorted({box[y] for row in boxes for box in row if box for y in (1, 3)})
     raw_origins = [(r, c, box) for r, row in enumerate(boxes) for c, box in enumerate(row) if box]
@@ -142,8 +138,14 @@ def native_table(table: dict[str, Any]) -> dict[str, Any]:
             cells.append({"raw": value if value is not None else "",
                           "origin": origin, "bbox": box, "unresolved": box is None})
         grid.append(cells)
-    return {"grid": grid, "header_depth": depth, "external_headers": names if header.get("external") else [],
-            "raw_native": table}
+    # The engine's names, bounding box and proposed depth do not establish row roles.
+    # Preserve every matrix row until a separate review or explicit markup establishes headers.
+    result = {"grid": grid, "header_depth": 0,
+              "external_headers": names if header.get("external") else [], "raw_native": table}
+    if matrix and not header.get("external") and (names or table.get("proposed_header_depth")):
+        result["header_proposal"] = {"basis": "native_engine_proposal", "labels": names,
+                                     "depth": table.get("proposed_header_depth", 1)}
+    return result
 
 
 def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
@@ -164,7 +166,7 @@ def table_blocks(table: dict[str, Any], *, block_id: str, parent_id: str | None,
     flags = []
     if table.get("raw_native"):
         flags.append(QnuQualityFlag(code="native_header_needs_review", detail="Header PDF được parser đề xuất; chưa là xác nhận của người duyệt."))
-    if table.get("header_proposal"):
+    elif table.get("header_proposal"):
         flags.append(QnuQualityFlag(code="native_header_needs_review",
             detail="Lớp chữ gốc của trang lặp lại mọi nhãn ở dòng đầu bảng OCR; parser đề xuất header, chưa phải xác nhận của người duyệt."))
     if not depth and not table.get("external_headers"):

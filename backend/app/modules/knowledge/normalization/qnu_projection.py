@@ -7,10 +7,13 @@ import json
 import re
 from typing import Any
 
-from app.modules.knowledge.normalization.qnu_markdown import QnuBlock, QnuStructuredDocument
+from app.modules.knowledge.normalization.qnu_markdown import (
+    QnuBlock,
+    QnuStructuredDocument,
+    parse_qnu_gfm_table,
+)
 from app.modules.knowledge.normalization.retrieval_models import SourceUnit, UnitManifest
 from app.modules.knowledge.normalization.retrieval_units import manifest_digest, validate_manifest
-from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
 from app.modules.knowledge.services.source_artifact import build_source_artifact
 from app.modules.knowledge.services.source_links import attach_fact_context, build_context_graph
 
@@ -49,15 +52,11 @@ def _table(block: QnuBlock, rows: list[QnuBlock]) -> tuple[str, list[str], list[
         if block.body.strip():
             raise ValueError("A nonempty GFM table must contain a header and separator")
         return block.body, [], [], []
-    # The standard validator already checks GFM structure; never re-infer a data row as a header.
-    parsed_headers = _split_gfm_row(lines[0])
-    if not re.fullmatch(r"\s*\|[\s|:\-]+\|\s*", lines[1]):
-        raise ValueError("Malformed GFM table separator")
+    parsed_headers, values = parse_qnu_gfm_table(block.body)
     paths = paths or [[header] for header in parsed_headers]
     headers = [" / ".join(path) for path in paths]
     if parsed_headers not in (headers, [path[-1] if path else "" for path in paths]):
         raise ValueError("GFM headers disagree with declared column paths")
-    values = [_split_gfm_row(line) for line in lines[2:]]
     if len(headers) != len(parsed_headers) or any(len(row) != len(headers) for row in values):
         raise ValueError("GFM table width differs from its columns")
     return "\n".join([_line(headers), _line(["---"] * len(headers)), *[_line(row) for row in values]]), headers, values, paths
@@ -137,7 +136,6 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
                     unit.context_refs.append(parent_ref)
         if block.type == "table_row" and block.parent_id:
             refs.extend(blocks[block.parent_id].context_refs)
-            refs.extend(note.id for note in document.blocks if note.parent_id == block.parent_id and note.type == "note")
             unit.context_refs.append(f"qnu:{block.parent_id}:header")
         for ref in refs:
             target = f"qnu:{ref}"
@@ -186,5 +184,9 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
         for table in tables]
     artifact["issues"].extend({"code": flag.code, "block_id": block.id, "field_id": flag.field_id}
         for block in document.blocks for flag in block.quality_flags if flag.status == "unresolved")
+    explicit_targets = {ref for block in document.blocks for ref in block.context_refs}
+    artifact["issues"].extend({"code": "table_note_scope_unresolved", "block_id": block.id}
+        for block in document.blocks if block.type == "note" and block.parent_id in blocks
+        and blocks[block.parent_id].type == "table" and block.id not in explicit_targets)
     artifact["review"] = {"status": "required"}  # File metadata cannot approve data.
     return canonical, artifact

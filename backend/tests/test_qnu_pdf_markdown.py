@@ -149,7 +149,10 @@ def test_native_merged_cell_uses_geometry_and_keeps_raw_null():
     assert parsed["grid"][1][1]["origin"] == [1, 0]
     assert parsed["raw_native"]["matrix"][1][1] is None
     blocks = table_blocks(parsed, block_id="t", parent_id=None, location=QnuSourceLocation(page=1, bbox_space="points"), section_path=[], engine="native")
-    assert blocks[1].attributes["field_sources"]["c02"]["bbox"] == [0, 10, 100, 20]
+    group = next(block for block in blocks if block.type == "table_row"
+                 and block.attributes["fields"]["c01"]["raw"] == "Group")
+    assert group.attributes["field_sources"]["c02"]["bbox"] == [0, 10, 100, 20]
+    assert group.attributes["field_origins"]["c02"]["column_id"] == "c01"
 
 
 @pytest.mark.parametrize("text", ["<table><tr><td rowspan='0'>x</td></tr></table>",
@@ -418,17 +421,21 @@ def _headerless_ocr_page(with_labels: bool, label_box: list[float]) -> dict:
 def test_ocr_header_proposal_requires_the_digital_layer_to_repeat_every_label_in_that_band():
     document = model([_headerless_ocr_page(True, [5, 10, 95, 20])])
     table = next(block for block in document.blocks if block.type == "table")
-    assert [column["header_path"] for column in table.attributes["columns"]] == [["Ref"], ["Name"]]
-    assert [flag.code for flag in table.quality_flags][:2] == ["native_header_needs_review", "native_ocr_conflict"]
+    assert any(flag.code == "native_header_needs_review" for flag in table.quality_flags)
+    assert any(flag.code == "table_header_unresolved" for flag in table.quality_flags)
     assert table.source_data["table"]["header_proposal"]["basis"] == "native_text_layer_corroboration"
+    assert table.source_data["table"]["header_proposal"]["labels"] == ["Ref", "Name"]
     rows = [block for block in document.blocks if block.type == "table_row"]
-    assert len(rows) == 1 and "**Ref:** 01" in rows[0].body
+    assert len(rows) == 2
+    assert rows[0].attributes["fields"]["c01"]["raw"] == "Ref"
+    assert rows[1].attributes["fields"]["c01"]["raw"] == "01"
     validate(document)
 
     for page in (_headerless_ocr_page(False, [0, 0, 0, 0]), _headerless_ocr_page(True, [5, 60, 95, 70])):
         document = model([page])
         unresolved = next(block for block in document.blocks if block.type == "table")
         assert any(flag.code == "table_header_unresolved" for flag in unresolved.quality_flags)
+        assert unresolved.source_data["table"].get("header_proposal") is None
         assert len([block for block in document.blocks if block.type == "table_row"]) == 2
 
 
@@ -462,3 +469,815 @@ def test_dash_cell_is_evidence_only_when_the_document_itself_defines_the_symbol(
     assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in row.quality_flags)
     assert not [f for f in row.quality_flags if f.code == "cell_symbol_defined"]
     validate(undefined)
+
+
+def test_native_continuation_data_rows_are_not_promoted_to_headers():
+    raw = {
+        "matrix": [
+            ["42", "7510605", "Logistics và Quản lý chuỗi cung ứng", "16", "19", "650", "16"],
+            ["43", "7520116", "Kỹ thuật cơ khí động lực", "15", "18", "600", "15"],
+        ],
+        "cell_boxes": [],
+        "header": {
+            "names": ["42", "7510605", "Logistics và Quản lý chuỗi cung ứng", "16", "19", "650", "16"],
+            "external": False,
+        },
+    }
+    parsed = native_table(raw)
+    assert parsed["header_depth"] == 0
+    blocks = table_blocks(
+        parsed,
+        block_id="p0006_b0001",
+        parent_id=None,
+        location=QnuSourceLocation(page=6, bbox_space="points"),
+        section_path=[],
+        engine="native",
+    )
+    assert len(blocks) == 3
+    data_rows = [b for b in blocks if b.type == "table_row"]
+    assert len(data_rows) == 2
+    assert data_rows[0].attributes["fields"]["c01"]["raw"] == "42"
+    assert data_rows[1].attributes["fields"]["c01"]["raw"] == "43"
+    assert any(flag.code == "table_header_unresolved" for flag in blocks[0].quality_flags)
+
+
+def test_ocr_header_proposal_does_not_consume_numeric_data_rows():
+    native = empty_native()
+    native["layout"]["blocks"] = [native_text("001 12 002 15", [5, 10, 95, 20])]
+    html = "<table><tr><td>001</td><td>12</td></tr><tr><td>002</td><td>15</td></tr></table>"
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100,
+                "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [5, 10, 95, 80], "block_content": html}
+                ],
+            }
+        },
+    }
+    doc = model([page])
+    table = next(b for b in doc.blocks if b.type == "table")
+    rows = [b for b in doc.blocks if b.type == "table_row"]
+    assert len(rows) == 2
+    assert rows[0].attributes["fields"]["c01"]["raw"] == "001"
+    assert rows[1].attributes["fields"]["c01"]["raw"] == "002"
+    assert any(f.code == "table_header_unresolved" for f in table.quality_flags)
+
+
+def test_symbol_legends_respect_page_scope_and_do_not_leak_cross_page():
+    legend_p1 = 'Ký hiệu "–": không xét tuyển.'
+    legend_p2 = 'Ký hiệu "–": chưa có dữ liệu.'
+    html_p1 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html_p2 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>02</td><td>–</td></tr></table>"
+    html_p3 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>03</td><td>–</td></tr></table>"
+
+    def make_page(p: int, legend: str | None, html: str) -> dict:
+        native = empty_native(p)
+        if legend:
+            native["layout"]["blocks"] = [native_text(legend, [10, 90, 90, 95])]
+        blocks = [{"block_label": "table", "block_bbox": [5, 10, 95, 80], "block_content": html}]
+        if legend:
+            blocks.append({"block_label": "text", "block_bbox": [10, 90, 90, 95], "block_content": legend})
+        return {
+            "page": p,
+            "native": native,
+            "ocr_selected": True,
+            "engine_used": "paddle",
+            "raw_ocr_available": True,
+            "ocr_raw_page": {
+                "prunedResult": {"width": 100, "height": 100, "parsing_res_list": blocks}
+            },
+        }
+
+    doc = model([
+        make_page(1, legend_p1, html_p1),
+        make_page(2, legend_p2, html_p2),
+        make_page(3, None, html_p3),
+    ])
+
+    r1 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    r2 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "02")
+    r3 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "03")
+
+    # Page 1 must use legend 1
+    assert r1.attributes["fields"]["c02"]["state"] == "present"
+    flag1 = next(f for f in r1.quality_flags if f.code == "cell_symbol_defined")
+    assert "không xét tuyển" in flag1.detail
+    assert r1.attributes["symbol_definitions"]["c02"]["line"] == legend_p1
+
+    # Page 2 must use legend 2, NOT legend 1
+    assert r2.attributes["fields"]["c02"]["state"] == "present"
+    flag2 = next(f for f in r2.quality_flags if f.code == "cell_symbol_defined")
+    assert "chưa có dữ liệu" in flag2.detail
+    assert r2.attributes["symbol_definitions"]["c02"]["line"] == legend_p2
+
+    # Page 3 has no legend and conflicting document definitions -> MUST be ambiguous
+    assert r3.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r3.quality_flags)
+    assert not [f for f in r3.quality_flags if f.code == "cell_symbol_defined"]
+
+
+def test_native_and_ocr_table_without_header_evidence_preserves_all_rows_at_depth_zero():
+    # 1. Native table with names: []
+    raw1 = {
+        "matrix": [["Alpha", "North"], ["Beta", "South"]],
+        "cell_boxes": [],
+        "header": {"names": [], "external": False},
+    }
+    parsed1 = native_table(raw1)
+    assert parsed1["header_depth"] == 0
+    blocks1 = table_blocks(
+        parsed1,
+        block_id="t1",
+        parent_id=None,
+        location=QnuSourceLocation(page=1, bbox_space="points"),
+        section_path=[],
+        engine="native",
+    )
+    rows1 = [b for b in blocks1 if b.type == "table_row"]
+    assert len(rows1) == 2
+    assert rows1[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert rows1[1].attributes["fields"]["c01"]["raw"] == "Beta"
+    assert any(f.code == "table_header_unresolved" for f in blocks1[0].quality_flags)
+
+    # 2. Native table with names: ["Alpha", "North"] but no structural evidence
+    raw2 = {
+        "matrix": [["Alpha", "North"], ["Beta", "South"]],
+        "cell_boxes": [],
+        "header": {"names": ["Alpha", "North"], "external": False},
+    }
+    parsed2 = native_table(raw2)
+    assert parsed2["header_depth"] == 0
+    blocks2 = table_blocks(
+        parsed2,
+        block_id="t2",
+        parent_id=None,
+        location=QnuSourceLocation(page=1, bbox_space="points"),
+        section_path=[],
+        engine="native",
+    )
+    rows2 = [b for b in blocks2 if b.type == "table_row"]
+    assert len(rows2) == 2
+    assert rows2[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert any(f.code == "table_header_unresolved" for f in blocks2[0].quality_flags)
+
+    # 3. OCR table with plain td elements
+    parsed_ocr = html_table("<table><tr><td>Alpha</td><td>North</td></tr><tr><td>Beta</td><td>South</td></tr></table>")
+    assert parsed_ocr["header_depth"] == 0
+    blocks_ocr = table_blocks(
+        parsed_ocr,
+        block_id="t3",
+        parent_id=None,
+        location=QnuSourceLocation(page=1, bbox_space="percent"),
+        section_path=[],
+        engine="ocr",
+    )
+    rows_ocr = [b for b in blocks_ocr if b.type == "table_row"]
+    assert len(rows_ocr) == 2
+    assert rows_ocr[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert any(f.code == "table_header_unresolved" for f in blocks_ocr[0].quality_flags)
+
+
+def test_native_external_headers_and_internal_header_proposals():
+    # 1. External header evidence
+    raw_ext = {
+        "matrix": [["Alpha", "North"], ["Beta", "South"]],
+        "header": {"names": ["Col A", "Col B"], "external": True},
+    }
+    parsed_ext = native_table(raw_ext)
+    assert parsed_ext["header_depth"] == 0
+    assert parsed_ext["external_headers"] == ["Col A", "Col B"]
+    blocks_ext = table_blocks(
+        parsed_ext,
+        block_id="t_ext",
+        parent_id=None,
+        location=QnuSourceLocation(page=1, bbox_space="points"),
+        section_path=[],
+        engine="native",
+    )
+    assert [c["header_path"] for c in blocks_ext[0].attributes["columns"]] == [["Col A"], ["Col B"]]
+    rows_ext = [b for b in blocks_ext if b.type == "table_row"]
+    assert len(rows_ext) == 2
+    assert rows_ext[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+
+    # 2. An engine bounding box and a gap remain a proposal, not a row-role annotation.
+    raw_bbox = {
+        "matrix": [["Ref", "Score"], ["01", "100"]],
+        "cell_boxes": [[[10, 10, 50, 20], [50, 10, 90, 20]], [[10, 25, 50, 35], [50, 25, 90, 35]]],
+        "header": {"names": ["Ref", "Score"], "bbox": [10, 10, 90, 20], "external": False},
+    }
+    parsed_bbox = native_table(raw_bbox)
+    assert parsed_bbox["header_depth"] == 0
+    assert parsed_bbox["header_proposal"]["labels"] == ["Ref", "Score"]
+    blocks_bbox = table_blocks(
+        parsed_bbox,
+        block_id="t_bbox",
+        parent_id=None,
+        location=QnuSourceLocation(page=1, bbox_space="points"),
+        section_path=[],
+        engine="native",
+    )
+    assert [c["header_path"] for c in blocks_bbox[0].attributes["columns"]] == [[], []]
+    rows_bbox = [b for b in blocks_bbox if b.type == "table_row"]
+    assert len(rows_bbox) == 2
+    assert rows_bbox[0].attributes["fields"]["c01"]["raw"] == "Ref"
+    assert rows_bbox[1].attributes["fields"]["c01"]["raw"] == "01"
+
+    # 3. A proposed multi-level header also preserves every row until reviewed.
+    raw_multi = {
+        "matrix": [["H1", "H2"], ["Sub1", "Sub2"], ["01", "100"]],
+        "header": {"names": ["H1", "H2"], "external": False},
+        "proposed_header_depth": 2,
+    }
+    parsed_multi = native_table(raw_multi)
+    assert parsed_multi["header_depth"] == 0
+    assert parsed_multi["header_proposal"]["depth"] == 2
+    assert len(parsed_multi["grid"]) == 3
+
+
+def test_symbol_legends_unrelated_pages_do_not_leak_single_document_legend():
+    legend_p1 = 'Ký hiệu "–": không đủ điều kiện.'
+    html_p1 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html_p2 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>02</td><td>–</td></tr></table>"
+
+    def make_page(p: int, legend: str | None, html: str) -> dict:
+        native = empty_native(p)
+        if legend:
+            native["layout"]["blocks"] = [native_text(legend, [10, 85, 90, 95])]
+        blocks = [{"block_label": "table", "block_bbox": [10, 30, 90, 70], "block_content": html}]
+        if legend:
+            blocks.append({"block_label": "text", "block_bbox": [10, 85, 90, 95], "block_content": legend})
+        return {
+            "page": p,
+            "native": native,
+            "ocr_selected": True,
+            "engine_used": "paddle",
+            "raw_ocr_available": True,
+            "ocr_raw_page": {
+                "prunedResult": {"width": 100, "height": 100, "parsing_res_list": blocks}
+            },
+        }
+
+    doc = model([
+        make_page(1, legend_p1, html_p1),
+        make_page(2, None, html_p2),
+    ])
+
+    r1 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    r2 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "02")
+
+    # Page 1 table resolves dash
+    assert r1.attributes["fields"]["c02"]["state"] == "present"
+    flag1 = next(f for f in r1.quality_flags if f.code == "cell_symbol_defined")
+    assert "không đủ điều kiện" in flag1.detail
+
+    # Page 2 table has NO continuation relation and no legend -> MUST remain ambiguous
+    assert r2.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r2.quality_flags)
+    assert not [f for f in r2.quality_flags if f.code == "cell_symbol_defined"]
+    legend_block_p1 = next(b for b in doc.blocks if b.type in {"text", "note"} and "không đủ điều kiện" in b.body)
+    assert legend_block_p1.id not in r2.context_refs
+
+
+def test_symbol_legends_same_page_conflicting_definitions_remain_ambiguous():
+    legend1 = 'Ký hiệu "–": không xét tuyển.'
+    legend2 = 'Ký hiệu "–": chưa có dữ liệu.'
+    html = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    native["layout"]["blocks"] = [
+        native_text(legend1, [10, 80, 90, 85]),
+        native_text(legend2, [10, 86, 90, 91]),
+    ]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100,
+                "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 10, 90, 75], "block_content": html},
+                    {"block_label": "text", "block_bbox": [10, 80, 90, 85], "block_content": legend1},
+                    {"block_label": "text", "block_bbox": [10, 86, 90, 91], "block_content": legend2},
+                ],
+            }
+        },
+    }
+
+    doc = model([page])
+    r = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    assert r.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r.quality_flags)
+    assert not [f for f in r.quality_flags if f.code == "cell_symbol_defined"]
+
+
+def test_symbol_legends_same_page_duplicate_same_meaning_resolves():
+    legend1 = 'Ký hiệu "–": không xét tuyển.'
+    legend2 = 'Ký hiệu "–": không xét tuyển.'
+    html = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    native["layout"]["blocks"] = [
+        native_text(legend1, [10, 80, 90, 85]),
+        native_text(legend2, [10, 86, 90, 91]),
+    ]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100,
+                "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 10, 90, 75], "block_content": html},
+                    {"block_label": "text", "block_bbox": [10, 80, 90, 85], "block_content": legend1},
+                    {"block_label": "text", "block_bbox": [10, 86, 90, 91], "block_content": legend2},
+                ],
+            }
+        },
+    }
+
+    doc = model([page])
+    r = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    assert r.attributes["fields"]["c02"]["state"] == "present"
+    assert any(f.code == "cell_symbol_defined" and f.field_id == "c02" for f in r.quality_flags)
+
+
+def test_symbol_legends_continuation_candidate_preserves_evidence_but_keeps_symbols_ambiguous():
+    legend_p1 = 'Ký hiệu "–": không xét tuyển.'
+    html_p1 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html_p2 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>02</td><td>–</td></tr></table>"
+
+    page1 = {
+        "page": 1,
+        "native": {**empty_native(1), "layout": {"blocks": [native_text(legend_p1, [10, 86, 90, 92])]}},
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 30, 90, 85], "block_content": html_p1},
+                    {"block_label": "text", "block_bbox": [10, 86, 90, 92], "block_content": legend_p1},
+                ],
+            }
+        },
+    }
+    page2 = {
+        "page": 2,
+        "native": empty_native(2),
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 10, 90, 70], "block_content": html_p2},
+                ],
+            }
+        },
+    }
+
+    doc = model([page1, page2])
+    t2 = next(b for b in doc.blocks if b.type == "table" and b.source_locations[0].page == 2)
+    assert any(f.code == "table_continuation_needs_review" for f in t2.quality_flags)
+    assert t2.attributes["continuation_candidate"]["basis"] == "inferred_geometry"
+    r2 = next(b for b in doc.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "02")
+    assert r2.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r2.quality_flags)
+    assert not [f for f in r2.quality_flags if f.code == "cell_symbol_defined"]
+
+
+@pytest.mark.asyncio
+async def test_queue_reparse_inline_is_not_enqueued_by_reconciler_or_worker():
+    from app.modules.jobs.models import JobRecord
+    from app.modules.jobs.service import jobs_service
+    from app.modules.knowledge.models import KnowledgeBinding, KnowledgeSourceRevision
+    from app.modules.knowledge.services.source_reparse import queue_reparse
+    from app.workers.tasks import task_knowledge_source_reparse
+
+    mock_binding = MagicMock(spec=KnowledgeBinding)
+    mock_rev = MagicMock(spec=KnowledgeSourceRevision)
+    mock_rev.id = "rev_base_1"
+    mock_rev.revision_no = 1
+    mock_rev.origin_document_id = "doc_1"
+    mock_rev.origin_file_hash = "h" * 64
+    mock_rev.snapshot_storage_path = "snapshots/s.pdf"
+    mock_rev.snapshot_metadata = {}
+    mock_binding.active_source_revision = mock_rev
+
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=MagicMock(scalar=MagicMock(return_value=1), scalar_one_or_none=MagicMock(return_value=None)))
+
+    with patch("app.modules.knowledge.services.source_reparse.lock_source", AsyncMock()), \
+         patch("app.modules.knowledge.services.source_ingestion_service.source_ingestion_service.get_source", AsyncMock(return_value=mock_binding)), \
+         patch("app.modules.knowledge.services.source_reparse.ensure_source_idle", AsyncMock()), \
+         patch("app.modules.knowledge.services.source_reparse.enqueue_arq_job", AsyncMock()) as mock_source_enqueue:
+
+        # 1. Inline reparse reservation
+        await queue_reparse(
+            session, "col_1", "src_1", "standard", None, "tenant", "workspace", dispatch=False
+        )
+        assert session.add.call_count >= 2
+        job_inline = next(call.args[0] for call in session.add.call_args_list if isinstance(call.args[0], JobRecord))
+        assert job_inline.dispatch_status == "inline"
+        mock_source_enqueue.assert_not_called()
+
+        # 2. Query-sensitive reconciliation fake session
+        job_pending_failed_broker = JobRecord(
+            id="job_pending_rec_1",
+            job_type="knowledge_source_reparse",
+            status="queued",
+            dispatch_status="pending",
+            cancel_requested=False,
+            error="Redis broker down on initial dispatch",
+        )
+        job_cancelled = JobRecord(
+            id="job_cancelled_1",
+            job_type="knowledge_source_reparse",
+            status="queued",
+            dispatch_status="pending",
+            cancel_requested=True,
+        )
+
+        class QuerySensitiveFakeSession:
+            def __init__(self, candidates: list[JobRecord]):
+                self.candidates = candidates
+                self.committed = False
+
+            async def execute(self, stmt):
+                where_clauses = stmt._where_criteria
+                has_dispatch_pending_filter = any(
+                    getattr(c, "left", None) is not None
+                    and getattr(c.left, "name", None) == "dispatch_status"
+                    and getattr(c, "right", None) is not None
+                    and getattr(c.right, "value", None) == "pending"
+                    for c in where_clauses
+                )
+                matched = []
+                for j in self.candidates:
+                    if has_dispatch_pending_filter:
+                        if j.status == "queued" and j.dispatch_status == "pending" and not j.cancel_requested:
+                            matched.append(j)
+                    else:
+                        if j.status == "queued" and not j.cancel_requested:
+                            matched.append(j)
+                res = MagicMock()
+                res.scalars.return_value.all.return_value = matched
+                return res
+
+            async def commit(self):
+                self.committed = True
+
+        fake_reconcile_db = QuerySensitiveFakeSession([job_inline, job_pending_failed_broker, job_cancelled])
+
+        with patch("app.modules.jobs.service.enqueue_arq_job", AsyncMock(return_value="arq_rec_123")) as mock_jobs_enqueue:
+            dispatched = await jobs_service.reconcile_pending_dispatches(fake_reconcile_db)
+
+            assert dispatched == 1
+            assert job_pending_failed_broker.dispatch_status == "dispatched"
+            assert job_pending_failed_broker.arq_job_id == "arq_rec_123"
+            assert job_pending_failed_broker.error is None
+            mock_jobs_enqueue.assert_awaited_once_with(
+                "task_knowledge_source_reparse",
+                "job_pending_rec_1",
+                broker_job_id="job_pending_rec_1:attempt:0",
+            )
+
+            assert job_inline.dispatch_status == "inline"
+            mock_source_enqueue.assert_not_called()
+
+        # 3. Worker task with ARQ worker context (job_try in ctx) must skip inline reserved job
+        with patch("app.workers.tasks._load_job", AsyncMock(return_value=job_inline)):
+            res = await task_knowledge_source_reparse({"redis": MagicMock(), "job_try": 1}, job_inline.id)
+            assert res["status"] in ("skipped", "cancelled")
+
+
+def test_native_table_engine_bbox_does_not_prove_header_role_even_with_separation():
+    # Matrix with text words in both rows, engine proposes header.names and header.bbox
+    # but cell boxes show contiguous grid without physical separation
+    table_data = {
+        "matrix": [["Alpha", "North"], ["Beta", "South"]],
+        "cell_boxes": [
+            [[0, 0, 50, 10], [50, 0, 100, 10]],
+            [[0, 10, 50, 20], [50, 10, 100, 20]],
+        ],
+        "proposed_header_depth": 1,
+        "header": {
+            "external": False,
+            "names": ["Alpha", "North"],
+            "bbox": [0, 0, 100, 10],
+        },
+    }
+    parsed = native_table(table_data)
+    assert parsed["header_depth"] == 0
+
+    location = QnuSourceLocation(page=1, locator="pdf:page:1/native/table/0")
+    blocks = table_blocks(parsed, block_id="p0001_b0001", parent_id=None,
+                          location=location, section_path=[], engine="pymupdf")
+    assert any(f.code == "table_header_unresolved" for f in blocks[0].quality_flags)
+    row_blocks = [b for b in blocks if b.type == "table_row"]
+    assert len(row_blocks) == 2
+    assert row_blocks[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert row_blocks[1].attributes["fields"]["c01"]["raw"] == "Beta"
+
+    # Whitespace cannot establish a header role either.
+    separated_table = copy.deepcopy(table_data)
+    separated_table["cell_boxes"][1] = [[0, 15, 50, 25], [50, 15, 100, 25]]
+    parsed_sep = native_table(separated_table)
+    assert parsed_sep["header_depth"] == 0
+    assert parsed_sep["header_proposal"]["labels"] == ["Alpha", "North"]
+
+
+def test_ocr_native_agreement_preserves_unverified_row_end_to_end_in_builder():
+    html = "<table><tr><td>Alpha</td><td>North</td></tr><tr><td>Beta</td><td>South</td></tr></table>"
+    native = empty_native(1)
+    # Native text layer repeats the OCR text in row 0
+    native["layout"]["blocks"] = [native_text("Alpha North", [5, 10, 95, 20])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [5, 10, 95, 80], "block_content": html},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    table = next(b for b in document.blocks if b.type == "table")
+    # Header proposal is retained for review
+    assert table.source_data["table"]["header_proposal"]["basis"] == "native_text_layer_corroboration"
+    assert table.source_data["table"]["header_proposal"]["labels"] == ["Alpha", "North"]
+    assert any(f.code == "native_header_needs_review" for f in table.quality_flags)
+    assert any(f.code == "table_header_unresolved" for f in table.quality_flags)
+    # Both rows are preserved as table_row blocks; unverified row is NOT consumed
+    rows = [b for b in document.blocks if b.type == "table_row"]
+    assert len(rows) == 2
+    assert rows[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert rows[1].attributes["fields"]["c01"]["raw"] == "Beta"
+    validate(document)
+
+
+def test_symbol_legends_two_independent_same_page_tables_do_not_leak_legend():
+    legend_text = 'Ký hiệu "–": không xét tuyển.'
+    html1 = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html2 = "<table><tr><td>Item</td><td>Value</td></tr><tr><td>10</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    # Legend is placed immediately below Table 1 [10, 10, 90, 40], at [10, 42, 90, 48]
+    native["layout"]["blocks"] = [native_text(legend_text, [10, 42, 90, 48])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 10, 90, 40], "block_content": html1},
+                    {"block_label": "text", "block_bbox": [10, 42, 90, 48], "block_content": legend_text},
+                    {"block_label": "table", "block_bbox": [10, 55, 90, 85], "block_content": html2},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    r1 = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    r2 = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "10")
+
+    # Table 1 (adjacent to legend) resolves symbol:
+    assert r1.attributes["fields"]["c02"]["state"] == "present"
+    flag1 = next(f for f in r1.quality_flags if f.code == "cell_symbol_defined")
+    assert "không xét tuyển" in flag1.detail
+
+    # Table 2 (independent, not adjacent) MUST remain ambiguous:
+    assert r2.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r2.quality_flags)
+    assert not [f for f in r2.quality_flags if f.code == "cell_symbol_defined"]
+    legend_block = next(b for b in document.blocks if b.type in {"text", "note"} and "không xét tuyển" in b.body)
+    assert legend_block.id in r1.context_refs
+    assert legend_block.id not in r2.context_refs
+    validate(document)
+
+
+def test_native_table_mixed_numeric_row1_does_not_consume_row0_without_independent_evidence():
+    # Matrix with text row 0 and mixed/numeric row 1, empty cell_boxes, engine header names equal row 0
+    table_data = {
+        "id": "native_table_0",
+        "bbox": [0, 0, 100, 100],
+        "matrix": [["Alpha", "North"], ["2", "South"]],
+        "cell_boxes": [],
+        "proposed_header_depth": 1,
+        "header": {
+            "external": False,
+            "names": ["Alpha", "North"],
+            "bbox": None,
+        },
+    }
+    # 1. Direct unit verification: header_depth must be 0 without independent evidence
+    parsed = native_table(table_data)
+    assert parsed["header_depth"] == 0
+
+    # 2. Full builder verification
+    native = empty_native(1)
+    native["tables"] = [table_data]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": False,
+        "engine_used": "pymupdf",
+    }
+    document = model([page])
+    table = next(b for b in document.blocks if b.type == "table")
+    assert any(f.code == "table_header_unresolved" for f in table.quality_flags)
+
+    # First-row record identity must be preserved and not consumed as header
+    rows = [b for b in document.blocks if b.type == "table_row"]
+    assert len(rows) == 2
+    assert rows[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert rows[0].attributes["fields"]["c02"]["raw"] == "North"
+    assert rows[1].attributes["fields"]["c01"]["raw"] == "2"
+    assert rows[1].attributes["fields"]["c02"]["raw"] == "South"
+    validate(document)
+
+
+def test_ocr_table_mixed_numeric_row1_does_not_consume_row0_in_full_builder():
+    html = "<table><tr><td>Alpha</td><td>North</td></tr><tr><td>2</td><td>South</td></tr></table>"
+    native = empty_native(1)
+    native["layout"]["blocks"] = [native_text("Alpha North", [0, 0, 100, 10])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [0, 0, 100, 100], "block_content": html},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    table = next(b for b in document.blocks if b.type == "table")
+    # Proposal is retained for reviewer inspection
+    assert table.source_data["table"]["header_proposal"]["basis"] == "native_text_layer_corroboration"
+    assert table.source_data["table"]["header_proposal"]["labels"] == ["Alpha", "North"]
+    assert any(f.code == "native_header_needs_review" for f in table.quality_flags)
+    assert any(f.code == "table_header_unresolved" for f in table.quality_flags)
+
+    # Both rows are preserved as table_row blocks; first-row record identity is preserved
+    rows = [b for b in document.blocks if b.type == "table_row"]
+    assert len(rows) == 2
+    assert rows[0].attributes["fields"]["c01"]["raw"] == "Alpha"
+    assert rows[0].attributes["fields"]["c02"]["raw"] == "North"
+    assert rows[1].attributes["fields"]["c01"]["raw"] == "2"
+    assert rows[1].attributes["fields"]["c02"]["raw"] == "South"
+    validate(document)
+
+
+def test_symbol_legends_side_by_side_tables_shared_legend_tie_abstains():
+    legend_text = 'Ký hiệu "–": không xét tuyển.'
+    html_a = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html_b = "<table><tr><td>Item</td><td>Value</td></tr><tr><td>10</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    # Full-width shared legend at [0, 65, 100, 70]
+    native["layout"]["blocks"] = [native_text(legend_text, [0, 65, 100, 70])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [0, 30, 40, 60], "block_content": html_a},
+                    {"block_label": "table", "block_bbox": [60, 30, 100, 60], "block_content": html_b},
+                    {"block_label": "text", "block_bbox": [0, 65, 100, 70], "block_content": legend_text},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    r_a = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    r_b = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "10")
+
+    # Symmetric / equal-distance case: tie must abstain; both fields remain ambiguous
+    assert r_a.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r_a.quality_flags)
+    assert not [f for f in r_a.quality_flags if f.code == "cell_symbol_defined"]
+
+    assert r_b.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r_b.quality_flags)
+    assert not [f for f in r_b.quality_flags if f.code == "cell_symbol_defined"]
+
+    legend_block = next(b for b in document.blocks if b.type in {"text", "note"} and "không xét tuyển" in b.body)
+    assert legend_block.id not in r_a.context_refs
+    assert legend_block.id not in r_b.context_refs
+    validate(document)
+
+
+def test_symbol_legends_positive_uniquely_adjacent_table_resolves():
+    legend_text = 'Ký hiệu "–": không xét tuyển.'
+    html = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    # Legend uniquely placed immediately below Table 1 [10, 10, 90, 40], at [10, 42, 90, 48]
+    native["layout"]["blocks"] = [native_text(legend_text, [10, 42, 90, 48])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [10, 10, 90, 40], "block_content": html},
+                    {"block_label": "text", "block_bbox": [10, 42, 90, 48], "block_content": legend_text},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    r = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    assert r.attributes["fields"]["c02"]["state"] == "present"
+    flag = next(f for f in r.quality_flags if f.code == "cell_symbol_defined")
+    assert "không xét tuyển" in flag.detail
+    legend_block = next(b for b in document.blocks if b.type in {"text", "note"} and "không xét tuyển" in b.body)
+    assert legend_block.id in r.context_refs
+    validate(document)
+
+
+def test_symbol_legends_nearby_table_in_another_column_does_not_interfere():
+    legend_text = 'Ký hiệu "–": giá trị cột trái.'
+    html_left = "<table><tr><td>Ref</td><td>Score</td></tr><tr><td>01</td><td>–</td></tr></table>"
+    html_right = "<table><tr><td>Item</td><td>Value</td></tr><tr><td>10</td><td>–</td></tr></table>"
+
+    native = empty_native(1)
+    # Legend is in left column [0, 52, 45, 56], immediately below Table 1 [0, 10, 45, 50]
+    native["layout"]["blocks"] = [native_text(legend_text, [0, 52, 45, 56])]
+    page = {
+        "page": 1,
+        "native": native,
+        "ocr_selected": True,
+        "engine_used": "paddle",
+        "raw_ocr_available": True,
+        "ocr_raw_page": {
+            "prunedResult": {
+                "width": 100, "height": 100,
+                "parsing_res_list": [
+                    {"block_label": "table", "block_bbox": [0, 10, 45, 50], "block_content": html_left},
+                    {"block_label": "text", "block_bbox": [0, 52, 45, 56], "block_content": legend_text},
+                    {"block_label": "table", "block_bbox": [55, 10, 100, 50], "block_content": html_right},
+                ],
+            }
+        },
+    }
+    document = model([page])
+    r_left = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "01")
+    r_right = next(b for b in document.blocks if b.type == "table_row" and b.attributes["fields"]["c01"]["raw"] == "10")
+
+    # Table 1 (left column) uniquely wins Legend 1
+    assert r_left.attributes["fields"]["c02"]["state"] == "present"
+    flag_left = next(f for f in r_left.quality_flags if f.code == "cell_symbol_defined")
+    assert "giá trị cột trái" in flag_left.detail
+
+    # Table 2 (right column) has no horizontal overlap with Legend 1; must NOT interfere and stays ambiguous
+    assert r_right.attributes["fields"]["c02"]["state"] == "ambiguous"
+    assert any(f.code == "ambiguous_cell" and f.field_id == "c02" for f in r_right.quality_flags)
+    assert not [f for f in r_right.quality_flags if f.code == "cell_symbol_defined"]
+
+    legend_block = next(b for b in document.blocks if b.type in {"text", "note"} and "giá trị cột trái" in b.body)
+    assert legend_block.id in r_left.context_refs
+    assert legend_block.id not in r_right.context_refs
+    validate(document)

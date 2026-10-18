@@ -31,7 +31,6 @@ from app.modules.knowledge.normalization.qnu_markdown import (
 LOCATOR_SCHEME = "docx_body_reading_order/v1"
 _MARKER_SET = {"-", "--", "–", "—", "/", "\\", "x", "X", "n/a", "N/A", "na", "không", "Không"}
 _WORD = re.compile(r"\w+")
-_MAX_MATCH_TOKENS = 12
 _BLANK_DISPLAY = "[Ô trống trong nguồn]"
 
 
@@ -53,29 +52,6 @@ def cell_state(raw: str) -> str:
 def _fence_for(text: str) -> str:
     longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
     return "`" * max(3, longest + 1)
-
-
-def map_text_to_page(
-    text: str,
-    page_ranges: list[tuple[int, int, int]],
-    cursor: int,
-    markdown: str,
-) -> tuple[int | None, int]:
-    """Locate a block inside the aligned projection; return (render page, next cursor)."""
-    tokens = [token.casefold() for token in _WORD.findall(text)][:_MAX_MATCH_TOKENS]
-    if not tokens or not page_ranges or not markdown:
-        return None, cursor
-    # Gaps may contain markup and list numbering ("1."), so allow non-word characters
-    # and short digits between tokens; token edges stay word-bounded.
-    body = r"(?:[\W\d]+)".join(re.escape(token) for token in tokens)
-    pattern = re.compile(rf"(?<!\w){body}(?!\w)", re.IGNORECASE)
-    match = pattern.search(markdown, cursor) or pattern.search(markdown)
-    if not match:
-        return None, cursor
-    for page, start, end in page_ranges:
-        if start <= match.start() < end:
-            return page, match.end()
-    return None, cursor
 
 
 def _unit_pattern(text: str) -> re.Pattern | None:
@@ -157,13 +133,14 @@ def _locations(index: int, pages: list[int], suffix: str = "") -> list[QnuSource
 
 
 class _Builder:
-    def __init__(self) -> None:
+    def __init__(self, has_page_mapping: bool = False) -> None:
         self.blocks: list[QnuBlock] = []
         self.counters: dict[str, int] = {}
         self.headings: list[tuple[int, str, str]] = []
         self.mapped = 0
         self.unmapped = 0
         self.unit_states: dict[str, int] = {}
+        self.has_page_mapping = has_page_mapping
 
     def next_id(self, prefix: str) -> str:
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
@@ -183,23 +160,11 @@ class _Builder:
         self.headings.append((level, text, block_id))
         return parent_id
 
-    def map_page(
-        self, text: str, page_ranges: list[tuple[int, int, int]], cursor: int, markdown: str
-    ) -> tuple[int | None, int]:
-        if not text.strip():
-            return None, cursor
-        page, cursor = map_text_to_page(text, page_ranges, cursor, markdown)
-        if page is None:
-            self.unmapped += 1
-        else:
-            self.mapped += 1
-        return page, cursor
-
     def map_unit(
         self, text: str, page_ranges: list[tuple[int, int, int]], cursor: int, markdown: str
     ) -> tuple[list[int], int]:
         pages, cursor, state = map_unit_to_page(text, page_ranges, cursor, markdown)
-        if state == "unavailable":
+        if state == "unavailable" and not self.has_page_mapping:
             return pages, cursor
         self.unit_states[state] = self.unit_states.get(state, 0) + 1
         if pages:
@@ -209,6 +174,10 @@ class _Builder:
         return pages, cursor
 
     def add(self, block: QnuBlock) -> None:
+        if (self.has_page_mapping and any(loc.page is None for loc in block.source_locations)
+                and not any(flag.code == "page_unresolved" for flag in block.quality_flags)):
+            block.quality_flags.append(QnuQualityFlag(
+                code="page_unresolved", detail="Không ghim được toàn bộ nội dung vào trang render; giữ locator và page = null."))
         self.blocks.append(block)
 
 
@@ -356,18 +325,20 @@ def _add_table(
             )
         )
         return cursor
-    num_rows = int(getattr(data, "num_rows", 0) or 0)
     header_rows = _table_header_rows(data)
-    # The table block is located by its own header line, never by the whole grid: a long
-    # table crosses pages and the concatenation would borrow the last row's position.
-    anchor_texts = [_row_unit_text(row) for row in grid[:header_rows]]
-    if not any(anchor_texts) and header_rows < len(grid):
-        anchor_texts = [_row_unit_text(grid[header_rows])]
-    pages, cursor = builder.map_unit(" ".join(anchor_texts), page_ranges, cursor, markdown)
+    # Locate each row once. Only a table whose entire grid is on the same known page
+    # can share one GFM location; records retain independent locations otherwise.
+    row_pages = []
+    for row in grid:
+        pages, cursor = builder.map_unit(_row_unit_text(row), page_ranges, cursor, markdown)
+        row_pages.append(pages)
+    header_pages = row_pages[:header_rows] or row_pages[:1]
+    pages = sorted({page for located in header_pages for page in located}) if all(header_pages) else []
+    single_page = all(row_pages) and len({page for located in row_pages for page in located}) == 1
     header_paths = _header_paths(data, header_rows)
     table_id = builder.next_id("t")
     attributes: dict[str, Any] = {
-        "representation": "records" if _uses_records(data, header_rows) else "gfm",
+        "representation": "records" if _uses_records(data, header_rows) or (page_ranges and not single_page) else "gfm",
         "columns": _table_columns(header_paths),
         "source_ref": getattr(item, "self_ref", None),
     }
@@ -392,14 +363,13 @@ def _add_table(
             block_index,
             section_path,
             header_paths,
-            page_ranges,
+            row_pages,
             cursor,
-            markdown,
         )
     headers = [path[-1] if path else "" for path in header_paths]
     rows = [
         [clean_text(getattr(cell, "text", "")) for cell in grid[row]]
-        for row in range(header_rows, min(num_rows, len(grid)))
+        for row in range(header_rows, len(grid))
     ]
     builder.add(
         QnuBlock(
@@ -434,44 +404,15 @@ def _add_table_rows(
     block_index: int,
     section_path: list[str],
     header_paths: list[list[str]],
-    page_ranges: list[tuple[int, int, int]],
+    row_pages: list[list[int]],
     cursor: int,
-    markdown: str,
 ) -> int:
     table_id = table_block.id
     column_ids = [f"c{index + 1:02d}" for index in range(num_cols)]
     row_ids: dict[int, str] = {}
-    note_rows: set[int] = set()
-    for row in range(header_rows, len(grid)):
-        cells = [cell for cell in grid[row] if cell is not None]
-        same_cell = bool(cells) and all(cell is cells[0] for cell in cells)
-        if (
-            same_cell
-            and int(getattr(cells[0], "col_span", 1) or 1) == num_cols
-            and clean_text(getattr(cells[0], "text", "")).strip()
-        ):
-            note_rows.add(row)
     emitted: list[QnuBlock] = []
     unknown_rows: list[str] = []
     for row in range(header_rows, len(grid)):
-        if row in note_rows:
-            cell = grid[row][0]
-            note_text = clean_text(getattr(cell, "text", ""))
-            pages, cursor = builder.map_unit(_row_unit_text(grid[row]), page_ranges, cursor, markdown)
-            if not pages:
-                unknown_rows.append(str(row + 1))
-            emitted.append(
-                QnuBlock(
-                    id=builder.next_id("n"),
-                    parent_id=table_id,
-                    type="note",
-                    source_locations=_locations(block_index, pages, f"#row{row + 1}"),
-                    source_label=str(row + 1),
-                    section_path=section_path,
-                    body=note_text,
-                )
-            )
-            continue
         row_id = builder.next_id("r")
         row_ids[row] = row_id
         fields = _row_fields(grid, row, column_ids)
@@ -492,15 +433,19 @@ def _add_table_rows(
         attributes: dict[str, Any] = {"fields": fields}
         if origins:
             attributes["field_origins"] = origins
+        cells = [cell for cell in grid[row] if cell is not None]
+        spanning = num_cols > 1 and len(cells) == num_cols and all(cell is cells[0] for cell in cells)
+        if spanning:
+            attributes["row_role"] = "spanning_row_unclassified"
         body_lines: list[str] = []
         for col, column_id in enumerate(column_ids):
             path = header_paths[col] if col < len(header_paths) else []
             label = " / ".join(part for part in path if part.strip()) or f"Cột {col + 1:02d}"
             value = fields[column_id]["raw"]
             body_lines.append(f"**{label}:** {value if value.strip() else _BLANK_DISPLAY}")
-        pages, cursor = builder.map_unit(_row_unit_text(grid[row]), page_ranges, cursor, markdown)
+        pages = row_pages[row]
         if not pages:
-            unknown_rows.append(str(row + 1))
+            unknown_rows.append(row_id)
         emitted.append(
             QnuBlock(
                 id=row_id,
@@ -510,6 +455,8 @@ def _add_table_rows(
                 source_label=str(row + 1),
                 section_path=section_path,
                 attributes=attributes,
+                quality_flags=[QnuQualityFlag(code="spanning_row_needs_review",
+                    detail="Dòng gộp chưa rõ là dữ liệu, nhãn nhóm hay chú thích; giữ hàng và ô nguồn.")] if spanning else [],
                 body="\n\n".join(body_lines),
             )
         )
@@ -543,7 +490,7 @@ def build_qnu_structured_document(
 ) -> QnuStructuredDocument:
     """Walk a Docling document in reading order and build the QNU v1.0 model."""
     ranges = page_ranges or []
-    builder = _Builder()
+    builder = _Builder(has_page_mapping=bool(ranges))
     indexed = [
         (index + 1, item, int(level or 0))
         for index, (item, level) in enumerate(document.iterate_items())
@@ -609,13 +556,13 @@ def build_qnu_structured_document(
                 depth = 1 if label == "title" else min(max(level, 1), 6)
                 section_id = builder.next_id("s")
                 parent_id = builder.open_section(level, text, section_id)
-                page, cursor = builder.map_page(text, ranges, cursor, projection_markdown)
+                pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
                 builder.add(
                     QnuBlock(
                         id=section_id,
                         parent_id=parent_id,
                         type="section",
-                        source_locations=[_location(block_index, page)],
+                        source_locations=_locations(block_index, pages),
                         section_path=builder.section_path(),
                         body=f"{'#' * depth} {text}",
                     )
@@ -628,13 +575,13 @@ def build_qnu_structured_document(
             continue
         if label == "picture":
             caption = _caption_text(item, document)
-            page, cursor = builder.map_page(caption, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(caption, ranges, cursor, projection_markdown)
             builder.add(
                 QnuBlock(
                     id=builder.next_id("fg"),
                     parent_id=builder.parent_id(),
                     type="figure",
-                    source_locations=[_location(block_index, page)],
+                    source_locations=_locations(block_index, pages),
                     section_path=builder.section_path(),
                     attributes={
                         "resource": {
@@ -654,7 +601,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if label == "formula":
-            page, cursor = builder.map_page(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
             flags = (
                 []
                 if text.strip()
@@ -670,7 +617,7 @@ def build_qnu_structured_document(
                     id=builder.next_id("fm"),
                     parent_id=builder.parent_id(),
                     type="formula",
-                    source_locations=[_location(block_index, page)],
+                    source_locations=_locations(block_index, pages),
                     section_path=builder.section_path(),
                     quality_flags=flags,
                     body=text or "*[Công thức chưa trích xuất được]*",
@@ -679,7 +626,7 @@ def build_qnu_structured_document(
             position += 1
             continue
         if label == "code":
-            page, cursor = builder.map_page(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
             fence = _fence_for(text)
             language = clean_text(getattr(item, "code_language", "") or "")
             builder.add(
@@ -687,7 +634,7 @@ def build_qnu_structured_document(
                     id=builder.next_id("c"),
                     parent_id=builder.parent_id(),
                     type="code",
-                    source_locations=[_location(block_index, page)],
+                    source_locations=_locations(block_index, pages),
                     section_path=builder.section_path(),
                     attributes={"language": language} if language else {},
                     body=f"{fence}{language}\n{text}\n{fence}",
@@ -696,14 +643,14 @@ def build_qnu_structured_document(
             position += 1
             continue
         if text.strip():
-            page, cursor = builder.map_page(text, ranges, cursor, projection_markdown)
+            pages, cursor = builder.map_unit(text, ranges, cursor, projection_markdown)
             block_type = "note" if label in {"caption", "footnote"} else "text"
             builder.add(
                 QnuBlock(
                     id=builder.next_id("n" if block_type == "note" else "p"),
                     parent_id=builder.parent_id(),
                     type=block_type,
-                    source_locations=[_location(block_index, page)],
+                    source_locations=_locations(block_index, pages),
                     section_path=builder.section_path(),
                     attributes={"role": label} if label in {"page_header", "page_footer"} else {},
                     body=text,

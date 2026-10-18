@@ -569,12 +569,18 @@ async def task_knowledge_source_reparse(ctx: dict[str, Any], job_id: str) -> dic
         job = await _load_job(db, job_id)
         if not job:
             return {"status": "failed", "job_id": job_id}
+        if "job_try" in ctx and job.dispatch_status in ("inline", "inline_running"):
+            logger.info("task_knowledge_source_reparse_skipped_inline_reservation", job_id=job_id)
+            return {"status": "skipped", "job_id": job_id, "reason": "inline_reserved"}
         if await _check_pre_execution_cancelled(db, job):
             revision = await db.get(KnowledgeSourceRevision, job.payload["revision_id"])
             if revision and revision.status == "queued":
                 revision.status = "cancelled"
                 await db.commit()
             return {"status": "cancelled", "job_id": job_id}
+        if job.dispatch_status == "inline":
+            job.dispatch_status = "inline_running"
+            await db.commit()
         if not await _set_job(db, job, "running", progress=10.0):
             revision = await db.get(KnowledgeSourceRevision, job.payload["revision_id"])
             if revision and revision.status == "queued":

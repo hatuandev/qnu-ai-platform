@@ -177,9 +177,11 @@ class TestQnuDocxBuilder(unittest.TestCase):
             if field["state"] == "blank"
         ]
         self.assertTrue(blank_fields)
-        notes = [block for block in model.blocks if block.type == "note"]
-        self.assertTrue(any("Ghi chú" in block.body for block in notes))
-        self.assertTrue(all(block.parent_id == table.id for block in [*rows, *notes]))
+        spanning = next(block for block in rows if "Ghi chú" in block.body)
+        self.assertEqual(spanning.attributes["row_role"], "spanning_row_unclassified")
+        self.assertTrue(any(flag.code == "spanning_row_needs_review" for flag in spanning.quality_flags))
+        self.assertEqual(len(spanning.attributes["fields"]), 4)
+        self.assertTrue(all(block.parent_id == table.id for block in rows))
 
         rendered = render_qnu_markdown(model, document_id=DOC_ID, revision_id=REV_ID)
         report = validate_qnu_markdown(rendered)

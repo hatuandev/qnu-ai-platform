@@ -15,6 +15,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from app.modules.knowledge.parsers.markdown_parser import _split_gfm_row
+
 QNU_MARKDOWN_SCHEMA = "qnu-rag-markdown/1.0"
 QNU_BLOCK_TYPES = frozenset(
     {
@@ -662,9 +664,54 @@ def _table_columns(metadata: dict[str, Any], block_id: str, report: QnuValidatio
             report.add_error("table_column_invalid", "Mỗi column cần 'id' là chuỗi không rỗng.", block_id=block_id)
             continue
         ids.append(column["id"])
+        path = column.get("header_path")
+        if not isinstance(path, list) or any(not isinstance(part, str) for part in path):
+            report.add_error("table_column_invalid", "header_path phải là danh sách chuỗi.", block_id=block_id)
     if len(ids) != len(set(ids)):
         report.add_error("table_column_duplicate", "Bảng có column 'id' trùng nhau.", block_id=block_id)
     return ids
+
+
+def parse_qnu_gfm_table(body: str) -> tuple[list[str], list[list[str]]]:
+    """One shared GFM shape contract for the artifact gate and serving projection."""
+    lines = [line for line in body.splitlines() if line.strip()]
+    rows = [_split_gfm_row(line) for line in lines]
+    if (len(rows) < 2 or not rows[0] or len(rows[1]) != len(rows[0])
+            or not all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in rows[1])
+            or any(len(row) != len(rows[0]) for row in rows[2:])):
+        raise ValueError("GFM requires a header, separator and rows of equal width")
+    return rows[0], rows[2:]
+
+
+def _validate_gfm(body: str, columns: Any, block_id: str, report: QnuValidationReport) -> None:
+    try:
+        headers, _ = parse_qnu_gfm_table(body)
+    except ValueError:
+        report.add_error("table_gfm_invalid", "Bảng GFM phải có header, separator và các dòng cùng số cột.", block_id=block_id)
+        return
+    if not isinstance(columns, list) or not columns:
+        return
+    paths = [column.get("header_path") if isinstance(column, dict) else None for column in columns]
+    if any(not isinstance(path, list) or any(not isinstance(part, str) for part in path) for path in paths):
+        return  # The column schema validator reports the malformed path.
+    if headers not in ([" / ".join(path) for path in paths], [path[-1] if path else "" for path in paths]):
+        report.add_error("table_gfm_invalid", "Header GFM không khớp columns đã khai báo.", block_id=block_id)
+
+
+def _validate_quality_flags(metadata: dict[str, Any], block_id: str, report: QnuValidationReport) -> bool:
+    """Validate warnings before allowing them to explain an unknown source location."""
+    flags = metadata.get("quality_flags")
+    has_location_warning = False
+    for flag in flags if isinstance(flags, list) else []:
+        if (not isinstance(flag, dict) or not isinstance(flag.get("code"), str) or not flag["code"].strip()
+                or not _typed_in(flag.get("status"), {"unresolved", "confirmed", "resolved", "rejected"})
+                or not isinstance(flag.get("detail"), str) or not flag["detail"].strip()
+                or not isinstance(flag.get("related_block_ids", []), list)
+                or any(not isinstance(ref, str) for ref in flag.get("related_block_ids", []))):
+            report.add_error("block_quality_flag_invalid", "Cờ chất lượng cần code/status/detail hợp lệ.", block_id=block_id)
+            continue
+        has_location_warning |= flag["code"] == "source_location_unverified" and flag["status"] in {"unresolved", "confirmed"}
+    return has_location_warning
 
 
 def _validate_table_relations(
@@ -781,7 +828,7 @@ def _validate_blocks(parsed: QnuParseResult, report: QnuValidationReport) -> Non
                     report.add_error("block_locations_invalid", "Mỗi source_location phải là mapping.", block_id=block_id)
                     continue
                 page = location.get("page")
-                if page is not None and (not isinstance(page, int) or page < 1):
+                if page is not None and (isinstance(page, bool) or not isinstance(page, int) or page < 1):
                     report.add_error("block_location_page_invalid", f"page không hợp lệ: {page!r}.", block_id=block_id)
         parent_id = metadata.get("parent_id")
         parents[block_id] = parent_id if isinstance(parent_id, str) and parent_id else None
@@ -793,6 +840,13 @@ def _validate_blocks(parsed: QnuParseResult, report: QnuValidationReport) -> Non
             value = metadata.get(key)
             if value is not None and not isinstance(value, list):
                 report.add_error("block_attribute_invalid", f"'{key}' phải là danh sách.", block_id=block_id)
+        has_location_warning = _validate_quality_flags(metadata, block_id, report)
+        has_source_location = isinstance(locations, list) and any(
+            isinstance(loc, dict) and (
+                (isinstance(loc.get("page"), int) and not isinstance(loc["page"], bool) and loc["page"] >= 1)
+                or (isinstance(loc.get("locator"), str) and bool(loc["locator"].strip()))) for loc in locations)
+        if isinstance(locations, list) and not has_source_location and block_type != "derived_index" and not has_location_warning:
+            report.add_error("block_location_unverified", "Khối thiếu vị trí nguồn cần cờ source_location_unverified.", block_id=block_id)
         index[block_id] = metadata
         attributes = metadata.get("attributes")
         attributes = attributes if isinstance(attributes, dict) else {}
@@ -816,6 +870,10 @@ def _validate_blocks(parsed: QnuParseResult, report: QnuValidationReport) -> Non
             report.add_error("block_body_empty", "Khối figure rỗng cần cờ chất lượng.", block_id=block_id)
         if block_type == "table":
             representation = attributes.get("representation")
+            if not _typed_in(representation, {"gfm", "records"}):
+                report.add_error("table_representation_invalid", "Biểu diễn bảng chỉ hỗ trợ gfm hoặc records.", block_id=block_id)
+            elif representation == "gfm" and block.body.strip():
+                _validate_gfm(block.body, attributes.get("columns"), block_id, report)
             if representation == "records" and not columns_by_table.get(block_id):
                 report.add_error(
                     "table_column_invalid",

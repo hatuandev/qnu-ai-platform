@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from collections import Counter
 from itertools import pairwise
 from typing import Any
@@ -16,7 +17,11 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuStructuredDocument,
 )
 from app.modules.knowledge.parsers.pdf_evidence import intersection_fraction, reading_order
-from app.modules.knowledge.parsers.pdf_tables import native_table, ocr_table, table_blocks
+from app.modules.knowledge.parsers.pdf_tables import (
+    native_table,
+    ocr_table,
+    table_blocks,
+)
 
 PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v1"
 # Anything no thicker than this carries a rule, not readable content, whatever painted it.
@@ -217,7 +222,7 @@ def _flags(item: dict[str, Any]) -> list[QnuQualityFlag]:
 
 
 def _propose_header(item: dict[str, Any], spans: list[tuple[str, list[float]]]) -> None:
-    """Read an OCR table's first row as a header only when the digital text layer repeats every label there."""
+    """Propose headers for an OCR table when corroborated by the digital text layer, for reviewer inspection."""
     table, box = item.get("table"), item.get("bbox")
     if not table or not box or table["header_depth"] or table.get("external_headers") or not table.get("raw_html"):
         return
@@ -230,44 +235,190 @@ def _propose_header(item: dict[str, Any], spans: list[tuple[str, list[float]]]) 
     in_band = [text for text, span in spans if intersection_fraction(span, band) >= 0.5]
     if len([label for label in labels if any(_compact(label) in text for text in in_band)]) != len(labels):
         return
-    table["header_depth"] = 1
+    # Text agreement corroborates the OCR transcription: retain proposal for reviewer inspection.
+    # But text agreement alone is NOT proof of semantic header role; do not consume an unverified row.
     table["header_proposal"] = {"basis": "native_text_layer_corroboration", "labels": labels}
 
 
 _SYMBOL_LEGEND = re.compile(r"[\"“”»']\s*(?P<symbol>[^\s\"“”»']{1,3})\s*[\"“”»']\s*[:–—-]\s*(?P<definition>\S.{7,})")
 
 
-def _symbol_legends(pages: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Collect symbol meanings the document itself defines, from its digital text layer only."""
-    found: dict[str, dict[str, Any]] = {}
-    for page in pages:
-        for block in page["native"].get("layout", {}).get("blocks", []):
-            text = "\n".join("".join(span.get("text", "") for span in line.get("spans", [])) for line in block.get("lines", []))
-            for line in text.splitlines():
-                match = _SYMBOL_LEGEND.search(line)
-                if not match:
-                    continue
-                symbol = match["symbol"]
-                if any(character.isalnum() for character in symbol):
-                    continue
-                found.setdefault(symbol, {"symbol": symbol, "page": page["native"]["page"], "line": line.strip()})
-    return found
+def _collect_page_legends(items: list[dict[str, Any]], page: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect candidate symbol definitions for a page with locator and bounding box."""
+    page_no = page["native"].get("page") or page.get("page", 1)
+    legends: list[dict[str, Any]] = []
+
+    # 1. Collect from selected items
+    for item in items:
+        if item.get("table"):
+            continue
+        text = item.get("text", "")
+        box = item.get("bbox")
+        locator = item.get("locator")
+        for line in text.splitlines():
+            match = _SYMBOL_LEGEND.search(line)
+            if not match:
+                continue
+            symbol = match["symbol"]
+            if any(character.isalnum() for character in symbol):
+                continue
+            meaning = unicodedata.normalize("NFC", match["definition"].strip().lower())
+            legends.append({
+                "symbol": symbol, "page": page_no, "line": line.strip(),
+                "meaning": meaning, "bbox": box, "locator": locator,
+            })
+
+    # 2. Also collect from native layout blocks if not already captured
+    native_blocks = page.get("native", {}).get("layout", {}).get("blocks", [])
+    native_w = page.get("native", {}).get("width") or page.get("native", {}).get("layout", {}).get("width") or 100.0
+    native_h = page.get("native", {}).get("height") or page.get("native", {}).get("layout", {}).get("height") or 100.0
+    for idx, block in enumerate(native_blocks):
+        lines = ["".join(span.get("text", "") for span in line.get("spans", [])) for line in block.get("lines", [])]
+        text = "\n".join(lines)
+        box = block.get("bbox")
+        norm_box = _percent(box, native_w, native_h) if _valid_box(box) and native_w > 0 and native_h > 0 else box
+        for line in text.splitlines():
+            match = _SYMBOL_LEGEND.search(line)
+            if not match:
+                continue
+            symbol = match["symbol"]
+            if any(character.isalnum() for character in symbol):
+                continue
+            meaning = unicodedata.normalize("NFC", match["definition"].strip().lower())
+            locator = f"pdf:page:{page_no}/native/block/{idx}"
+            if not any(l["line"] == line.strip() and l["page"] == page_no
+                       and l["locator"] == locator for l in legends):
+                legends.append({
+                    "symbol": symbol, "page": page_no, "line": line.strip(),
+                    "meaning": meaning, "bbox": norm_box,
+                    "locator": locator,
+                })
+
+    return legends
+
+
+def _is_table_geometrically_applicable(
+    t: dict[str, Any],
+    cand: dict[str, Any],
+    page_tables: list[dict[str, Any]],
+) -> bool:
+    t_box = t.get("bbox")
+    c_box = cand.get("bbox")
+    if not t_box or len(t_box) < 4 or not c_box or len(c_box) < 4:
+        return False
+    t_x0, _t_y0, t_x1, t_y1 = t_box
+    c_x0, c_y0, c_x1, _c_y1 = c_box
+
+    # 1. Legend must be situated immediately below the table
+    # Vertical gap: legend top is at or below table bottom (allowing minor 2% rounding / subpixel overlap, up to 25% of page)
+    if not (t_y1 - 2.0 <= c_y0 <= t_y1 + 25.0):
+        return False
+
+    # 2. Horizontal overlap
+    h_overlap = min(t_x1, c_x1) - max(t_x0, c_x0)
+    if h_overlap <= 0:
+        return False
+
+    # 3. No intervening table between table t and candidate legend
+    for other in page_tables:
+        if other is t:
+            continue
+        o_box = other.get("bbox")
+        if not o_box or len(o_box) < 4:
+            continue
+        corridor_left, corridor_right = max(t_x0, c_x0), min(t_x1, c_x1)
+        if (t_y1 - 2.0 <= o_box[1] < c_y0
+                and min(o_box[2], corridor_right) > max(o_box[0], corridor_left)):
+            return False
+
+    return True
+
+
+def _find_table_legends(
+    table_item: dict[str, Any],
+    page_tables: list[dict[str, Any]],
+    page_legends: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Resolve symbol legends specifically to a table based on proven unique spatial adjacency."""
+    table_box = table_item.get("bbox")
+    if not table_box or len(table_box) < 4:
+        return {}
+
+    candidate_matches: dict[str, list[dict[str, Any]]] = {}
+
+    for cand in page_legends:
+        c_box = cand.get("bbox")
+        if not c_box or len(c_box) < 4:
+            continue
+
+        if not _is_table_geometrically_applicable(table_item, cand, page_tables):
+            continue
+
+        # Find all geometrically applicable tables for this candidate
+        applicable_tables = [
+            t for t in page_tables
+            if _is_table_geometrically_applicable(t, cand, page_tables)
+        ]
+
+        if not applicable_tables:
+            continue
+
+        # Compute vertical distance from each applicable table bottom to candidate top
+        distances = [
+            abs(cand["bbox"][1] - t["bbox"][3])
+            for t in applicable_tables
+        ]
+        min_dist = min(distances)
+
+        # Tables achieving the minimum distance within 0.5 tolerance
+        closest = [
+            t for t, d in zip(applicable_tables, distances, strict=False)
+            if abs(d - min_dist) < 0.5
+        ]
+
+        # Require a unique winning association among geometrically applicable tables; ties must abstain.
+        if len(closest) == 1 and closest[0] is table_item:
+            candidate_matches.setdefault(cand["symbol"], []).append(cand)
+
+    applicable: dict[str, dict[str, Any]] = {}
+    for sym, matches in candidate_matches.items():
+        distinct_meanings = {m["meaning"] for m in matches}
+        if len(distinct_meanings) == 1:
+            applicable[sym] = matches[0]
+
+    return applicable
 
 
 def _link_symbol_legends(blocks: list[QnuBlock]) -> None:
-    """Point every legend-defined cell at the block that carries the defining sentence."""
+    """Point every legend-defined cell at the canonical block that carries the defining sentence."""
     for block in blocks:
-        for field_id, entry in (block.attributes.get("symbol_definitions") or {}).items():
-            legend = next((other for other in blocks if other.id != block.id and other.type in {"text", "note", "list"}
-                           and entry["page"] in {loc.page for loc in other.source_locations}
-                           and _compact(entry["line"]) in _compact(other.body)), None)
+        defs = block.attributes.get("symbol_definitions") or {}
+        to_remove = []
+        for field_id, entry in list(defs.items()):
+            matches = [other for other in blocks if other.id != block.id and other.type in {"text", "note", "list"}
+                       and any(loc.page == entry["page"]
+                               and (not entry.get("locator") or loc.locator == entry["locator"])
+                               for loc in other.source_locations)
+                       and _compact(entry["line"]) in _compact(other.body)]
+            legend = matches[0] if len(matches) == 1 else None
             if legend is None:
+                to_remove.append(field_id)
+                block.attributes.setdefault("symbol_definition_candidates", {})[field_id] = entry
+                if "fields" in block.attributes and field_id in block.attributes["fields"]:
+                    block.attributes["fields"][field_id]["state"] = "ambiguous"
+                block.quality_flags = [f for f in block.quality_flags if not (f.code == "cell_symbol_defined" and f.field_id == field_id)]
+                block.quality_flags.append(QnuQualityFlag(
+                    code="ambiguous_cell", field_id=field_id,
+                    detail=f"Ký hiệu \"{entry['symbol']}\" không tìm thấy block định nghĩa chuẩn xác trong tài liệu."
+                ))
                 continue
             if legend.id not in block.context_refs:
                 block.context_refs.append(legend.id)
             for flag in block.quality_flags:
                 if flag.code == "cell_symbol_defined" and flag.field_id == field_id and legend.id not in flag.related_block_ids:
                     flag.related_block_ids.append(legend.id)
+        for field_id in to_remove:
+            defs.pop(field_id, None)
 
 
 def _link_continuations(blocks: list[QnuBlock]) -> None:
@@ -318,21 +469,26 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
                 font_counts[item.get("font_size", 0)] += len(item["text"])
     body_size = font_counts.most_common(1)[0][0] if font_counts else 0
     sizes = sorted((size for size in font_counts if size > body_size), reverse=True)
-    legends = _symbol_legends(pages)
     sections: list[tuple[int, str, str]] = []
+    all_legends: set[str] = set()
+
     for page in pages:
         native = _native_items(page["native"])
         spans = _native_spans(page["native"])
         items = _select_items(native, _ocr_items(page) if page.get("ocr_selected") else [])
         ordered = reading_order(items)
+        page_tables = [it for it in ordered if it.get("table") and it.get("bbox")]
+        page_legends = _collect_page_legends(ordered, page)
+        all_legends.update(cand["symbol"] for cand in page_legends)
         for index, item in enumerate(ordered):
             block_id = f"p{page['page']:04d}_b{index + 1:04d}"
             location, flags = _location(item, page), _flags(item)
             path, parent = [s[1] for s in sections], sections[-1][2] if sections else None
             if item.get("table"):
                 _propose_header(item, spans)
+                applicable_legends = _find_table_legends(item, page_tables, page_legends)
                 emitted = table_blocks(item["table"], block_id=block_id, parent_id=parent,
-                    location=location, section_path=path, engine=item["engine"], symbol_definitions=legends)
+                    location=location, section_path=path, engine=item["engine"], symbol_definitions=applicable_legends)
                 if emitted:
                     emitted[0].quality_flags.extend(flags)
                     emitted[0].attributes["comparison_bbox"] = item.get("bbox")
@@ -395,6 +551,6 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
     result.document_meta["visual_classification"] = {
         "ruling_strokes_in_source": _count_rulings(pages),
         "visual_regions_retained": sum(1 for block in result.blocks if block.type == "figure"),
-        "symbol_legend_definitions": len(legends)}
+        "symbol_legend_definitions": len(all_legends)}
     result.document_meta["content_status"] = "needs_review" if result.stats["quality_flags"] or result.document_meta.get("extraction_warnings") else "unreviewed"
     return result

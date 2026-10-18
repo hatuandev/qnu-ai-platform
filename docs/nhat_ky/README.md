@@ -7,6 +7,13 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-18** | [Phiên533](./2026-10-18_phien_533_sua_bon_loi_chuan_docx_pdf.md) | Sửa bốn lỗi review chuẩn DOCX/PDF | Mapping toàn đơn vị/row, không suy ô gộp thành note, explicit scope, gate GFM/location/flags; focused164PASS+23subtest, Ruff5PASS,6pair valid; full13FAIL/2100PASS khớp baseline;5PDF chưa reparse/duyệt |
+
+| **2026-10-18** | [Phiên532](./2026-10-18_phien_532_review_chuan_docx_pdf.md) | Review cấu trúc DOCX/PDF | Chưa đạt đầy đủ:4finding mapping trang/role hàng/note scope/validator; focused122PASS+23subtest, READ ONLY6pair valid;5PDF vẫn chờ đối soát; không sửa app |
+
+| **2026-10-18** | [Phiên531](./2026-10-18_phien_531_codex_sua_pdf_sau_review.md) | Dừng monitor, Codex sửa PDF trực tiếp | Native giữ mọi hàng chưa rõ header; legend nối đúng unique locator, giữ ambiguous khi thiếu/trùng nguồn; focused115PASS, Ruff6PASS, raw3/3PASS, full **13fail/2074pass/17skip** khớp13ID baseline; không reparse/duyệt PDF cũ |
+
+| **2026-10-18** | [Phiên530](./2026-10-18_phien_530_khac_phuc_3_loi_header_symbol_inline_reparse.md) | Khắc phục 3 lỗi Header, Ký hiệu chú thích, Inline Reparse Job | Heuristic cấu trúc/ngôn ngữ bảo toàn 100% dòng dữ liệu thô (3/3 dòng artifact thật pass); điển ký hiệu theo trang và positive case liên trang; inline job status riêng không bị ARQ worker tự nhận; TDD 4 fail->pass, Core 63PASS, Extended 118PASS, Jobs 27PASS, Scoped Ruff PASS, Full backend 13failed/2049passed/17skipped khớp 13 baseline IDs |
 | **2026-10-18** | [Phiên529](./2026-10-18_phien_529_sua_nguyen_nhan_canh_bao_markdown_5_pdf.md) | Sửa nguyên nhân cờ Markdown 5PDF | F1 nét kẻ/chấm không thành figure, F2 native table theo độ đầy đủ ô, F3 điển ký hiệu cho ô "–", F4 căn cứ header cho reviewer; reparse inline 4nguồn, 5cặp pair_valid, điểm sàn586→87blocks/30ô→present, poster665cờ→0unresolved+52facts, quy đổi/học phí giữ nguyên present/facts; 4revision `review_required`, epoch50; Ruff7PASS, focused161PASS, full **13fail/2044pass** khớp baseline528 |
 
 | **2026-10-18** | [Phiên528](./2026-10-18_phien_528_don_kho_va_nap_nguon_chuan.md) | Đợt4–6, user bỏ backup | Purge22/33, nạp6pair chuẩn; DOCX duyệt riêng đãpub56chunks,5PDFchờ;57focusedPASS/full13FAIL; [12câu chưa chạy](./2026-10-18_phien_528_kich_ban_12_cau.md) |

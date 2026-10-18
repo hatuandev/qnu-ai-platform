@@ -92,6 +92,8 @@ async def queue_reparse(
         tenant_id=tenant_id,
         workspace_id=workspace_id,
         status="queued",
+        dispatch_status="inline" if not dispatch else "pending",
+        phase="inline_reserved" if not dispatch else "queued",
         payload={
             "source_id": source_id,
             "revision_id": revision.id,
