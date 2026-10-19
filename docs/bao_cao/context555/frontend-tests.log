@@ -1,0 +1,29 @@
+✔ related reference uses its own action and shows the full appendix body (14.6208ms)
+✔ a lone heading cannot offer a decision and reference spans use Unicode code points (2.838ms)
+✔ scope confirmation shows exact string row codes and full exclusion separately (1.8297ms)
+✔ context issue survives proposed preview without calling it a clean empty result (1.2277ms)
+✔ context issue survives empty preview without calling it a clean empty result (0.5505ms)
+✔ context issue survives rejected preview without calling it a clean empty result (0.5349ms)
+✔ context issue survives changes_requested preview without calling it a clean empty result (0.5903ms)
+✔ context issue survives verified preview without calling it a clean empty result (0.5512ms)
+✔ specific issue intent sends coordinates, source binding and reason without client actor (22.9119ms)
+✔ bound review shows exact source coordinates, reason and unresolved scope safely (2.904ms)
+✔ related reference intent preserves supporting evidence and exact proposal hash (0.7568ms)
+✔ review renders real source coordinates and escaped exact quotes (1.1205ms)
+✔ applied, unavailable or absent proposals do not masquerade as pending preview (0.4209ms)
+✔ semantic actions send authenticated POST and exact reviewed hash to selected revision (1.4637ms)
+✔ backend stale-review failure stays a failure (0.8705ms)
+✔ limit preview keeps raw, displays examination scope and never claims resolved (1.394ms)
+✔ acknowledged limit summary still reports semantic unknowns (0.3001ms)
+✔ acknowledgment and further-check actions send distinct decisions with exact hash (0.6415ms)
+✔ twelve labeled relations and eighteen separate issues show workflow and reference roles (10.4655ms)
+✔ checkpoint import without authenticated permission offers no enabled action or approval (1.3195ms)
+✔ import uses authenticated API and expected current hash; stale remains failure (1.4057ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 794.9156

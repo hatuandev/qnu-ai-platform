@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useRbac } from "@/rbac/context";
 import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 import type {
   ContextIssueDecision,
@@ -64,6 +65,7 @@ import type {
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
 import { QnuStandardEditor } from "./components/qnu-standard-editor";
+import { SemanticCheckpointImport } from "./components/semantic-checkpoint-import";
 import { SemanticReviewPreview } from "./components/semantic-review-preview";
 import { SourceContextEditor } from "./components/source-context-editor";
 import { refreshSourceQueries } from "./utils/source-query-cache";
@@ -91,6 +93,11 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const rbac = useRbac();
+  const canReviewSemantics =
+    rbac.isAccessVerified &&
+    !rbac.isDemoMode &&
+    rbac.can("ai.knowledge.update");
 
   // Editing state
   const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
@@ -248,6 +255,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         | "changes_requested",
     ) => {
       if (
+        !canReviewSemantics ||
         !activeRev?.id ||
         !semanticProposal?.proposal_hash ||
         !hasReviewedSemantics ||
@@ -1039,6 +1047,43 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                 khi duyệt.
               </p>
             )}
+            {activeRev?.status === "review_required" &&
+              !semanticIsPending &&
+              semanticProposal?.status !== "verified" && (
+                <SemanticCheckpointImport
+                  key={`${activeRev.id}:${semanticProposal?.proposal_hash ?? "empty"}`}
+                  canImport={canReviewSemantics}
+                  onImport={async (checkpoint, comment) => {
+                    if (!canReviewSemantics)
+                      throw new Error("Bạn chưa có quyền nhập đề xuất.");
+                    await knowledgeApi.importSemanticCheckpoint(
+                      collectionId,
+                      sourceId,
+                      activeRev.id,
+                      checkpoint,
+                      comment,
+                      semanticProposal?.proposal_hash,
+                    );
+                    setReviewedSemanticKey(null);
+                    setContextSelection({ key: "", decisions: [] });
+                    await refreshSourceQueries(
+                      queryClient,
+                      collectionId,
+                      sourceId,
+                    );
+                    await queryClient.invalidateQueries({
+                      queryKey: [
+                        "source-semantic-review",
+                        collectionId,
+                        sourceId,
+                      ],
+                    });
+                    toast.success(
+                      "Đã tạo đề xuất chờ đối chiếu. Chưa áp dụng hoặc xuất bản.",
+                    );
+                  }}
+                />
+              )}
             {semanticReview.data?.structured_artifact?.input_format ===
               "qnu-rag-projection/v1" &&
               activeRev?.status === "review_required" &&
@@ -1065,16 +1110,20 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
               <SemanticReviewPreview
                 artifact={semanticReview.data.structured_artifact}
                 decisions={contextDecisions}
-                onDecision={(decision, issueId) =>
-                  setContextSelection({
-                    key: semanticReviewKey,
-                    decisions: [
-                      ...contextDecisions.filter(
-                        (item) => item.issue_id !== issueId,
-                      ),
-                      ...(decision ? [decision] : []),
-                    ],
-                  })
+                key={semanticReviewKey}
+                onDecision={
+                  canReviewSemantics
+                    ? (decision, issueId) =>
+                        setContextSelection({
+                          key: semanticReviewKey,
+                          decisions: [
+                            ...contextDecisions.filter(
+                              (item) => item.issue_id !== issueId,
+                            ),
+                            ...(decision ? [decision] : []),
+                          ],
+                        })
+                    : undefined
                 }
               />
             )}

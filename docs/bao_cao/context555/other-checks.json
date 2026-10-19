@@ -1,0 +1,24 @@
+{
+  "frontend_tests": {
+    "command": "node --test src/features/knowledge/components/semantic-review-preview.test.mjs",
+    "exit_code": 0,
+    "pass": 21
+  },
+  "biome": {
+    "command": "npx biome check --line-ending=lf <6 scoped files>",
+    "exit_code": 0
+  },
+  "ruff": {
+    "command": "python -m ruff check <8 scoped files>",
+    "exit_code": 0
+  },
+  "build": {
+    "command": "npm run build (vite build && tsc --noEmit)",
+    "exit_code": 0
+  },
+  "limits": {
+    "browser_visual_review": "NOT RUN",
+    "live_human_approval": "NOT RUN",
+    "live_staging": "BLOCKED_SOURCE_PAIR_MISMATCH"
+  }
+}

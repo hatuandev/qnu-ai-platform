@@ -1,0 +1,425 @@
+{
+  "prior_hash": "33d9cdae6fc80547aa6243ea7ac11d94b9fa5e9b765398ba569a9905870f3fc2",
+  "new_hash": "0ae13c8d1b3584506a4aad171cf5464a19e8dcf2c06767e47e93ca0df9ac6840",
+  "A03": {
+    "before": {
+      "scope": "column",
+      "row_unit_ids": [
+        "qnu:r001",
+        "qnu:r002",
+        "qnu:r003",
+        "qnu:r004",
+        "qnu:r005",
+        "qnu:r006"
+      ],
+      "column_ids": [
+        "c10",
+        "c11",
+        "c12"
+      ],
+      "context_kind": null
+    },
+    "after": {
+      "scope": "group",
+      "row_unit_ids": [
+        "qnu:r001",
+        "qnu:r002",
+        "qnu:r003",
+        "qnu:r004",
+        "qnu:r005",
+        "qnu:r006"
+      ],
+      "column_ids": [],
+      "context_kind": "workflow"
+    },
+    "old_issue_id": "ctxissue:8c14350a7e481cb5770d82b46947e8b3557fc0ddf015507eb2fd5d4c9d0170d2",
+    "new_issue_id": "ctxissue:b3401287c9e213a0f08c838dd2c44f28ff161f8d677ba1b90dee95f6ef27d0ee"
+  },
+  "references": [
+    {
+      "issue": "O03",
+      "issue_id": "ctxissue:020f5d0bffea6fabb4605e5fb4c53ccd72fb7320a3cf354dd477b5b81000a21e",
+      "before_assertion_ids": [
+        "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+        "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+        "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+        "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+        "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da"
+      ],
+      "after": [
+        {
+          "assertion": "A03",
+          "assertion_id": "assertion:5579c5be2fdefcd7236130ccf0ca7223e91ae6e14939435e82048c7ac082be13",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A05",
+          "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p084",
+            "qnu:l012"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A04",
+          "assertion_id": "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A10",
+          "assertion_id": "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A12",
+          "assertion_id": "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A06",
+          "assertion_id": "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A07",
+          "assertion_id": "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A08",
+          "assertion_id": "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A02",
+          "assertion_id": "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        },
+        {
+          "assertion": "A11",
+          "assertion_id": "assertion:95980004d5efeafe34f968d53da058e2d080cff2d443cdfd488e7529c529d974",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        },
+        {
+          "assertion": "A09",
+          "assertion_id": "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi có chứng cứ bổ sung xác lập tỷ lệ Bảng 1 được dùng trong quy trình đánh giá này; hiện chưa có liên kết đó."
+        }
+      ]
+    },
+    {
+      "issue": "O04",
+      "issue_id": "ctxissue:081d95e2e836c4aad52bfa72977575c1e7c732c094cffc52c9d42cc4c9fb26c4",
+      "before_assertion_ids": [
+        "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+        "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+        "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+        "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339"
+      ],
+      "after": [
+        {
+          "assertion": "A05",
+          "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A06",
+          "assertion_id": "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A07",
+          "assertion_id": "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A08",
+          "assertion_id": "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A02",
+          "assertion_id": "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        },
+        {
+          "assertion": "A11",
+          "assertion_id": "assertion:95980004d5efeafe34f968d53da058e2d080cff2d443cdfd488e7529c529d974",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:l012"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        }
+      ]
+    },
+    {
+      "issue": "O05",
+      "issue_id": "ctxissue:d62e3952982928c38fa242bf17a7cf867f7ffdceb5f4599915d9260884e65530",
+      "before_assertion_ids": [
+        "assertion:ef2f233670f3db45390c35d7d5eb9d2297a04865515607a190e1334f8bb2c111",
+        "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+        "assertion:353338132c32a2c1d4f5ba31a8892fa160d64b92d93acb58460bef6bdd289cea",
+        "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+        "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+        "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb",
+        "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+        "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+        "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da",
+        "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+        "assertion:95980004d5efeafe34f968d53da058e2d080cff2d443cdfd488e7529c529d974",
+        "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc"
+      ],
+      "after": [
+        {
+          "assertion": "A03",
+          "assertion_id": "assertion:5579c5be2fdefcd7236130ccf0ca7223e91ae6e14939435e82048c7ac082be13",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A05",
+          "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A04",
+          "assertion_id": "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A10",
+          "assertion_id": "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A12",
+          "assertion_id": "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A06",
+          "assertion_id": "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A07",
+          "assertion_id": "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A08",
+          "assertion_id": "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A02",
+          "assertion_id": "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        },
+        {
+          "assertion": "A11",
+          "assertion_id": "assertion:95980004d5efeafe34f968d53da058e2d080cff2d443cdfd488e7529c529d974",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi chứng cứ được dùng trong đúng quy trình xếp loại; chưa chứng minh dữ liệu số Bảng 1 là các biến A/B/C."
+        },
+        {
+          "assertion": "A09",
+          "assertion_id": "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da",
+          "role": "conditional",
+          "source_unit_ids": [
+            "qnu:p084"
+          ],
+          "condition": "Chỉ khi có chứng cứ bổ sung xác lập tỷ lệ Bảng 1 được dùng trong quy trình đánh giá này; hiện chưa có liên kết đó."
+        }
+      ]
+    },
+    {
+      "issue": "O06",
+      "issue_id": "ctxissue:8e49ed2d0da6280c39ddd1f068fe53c891bed6999eb732e92cd8214758ec9c11",
+      "before_assertion_ids": [
+        "assertion:353338132c32a2c1d4f5ba31a8892fa160d64b92d93acb58460bef6bdd289cea",
+        "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652"
+      ],
+      "after": [
+        {
+          "assertion": "A03",
+          "assertion_id": "assertion:5579c5be2fdefcd7236130ccf0ca7223e91ae6e14939435e82048c7ac082be13",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p090",
+            "qnu:l014"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A05",
+          "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:p090",
+            "qnu:l015"
+          ],
+          "condition": null
+        }
+      ]
+    },
+    {
+      "issue": "O07",
+      "issue_id": "ctxissue:54652f308c332f02a379469f0d2ee9fc8f62a858dbc4ac98fb0d8adc515d9bda",
+      "before_assertion_ids": [
+        "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652"
+      ],
+      "after": [
+        {
+          "assertion": "A05",
+          "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+          "role": "direct",
+          "source_unit_ids": [
+            "qnu:l015",
+            "qnu:p092"
+          ],
+          "condition": null
+        }
+      ]
+    },
+    {
+      "issue": "O08",
+      "issue_id": "ctxissue:891a560adef9b2010117727e0188690b2d36c25c0dda4d594ebe58456cd9920d",
+      "before_assertion_ids": [
+        "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+        "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+        "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc"
+      ],
+      "after": [
+        {
+          "assertion": "A04",
+          "assertion_id": "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:docx_footnote_2"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A10",
+          "assertion_id": "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:docx_footnote_2"
+          ],
+          "condition": null
+        },
+        {
+          "assertion": "A12",
+          "assertion_id": "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc",
+          "role": "protective",
+          "source_unit_ids": [
+            "qnu:docx_footnote_2"
+          ],
+          "condition": null
+        }
+      ]
+    }
+  ]
+}

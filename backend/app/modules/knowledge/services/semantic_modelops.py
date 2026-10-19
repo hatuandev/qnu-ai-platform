@@ -192,7 +192,7 @@ async def _generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mod
                 prior = {item["issue_id"]: item for item in packet["prior_context_issues"]}
                 for followup in wire.context_followups:
                     old = prior.get(followup.issue_id)
-                    if old is None or old["kind"] != "missing_context":
+                    if old is None or old["kind"] not in {"missing_context", "deferred_reference"}:
                         raise AppException("Đề xuất bổ sung trỏ sai issue.", code="SEMANTIC_EVIDENCE_INVALID", status_code=422)
                     source_ids = set()
                     for eid in followup.evidence_ids:

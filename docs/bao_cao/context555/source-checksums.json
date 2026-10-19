@@ -1,0 +1,16 @@
+{
+  "backend/app/modules/knowledge/router.py": "b998fc541743d5a80fa90921993a13dd1894d698f093281603aaf341898af849",
+  "backend/app/modules/knowledge/schemas.py": "ef23abdb86325d898276fb20e741710afedf3706d195d8a9d005893ef38a31f5",
+  "backend/app/modules/knowledge/services/semantic_annotations.py": "c2058ca7624162a09d5edd3c925176db04fc414481ecaa61f048ce047e7f3189",
+  "backend/app/modules/knowledge/services/semantic_assertions.py": "67f8940221332fe00dad3a4cab1a6d679f5b50f25a87ea17ba32080a9300213a",
+  "backend/app/modules/knowledge/services/semantic_context_review.py": "7c0e3b79ed849eca05574a6b640dbf20082244986bc1d606b3f9f638e08847d0",
+  "backend/app/modules/knowledge/services/semantic_checkpoint.py": "41b93099feadc3c5899a3fb802abd9f940b4a390f2b1367b75d7b769ac15fd45",
+  "backend/scripts/prepare_semantic_review_checkpoint.py": "c2ccf5be8c00c0efce65a40e86a052cb92d73ef060ec7d999bf3f194aaa6ba6f",
+  "backend/tests/test_semantic_checkpoint_import.py": "73a7706f48dec8502ac94385f9698fad81954f321a7aede4c70fd4ec11d95ad6",
+  "frontend/src/features/knowledge/components/semantic-review-preview.tsx": "107068172ccf70a3c52f1cd6ffdc240670591f4e7822c0bf4a7f85e13c114b35",
+  "frontend/src/features/knowledge/components/semantic-review-preview.test.mjs": "8868e62e00c3f56285a9ffdf4b959a4456a090f3da60f8aa0bdf586f6724e0e4",
+  "frontend/src/features/knowledge/components/semantic-checkpoint-import.tsx": "ef5519eed12d2a937a5aa10ae51030d23bb875e061aad11cbba85facda3de287",
+  "frontend/src/features/knowledge/source-detail-page.tsx": "4431a30e7910b9966048cd36918b8910a621710a1bef3fa041af7755e88f8df3",
+  "frontend/src/services/knowledge-api.ts": "72d5156433743d56a962a64e99c6c06030adec364ac282e90fa0717446429465",
+  "frontend/src/types/knowledge.ts": "2323099774ec92d7a7a75ff727faf2263d43c2d4ec2bd9fd1432e533d0cc015c"
+}

@@ -1,0 +1,90 @@
+{
+  "status": "REPORT_CHECKS_PASS",
+  "application_test_status": "NOT_RUN_REPORT_ONLY",
+  "original_checkpoint_files_unchanged": 14,
+  "revised_checkpoint_files_unchanged": 5,
+  "application_source_files_unchanged": 1230,
+  "relations_mapped": 12,
+  "original_issues_mapped": 8,
+  "new_scope_issues_mapped": 10,
+  "evidence_binding_checks": 53,
+  "formal_replacements": 0,
+  "duplicate_issue_ids": 0,
+  "relative_links_checked": 11,
+  "utf8_no_bom_lf": true,
+  "model_calls": 0,
+  "human_decisions_recorded": 0,
+  "data_applied": false,
+  "storage_deleted": false,
+  "storage_policy_changed": false,
+  "storage_inventory": {
+    "target": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-eba155eff9ff",
+    "owned_state_status": "database_removed_storage_pending",
+    "nonce_name_matches": true,
+    "path_verified": true,
+    "reparse_or_symlink_count": 0,
+    "regular_files_with_multiple_hardlinks": 0,
+    "groups": {
+      "after": {
+        "files": 390,
+        "bytes": 6641220
+      },
+      "after-final": {
+        "files": 147,
+        "bytes": 4310993
+      },
+      "after-verified": {
+        "files": 390,
+        "bytes": 6644648
+      },
+      "baseline": {
+        "files": 372,
+        "bytes": 6485415
+      },
+      "baseline-code": {
+        "files": 768,
+        "bytes": 9483894
+      },
+      "final-scope": {
+        "files": 18,
+        "bytes": 153166
+      },
+      "final-scope-verified": {
+        "files": 18,
+        "bytes": 156658
+      },
+      "focused": {
+        "files": 267,
+        "bytes": 3321803
+      },
+      "focused-final": {
+        "files": 270,
+        "bytes": 3341701
+      },
+      "focused-last": {
+        "files": 282,
+        "bytes": 3458707
+      },
+      "focused-new": {
+        "files": 3,
+        "bytes": 19746
+      },
+      "focused-verified": {
+        "files": 270,
+        "bytes": 3341701
+      },
+      "objects": {
+        "files": 33,
+        "bytes": 1195954
+      },
+      "red": {
+        "files": 2,
+        "bytes": 14701
+      }
+    },
+    "total_files": 3230,
+    "total_bytes": 48570307,
+    "deleted": false,
+    "policy_changed": false
+  }
+}

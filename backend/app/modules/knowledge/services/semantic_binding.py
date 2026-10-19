@@ -142,23 +142,27 @@ def _row_field(artifact: dict, packet: dict, row_id: str, column_id: str) -> dic
     return fields[0]
 
 
-def scope_guard(artifact: dict, note: NoteSelection, quote: str, full_text: str, issues: list | None) -> None:
+def scope_guard(artifact: dict, note: NoteSelection, quote: str, full_text: str, issues: list | None,
+                *, assertion_id: str | None = None) -> None:
     """Reject verifiable contradictions, never certify arbitrary natural language."""
     table = next(table for table in artifact["tables"] if table["id"] == note.table_id)
+    if note.scope == "table" and quote == full_text and len(re.findall(r"(?m)^\s*\d+[.)]\s+", full_text)) > 1:
+        raise ValueError("EVIDENCE_TABLE_SCOPE_REQUIRES_ASSERTIONS")
     years = set(re.findall(r"\b(?:19|20)\d{2}\b", quote))
     full_years = set(re.findall(r"\b(?:19|20)\d{2}\b", full_text))
     selected = [column for column in table["columns"] if column["id"] in note.column_ids]
     header_years = [set(re.findall(r"\b(?:19|20)\d{2}\b", " / ".join(column["header_path"]))) for column in selected]
     # Code occurrence, numeric ranges and a selected clause cannot prove the
     # meaning of exclusions. Every row/group relation needs exact human scope.
-    needs_review = note.scope in {"row", "group"} or (note.scope == "column" and (
+    needs_review = assertion_id is not None or note.scope in {"row", "group"} or (note.scope == "column" and (
         len(full_years) > 1 or any(len(value) != 1 for value in header_years)))
     if needs_review:
         if issues is None:
             raise ValueError("SEMANTIC_SCOPE_REVIEW_COLLECTOR_REQUIRED")
         from app.modules.knowledge.services.semantic_context_review import make_issue
         issue = make_issue(artifact, "scope_confirmation_required", [note.source_unit_id],
-            {"table_id": note.table_id, "row_unit_ids": note.row_unit_ids, "column_ids": note.column_ids},
+            {"table_id": note.table_id, "row_unit_ids": note.row_unit_ids, "column_ids": note.column_ids,
+             **({"assertion_id": assertion_id} if assertion_id else {})},
             "Đọc toàn đơn vị nguồn, các năm và điều kiện loại trừ; xác nhận đúng tập cột/dòng.")
         if not issue["review_evidence"] or issue["review_evidence"][0]["evidence_quote"] != full_text:
             raise ValueError("SEMANTIC_FULL_SOURCE_REVIEW_UNAVAILABLE")
@@ -172,6 +176,7 @@ def scope_guard(artifact: dict, note: NoteSelection, quote: str, full_text: str,
 
 def _bound_selection(artifact: dict, packet: dict, category: str, selection, review_issues: list | None) -> dict:
     binding, quote = _evidence(artifact, packet, selection)
+    is_v2 = isinstance(selection, SelectionV2)
     if isinstance(selection, SelectionV2):
         internal = {"notes": NoteSelection, "cells": CellSelection, "limitations": LimitSelection}[category]
         selection = internal(**selection.model_dump(), source_unit_id=binding.source_unit_id)
@@ -182,8 +187,15 @@ def _bound_selection(artifact: dict, packet: dict, category: str, selection, rev
             raise ValueError("SEMANTIC_SCOPE_OUTSIDE_CONTEXT")
         if binding.column_id is not None:
             raise ValueError("NOTE_EVIDENCE_REQUIRES_PROSE")
-        scope_guard(artifact, selection, quote, source_text(artifact, binding.source_unit_id), review_issues)
         item.update(selection.model_dump(exclude={"evidence_id", "source_unit_id", "reason"}), note_unit_id=binding.source_unit_id)
+        assertion_id = None
+        if is_v2 and (binding.start != 0 or binding.end != len(source_text(artifact, binding.source_unit_id))):
+            item["assertion_version"] = 1
+            from app.modules.knowledge.services.semantic_annotations import NoteScope
+            from app.modules.knowledge.services.semantic_assertions import assertion_identity
+            assertion_id = assertion_identity(NoteScope.model_validate(item))
+        scope_guard(artifact, selection, quote, source_text(artifact, binding.source_unit_id), review_issues,
+                    assertion_id=assertion_id)
     else:
         target = _row_field(artifact, packet, selection.row_unit_id, selection.column_id)
         item.update(selection.model_dump(exclude={"evidence_id", "source_unit_id", "reason"}),

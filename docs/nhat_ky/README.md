@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên555](./2026-10-19_phien_555_final_semantic_review.md) | Final semantic review A03/ref/import có xác thực | A03 workflow không fact; typed roles/pending/UI; full18FAIL/2416PASS/17SKIP exact nền,18thêmPASS. Live hash khác BLOCKED/chưa human; DB dọn/Storage và bản xuất thừa còn do policy |
+
+| **2026-10-19** | [Phiên554](./2026-10-19_phien_554_doi_soat_issue_context552.md) | Báo cáo đối soát Context552/553 | Map8O/10S/12A; 53binding/manifestPASS; A03 đích hồ sơ cần rõ, O05 mapping rộng; không sửa code/LLM/apply/fullrun; Storage kiểm kê, không xóa vượt policy |
+
+| **2026-10-19** | [Phiên553](./2026-10-19_phien_553_semantic_scope_review.md) | Mixed-scope/assertion/reference review | Focused261/FE18/buildPASS; full18FAIL/2398PASS/17SKIP exact nền/23thêmPASS; revised12assertion/18issue WAITING_FOR_REVIEW. DB test dọn, Storage bị policy chặn xóa |
+
 | **2026-10-19** | [Phiên552](./2026-10-19_phien_552_selector_v2_scope_review.md) | Selector v2 + scope review | Focused217/Ruff14/FE15/buildPASS; full18FAIL/2375PASS/17SKIP, exact18ID/cause/39addedPASS/0new. Qwen Bảng1 JSON/schema/bindingPASS,4notes/8issues WAITING_FOR_REVIEW; DB/runtime2test dọn, checkpoint private giữ |
 
 | **2026-10-19** | [Phiên551](./2026-10-19_phien_551_live_retest_qwen_32k.md) | Retest Qwen32K/Luna | Short chat cả haiPASS; Qwen tài liệu không còn context400, JSON/schemaPASS nhưng scope/unit bindingFAIL;22packet planned/1sent, E2EBLOCKED. RuffPASS/fullNOT RUN; DB/runtime test dọn, defaults giữ |

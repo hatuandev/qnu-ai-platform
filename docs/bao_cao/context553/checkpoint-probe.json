@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "mode": "pure proposed-projection validation; NOT approval/apply",
+  "proposal_hash": "33d9cdae6fc80547aa6243ea7ac11d94b9fa5e9b765398ba569a9905870f3fc2",
+  "original_integrity": "PASS",
+  "revised_integrity": "PASS",
+  "assertions": 12,
+  "original_issues_preserved": 8,
+  "pending_issues": 18,
+  "related_assessments": 6,
+  "scope_no_cross_group_row_column_year": "PASS",
+  "raw_fields_unchanged": true,
+  "manifest_canonical_spans": "PASS",
+  "chunks": 278,
+  "facts": 392,
+  "human_approved": false,
+  "source_applied": false,
+  "new_model_calls": 0
+}

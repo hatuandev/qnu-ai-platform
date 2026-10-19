@@ -76,13 +76,27 @@ function ContextIssueItem({
   selected?: boolean;
 }) {
   const [reason, setReason] = useState("");
+  const assessment =
+    artifact.semantic_annotations?.context_review?.reference_assessments?.find(
+      (item) => item.issue_id === issue.issue_id,
+    );
+  const review = artifact.semantic_annotations?.context_review;
+  const label = review?.display_labels?.issues?.[issue.issue_id];
+  const evidence = assessment?.evidence.length
+    ? issue.review_evidence?.[0]
+    : issue.review_evidence?.find(
+        (item) => !item.evidence_quote.trimStart().startsWith("#"),
+      );
   const action =
-    issue.kind === "scope_confirmation_required"
-      ? "scope_confirmed"
-      : issue.kind === "deferred_reference"
-        ? "not_applicable_to_target"
-        : null;
-  const evidence = issue.review_evidence?.[0];
+    !evidence || assessment?.relevance === "insufficient"
+      ? null
+      : assessment?.relevance === "related"
+        ? "related_context_reviewed"
+        : issue.kind === "scope_confirmation_required"
+          ? "scope_confirmed"
+          : issue.kind === "deferred_reference"
+            ? "not_applicable_to_target"
+            : null;
   const rows = Array.isArray(issue.target.row_unit_ids)
     ? issue.target.row_unit_ids
     : [];
@@ -94,7 +108,17 @@ function ContextIssueItem({
     : [issue.target.table_id];
   return (
     <article className="space-y-2 rounded-lg border p-3">
-      <p className="font-medium">{issue.reason}</p>
+      <p className="font-medium">
+        {label && `${label} · `}
+        {issue.reason}
+      </p>
+      <p className="text-muted-foreground">
+        {selected
+          ? "Đã chọn đối chiếu, chưa gửi quyết định"
+          : assessment?.relevance === "insufficient"
+            ? "Còn thiếu bằng chứng"
+            : "Chờ quyết định có xác thực"}
+      </p>
       {artifact.tables
         .filter((table) => tableIds.includes(table.id))
         .map((table) => (
@@ -135,6 +159,46 @@ function ContextIssueItem({
           {item.evidence_quote}
         </blockquote>
       ))}
+      {assessment && (
+        <div className="space-y-2">
+          <p>Phân tích tham chiếu cần bạn đối chiếu: {assessment.reason}</p>
+          {assessment.links?.map((link) => (
+            <div
+              key={link.assertion_id}
+              className="space-y-1 rounded-md border p-2"
+            >
+              <p>
+                {review?.display_labels?.assertions?.[link.assertion_id] ??
+                  link.assertion_id}{" "}
+                ·{" "}
+                {link.role === "direct"
+                  ? "Trực tiếp (direct)"
+                  : link.role === "protective"
+                    ? "Bảo vệ (protective)"
+                    : "Có điều kiện (conditional)"}
+              </p>
+              <p>{link.reason}</p>
+              {link.condition && <p>Chỉ khi: {link.condition}</p>}
+              {link.evidence.map((item) => (
+                <blockquote
+                  key={item.evidence_binding.evidence_id}
+                  className="whitespace-pre-wrap border-l-2 pl-3"
+                >
+                  {item.evidence_quote}
+                </blockquote>
+              ))}
+            </div>
+          ))}
+          {assessment.evidence.map((item) => (
+            <blockquote
+              key={item.evidence_binding.evidence_id}
+              className="whitespace-pre-wrap border-l-2 pl-3"
+            >
+              {item.evidence_quote}
+            </blockquote>
+          ))}
+        </div>
+      )}
       {!action && (
         <p>
           Cần bổ sung và phân tích lại nguồn; ghi chú chung không giải quyết
@@ -166,6 +230,9 @@ function ContextIssueItem({
                       action,
                       ...evidence,
                       reason: reason.trim(),
+                      supporting_evidence: assessment?.evidence.map(
+                        (item) => item.evidence_binding,
+                      ),
                     },
                 issue.issue_id,
               )
@@ -175,7 +242,9 @@ function ContextIssueItem({
               ? "Bỏ lựa chọn đối chiếu"
               : action === "scope_confirmed"
                 ? "Xác nhận đúng tập dòng/cột này"
-                : "Xác nhận tham chiếu không chi phối đích này"}
+                : action === "related_context_reviewed"
+                  ? "Xác nhận đã đối chiếu tham chiếu liên quan"
+                  : "Xác nhận tham chiếu không chi phối đích này"}
           </Button>
         </>
       )}
@@ -209,15 +278,46 @@ export function SemanticReviewPreview({
         . {artifact.source_policy?.context_blocker_count ?? 0} vấn đề còn chặn
         áp dụng/xuất bản.
       </p>
-      {(proposal.context_review.issues ?? []).map((issue) => (
-        <ContextIssueItem
-          key={issue.issue_id}
-          issue={issue}
-          artifact={artifact}
-          selected={decisions.some((item) => item.issue_id === issue.issue_id)}
-          onDecision={proposal.status === "proposed" ? onDecision : undefined}
-        />
-      ))}
+      {[
+        {
+          title: "Vấn đề gốc và tham chiếu",
+          items: (proposal.context_review.issues ?? []).filter(
+            (issue) =>
+              !proposal.context_review?.display_labels?.issues?.[
+                issue.issue_id
+              ]?.startsWith("S"),
+          ),
+        },
+        {
+          title: "Xác nhận phạm vi của từng quan hệ",
+          items: (proposal.context_review.issues ?? []).filter((issue) =>
+            proposal.context_review?.display_labels?.issues?.[
+              issue.issue_id
+            ]?.startsWith("S"),
+          ),
+        },
+      ]
+        .filter((group) => group.items.length > 0)
+        .map((group) => (
+          <section key={group.title} className="space-y-3">
+            <p className="font-medium">
+              {group.title} ({group.items.length})
+            </p>
+            {group.items.map((issue) => (
+              <ContextIssueItem
+                key={issue.issue_id}
+                issue={issue}
+                artifact={artifact}
+                selected={decisions.some(
+                  (item) => item.issue_id === issue.issue_id,
+                )}
+                onDecision={
+                  proposal.status === "proposed" ? onDecision : undefined
+                }
+              />
+            ))}
+          </section>
+        ))}
       {(!proposal.context_review.contract ||
         !proposal.context_review.issues?.length) &&
         proposal.context_review.unresolved.map((item) => (
@@ -259,7 +359,14 @@ export function SemanticReviewPreview({
       className="space-y-3 text-sm"
     >
       {contextPanel}
-      <p className="font-medium">Đề xuất từ model cần bạn đối chiếu</p>
+      <p className="break-all text-muted-foreground">
+        Đề xuất hiện hành: {proposal.proposal_hash ?? "Chưa có hash"} · nguồn:{" "}
+        {proposal.input_hash ?? "Chưa có mã kiểm chứng"}
+      </p>
+      <p className="font-medium">
+        Đề xuất ngữ nghĩa cần bạn đối chiếu ({proposal.annotations.notes.length}{" "}
+        quan hệ)
+      </p>
       <p className="text-muted-foreground">
         Chưa áp dụng vào dữ liệu hoặc câu trả lời. Hãy kiểm tra phạm vi và trích
         đoạn dưới đây trước khi duyệt.
@@ -286,19 +393,32 @@ export function SemanticReviewPreview({
           ))}
         </div>
       )}
-      {proposal.annotations.notes.map((note) => {
+      {proposal.annotations.notes.map((note, noteIndex) => {
         const index = artifact.tables.findIndex(
           (table) => table.id === note.table_id,
         );
         const table = artifact.tables[index];
         return (
           <article
-            key={`${note.note_unit_id}-${note.table_id}-${note.scope}-${note.row_unit_ids.join(",")}-${note.column_ids.join(",")}`}
+            key={`${note.evidence_binding?.evidence_id ?? note.note_unit_id}-${note.table_id}-${note.scope}-${note.row_unit_ids.join(",")}-${note.column_ids.join(",")}`}
             className="space-y-2 rounded-lg border p-3"
           >
             <p className="font-medium">
-              Bảng {index + 1} · {scopeLabels[note.scope]}
+              {proposal.context_review?.display_labels?.assertions?.[
+                proposal.context_review?.assertion_ids?.[noteIndex] ?? ""
+              ] ?? `Quan hệ ${noteIndex + 1}`}{" "}
+              · Bảng {index + 1} · {scopeLabels[note.scope]}
             </p>
+            {note.context_kind === "workflow" && (
+              <div className="space-y-1">
+                <p>{note.context_label}</p>
+                <p>
+                  Ngữ cảnh hồ sơ hoặc quy trình có điều kiện, không trực tiếp
+                  sửa dữ liệu số của bảng. Tập dòng xác định chủ thể cần xét,
+                  không có nghĩa mọi hồ sơ đều đủ điều kiện.
+                </p>
+              </div>
+            )}
             {table && note.row_unit_ids.length > 0 && (
               <p>
                 Dòng:{" "}
@@ -330,6 +450,25 @@ export function SemanticReviewPreview({
                 note.evidence_binding?.source_unit_id ?? note.note_unit_id,
               )}
             />
+            {note.related_evidence?.map((binding) => {
+              const sourceText = sourceTextFor(binding.source_unit_id);
+              return (
+                <details key={binding.evidence_id} className="space-y-2">
+                  <summary>Tham chiếu và điều kiện đi kèm</summary>
+                  <blockquote className="whitespace-pre-wrap border-l-2 pl-3">
+                    {sourceText !== undefined
+                      ? Array.from(sourceText)
+                          .slice(binding.start, binding.end)
+                          .join("")
+                      : "Chưa tải được nội dung tham chiếu; cần bổ sung trước khi duyệt."}
+                  </blockquote>
+                  <EvidenceReviewDetails
+                    binding={binding}
+                    sourceText={sourceText}
+                  />
+                </details>
+              );
+            })}
           </article>
         );
       })}

@@ -48,6 +48,8 @@ class SourceUnit(BaseModel):
     context_refs: list[str] = Field(default_factory=list)
     field_context_refs: dict[str, list[str]] = Field(default_factory=dict)
     field_usage: dict[str, Literal["description_only"]] = Field(default_factory=dict)
+    # Backend-derived assertion metadata; never a human approval or source rewrite.
+    semantic_scope: dict[str, Any] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
 
 class UnitManifest(BaseModel):

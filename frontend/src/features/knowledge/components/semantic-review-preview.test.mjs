@@ -36,6 +36,24 @@ const { SemanticReviewPreview } = loadSource(
     },
   },
 );
+const { SemanticCheckpointImport } = loadSource(
+  new URL("./semantic-checkpoint-import.tsx", import.meta.url),
+  {
+    "@/components/ui/button": {
+      Button: ({ children, ...props }) =>
+        React.createElement("button", { type: "button", ...props }, children),
+    },
+    "@/components/ui/input": {
+      Input: (props) => React.createElement("input", props),
+    },
+    "@/components/ui/textarea": {
+      Textarea: (props) => React.createElement("textarea", props),
+    },
+    "@/services/knowledge-api": {
+      extractErrorMessage: (error, fallback) => error?.message ?? fallback,
+    },
+  },
+);
 const proposal = {
   status: "proposed",
   annotations: {
@@ -71,6 +89,102 @@ const artifact = {
     },
   ],
 };
+
+test("related reference uses its own action and shows the full appendix body", () => {
+  const value = structuredClone(artifact);
+  const binding = {
+    source_unit_id: "appendix",
+    evidence_id: "ev:body",
+    start: 0,
+    end: 35,
+  };
+  value.semantic_annotations.context_review = {
+    scope: "selected_tables",
+    unresolved: [],
+    contract: "qnu-context-review-v2",
+    issues: [
+      {
+        issue_id: "original-issue",
+        kind: "deferred_reference",
+        target: { table_ids: ["table"] },
+        unit_ids: ["heading"],
+        reason: "Read the appendix",
+        review_evidence: [
+          {
+            evidence_binding: { ...binding, source_unit_id: "heading" },
+            evidence_quote: "### Appendix",
+          },
+        ],
+      },
+    ],
+    reference_assessments: [
+      {
+        issue_id: "original-issue",
+        relevance: "related",
+        assertion_ids: ["assertion:test"],
+        reason: "Only group B; excludes group A",
+        evidence: [
+          {
+            evidence_binding: binding,
+            evidence_quote: "Only B; valid thirty days; never A.",
+          },
+        ],
+      },
+    ],
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, {
+      artifact: value,
+      onDecision() {},
+    }),
+  );
+  assert.match(html, /Only B; valid thirty days; never A/);
+  assert.match(html, /Xác nhận đã đối chiếu tham chiếu liên quan/);
+  assert.doesNotMatch(html, /Xác nhận tham chiếu không chi phối đích này/);
+});
+
+test("a lone heading cannot offer a decision and reference spans use Unicode code points", () => {
+  const value = structuredClone(artifact);
+  value.semantic_annotations.context_review = {
+    scope: "selected_tables",
+    unresolved: [],
+    issues: [
+      {
+        issue_id: "heading-only",
+        kind: "deferred_reference",
+        target: {},
+        unit_ids: ["heading"],
+        reason: "Need body",
+        review_evidence: [
+          {
+            evidence_binding: { evidence_id: "ev:heading" },
+            evidence_quote: "### Only a heading",
+          },
+        ],
+      },
+    ],
+  };
+  const binding = {
+    evidence_id: "ev:unicode",
+    source_unit_id: "appendix",
+    start: 2,
+    end: 9,
+    text_sha256: "a".repeat(64),
+  };
+  value.semantic_annotations.annotations.notes[0].related_evidence = [binding];
+  value.retrieval_units = {
+    units: [{ id: "appendix", text: "😀 Điều kiện khác" }],
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, {
+      artifact: value,
+      onDecision() {},
+    }),
+  );
+  assert.doesNotMatch(html, /Xác nhận tham chiếu không chi phối đích này/);
+  assert.match(html, /Tham chiếu và điều kiện đi kèm/);
+  assert.match(html, />Điều ki<|>Điều kiệ</);
+});
 
 test("scope confirmation shows exact string row codes and full exclusion separately", () => {
   const value = structuredClone(artifact);
@@ -215,6 +329,41 @@ test("bound review shows exact source coordinates, reason and unresolved scope s
   assert.match(html, /Needs &lt;source&gt; condition/);
   assert.match(html, /Inspect &lt;script&gt;unsafe&lt;\/script&gt; scope/);
   assert.doesNotMatch(html, /<script>/);
+});
+
+test("related reference intent preserves supporting evidence and exact proposal hash", async () => {
+  const original = globalThis.fetch;
+  let sent;
+  globalThis.fetch = async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return new Response(JSON.stringify({ id: "draft" }));
+  };
+  const decision = {
+    issue_id: "original-issue",
+    target: { table_ids: ["table"] },
+    action: "related_context_reviewed",
+    evidence_binding: { source_unit_id: "heading" },
+    evidence_quote: "### Appendix",
+    reason: "Read complete body and exclusion",
+    supporting_evidence: [{ source_unit_id: "body", evidence_id: "ev:body" }],
+  };
+  try {
+    await knowledgeApi.reviewSemanticProposals(
+      "c",
+      "s",
+      "r",
+      "a".repeat(64),
+      "Review reference",
+      "approved",
+      "strict",
+      [decision],
+    );
+    assert.deepEqual(sent.context_decisions, [decision]);
+    assert.equal(sent.expected_semantic_proposal_hash, "a".repeat(64));
+    assert.equal(sent.context_decisions[0].actor_id, undefined);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test("review renders real source coordinates and escaped exact quotes", () => {
@@ -403,6 +552,155 @@ test("acknowledgment and further-check actions send distinct decisions with exac
       calls.every(
         (value) => value.expected_semantic_proposal_hash === "b".repeat(64),
       ),
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("twelve labeled relations and eighteen separate issues show workflow and reference roles", () => {
+  const value = structuredClone(artifact);
+  const assertions = Object.fromEntries(
+    Array.from({ length: 12 }, (_, i) => [
+      `a${i}`,
+      `A${String(i + 1).padStart(2, "0")}`,
+    ]),
+  );
+  value.semantic_annotations.proposal_hash = "current-hash";
+  value.semantic_annotations.annotations.notes = Array.from(
+    { length: 12 },
+    (_, i) => ({
+      ...proposal.annotations.notes[0],
+      evidence_quote: `Rule ${i}`,
+      ...(i === 2
+        ? {
+            context_kind: "workflow",
+            context_label: "Hồ sơ thiết bị nhóm A / 2027",
+            scope: "group",
+            column_ids: [],
+            row_unit_ids: ["row"],
+          }
+        : {}),
+    }),
+  );
+  value.semantic_annotations.context_review = {
+    scope: "selected_tables",
+    contract: "qnu-context-review-v2",
+    unresolved: [],
+    assertion_ids: Object.keys(assertions),
+    display_labels: { assertions, issues: {} },
+    issues: [],
+    reference_assessments: [],
+  };
+  for (let i = 0; i < 18; i++) {
+    value.semantic_annotations.context_review.display_labels.issues[
+      `issue${i}`
+    ] =
+      i < 8
+        ? `O${String(i + 1).padStart(2, "0")}`
+        : `S${String(i - 7).padStart(2, "0")}`;
+    value.semantic_annotations.context_review.issues.push({
+      issue_id: `issue${i}`,
+      kind: "scope_confirmation_required",
+      unit_ids: ["note"],
+      target: { table_id: "table" },
+      reason: `Need review ${i}`,
+      review_evidence: [],
+    });
+  }
+  value.semantic_annotations.context_review.reference_assessments.push({
+    issue_id: "issue4",
+    relevance: "related",
+    evidence: [],
+    reason: "Typed references",
+    assertion_ids: ["a2", "a3", "a8"],
+    links: [
+      {
+        assertion_id: "a2",
+        role: "direct",
+        reason: "Equipment condition",
+        evidence: [],
+      },
+      {
+        assertion_id: "a3",
+        role: "protective",
+        reason: "Keep identity",
+        evidence: [],
+      },
+      {
+        assertion_id: "a8",
+        role: "conditional",
+        reason: "No automatic Q input",
+        condition: "Only if source proves this assessment link",
+        evidence: [],
+      },
+    ],
+  });
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, { artifact: value }),
+  );
+  for (const label of Object.values(assertions))
+    assert.match(html, new RegExp(`${label} ·`));
+  assert.match(html, /Vấn đề gốc và tham chiếu \(8\)/);
+  assert.match(html, /Xác nhận phạm vi của từng quan hệ \(10\)/);
+  assert.equal((html.match(/Chờ quyết định có xác thực/g) ?? []).length, 18);
+  assert.match(html, /Hồ sơ thiết bị nhóm A \/ 2027/);
+  assert.match(html, /không trực tiếp sửa dữ liệu số/);
+  assert.match(html, /Trực tiếp \(direct\)/);
+  assert.match(html, /Bảo vệ \(protective\)/);
+  assert.match(html, /Có điều kiện \(conditional\)/);
+  assert.match(html, /Only if source proves/);
+  assert.match(html, /current-hash/);
+  assert.doesNotMatch(html, /<button/);
+});
+
+test("checkpoint import without authenticated permission offers no enabled action or approval", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticCheckpointImport, {
+      canImport: false,
+      onImport: async () => {
+        throw new Error("must not run");
+      },
+    }),
+  );
+  assert.match(html, /Cần đăng nhập/);
+  assert.match(html, /<button[^>]*disabled/);
+  assert.match(html, /<input[^>]*disabled/);
+  assert.doesNotMatch(html, /Đã duyệt|Đã áp dụng/);
+});
+
+test("import uses authenticated API and expected current hash; stale remains failure", async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return new Response(
+      JSON.stringify({ id: "draft", status: "review_required" }),
+    );
+  };
+  try {
+    await knowledgeApi.importSemanticCheckpoint(
+      "c",
+      "s",
+      "draft",
+      { contract: "qnu-semantic-checkpoint-v1" },
+      "Checked source",
+      "old-hash",
+    );
+    assert.match(calls[0].url, /draft\/semantic-checkpoint$/);
+    assert.equal(calls[0].init.headers.get("Authorization"), "Bearer test");
+    assert.deepEqual(JSON.parse(calls[0].init.body), {
+      checkpoint: { contract: "qnu-semantic-checkpoint-v1" },
+      comment: "Checked source",
+      expected_semantic_proposal_hash: "old-hash",
+    });
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ detail: "Proposal stale" }), {
+        status: 409,
+      });
+    await assert.rejects(
+      knowledgeApi.importSemanticCheckpoint("c", "s", "draft", {}, "Checked"),
+      /Proposal stale/,
     );
   } finally {
     globalThis.fetch = original;

@@ -231,10 +231,14 @@ export interface SemanticEvidenceBinding {
 export interface ContextIssueDecision {
   issue_id: string;
   target: Record<string, string | string[]>;
-  action: "scope_confirmed" | "not_applicable_to_target";
+  action:
+    | "scope_confirmed"
+    | "not_applicable_to_target"
+    | "related_context_reviewed";
   evidence_binding: SemanticEvidenceBinding;
   evidence_quote: string;
   reason: string;
+  supporting_evidence?: SemanticEvidenceBinding[];
 }
 
 export interface ContextReviewIssue {
@@ -260,6 +264,7 @@ export interface SourceArtifact {
       | "rejected"
       | "changes_requested";
     proposal_hash?: string;
+    input_hash?: string;
     error_code?: string;
     context_review?: {
       coverage_complete: boolean;
@@ -270,6 +275,31 @@ export interface SourceArtifact {
       packets_complete?: boolean;
       contract?: string;
       issues?: ContextReviewIssue[];
+      assertion_ids?: string[];
+      display_labels?: {
+        assertions?: Record<string, string>;
+        issues?: Record<string, string>;
+      };
+      reference_assessments?: {
+        issue_id: string;
+        relevance: "related" | "unrelated" | "insufficient";
+        assertion_ids: string[];
+        reason: string;
+        links?: {
+          assertion_id: string;
+          role: "direct" | "protective" | "conditional";
+          reason: string;
+          condition?: string | null;
+          evidence: {
+            evidence_binding: SemanticEvidenceBinding;
+            evidence_quote: string;
+          }[];
+        }[];
+        evidence: {
+          evidence_binding: SemanticEvidenceBinding;
+          evidence_quote: string;
+        }[];
+      }[];
     };
     review?: {
       context_decisions?: (ContextIssueDecision & {
@@ -280,6 +310,10 @@ export interface SourceArtifact {
     };
     annotations?: {
       notes: {
+        assertion_version?: 1 | null;
+        context_kind?: "data" | "workflow";
+        context_label?: string | null;
+        related_evidence?: SemanticEvidenceBinding[];
         evidence_binding?: SemanticEvidenceBinding | null;
         reason?: string | null;
         note_unit_id: string;

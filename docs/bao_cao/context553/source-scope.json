@@ -1,0 +1,18 @@
+{
+  "changed_existing": [
+    "modules/knowledge/normalization/retrieval_models.py",
+    "modules/knowledge/normalization/retrieval_units.py",
+    "modules/knowledge/normalization/structure_chunks.py",
+    "modules/knowledge/services/semantic_annotations.py",
+    "modules/knowledge/services/semantic_binding.py",
+    "modules/knowledge/services/semantic_context.py",
+    "modules/knowledge/services/semantic_context_review.py",
+    "modules/knowledge/services/semantic_evidence.py",
+    "modules/knowledge/services/semantic_modelops.py",
+    "modules/knowledge/services/semantic_store.py"
+  ],
+  "new": [
+    "modules/knowledge/services/semantic_assertions.py"
+  ],
+  "scope": "byte comparison against frozen baseline; no Git writes"
+}

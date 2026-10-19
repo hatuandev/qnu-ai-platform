@@ -279,8 +279,8 @@ class ContextBuilder:
         if (packet["round"] >= self.policy.max_expansions or len(requested) != len(set(requested))
                 or not set(requested).issubset(self.units)):
             raise ValueError("CONTEXT_EXPANSION_INVALID_OR_EXHAUSTED")
-        children = ["qnu:" + child.id for unit_id in requested if self.units[unit_id].kind == "heading"
-                    for child in self.document.blocks if child.parent_id == self.units[unit_id].qnu_block_id]
+        children = [child for unit_id in requested if self.units[unit_id].kind == "heading"
+                    for child in self._heading_descendants(unit_id)]
         ids = sorted(set(packet["_unit_ids"]) | set(self._related([*requested, *children])), key=self.order.get)
         tables = [(self.tables[tid], rows) for tid, rows in packet["_tables"]]
         for unit_id in requested:
@@ -298,3 +298,42 @@ class ContextBuilder:
             raise ValueError("CONTEXT_EXPANSION_NO_NEW_UNITS")
         self.trace.append({"reason": "model_requested_expansion", "units": requested})
         return revised
+
+    def _heading_descendants(self, uid: str) -> list[str]:
+        descendants = {self.units[uid].qnu_block_id}
+        changed = True
+        while changed:
+            additions = {b.id for b in self.document.blocks if b.parent_id in descendants} - descendants
+            changed = bool(additions)
+            descendants.update(additions)
+        return [u.id for u in self.manifest.units if u.qnu_block_id in descendants and u.id != uid and not u.is_container]
+
+    def review_context(self, requested: list[str], table_ids: list[str]) -> dict:
+        """Bounded HUMAN review data, not a model packet or an approval.
+
+        A heading brings its complete structural subtree, including nested sections.
+        A lone heading explicitly remains insufficient evidence.
+        """
+        if len(requested) != len(set(requested)) or not set(requested).issubset(self.units) or not set(table_ids).issubset(self.tables):
+            raise ValueError("CONTEXT_REVIEW_TARGET_INVALID")
+        included = set(requested)
+        missing = []
+        for uid in requested:
+            unit = self.units[uid]
+            if unit.kind != "heading":
+                continue
+            children = self._heading_descendants(uid)
+            included.update(children)
+            if not any(self.units[child].kind != "heading" for child in children):
+                missing.append(uid)
+        if len(included) > self.policy.max_units:
+            raise ValueError("CONTEXT_REVIEW_UNIT_BUDGET")
+        result = {"source": source_identity(self.artifact), "input_hash": self.input_hash,
+            "heading_without_body": missing,
+            "units": [{"id": uid, "text": self.units[uid].text, "kind": self.units[uid].kind,
+                "parent_id": self.units[uid].parent_id, "source_locations": self.units[uid].source_locations}
+                for uid in sorted(included, key=self.order.get)],
+            "tables": [self.tables[tid] for tid in table_ids], "human_approved": False}
+        if len(json.dumps(result, ensure_ascii=False).encode()) > self.policy.max_total_bytes:
+            raise ValueError("CONTEXT_REVIEW_BYTES_BUDGET")
+        return result

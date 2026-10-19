@@ -1,0 +1,18 @@
+{
+  "test_database_removed": true,
+  "database_absence_verified_by_cleanup_runner": true,
+  "runtime_removed": false,
+  "runtime": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-abdc51dce9be",
+  "status": "DATABASE_CLEANED_STORAGE_BLOCKED_BY_POLICY",
+  "policy_disabled": false,
+  "alternate_delete_attempted": false,
+  "prior_runtime_553_untouched": true,
+  "sealed_checkpoints_retained": true,
+  "misplaced_export_copies": {
+    "path": "D:\\DuAnPhanMem\\docs\\bao_cao\\context555",
+    "file_count": 15,
+    "bytes": 1313647,
+    "status": "RELOCATION_AND_CLEANUP_BLOCKED_BY_POLICY",
+    "correct_repo_exports_regenerated": true
+  }
+}

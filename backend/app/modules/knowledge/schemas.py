@@ -1048,6 +1048,13 @@ class ReviewSourceRevisionRequest(BaseModel):
     expected_semantic_proposal_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
 
 
+class SemanticCheckpointImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    checkpoint: dict[str, Any]
+    comment: str = Field(min_length=3, max_length=2000)
+    expected_semantic_proposal_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
+
+
 class SemanticProposalReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     decision: Literal["approved", "acknowledged_limits", "rejected", "changes_requested"]

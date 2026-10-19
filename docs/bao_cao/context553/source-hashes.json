@@ -1,0 +1,18 @@
+{
+  "backend/app/modules/knowledge/normalization/retrieval_models.py": "e4699378356518e55eb88c7c5ca35ead17d4ed11e961879edd601b1b5eaa423e",
+  "backend/app/modules/knowledge/normalization/retrieval_units.py": "a5a3c5b69dd742143d473e3dbf6cf98eafbe5597b4b66ebb3818bcdc8945894b",
+  "backend/app/modules/knowledge/normalization/structure_chunks.py": "c449ce060a83112776f13e34f7082ec2845c095322f73d202404bb6a66cc1dd7",
+  "backend/app/modules/knowledge/services/semantic_annotations.py": "4fdd41e499530558adfe80a8b08f0dc60a4abddcfc4de5f97391e8a23fdd07af",
+  "backend/app/modules/knowledge/services/semantic_assertions.py": "3a6f08dd304c4fc98184831ffbe2f110443b74abd1559c2bf59c2b81c834d853",
+  "backend/app/modules/knowledge/services/semantic_binding.py": "45715b47a0cadc346dcba9cb66bcf08841427f30abfcbeb64ce5bdc084887d5b",
+  "backend/app/modules/knowledge/services/semantic_context.py": "7e2ef4cf508f3f25129ceb05a243061b15f29560d32c2c4dd96b2f62ccbd6ea8",
+  "backend/app/modules/knowledge/services/semantic_context_review.py": "4fb3216cccf10e72ff131b971f5d251fef28119b85edb88e04ccced497e5c304",
+  "backend/app/modules/knowledge/services/semantic_evidence.py": "3215a462d361fb6e4c89151276063cb2695659aeffff64add3031aa1fa95353b",
+  "backend/app/modules/knowledge/services/semantic_modelops.py": "db8f821d6dc42c37f38b9969c74ad2d0d5019fd77aab49fe46ba1a3901c3a9ee",
+  "backend/app/modules/knowledge/services/semantic_store.py": "870b22e9677847bc6012898d69a12ce2d58087b79b2720af34d9a2a4e6a721c3",
+  "backend/scripts/prepare_semantic_review_checkpoint.py": "7dda48a86b0589e3ca72096b12f0df300184050c37c1ad0a7b5a3895949e58e2",
+  "backend/tests/test_semantic_scope_assertions.py": "ae110d9f6847bd771bcbbe93da636d74bfa3bb1c92039fd6844e16a1996ab6ab",
+  "frontend/src/types/knowledge.ts": "e10c07c5012a066951984f145cf428fef23ad7cffd0a99f0efc412b7494a1091",
+  "frontend/src/features/knowledge/components/semantic-review-preview.tsx": "1e2432c55beb4648d329edd370622b3b2fd935a9f1c8c3abe6c0427ca6f2107e",
+  "frontend/src/features/knowledge/components/semantic-review-preview.test.mjs": "1215f4dc514667364d4120b6bfb3d92100385a1601ab4f49c2790d4b02eea254"
+}

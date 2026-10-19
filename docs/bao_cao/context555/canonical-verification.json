@@ -1,0 +1,376 @@
+{
+  "status": "PASS",
+  "evidence_bindings_verified": 86,
+  "llm_calls": 0,
+  "db_writes": 0,
+  "source_writes": 0,
+  "approved": false,
+  "proposal_hash": "0ae13c8d1b3584506a4aad171cf5464a19e8dcf2c06767e47e93ca0df9ac6840",
+  "chunks_checked": 278,
+  "checks": [
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/checkpoint.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/proposal.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/pending-projection.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/policy.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/report.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/before.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/canonical.md",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/response-1.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/validation-1.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/source-reference.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/objects\\snapshots\\offline544\\draft.docx.cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c.qnu-rag-v1.md",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/objects\\snapshots\\offline544\\draft.docx.d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f.qnu-doc-v1.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/objects\\snapshots\\offline544\\draft.docx.3a7569081ca4b05daf03cda22d078b6267c3189784112334bc4d0e8bac19cc47.docx-resources-v1.zip",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context552-checkpoint-06689f8f17dc/REVIEW.md",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context553-review-final/checkpoint.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context553-review-final/pending-projection.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context553-review-final/proposal.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context553-review-final/review-context.json",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:backend\\storage\\context553-review-final/REVIEW.md",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:new_hash",
+      "status": "PASS"
+    },
+    {
+      "id": "T11:envelope",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:assertion_count",
+      "status": "PASS"
+    },
+    {
+      "id": "T15:issue_count",
+      "status": "PASS"
+    },
+    {
+      "id": "T15:original_issues_retained",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A01_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A02_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A04_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A05_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A06_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A07_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A08_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A09_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A10_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A11_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A12_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:A03_workflow",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:A03_no_columns",
+      "status": "PASS"
+    },
+    {
+      "id": "T03:A03_group_A",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A03_complete_quote",
+      "status": "PASS"
+    },
+    {
+      "id": "T02:A03_all_supporting_conditions",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:workflow_not_fact_dependencies",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:raw_tables_unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r001:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r001:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r001:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r002:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r002:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r002:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r003:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r003:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r003:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r004:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r004:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r004:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r005:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r005:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r005:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r006:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r006:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r006:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r007:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r007:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r007:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r008:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r008:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r008:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r009:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r009:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r009:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r010:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r010:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r010:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r011:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r011:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r011:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r012:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r012:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r012:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r013:c10_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r013:c11_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T01:qnu:r013:c12_no_A03",
+      "status": "PASS"
+    },
+    {
+      "id": "T09:O05_direct",
+      "status": "PASS"
+    },
+    {
+      "id": "T05:O05_protective",
+      "status": "PASS"
+    },
+    {
+      "id": "T06:O05_conditional",
+      "status": "PASS"
+    },
+    {
+      "id": "T09:no_A01",
+      "status": "PASS"
+    },
+    {
+      "id": "T07:O03_body_only",
+      "status": "PASS"
+    },
+    {
+      "id": "T08:O04_direct",
+      "status": "PASS"
+    },
+    {
+      "id": "T13:binding_checks_positive",
+      "status": "PASS"
+    },
+    {
+      "id": "T12:exact_offline_binding",
+      "status": "PASS"
+    },
+    {
+      "id": "T18:workflow_own_chunks",
+      "status": "PASS"
+    },
+    {
+      "id": "T18:workflow_scope_persisted",
+      "status": "PASS"
+    }
+  ]
+}

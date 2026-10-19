@@ -3,7 +3,7 @@ import copy
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.exceptions import AppException
 from app.modules.knowledge.services.semantic_evidence import (
@@ -22,10 +22,77 @@ class ContextDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
     issue_id: str
     target: dict[str, str | list[str]]
-    action: Literal["scope_confirmed", "not_applicable_to_target"]
+    action: Literal["scope_confirmed", "not_applicable_to_target", "related_context_reviewed"]
     evidence_binding: EvidenceBinding
     evidence_quote: str = Field(min_length=3, max_length=10000)
     reason: str = Field(min_length=3, max_length=2000)
+    supporting_evidence: list[EvidenceBinding] = Field(default_factory=list, max_length=32)
+
+
+class ReviewEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    evidence_binding: EvidenceBinding
+    evidence_quote: str = Field(min_length=3, max_length=10000)
+
+
+class ReferenceLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    assertion_id: str
+    role: Literal["direct", "protective", "conditional"]
+    evidence: list[ReviewEvidence] = Field(min_length=1, max_length=32)
+    reason: str = Field(min_length=3, max_length=2000)
+    condition: str | None = Field(None, min_length=3, max_length=2000)
+
+    @model_validator(mode="after")
+    def require_conditional_context(self):
+        if self.role == "conditional" and not self.condition:
+            raise ValueError("CONTEXT_CONDITIONAL_REFERENCE_REQUIRES_CONDITION")
+        return self
+
+
+class ReferenceAssessment(BaseModel):
+    """Source-bound advisory analysis. Only a subsequent actor decision clears an issue."""
+    model_config = ConfigDict(extra="forbid")
+    issue_id: str
+    relevance: Literal["related", "unrelated", "insufficient"]
+    assertion_ids: list[str] = Field(default_factory=list, max_length=128)
+    evidence: list[ReviewEvidence] = Field(default_factory=list, max_length=32)
+    reason: str = Field(min_length=3, max_length=2000)
+    links: list[ReferenceLink] = Field(default_factory=list, max_length=128, exclude_if=lambda value: not value)
+
+
+def validate_reference_assessments(artifact: dict, review: dict | None, notes: list) -> None:
+    from app.modules.knowledge.services.semantic_assertions import assertion_identity
+    known = {assertion_identity(note) for note in notes if note.assertion_version == 1}
+    issues = {issue["issue_id"]: issue for issue in (review or {}).get("issues", [])}
+    seen = set()
+    for raw in (review or {}).get("reference_assessments", []):
+        item = ReferenceAssessment.model_validate(raw)
+        if (item.issue_id in seen or item.issue_id not in issues or issues[item.issue_id]["kind"] != "deferred_reference"
+                or not set(item.assertion_ids).issubset(known)
+                or (item.relevance == "related" and not item.assertion_ids)):
+            raise ValueError("CONTEXT_REFERENCE_ASSESSMENT_TARGET_INVALID")
+        seen.add(item.issue_id)
+        if item.links and (len({link.assertion_id for link in item.links}) != len(item.links)
+                or {link.assertion_id for link in item.links} != set(item.assertion_ids)
+                or item.relevance != "related"):
+            raise ValueError("CONTEXT_REFERENCE_ROLE_TARGET_INVALID")
+        for evidence in item.evidence:
+            binding = evidence.evidence_binding
+            text = source_text(artifact, binding.source_unit_id)
+            verify_binding(artifact, binding, evidence.evidence_quote, binding.source_unit_id)
+            if binding.column_id is not None or binding.start != 0 or binding.end != len(text):
+                raise ValueError("CONTEXT_REFERENCE_ASSESSMENT_REQUIRES_FULL_UNIT")
+        if item.relevance != "insufficient" and not any(not e.evidence_quote.lstrip().startswith("#") for e in item.evidence):
+            raise ValueError("CONTEXT_REFERENCE_ASSESSMENT_REQUIRES_BODY")
+        evidence_units = {e.evidence_binding.source_unit_id for e in item.evidence}
+        for link in item.links:
+            for evidence in link.evidence:
+                binding = evidence.evidence_binding
+                verify_binding(artifact, binding, evidence.evidence_quote, binding.source_unit_id)
+                if (binding.column_id is not None or binding.source_unit_id not in evidence_units
+                        or evidence.evidence_quote.lstrip().startswith("#")):
+                    raise ValueError("CONTEXT_REFERENCE_ROLE_REQUIRES_ASSESSED_BODY")
 
 
 def make_issue(artifact: dict, kind: str, unit_ids: list[str], target: dict, reason: str) -> dict:
@@ -70,9 +137,13 @@ def normalize_review(artifact: dict, review: dict | None, previous: dict | None 
         replacement = replacements.get(item["issue_id"])
         if replacement:
             new = issues.get(replacement["new_issue_id"])
-            if (item["kind"] != "missing_context" or new is None or new["kind"] != "scope_confirmation_required"
+            if (item["kind"] not in {"missing_context", "deferred_reference"} or new is None or new["kind"] != "scope_confirmation_required"
                     or new["target"] != item["target"] or not set(new["unit_ids"]) - set(item["unit_ids"])):
                 raise ValueError("CONTEXT_REPROCESSING_INVALID")
+            additions = set(new["unit_ids"]) - set(item["unit_ids"])
+            if not any(e["evidence_binding"]["source_unit_id"] in additions
+                       and not e["evidence_quote"].lstrip().startswith("#") for e in new["review_evidence"]):
+                raise ValueError("CONTEXT_REPROCESSING_REQUIRES_BODY")
             for evidence in new["review_evidence"]:
                 binding = EvidenceBinding.model_validate(evidence["evidence_binding"])
                 verify_binding(artifact, binding, evidence["evidence_quote"], binding.source_unit_id)
@@ -84,6 +155,9 @@ def normalize_review(artifact: dict, review: dict | None, previous: dict | None 
                         "reprocessed": list(replacements.values()), "prior_issues": (previous or {}).get("issues", []),
                         "reason": "An omitted model issue remains open until source-bound reprocessing or a valid specific decision."},
         packets_complete=review.get("packets_complete", review.get("coverage_complete", True)))
+    if "reference_assessments" not in result and previous and previous.get("reference_assessments"):
+        result["reference_assessments"] = [copy.deepcopy(item) for item in previous["reference_assessments"]
+            if item["issue_id"] in issues and item["issue_id"] not in replacements]
     return result
 
 
@@ -114,16 +188,31 @@ def checked_decisions(artifact: dict, proposal: dict, requests: list, actor_id: 
     issues = {item["issue_id"]: item for item in (proposal.get("context_review") or {}).get("issues", [])}
     actions = {"scope_confirmation_required": "scope_confirmed", "deferred_reference": "not_applicable_to_target"}
     checked, seen = [], set()
+    assessments = {item["issue_id"]: ReferenceAssessment.model_validate(item)
+        for item in (proposal.get("context_review") or {}).get("reference_assessments", [])}
     for raw in requests:
         intent = ContextDecision.model_validate(raw)
         issue = issues.get(intent.issue_id)
+        assessment = assessments.get(intent.issue_id)
+        allowed = actions.get(issue["kind"]) if issue else None
+        if assessment:
+            allowed = {"related": "related_context_reviewed", "unrelated": "not_applicable_to_target", "insufficient": None}[assessment.relevance]
         if (issue is None or issue.get("input_hash") != proposal.get("input_hash") or issue.get("source") != source_identity(artifact)
                 or intent.issue_id in seen or intent.target != issue["target"]
-                or intent.action != actions.get(issue["kind"]) or not actor_id):
+                or intent.action != allowed or not actor_id):
             raise ValueError("CONTEXT_DECISION_TARGET_OR_ACTION_INVALID")
+        expected = {item.evidence_binding.evidence_id: item.evidence_binding for item in assessment.evidence} if assessment else {}
+        supplied = {item.evidence_id: item for item in intent.supporting_evidence}
+        if expected != supplied or len(supplied) != len(intent.supporting_evidence):
+            raise ValueError("CONTEXT_DECISION_SUPPORTING_EVIDENCE_REQUIRED")
+        for evidence in intent.supporting_evidence:
+            text = source_text(artifact, evidence.source_unit_id)
+            verify_binding(artifact, evidence, text[evidence.start:evidence.end], evidence.source_unit_id)
         binding = intent.evidence_binding
         verify_binding(artifact, binding, intent.evidence_quote, binding.source_unit_id)
         text = source_text(artifact, binding.source_unit_id, binding.column_id)
+        if text.lstrip().startswith("#") and not intent.supporting_evidence:
+            raise ValueError("CONTEXT_DECISION_HEADING_REQUIRES_BODY_REPROCESSING")
         if (binding.source_unit_id not in issue["unit_ids"] or binding.column_id is not None
                 or binding.start != 0 or binding.end != len(text)):
             raise ValueError("CONTEXT_DECISION_REQUIRES_FULL_CANONICAL_UNIT")
@@ -134,6 +223,9 @@ def checked_decisions(artifact: dict, proposal: dict, requests: list, actor_id: 
 
 
 def guard_application(artifact: dict, proposal: dict, requests: list, actor_id: str) -> list[dict]:
+    from app.modules.knowledge.services.semantic_annotations import SemanticAnnotations
+    validate_reference_assessments(artifact, proposal.get("context_review"),
+        SemanticAnnotations.model_validate(proposal["annotations"]).notes)
     checked = checked_decisions(artifact, proposal, requests, actor_id)
     candidate = {**proposal, "status": "verified", "review": {"context_decisions": checked}}
     if proposal_summary(candidate)["application_blocked"]:

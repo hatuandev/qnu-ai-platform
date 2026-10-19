@@ -1843,6 +1843,37 @@ export const knowledgeApi = {
     return response.json();
   },
 
+  async importSemanticCheckpoint(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    checkpoint: unknown,
+    comment: string,
+    expectedHash?: string,
+  ): Promise<KnowledgeSourceRevisionResponse> {
+    const response = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/semantic-checkpoint`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          checkpoint,
+          comment,
+          expected_semantic_proposal_hash: expectedHash,
+        }),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(
+        extractErrorMessage(
+          await response.json().catch(() => ({})),
+          "Checkpoint không khớp bản nháp hoặc bạn chưa có quyền nhập.",
+        ),
+      );
+    }
+    return response.json();
+  },
+
   async reviewSemanticProposals(
     collectionId: string,
     sourceId: string,

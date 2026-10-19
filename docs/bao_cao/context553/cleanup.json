@@ -1,0 +1,16 @@
+{
+  "database_removed": true,
+  "database_name": "qnu_test_context548_eba155eff9ff",
+  "ownership_comment_verified": true,
+  "database_absence_verified_by_cleanup_helper": true,
+  "storage_removed": false,
+  "storage_runtime": "backend/storage/context548-runtime-eba155eff9ff",
+  "storage_exists": true,
+  "storage_cleanup_status": "BLOCKED_BY_POLICY",
+  "reason": "Automatic review rejected recursive Remove-Item, including verified explicit literal path: blocked by policy. No alternate deletion mechanism used.",
+  "original_checkpoint_retained": true,
+  "final_checkpoint_retained": "backend/storage/context553-review-final",
+  "application_config_read_only_before_after_unchanged": true,
+  "source_applied": false,
+  "human_approved": false
+}

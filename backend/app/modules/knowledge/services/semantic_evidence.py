@@ -75,6 +75,11 @@ def evidence_spans(artifact: dict, unit_id: str, *, max_chars: int,
     spans = []
     if 3 <= len(text) <= max_chars:
         spans.append((0, len(text)))
+    items = list(re.finditer(r"(?m)^\s*\d+[.)]\s+", text))
+    for index, match in enumerate(items):
+        end = items[index + 1].start() if index + 1 < len(items) else len(text)
+        if 3 <= end - match.start() <= max_chars:
+            spans.append((match.start(), end))
     for match in re.finditer(r"[^.;\n]+(?:[.;]|$)", text):
         for start in range(match.start(), match.end(), max_chars):
             end = min(match.end(), start + max_chars)

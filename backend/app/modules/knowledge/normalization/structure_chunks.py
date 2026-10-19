@@ -175,6 +175,9 @@ def structure_chunks(markdown: str, manifest: UnitManifest, *, max_chars: int = 
                 metadata["context_graph_hash"] = context_graph["digest"]
             if manifest.semantic_annotation_hash:
                 metadata["semantic_annotation_hash"] = manifest.semantic_annotation_hash
+            scopes = {uid: by_id[uid].semantic_scope for uid in refs if by_id[uid].semantic_scope}
+            if scopes:
+                metadata["context_scopes"] = scopes
             result.append({"index": len(result), "content": content,
                            "chunk_hash": hashlib.sha256(content.encode()).hexdigest(),
                            "token_count": max(1, len(content) // 3), "section": " / ".join(paths[first.id]),

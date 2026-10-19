@@ -1,0 +1,31 @@
+{
+  "environment": "owned local test DB and temporary LocalStorage",
+  "human_approval": false,
+  "test_actor_only": true,
+  "live_source_writes": 0,
+  "llm_semantic_calls": 0,
+  "test_case": "tests/test_semantic_checkpoint_import.py::test_T12_T14_authenticated_import_endpoint_and_forged_approval",
+  "asserted_http_results": {
+    "viewer_import": 403,
+    "authorized_import": 200,
+    "old_offline_hash_review": 409,
+    "missing_issue_decisions": 409
+  },
+  "persistence_test": "tests/test_semantic_checkpoint_import.py::test_T12_T13_T14_T16_T17_T18_import_review_reload",
+  "live_mapping": {
+    "read_only": true,
+    "origin_matches": [
+      {
+        "binding_id": "bnd_21c09bbc6ca0",
+        "revision_id": "ks_rev_84c4950c9ce2",
+        "status": "review_required",
+        "sha256": "491a022b54ecfd4ed3166bbd42eaba5c7c9e41bc26d419e405833f60c242e1c6",
+        "structured_sha256": "b9b00f1915988c79493a340ce5d37a6306900192dfc0cd22d93c8c8e072de41c",
+        "exact_pair": false
+      }
+    ],
+    "exact_pair_count": 0,
+    "staged": false,
+    "human_approved": false
+  }
+}

@@ -87,6 +87,7 @@ async def base_projection(revision: Any, document: Any = None) -> tuple[str, dic
 def semantic_fingerprint(artifact: dict) -> str:
     """Independent of audit timestamps and subsequent temporal-scope approval."""
     return _digest({"units": [{**{key: unit.get(key) for key in ("id", "context_refs", "field_context_refs")},
+                              **({"semantic_scope": unit["semantic_scope"]} if unit.get("semantic_scope") else {}),
                               "field_usage": unit.get("field_usage") or {}}
                               for unit in artifact["retrieval_units"]["units"]],
         "fields": [[[{key: field.get(key) for key in ("raw", "state", "normalized", "state_source", "state_evidence", "usage", "source_limitation")}

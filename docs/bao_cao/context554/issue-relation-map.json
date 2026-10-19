@@ -1,0 +1,794 @@
+{
+  "report_only": true,
+  "original_proposal_hash": "80308912eba6ceecfcec7283e7ebedef225fe756000eb57c14602b0b58bbcfc3",
+  "revised_proposal_hash": "33d9cdae6fc80547aa6243ea7ac11d94b9fa5e9b765398ba569a9905870f3fc2",
+  "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+  "source": {
+    "document_id": "offline544",
+    "revision_id": "draft544",
+    "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+    "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+  },
+  "relations": [
+    {
+      "label": "A01",
+      "assertion_id": "assertion:ef2f233670f3db45390c35d7d5eb9d2297a04865515607a190e1334f8bb2c111",
+      "source_unit_id": "qnu:l006",
+      "span": {
+        "start": 0,
+        "end": 132
+      },
+      "evidence_id": "ev:d5b040cff85aae6bd017e8263e0f862a",
+      "table_id": "qnu:t001",
+      "scope": "table",
+      "row_unit_ids": [],
+      "column_ids": [],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A02",
+      "assertion_id": "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025",
+      "source_unit_id": "qnu:l006",
+      "span": {
+        "start": 132,
+        "end": 217
+      },
+      "evidence_id": "ev:1e2fbe1ad70d19456990dcb67a05b52b",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [],
+      "column_ids": [
+        "c10",
+        "c11",
+        "c12"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A03",
+      "assertion_id": "assertion:353338132c32a2c1d4f5ba31a8892fa160d64b92d93acb58460bef6bdd289cea",
+      "source_unit_id": "qnu:l006",
+      "span": {
+        "start": 218,
+        "end": 520
+      },
+      "evidence_id": "ev:0b5aa1b9a17c4a2e8f47bead52b9b6e4",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [
+        "qnu:r001",
+        "qnu:r002",
+        "qnu:r003",
+        "qnu:r004",
+        "qnu:r005",
+        "qnu:r006"
+      ],
+      "column_ids": [
+        "c10",
+        "c11",
+        "c12"
+      ],
+      "related_sources": [
+        "qnu:l014"
+      ],
+      "audit_status": "NEEDS_TARGET_ROLE_CLARIFICATION",
+      "approved": false
+    },
+    {
+      "label": "A04",
+      "assertion_id": "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5",
+      "source_unit_id": "qnu:l006",
+      "span": {
+        "start": 521,
+        "end": 648
+      },
+      "evidence_id": "ev:441d3b7d50fcb9a55b8802d369121578",
+      "table_id": "qnu:t001",
+      "scope": "row",
+      "row_unit_ids": [
+        "qnu:r003"
+      ],
+      "column_ids": [],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A05",
+      "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652",
+      "source_unit_id": "qnu:l006",
+      "span": {
+        "start": 648,
+        "end": 743
+      },
+      "evidence_id": "ev:1d702d6aca5d990dc063cfab0f392c81",
+      "table_id": "qnu:t001",
+      "scope": "group",
+      "row_unit_ids": [
+        "qnu:r007",
+        "qnu:r008",
+        "qnu:r009",
+        "qnu:r010",
+        "qnu:r011",
+        "qnu:r012"
+      ],
+      "column_ids": [],
+      "related_sources": [
+        "qnu:l015",
+        "qnu:l012",
+        "qnu:p090",
+        "qnu:p092"
+      ],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A06",
+      "assertion_id": "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb",
+      "source_unit_id": "qnu:p049",
+      "span": {
+        "start": 0,
+        "end": 53
+      },
+      "evidence_id": "ev:2233602451e054b9e2ffd2dbda188712",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [],
+      "column_ids": [
+        "c04",
+        "c05",
+        "c06"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A07",
+      "assertion_id": "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f",
+      "source_unit_id": "qnu:p049",
+      "span": {
+        "start": 53,
+        "end": 83
+      },
+      "evidence_id": "ev:0ac01cd2f7b499b70ec992da285e5bdd",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [],
+      "column_ids": [
+        "c07",
+        "c08",
+        "c09"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A08",
+      "assertion_id": "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339",
+      "source_unit_id": "qnu:p049",
+      "span": {
+        "start": 83,
+        "end": 119
+      },
+      "evidence_id": "ev:a97951470ef33b84c0ae39ef081281bc",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [],
+      "column_ids": [
+        "c10",
+        "c11",
+        "c12"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A09",
+      "assertion_id": "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da",
+      "source_unit_id": "qnu:p049",
+      "span": {
+        "start": 119,
+        "end": 222
+      },
+      "evidence_id": "ev:e8511c420710d0a0eb7f1930e3a63651",
+      "table_id": "qnu:t001",
+      "scope": "table",
+      "row_unit_ids": [],
+      "column_ids": [],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A10",
+      "assertion_id": "assertion:aa21305077e70d79c66e1fa6331922ca10c76a1c945e3da03b04887b2e07ded9",
+      "source_unit_id": "qnu:p050",
+      "span": {
+        "start": 0,
+        "end": 177
+      },
+      "evidence_id": "ev:c7739a48dd7a38344efe7294f85a10b5",
+      "table_id": "qnu:t001",
+      "scope": "row",
+      "row_unit_ids": [
+        "qnu:r003"
+      ],
+      "column_ids": [],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A11",
+      "assertion_id": "assertion:95980004d5efeafe34f968d53da058e2d080cff2d443cdfd488e7529c529d974",
+      "source_unit_id": "qnu:p051",
+      "span": {
+        "start": 0,
+        "end": 223
+      },
+      "evidence_id": "ev:8ec9488b3a6b591d6b01b31cc629aacb",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [],
+      "column_ids": [
+        "c11"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    },
+    {
+      "label": "A12",
+      "assertion_id": "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc",
+      "source_unit_id": "qnu:docx_footnote_2",
+      "span": {
+        "start": 0,
+        "end": 121
+      },
+      "evidence_id": "ev:67cbdd6d10030c5623d4d0a27e0a9b2e",
+      "table_id": "qnu:t001",
+      "scope": "column",
+      "row_unit_ids": [
+        "qnu:r001",
+        "qnu:r002",
+        "qnu:r003"
+      ],
+      "column_ids": [
+        "c02"
+      ],
+      "related_sources": [],
+      "audit_status": "EVIDENCE_SUFFICIENT_FOR_HUMAN_RULE_REVIEW",
+      "approved": false
+    }
+  ],
+  "original_issues": [
+    {
+      "label": "O01",
+      "issue_id": "ctxissue:caaaec699ea13848e145573699939a54240f13984efbc7b77767fd164ec32a6d",
+      "kind": "scope_confirmation_required",
+      "source_unit_ids": [
+        "qnu:p050"
+      ],
+      "stored_target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": []
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A10"
+        ],
+        "complementary": [
+          "A04"
+        ],
+        "identity_support": [
+          "A12"
+        ],
+        "new_scope_labels": [
+          "S04",
+          "S10"
+        ],
+        "status": "EVIDENCE_SUFFICIENT_FOR_SCOPE_REVIEW"
+      },
+      "approved": false
+    },
+    {
+      "label": "O02",
+      "issue_id": "ctxissue:7796dfd6b7e8ef92fea6bf823a8618825a249295d3404d17d8716d9d6b4ff3fb",
+      "kind": "scope_confirmation_required",
+      "source_unit_ids": [
+        "qnu:p051"
+      ],
+      "stored_target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c11"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A11"
+        ],
+        "complementary": [
+          "A02",
+          "A08"
+        ],
+        "new_scope_labels": [
+          "S02",
+          "S08"
+        ],
+        "status": "EVIDENCE_SUFFICIENT_FOR_SCOPE_REVIEW"
+      },
+      "approved": false
+    },
+    {
+      "label": "O03",
+      "issue_id": "ctxissue:020f5d0bffea6fabb4605e5fb4c53ccd72fb7320a3cf354dd477b5b81000a21e",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:s030"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "container_for": [
+          "O04",
+          "O05"
+        ],
+        "direct": [],
+        "new_scope_labels_direct_via_body": [
+          "S03",
+          "S05"
+        ],
+        "status": "BODY_PRESENT_ASSOCIATION_NEEDS_CLARIFICATION"
+      },
+      "approved": false
+    },
+    {
+      "label": "O04",
+      "issue_id": "ctxissue:081d95e2e836c4aad52bfa72977575c1e7c732c094cffc52c9d42cc4c9fb26c4",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:l012"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A05"
+        ],
+        "temporal_guard": [
+          "A06",
+          "A07",
+          "A08"
+        ],
+        "conditional_evaluation": [
+          "A02",
+          "A11"
+        ],
+        "new_scope_labels": [
+          "S05",
+          "S06",
+          "S07",
+          "S08",
+          "S02"
+        ],
+        "q_input_mapping_proven": false,
+        "status": "BODY_PRESENT_DIRECT_B_RULE_SUPPORTED_OTHER_ASSOCIATIONS_CONDITIONAL"
+      },
+      "approved": false
+    },
+    {
+      "label": "O05",
+      "issue_id": "ctxissue:d62e3952982928c38fa242bf17a7cf867f7ffdceb5f4599915d9260884e65530",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:p084"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A03",
+          "A05"
+        ],
+        "identity_guard": [
+          "A04",
+          "A10",
+          "A12"
+        ],
+        "temporal_guard": [
+          "A06",
+          "A07",
+          "A08"
+        ],
+        "conditional_evaluation": [
+          "A02",
+          "A09",
+          "A11"
+        ],
+        "no_independent_governing_relation_proven": [
+          "A01"
+        ],
+        "new_scope_labels": [
+          "S03",
+          "S05",
+          "S04",
+          "S10",
+          "S06",
+          "S07",
+          "S08",
+          "S02",
+          "S09"
+        ],
+        "status": "STORED_ALL_TWELVE_ASSOCIATION_TOO_BROAD"
+      },
+      "approved": false
+    },
+    {
+      "label": "O06",
+      "issue_id": "ctxissue:8e49ed2d0da6280c39ddd1f068fe53c891bed6999eb732e92cd8214758ec9c11",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:p090"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A03",
+          "A05"
+        ],
+        "new_scope_labels": [
+          "S03",
+          "S05"
+        ],
+        "status": "BODY_PRESENT_A_TARGET_UNCLEAR_B_RULE_SUPPORTED"
+      },
+      "approved": false
+    },
+    {
+      "label": "O07",
+      "issue_id": "ctxissue:54652f308c332f02a379469f0d2ee9fc8f62a858dbc4ac98fb0d8adc515d9bda",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:s036"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A05"
+        ],
+        "new_scope_labels": [
+          "S05"
+        ],
+        "status": "EVIDENCE_SUFFICIENT_FOR_SPECIFIC_B_REFERENCE_REVIEW"
+      },
+      "approved": false
+    },
+    {
+      "label": "O08",
+      "issue_id": "ctxissue:891a560adef9b2010117727e0188690b2d36c25c0dda4d594ebe58456cd9920d",
+      "kind": "deferred_reference",
+      "source_unit_ids": [
+        "qnu:docx_footnote_2"
+      ],
+      "stored_target": {
+        "table_ids": [
+          "qnu:t001"
+        ]
+      },
+      "audit_recommendation_only": {
+        "direct": [
+          "A12"
+        ],
+        "identity_guard": [
+          "A04",
+          "A10"
+        ],
+        "new_scope_labels": [
+          "S10",
+          "S04"
+        ],
+        "status": "EVIDENCE_SUFFICIENT_FOR_IDENTIFIER_REFERENCE_REVIEW"
+      },
+      "approved": false
+    }
+  ],
+  "new_scope_issues": [
+    {
+      "label": "S01",
+      "issue_id": "ctxissue:8c74cecc6c1de94bac3715d48d783e4d7975188f749d9e681ae8988e5c4011a3",
+      "kind": "scope_confirmation_required",
+      "relation": "A01",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "assertion_id": "assertion:ef2f233670f3db45390c35d7d5eb9d2297a04865515607a190e1334f8bb2c111"
+      },
+      "approved": false
+    },
+    {
+      "label": "S02",
+      "issue_id": "ctxissue:ee53a5c2d8f121596b5bb8f81c1e93044a89c36656a8eab14375b5e727f29b15",
+      "kind": "scope_confirmation_required",
+      "relation": "A02",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "assertion_id": "assertion:97deb454b96a5f242838c41f6c6402ee9c24fd83d1820ca663af3664c2082025"
+      },
+      "approved": false
+    },
+    {
+      "label": "S03",
+      "issue_id": "ctxissue:8c14350a7e481cb5770d82b46947e8b3557fc0ddf015507eb2fd5d4c9d0170d2",
+      "kind": "scope_confirmation_required",
+      "relation": "A03",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003",
+          "qnu:r004",
+          "qnu:r005",
+          "qnu:r006"
+        ],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "assertion_id": "assertion:353338132c32a2c1d4f5ba31a8892fa160d64b92d93acb58460bef6bdd289cea"
+      },
+      "approved": false
+    },
+    {
+      "label": "S04",
+      "issue_id": "ctxissue:f026c80a950ff10430b7b31e7b146b5014f81deeba899ed8b4af776fc79129fa",
+      "kind": "scope_confirmation_required",
+      "relation": "A04",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": [],
+        "assertion_id": "assertion:304cdcdb31c9140ff804cb343f9e0903524faa1cf28c1a25b71cd6294fa620f5"
+      },
+      "approved": false
+    },
+    {
+      "label": "S05",
+      "issue_id": "ctxissue:8366568b67932170f56e7728d71dbe61e463cb0ef213ff43ad7c42de4c4dbc8a",
+      "kind": "scope_confirmation_required",
+      "relation": "A05",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [
+          "qnu:r007",
+          "qnu:r008",
+          "qnu:r009",
+          "qnu:r010",
+          "qnu:r011",
+          "qnu:r012"
+        ],
+        "column_ids": [],
+        "assertion_id": "assertion:17e7f93a4b457aad45d9bf1f24cc3ee7ef3a519e99a30973331c7b636d8a5652"
+      },
+      "approved": false
+    },
+    {
+      "label": "S06",
+      "issue_id": "ctxissue:7b65a696f23638a4fa87a3096380e020d4bc1a15ecad40472fd8b3356974f812",
+      "kind": "scope_confirmation_required",
+      "relation": "A06",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c04",
+          "c05",
+          "c06"
+        ],
+        "assertion_id": "assertion:d85bf67d55be5465b9b978fdcda554eeca14de39784cf5dfb7e1e1d1af7390cb"
+      },
+      "approved": false
+    },
+    {
+      "label": "S07",
+      "issue_id": "ctxissue:b0fd1ca47916f488a8d360129770b19894f89670f5e6ef4937cf30b97bdcc544",
+      "kind": "scope_confirmation_required",
+      "relation": "A07",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c07",
+          "c08",
+          "c09"
+        ],
+        "assertion_id": "assertion:33f215deea2d7bf1835df650f0af030db8c269613ad8d45c9eb12b5a563c764f"
+      },
+      "approved": false
+    },
+    {
+      "label": "S08",
+      "issue_id": "ctxissue:34fa2d9f090fc7934c168680a8d3ce0858e3263f2b8f71c830e71ad686fbfb84",
+      "kind": "scope_confirmation_required",
+      "relation": "A08",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "assertion_id": "assertion:0c5e6143d21f8fb70a9a9603ed89b519011229f8831d9072d75884b516856339"
+      },
+      "approved": false
+    },
+    {
+      "label": "S09",
+      "issue_id": "ctxissue:13adc3149f8c41067159b8b17fdde7c5a5b64f9738f430d5089d401814ad3e3c",
+      "kind": "scope_confirmation_required",
+      "relation": "A09",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "assertion_id": "assertion:e4c57a8a772072df85ff9ed146e9e86f441432d9106d66a79610cc6d238508da"
+      },
+      "approved": false
+    },
+    {
+      "label": "S10",
+      "issue_id": "ctxissue:f5535089659a575c39048156c03ab3a3bcb59bf6f673873b56f4d632413a600a",
+      "kind": "scope_confirmation_required",
+      "relation": "A12",
+      "target": {
+        "table_id": "qnu:t001",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003"
+        ],
+        "column_ids": [
+          "c02"
+        ],
+        "assertion_id": "assertion:1041672374d1a5525a977ef14d54835158dd7507f151e9671a002f092220b6fc"
+      },
+      "approved": false
+    }
+  ],
+  "stored_reference_assessments": [
+    {
+      "original_label": "O03",
+      "issue_id": "ctxissue:020f5d0bffea6fabb4605e5fb4c53ccd72fb7320a3cf354dd477b5b81000a21e",
+      "stored_relations": [
+        "A05",
+        "A02",
+        "A07",
+        "A08",
+        "A09"
+      ],
+      "evidence_sources": [
+        "qnu:l012",
+        "qnu:p084"
+      ]
+    },
+    {
+      "original_label": "O04",
+      "issue_id": "ctxissue:081d95e2e836c4aad52bfa72977575c1e7c732c094cffc52c9d42cc4c9fb26c4",
+      "stored_relations": [
+        "A05",
+        "A02",
+        "A07",
+        "A08"
+      ],
+      "evidence_sources": [
+        "qnu:l012"
+      ]
+    },
+    {
+      "original_label": "O05",
+      "issue_id": "ctxissue:d62e3952982928c38fa242bf17a7cf867f7ffdceb5f4599915d9260884e65530",
+      "stored_relations": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+        "A11",
+        "A12"
+      ],
+      "evidence_sources": [
+        "qnu:p084"
+      ]
+    },
+    {
+      "original_label": "O06",
+      "issue_id": "ctxissue:8e49ed2d0da6280c39ddd1f068fe53c891bed6999eb732e92cd8214758ec9c11",
+      "stored_relations": [
+        "A03",
+        "A05"
+      ],
+      "evidence_sources": [
+        "qnu:p090",
+        "qnu:l014",
+        "qnu:l015"
+      ]
+    },
+    {
+      "original_label": "O07",
+      "issue_id": "ctxissue:54652f308c332f02a379469f0d2ee9fc8f62a858dbc4ac98fb0d8adc515d9bda",
+      "stored_relations": [
+        "A05"
+      ],
+      "evidence_sources": [
+        "qnu:l015",
+        "qnu:p092"
+      ]
+    },
+    {
+      "original_label": "O08",
+      "issue_id": "ctxissue:891a560adef9b2010117727e0188690b2d36c25c0dda4d594ebe58456cd9920d",
+      "stored_relations": [
+        "A04",
+        "A10",
+        "A12"
+      ],
+      "evidence_sources": [
+        "qnu:docx_footnote_2"
+      ]
+    }
+  ],
+  "reused_original_issues": {
+    "A10": "O01",
+    "A11": "O02"
+  },
+  "formal_replacements": [],
+  "technical_duplicate_issue_ids": [],
+  "human_decisions_recorded": false,
+  "binding_checks": 53,
+  "semantic_inferences_are_advisory": true
+}

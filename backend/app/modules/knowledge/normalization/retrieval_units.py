@@ -138,6 +138,8 @@ def manifest_digest(manifest: UnitManifest) -> str:
     if payload.get("semantic_annotation_hash") is None:
         payload.pop("semantic_annotation_hash", None)
     for unit in payload["units"]:
+        if not unit.get("semantic_scope"):
+            unit.pop("semantic_scope", None)
         if not unit.get("field_usage"):
             unit.pop("field_usage", None)
         if not unit.get("field_context_refs"):
@@ -158,6 +160,8 @@ def legacy_manifest_digest(manifest: UnitManifest) -> str:
     if payload.get("semantic_annotation_hash") is None:
         payload.pop("semantic_annotation_hash", None)
     for unit in payload["units"]:
+        if not unit.get("semantic_scope"):
+            unit.pop("semantic_scope", None)
         if not unit.get("field_usage"):
             unit.pop("field_usage", None)
         if not unit.get("field_context_refs"):
@@ -184,6 +188,9 @@ def validate_manifest(manifest: UnitManifest, markdown: str) -> None:
     if len(ids) != len(manifest.units):
         raise ValueError("Duplicate source unit ID")
     for unit in manifest.units:
+        if unit.semantic_scope:
+            from app.modules.knowledge.services.semantic_assertions import validate_assertion_unit
+            validate_assertion_unit(unit, by_id)
         if any(ref not in ids or ref == unit.id for refs in unit.field_context_refs.values() for ref in refs):
             raise ValueError("Invalid field-scoped source context")
         if unit.end <= unit.start or markdown[unit.start:unit.end] != unit.text:

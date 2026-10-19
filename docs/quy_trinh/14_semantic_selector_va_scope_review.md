@@ -27,3 +27,23 @@ Runner `backend/scripts/verify_semantic_modelops.py` hỗ trợ selected tables 
 Trình tự nghiệm thu: deterministic tests → model thật trên bảng chọn → người có quyền đối chiếu từng issue → lưu/đọc lại/rebuild qua luồng thật → đánh giá đủ budget trước chạy API toàn tài liệu. Test actor chỉ dùng trong kiểm thử, không thay bằng chứng người dùng thật duyệt. Một bảng đạt hoặc packet đầu đạt không xác nhận toàn tài liệu hoàn tất.
 
 Giữ giới hạn context/output, deadline/run/call, retry/fallback/expansion và atomic staging. Không tạo worker mới, cắt packet hoặc tăng timeout vô hạn để né blocker.
+
+## Assertion độc lập và tham chiếu liên quan
+
+Một source unit có thể chứa nhiều điều kiện khác phạm vi. Annotation nội bộ mới dùng `assertion_version=1` để giữ exact EvidenceBinding và target riêng; backend dựng span canonical dẫn xuất, không sửa Structured Document hoặc gắn cả unit hỗn hợp cho mọi dòng. `related_evidence` giữ những điều kiện dẫn chiếu nguyên văn theo cùng phạm vi. Cột có thể giới hạn thêm tập dòng, ví dụ giao nhóm chương trình và nhóm cột năm. Facts/chunks mang `context_scopes`; không biến metadata này thành xác nhận dữ liệu.
+
+Selector wire v1/v2 không đổi. Snapshot cũ tiếp tục replay theo liên kết unit cũ; metadata assertion rỗng được bỏ khi serialize để không đổi seal cũ. Span con của v2 mới cần scope review; một list nhiều khoản không được chọn nguyên unit làm điều kiện toàn bảng.
+
+ContextBuilder mở subtree đầy đủ của heading trong giới hạn. Một heading đơn lẻ không đủ cho kết luận về reference. Phân tích reference có source bindings và assertion IDs là advisory, chưa phê duyệt. Reference liên quan dùng quyết định riêng `related_context_reviewed` với đầy đủ supporting evidence, actor/quyền server và exact proposal hash; không dùng `not_applicable_to_target` để bỏ tham chiếu đã được xác định liên quan. Nếu chưa đủ body/binding hoặc thiếu một scope decision, áp dụng vẫn bị chặn.
+
+`prepare_semantic_review_checkpoint.py` tạo checkpoint offline mới từ bản gốc đã seal và kế hoạch đối soát, giữ bản gốc cùng tám issue ID. Không nhập checkpoint thành approval hoặc pending revision trong ứng dụng. [Bản đối soát Context553](../bao_cao/context553/REVIEW_READY.md) minh họa quy trình chờ người dùng, không phải nguồn đã duyệt.
+
+## Nhập checkpoint vào review có xác thực
+
+Từ Context555, hộp kiểm duyệt nguồn có đường nhập riêng `semantic-checkpoint`. Chọn đúng revision nháp, tải gói contract `qnu-semantic-checkpoint-v1` và ghi căn cứ. Server kiểm tài khoản/quyền, collection/binding/revision, draft/lease, cặp MD/Structured Document và cấu trúc/manifest/ô chính xác; không match theo tên file. Source hash khác phải dừng. Không tự sửa hash hay đưa offline ID vào DB như revision thật.
+
+Nhập chỉ tạo pending: server rebind evidence, đổi assertion/issue ID nếu cần và tính proposal hash mới kèm audit nguồn offline và actor staging. Mọi quyết định cũ vẫn phải đối chiếu lại theo revision/hash mới; chuỗi approved trong file không cấp quyền. Nhập lặp cùng gói là idempotent; phải xử lý đề xuất đang mở trước khi nhập gói khác, và chỉ đúng hash hiện hành khi thay gói đã yêu cầu sửa/từ chối. Không xác nhận một scope cũ sai để vượt guard; nếu vấn đề cũ còn được giữ lại mà chưa có cách xử lý hợp lệ thì dừng đối soát.
+
+Workflow note là ngữ cảnh hồ sơ/quy trình có chủ thể và điều kiện, không phải data-field dependency. Nó có assertion/chunk riêng, không tự gắn vào các fact số. `ReferenceAssessment.links` có vai trò direct/protective/conditional và evidence; conditional cần ghi điều kiện. Các vai trò là advisory, không tự phát sinh effective graph edges. Snapshot/selector cũ giữ khả năng đọc; metadata trung tính không đổi seal.
+
+Sau stage, mở Preview A/O/S, xem toàn nguồn, target, điều kiện và loại trừ rồi dùng từng quyết định hiện có. Áp dụng annotation vào nháp và xuất bản nguồn là hai bước khác nhau. Test với actor TEST không chứng minh người dùng thật đã duyệt. Chưa có review thật phải ghi `IMPLEMENTATION_VERIFIED — WAITING_FOR_REVIEW` nếu triển khai đã kiểm chứng; blocker source/revision vẫn ghi riêng. [Bàn giao Context555](../bao_cao/context555/REVIEW_READY.md).

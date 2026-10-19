@@ -83,6 +83,7 @@ from app.modules.knowledge.schemas import (
     ReparseSourceRequest,
     ReviewSourceRevisionRequest,
     RollbackIndexRevisionRequest,
+    SemanticCheckpointImportRequest,
     SemanticProposalReviewRequest,
     ShadowRetrievalReport,
     ShadowRetrievalRequest,
@@ -1508,6 +1509,21 @@ async def propose_source_semantics(
     from app.modules.knowledge.services.semantic_annotations import generate_semantic_proposals
 
     revision = await generate_semantic_proposals(db, collection_id, source_id, revision_id, actor)
+    return KnowledgeSourceRevisionResponse.model_validate(revision)
+
+
+@router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/semantic-checkpoint",
+             response_model=KnowledgeSourceRevisionResponse,
+             summary="Nhập checkpoint đã đối chiếu vào đề xuất chờ duyệt, chưa áp dụng")
+async def import_source_semantic_checkpoint(
+    collection_id: str, source_id: str, revision_id: str,
+    payload: SemanticCheckpointImportRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> KnowledgeSourceRevisionResponse:
+    from app.modules.knowledge.services.semantic_checkpoint import import_semantic_checkpoint
+
+    revision = await import_semantic_checkpoint(db, collection_id, source_id, revision_id, payload, actor)
     return KnowledgeSourceRevisionResponse.model_validate(revision)
 
 

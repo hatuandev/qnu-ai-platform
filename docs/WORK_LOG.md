@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-19** | Codex | Final semantic review A03/reference/authenticated import | Workflow không vào fact SV; typed ref/pending adapter/UI; focused18+6/FE21/canonical91PASS; full18FAIL/2416PASS/17SKIP exact nền18ID,0new. Source thật hash khác BLOCKED/chưa human; DB dọn, Storage+exports còn do policy | [Nhật ký555](./nhat_ky/2026-10-19_phien_555_final_semantic_review.md) |
+
+| **2026-10-19** | Codex | Đối soát8 issue/10scope/12quan hệ | Report-only; 53binding/2manifest PASS, không replacement; A03 cần làm rõ đích, O05 mapping quá rộng, Q inputs chưa chứng minh; Storage chỉ kiểm kê46,3MiB/không bypass policy, checkpoint/code giữ nguyên | [Nhật ký554](./nhat_ky/2026-10-19_phien_554_doi_soat_issue_context552.md) |
+
+| **2026-10-19** | Codex | Semantic Context552: assertions và reference review | Focused261/FE18/build/RuffPASS; full18FAIL/2398PASS/17SKIP, exact18ID/cause/23addedPASS. Revised12assertion/18issue chờ người duyệt; DB test dọn, Storage còn do policy chặn xóa; không apply nguồn thật | [Nhật ký553](./nhat_ky/2026-10-19_phien_553_semantic_scope_review.md) |
+
 | **2026-10-19** | Codex | Selector v2 và scope review | Registry-derived owner/v1 compatible/full-source review/preview; focused217/Ruff14/FE15/Biome2/buildPASS. Full18FAIL/2375PASS/17SKIP, exact18ID/cause/39addedPASS/0new. Live Qwen Bảng1 JSON/schema/bindingPASS,4notes/8issue pending; human/C/D chờ, DB/runtime2test dọn/private checkpoint giữ | [Nhật ký552](./nhat_ky/2026-10-19_phien_552_selector_v2_scope_review.md) |
 
 | **2026-10-19** | Codex | Retest Qwen32K và Luna | No-fallback short Qwen/LunaPASS; tài liệu Qwen200/16,3Kinput/JSON-schemaPASS nhưng table scope ambiguity và API unit mismatchFAIL; không context400/fallback,22packet planned/1sent. Helper active-chain probe/RuffPASS, fullNOT RUN; metadata xuất/DB-runtime test dọn/config giữ nguyên | [Nhật ký551](./nhat_ky/2026-10-19_phien_551_live_retest_qwen_32k.md) |

@@ -36,6 +36,11 @@ class NoteScope(BaseModel):
     column_ids: list[str] = Field(default_factory=list, max_length=100)
     evidence_binding: EvidenceBinding | None = None
     reason: str | None = Field(None, max_length=1200)
+    assertion_version: Literal[1] | None = None
+    related_evidence: list[EvidenceBinding] = Field(default_factory=list, max_length=16)
+    # Neutral values stay absent so legacy assertion IDs and snapshot seals remain stable.
+    context_kind: Literal["data", "workflow"] = Field("data", exclude_if=lambda value: value == "data")
+    context_label: str | None = Field(None, min_length=3, max_length=500, exclude_if=lambda value: value is None)
 
 
 class CellMeaning(BaseModel):
@@ -94,6 +99,9 @@ def _note_targets(note: NoteScope, artifact: dict, manifest: UnitManifest) -> li
         raise ValueError("A row scope names exactly one row")
     if note.scope == "column" and not note.column_ids:
         raise ValueError("Column scope requires explicit column IDs")
+    if note.context_kind == "workflow" and (
+            note.assertion_version != 1 or note.column_ids or note.scope == "column" or not note.context_label):
+        raise ValueError("WORKFLOW_CONTEXT_REQUIRES_VERSIONED_NON_FIELD_SCOPE")
     by_id = {unit.id: unit for unit in manifest.units}
     source = by_id.get(note.note_unit_id)
     if (source is None or source.kind not in {"paragraph", "list"} or source.is_container
@@ -103,21 +111,35 @@ def _note_targets(note: NoteScope, artifact: dict, manifest: UnitManifest) -> li
 
 
 def _apply_notes(artifact: dict, manifest: UnitManifest, proposals: SemanticAnnotations) -> None:
+    from app.modules.knowledge.services.semantic_assertions import (
+        assertion_identity,
+        attach_assertion,
+    )
     by_id = {unit.id: unit for unit in manifest.units}
     seen = set()
     for note in proposals.notes:
         identity = (note.note_unit_id, note.table_id, note.scope, tuple(note.row_unit_ids), tuple(note.column_ids))
+        if note.assertion_version == 1:
+            identity = (*identity, assertion_identity(note))
+        elif note.related_evidence:
+            raise ValueError("Related evidence requires versioned assertion scope")
         if identity in seen:
             raise ValueError("Duplicate note proposal")
         seen.add(identity)
-        for row_id in _note_targets(note, artifact, manifest):
+        targets = _note_targets(note, artifact, manifest)
+        reference_id = attach_assertion(artifact, manifest, note) if note.assertion_version == 1 else note.note_unit_id
+        if note.context_kind == "workflow":
+            # A conditional dossier/process assertion has its own source-bound unit.
+            # Membership identifies subjects, never numerical field dependencies.
+            continue
+        for row_id in targets:
             row = by_id[row_id]
             if note.scope == "column":
                 for column in note.column_ids:
                     row.field_context_refs[column] = list(dict.fromkeys(
-                        [*row.field_context_refs.get(column, []), note.note_unit_id]))
+                        [*row.field_context_refs.get(column, []), reference_id]))
             else:
-                row.context_refs = list(dict.fromkeys([*row.context_refs, note.note_unit_id]))
+                row.context_refs = list(dict.fromkeys([*row.context_refs, reference_id]))
 
 
 def _apply_cells(artifact: dict, manifest: UnitManifest, proposals: SemanticAnnotations) -> None:
@@ -135,9 +157,13 @@ def _apply_cells(artifact: dict, manifest: UnitManifest, proposals: SemanticAnno
             raise ValueError("Semantic proposals must preserve blank and numeric source values")
         evidence = by_id.get(cell.evidence_unit_id)
         refs = unit_context_ids(manifest, cell.row_unit_id, cell.column_id)
+        scoped_assertion = cell.evidence_binding is not None and any(
+            by_id[uid].semantic_scope.get("role") == "assertion"
+            and by_id[uid].semantic_scope.get("binding") == cell.evidence_binding.model_dump()
+            for uid in refs)
         own_bound_cell = cell.evidence_binding is not None and cell.evidence_binding.column_id == cell.column_id and cell.evidence_unit_id == cell.row_unit_id
         if (evidence is None or (not own_bound_cell and cell.evidence_quote not in evidence.text)
-                or cell.evidence_unit_id not in {cell.row_unit_id, *refs}):
+                or (cell.evidence_unit_id not in {cell.row_unit_id, *refs} and not scoped_assertion)):
             raise ValueError("Cell meaning needs its own or explicitly scoped evidence")
         if cell.evidence_unit_id == cell.row_unit_id and cell.evidence_quote not in cell.raw:
             raise ValueError("A cell cannot borrow meaning from a sibling field")
@@ -164,6 +190,10 @@ def _refresh(artifact: dict, manifest: UnitManifest) -> None:
                        unit_manifest_hash=seal, context_graph_hash=graph["digest"])
             if manifest.semantic_annotation_hash:
                 raw["semantic_annotation_hash"] = manifest.semantic_annotation_hash
+            scopes = {unit.id: unit.semantic_scope for unit in manifest.units
+                      if unit.id in raw["context_unit_ids"] and unit.semantic_scope}
+            if scopes:
+                raw["context_scopes"] = scopes
         if raw.get("field_state") == "present":
             facts.append(fact)
     artifact.update(retrieval_units=manifest.model_dump(), unit_manifest_hash=seal,
@@ -209,7 +239,18 @@ def stage_semantic_annotations(artifact: dict, proposals: SemanticAnnotations, *
     )
 
     prior = (artifact.get("semantic_annotations") or {}).get("context_review")
+    from app.modules.knowledge.services.semantic_assertions import assertion_issues
+    added = assertion_issues(base, proposals.notes, (context_review or {}).get("issues"))
+    if added:
+        context_review = {**(context_review or {}), "issues": [*(context_review or {}).get("issues", []), *added]}
     context_review = normalize_review(base, context_review, prior)
+    if context_review and context_review.get("display_labels"):
+        from app.modules.knowledge.services.semantic_assertions import assertion_identity
+        context_review["assertion_ids"] = [assertion_identity(note) for note in proposals.notes]
+    from app.modules.knowledge.services.semantic_context_review import (
+        validate_reference_assessments,
+    )
+    validate_reference_assessments(base, context_review, proposals.notes)
     if context_review and (artifact.get("semantic_annotations") or {}).get("proposal_hash"):
         context_review.setdefault("reconciliation", {})["prior_proposal_hash"] = artifact["semantic_annotations"]["proposal_hash"]
     has_context = proposal_summary({"context_review": context_review}).get("application_blocked")
@@ -290,6 +331,8 @@ Choose the smallest supplied evidence span that supports the relationship, and r
 unit and exclusions before deciding scope. Evidence from a neighboring cell cannot explain the target cell.
 For a cell explained by prose, propose that prose's exact note scope too, using the SAME evidence ID.
 Heading, adjacency and captions are context candidates, never proof of a note's target by themselves.
+For a numbered source unit containing different conditions, select independent complete item/clause spans
+with their own targets. Never attach the entire multi-item unit as a single table-wide rule.
 Note targets must be in the row directory; cell targets require full visible fields. Preserve a complete
 span when several years, negation or exclusions are needed; never shorten a quote to hide conditions.
 Use needs_context with exact known unit IDs if context is missing, including deferred_related_unit_ids;
