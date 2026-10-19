@@ -26,6 +26,15 @@ function loadSource(url, overrides = {}) {
 }
 const { SemanticReviewPreview } = loadSource(
   new URL("./semantic-review-preview.tsx", import.meta.url),
+  {
+    "@/components/ui/button": {
+      Button: ({ children, ...props }) =>
+        React.createElement("button", { type: "button", ...props }, children),
+    },
+    "@/components/ui/textarea": {
+      Textarea: (props) => React.createElement("textarea", props),
+    },
+  },
 );
 const proposal = {
   status: "proposed",
@@ -62,6 +71,76 @@ const artifact = {
     },
   ],
 };
+
+for (const status of [
+  "proposed",
+  "empty",
+  "rejected",
+  "changes_requested",
+  "verified",
+]) {
+  test(`context issue survives ${status} preview without calling it a clean empty result`, () => {
+    const value = structuredClone(artifact);
+    value.semantic_annotations.status = status;
+    value.semantic_annotations.context_review = {
+      coverage_complete: true,
+      scope: "document",
+      unresolved: [
+        { unit_ids: ["qnu:missing"], reason: "Missing <mandatory> condition" },
+      ],
+      semantic_support: "human_review_required",
+    };
+    value.source_policy = {
+      mode: "strict",
+      semantic_unknown_count: 0,
+      acknowledged_limit_count: 0,
+      unfinished_count: 0,
+      context_blocker_count: 1,
+      publication_enabled: false,
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(SemanticReviewPreview, { artifact: value }),
+    );
+    assert.match(html, /qnu:missing/);
+    assert.match(html, /Missing &lt;mandatory&gt; condition/);
+    assert.match(html, /1 vấn đề còn chặn/);
+    if (status !== "proposed")
+      assert.doesNotMatch(html, /Đề xuất từ model cần bạn đối chiếu/);
+  });
+}
+
+test("specific issue intent sends coordinates, source binding and reason without client actor", async () => {
+  const original = globalThis.fetch;
+  let sent;
+  globalThis.fetch = async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return new Response(JSON.stringify({ id: "draft" }));
+  };
+  const decision = {
+    issue_id: "ctxissue:TEST",
+    action: "scope_confirmed",
+    target: { column_ids: ["c4", "c7"] },
+    evidence_quote: "Full original condition",
+    evidence_binding: { source_unit_id: "qnu:g", start: 0, end: 23 },
+    reason: "Checked complete condition and columns",
+  };
+  try {
+    await knowledgeApi.reviewSemanticProposals(
+      "c",
+      "s",
+      "r",
+      "b".repeat(64),
+      "Specific review",
+      "approved",
+      "strict",
+      [decision],
+    );
+    assert.deepEqual(sent.context_decisions, [decision]);
+    assert.equal(sent.context_decisions[0].actor_id, undefined);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
 
 test("bound review shows exact source coordinates, reason and unresolved scope safely", () => {
   const value = structuredClone(artifact);

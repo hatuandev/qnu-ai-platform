@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import hashlib
 import json
@@ -201,32 +202,61 @@ def stage_semantic_annotations(artifact: dict, proposals: SemanticAnnotations, *
     if artifact.get("semantic_effective") and base_artifact is None:
         raise ValueError("Replacement proposals require the verified base projection")
     _validated_copy(base, proposals)
-    staged = {"status": "proposed" if proposals.notes or proposals.cells or proposals.limitations else "empty", "input_hash": semantic_input_hash(base),
+    from app.modules.knowledge.services.semantic_context_review import (
+        normalize_review,
+        proposal_summary,
+        refresh_policy,
+    )
+
+    prior = (artifact.get("semantic_annotations") or {}).get("context_review")
+    context_review = normalize_review(base, context_review, prior)
+    if context_review and (artifact.get("semantic_annotations") or {}).get("proposal_hash"):
+        context_review.setdefault("reconciliation", {})["prior_proposal_hash"] = artifact["semantic_annotations"]["proposal_hash"]
+    has_context = proposal_summary({"context_review": context_review}).get("application_blocked")
+    staged = {"status": "proposed" if proposals.notes or proposals.cells or proposals.limitations or has_context else "empty", "input_hash": semantic_input_hash(base),
               "annotations": proposals.model_dump(), "model": model or {}, "at": datetime.now(UTC).isoformat()}
     if context_review is not None:
         staged["context_review"] = context_review
     staged["proposal_hash"] = _digest(staged)
     artifact["semantic_annotations"] = staged
     artifact["review"] = {"status": "required"}
+    refresh_policy(artifact)
     return staged
 
 
+def verify_pending_envelope(artifact: dict, expected_hash: str | None, actor_id: str | None, comment: str | None) -> dict:
+    from app.modules.knowledge.services.semantic_context_review import proposal_summary
+
+    proposal = artifact.get("semantic_annotations") or {}
+    pending = proposal.get("status") == "proposed" or (proposal.get("status") == "empty" and proposal_summary(proposal)["application_blocked"])
+    if not pending:
+        raise AppException("Không có đề xuất cần xử lý.", code="SEMANTIC_PROPOSAL_NOT_PENDING", status_code=409)
+    if not actor_id or not comment or not comment.strip() or expected_hash != proposal.get("proposal_hash"):
+        raise AppException("Cần xem và duyệt đúng đề xuất hiện tại.", code="SEMANTIC_REVIEW_REQUIRED", status_code=409)
+    if _digest({k: v for k, v in proposal.items() if k != "proposal_hash"}) != expected_hash or proposal.get("input_hash") != semantic_input_hash(artifact):
+        raise AppException("Nguồn hoặc đề xuất đã thay đổi.", code="SEMANTIC_PROPOSAL_STALE", status_code=409)
+    return proposal
+
+
 def apply_reviewed_semantics(artifact: dict, expected_hash: str | None, actor_id: str | None,
-                             comment: str | None, *, acknowledged_limits: bool = False) -> dict:
+                             comment: str | None, *, acknowledged_limits: bool = False, context_decisions: list | None = None) -> dict:
+    from app.modules.knowledge.services.semantic_context_review import (
+        guard_application,
+        proposal_summary,
+        refresh_policy,
+    )
+
     proposal = artifact.get("semantic_annotations") or {}
     if proposal.get("status") == "unavailable":
         raise AppException("Chưa tạo được đề xuất ngữ nghĩa; cần xử lý lỗi trước khi duyệt.",
                            code="SEMANTIC_PROPOSAL_UNAVAILABLE", status_code=409)
     if proposal.get("status") != "proposed":
+        if proposal_summary(proposal)["application_blocked"]:
+            raise AppException("Còn vấn đề ngữ cảnh cần xử lý.", code="SEMANTIC_CONTEXT_REVIEW_REQUIRED", status_code=409)
         return artifact
-    if (proposal.get("context_review") or {}).get("coverage_complete") is False:
-        raise AppException("Ngữ cảnh chưa đủ; cần mở rộng trước khi áp dụng đề xuất.", code="SEMANTIC_CONTEXT_INCOMPLETE", status_code=409)
-    if not actor_id or not comment or not comment.strip() or expected_hash != proposal.get("proposal_hash"):
-        raise AppException("Cần xem và duyệt đúng đề xuất ngữ nghĩa hiện tại.", code="SEMANTIC_REVIEW_REQUIRED", status_code=409)
-    payload = {key: value for key, value in proposal.items() if key != "proposal_hash"}
-    if _digest(payload) != expected_hash or proposal.get("input_hash") != semantic_input_hash(artifact):
-        raise AppException("Nguồn hoặc đề xuất ngữ nghĩa đã thay đổi.", code="SEMANTIC_PROPOSAL_STALE", status_code=409)
+    verify_pending_envelope(artifact, expected_hash, actor_id, comment)
     try:
+        decisions = guard_application(artifact, proposal, context_decisions or [], actor_id)
         annotations = SemanticAnnotations.model_validate(proposal["annotations"])
         if annotations.limitations and not acknowledged_limits:
             raise AppException("Cần xác nhận riêng phạm vi đã đối chiếu và giới hạn sử dụng của nguồn.",
@@ -236,6 +266,9 @@ def apply_reviewed_semantics(artifact: dict, expected_hash: str | None, actor_id
         raise AppException("Đề xuất ngữ nghĩa không khớp bằng chứng nguồn.", code="SEMANTIC_PROPOSAL_INVALID", status_code=409) from exc
     revised["semantic_annotations"] = {**proposal, "status": "verified", "review": {
         "actor_id": actor_id, "comment": comment, "at": datetime.now(UTC).isoformat(), "decision": "approved"}}
+    if proposal.get("context_review"):
+        revised["semantic_annotations"]["review"]["context_decisions"] = decisions
+    refresh_policy(revised)
     return revised
 
 
@@ -257,8 +290,8 @@ Choose the smallest supplied evidence span that supports the relationship, and r
 unit and exclusions before deciding scope. Evidence from a neighboring cell cannot explain the target cell.
 For a cell explained by prose, propose that prose's exact note scope too, using the SAME evidence ID.
 Heading, adjacency and captions are context candidates, never proof of a note's target by themselves.
-Note targets must be in the row directory; cell targets require full visible fields. Select a narrower
-positive-scope span when a whole note mentions several years/identifiers, while reading every exclusion.
+Note targets must be in the row directory; cell targets require full visible fields. Preserve a complete
+span when several years, negation or exclusions are needed; never shorten a quote to hide conditions.
 Use needs_context with exact known unit IDs if context is missing, including deferred_related_unit_ids;
 use unresolved with a reason if a source reference is missing/ambiguous. Never guess an absent unit.
 Read whole notes, negation and exclusions. Table notes apply to every row; row notes to one row; group notes
@@ -274,6 +307,9 @@ Limitations are candidates, never approvals. Use source_explicit only when a quo
 that the source supplies no definition/value. Use human_examined_scope for an unconfirmed scoped search;
 list the exact examined unit IDs including the target row and evidence. Do not interpret unknown symbols.
 Never label unreadable/extraction errors or unresolved note scope as a source limitation.
+Prior missing-context issues remain open. To reprocess one, request the missing units and submit
+context_followups with its issue_id and supplied evidence IDs from additional prose units.
+The backend can replace it only with a new human scope-review issue; you cannot mark it resolved.
 """
 
 
@@ -308,7 +344,7 @@ async def review_semantic_proposals(db: Any, collection_id: str, source_id: str,
     document = await verify_revision_pair(revision)
     validate_projection_binding(revision, artifact)
     proposal = artifact.get("semantic_annotations") or {}
-    if proposal.get("status") != "proposed":
+    if proposal.get("status") not in {"proposed", "empty"}:
         raise AppException("Không có đề xuất đang chờ duyệt.", code="SEMANTIC_PROPOSAL_NOT_PENDING", status_code=409)
     from app.modules.knowledge.services.semantic_store import (
         record_decision,
@@ -320,9 +356,9 @@ async def review_semantic_proposals(db: Any, collection_id: str, source_id: str,
         await verify_effective_projection(revision, artifact, document)
         await record_decision(revision, artifact, payload.expected_semantic_proposal_hash,
                               actor.actor_id, payload.comment, payload.decision, document,
-                              policy_mode=payload.policy_mode)
+                              policy_mode=payload.policy_mode, context_decisions=[item.model_dump() for item in payload.context_decisions])
         await db.commit()
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         await db.rollback()
         revision.parse_provenance = before
         raise
@@ -333,7 +369,6 @@ async def review_semantic_proposals(db: Any, collection_id: str, source_id: str,
 async def generate_semantic_proposals(db: Any, collection_id: str, source_id: str, revision_id: str,
                                       actor: Any) -> Any:
     """Explicit draft-only ModelOps action; no policy or model configuration changes."""
-    import asyncio
 
     from app.core.database import AsyncSessionFactory
     from app.modules.knowledge.services.qnu_serving import (
@@ -363,16 +398,20 @@ async def generate_semantic_proposals(db: Any, collection_id: str, source_id: st
     if (artifact.get("semantic_annotations") or {}).get("status") == "verified" and "semantic_store" not in revision.parse_provenance:
         artifact = await backfill_verified_semantics(revision, document)
     base = await proposal_base(revision, artifact, document)
+    if (artifact.get("semantic_annotations") or {}).get("context_review"):
+        base["semantic_annotations"] = copy.deepcopy(artifact["semantic_annotations"])
     try:
         # ModelOps accounting can commit; keep it separate from the source lock.
-        async with asyncio.timeout(120), AsyncSessionFactory() as model_db:
+        async with AsyncSessionFactory() as model_db:
             await propose_source_semantics(model_db, base, actor.tenant_id, document=document,
                 context_policy=((revision.snapshot_metadata or {}).get("unit_temporal_annotation") or {}).get("semantic_context"))
-    except (ValueError, KeyError, TypeError, TimeoutError) as exc:
+    except (ValueError, KeyError, TypeError) as exc:
         raise AppException("Model chưa tạo được đề xuất có bằng chứng hợp lệ. Bản nháp được giữ nguyên.",
                            code="SEMANTIC_PROPOSAL_INVALID", status_code=422) from exc
     revised = copy.deepcopy(artifact)
     revised["semantic_annotations"] = base["semantic_annotations"]
+    from app.modules.knowledge.services.semantic_context_review import refresh_policy
+    refresh_policy(revised)
     revised["review"] = {"status": "required"}
     revision.parse_provenance = {**revision.parse_provenance, "structured_artifact": revised}
     await db.commit()

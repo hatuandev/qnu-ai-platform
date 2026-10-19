@@ -21,6 +21,7 @@ from app.modules.knowledge.services.semantic_annotations import (
     _validated_copy,
     apply_reviewed_semantics,
     semantic_input_hash,
+    verify_pending_envelope,
 )
 
 SCHEMA = "qnu-semantic-v1"
@@ -93,7 +94,17 @@ def semantic_fingerprint(artifact: dict) -> str:
         "facts": [{"id": fact["id"], "context": fact["raw_data"].get("context_unit_ids"),
                    "column": fact["raw_data"].get("column_id"), "state": fact["raw_data"].get("field_state")}
                   for fact in artifact["facts"]], "source_limitations": artifact.get("source_limitations"),
-        "source_policy": artifact.get("source_policy")})
+        "source_policy": _policy_fingerprint(artifact.get("source_policy"))})
+
+
+def _policy_fingerprint(policy: dict | None) -> dict | None:
+    if policy is None:
+        return None
+    value = copy.deepcopy(policy)
+    if not value.get("context_blocker_count") and (value.get("context_summary") or {}).get("scope", "legacy") == "legacy":
+        for key in ("context_blocker_count", "context_blocker_ids", "context_summary"):
+            value.pop(key, None)  # neutral new counters preserve cached v1 semantics
+    return value
 
 
 def _proposal(snapshot: dict) -> dict:
@@ -112,6 +123,12 @@ def _semantic_hash(snapshot: dict) -> str:
                     "annotations": snapshot["proposal"]["annotations"]}
     if "policy_mode" in snapshot:
         payload["policy_mode"] = snapshot["policy_mode"]
+    version = snapshot.get("semantic_hash_version", 1)
+    if version not in {1, 2}:
+        raise invalid("semantic_hash_version")
+    if version == 2:
+        payload.update(semantic_hash_version=2, context_review=snapshot["proposal"].get("context_review"),
+            context_decisions=snapshot["review"].get("context_decisions", []))
     return _digest(payload)
 
 
@@ -130,6 +147,11 @@ def _apply_snapshot(base: dict, snapshot: dict, reference: dict) -> dict:
     if annotations.limitations and not acknowledged:
         raise invalid("limitation_not_acknowledged")
     result = _validated_copy(enriched, annotations, acknowledged_limits=acknowledged)
+    if proposal.get("context_review"):
+        from app.modules.knowledge.services.semantic_context_review import guard_application
+        requests = [{k: v for k, v in item.items() if k not in {"actor_id", "at", "proposal_hash"}}
+                    for item in snapshot["review"].get("context_decisions", [])]
+        guard_application(enriched, proposal, requests, snapshot["review"]["actor_id"])
     if annotations.limitations:
         from app.modules.knowledge.services.source_limitations import evaluate_source_policy
 
@@ -140,6 +162,25 @@ def _apply_snapshot(base: dict, snapshot: dict, reference: dict) -> dict:
     result["semantic_effective"] = {"semantic_hash": semantic_hash, "snapshot_sha256": reference["sha256"],
                                     "proposal_hash": proposal["proposal_hash"]}
     result["semantic_annotations"] = {**proposal, "status": "verified", "review": snapshot["review"]}
+    from app.modules.knowledge.services.semantic_context_review import refresh_policy
+    refresh_policy(result, snapshot.get("policy_mode", "strict"))
+    return result
+
+
+async def _overlay_latest_context(revision: Any, result: dict) -> dict:
+    from app.modules.knowledge.services.semantic_context_review import refresh_policy
+    store = (revision.parse_provenance or {}).get(STORE) or {}
+    current = ((revision.parse_provenance or {}).get("structured_artifact") or {}).get("semantic_annotations") or {}
+    if current.get("context_review") and current.get("status") in {"proposed", "empty"}:
+        result["semantic_annotations"] = copy.deepcopy(current)
+    elif store.get("history") and store["history"][-1] != store.get("active"):
+        latest = await _read(revision, store["history"][-1])
+        if latest["proposal"].get("context_review"):
+            result["semantic_annotations"] = {**latest["proposal"], "status": latest["review"]["decision"], "review": latest["review"]}
+    else:
+        if current.get("context_review") and current.get("status") in {"proposed", "empty", "rejected", "changes_requested"}:
+            result["semantic_annotations"] = copy.deepcopy(current)
+    refresh_policy(result, (result.get("source_policy") or {}).get("mode", "strict"))
     return result
 
 
@@ -189,7 +230,7 @@ async def rebuild_projection(revision: Any, document: Any = None) -> tuple[str, 
             result = _apply_snapshot(base, snapshot, reference)
         except (ValueError, KeyError, TypeError) as exc:
             raise invalid("snapshot_evidence", "SEMANTIC_SOURCE_MISMATCH") from exc
-        return canonical, result
+        return canonical, await _overlay_latest_context(revision, result)
     old = ((revision.parse_provenance or {}).get("structured_artifact") or {}).get("semantic_annotations") or {}
     if old.get("status") == "verified":
         from app.modules.knowledge.services.qnu_serving import validate_projection_binding
@@ -211,7 +252,7 @@ async def rebuild_projection(revision: Any, document: Any = None) -> tuple[str, 
         return canonical, restored
     if ((revision.parse_provenance or {}).get("structured_artifact") or {}).get("semantic_effective"):
         raise invalid("effective_reference_missing")
-    return canonical, base
+    return canonical, await _overlay_latest_context(revision, base)
 
 
 async def proposal_base(revision: Any, current: dict, document: Any = None) -> dict:
@@ -227,7 +268,7 @@ async def proposal_base(revision: Any, current: dict, document: Any = None) -> d
 
 
 async def record_decision(revision: Any, artifact: dict, expected_hash: str, actor_id: str,
-                          comment: str, decision: str, document: Any = None, *, policy_mode: str = "strict") -> dict:
+                          comment: str, decision: str, document: Any = None, *, policy_mode: str = "strict", context_decisions: list | None = None) -> dict:
     """Storage first, read-back verified; mutate DB pointer only inside caller's transaction."""
     if (revision.status != "review_required" or decision not in {"approved", "acknowledged_limits", "rejected", "changes_requested"}
             or policy_mode not in {"strict", "acknowledged_limits"}
@@ -236,14 +277,23 @@ async def record_decision(revision: Any, artifact: dict, expected_hash: str, act
     _, base = await base_projection(revision, document)
     enriched = await proposal_base(revision, artifact, document)
     proposal = copy.deepcopy(artifact.get("semantic_annotations") or {})
+    if decision in {"approved", "acknowledged_limits"} and artifact.get("semantic_effective") and (proposal.get("context_review") or {}).get("scope") == "selected_tables":
+        raise invalid("selected_scope_cannot_replace_document_annotations", "SEMANTIC_SCOPE_REPLACEMENT_REQUIRED")
     enriched["semantic_annotations"] = proposal
     # Exact pending payload + input checks, even for rejection.
-    checked = apply_reviewed_semantics(enriched, expected_hash, actor_id, comment,
-                                      acknowledged_limits=decision != "approved")
-    if proposal.get("status") != "proposed":
-        raise invalid("not_pending", "SEMANTIC_PROPOSAL_NOT_PENDING")
+    verify_pending_envelope(enriched, expected_hash, actor_id, comment)
+    from datetime import UTC, datetime
+    review = {"actor_id": actor_id, "comment": comment, "at": datetime.now(UTC).isoformat(), "decision": decision}
+    if decision in {"approved", "acknowledged_limits"}:
+        checked = apply_reviewed_semantics(enriched, expected_hash, actor_id, comment,
+            acknowledged_limits=decision == "acknowledged_limits", context_decisions=context_decisions)
+        review = checked["semantic_annotations"]["review"]
+    elif context_decisions:
+        raise invalid("rejection_cannot_resolve_issues")
     snapshot = {"schema": SCHEMA, "identity": identity(revision), "enrichment": _enrichment(base, enriched),
-                "proposal": proposal, "review": checked["semantic_annotations"]["review"]}
+                "proposal": proposal, "review": review}
+    if proposal.get("context_review"):
+        snapshot["semantic_hash_version"] = 2
     snapshot["review"]["decision"] = "approved" if decision == "acknowledged_limits" else decision
     if decision == "acknowledged_limits":
         if not proposal["annotations"].get("limitations"):
@@ -271,6 +321,8 @@ async def _persist_snapshot(revision: Any, base: dict, artifact: dict, snapshot:
     else:
         revised = copy.deepcopy(artifact)
         revised["semantic_annotations"] = {**snapshot["proposal"], "status": snapshot["review"]["decision"], "review": snapshot["review"]}
+        from app.modules.knowledge.services.semantic_context_review import refresh_policy
+        refresh_policy(revised)
     revision.parse_provenance = {**revision.parse_provenance, STORE: store, "structured_artifact": revised}
     return revised
 

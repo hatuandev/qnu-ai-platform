@@ -7,6 +7,8 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên548](./2026-10-19_phien_548_va_context547.md) | Vá vòng đời context547 | Issue/review/policy/replay v2, scope nhiều năm, common budget/deadline;183focused/FE14/buildPASS. Full18FAIL/2289PASS/17skip, exact18ID/cause nền,6đỏ→PASS/17thêmPASS/0lỗi mới; dossier xuất/DB-runtime test đã dọn; live schemaFAIL, E2E BLOCKED |
+
 | **2026-10-19** | [Phiên547](./2026-10-19_phien_547_context_va_evidence_binding.md) | Structure-aware context + evidence binding | Backend exact selectors, bounded context/UI reason/span/full source; DB test riêng đã dọn, focused127/FE8/buildPASS. Full18FAIL/2264PASS/17skip, exact18ID/cause baseline, không lỗi mới; live timeout, E2E BLOCKED |
 
 | **2026-10-19** | [Phiên546](./2026-10-19_phien_546_gioi_han_nguon_va_modelops.md) | Đợt 2 giới hạn nguồn + ModelOps | Tách state/review/usage, snapshot và consumer restrictions, UI xác nhận riêng; policy evaluation chưa mở xuất bản. Đổi đúng hai model theo user; inference thật đạt, evidence FAIL; chưa có phê duyệt thật |

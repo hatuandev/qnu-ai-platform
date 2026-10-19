@@ -1855,6 +1855,7 @@ export const knowledgeApi = {
       | "rejected"
       | "changes_requested" = "approved",
     policyMode: "strict" | "acknowledged_limits" = "strict",
+    contextDecisions: import("@/types/knowledge").ContextIssueDecision[] = [],
   ): Promise<KnowledgeSourceRevisionResponse> {
     const response = await fetch(
       `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/semantic-review`,
@@ -1866,6 +1867,7 @@ export const knowledgeApi = {
           comment,
           expected_semantic_proposal_hash: proposalHash,
           policy_mode: policyMode,
+          context_decisions: contextDecisions,
         }),
       },
     );

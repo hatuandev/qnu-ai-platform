@@ -61,7 +61,8 @@ class SafeDiagnostics(logging.Handler):
 async def run_proposal(artifact: dict, invoke, *, proposal_only: bool = False) -> tuple[int, dict]:
     """Same workflow contract for real calls and explicitly labeled test adapters."""
     before = semantic_fingerprint(artifact)
-    report = {"stages": {"proposal": "NOT_RUN", "human_review": "NOT_RUN", "apply": "NOT_RUN",
+    original_policy = copy.deepcopy(artifact.get("source_policy"))
+    report = {"stages": {"provider": "NOT_RUN", "selector_schema": "NOT_RUN", "evidence_binding": "NOT_RUN", "proposal": "NOT_RUN", "human_review": "NOT_RUN", "apply": "NOT_RUN",
                           "persist_reload": "NOT_RUN", "projection_chunks": "NOT_RUN"},
               "source_applied": False, "human_approved": False, "end_to_end": "INCOMPLETE"}
     try:
@@ -72,16 +73,33 @@ async def run_proposal(artifact: dict, invoke, *, proposal_only: bool = False) -
             raise ValueError("Invalid proposal envelope")
         _validated_copy(artifact, SemanticAnnotations.model_validate(proposal["annotations"]))
         if semantic_fingerprint(artifact) != before:
-            raise ValueError("Proposal mutated effective data")
+            # Context policy is a derived blocker for a pending proposal, not an
+            # applied semantic edit. Compare the effective payload independently.
+            comparable = copy.deepcopy(artifact)
+            comparable["source_policy"] = original_policy
+            if semantic_fingerprint(comparable) != before:
+                raise ValueError("Proposal mutated effective data")
         report.update(status="WAITING_FOR_REVIEW", proposal_hash=proposal["proposal_hash"],
                       model=proposal["model"], counts={key: len(value) for key, value in proposal["annotations"].items()})
-        report["stages"].update(proposal="PASS", human_review="WAITING_FOR_REVIEW")
-        return (0 if proposal_only else 2), report
+        from app.modules.knowledge.services.semantic_context_review import proposal_summary
+        summary = proposal_summary(proposal)
+        report["context_summary"] = summary
+        status = "WAITING_FOR_CONTEXT" if summary["requires_more_context"] else "WAITING_FOR_REVIEW"
+        report.update(status=status)
+        report["stages"].update(proposal="PASS", human_review=status)
+        report["stages"].update(provider="PASS", selector_schema="PASS", evidence_binding="PASS")
+        return (0 if proposal_only and not summary["requires_more_context"] else 2), report
     except Exception as exc:
         report.update(status="BLOCKED", error_code=getattr(exc, "code", type(exc).__name__))
+        if getattr(exc, "code", None) in {"SEMANTIC_RUN_DEADLINE", "SEMANTIC_CALL_DEADLINE"}:
+            report["failure_category"] = exc.code
+            report["stages"]["proposal"] = "FAIL"
+            return 1, report
         if getattr(exc, "code", None) in {"SEMANTIC_EVIDENCE_INVALID", "SEMANTIC_OUTPUT_INVALID"}:
             report["output_validation"] = exc.details
             report["provider_inference"] = "PASS"
+            report["stages"].update(provider="PASS", selector_schema="FAIL" if exc.code == "SEMANTIC_OUTPUT_INVALID" else "PASS",
+                evidence_binding="NOT_RUN" if exc.code == "SEMANTIC_OUTPUT_INVALID" else "FAIL")
         if getattr(exc, "code", None) == "SEMANTIC_CONTEXT_INCOMPLETE":
             report["context_incomplete"] = exc.details
             report["provider_inference"] = "PASS" if exc.details.get("model") else "NOT_RUN"
@@ -137,8 +155,9 @@ async def main(args) -> int:
                 "chat_mode": defaults.default_chat_mode,
                 "chat_chain": [{"provider_id": item.provider_id, "model": item.model_name, "is_active": item.is_active}
                                for item in defaults.chat_combo_chain],
-                "providers": [dict(row) for row in public], "outer_timeout_seconds": 125,
-                "top_level_calls": 1, "transport_retry": "existing ModelOps shared retry budget (1)",
+                "providers": [dict(row) for row in public], "deadline_policy": "shared SemanticContextPolicy; no outer timeout override",
+                "max_top_level_calls": args.max_calls, "scope": "selected_tables" if args.target_table else "document",
+                "transport_retry": "existing ModelOps shared retry budget (1)",
                 "fallback": "existing configured routes only; no fallback override",
                 "authorization": "user authorized synthetic fixture proposal; configured ModelOps credentials"}
             selected = next((dict(row) for row in public if row["id"] == defaults.default_chat_provider_id), None)
@@ -148,7 +167,7 @@ async def main(args) -> int:
         logger = logging.getLogger("app.modules.modelops.services.inference_service")
         logger.addHandler(diagnostics)
         async def invoke(target):
-            async with AsyncSessionFactory() as db, asyncio.timeout(125):
+            async with AsyncSessionFactory() as db:
                 async def observe(kind, data):
                     await asyncio.to_thread(write_json, args.output / f"{kind}-{data['call']}.json", data)
                 return await propose_source_semantics(db, target, "tenant_qnu", document=document,

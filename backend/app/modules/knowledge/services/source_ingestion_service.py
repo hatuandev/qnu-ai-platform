@@ -785,6 +785,12 @@ class SourceIngestionService:
     ) -> None:
         artifact = copy.deepcopy(artifact)
         reviewed_at = datetime.now(UTC)
+        if decision == "approved":
+            from app.modules.knowledge.services.semantic_context_review import proposal_summary
+            summary = proposal_summary(artifact.get("semantic_annotations") or {})
+            if summary["publication_blocked"]:
+                raise AppException("Còn vấn đề ngữ cảnh cần đối chiếu trước khi duyệt nguồn.",
+                    code="SEMANTIC_CONTEXT_REVIEW_REQUIRED", status_code=409, details=summary)
         if decision == "approved" and (rev.parse_provenance or {}).get("standard_required"):
             if artifact.get("input_format") != "qnu-rag-projection/v1":
                 raise AppException("Chưa có bản chuẩn hợp lệ để duyệt.", code="QNU_STANDARD_INVALID", status_code=409)
@@ -1068,6 +1074,9 @@ class SourceIngestionService:
         )
         filename = (rev.snapshot_metadata or {}).get("file_name") or f"{title}.pdf"
         review_status, requires_review, issue_count = get_structured_review_state(rev)
+        studio_artifact = copy.deepcopy(get_source_artifact(rev))
+        from app.modules.knowledge.services.semantic_context_review import refresh_policy
+        refresh_policy(studio_artifact)
 
         return StudioViewResponse(
             pagination_known=manifest_page_count(rev.page_manifest) > 0 and not unmapped_markdown,
@@ -1090,7 +1099,7 @@ class SourceIngestionService:
             total_pages=len(pages_views) or 1,
             file_size_bytes=len((rev.canonical_markdown or "").encode("utf-8")),
             total_chunks=0,
-            structured_artifact=get_source_artifact(rev),
+            structured_artifact=studio_artifact,
             source_metadata=rev.snapshot_metadata or {},
             citation_metadata=rev.citation_metadata or {},
             layout_text_alignment="stale" if standard or any(p.get("layout_text_alignment") == "stale" for p in manifest) else "original",

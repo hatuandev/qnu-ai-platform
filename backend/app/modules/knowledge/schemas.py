@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.single_application import SingleApplicationModel
 from app.modules.documents.schemas import DocumentGroupMinimalItem
+from app.modules.knowledge.services.semantic_context_review import ContextDecision
 
 
 # ==============================================================================
@@ -1053,6 +1054,7 @@ class SemanticProposalReviewRequest(BaseModel):
     policy_mode: Literal["strict", "acknowledged_limits"] = "strict"
     expected_semantic_proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     comment: str = Field(min_length=3, max_length=2000)
+    context_decisions: list[ContextDecision] = Field(default_factory=list, max_length=256)
 
 
 class BulkReviewSourceRevisionItem(BaseModel):

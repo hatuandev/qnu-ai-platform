@@ -1,4 +1,9 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import type {
+  ContextIssueDecision,
+  ContextReviewIssue,
   SemanticEvidenceBinding,
   SourceArtifact,
 } from "@/types/knowledge";
@@ -52,22 +57,152 @@ function EvidenceReviewDetails({
   );
 }
 
+function ContextIssueItem({
+  issue,
+  onDecision,
+  selected,
+}: {
+  issue: ContextReviewIssue;
+  onDecision?: (decision: ContextIssueDecision | null, issueId: string) => void;
+  selected?: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  const action =
+    issue.kind === "scope_confirmation_required"
+      ? "scope_confirmed"
+      : issue.kind === "deferred_reference"
+        ? "not_applicable_to_target"
+        : null;
+  const evidence = issue.review_evidence?.[0];
+  return (
+    <article className="space-y-2 rounded-lg border p-3">
+      <p className="font-medium">{issue.reason}</p>
+      <p className="break-all text-muted-foreground">
+        Đích: {JSON.stringify(issue.target)} · nguồn:{" "}
+        {issue.unit_ids.join(", ")}
+      </p>
+      {issue.review_evidence?.map((item) => (
+        <blockquote
+          key={item.evidence_binding.evidence_id}
+          className="whitespace-pre-wrap border-l-2 pl-3"
+        >
+          {item.evidence_quote}
+        </blockquote>
+      ))}
+      {!action && (
+        <p>
+          Cần bổ sung và phân tích lại nguồn; ghi chú chung không giải quyết
+          được vấn đề này.
+        </p>
+      )}
+      {action && evidence && onDecision && (
+        <>
+          <Textarea
+            aria-label={`Căn cứ quyết định ${issue.issue_id}`}
+            value={reason}
+            onChange={(event) => {
+              setReason(event.target.value);
+              if (selected) onDecision(null, issue.issue_id);
+            }}
+            placeholder="Ghi căn cứ đối chiếu toàn đơn vị nguồn và đúng phạm vi đích"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={reason.trim().length < 3}
+            onClick={() =>
+              onDecision(
+                selected
+                  ? null
+                  : {
+                      issue_id: issue.issue_id,
+                      target: issue.target,
+                      action,
+                      ...evidence,
+                      reason: reason.trim(),
+                    },
+                issue.issue_id,
+              )
+            }
+          >
+            {selected
+              ? "Bỏ lựa chọn đối chiếu"
+              : action === "scope_confirmed"
+                ? "Xác nhận đúng tập dòng/cột này"
+                : "Xác nhận tham chiếu không chi phối đích này"}
+          </Button>
+        </>
+      )}
+    </article>
+  );
+}
+
 export function SemanticReviewPreview({
   artifact,
+  decisions = [],
+  onDecision,
 }: {
   artifact: SourceArtifact;
+  decisions?: ContextIssueDecision[];
+  onDecision?: (decision: ContextIssueDecision | null, issueId: string) => void;
 }) {
   const proposal = artifact.semantic_annotations;
+  const contextPanel = proposal?.context_review && (
+    <section
+      aria-label="Vấn đề ngữ cảnh và lịch sử đối chiếu"
+      className="space-y-3 text-sm"
+    >
+      <p className="font-medium">
+        Ngữ cảnh và phạm vi · trạng thái: {proposal.status}
+      </p>
+      <p>
+        Phạm vi:{" "}
+        {proposal.context_review.scope === "selected_tables"
+          ? "các bảng được chọn"
+          : "tài liệu"}
+        . {artifact.source_policy?.context_blocker_count ?? 0} vấn đề còn chặn
+        áp dụng/xuất bản.
+      </p>
+      {(proposal.context_review.issues ?? []).map((issue) => (
+        <ContextIssueItem
+          key={issue.issue_id}
+          issue={issue}
+          selected={decisions.some((item) => item.issue_id === issue.issue_id)}
+          onDecision={proposal.status === "proposed" ? onDecision : undefined}
+        />
+      ))}
+      {(!proposal.context_review.contract ||
+        !proposal.context_review.issues?.length) &&
+        proposal.context_review.unresolved.map((item) => (
+          <p
+            key={`${item.unit_ids.join(",")}-${item.reason}`}
+            className="text-warning"
+          >
+            Cần đối chiếu thêm ({item.unit_ids.join(", ")}): {item.reason}
+          </p>
+        ))}
+      {proposal.review?.context_decisions?.map((item) => (
+        <p key={item.issue_id}>
+          Đã đối chiếu {item.issue_id}: {item.reason} · {item.actor_id}
+        </p>
+      ))}
+    </section>
+  );
   if (proposal?.status !== "proposed" || !proposal.annotations) {
     const policy = artifact.source_policy;
-    return policy ? (
-      <p role="status" className="text-sm text-muted-foreground">
-        Còn {policy.semantic_unknown_count} ô chưa rõ nghĩa; đã xác nhận{" "}
-        {policy.acknowledged_limit_count} giới hạn nguồn; còn{" "}
-        {policy.unfinished_count} ô cần xử lý. Xuất bản có giới hạn chưa được
-        bật.
-      </p>
-    ) : null;
+    return (
+      <>
+        {contextPanel}
+        {policy ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Còn {policy.semantic_unknown_count} ô chưa rõ nghĩa; đã xác nhận{" "}
+            {policy.acknowledged_limit_count} giới hạn nguồn; còn{" "}
+            {policy.unfinished_count} ô cần xử lý. Xuất bản có giới hạn chưa
+            được bật.
+          </p>
+        ) : null}
+      </>
+    );
   }
   const rowLabel = (table: SourceArtifact["tables"][number], row: string) => {
     const index = table.row_unit_ids?.indexOf(row) ?? -1;
@@ -82,6 +217,7 @@ export function SemanticReviewPreview({
       aria-label="Đề xuất ngữ nghĩa chờ đối chiếu"
       className="space-y-3 text-sm"
     >
+      {contextPanel}
       <p className="font-medium">Đề xuất từ model cần bạn đối chiếu</p>
       <p className="text-muted-foreground">
         Chưa áp dụng vào dữ liệu hoặc câu trả lời. Hãy kiểm tra phạm vi và trích

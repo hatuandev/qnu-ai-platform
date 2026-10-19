@@ -73,8 +73,11 @@ def evaluate_source_policy(artifact: dict, *, mode: PolicyMode = "strict") -> di
     audit = artifact.get("context_audit") or {}
     if audit.get("unresolved_count") or audit.get("status") in {"unresolved", "failed"}:
         independent.append("context_audit")
-    blockers = (len(unknown) if mode == "strict" else len(unfinished)) + len(independent)
+    from app.modules.knowledge.services.semantic_context_review import proposal_summary
+    summary = proposal_summary(artifact.get("semantic_annotations") or {})
+    blockers = (len(unknown) if mode == "strict" else len(unfinished)) + len(independent) + summary["context_blocker_count"]
     return {"mode": mode, "semantic_unknown_count": len(unknown), "acknowledged_limit_count": len(acknowledged),
             "unfinished_count": len(unfinished), "policy_blocker_count": blockers,
             "independent_blockers": sorted(set(independent)), "eligible_for_limited_use": blockers == 0,
+            "context_blocker_count": summary["context_blocker_count"], "context_blocker_ids": summary["open_issue_ids"], "context_summary": summary,
             "publication_enabled": False, "publication_blocker": "limited_publication_not_enabled"}

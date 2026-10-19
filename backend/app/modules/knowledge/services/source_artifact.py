@@ -164,9 +164,11 @@ def get_structured_review_state(revision: Any) -> tuple[str, bool, int]:
     review_status = str((artifact.get("review") or {}).get("status") or "auto_ready")
     approved = review_status == "approved"
     unresolved_standard_cells = artifact.get("input_format") == "qnu-rag-projection/v1" and bool(artifact.get("unresolved_cell_count"))
-    requires_review = unresolved_standard_cells or (not approved and (review_status == "required" or bool(issues)))
+    from app.modules.knowledge.services.semantic_context_review import proposal_summary
+    context = proposal_summary(artifact.get("semantic_annotations") or {})
+    requires_review = context["publication_blocked"] or unresolved_standard_cells or (not approved and (review_status == "required" or bool(issues)))
     effective_status = "required" if requires_review else review_status
-    return effective_status, requires_review, len(issues)
+    return effective_status, requires_review, len(issues) + context["context_blocker_count"]
 
 
 def add_layout_issues(artifact: dict[str, Any], pages: list[dict[str, Any]]) -> None:

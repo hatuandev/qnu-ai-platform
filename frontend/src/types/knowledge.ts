@@ -228,6 +228,27 @@ export interface SemanticEvidenceBinding {
   evidence_id: string;
 }
 
+export interface ContextIssueDecision {
+  issue_id: string;
+  target: Record<string, string | string[]>;
+  action: "scope_confirmed" | "not_applicable_to_target";
+  evidence_binding: SemanticEvidenceBinding;
+  evidence_quote: string;
+  reason: string;
+}
+
+export interface ContextReviewIssue {
+  issue_id: string;
+  kind: string;
+  unit_ids: string[];
+  target: Record<string, string | string[]>;
+  reason: string;
+  review_evidence: {
+    evidence_binding: SemanticEvidenceBinding;
+    evidence_quote: string;
+  }[];
+}
+
 export interface SourceArtifact {
   input_format?: string;
   semantic_annotations?: {
@@ -246,6 +267,16 @@ export interface SourceArtifact {
       target_table_ids?: string[] | null;
       unresolved: { unit_ids: string[]; reason: string }[];
       semantic_support: string;
+      packets_complete?: boolean;
+      contract?: string;
+      issues?: ContextReviewIssue[];
+    };
+    review?: {
+      context_decisions?: (ContextIssueDecision & {
+        actor_id: string;
+        at: string;
+        proposal_hash: string;
+      })[];
     };
     annotations?: {
       notes: {
@@ -289,6 +320,13 @@ export interface SourceArtifact {
     unfinished_count: number;
     policy_blocker_count: number;
     publication_enabled: false;
+    context_blocker_count?: number;
+    context_blocker_ids?: string[];
+    context_summary?: {
+      packets_complete: boolean;
+      application_blocked: boolean;
+      open_issue_ids: string[];
+    };
   };
   content_integrity?: ContentIntegrityReport;
   temporal_metadata?: {

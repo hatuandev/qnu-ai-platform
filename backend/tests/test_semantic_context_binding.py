@@ -140,14 +140,17 @@ def test_T05_T06_T07_T08_actual_docx_scopes_remain_exact(actual_document, marker
         payload["notes"][0]["evidence_id"] = next(ev["id"] for ev in packet["evidence"] if ev["source_unit_id"] == unit.id
             and (("AM-0007" in ev["text"] and "AM-0070" not in ev["text"]) if scope == "row"
                  else ("2027" in ev["text"] and "2025" not in ev["text"])))
-    proposal = bind_model_proposals(artifact, packet, payload)
+    review_issues = []
+    proposal = bind_model_proposals(artifact, packet, payload, review_issues=review_issues)
     assert proposal.notes[0].evidence_quote in unit.text
-    pending = stage_semantic_annotations(artifact, proposal)
+    pending = stage_semantic_annotations(artifact, proposal, context_review={"coverage_complete": True, "scope": "document", "issues": review_issues})
     from app.modules.knowledge.normalization.retrieval_units import UnitManifest
     from app.modules.knowledge.services.semantic_annotations import apply_reviewed_semantics
     from app.modules.knowledge.services.source_links import unit_context_ids
 
-    approved = apply_reviewed_semantics(artifact, pending["proposal_hash"], "TEST-reviewer547", "TEST ONLY known fixture scope")
+    decisions = [{"issue_id": issue["issue_id"], "target": issue["target"], "action": "scope_confirmed",
+                  **issue["review_evidence"][0], "reason": "TEST complete source and exact columns checked"} for issue in review_issues]
+    approved = apply_reviewed_semantics(artifact, pending["proposal_hash"], "TEST-reviewer547", "TEST ONLY known fixture scope", context_decisions=decisions)
     manifest = UnitManifest.model_validate(approved["retrieval_units"])
     for rid in target["row_unit_ids"]:
         for column in target["columns"]:
@@ -166,8 +169,15 @@ def test_T06_T07_wrong_year_or_identifier_is_rejected(actual_document):
     wrong_col = next(col["id"] for col in target["columns"] if any("2026" in part for part in col["header_path"]))
     payload = note_payload(packet, column_note.id, columns=[wrong_col])
     payload["notes"][0]["evidence_id"] = ev["id"]
-    with pytest.raises(ValueError, match="YEAR_CONFLICT"):
-        bind_model_proposals(artifact, packet, payload)
+    # Full source includes several years and exclusions. Exact binding may stage
+    # only with a scope issue; a generic approval cannot accept the wrong column.
+    issues = []
+    proposal = bind_model_proposals(artifact, packet, payload, review_issues=issues)
+    pending = stage_semantic_annotations(artifact, proposal, context_review={"coverage_complete": True, "issues": issues})
+    from app.modules.knowledge.services.semantic_annotations import apply_reviewed_semantics
+    with pytest.raises(AppException) as error:
+        apply_reviewed_semantics(artifact, pending["proposal_hash"], "TEST", "Generic comment")
+    assert error.value.code == "SEMANTIC_CONTEXT_REVIEW_REQUIRED"
     row_note = next(unit for unit in builder.manifest.units if "(D-AM-0007)" in unit.text)
     ev = next(ev for ev in packet["evidence"] if ev["source_unit_id"] == row_note.id and "AM-0007" in ev["text"] and "AM-0070" not in ev["text"])
     wrong_row = next(rid for rid, values in zip(target["row_unit_ids"], target["rows"], strict=True) if "AM-0070" in values)

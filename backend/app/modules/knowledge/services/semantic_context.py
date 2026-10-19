@@ -26,6 +26,8 @@ class SemanticContextPolicy(BaseModel):
     neighbor_units: int = Field(3, ge=0, le=12)
     max_evidence_chars: int = Field(2000, ge=100, le=5000)
     max_output_tokens: int = Field(6000, ge=512, le=8192)
+    run_seconds: float = Field(120, gt=0, le=600)
+    call_seconds: float = Field(90, gt=0, le=180)
 
 
 def model_context(packet: dict) -> dict:
@@ -34,6 +36,28 @@ def model_context(packet: dict) -> dict:
 
 def context_bytes(packet: dict) -> int:
     return len(json.dumps(model_context(packet), ensure_ascii=False).encode())
+
+
+def packet_usage(packet: dict) -> dict:
+    identities = {unit["id"] for unit in packet["units"]}
+    for table in packet["tables"]:
+        rows = [row["id"] for row in table["rows"]]
+        if len(rows) != len(set(rows)) or len(table["visible_row_ids"]) != len(set(table["visible_row_ids"])) or set(rows) != set(table["visible_row_ids"]):
+            raise ValueError("CONTEXT_VISIBLE_ROWS_INVALID")
+        identities.update([table["id"], *rows])
+    return {"units": len(identities), "payload_bytes": context_bytes(packet)}
+
+
+def enforce_packet_budget(packet: dict, policy: SemanticContextPolicy) -> dict:
+    usage = packet_usage(packet)
+    if usage["units"] > policy.max_units or usage["payload_bytes"] > policy.max_packet_bytes:
+        raise ValueError("CONTEXT_EXPANSION_BUDGET")
+    return usage
+
+
+def fits_packet(packet: dict, policy: SemanticContextPolicy) -> bool:
+    usage = packet_usage(packet)
+    return usage["units"] <= policy.max_units and usage["payload_bytes"] <= policy.max_packet_bytes
 
 
 def _label(value: str) -> str:
@@ -174,6 +198,8 @@ class ContextBuilder:
             registry[item["id"]] = item["binding"]
             public.append({key: value for key, value in item.items() if key != "binding"})
         packet = {"source": source_identity(self.artifact), "tables": views, "units": units, "evidence": public,
+            "prior_context_issues": [{key: item[key] for key in ("issue_id", "kind", "unit_ids", "target", "reason")}
+                for item in ((self.artifact.get("semantic_annotations") or {}).get("context_review") or {}).get("issues", [])],
             "deferred_related_unit_ids": sorted({uid for table, _ in tables for uid in self.deferred.get(table["id"], [])
                                                  if uid not in unit_ids}, key=self.order.get),
             "coordinate_rule": "half-open Unicode code points in the supplied unit text or raw cell; select evidence IDs, never rewrite quotes",
@@ -196,7 +222,7 @@ class ContextBuilder:
                 self.trace.append({"reason": "packet_count_budget", "table_id": table["id"]})
                 return
             packet = self._packet([(table, rows)], local)
-            if context_bytes(packet) > self.policy.max_packet_bytes or len(local) + len(rows) > self.policy.max_units:
+            if not fits_packet(packet, self.policy):
                 if len(rows) > 1:
                     middle = len(rows) // 2
                     append(table, rows[:middle], local); append(table, rows[middle:], local)
@@ -230,7 +256,7 @@ class ContextBuilder:
                 # of every section they reference. The reference directory and
                 # on-demand expansion remain available in each packet.
                 trial = self._packet([], [*group, unit_id])
-                if group and (context_bytes(trial) > self.policy.max_packet_bytes or len(trial["_unit_ids"]) > self.policy.max_units):
+                if group and not fits_packet(trial, self.policy):
                     result.append(self._packet([], group))
                     group = []
                 group.append(unit_id)
@@ -238,7 +264,7 @@ class ContextBuilder:
                 result.append(self._packet([], group))
         accepted = []
         for packet in result:
-            if len(accepted) >= self.policy.max_packets or context_bytes(packet) > self.policy.max_packet_bytes:
+            if len(accepted) >= self.policy.max_packets or not fits_packet(packet, self.policy):
                 self.unexamined.extend([*packet["_unit_ids"], *(rid for _, rows in packet["_tables"] for rid in rows)])
                 self.trace.append({"reason": "packet_count_or_bytes_budget"})
             else:
@@ -263,8 +289,7 @@ class ContextBuilder:
                 tables = [(current, values) for current, values in tables if current["id"] != table_id]
                 tables.append((table, rows))
         revised = self._packet(tables, ids, round_no=packet["round"] + 1)
-        if context_bytes(revised) > self.policy.max_packet_bytes or len(ids) > self.policy.max_units:
-            raise ValueError("CONTEXT_EXPANSION_BUDGET")
+        enforce_packet_budget(revised, self.policy)
         if set(ids) == set(packet["_unit_ids"]) and revised["_tables"] == packet["_tables"]:
             raise ValueError("CONTEXT_EXPANSION_NO_NEW_UNITS")
         self.trace.append({"reason": "model_requested_expansion", "units": requested})

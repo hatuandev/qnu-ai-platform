@@ -1,6 +1,7 @@
 """One existing ModelOps path, bounded context rounds, atomic proposal staging."""
 
 import asyncio
+import copy
 import json
 import time
 from typing import Any
@@ -15,6 +16,7 @@ from app.modules.knowledge.services.semantic_binding import (
 from app.modules.knowledge.services.semantic_context import (
     ContextBuilder,
     SemanticContextPolicy,
+    enforce_packet_budget,
     model_context,
 )
 
@@ -32,9 +34,11 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
     from app.modules.modelops.services.model_catalog_service import model_catalog_service
 
     policy = context_policy if isinstance(context_policy, SemanticContextPolicy) else SemanticContextPolicy.model_validate(context_policy or {})
+    from app.modules.knowledge.services.semantic_run_budget import SemanticRunBudget
+    budget = SemanticRunBudget(policy.run_seconds)
     fallback_provider_id, fallback_model_name = None, None
     if not model_name:
-        defaults = (await model_catalog_service.get_system_model_defaults(db)).defaults
+        defaults = (await budget.wait(lambda: model_catalog_service.get_system_model_defaults(db))).defaults
         model_name, provider_id = defaults.default_chat_model, provider_id or defaults.default_chat_provider_id
         if defaults.default_chat_mode == "combo":
             chain = [item for item in defaults.chat_combo_chain if item.is_active]
@@ -50,9 +54,9 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
     if policy.max_packet_bytes - system_bytes < 2000:
         raise AppException("Ngân sách không đủ cho hợp đồng và ngữ cảnh.", code="SEMANTIC_CONTEXT_BUDGET", status_code=422)
     build_start = time.perf_counter()
-    builder = await asyncio.to_thread(ContextBuilder, artifact, document,
-        policy.model_copy(update={"max_packet_bytes": policy.max_packet_bytes - system_bytes}))
-    packets = await asyncio.to_thread(builder.packets, target_table_ids)
+    builder = await budget.wait(lambda: asyncio.to_thread(ContextBuilder, artifact, document,
+        policy.model_copy(update={"max_packet_bytes": policy.max_packet_bytes - system_bytes})))
+    packets = await budget.wait(lambda: asyncio.to_thread(builder.packets, target_table_ids))
     metrics = {"build_ms": (time.perf_counter() - build_start) * 1000, "calls": 0, "input_utf8_bytes": 0,
                "model_ms": 0.0, "binding_ms": 0.0, "accepted": 0, "rejected": 0, "packet_count": len(packets)}
     if builder.unexamined:
@@ -66,10 +70,12 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
             details={"minimum_input_utf8_bytes": minimum_bytes, "metrics": metrics})
     merged = {"notes": [], "cells": [], "limitations": []}
     seen = {key: {} for key in merged}
-    runs, unresolved = [], []
+    runs, unresolved, issues, reprocessed = [], [], [], []
     for original in packets:
         packet = original
         while True:
+            budget.check()
+            enforce_packet_budget(packet, builder.policy)
             content = json.dumps(model_context(packet), ensure_ascii=False)
             size = len(content.encode()) + system_bytes
             if metrics["calls"] >= policy.max_calls or metrics["input_utf8_bytes"] + size > policy.max_total_bytes:
@@ -80,11 +86,11 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
             started = time.perf_counter()
             metrics["calls"] += 1
             metrics["input_utf8_bytes"] += size
-            response = await modelops_service.generate(db, LLMGenerateRequest(
+            response = await budget.wait(lambda content=content: modelops_service.generate(db, LLMGenerateRequest(
                 tenant_id=tenant_id, preferred_model_name=model_name, preferred_provider_id=provider_id,
                 fallback_provider_id=fallback_provider_id, fallback_model_name=fallback_model_name,
                 temperature=0, thinking_budget=0, max_tokens=policy.max_output_tokens,
-                messages=[ChatMessage(role="system", content=system), ChatMessage(role="user", content=content)]))
+                messages=[ChatMessage(role="system", content=system), ChatMessage(role="user", content=content)])), call_seconds=policy.call_seconds)
             metrics["model_ms"] += (time.perf_counter() - started) * 1000
             model = {"provider": response.provider, "model": response.model, "is_fallback": response.is_fallback,
                      "prompt_tokens": response.prompt_tokens, "completion_tokens": response.completion_tokens, "cost_usd": response.cost_usd}
@@ -97,9 +103,9 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
                 if wire.context_id != packet["context_id"]:
                     raise ValueError("EVIDENCE_CONTEXT_MISMATCH")
                 if wire.needs_context:
-                    packet = await asyncio.to_thread(builder.expand, packet, wire.needs_context)
+                    packet = await budget.wait(lambda packet=packet, wire=wire: asyncio.to_thread(builder.expand, packet, wire.needs_context))
                     continue
-                annotations = await asyncio.to_thread(bind_model_proposals, artifact, packet, wire)
+                annotations = await budget.wait(lambda packet=packet, wire=wire: asyncio.to_thread(bind_model_proposals, artifact, packet, wire, review_issues=issues))
             except (ValueError, KeyError, TypeError) as exc:
                 if type(exc) is ValueError and str(exc).startswith("CONTEXT_EXPANSION_"):
                     raise AppException("Chưa đủ ngữ cảnh trong ngân sách; chưa tạo hoặc áp dụng đề xuất.",
@@ -109,16 +115,50 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
                 code = "SEMANTIC_OUTPUT_INVALID" if isinstance(exc, ValidationError) else "SEMANTIC_EVIDENCE_INVALID"
                 reason = str(exc) if type(exc) is ValueError else "invalid_selector_schema_or_coordinates"
                 raise AppException("Đề xuất không khớp source/span/scope; dữ liệu nháp được giữ nguyên.", code=code, status_code=422,
-                                   details={"stage": "binding", "reason": reason[:160], "model": model, "metrics": metrics}) from exc
+                                   details={"stage": "schema" if isinstance(exc, ValidationError) else "binding", "reason": reason[:160], "model": model, "metrics": metrics}) from exc
             finally:
                 metrics["binding_ms"] += (time.perf_counter() - started) * 1000
             visible = {unit["id"] for unit in packet["units"]} | {row["id"] for table in packet["tables"] for row in table["rows"]}
             if any(not set(item.unit_ids).issubset(visible) for item in wire.unresolved):
                 raise AppException("Báo thiếu căn cứ trỏ sai đối tượng.", code="SEMANTIC_EVIDENCE_INVALID", status_code=422)
             unresolved.extend(item.model_dump() for item in wire.unresolved)
+            if wire.context_followups:
+                from app.modules.knowledge.services.semantic_context_review import make_issue
+                from app.modules.knowledge.services.semantic_evidence import (
+                    EvidenceBinding,
+                    source_text,
+                    verify_binding,
+                )
+                prior = {item["issue_id"]: item for item in packet["prior_context_issues"]}
+                for followup in wire.context_followups:
+                    old = prior.get(followup.issue_id)
+                    if old is None or old["kind"] != "missing_context":
+                        raise AppException("Đề xuất bổ sung trỏ sai issue.", code="SEMANTIC_EVIDENCE_INVALID", status_code=422)
+                    source_ids = set()
+                    for eid in followup.evidence_ids:
+                        if eid not in packet["_bindings"]:
+                            raise AppException("Bằng chứng bổ sung ngoài context.", code="SEMANTIC_EVIDENCE_INVALID", status_code=422)
+                        binding = EvidenceBinding.model_validate(packet["_bindings"][eid])
+                        text = source_text(artifact, binding.source_unit_id, binding.column_id)
+                        verify_binding(artifact, binding, text[binding.start:binding.end], binding.source_unit_id)
+                        if binding.column_id is not None:
+                            raise AppException("Bổ sung điều kiện cần source prose.", code="SEMANTIC_EVIDENCE_INVALID", status_code=422)
+                        source_ids.add(binding.source_unit_id)
+                    if not source_ids - set(old["unit_ids"]):
+                        raise AppException("Chưa có đơn vị nguồn bổ sung cho issue thiếu context.", code="SEMANTIC_CONTEXT_INCOMPLETE", status_code=422)
+                    issue = make_issue(artifact, "scope_confirmation_required", sorted(source_ids | set(old["unit_ids"])), old["target"], followup.reason)
+                    issues.append(issue)
+                    reprocessed.append({"old_issue_id": old["issue_id"], "new_issue_id": issue["issue_id"],
+                        "reason": "New source-bound evidence from reprocessing; replacement still requires specific human review."})
             if packet["deferred_related_unit_ids"]:
-                unresolved.append({"unit_ids": packet["deferred_related_unit_ids"],
-                    "reason": "Related source units deferred by context budget; semantic support still needs review."})
+                from app.modules.knowledge.services.semantic_context_review import make_issue
+                for unit_id in packet["deferred_related_unit_ids"]:
+                    unit = builder.units[unit_id]
+                    if unit.is_container or unit.kind not in {"paragraph", "list", "heading"}:
+                        continue
+                    issues.append(make_issue(artifact, "deferred_reference", [unit_id],
+                        {"table_ids": [table["id"] for table in packet["tables"]]},
+                        "Tham chiếu chưa được cấp trong gói; cần đọc và xác nhận không chi phối đích hoặc phân tích lại."))
             for key, entries in merged.items():
                 for item in getattr(annotations, key):
                     data = item.model_dump(exclude_none=True)
@@ -136,7 +176,18 @@ async def generate_bound_semantics(db: Any, artifact: dict, tenant_id: str, mode
     result = SemanticAnnotations.model_validate(merged)
     review = {"coverage_complete": True, "scope": "document" if target_table_ids is None else "selected_tables",
               "target_table_ids": target_table_ids, "unresolved": unresolved, "expansions": builder.trace,
+              "issues": issues,
+              "reprocessed_issues": reprocessed,
               "metrics": metrics, "semantic_support": "human_review_required"}
     # The only mutation: stage the entire validated set after all packets succeed.
-    return stage_semantic_annotations(artifact, result, model={"runs": runs, "metrics": metrics,
-        **(runs[-1] if runs else {})}, context_review=review)
+    # A cancelled to_thread may continue; stage only on a private copy, then
+    # check the owner deadline again before the single caller-visible mutation.
+    staged = copy.deepcopy(artifact)
+    pending = await budget.wait(lambda: asyncio.to_thread(stage_semantic_annotations, staged, result,
+        model={"runs": runs, "metrics": metrics, **(runs[-1] if runs else {})}, context_review=review))
+    budget.check()
+    artifact["semantic_annotations"] = staged["semantic_annotations"]
+    artifact["review"] = staged["review"]
+    if "source_policy" in staged:
+        artifact["source_policy"] = staged["source_policy"]
+    return pending

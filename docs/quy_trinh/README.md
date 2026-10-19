@@ -13,6 +13,7 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
   snapshot annotation theo revision, replay và gói xuất có sidecar tại 11.7;
   giới hạn nguồn đã đối chiếu, strict/evaluation và runner ModelOps tại 11.8;
   context có cấu trúc, selectors/exact evidence binding và bounded expansion tại 11.9;
+  vòng đời issue/decisions, snapshot hash tương thích và deadline/accounting chung tại 11.10;
   DOCX/PDF mới có luồng serving chuẩn có duyệt (phiên526), revision cũ không tự chuyển; không nạp nguyên tài
   liệu chuẩn này làm kiến thức.
 

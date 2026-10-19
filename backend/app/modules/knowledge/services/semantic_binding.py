@@ -46,6 +46,13 @@ class UnresolvedRelation(BaseModel):
     reason: str = Field(min_length=3, max_length=1200)
 
 
+class ContextFollowup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    issue_id: str
+    evidence_ids: list[str] = Field(min_length=1, max_length=16)
+    reason: str = Field(min_length=3, max_length=1200)
+
+
 class ModelSemanticProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
     context_id: str
@@ -54,6 +61,7 @@ class ModelSemanticProposal(BaseModel):
     limitations: list[LimitSelection] = Field(default_factory=list, max_length=256)
     needs_context: list[str] = Field(default_factory=list, max_length=32)
     unresolved: list[UnresolvedRelation] = Field(default_factory=list, max_length=64)
+    context_followups: list[ContextFollowup] = Field(default_factory=list, max_length=64)
 
 
 def _evidence(artifact: dict, packet: dict, selection: Selection) -> tuple[EvidenceBinding, str]:
@@ -79,13 +87,22 @@ def _row_field(artifact: dict, packet: dict, row_id: str, column_id: str) -> dic
     return fields[0]
 
 
-def scope_guard(artifact: dict, note: NoteSelection, quote: str) -> None:
+def scope_guard(artifact: dict, note: NoteSelection, quote: str, full_text: str, issues: list | None) -> None:
     """Reject verifiable contradictions, never certify arbitrary natural language."""
     table = next(table for table in artifact["tables"] if table["id"] == note.table_id)
     years = set(re.findall(r"\b(?:19|20)\d{2}\b", quote))
-    if note.scope == "column" and len(years) > 1:
-        raise ValueError("EVIDENCE_SCOPE_YEAR_AMBIGUOUS_SELECT_NARROWER_SPAN")
-    if note.scope == "column" and len(years) == 1:
+    full_years = set(re.findall(r"\b(?:19|20)\d{2}\b", full_text))
+    selected = [column for column in table["columns"] if column["id"] in note.column_ids]
+    header_years = [set(re.findall(r"\b(?:19|20)\d{2}\b", " / ".join(column["header_path"]))) for column in selected]
+    needs_review = note.scope == "column" and (len(full_years) > 1 or any(len(value) != 1 for value in header_years))
+    if needs_review:
+        if issues is None:
+            raise ValueError("SEMANTIC_SCOPE_REVIEW_COLLECTOR_REQUIRED")
+        from app.modules.knowledge.services.semantic_context_review import make_issue
+        issues.append(make_issue(artifact, "scope_confirmation_required", [note.source_unit_id],
+            {"table_id": note.table_id, "row_unit_ids": note.row_unit_ids, "column_ids": note.column_ids},
+            "Đọc toàn đơn vị nguồn, các năm và điều kiện loại trừ; xác nhận đúng tập cột/dòng."))
+    if note.scope == "column" and len(years) == 1 and not needs_review:
         for column in table["columns"]:
             target_years = set(re.findall(r"\b(?:19|20)\d{2}\b", " / ".join(column["header_path"])))
             if column["id"] in note.column_ids and target_years and not target_years.issubset(years):
@@ -111,7 +128,7 @@ def scope_guard(artifact: dict, note: NoteSelection, quote: str) -> None:
         raise ValueError("EVIDENCE_SCOPE_ROW_CONFLICT")
 
 
-def bind_model_proposals(artifact: dict, packet: dict, payload: dict | ModelSemanticProposal):
+def bind_model_proposals(artifact: dict, packet: dict, payload: dict | ModelSemanticProposal, *, review_issues: list | None = None):
     from app.modules.knowledge.services.semantic_annotations import (
         SemanticAnnotations,
         _validated_copy,
@@ -131,7 +148,7 @@ def bind_model_proposals(artifact: dict, packet: dict, payload: dict | ModelSema
                     raise ValueError("SEMANTIC_SCOPE_OUTSIDE_CONTEXT")
                 if binding.column_id is not None:
                     raise ValueError("NOTE_EVIDENCE_REQUIRES_PROSE")
-                scope_guard(artifact, selection, quote)
+                scope_guard(artifact, selection, quote, source_text(artifact, binding.source_unit_id), review_issues)
                 item.update(selection.model_dump(exclude={"evidence_id", "source_unit_id", "reason"}), note_unit_id=binding.source_unit_id)
             else:
                 target = _row_field(artifact, packet, selection.row_unit_id, selection.column_id)

@@ -58,6 +58,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { extractErrorMessage, knowledgeApi } from "@/services/knowledge-api";
 import type {
+  ContextIssueDecision,
   KnowledgeChunkSetResponse,
   KnowledgeSourceDetailResponse,
 } from "@/types/knowledge";
@@ -152,6 +153,26 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
     semanticReview.data?.structured_artifact?.semantic_annotations;
   const semanticReviewKey = `${activeRev?.id}:${semanticProposal?.proposal_hash}`;
   const hasReviewedSemantics = reviewedSemanticKey === semanticReviewKey;
+  const [contextSelection, setContextSelection] = useState<{
+    key: string;
+    decisions: ContextIssueDecision[];
+  }>({ key: "", decisions: [] });
+  const contextDecisions =
+    contextSelection.key === semanticReviewKey
+      ? contextSelection.decisions
+      : [];
+  const openContextIds =
+    semanticReview.data?.structured_artifact?.source_policy
+      ?.context_blocker_ids ?? [];
+  const contextApplyBlocked =
+    semanticProposal?.context_review?.coverage_complete === false ||
+    semanticProposal?.context_review?.packets_complete === false ||
+    openContextIds.some(
+      (id) => !contextDecisions.some((item) => item.issue_id === id),
+    );
+  const semanticIsPending =
+    semanticProposal?.status === "proposed" ||
+    (semanticProposal?.status === "empty" && contextApplyBlocked);
 
   // Sync markdown content when revision loads
   useEffect(() => {
@@ -211,7 +232,9 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       await queryClient.invalidateQueries({
         queryKey: ["source-semantic-review", collectionId, sourceId],
       });
-      toast.success("Đã tạo đề xuất. Hãy đối chiếu trước khi áp dụng.");
+      toast.success(
+        "Đã nhận kết quả phân tích. Hãy xem trạng thái ngữ cảnh và từng vấn đề trước khi áp dụng.",
+      );
     },
     onError: (error: unknown) =>
       toast.error(extractErrorMessage(error, "Tạo đề xuất thất bại.")),
@@ -233,6 +256,11 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         throw new Error(
           "Hãy đối chiếu đề xuất và ghi chú trước khi áp dụng vào bản nháp.",
         );
+      if (
+        (decision === "approved" || decision === "acknowledged_limits") &&
+        contextApplyBlocked
+      )
+        throw new Error("Còn vấn đề ngữ cảnh hoặc phạm vi chưa được xử lý.");
       return knowledgeApi.reviewSemanticProposals(
         collectionId,
         sourceId,
@@ -241,6 +269,9 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         reviewComment.trim(),
         decision,
         decision === "acknowledged_limits" ? "acknowledged_limits" : "strict",
+        decision === "approved" || decision === "acknowledged_limits"
+          ? contextDecisions
+          : [],
       );
     },
     onSuccess: async (_revision, decision) => {
@@ -1033,9 +1064,21 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
             {semanticReview.data?.structured_artifact && (
               <SemanticReviewPreview
                 artifact={semanticReview.data.structured_artifact}
+                decisions={contextDecisions}
+                onDecision={(decision, issueId) =>
+                  setContextSelection({
+                    key: semanticReviewKey,
+                    decisions: [
+                      ...contextDecisions.filter(
+                        (item) => item.issue_id !== issueId,
+                      ),
+                      ...(decision ? [decision] : []),
+                    ],
+                  })
+                }
               />
             )}
-            {semanticProposal?.status === "proposed" && (
+            {semanticIsPending && (
               <Button
                 type="button"
                 variant="ghost"
@@ -1052,7 +1095,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                 Bỏ đề xuất
               </Button>
             )}
-            {semanticProposal?.status === "proposed" && (
+            {semanticIsPending && (
               <Button
                 type="button"
                 variant="outline"
@@ -1069,7 +1112,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                 Yêu cầu kiểm tra tiếp
               </Button>
             )}
-            {semanticProposal?.status === "proposed" && (
+            {semanticIsPending && (
               <label
                 htmlFor="review-semantic-proposals"
                 className="flex items-start gap-2"
@@ -1137,7 +1180,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
           </div>
 
           <DialogFooter className="border-t bg-card p-4">
-            {semanticProposal?.status === "proposed" && (
+            {semanticIsPending && (
               <Button
                 type="button"
                 variant="outline"
@@ -1147,7 +1190,8 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                   proposalMutation.isPending ||
                   semanticReview.isFetching ||
                   !hasReviewedSemantics ||
-                  reviewComment.trim().length < 3
+                  reviewComment.trim().length < 3 ||
+                  contextApplyBlocked
                 }
                 onClick={() =>
                   semanticMutation.mutate(

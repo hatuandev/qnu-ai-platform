@@ -819,3 +819,44 @@ hữu, không đổi ModelOps defaults. Runner có `--target-table`, `--max-call
 `--max-packet-bytes` cho lượt kiểm được giao. Lỗi provider, context budget và lỗi
 binding là các trạng thái riêng; provider trả response không đồng nghĩa proposal
 hợp lệ hay nguồn đã được duyệt. Xem [báo cáo547](../bao_cao/context547/VALIDATION_REPORT.md).
+
+### 11.10. Vòng đời vấn đề ngữ cảnh và quyết định riêng — phiên548
+
+Không đổi định dạng Markdown. `context_review` phiên bản2 phân biệt độ phủ packet,
+vấn đề thiếu căn cứ, yêu cầu đối chiếu phạm vi, khả năng áp dụng và điều kiện
+publication. Backend tạo issue ID từ source/revision/input/kind/unit IDs và tập
+tọa độ; reason đổi câu chữ không đổi danh tính. Có annotation **hoặc issue** thì
+proposal vẫn cần xử lý; legacy empty+unresolved không được coi là nguồn sạch.
+
+Người có quyền xem full source unit, target và lý do. Với scope nhiều năm/cột,
+gửi `scope_confirmed`; tham chiếu đã đọc và được xác định không chi phối đích gửi
+`not_applicable_to_target`. Mỗi intent phải gắn issue ID/target/full canonical
+evidence/reason và đúng proposal hash. Server lấy actor, kiểm quyền/binding/
+revision/hash/span, rồi mới tạo checked decision trong review envelope riêng.
+Comment chung, confidence model và acknowledged_limits không miễn scope issue.
+
+Thiếu nguồn bắt buộc không thể đóng bằng checkbox. Reprocess cần thêm source
+unit/evidence ID trong context; backend xác minh rồi chuyển thành scope-review
+issue mới vẫn chờ người duyệt. Issue bị model bỏ nhắc vẫn mở; history giữ prior
+issue/proposal hash và lý do thay thế. Reject/changes_requested không áp annotation,
+không đổi active pointer và không xóa blocker còn tồn tại khi reload/publication.
+
+Snapshot mới có context dùng semantic_hash_version2 để ràng buộc context/decision;
+v1 vẫn kiểm đúng recipe cũ, không viết lại immutable bytes hoặc tự backfill.
+Rebuild không gọi model và policy/publication dùng cùng summary backend, kể cả
+legacyempty hoặc rejected history. Selected-tables không chứng minh đã kiểm toàn
+tài liệu và không được thay cả bộ annotation toàn tài liệu đang hiệu lực.
+
+Packet accounting đếm union public source/container/full-row IDs, không đếm
+directory thành dữ liệu đã đọc; bytes gồm toàn public payload. Initial split,
+prose, accepted, expand và preflight dùng cùng giới hạn. SemanticContextPolicy
+thêm finite run_seconds/call_seconds; API, enrichment và runner dùng một deadline
+monotonic cho mỗi semantic run. Run deadline, call deadline, lỗi provider/schema/
+binding và cancellation có contract riêng. Stage chỉ trên private copy; kiểm hạn
+và hủy ngay trước mutation để thread bị hủy không ghi trễ vào caller artifact.
+
+Runner chỉ công bố WAITING_FOR_CONTEXT khi còn thiếu context, WAITING_FOR_REVIEW
+khi chỉ chờ quyết định hợp lệ, và E2E PASS khi có provider/binding/human review/
+persist-reload thật. Kết quả test adapter không thay upstream verification.
+Hồ sơ nghiệm thu có ZIP allowlist/manifest, JUnit trước-sau, exact ID/cause và
+cleanup ownership; xem [báo cáo548](../bao_cao/context548/VALIDATION_REPORT.md).

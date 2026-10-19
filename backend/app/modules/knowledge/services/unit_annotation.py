@@ -234,7 +234,7 @@ async def enrich_source_units(markdown: str, artifact: dict[str, Any], tenant_id
         from app.modules.knowledge.services.semantic_annotations import propose_source_semantics
 
         try:
-            async with asyncio.timeout(120), AsyncSessionFactory() as model_db:
+            async with AsyncSessionFactory() as model_db:
                 await propose_source_semantics(model_db, artifact, tenant_id,
                                                parsed_policy.model_name, parsed_policy.provider_id,
                                                document=document, context_policy=parsed_policy.semantic_context)
