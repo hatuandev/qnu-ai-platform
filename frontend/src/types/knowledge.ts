@@ -216,14 +216,41 @@ export interface FactItem {
   created_at: string;
 }
 
+export interface SemanticEvidenceBinding {
+  source_identity: Record<string, string | null>;
+  input_hash: string;
+  source_unit_id: string;
+  coordinate_space: "unit_codepoints" | "cell_raw_codepoints";
+  column_id?: string | null;
+  start: number;
+  end: number;
+  text_sha256: string;
+  evidence_id: string;
+}
+
 export interface SourceArtifact {
   input_format?: string;
   semantic_annotations?: {
-    status: "proposed" | "verified" | "empty" | "unavailable" | "rejected";
+    status:
+      | "proposed"
+      | "verified"
+      | "empty"
+      | "unavailable"
+      | "rejected"
+      | "changes_requested";
     proposal_hash?: string;
     error_code?: string;
+    context_review?: {
+      coverage_complete: boolean;
+      scope: string;
+      target_table_ids?: string[] | null;
+      unresolved: { unit_ids: string[]; reason: string }[];
+      semantic_support: string;
+    };
     annotations?: {
       notes: {
+        evidence_binding?: SemanticEvidenceBinding | null;
+        reason?: string | null;
         note_unit_id: string;
         evidence_quote: string;
         table_id: string;
@@ -232,6 +259,8 @@ export interface SourceArtifact {
         column_ids: string[];
       }[];
       cells: {
+        evidence_binding?: SemanticEvidenceBinding | null;
+        reason?: string | null;
         row_unit_id: string;
         column_id: string;
         raw: string;
@@ -239,7 +268,27 @@ export interface SourceArtifact {
         evidence_unit_id: string;
         evidence_quote: string;
       }[];
+      limitations?: {
+        evidence_binding?: SemanticEvidenceBinding | null;
+        reason?: string | null;
+        row_unit_id: string;
+        column_id: string;
+        raw: string;
+        basis: "source_explicit" | "human_examined_scope";
+        evidence_unit_id: string;
+        evidence_quote: string;
+        examined_unit_ids: string[];
+      }[];
     };
+  };
+  retrieval_units?: { units: { id: string; text: string }[] };
+  source_policy?: {
+    mode: "strict" | "acknowledged_limits";
+    semantic_unknown_count: number;
+    acknowledged_limit_count: number;
+    unfinished_count: number;
+    policy_blocker_count: number;
+    publication_enabled: false;
   };
   content_integrity?: ContentIntegrityReport;
   temporal_metadata?: {

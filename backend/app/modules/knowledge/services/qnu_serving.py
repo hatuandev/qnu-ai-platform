@@ -18,7 +18,7 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     render_qnu_markdown,
     validate_qnu_markdown,
 )
-from app.modules.knowledge.normalization.qnu_projection import VERSION, project_document
+from app.modules.knowledge.normalization.qnu_projection import VERSION
 
 
 def _invalid(reason: str) -> AppException:
@@ -31,11 +31,12 @@ def standard_reference(revision: Any) -> dict:
 
 
 async def load_document(reference: dict, *, binding_id: str, revision_id: str,
-                        origin_hash: str, snapshot_path: str) -> QnuStructuredDocument:
+                        origin_hash: str, snapshot_path: str, storage: Any = None) -> QnuStructuredDocument:
     """Verify both saved files, identities, source bytes identity and deterministic pair parity."""
     if (reference.get("status") != "ready" or reference.get("document_id") != binding_id
             or reference.get("revision_id") != revision_id or reference.get("schema_version") != QNU_MARKDOWN_SCHEMA):
         raise _invalid("identity_or_status")
+    driver = storage or storage_service
     payloads = []
     for path_key, hash_key, suffix in [("path", "sha256", ".qnu-rag-v1.md"),
                                       ("structured_path", "structured_sha256", ".qnu-doc-v1.json")]:
@@ -43,7 +44,7 @@ async def load_document(reference: dict, *, binding_id: str, revision_id: str,
         if (not isinstance(path, str) or not path.startswith(snapshot_path + ".") or not path.endswith(suffix)
                 or ".." in path or "\\" in path):
             raise _invalid("artifact_path")
-        data = await storage_service.get(path)
+        data = await driver.get(path)
         if data is None or hashlib.sha256(data).hexdigest() != expected:
             raise _invalid("artifact_checksum")
         payloads.append(data)
@@ -67,7 +68,7 @@ async def load_document(reference: dict, *, binding_id: str, revision_id: str,
         path = raw.get("path")
         if not isinstance(path, str) or not path.startswith(snapshot_path + ".") or ".." in path or "\\" in path:
             raise _invalid("raw_evidence_path")
-        data = await storage_service.get(path)
+        data = await driver.get(path)
         if data is None or hashlib.sha256(data).hexdigest() != raw.get("sha256"):
             raise _invalid("raw_evidence_checksum")
     return document
@@ -119,11 +120,16 @@ async def verify_revision_pair(revision: Any) -> QnuStructuredDocument:
 
 async def verify_approval_pair(revision: Any, decision: str) -> None:
     if decision == "approved" and (revision.parse_provenance or {}).get("standard_required"):
-        await verify_revision_pair(revision)
+        document = await verify_revision_pair(revision)
+        from app.modules.knowledge.services.semantic_store import verify_effective_projection
+
+        await verify_effective_projection(revision, (revision.parse_provenance or {}).get("structured_artifact") or {}, document)
 
 
 async def prepare_standard_revision(revision: Any) -> None:
     """Opt new/reparsed supported sources into the standard, never mutate a published revision."""
+    if getattr(revision, "status", None) == "ready":
+        raise _invalid("cannot_rebuild_serving_revision")
     reference = standard_reference(revision)
     revision.parse_provenance = {**(revision.parse_provenance or {}), "standard_required": True}
     if reference.get("status") != "ready":
@@ -133,17 +139,33 @@ async def prepare_standard_revision(revision: Any) -> None:
         revision.parse_provenance = {**revision.parse_provenance, "structured_artifact": artifact}
     else:
         document = await verify_revision_pair(revision)
+        from app.modules.knowledge.services.semantic_store import STORE, rebuild_projection
+
+        previous = (revision.parse_provenance or {}).get("structured_artifact") or {}
+        previous_status = (previous.get("semantic_annotations") or {}).get("status")
+        has_semantics = STORE in revision.parse_provenance or previous_status in {"proposed", "verified", "rejected", "changes_requested", "empty"}
         try:
-            canonical, artifact = await asyncio.to_thread(project_document, document, input_reference(reference),
-                                                         revision.citation_metadata or {})
+            canonical, artifact = await rebuild_projection(revision, document)
         except (ValueError, TypeError, KeyError) as exc:
             raise _invalid("standard_projection_invalid") from exc
         if not canonical.strip():
             raise _invalid("empty_projection")
         from app.modules.knowledge.services.unit_annotation import enrich_source_units
 
-        await enrich_source_units(canonical, artifact, getattr(revision, "tenant_id", "tenant_qnu"),
-                                  (revision.snapshot_metadata or {}).get("unit_temporal_annotation"))
+        if not has_semantics:
+            await enrich_source_units(canonical, artifact, getattr(revision, "tenant_id", "tenant_qnu"),
+                                      (revision.snapshot_metadata or {}).get("unit_temporal_annotation"), document=document)
+        pending = previous.get("semantic_annotations") or {}
+        if pending.get("status") == "proposed":
+            from app.modules.knowledge.services.semantic_annotations import semantic_input_hash
+            from app.modules.knowledge.services.semantic_store import proposal_base
+
+            base = await proposal_base(revision, previous, document)
+            if pending.get("input_hash") != semantic_input_hash(base):
+                raise _invalid("pending_semantic_input_changed")
+            if not artifact.get("semantic_effective"):
+                artifact = base
+            artifact["semantic_annotations"] = pending
         revision.canonical_markdown = canonical
         revision.canonical_hash = hashlib.sha256(canonical.encode()).hexdigest()
         revision.parse_provenance = {**revision.parse_provenance, "canonical_format": VERSION,

@@ -109,6 +109,7 @@ def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str]
     if len(fields) != len(values) or len(columns) != len(values):
         raise ValueError("Standard row fields do not match its emitted cells")
     state_source = row.metadata.get("cell_state_source") or "legacy"
+    usage = SourceUnit.model_validate(row.metadata["source_unit"]).field_usage
     for column, (cell_field, label, value) in enumerate(zip(fields, headers, values, strict=True)):
         if not isinstance(cell_field, dict) or not isinstance(cell_field.get("raw"), str) or not _same_cell(cell_field["raw"], value):
             raise ValueError("Standard row field disagrees with its canonical cell")
@@ -119,7 +120,10 @@ def _standard_fields(row: FusionCandidate, headers: list[str], values: list[str]
             raise ValueError("Standard row header disagrees with its column path")
         if cell_field.get("state") not in QNU_CELL_STATES:
             raise ValueError("Standard row cell state is unavailable")
-        if state_source == "declared" and cell_field.get("state") in {"ambiguous", "unreadable"}:
+        if cell_field.get("usage") == "description_only" or usage.get(cell_field.get("column_id")) == "description_only":
+            raise ValueError("Source limitation is not answer-bearing quantitative evidence")
+        if (cell_field.get("state_source", state_source) == "declared"
+                and cell_field.get("state") in {"ambiguous", "unreadable"}):
             raise ValueError("Unresolved standard cell cannot answer")
     return fields
 

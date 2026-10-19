@@ -10,6 +10,9 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 - [13 — Chuẩn Markdown RAG v1.0](./13_chuan_markdown_rag_v1.md): file chuẩn và mẫu
   dùng lại, lõi Universal + quy tắc dữ liệu chọn lọc + chỉ mục dẫn xuất; parser
   có đề xuất ngữ nghĩa qua ModelOps và đối chiếu trước khi áp dụng vào bản nháp (11.6);
+  snapshot annotation theo revision, replay và gói xuất có sidecar tại 11.7;
+  giới hạn nguồn đã đối chiếu, strict/evaluation và runner ModelOps tại 11.8;
+  context có cấu trúc, selectors/exact evidence binding và bounded expansion tại 11.9;
   DOCX/PDF mới có luồng serving chuẩn có duyệt (phiên526), revision cũ không tự chuyển; không nạp nguyên tài
   liệu chuẩn này làm kiến thức.
 

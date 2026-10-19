@@ -555,7 +555,7 @@ class SourceIngestionService:
             select(KnowledgeSourceRevision).where(
                 KnowledgeSourceRevision.id == revision_id,
                 KnowledgeSourceRevision.binding_id == binding.id,
-            )
+            ).execution_options(populate_existing=True)
         )
         rev = rev_res.scalar_one_or_none()
         if not rev:
@@ -579,8 +579,10 @@ class SourceIngestionService:
             )
         if (rev.parse_provenance or {}).get("standard_required") and artifact.get("status") == "ready":
             from app.modules.knowledge.services.qnu_serving import verify_revision_pair
+            from app.modules.knowledge.services.semantic_store import verify_effective_projection
 
-            await verify_revision_pair(rev)
+            document = await verify_revision_pair(rev)
+            await verify_effective_projection(rev, get_source_artifact(rev), document)
         return artifact
 
     async def update_revision_content(
@@ -607,7 +609,7 @@ class SourceIngestionService:
             select(KnowledgeSourceRevision).where(
                 KnowledgeSourceRevision.id == revision_id,
                 KnowledgeSourceRevision.binding_id == binding.id,
-            )
+            ).execution_options(populate_existing=True)
         )
         rev = rev_res.scalar_one_or_none()
         if not rev:
@@ -743,7 +745,7 @@ class SourceIngestionService:
             select(KnowledgeSourceRevision).where(
                 KnowledgeSourceRevision.id == revision_id,
                 KnowledgeSourceRevision.binding_id == binding.id,
-            )
+            ).execution_options(populate_existing=True)
         )
         rev = rev_res.scalar_one_or_none()
         if not rev:
@@ -792,6 +794,9 @@ class SourceIngestionService:
             if artifact.get("unresolved_cell_count"):
                 raise AppException("Cần xử lý rõ các ô mơ hồ/không đọc được trước khi duyệt bản chuẩn.",
                                    code="QNU_UNRESOLVED_CELLS", status_code=409)
+            if artifact.get("source_limitations"):
+                raise AppException("Giới hạn nguồn đã được ghi nhận; chính sách xuất bản có giới hạn chưa được bật.",
+                                   code="SOURCE_LIMITED_PUBLICATION_DISABLED", status_code=409)
             if not actor_id or not comment or not comment.strip():
                 raise AppException("Cần người duyệt và ghi chú đối chiếu bản chuẩn.",
                                    code="CONTENT_REVIEW_REASON_REQUIRED", status_code=422)
@@ -863,8 +868,16 @@ class SourceIngestionService:
         from app.modules.knowledge.services.qnu_serving import verify_approval_pair
 
         await verify_approval_pair(rev, decision)
-        self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id, expected_semantic_proposal_hash)
-        await db.commit()
+        try:
+            if decision == "approved" and (artifact.get("semantic_annotations") or {}).get("status") == "proposed":
+                from app.modules.knowledge.services.semantic_store import record_decision
+
+                artifact = await record_decision(rev, artifact, expected_semantic_proposal_hash, actor_id, comment, "approved")
+            self._apply_review_decision(binding, rev, artifact, decision, comment, actor_id, expected_semantic_proposal_hash)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
         await db.refresh(rev)
         return rev
 
@@ -1361,6 +1374,10 @@ class SourceIngestionService:
             started_at=datetime.now(UTC),
             finished_at=datetime.now(UTC),
         )
+
+        prior_semantics = current_rev.parse_provenance or {}
+        if prior_semantics.get("semantic_store") or ((prior_semantics.get("structured_artifact") or {}).get("semantic_annotations") or {}).get("status") == "verified":
+            new_rev.parse_provenance["semantic_review_required_from_revision"] = current_rev.id
 
         if (file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
             from app.modules.knowledge.services.qnu_serving import prepare_standard_revision

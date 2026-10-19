@@ -32,7 +32,7 @@ def source_fingerprint(source: Any, artifact: dict) -> dict:
             raise ValueError("Derivative hash mismatch")
     except (TypeError, ValueError, KeyError) as error:
         raise AppException("Bản sạch và dữ liệu dẫn xuất không còn khớp.", code="DERIVED_BUNDLE_INVALID", status_code=409) from error
-    return {
+    fingerprint = {
         "source_revision_id": source.id, "binding_id": source.binding_id,
         "origin_document_id": source.origin_document_id, "snapshot_metadata_hash": digest(source.snapshot_metadata),
         "origin_file_hash": source.origin_file_hash, "canonical_hash": actual_hash,
@@ -41,6 +41,10 @@ def source_fingerprint(source: Any, artifact: dict) -> dict:
         "unit_manifest_hash": manifest_digest(units), "context_graph_hash": graph["digest"] if graph else None,
         "fact_set_hash": artifact["fact_set_hash"],
     }
+    if artifact.get("semantic_effective"):
+        fingerprint["semantic_annotation_hash"] = artifact["semantic_effective"]["semantic_hash"]
+        fingerprint["semantic_snapshot_sha256"] = artifact["semantic_effective"]["snapshot_sha256"]
+    return fingerprint
 
 
 def make_bundle(source: Any, artifact: dict, chunk_set: Any) -> dict:
@@ -94,8 +98,10 @@ async def validate_index_bundle(db: Any, index: Any, source: Any, artifact: dict
     artifact = get_source_artifact(source)
     if (source.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
         from app.modules.knowledge.services.qnu_serving import verify_revision_pair
+        from app.modules.knowledge.services.semantic_store import verify_effective_projection
 
-        await verify_revision_pair(source)
+        document = await verify_revision_pair(source)
+        await verify_effective_projection(source, artifact, document)
     if source.status != "ready" or get_structured_review_state(source)[1]:
         raise AppException("Nguồn cần duyệt lại.", code="SOURCE_NOT_READY", status_code=409)
     bundle = validate_chunk_set(source, artifact, chunk_set)

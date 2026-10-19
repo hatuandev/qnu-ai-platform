@@ -696,3 +696,126 @@ có thể chứa đủ chú thích để đọc bảng. Không mở rộng scope
 Lỗi provider, output sai schema hoặc thiếu bằng chứng phải báo lỗi; không giả
 proposal rỗng, không tự dùng nhãn benchmark thay output model. Phiên 544 gọi thật
 gặp `ALL_PROVIDERS_UNAVAILABLE`; chưa có proposal được người dùng duyệt cho DOCX thử.
+
+### 11.7. Snapshot annotation, rebuild và gói xuất — phiên 545
+
+Quyết định ngữ nghĩa mới được ghim theo revision tại
+`parse_provenance.semantic_store`: `active` trỏ bộ hiệu lực và `history` giữ các
+quyết định. Payload bất biến trong StorageDriver có đuôi `.qnu-semantic-v1.json`,
+checksum, identity nguồn/revision/pair, fingerprint đầu vào, enrichment đã ghim,
+proposal nguyên bản và audit quyết định riêng. Không lấy graph hoặc chữ
+“approved” trong file người dùng làm căn cứ cấp quyền.
+
+Rebuild dùng cặp nguồn đã xác minh → base projection → enrichment đã ghim → kiểm
+input hash trước hiệu đính → đúng bộ annotation hiệu lực → manifest/graph/facts
+→ chunks. Không gọi model trong bước phục hồi. Thay bộ annotation dựng lại từ
+base, không append toàn bộ lịch sử; đề xuất mới hoặc bị từ chối không xóa bộ
+đang hiệu lực. Semantic hash đi vào manifest/graph/facts/chunk metadata và
+fingerprint bundle để không tái dùng dẫn xuất cũ khi raw text không đổi.
+
+Ghi và đọc kiểm sidecar trước khi commit con trỏ DB. Lỗi Storage/checksum hoặc
+commit phải báo lỗi và giữ con trỏ cũ; có thể còn file orphan chưa được tham
+chiếu, không tự xóa. Mất sidecar đã được tham chiếu là lỗi toàn vẹn, không phải
+revision chưa từng có annotation. Hiệu đính hoặc reparse sang revision mới yêu
+cầu duyệt lại, không chuyển phê duyệt từ revision trước.
+
+API download hiện có nhận thêm `format=bundle`: ZIP gồm MD/JSON nguồn, sidecar
+hiệu lực nếu có, raw evidence cần thiết và manifest liên kết hash. `md`/`json`
+riêng vẫn là bản trích xuất nguồn. ZIP hiện chỉ chứa bộ hiệu lực, không thay
+thế toàn bộ archive lịch sử audit trên server.
+
+Loader file ngoài chỉ trả candidate **chưa được tin cậy**, không tự áp dụng
+quyết định trong file. Đường khôi phục nội bộ nhận revision được server xác
+minh và kiểm gói xuất với active reference có thẩm quyền. Chưa có UI nhập ZIP
+mới. Dữ liệu verified legacy chỉ được replay khi khôi phục exact proposal hash,
+binding/input và audit; thiếu căn cứ trả `SEMANTIC_LEGACY_REVIEW_REQUIRED`.
+Backfill sidecar là thao tác xác định trên draft đủ chứng cứ, không chạy hàng
+loạt hoặc sửa revision đang phục vụ. Guard unknown và quyền xuất bản giữ nguyên.
+
+### 11.8. Giới hạn nguồn đã đối chiếu — phiên 546
+
+Ba khía cạnh được giữ riêng: `raw/state/normalized` mô tả dữ liệu nguồn;
+`source_limitation.status` mô tả kết quả đối chiếu; `usage=description_only`
+giới hạn cách sử dụng. Xác nhận giới hạn không đổi `/` thành số 0 hoặc
+`not_applicable`, không giảm `unresolved_cell_count`. “Chưa công bố” vẫn giữ raw
+và trích đoạn trong `state_evidence`, khác ô trống, không áp dụng và số 0.
+
+Proposal có thể thêm `limitations`: đúng row/column/raw, evidence unit/quote,
+`examined_unit_ids` và basis `source_explicit` hoặc `human_examined_scope`.
+Đây chỉ là candidate. Basis thứ hai nghĩa là cần người dùng kiểm tra chính
+phạm vi được liệt kê, không phải model đã chứng minh toàn tài liệu không có
+định nghĩa. Không nhận unreadable, ô mất, bằng chứng không tồn tại hoặc tọa độ
+khác nguồn. Không vừa diễn giải và xác nhận giới hạn cho cùng một ô.
+
+Panel ngữ nghĩa cho đọc trích đoạn và toàn bộ đơn vị trong phạm vi; checkbox
+không tự ghi hoặc phê duyệt. API `semantic-review` phân biệt `approved`
+(diễn giải có căn cứ), `acknowledged_limits` (xác nhận riêng giới hạn cùng các
+diễn giải trong proposal), `rejected` và `changes_requested`. Phải đối chiếu
+từng mục của proposal, ghi lý do và gửi đúng hash; quyền, draft/idle, pair và
+revision được kiểm trên server. Proposal có limitations không thể được chấp
+nhận bằng hành động duyệt diễn giải hoặc duyệt toàn nguồn thông thường.
+
+Snapshot/pointer/history của mục 11.7 được tái sử dụng, không có kho annotation
+song song. Snapshot lưu action, actor, thời điểm, comment, proposal hash, binding
+và `policy_mode`. Rebuild giữ raw/state, giới hạn và semantic hash; thay đổi nguồn,
+kể cả thêm chú giải mới dù raw còn giống, yêu cầu đối soát lại. Từ chối/yêu cầu
+kiểm tra tiếp không thay bộ đang hiệu lực.
+
+`evaluate_source_policy` mặc định `strict`. Chọn rõ `acknowledged_limits` chỉ
+đánh giá khác biệt giữa unknown đã đối chiếu và công việc còn thiếu; trả các
+count `semantic_unknown_count`, `acknowledged_limit_count`, `unfinished_count`,
+`policy_blocker_count` cùng independent blockers. Page mapping, extraction,
+context/scope và toàn vẹn vẫn phải được kiểm riêng. Kết quả đánh giá không cấp
+quyền xuất bản: **publication_enabled=false**, guard unknown cũ giữ nguyên và
+nguồn có limitations bị chặn kể cả khi chỉ còn ô trống. Chưa bật chính sách
+phục vụ có giới hạn trên bất kỳ môi trường nào.
+
+Giới hạn đi vào row field và `SourceUnit.field_usage`, theo manifest/semantic
+seal tới chunk. Ô non-present không tạo fact; row-answer consumer chặn dữ kiện
+định lượng có `description_only`, kể cả khi một nhánh mất cờ trên row field.
+Đây là hành vi từ chối, chưa có đường trả lời riêng mô tả known unknown cho
+nguồn được xuất bản có giới hạn. Không thay retrieval hoặc tạo phép tính mới.
+
+Runner `backend/scripts/verify_semantic_modelops.py` chỉ kiểm DOCX mô phỏng được
+chỉ định bằng checksum, cặp MD/JSON và raw resource hash. ModelOps dùng default
+DB và successor trong chat combo cho fallback; explicit override không tự nhận
+fallback khác. Lỗi provider, schema hoặc evidence trả exit 1. Mặc định workflow
+chưa có human review trả exit 2; `--proposal-only` chỉ trả 0 khi riêng bước tạo
+và kiểm proposal đạt, trạng thái vẫn WAITING_FOR_REVIEW. Không sửa source DB,
+active pointer hoặc tự phê duyệt; accounting/quota/health thông thường của
+ModelOps vẫn có hiệu lực. Không lặp vô hạn để tìm một output PASS.
+
+### 11.9. Context có cấu trúc và binding bằng chứng — phiên 547
+
+Hợp đồng file Markdown v1.0 không đổi. API semantic-proposals tiếp tục kiểm quyền,
+draft/idle, binding/revision và cặp MD–JSON, rồi dựng proposal base từ snapshot
+authority. Structured Document đã xác minh được dùng để đối chiếu source units,
+raw/state và provenance trước khi cấp context; không gửi DOCX trực tiếp hoặc lấy
+file Markdown chưa xác minh làm nguồn chứng cứ.
+
+Context chia theo bảng/cửa sổ dòng, giữ column/header paths đầy đủ, raw/state,
+headings, lân cận và source IDs. Row directory bảo toàn định danh cho note group
+xuyên cửa sổ; diễn giải cell phải có fields đầy đủ trong gói. Related context chỉ
+theo refs/parent hoặc nhãn cấu trúc chính xác duy nhất; trùng/thiếu ghi trace.
+Remote vượt budget giữ deferred IDs và unresolved, không tự xem là đã đọc.
+Model yêu cầu `needs_context` bằng ID có thật; backend nạp thêm đúng units/rows,
+kiểm round/unit/call/byte budgets và chống vòng/no-new. Focal data thiếu thì lỗi
+trước model; proposal chỉ stage nguyên bộ sau tất cả gói hợp lệ.
+
+Model trả context/evidence/source/target IDs, scope và reason. Backend cấp evidence
+spans, trích nguyên văn canonical unit hoặc raw cell đã xác minh; binding ghim
+source/revision, hash nguồn/input/text và `[start,end)` Unicode code points.
+Không nhận quote/raw/offset do model tự viết, không fuzzy match hoặc đổi unit để
+vượt validator. Guard scope cơ học chặn năm/mã dòng trái căn cứ và sibling evidence;
+không tuyên bố hiểu đủ phủ định hay điều kiện pháp lý chỉ vì quote tồn tại.
+
+Preview hiện có hiển thị exact quote, source unit, span, reason, target và phần
+chưa đủ căn cứ. Người dùng có quyền vẫn phải đối chiếu, gửi action/comment và đúng
+proposal hash. Snapshot/pointer/history mục11.7 và strict/unknown policy mục11.8
+giữ nguyên. Không tự duyệt, publish hoặc gọi model lại khi replay annotation.
+
+`unit_temporal_annotation.semantic_context` cấu hình ngân sách trong policy hiện
+hữu, không đổi ModelOps defaults. Runner có `--target-table`, `--max-calls` và
+`--max-packet-bytes` cho lượt kiểm được giao. Lỗi provider, context budget và lỗi
+binding là các trạng thái riêng; provider trả response không đồng nghĩa proposal
+hợp lệ hay nguồn đã được duyệt. Xem [báo cáo547](../bao_cao/context547/VALIDATION_REPORT.md).

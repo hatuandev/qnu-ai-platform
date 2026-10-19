@@ -44,6 +44,15 @@ async def update_standard_revision(db: AsyncSession, binding: KnowledgeBinding, 
         "edited_from_revision_id": base.id,
         "content_review": {"actor_id": actor_id, "reason": reason, "at": datetime.now(UTC).isoformat(),
                            "base_revision_id": base.id, "base_hash": base.canonical_hash}}
+    # A content/context edit creates another revision. Prior approvals remain on
+    # the old revision; they never transfer by equal text or a reused path.
+    from app.modules.knowledge.services.semantic_store import STORE
+
+    inherited = revision.parse_provenance.pop(STORE, None)
+    previous_artifact = revision.parse_provenance.pop("structured_artifact", {})
+    if inherited or previous_artifact.get("semantic_effective") or (previous_artifact.get("semantic_annotations") or {}).get("status") == "verified":
+        revision.parse_provenance["semantic_review_required_from_revision"] = base.id
+    revision.status = "review_required"
     await prepare_standard_revision(revision)
     if context_edits is not None:
         from app.modules.knowledge.services.source_artifact import get_source_artifact

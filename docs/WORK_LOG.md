@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-19** | Codex | Context và evidence binding | Backend exact selectors, bounded context/UI reason/span/full source; giữ snapshot/policy. Focused127/FE8/Ruff/Biome/buildPASS. Full18FAIL/2264PASS/17skip, exact18ID/cause baseline không lỗi mới; DB/runtime test đã dọn. Live timeout, E2E BLOCKED | [Nhật ký547](./nhat_ky/2026-10-19_phien_547_context_va_evidence_binding.md) |
+
+| **2026-10-19** | Codex | Đợt 2 giới hạn nguồn + ModelOps | Known unknown tách state/review/usage, API/UI xác nhận riêng, strict giữ guard; 25 test mới PASS, focused235/FE7/Ruff/Biome/build PASS. Full13FAIL/2248PASS/17skip trùng exact13ID lịch sử. User cho đổi primary cx/gpt-6-luna + fallback qwen3.5-9b; inference thật đạt nhưng evidence FAIL, đợt2 BLOCKED, chưa human approval | [Nhật ký546](./nhat_ky/2026-10-19_phien_546_gioi_han_nguon_va_modelops.md) |
+
+| **2026-10-19** | Codex | Đợt 1 vòng đời annotation đã duyệt | Snapshot bất biến, pointer/history revision, replay base+enrichment không model, export ZIP/loader untrusted, seal qua facts/chunks. Focused211PASS/29lifecyclePASS; full13FAIL/2223PASS/17skip, exact13ID baseline, không lỗi mới | [Nhật ký545](./nhat_ky/2026-10-19_phien_545_vong_doi_annotation_da_duyet.md) |
+
 | **2026-10-18** | Codex | Đề xuất ngữ nghĩa có duyệt | Proposal/review nháp có hash/actor/quote; field scope, mapping9→1, BM25draft20/20.175 focused/4frontend PASS, full13FAIL/2194PASS exact baseline; ModelOps thật FAIL ALL_PROVIDERS_UNAVAILABLE, nguồn vẫn NOT_READY | [Nhật ký544](./nhat_ky/2026-10-18_phien_544_de_xuat_ngu_nghia_co_duyet.md) |
 
 | **2026-10-18** | Codex | Kiểm DOCX đến RAG offline | NOT READY: giữ183đoạn/103dòng/645ô/3footnote/ảnh/261citation; thiếu5scope note deps và2state sai. BM25draft17/20Hit5;3ô ambiguous bị gate chặn. Không sửa app/nạp lại/model/live | [Nhật ký543](./nhat_ky/2026-10-18_phien_543_kiem_thu_docx_den_rag_offline.md) |

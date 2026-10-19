@@ -57,6 +57,8 @@ def build_context_graph(manifest: UnitManifest) -> dict[str, Any]:
         links = {unit.id: unit_context_ids(manifest, unit.id) for unit in units}
         graph = {"version": VERSION, "canonical_hash": manifest.canonical_hash, "status": "context_only",
                  "links": links, "row_projections": {}}
+        if manifest.semantic_annotation_hash:
+            graph["semantic_annotation_hash"] = manifest.semantic_annotation_hash
         graph["digest"] = graph_digest(graph)
         return graph
     containers = [unit for unit in units if unit.is_container and unit.kind == "table"]

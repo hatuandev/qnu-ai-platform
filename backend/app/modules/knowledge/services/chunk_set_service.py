@@ -101,8 +101,10 @@ class ChunkSetService:
         artifact = get_source_artifact(source_rev)
         if (source_rev.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
             from app.modules.knowledge.services.qnu_serving import verify_revision_pair
+            from app.modules.knowledge.services.semantic_store import verify_effective_projection
 
-            await verify_revision_pair(source_rev)
+            document = await verify_revision_pair(source_rev)
+            await verify_effective_projection(source_rev, artifact, document)
         if get_structured_review_state(source_rev)[1]:
             raise AppException("Cần duyệt bản sạch và dữ liệu cấu trúc trước khi chia đoạn.",
                                code="FACT_SET_REVIEW_REQUIRED", status_code=409)

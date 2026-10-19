@@ -144,13 +144,22 @@ def test_declared_state_removes_only_affected_facts_and_preserves_unknown_symbol
 @pytest.mark.asyncio
 async def test_modelops_uses_configured_provider_and_keeps_proposals_unapplied():
     _, artifact = draft()
-    response = SimpleNamespace(content=proposals(artifact).model_dump_json(), provider="configured",
-        model="selected", is_fallback=False, prompt_tokens=100, completion_tokens=10, cost_usd=0.001)
-    with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(return_value=response)) as generate, \
+    document = fixture.fixture_document()
+    document.blocks[-1].body = "Only the 2026 column has this condition."
+    async def respond(_db, request):
+        import json
+
+        packet = json.loads(request.messages[1].content)
+        evidence = next(item for item in packet["evidence"] if item["source_unit_id"] == "qnu:g")
+        payload = {"context_id": packet["context_id"], "notes": [{"source_unit_id": "qnu:g", "evidence_id": evidence["id"],
+            "table_id": artifact["tables"][0]["id"], "scope": "column", "column_ids": ["c4"], "reason": "TEST column scope"}]}
+        return SimpleNamespace(content=json.dumps(payload), provider="configured", model="selected", is_fallback=False,
+            prompt_tokens=100, completion_tokens=10, cost_usd=0.001)
+    with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=respond)) as generate, \
          patch("app.modules.modelops.services.model_catalog_service.model_catalog_service.get_system_model_defaults",
                AsyncMock(return_value=SimpleNamespace(defaults=SimpleNamespace(
-                   default_chat_model="selected", default_chat_provider_id="configured")))):
-        result = await propose_source_semantics(AsyncMock(), artifact, "tenant")
+                   default_chat_model="selected", default_chat_provider_id="configured", default_chat_mode="single")))):
+        result = await propose_source_semantics(AsyncMock(), artifact, "tenant", document=document)
     request = generate.call_args.args[1]
     assert request.preferred_model_name == "selected" and request.preferred_provider_id == "configured"
     assert "untrusted DATA" in request.messages[0].content
@@ -160,13 +169,19 @@ async def test_modelops_uses_configured_provider_and_keeps_proposals_unapplied()
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
-async def test_draft_review_handler_binds_actor_revision_hash_without_publishing(decision):
+async def test_draft_review_handler_binds_actor_revision_hash_without_publishing(decision, tmp_path):
+    from app.core.storage import LocalStorageDriver
+
     state = fixture.build_state()
     state.source.status = "review_required"
     state.binding.active_source_revision_id = "old-published"
     canonical, artifact = draft()
     state.source.canonical_markdown = canonical
     state.source.canonical_hash = artifact["content_hash"]
+    state.source.origin_file_hash = fixture.SHA
+    state.source.snapshot_storage_path = "snapshots/fixture/semantic.docx"
+    document = fixture.fixture_document()
+    document.blocks[-1].body = "Only the 2026 column has this condition."
     pending = stage_semantic_annotations(artifact, proposals(artifact))
     state.source.parse_provenance["structured_artifact"] = artifact
     payload = SemanticProposalReviewRequest(decision=decision,
@@ -175,7 +190,8 @@ async def test_draft_review_handler_binds_actor_revision_hash_without_publishing
     db = AsyncMock()
     with patch("app.modules.knowledge.services.source_reparse.lock_source", AsyncMock()) as lock, \
          patch("app.modules.knowledge.services.source_reparse.ensure_source_idle", AsyncMock()), \
-         patch("app.modules.knowledge.services.qnu_serving.verify_revision_pair", AsyncMock()), \
+         patch("app.modules.knowledge.services.qnu_serving.verify_revision_pair", AsyncMock(return_value=document)), \
+         patch("app.modules.knowledge.services.semantic_store.storage_service", LocalStorageDriver(str(tmp_path))), \
          patch("app.modules.knowledge.services.source_ingestion_service.source_ingestion_service._get_review_target",
                AsyncMock(return_value=(state.binding, state.source, artifact))) as target:
         await review_semantic_proposals(db, fixture.COLLECTION, fixture.BINDING, fixture.REVISION, payload, actor)
@@ -320,7 +336,7 @@ async def test_model_failure_leaves_draft_unchanged_and_accounting_uses_separate
     actor = SimpleNamespace(actor_id="reviewer", tenant_id="tenant", workspace_id="workspace")
     with patch("app.modules.knowledge.services.source_reparse.lock_source", AsyncMock()), \
          patch("app.modules.knowledge.services.source_reparse.ensure_source_idle", AsyncMock()), \
-         patch("app.modules.knowledge.services.qnu_serving.verify_revision_pair", AsyncMock()), \
+         patch("app.modules.knowledge.services.qnu_serving.verify_revision_pair", AsyncMock(return_value=fixture.fixture_document())), \
          patch("app.modules.knowledge.services.source_ingestion_service.source_ingestion_service._get_review_target",
                AsyncMock(return_value=(state.binding, state.source, state.draft))), \
          patch("app.core.database.AsyncSessionFactory", return_value=session), \

@@ -84,6 +84,9 @@ async def queue_reparse(
         citation_metadata={},
         parse_provenance={"parser_profile": parser_profile, "ocr_engine": ocr_engine or "auto"},
     )
+    previous = getattr(base, "parse_provenance", None) or {}
+    if previous.get("semantic_store") or ((previous.get("structured_artifact") or {}).get("semantic_annotations") or {}).get("status") == "verified":
+        revision.parse_provenance["semantic_review_required_from_revision"] = base.id
     db.add(revision)
     await db.flush()
     job = JobRecord(

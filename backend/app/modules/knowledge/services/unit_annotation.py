@@ -13,6 +13,7 @@ from app.core.database import AsyncSessionFactory
 from app.core.exceptions import AppException
 from app.modules.knowledge.normalization.retrieval_models import UnitManifest
 from app.modules.knowledge.normalization.retrieval_units import YEAR, manifest_digest
+from app.modules.knowledge.services.semantic_context import SemanticContextPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class UnitAnnotationPolicy(BaseModel):
     model_name: str | None = Field(None, min_length=1, max_length=255)
     provider_id: str | None = Field(None, min_length=1, max_length=64)
     semantic_enabled: bool = True
+    semantic_context: SemanticContextPolicy = Field(default_factory=SemanticContextPolicy)
 
 
 INSTRUCTION = """Classify temporal roles of supplied document units, never answer a question.
@@ -206,7 +208,7 @@ async def propose_unit_annotations(db: AsyncSession, manifest: UnitManifest, ten
 
 
 async def enrich_source_units(markdown: str, artifact: dict[str, Any], tenant_id: str,
-                              policy: dict[str, Any] | None) -> None:
+                              policy: dict[str, Any] | None, *, document=None) -> None:
     """Optional controlled ingestion enrichment; unknown on failure, never fake years."""
     if not policy:
         return
@@ -234,7 +236,8 @@ async def enrich_source_units(markdown: str, artifact: dict[str, Any], tenant_id
         try:
             async with asyncio.timeout(120), AsyncSessionFactory() as model_db:
                 await propose_source_semantics(model_db, artifact, tenant_id,
-                                               parsed_policy.model_name, parsed_policy.provider_id)
+                                               parsed_policy.model_name, parsed_policy.provider_id,
+                                               document=document, context_policy=parsed_policy.semantic_context)
         except (AppException, ValueError, KeyError, TypeError, TimeoutError) as exc:
             artifact["semantic_annotations"] = {"status": "unavailable", "error_code": getattr(exc, "code", type(exc).__name__)}
             artifact["review"] = {"status": "required"}

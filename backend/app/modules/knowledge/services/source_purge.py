@@ -36,6 +36,9 @@ def snapshot_paths(revision: KnowledgeSourceRevision) -> set[str]:
         standard = metadata.get("qnu_markdown") or {}
         paths.update((standard.get("path"), standard.get("structured_path")))
         paths.add((standard.get("raw_evidence") or {}).get("path"))
+        semantic = metadata.get("semantic_store") or {}
+        paths.add((semantic.get("active") or {}).get("path"))
+        paths.update(item.get("path") for item in semantic.get("history", []))
     return {path for path in paths if path}
 
 
@@ -54,6 +57,8 @@ def _path_references(path: str) -> Any:
                         metadata["qnu_markdown"]["path"].astext == path,
                         metadata["qnu_markdown"]["structured_path"].astext == path,
                         metadata["qnu_markdown"]["raw_evidence"]["path"].astext == path))
+        clauses.extend((metadata["semantic_store"]["active"]["path"].astext == path,
+                        metadata["semantic_store"]["history"].contains([{"path": path}])))
     return or_(*clauses)
 
 

@@ -135,7 +135,11 @@ def _digest(payload: dict[str, Any]) -> str:
 
 def manifest_digest(manifest: UnitManifest) -> str:
     payload = manifest.model_dump()
+    if payload.get("semantic_annotation_hash") is None:
+        payload.pop("semantic_annotation_hash", None)
     for unit in payload["units"]:
+        if not unit.get("field_usage"):
+            unit.pop("field_usage", None)
         if not unit.get("field_context_refs"):
             unit.pop("field_context_refs", None)
         if not unit.get("qnu_block_id"):
@@ -151,7 +155,11 @@ def legacy_manifest_digest(manifest: UnitManifest) -> str:
     carrying actual typed temporal metadata still needs its current digest.
     """
     payload = manifest.model_dump()
+    if payload.get("semantic_annotation_hash") is None:
+        payload.pop("semantic_annotation_hash", None)
     for unit in payload["units"]:
+        if not unit.get("field_usage"):
+            unit.pop("field_usage", None)
         if not unit.get("field_context_refs"):
             unit.pop("field_context_refs", None)
         temporal = unit.get("temporal") or {}

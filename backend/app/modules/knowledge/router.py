@@ -1385,7 +1385,7 @@ async def download_source_qnu_markdown(
     collection_id: str,
     source_id: str,
     revision_id: str,
-    format: str = Query("md", pattern="^(md|json)$", description="md: tệp chuẩn; json: mô hình cấu trúc"),
+    format: str = Query("md", pattern="^(md|json|bundle)$", description="md/json: nguồn chuẩn; bundle: ZIP kèm annotation đã duyệt"),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> Response:
@@ -1393,6 +1393,13 @@ async def download_source_qnu_markdown(
 
     from app.core.exceptions import AppException
     from app.core.storage import storage_service
+
+    if format == "bundle":
+        from app.modules.knowledge.services.semantic_bundle import download_revision_bundle
+
+        content = await download_revision_bundle(db, collection_id, source_id, revision_id, actor)
+        return Response(content=content, media_type="application/zip", headers={
+            "Content-Disposition": f'attachment; filename="{quote(revision_id)}.qnu-bundle-v1.zip"'})
 
     artifact = await source_ingestion_service.get_qnu_markdown_artifact(
         db=db,

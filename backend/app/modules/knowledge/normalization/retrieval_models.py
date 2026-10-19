@@ -47,6 +47,7 @@ class SourceUnit(BaseModel):
     source_locations: list[dict] = Field(default_factory=list)
     context_refs: list[str] = Field(default_factory=list)
     field_context_refs: dict[str, list[str]] = Field(default_factory=dict)
+    field_usage: dict[str, Literal["description_only"]] = Field(default_factory=dict)
 
 
 class UnitManifest(BaseModel):
@@ -54,6 +55,7 @@ class UnitManifest(BaseModel):
     version: Literal["source-units-v1"] = UNIT_VERSION
     canonical_hash: str
     units: list[SourceUnit] = Field(default_factory=list)
+    semantic_annotation_hash: str | None = None
 
 
 def temporal_is_compatible(scope: TemporalScope, years: list[int]) -> bool:

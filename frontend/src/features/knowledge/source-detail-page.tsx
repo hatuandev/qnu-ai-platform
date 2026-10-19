@@ -217,7 +217,13 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       toast.error(extractErrorMessage(error, "Tạo đề xuất thất bại.")),
   });
   const semanticMutation = useMutation({
-    mutationFn: (decision: "approved" | "rejected") => {
+    mutationFn: (
+      decision:
+        | "approved"
+        | "acknowledged_limits"
+        | "rejected"
+        | "changes_requested",
+    ) => {
       if (
         !activeRev?.id ||
         !semanticProposal?.proposal_hash ||
@@ -234,6 +240,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         semanticProposal.proposal_hash,
         reviewComment.trim(),
         decision,
+        decision === "acknowledged_limits" ? "acknowledged_limits" : "strict",
       );
     },
     onSuccess: async (_revision, decision) => {
@@ -242,9 +249,13 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         queryKey: ["source-semantic-review", collectionId, sourceId],
       });
       toast.success(
-        decision === "approved"
-          ? "Đã áp dụng đề xuất đã duyệt vào bản nháp. Tài liệu chưa được xuất bản."
-          : "Đã bỏ đề xuất. Dữ liệu trong bản nháp được giữ nguyên.",
+        decision === "acknowledged_limits"
+          ? "Đã ghi nhận giới hạn nguồn. Dữ liệu chưa rõ vẫn giữ nguyên; xuất bản vẫn bị chặn."
+          : decision === "changes_requested"
+            ? "Đã ghi nhận yêu cầu kiểm tra tiếp."
+            : decision === "approved"
+              ? "Đã áp dụng đề xuất đã duyệt vào bản nháp. Tài liệu chưa được xuất bản."
+              : "Đã bỏ đề xuất. Dữ liệu trong bản nháp được giữ nguyên.",
       );
     },
     onError: (error: unknown) =>
@@ -1042,6 +1053,23 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
               </Button>
             )}
             {semanticProposal?.status === "proposed" && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  semanticMutation.isPending ||
+                  reviewMutation.isPending ||
+                  proposalMutation.isPending ||
+                  semanticReview.isFetching ||
+                  !hasReviewedSemantics ||
+                  reviewComment.trim().length < 3
+                }
+                onClick={() => semanticMutation.mutate("changes_requested")}
+              >
+                Yêu cầu kiểm tra tiếp
+              </Button>
+            )}
+            {semanticProposal?.status === "proposed" && (
               <label
                 htmlFor="review-semantic-proposals"
                 className="flex items-start gap-2"
@@ -1055,7 +1083,9 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                     )
                   }
                 />
-                Tôi đã đối chiếu các trích đoạn và phạm vi áp dụng ở trên.
+                Tôi đã đối chiếu trích đoạn và toàn bộ phạm vi nêu trên. Nếu xác
+                nhận giới hạn nguồn, tôi xác nhận kết quả kiểm tra trong chính
+                phạm vi này; không suy nghĩa cho ô còn chưa rõ.
               </label>
             )}
             <div className="space-y-1.5">
@@ -1119,11 +1149,19 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                   !hasReviewedSemantics ||
                   reviewComment.trim().length < 3
                 }
-                onClick={() => semanticMutation.mutate("approved")}
+                onClick={() =>
+                  semanticMutation.mutate(
+                    semanticProposal.annotations?.limitations?.length
+                      ? "acknowledged_limits"
+                      : "approved",
+                  )
+                }
               >
                 {semanticMutation.isPending
                   ? "Đang áp dụng..."
-                  : "Áp dụng đề xuất vào bản nháp"}
+                  : semanticProposal.annotations?.limitations?.length
+                    ? "Xác nhận giới hạn nguồn và diễn giải kèm theo"
+                    : "Duyệt diễn giải có bằng chứng"}
               </Button>
             )}
             <Button

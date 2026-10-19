@@ -1049,7 +1049,8 @@ class ReviewSourceRevisionRequest(BaseModel):
 
 class SemanticProposalReviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    decision: Literal["approved", "rejected"]
+    decision: Literal["approved", "acknowledged_limits", "rejected", "changes_requested"]
+    policy_mode: Literal["strict", "acknowledged_limits"] = "strict"
     expected_semantic_proposal_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
     comment: str = Field(min_length=3, max_length=2000)
 

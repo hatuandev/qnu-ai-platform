@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên547](./2026-10-19_phien_547_context_va_evidence_binding.md) | Structure-aware context + evidence binding | Backend exact selectors, bounded context/UI reason/span/full source; DB test riêng đã dọn, focused127/FE8/buildPASS. Full18FAIL/2264PASS/17skip, exact18ID/cause baseline, không lỗi mới; live timeout, E2E BLOCKED |
+
+| **2026-10-19** | [Phiên546](./2026-10-19_phien_546_gioi_han_nguon_va_modelops.md) | Đợt 2 giới hạn nguồn + ModelOps | Tách state/review/usage, snapshot và consumer restrictions, UI xác nhận riêng; policy evaluation chưa mở xuất bản. Đổi đúng hai model theo user; inference thật đạt, evidence FAIL; chưa có phê duyệt thật |
+
+| **2026-10-19** | [Phiên545](./2026-10-19_phien_545_vong_doi_annotation_da_duyet.md) | Vòng đời annotation đã duyệt | Snapshot/pointer/history, phục hồi từ pair+sidecar, API export/loader và scope qua facts/chunks; DB rollback/LocalStorage/API/DOCX thật đã kiểm |
+
 | **2026-10-18** | [Phiên544](./2026-10-18_phien_544_de_xuat_ngu_nghia_co_duyet.md) | Đề xuất ngữ nghĩa có duyệt | ModelOps chỉ đề xuất, người dùng đối chiếu rồi áp dụng vào nháp; mapping9→1, BM25draft20/20. ModelOps thật lỗi provider; chưa duyệt nguồn |
 
 | **2026-10-18** | [Phiên543](./2026-10-18_phien_543_kiem_thu_docx_den_rag_offline.md) | DOCX đến RAG offline | NOT READY: đủ text/rows/footnotes/image/citation, thiếu5note deps/2state; BM25draft17/20Hit5; gate chặn3ambiguous. Không sửa app/nạp lại |
