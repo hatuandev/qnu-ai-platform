@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [Nạp tài liệu tự động và đối chiếu nâng cao](./smart_approval.md): ba trạng thái chất lượng, nạp vector tách publication; Smart Approval, audit và transaction trong chế độ nâng cao.
+
 - [14 — Semantic selector và scope review](./14_semantic_selector_va_scope_review.md):
   selector v1/v2, owner do registry xác thực, đối chiếu toàn nguồn và tập đích,
   quyết định theo issue/proposal hash và checkpoint kiểm chứng có người duyệt.

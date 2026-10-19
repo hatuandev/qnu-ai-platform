@@ -48,6 +48,9 @@ async def queue_vector_load(
             raise AppException("Markdown chưa đủ điều kiện nạp vector.", code="SOURCE_REVISION_NOT_READY", status_code=409)
         if get_structured_review_state(revision)[1]:
             raise AppException("Cần duyệt bản sạch trước khi nạp vector.", code="FACT_SET_REVIEW_REQUIRED", status_code=409)
+        if (revision.parse_provenance or {}).get("automatic_ingestion"):
+            from app.modules.knowledge.services.automatic_ingestion import verify_content_source
+            await verify_content_source(revision)
         existing = await db.scalar(select(JobRecord).where(
             JobRecord.collection_id == collection_id,
 

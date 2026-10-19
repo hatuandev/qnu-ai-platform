@@ -1,0 +1,20 @@
+{
+  "studio_http": 200,
+  "revision_id": "ks_rev_2b5e0352565f",
+  "proposal_hash": "543ddd61aa0b1527babe8c6adcb122c5cb2157f30d542c91d1de6fa5407207df",
+  "assertions": 12,
+  "issues": 18,
+  "evidence_download": {
+    "md": {
+      "status": 200,
+      "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97"
+    },
+    "json": {
+      "status": 200,
+      "sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+    }
+  },
+  "enforced_auth_without_session": 401,
+  "browser": "UI_LIVE_NOT_RUN: SSO sign-in; no user session supplied",
+  "frontend_route": "http://localhost:3000/knowledge/col_admissions/sources/bnd_21c09bbc6ca0?revision=ks_rev_2b5e0352565f&tab=content"
+}

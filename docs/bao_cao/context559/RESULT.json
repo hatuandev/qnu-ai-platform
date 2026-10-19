@@ -1,0 +1,15 @@
+{
+  "revision_id": "ks_rev_9c93b4b4e2be",
+  "revision_no": 3,
+  "source_validation": "PASS",
+  "markdown_json_validation": "PASS",
+  "automatic_readiness": "NEEDS_ATTENTION",
+  "blockers": 8,
+  "raw_limitations": 4,
+  "vector_status": "BLOCKED",
+  "vector_http": 404,
+  "new_revision_qdrant_points": 0,
+  "published": false,
+  "old_revisions_unchanged": true,
+  "application_code_changed": false
+}

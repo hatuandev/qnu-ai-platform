@@ -1,0 +1,127 @@
+{
+  "status": "CANONICAL_REVISION_VALID",
+  "new_revision_id": "ks_rev_2b5e0352565f",
+  "old_revision_id": "ks_rev_84c4950c9ce2",
+  "old_row_unchanged": true,
+  "core_content_order_exact_offline": true,
+  "all_table_headers_rows_raw_states_exact_offline": true,
+  "block_count": 233,
+  "table_count": 10,
+  "footnotes": [
+    {
+      "id": "docx_footnote_1",
+      "type": "note",
+      "role": "footnote",
+      "body_sha256": "e6823fdf947bcbbcfcf31d2c22cbad4f208854ebcc0cd2cdbe344e6d3dc59665",
+      "source_locations": [
+        {
+          "page": 3,
+          "page_label": null,
+          "locator": "word/footnotes.xml#id=1",
+          "bbox": null,
+          "bbox_space": null
+        }
+      ],
+      "attributes": {
+        "role": "footnote",
+        "source_anchors": [
+          {
+            "block_id": "p045",
+            "locator": "word/document.xml#p51",
+            "table": null
+          }
+        ],
+        "source_note_id": "1"
+      }
+    },
+    {
+      "id": "docx_footnote_2",
+      "type": "note",
+      "role": "footnote",
+      "body_sha256": "1eb83c904195da93dfef8ac0773ea568c1e2b9bf0c523a9820f00e19a7bf7575",
+      "source_locations": [
+        {
+          "page": 6,
+          "page_label": null,
+          "locator": "word/footnotes.xml#id=2",
+          "bbox": null,
+          "bbox_space": null
+        }
+      ],
+      "attributes": {
+        "role": "footnote",
+        "source_anchors": [
+          {
+            "block_id": "p052",
+            "locator": "word/document.xml#p274",
+            "table": null
+          }
+        ],
+        "source_note_id": "2"
+      }
+    },
+    {
+      "id": "docx_footnote_3",
+      "type": "note",
+      "role": "footnote",
+      "body_sha256": "c702f5ad3134049e248ff353aa79ce90f0c197db57a42c04fe614d8d25723357",
+      "source_locations": [
+        {
+          "page": null,
+          "page_label": null,
+          "locator": "word/footnotes.xml#id=3",
+          "bbox": null,
+          "bbox_space": null
+        }
+      ],
+      "attributes": {
+        "role": "footnote",
+        "source_anchors": [
+          {
+            "block_id": "p072",
+            "locator": "word/document.xml#p697",
+            "table": null
+          }
+        ],
+        "source_note_id": "3"
+      }
+    }
+  ],
+  "source_inventory": {
+    "image_anchor_count": 1,
+    "image_resources": 1,
+    "linked_anchors": 3,
+    "missing_note_ids": [],
+    "note_anchor_count": 3,
+    "note_blocks": 3,
+    "note_count": 3,
+    "unresolved_anchors": 0
+  },
+  "resource_bundle_sha256": "3a7569081ca4b05daf03cda22d078b6267c3189784112334bc4d0e8bac19cc47",
+  "resource_members": [
+    "word/media/image1.png"
+  ],
+  "markdown_sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+  "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b",
+  "stored_projection_replay": "PASS",
+  "publication_rows_and_counts_unchanged": true,
+  "page_mapping": {
+    "kind": "pdf_preview_render",
+    "note": "DOCX không có số trang vật lý; page là trang của bản PDF render xem trước, không phải trang in của DOCX.",
+    "method": "aligned_tokens_unique_native_units_and_same_page_row_brackets",
+    "status": "partial",
+    "render_sha256": "176706536ee8f7c3434de98148a58d3df8386fd0e9a3d79d0aac232cedafaa13",
+    "render_page_count": 18
+  },
+  "revision_status": "review_required",
+  "quality_warning_codes": {
+    "TABLE_WIDTH_MISMATCH": 1,
+    "REPEATED_MARGIN_REVIEW": 9,
+    "TABLES_NOT_MATERIALIZED": 2,
+    "VISUAL_CONTENT_REVIEW": 1,
+    "CONTENT_TABLE_WIDTH": 2,
+    "CONTENT_HEADER_REVIEW": 1
+  },
+  "quality_warning_count": 16,
+  "preview_diagnostic": "PDF Inspector exited unsuccessfully; native evidence retained. Core DOCX/source validation passed independently."
+}

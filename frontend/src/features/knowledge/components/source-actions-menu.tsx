@@ -46,7 +46,7 @@ export function SourceActionsMenu({
           : []
       }
       disabledReason={
-        canLoad ? undefined : "Hãy bóc tách và duyệt Markdown trước."
+        canLoad ? undefined : "Hãy chờ chuẩn hóa và kiểm tra nội dung hoàn tất."
       }
       renderTrigger={(vectorItem) => (
         <PauseSourceButton

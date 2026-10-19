@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "new_revision_id": "ks_rev_2b5e0352565f",
+  "old_revision_unchanged": true,
+  "source_revision_count": 2,
+  "new_revision_count": 1,
+  "pending_hash": "543ddd61aa0b1527babe8c6adcb122c5cb2157f30d542c91d1de6fa5407207df",
+  "pending_status": "proposed",
+  "revision_status": "review_required",
+  "publication_counts_unchanged": {
+    "knowledge_index_revisions": 26,
+    "knowledge_chunks": 56,
+    "knowledge_facts": 0
+  },
+  "publication_row_hash": "6e03fccd8cf2c1c605535ada7986afb2e7292d52bb943b1a480a985bfa3ef302",
+  "changed_artifact_keys": [
+    "semantic_annotations",
+    "source_policy"
+  ],
+  "pre_post_draft_data_hashes": {
+    "tables": {
+      "before": "ca4f788acf86a1ecfa013a8f5fb490cfa799bcdae1075430a42aa4cc2f7a4770",
+      "after": "ca4f788acf86a1ecfa013a8f5fb490cfa799bcdae1075430a42aa4cc2f7a4770"
+    },
+    "facts": {
+      "before": "1211d7d68e29614f19b5661a2f7a85f876a3396ecb088c0c733ccda217d25f10",
+      "after": "1211d7d68e29614f19b5661a2f7a85f876a3396ecb088c0c733ccda217d25f10"
+    },
+    "context_graph": {
+      "before": "7e27c6f88ef18d1604861d109e95fd289c21fe51fbeb105001e09934d0dff064",
+      "after": "7e27c6f88ef18d1604861d109e95fd289c21fe51fbeb105001e09934d0dff064"
+    },
+    "retrieval_units": {
+      "before": "768b92255e495828aaa4e1db1b859e26f0e072f16f1def3359e32a2ab9458e41",
+      "after": "768b92255e495828aaa4e1db1b859e26f0e072f16f1def3359e32a2ab9458e41"
+    }
+  },
+  "draft_artifact_facts": 392,
+  "effective": false,
+  "test_database_absent": true,
+  "new_modelops_llm_usage_rows": 0,
+  "llm_usage_count": 1774,
+  "live_db_transaction": "READ ONLY"
+}

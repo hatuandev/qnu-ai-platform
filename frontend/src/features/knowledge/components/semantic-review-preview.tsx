@@ -54,10 +54,10 @@ function EvidenceReviewDetails({
       {binding && (
         <details>
           <summary>Đọc toàn bộ đơn vị nguồn và điều kiện loại trừ</summary>
-          <p className="whitespace-pre-wrap break-words">
-            {sourceText ??
-              "Không tải được đơn vị nguồn; chưa đủ căn cứ đối chiếu."}
-          </p>
+          <SourceEvidenceLink binding={binding} />
+          {!sourceText && (
+            <p>Không tải được đơn vị nguồn; chưa đủ căn cứ đối chiếu.</p>
+          )}
         </details>
       )}
     </div>
@@ -152,12 +152,10 @@ function ContextIssueItem({
         </p>
       </details>
       {issue.review_evidence?.map((item) => (
-        <blockquote
+        <SourceEvidenceLink
           key={item.evidence_binding.evidence_id}
-          className="whitespace-pre-wrap border-l-2 pl-3"
-        >
-          {item.evidence_quote}
-        </blockquote>
+          binding={item.evidence_binding}
+        />
       ))}
       {assessment && (
         <div className="space-y-2">
@@ -180,22 +178,18 @@ function ContextIssueItem({
               <p>{link.reason}</p>
               {link.condition && <p>Chỉ khi: {link.condition}</p>}
               {link.evidence.map((item) => (
-                <blockquote
+                <SourceEvidenceLink
                   key={item.evidence_binding.evidence_id}
-                  className="whitespace-pre-wrap border-l-2 pl-3"
-                >
-                  {item.evidence_quote}
-                </blockquote>
+                  binding={item.evidence_binding}
+                />
               ))}
             </div>
           ))}
           {assessment.evidence.map((item) => (
-            <blockquote
+            <SourceEvidenceLink
               key={item.evidence_binding.evidence_id}
-              className="whitespace-pre-wrap border-l-2 pl-3"
-            >
-              {item.evidence_quote}
-            </blockquote>
+              binding={item.evidence_binding}
+            />
           ))}
         </div>
       )}
@@ -252,7 +246,7 @@ function ContextIssueItem({
   );
 }
 
-export function SemanticReviewPreview({
+function SemanticReviewContent({
   artifact,
   decisions = [],
   onDecision,
@@ -333,6 +327,16 @@ export function SemanticReviewPreview({
           Đã đối chiếu {item.issue_id}: {item.reason} · {item.actor_id}
         </p>
       ))}
+      {proposal.review?.machine_validation && (
+        <p>
+          Quyết định chấp thuận hàng loạt của {proposal.review.actor_id} lúc{" "}
+          {proposal.review.at}.{" "}
+          {proposal.review.machine_validation.auto_verified_count} mục được hệ
+          thống kiểm chứng theo {proposal.review.machine_validation.policy_id} /{" "}
+          {proposal.review.machine_validation.policy_version}; không ghi nhận
+          người dùng đã đọc riêng từng mục.
+        </p>
+      )}
     </section>
   );
   if (proposal?.status !== "proposed" || !proposal.annotations) {
@@ -455,13 +459,7 @@ export function SemanticReviewPreview({
               return (
                 <details key={binding.evidence_id} className="space-y-2">
                   <summary>Tham chiếu và điều kiện đi kèm</summary>
-                  <blockquote className="whitespace-pre-wrap border-l-2 pl-3">
-                    {sourceText !== undefined
-                      ? Array.from(sourceText)
-                          .slice(binding.start, binding.end)
-                          .join("")
-                      : "Chưa tải được nội dung tham chiếu; cần bổ sung trước khi duyệt."}
-                  </blockquote>
+                  <SourceEvidenceLink binding={binding} />
                   <EvidenceReviewDetails
                     binding={binding}
                     sourceText={sourceText}
@@ -563,5 +561,110 @@ export function SemanticReviewPreview({
         );
       })}
     </section>
+  );
+}
+
+function evidenceAnchor(unitId: string) {
+  return `semantic-source-${encodeURIComponent(unitId)}`;
+}
+
+function SourceEvidenceLink({ binding }: { binding: SemanticEvidenceBinding }) {
+  return (
+    <a
+      className="text-primary underline break-all"
+      href={`#${evidenceAnchor(binding.source_unit_id)}`}
+    >
+      Nguồn {binding.source_unit_id} · [{binding.start}, {binding.end})
+    </a>
+  );
+}
+
+export function SemanticReviewPreview(
+  props: Parameters<typeof SemanticReviewContent>[0],
+) {
+  const proposal = props.artifact.semantic_annotations;
+  const sources = new Map<string, { text: string; references: Set<string> }>();
+  if (proposal?.status !== "proposed" && !proposal?.context_review)
+    return <SemanticReviewContent {...props} />;
+  const register = (
+    binding: SemanticEvidenceBinding | null | undefined,
+    quote: string,
+    reference: string,
+  ) => {
+    if (!binding?.source_unit_id) return;
+    const id = binding.source_unit_id;
+    const canonical = props.artifact.retrieval_units?.units.find(
+      (unit) => unit.id === id,
+    )?.text;
+    const previous = sources.get(id);
+    const text =
+      canonical ??
+      (quote.length > (previous?.text.length ?? 0)
+        ? quote
+        : (previous?.text ?? quote));
+    const references = previous?.references ?? new Set<string>();
+    references.add(reference);
+    sources.set(id, { text, references });
+  };
+  for (const issue of proposal?.context_review?.issues ?? []) {
+    const label =
+      proposal?.context_review?.display_labels?.issues?.[issue.issue_id] ??
+      issue.issue_id;
+    for (const item of issue.review_evidence ?? [])
+      register(item.evidence_binding, item.evidence_quote, label);
+  }
+  for (const assessment of proposal?.context_review?.reference_assessments ??
+    []) {
+    for (const item of assessment.evidence)
+      register(item.evidence_binding, item.evidence_quote, assessment.issue_id);
+    for (const link of assessment.links ?? [])
+      for (const item of link.evidence)
+        register(item.evidence_binding, item.evidence_quote, link.assertion_id);
+  }
+  for (const note of proposal?.annotations?.notes ?? []) {
+    register(note.evidence_binding, note.evidence_quote, note.note_unit_id);
+    for (const binding of note.related_evidence ?? []) {
+      const text = props.artifact.retrieval_units?.units.find(
+        (unit) => unit.id === binding.source_unit_id,
+      )?.text;
+      register(
+        binding,
+        text === undefined
+          ? "Chưa tải được nội dung tham chiếu; cần bổ sung trước khi duyệt."
+          : Array.from(text).slice(binding.start, binding.end).join(""),
+        note.note_unit_id,
+      );
+    }
+  }
+  for (const cell of proposal?.annotations?.cells ?? [])
+    register(cell.evidence_binding, cell.evidence_quote, cell.row_unit_id);
+  for (const limit of proposal?.annotations?.limitations ?? [])
+    register(limit.evidence_binding, limit.evidence_quote, limit.row_unit_id);
+  return (
+    <>
+      <SemanticReviewContent {...props} />
+      {sources.size > 0 && (
+        <details className="space-y-2 text-sm">
+          <summary className="cursor-pointer font-medium">
+            Nguồn đối chiếu dùng chung ({sources.size})
+          </summary>
+          {Array.from(sources, ([id, source]) => (
+            <article
+              id={evidenceAnchor(id)}
+              key={id}
+              className="space-y-2 rounded-lg border p-3"
+            >
+              <p className="break-all font-medium">{id}</p>
+              <p className="break-all text-muted-foreground">
+                Liên quan: {Array.from(source.references).join("; ")}
+              </p>
+              <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3">
+                {source.text}
+              </blockquote>
+            </article>
+          ))}
+        </details>
+      )}
+    </>
   );
 }

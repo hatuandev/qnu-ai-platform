@@ -915,6 +915,12 @@ class KnowledgeSourceRevision(Base):
         return get_structured_review_state(self)[0]
 
     @property
+    def ingestion_readiness(self) -> dict | None:
+        from app.modules.knowledge.services.automatic_ingestion import content_readiness
+
+        return content_readiness(self)
+
+    @property
     def requires_structured_review(self) -> bool:
         from app.modules.knowledge.services.source_artifact import get_structured_review_state
 

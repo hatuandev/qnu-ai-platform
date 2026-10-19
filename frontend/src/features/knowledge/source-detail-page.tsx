@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Save,
   Scan,
-  ShieldAlert,
   ShieldCheck,
   XCircle,
 } from "lucide-react";
@@ -64,10 +63,13 @@ import type {
   KnowledgeSourceDetailResponse,
 } from "@/types/knowledge";
 import { DeleteSourceButton } from "./components/delete-source-button";
+import { IngestionReadinessPanel } from "./components/ingestion-readiness-panel";
 import { QnuStandardEditor } from "./components/qnu-standard-editor";
 import { SemanticCheckpointImport } from "./components/semantic-checkpoint-import";
 import { SemanticReviewPreview } from "./components/semantic-review-preview";
+import { SmartApprovalPanel } from "./components/smart-approval-panel";
 import { SourceContextEditor } from "./components/source-context-editor";
+import { VectorLoadControls } from "./components/vector-load-controls";
 import { refreshSourceQueries } from "./utils/source-query-cache";
 
 interface SourceDetailPageProps {
@@ -101,6 +103,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
   // Editing state
   const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
+  const [isMarkdownVisible, setIsMarkdownVisible] = useState(false);
   const [editedMarkdown, setEditedMarkdown] = useState("");
   const [editReason, setEditReason] = useState("");
 
@@ -110,6 +113,7 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
     "approved",
   );
   const [reviewComment, setReviewComment] = useState("");
+  const [isSmartApprovalPending, setIsSmartApprovalPending] = useState(false);
   const [reviewedSemanticKey, setReviewedSemanticKey] = useState<string | null>(
     null,
   );
@@ -301,17 +305,17 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       toast.error(extractErrorMessage(error, "Đối chiếu đề xuất thất bại.")),
   });
   const reviewMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (decision: "approved" | "rejected") => {
       if (!activeRev?.id) throw new Error("Chưa có bản sửa đổi để duyệt.");
       if (
-        reviewDecision === "approved" &&
+        decision === "approved" &&
         (semanticReview.isFetching ||
           semanticReview.isPending ||
           semanticReview.isError)
       )
         throw new Error("Cần tải đầy đủ nội dung đối chiếu trước khi duyệt.");
       if (
-        reviewDecision === "approved" &&
+        decision === "approved" &&
         semanticProposal?.status === "proposed" &&
         !hasReviewedSemantics
       )
@@ -322,17 +326,17 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
         collectionId,
         sourceId,
         activeRev.id,
-        reviewDecision,
+        decision,
         reviewComment.trim() || undefined,
         semanticProposal?.status === "proposed"
           ? semanticProposal.proposal_hash
           : undefined,
       );
     },
-    onSuccess: async () => {
+    onSuccess: async (_revision, decision) => {
       await refreshSourceQueries(queryClient, collectionId, sourceId);
       toast.success(
-        reviewDecision === "approved"
+        decision === "approved"
           ? "Đã phê duyệt bản sửa đổi thành công."
           : "Đã từ chối bản sửa đổi.",
       );
@@ -531,53 +535,32 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
             <h1 className="text-lg sm:text-xl font-bold text-foreground">
               Chi Tiết Nguồn Tri Thức
             </h1>
-            <Badge
-              variant="outline"
-              className={`text-[11px] ${
-                source.status === "ready"
-                  ? "bg-success/10 text-success border-success/30"
-                  : source.status === "review_required"
-                    ? "bg-warning/10 text-warning border-warning/30"
-                    : source.status === "failed"
-                      ? "bg-destructive/10 text-destructive border-destructive/30"
-                      : "bg-primary/10 text-primary border-primary/30"
-              }`}
-            >
-              {source.status === "ready"
-                ? "Sẵn sàng (Ready)"
-                : source.status === "review_required"
-                  ? "Cần duyệt (Review Required)"
-                  : source.status === "failed"
-                    ? "Lỗi (Failed)"
-                    : source.status}
-            </Badge>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Mã nguồn:{" "}
-            <span className="font-mono text-foreground">{source.id}</span>
-          </p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <Button
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => onStudioModeChange(true)}
-          >
-            <Scan className="size-3.5" />
-            <span>Bóc tách & Studio OCR</span>
-          </Button>
+          {canReviewSemantics && (
+            <>
+              <Button
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => onStudioModeChange(true)}
+              >
+                <Scan className="size-3.5" />
+                <span>Bóc tách & Studio OCR</span>
+              </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => setIsReparseDialogOpen(true)}
-          >
-            <RefreshCw className="size-3.5" />
-            <span>Bóc tách lại</span>
-          </Button>
-
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => setIsReparseDialogOpen(true)}
+              >
+                <RefreshCw className="size-3.5" />
+                <span>Bóc tách lại</span>
+              </Button>
+            </>
+          )}
           {source.repository_document_id && (
             <Button
               asChild
@@ -598,78 +581,96 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       </div>
 
       {/* 2. Snapshot Provenance Ribbon */}
-      <Card className="border border-border/70 shadow-xs bg-muted/20">
-        <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div>
-            <span className="text-muted-foreground text-[11px] block">
-              Tài liệu gốc (Repository Doc)
-            </span>
-            <span className="font-mono font-medium text-foreground block truncate">
-              {source.repository_document_id}
-            </span>
-          </div>
-          <div>
-            <span className="text-muted-foreground text-[11px] block">
-              Mã băm tệp gốc (SHA-256)
-            </span>
-            <span
-              className="font-mono text-muted-foreground text-[11px] block truncate"
-              title={activeRev?.origin_file_hash}
-            >
-              {activeRev?.origin_file_hash
-                ? `${activeRev.origin_file_hash.slice(0, 16)}...`
-                : "—"}
-            </span>
-          </div>
-          <div>
-            <span className="text-muted-foreground text-[11px] block">
-              Bản sửa đổi hiện hành (Revision)
-            </span>
-            <span className="font-semibold text-foreground">
-              v{activeRev?.revision_no ?? 1} ({activeRev?.status ?? "—"})
-            </span>
-          </div>
-          <div>
-            <span className="text-muted-foreground text-[11px] block">
-              Ngày nạp (Snapshot Date)
-            </span>
-            <span className="text-foreground">
-              {new Date(source.created_at).toLocaleDateString("vi-VN")}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 3. Review Required Alert Action Banner */}
-      {(activeRev?.status === "review_required" ||
-        activeRev?.requires_structured_review) && (
-        <Card className="border border-warning/40 bg-warning/5 shadow-xs">
-          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <ShieldAlert className="size-5 text-warning shrink-0" />
-              <div>
-                <h4 className="text-xs font-bold text-foreground">
-                  Tài liệu cần cán bộ kiểm duyệt trước khi lập chỉ mục (Quality
-                  Gate)
-                </h4>
-                <p className="text-[11px] text-muted-foreground">
-                  {activeRev.failure_detail ||
-                    "Chất lượng bóc tách tài liệu chưa đạt ngưỡng tự động hoặc phát hiện bất thường cấu trúc."}
-                </p>
-              </div>
+      <details>
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          Thông tin tài liệu
+        </summary>
+        <Card className="border border-border/70 shadow-xs bg-muted/20">
+          <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div>
+              <span className="text-muted-foreground text-[11px] block">
+                Tài liệu gốc (Repository Doc)
+              </span>
+              <span className="font-mono font-medium text-foreground block truncate">
+                {source.repository_document_id}
+              </span>
             </div>
-
-            <Button
-              size="sm"
-              onClick={() => setIsReviewDialogOpen(true)}
-              className="h-8 text-xs gap-1.5 shrink-0 self-start sm:self-auto"
-            >
-              <ShieldCheck className="size-3.5" />
-              <span>Phê duyệt / Từ chối</span>
-            </Button>
+            <div>
+              <span className="text-muted-foreground text-[11px] block">
+                Mã băm tệp gốc (SHA-256)
+              </span>
+              <span
+                className="font-mono text-muted-foreground text-[11px] block truncate"
+                title={activeRev?.origin_file_hash}
+              >
+                {activeRev?.origin_file_hash
+                  ? `${activeRev.origin_file_hash.slice(0, 16)}...`
+                  : "—"}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-[11px] block">
+                Bản sửa đổi hiện hành (Revision)
+              </span>
+              <span className="font-semibold text-foreground">
+                v{activeRev?.revision_no ?? 1} ({activeRev?.status ?? "—"})
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground text-[11px] block">
+                Ngày nạp (Snapshot Date)
+              </span>
+              <span className="text-foreground">
+                {new Date(source.created_at).toLocaleDateString("vi-VN")}
+              </span>
+            </div>
           </CardContent>
         </Card>
-      )}
+      </details>
+
+      <IngestionReadinessPanel
+        readiness={activeRev?.ingestion_readiness}
+        isReady={
+          activeRev?.status === "ready" && !activeRev.requires_structured_review
+        }
+        isProcessing={[
+          "queued",
+          "extracting",
+          "normalizing",
+          "validating",
+        ].includes(activeRev?.status ?? "")}
+        onViewMarkdown={() => {
+          setActiveTab("content");
+          setIsMarkdownVisible(true);
+        }}
+        onAdvanced={
+          canReviewSemantics ? () => setIsReviewDialogOpen(true) : undefined
+        }
+        vectorAction={
+          <VectorLoadControls
+            collectionId={collectionId}
+            targets={
+              activeRev?.id &&
+              activeRev.status === "ready" &&
+              !activeRev.requires_structured_review &&
+              source.active_source_revision_id === activeRev.id
+                ? [{ binding_id: sourceId, source_revision_id: activeRev.id }]
+                : []
+            }
+            disabledReason={
+              !rbac.isAccessVerified ||
+              rbac.isDemoMode ||
+              !rbac.can("ai.knowledge.upload")
+                ? "Bạn chưa có quyền nạp vector."
+                : activeRev?.status !== "ready" ||
+                    activeRev.requires_structured_review ||
+                    source.active_source_revision_id !== activeRev.id
+                  ? "Nội dung chưa sẵn sàng để nạp vector."
+                  : undefined
+            }
+          />
+        }
+      />
 
       {/* 4. Tab Navigation */}
       <Tabs
@@ -701,103 +702,110 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
 
         {/* Tab 1: Canonical Markdown Content */}
         <TabsContent value="content" className="space-y-3">
-          {activeRev?.qnu_markdown_status === "ready" ? (
-            <QnuStandardEditor
-              key={activeRev.id}
-              collectionId={collectionId}
-              sourceId={sourceId}
-              revision={activeRev}
-              onSaved={setSelectedRevisionId}
-            />
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">
-                  {isEditingMarkdown
-                    ? "Chế độ hiệu đính Markdown: Bạn có thể chỉnh sửa cấu trúc văn bản hoặc tiêu đề trước khi lập chỉ mục."
-                    : "Nội dung Markdown đã được chuẩn hóa qua tầng bóc tách và làm sạch Unicode NFC."}
-                </div>
+          {!isMarkdownVisible && (
+            <p className="text-sm text-muted-foreground">
+              Dùng Xem Markdown để mở nội dung đã chuẩn hóa.
+            </p>
+          )}
+          {isMarkdownVisible &&
+            (activeRev?.qnu_markdown_status === "ready" ? (
+              <QnuStandardEditor
+                key={activeRev.id}
+                collectionId={collectionId}
+                sourceId={sourceId}
+                revision={activeRev}
+                onSaved={setSelectedRevisionId}
+              />
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs text-muted-foreground">
+                    {isEditingMarkdown
+                      ? "Chế độ hiệu đính Markdown: Bạn có thể chỉnh sửa cấu trúc văn bản hoặc tiêu đề trước khi lập chỉ mục."
+                      : "Nội dung Markdown đã được chuẩn hóa qua tầng bóc tách và làm sạch Unicode NFC."}
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  {isEditingMarkdown ? (
-                    <>
+                  <div className="flex items-center gap-2">
+                    {isEditingMarkdown ? (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setIsEditingMarkdown(false);
+                            setEditedMarkdown(
+                              activeRev?.canonical_markdown || "",
+                            );
+                          }}
+                        >
+                          Hủy
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs gap-1.5"
+                          disabled={updateContentMutation.isPending}
+                          onClick={() => updateContentMutation.mutate()}
+                        >
+                          {updateContentMutation.isPending ? (
+                            <RefreshCw className="size-3.5 animate-spin" />
+                          ) : (
+                            <Save className="size-3.5" />
+                          )}
+                          <span>Lưu Thay Đổi</span>
+                        </Button>
+                      </>
+                    ) : (
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => {
-                          setIsEditingMarkdown(false);
-                          setEditedMarkdown(
-                            activeRev?.canonical_markdown || "",
-                          );
-                        }}
-                      >
-                        Hủy
-                      </Button>
-                      <Button
+                        variant="outline"
                         size="sm"
                         className="h-8 text-xs gap-1.5"
-                        disabled={updateContentMutation.isPending}
-                        onClick={() => updateContentMutation.mutate()}
+                        onClick={() => setIsEditingMarkdown(true)}
                       >
-                        {updateContentMutation.isPending ? (
-                          <RefreshCw className="size-3.5 animate-spin" />
-                        ) : (
-                          <Save className="size-3.5" />
-                        )}
-                        <span>Lưu Thay Đổi</span>
+                        <Pencil className="size-3.5" />
+                        <span>Hiệu đính Markdown</span>
                       </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs gap-1.5"
-                      onClick={() => setIsEditingMarkdown(true)}
-                    >
-                      <Pencil className="size-3.5" />
-                      <span>Hiệu đính Markdown</span>
-                    </Button>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <Card className="border border-border">
-                <CardContent className="p-4">
-                  {isEditingMarkdown ? (
-                    <div className="space-y-3">
-                      <Textarea
-                        aria-label="Lý do hiệu đính"
-                        value={editReason}
-                        maxLength={2000}
-                        onChange={(e) => setEditReason(e.target.value)}
-                        placeholder="Lý do hiệu đính sau khi đối chiếu nguồn…"
-                        rows={2}
-                      />
-                      <Textarea
-                        value={editedMarkdown}
-                        onChange={(e) => setEditedMarkdown(e.target.value)}
-                        rows={20}
-                        className="font-mono text-xs leading-relaxed resize-y bg-background"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Tạo revision chờ duyệt; không thay nguồn/vector đang
-                        xuất bản. Dùng Studio để đối chiếu và kiểm tra chi tiết.
-                      </p>
-                    </div>
-                  ) : activeRev?.canonical_markdown ? (
-                    <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap max-h-[600px] overflow-y-auto p-2">
-                      {activeRev.canonical_markdown}
-                    </pre>
-                  ) : (
-                    <div className="py-12 text-center text-xs text-muted-foreground">
-                      Chưa có nội dung Markdown cho bản sửa đổi này.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
-          )}
+                <Card className="border border-border">
+                  <CardContent className="p-4">
+                    {isEditingMarkdown ? (
+                      <div className="space-y-3">
+                        <Textarea
+                          aria-label="Lý do hiệu đính"
+                          value={editReason}
+                          maxLength={2000}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          placeholder="Lý do hiệu đính sau khi đối chiếu nguồn…"
+                          rows={2}
+                        />
+                        <Textarea
+                          value={editedMarkdown}
+                          onChange={(e) => setEditedMarkdown(e.target.value)}
+                          rows={20}
+                          className="font-mono text-xs leading-relaxed resize-y bg-background"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Tạo revision chờ duyệt; không thay nguồn/vector đang
+                          xuất bản. Dùng Studio để đối chiếu và kiểm tra chi
+                          tiết.
+                        </p>
+                      </div>
+                    ) : activeRev?.canonical_markdown ? (
+                      <pre className="font-mono text-xs leading-relaxed text-foreground whitespace-pre-wrap max-h-[600px] overflow-y-auto p-2">
+                        {activeRev.canonical_markdown}
+                      </pre>
+                    ) : (
+                      <div className="py-12 text-center text-xs text-muted-foreground">
+                        Chưa có nội dung Markdown cho bản sửa đổi này.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ))}
         </TabsContent>
 
         {/* Tab 2: Quality Gate */}
@@ -1020,15 +1028,20 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
       </Tabs>
 
       {/* Review Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+      <Dialog
+        open={isReviewDialogOpen}
+        onOpenChange={(isOpen) => {
+          if (!isSmartApprovalPending) setIsReviewDialogOpen(isOpen);
+        }}
+      >
         <DialogContent className="flex max-h-[min(820px,calc(100vh-2rem))] flex-col gap-0 p-0 sm:max-w-2xl">
           <DialogHeader className="border-b bg-muted/20 p-4">
             <DialogTitle className="text-base font-bold text-foreground">
-              Kiểm Duyệt Nguồn Tri Thức
+              Đối chiếu nâng cao
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Xác nhận phê duyệt tài liệu để tiến hành lập chỉ mục hoặc từ chối
-              để yêu cầu quét lại.
+              Đối chiếu diễn giải và phạm vi dành cho quản trị. Nội dung nguồn
+              đạt kiểm tra có thể nạp vector độc lập với proposal chưa duyệt.
             </DialogDescription>
           </DialogHeader>
 
@@ -1047,243 +1060,327 @@ export const SourceDetailPage: React.FC<SourceDetailPageProps> = ({
                 khi duyệt.
               </p>
             )}
-            {activeRev?.status === "review_required" &&
-              !semanticIsPending &&
-              semanticProposal?.status !== "verified" && (
-                <SemanticCheckpointImport
-                  key={`${activeRev.id}:${semanticProposal?.proposal_hash ?? "empty"}`}
-                  canImport={canReviewSemantics}
-                  onImport={async (checkpoint, comment) => {
-                    if (!canReviewSemantics)
-                      throw new Error("Bạn chưa có quyền nhập đề xuất.");
-                    await knowledgeApi.importSemanticCheckpoint(
+            <SmartApprovalPanel
+              key={`${semanticReviewKey}:${activeRev?.canonical_hash}:${semanticProposal?.status}`}
+              disabled={
+                !canReviewSemantics ||
+                !activeRev?.canonical_hash ||
+                semanticReview.isFetching ||
+                semanticReview.isPending ||
+                semanticReview.isError ||
+                isSmartApprovalPending ||
+                semanticMutation.isPending ||
+                reviewMutation.isPending ||
+                proposalMutation.isPending
+              }
+              onBusyChange={setIsSmartApprovalPending}
+              onApprove={async () => {
+                if (!activeRev?.id || !activeRev.canonical_hash)
+                  throw new Error("Chưa có phiên bản để duyệt.");
+                const result = await knowledgeApi.smartApproveSource(
+                  collectionId,
+                  sourceId,
+                  activeRev.id,
+                  {
+                    expected_canonical_hash: activeRev.canonical_hash,
+                    expected_semantic_proposal_hash:
+                      semanticProposal?.proposal_hash ?? null,
+                    policy_version: "2026-10-19.1",
+                    idempotency_key: crypto.randomUUID(),
+                    comment:
+                      reviewComment.trim().length >= 3
+                        ? reviewComment.trim()
+                        : undefined,
+                  },
+                );
+                if (result.approved) {
+                  toast.success(result.message);
+                  await refreshSourceQueries(
+                    queryClient,
+                    collectionId,
+                    sourceId,
+                  );
+                  await queryClient.invalidateQueries({
+                    queryKey: [
+                      "source-semantic-review",
                       collectionId,
                       sourceId,
-                      activeRev.id,
-                      checkpoint,
-                      comment,
-                      semanticProposal?.proposal_hash,
-                    );
-                    setReviewedSemanticKey(null);
-                    setContextSelection({ key: "", decisions: [] });
-                    await refreshSourceQueries(
-                      queryClient,
-                      collectionId,
-                      sourceId,
-                    );
-                    await queryClient.invalidateQueries({
-                      queryKey: [
-                        "source-semantic-review",
-                        collectionId,
-                        sourceId,
-                      ],
-                    });
-                    toast.success(
-                      "Đã tạo đề xuất chờ đối chiếu. Chưa áp dụng hoặc xuất bản.",
-                    );
-                  }}
-                />
-              )}
-            {semanticReview.data?.structured_artifact?.input_format ===
-              "qnu-rag-projection/v1" &&
-              activeRev?.status === "review_required" &&
-              !["proposed", "verified"].includes(
-                semanticProposal?.status ?? "",
-              ) && (
+                    ],
+                  });
+                  setIsReviewDialogOpen(false);
+                  setReviewComment("");
+                }
+                return result;
+              }}
+              onError={(error) =>
+                toast.error(
+                  extractErrorMessage(
+                    error,
+                    "Không thể kiểm tra và duyệt nguồn.",
+                  ),
+                )
+              }
+            />
+            <details className="space-y-3">
+              <summary className="cursor-pointer font-medium">
+                Xem chi tiết đối chiếu
+              </summary>
+              <div className="space-y-4 pt-3">
                 <Button
                   type="button"
                   variant="outline"
                   disabled={
-                    proposalMutation.isPending ||
+                    !canReviewSemantics ||
+                    isSmartApprovalPending ||
                     semanticMutation.isPending ||
                     reviewMutation.isPending ||
-                    semanticReview.isFetching
+                    proposalMutation.isPending ||
+                    semanticReview.isFetching ||
+                    semanticReview.isError ||
+                    reviewComment.trim().length < 3 ||
+                    (semanticIsPending && !hasReviewedSemantics)
                   }
-                  onClick={() => proposalMutation.mutate()}
+                  onClick={() => reviewMutation.mutate("approved")}
                 >
-                  {proposalMutation.isPending
-                    ? "Đang đọc ngữ nghĩa..."
-                    : "Tạo đề xuất đối chiếu qua ModelOps"}
+                  Duyệt sau đối chiếu thủ công
                 </Button>
-              )}
-            {semanticReview.data?.structured_artifact && (
-              <SemanticReviewPreview
-                artifact={semanticReview.data.structured_artifact}
-                decisions={contextDecisions}
-                key={semanticReviewKey}
-                onDecision={
-                  canReviewSemantics
-                    ? (decision, issueId) =>
-                        setContextSelection({
-                          key: semanticReviewKey,
-                          decisions: [
-                            ...contextDecisions.filter(
-                              (item) => item.issue_id !== issueId,
-                            ),
-                            ...(decision ? [decision] : []),
-                          ],
-                        })
-                    : undefined
-                }
-              />
-            )}
-            {semanticIsPending && (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={
-                  semanticMutation.isPending ||
-                  reviewMutation.isPending ||
-                  proposalMutation.isPending ||
-                  semanticReview.isFetching ||
-                  !hasReviewedSemantics ||
-                  reviewComment.trim().length < 3
-                }
-                onClick={() => semanticMutation.mutate("rejected")}
-              >
-                Bỏ đề xuất
-              </Button>
-            )}
-            {semanticIsPending && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  semanticMutation.isPending ||
-                  reviewMutation.isPending ||
-                  proposalMutation.isPending ||
-                  semanticReview.isFetching ||
-                  !hasReviewedSemantics ||
-                  reviewComment.trim().length < 3
-                }
-                onClick={() => semanticMutation.mutate("changes_requested")}
-              >
-                Yêu cầu kiểm tra tiếp
-              </Button>
-            )}
-            {semanticIsPending && (
-              <label
-                htmlFor="review-semantic-proposals"
-                className="flex items-start gap-2"
-              >
-                <Checkbox
-                  id="review-semantic-proposals"
-                  checked={hasReviewedSemantics}
-                  onCheckedChange={(checked) =>
-                    setReviewedSemanticKey(
-                      checked === true ? semanticReviewKey : null,
-                    )
-                  }
-                />
-                Tôi đã đối chiếu trích đoạn và toàn bộ phạm vi nêu trên. Nếu xác
-                nhận giới hạn nguồn, tôi xác nhận kết quả kiểm tra trong chính
-                phạm vi này; không suy nghĩa cho ô còn chưa rõ.
-              </label>
-            )}
-            <div className="space-y-1.5">
-              <div className="font-medium text-foreground block">
-                Quyết định phê duyệt
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={
-                    reviewDecision === "approved" ? "default" : "outline"
-                  }
-                  onClick={() => setReviewDecision("approved")}
-                  className="h-9 text-xs gap-1.5"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                  <span>Chấp thuận (Approve)</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant={
-                    reviewDecision === "rejected" ? "destructive" : "outline"
-                  }
-                  onClick={() => setReviewDecision("rejected")}
-                  className="h-9 text-xs gap-1.5"
-                >
-                  <XCircle className="size-3.5" />
-                  <span>Từ chối (Reject)</span>
-                </Button>
-              </div>
-            </div>
+                <p className="text-muted-foreground">
+                  Chỉ dùng thao tác thủ công sau khi đã đọc và xử lý các mục bên
+                  dưới. Các quy tắc chặn hiện hành vẫn áp dụng.
+                </p>
 
-            <div className="space-y-1.5">
-              <label
-                htmlFor="source-review-comment"
-                className="font-medium text-foreground block"
-              >
-                Ghi chú đối chiếu (bắt buộc với bản hiệu đính)
-              </label>
-              <Textarea
-                id="source-review-comment"
-                value={reviewComment}
-                onChange={(e) => setReviewComment(e.target.value)}
-                placeholder="Nhập lý do phê duyệt hoặc yêu cầu chỉnh sửa..."
-                rows={3}
-                className="text-xs resize-none"
-              />
-            </div>
+                {activeRev?.status === "review_required" &&
+                  !semanticIsPending &&
+                  semanticProposal?.status !== "verified" && (
+                    <SemanticCheckpointImport
+                      key={`${activeRev.id}:${semanticProposal?.proposal_hash ?? "empty"}`}
+                      canImport={canReviewSemantics && !isSmartApprovalPending}
+                      onImport={async (checkpoint, comment) => {
+                        if (!canReviewSemantics)
+                          throw new Error("Bạn chưa có quyền nhập đề xuất.");
+                        await knowledgeApi.importSemanticCheckpoint(
+                          collectionId,
+                          sourceId,
+                          activeRev.id,
+                          checkpoint,
+                          comment,
+                          semanticProposal?.proposal_hash,
+                        );
+                        setReviewedSemanticKey(null);
+                        setContextSelection({ key: "", decisions: [] });
+                        await refreshSourceQueries(
+                          queryClient,
+                          collectionId,
+                          sourceId,
+                        );
+                        await queryClient.invalidateQueries({
+                          queryKey: [
+                            "source-semantic-review",
+                            collectionId,
+                            sourceId,
+                          ],
+                        });
+                        toast.success(
+                          "Đã tạo đề xuất chờ đối chiếu. Chưa áp dụng hoặc xuất bản.",
+                        );
+                      }}
+                    />
+                  )}
+                {semanticReview.data?.structured_artifact?.input_format ===
+                  "qnu-rag-projection/v1" &&
+                  activeRev?.status === "review_required" &&
+                  !["proposed", "verified"].includes(
+                    semanticProposal?.status ?? "",
+                  ) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={
+                        proposalMutation.isPending ||
+                        isSmartApprovalPending ||
+                        semanticMutation.isPending ||
+                        reviewMutation.isPending ||
+                        semanticReview.isFetching
+                      }
+                      onClick={() => proposalMutation.mutate()}
+                    >
+                      {proposalMutation.isPending
+                        ? "Đang đọc ngữ nghĩa..."
+                        : "Tạo đề xuất đối chiếu qua ModelOps"}
+                    </Button>
+                  )}
+                {semanticReview.data?.structured_artifact && (
+                  <SemanticReviewPreview
+                    artifact={semanticReview.data.structured_artifact}
+                    decisions={contextDecisions}
+                    key={semanticReviewKey}
+                    onDecision={
+                      canReviewSemantics
+                        ? (decision, issueId) =>
+                            setContextSelection({
+                              key: semanticReviewKey,
+                              decisions: [
+                                ...contextDecisions.filter(
+                                  (item) => item.issue_id !== issueId,
+                                ),
+                                ...(decision ? [decision] : []),
+                              ],
+                            })
+                        : undefined
+                    }
+                  />
+                )}
+                {semanticIsPending && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={
+                      isSmartApprovalPending ||
+                      semanticMutation.isPending ||
+                      reviewMutation.isPending ||
+                      proposalMutation.isPending ||
+                      semanticReview.isFetching ||
+                      !hasReviewedSemantics ||
+                      reviewComment.trim().length < 3
+                    }
+                    onClick={() => semanticMutation.mutate("rejected")}
+                  >
+                    Bỏ đề xuất
+                  </Button>
+                )}
+                {semanticIsPending && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      isSmartApprovalPending ||
+                      semanticMutation.isPending ||
+                      reviewMutation.isPending ||
+                      proposalMutation.isPending ||
+                      semanticReview.isFetching ||
+                      !hasReviewedSemantics ||
+                      reviewComment.trim().length < 3
+                    }
+                    onClick={() => semanticMutation.mutate("changes_requested")}
+                  >
+                    Yêu cầu kiểm tra tiếp
+                  </Button>
+                )}
+                {semanticIsPending && (
+                  <label
+                    htmlFor="review-semantic-proposals"
+                    className="flex items-start gap-2"
+                  >
+                    <Checkbox
+                      id="review-semantic-proposals"
+                      checked={hasReviewedSemantics}
+                      onCheckedChange={(checked) =>
+                        setReviewedSemanticKey(
+                          checked === true ? semanticReviewKey : null,
+                        )
+                      }
+                    />
+                    Tôi đã đối chiếu trích đoạn và toàn bộ phạm vi nêu trên. Nếu
+                    xác nhận giới hạn nguồn, tôi xác nhận kết quả kiểm tra trong
+                    chính phạm vi này; không suy nghĩa cho ô còn chưa rõ.
+                  </label>
+                )}
+                <div className="space-y-1.5">
+                  <div className="font-medium text-foreground block">
+                    Yêu cầu xử lý thủ công
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant={
+                        reviewDecision === "rejected"
+                          ? "destructive"
+                          : "outline"
+                      }
+                      onClick={() => setReviewDecision("rejected")}
+                      className="h-9 text-xs gap-1.5"
+                    >
+                      <XCircle className="size-3.5" />
+                      <span>Từ chối (Reject)</span>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="source-review-comment"
+                    className="font-medium text-foreground block"
+                  >
+                    Ghi chú đối chiếu (bắt buộc với bản hiệu đính)
+                  </label>
+                  <Textarea
+                    id="source-review-comment"
+                    value={reviewComment}
+                    onChange={(e) => setReviewComment(e.target.value)}
+                    placeholder="Nhập lý do phê duyệt hoặc yêu cầu chỉnh sửa..."
+                    rows={3}
+                    className="text-xs resize-none"
+                  />
+                </div>
+                {semanticIsPending && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                      isSmartApprovalPending ||
+                      semanticMutation.isPending ||
+                      reviewMutation.isPending ||
+                      proposalMutation.isPending ||
+                      semanticReview.isFetching ||
+                      !hasReviewedSemantics ||
+                      reviewComment.trim().length < 3 ||
+                      contextApplyBlocked
+                    }
+                    onClick={() =>
+                      semanticMutation.mutate(
+                        semanticProposal.annotations?.limitations?.length
+                          ? "acknowledged_limits"
+                          : "approved",
+                      )
+                    }
+                  >
+                    {semanticMutation.isPending
+                      ? "Đang áp dụng..."
+                      : semanticProposal.annotations?.limitations?.length
+                        ? "Xác nhận giới hạn nguồn và diễn giải kèm theo"
+                        : "Duyệt diễn giải có bằng chứng"}
+                  </Button>
+                )}
+              </div>
+            </details>
           </div>
 
           <DialogFooter className="border-t bg-card p-4">
-            {semanticIsPending && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  semanticMutation.isPending ||
-                  reviewMutation.isPending ||
-                  proposalMutation.isPending ||
-                  semanticReview.isFetching ||
-                  !hasReviewedSemantics ||
-                  reviewComment.trim().length < 3 ||
-                  contextApplyBlocked
-                }
-                onClick={() =>
-                  semanticMutation.mutate(
-                    semanticProposal.annotations?.limitations?.length
-                      ? "acknowledged_limits"
-                      : "approved",
-                  )
-                }
-              >
-                {semanticMutation.isPending
-                  ? "Đang áp dụng..."
-                  : semanticProposal.annotations?.limitations?.length
-                    ? "Xác nhận giới hạn nguồn và diễn giải kèm theo"
-                    : "Duyệt diễn giải có bằng chứng"}
-              </Button>
-            )}
             <Button
               type="button"
               variant="ghost"
+              disabled={isSmartApprovalPending}
               onClick={() => setIsReviewDialogOpen(false)}
             >
               Hủy
             </Button>
-            <Button
-              type="button"
-              disabled={
-                reviewMutation.isPending ||
-                semanticMutation.isPending ||
-                proposalMutation.isPending ||
-                (reviewDecision === "approved" &&
-                  (semanticReview.isFetching ||
-                    semanticReview.isPending ||
-                    semanticReview.isError ||
-                    semanticProposal?.status === "unavailable" ||
-                    (semanticProposal?.status === "proposed" &&
-                      !hasReviewedSemantics)))
-              }
-              onClick={() => reviewMutation.mutate()}
-            >
-              {reviewMutation.isPending
-                ? "Đang xử lý..."
-                : "Xác Nhận Quyết Định"}
-            </Button>
+            {reviewDecision === "rejected" && (
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={
+                  reviewMutation.isPending ||
+                  isSmartApprovalPending ||
+                  semanticMutation.isPending ||
+                  proposalMutation.isPending
+                }
+                onClick={() => reviewMutation.mutate("rejected")}
+              >
+                {reviewMutation.isPending
+                  ? "Đang xử lý..."
+                  : "Xác nhận từ chối"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

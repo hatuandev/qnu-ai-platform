@@ -169,6 +169,15 @@ def proposal_summary(proposal: dict) -> dict:
     # payloads cannot carry "resolved" flags that bypass application checks.
     cleared = {item["issue_id"] for item in decisions if item.get("proposal_hash") == proposal.get("proposal_hash")
                and item.get("actor_id") and item.get("at")} if proposal.get("status") == "verified" else set()
+    bulk = proposal.get("review") or {}
+    certificate = bulk.get("machine_validation") or {}
+    if (proposal.get("status") == "verified" and bulk.get("action") == "bulk_acceptance_v1"
+            and bulk.get("actor_id") and bulk.get("at") and certificate.get("eligible") is True
+            and certificate.get("contract") == "qnu-smart-approval-v1"
+            and certificate.get("proposal_hash") == proposal.get("proposal_hash")):
+        # Snapshot replay independently revalidates this certificate. It is not
+        # recorded as a set of individual human context decisions.
+        cleared.update(item["issue_id"] for item in certificate.get("issues", []) if item["result"] == "AUTO_VERIFIED")
     opened = [item["issue_id"] for item in issues if item["issue_id"] not in cleared]
     legacy = review.get("unresolved", []) if not review.get("contract") else []
     opened.extend("legacy:" + digest(item) for item in legacy)

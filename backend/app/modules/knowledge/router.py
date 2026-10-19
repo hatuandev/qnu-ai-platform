@@ -87,6 +87,8 @@ from app.modules.knowledge.schemas import (
     SemanticProposalReviewRequest,
     ShadowRetrievalReport,
     ShadowRetrievalRequest,
+    SmartApprovalRequest,
+    SmartApprovalResponse,
     SourceContextEditRequest,
     StudioViewResponse,
     SyncGroupSourceRequest,
@@ -1510,6 +1512,18 @@ async def propose_source_semantics(
 
     revision = await generate_semantic_proposals(db, collection_id, source_id, revision_id, actor)
     return KnowledgeSourceRevisionResponse.model_validate(revision)
+
+
+@router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/smart-approval",
+             response_model=SmartApprovalResponse, summary="Kiểm tra và chấp thuận nguồn bằng một quyết định có xác thực")
+async def smart_approve_source(
+    collection_id: str, source_id: str, revision_id: str, payload: SmartApprovalRequest,
+    db: AsyncSession = Depends(get_db),
+    actor: AuthActor = Depends(require_permission("ai.knowledge.update")),
+) -> dict[str, Any]:
+    from app.modules.knowledge.services.smart_approval_service import smart_approve
+
+    return await smart_approve(db, collection_id, source_id, revision_id, payload, actor)
 
 
 @router.post("/collections/{collection_id}/sources/{source_id}/revisions/{revision_id}/semantic-checkpoint",

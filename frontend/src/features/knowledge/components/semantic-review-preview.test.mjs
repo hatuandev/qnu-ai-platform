@@ -183,7 +183,8 @@ test("a lone heading cannot offer a decision and reference spans use Unicode cod
   );
   assert.doesNotMatch(html, /Xác nhận tham chiếu không chi phối đích này/);
   assert.match(html, /Tham chiếu và điều kiện đi kèm/);
-  assert.match(html, />Điều ki<|>Điều kiệ</);
+  assert.match(html, /😀 Điều kiện khác/);
+  assert.match(html, /appendix · \[2, 9\)/);
 });
 
 test("scope confirmation shows exact string row codes and full exclusion separately", () => {
@@ -705,4 +706,304 @@ test("import uses authenticated API and expected current hash; stale remains fai
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("one approve click posts one authenticated atomic request with exact source hashes", async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return new Response(
+      JSON.stringify({ approved: false, message: "Blocked" }),
+    );
+  };
+  try {
+    const payload = {
+      expected_canonical_hash: "c".repeat(64),
+      expected_semantic_proposal_hash: "d".repeat(64),
+      policy_version: "2026-10-19.1",
+      idempotency_key: "TEST-one-click",
+    };
+    const result = await knowledgeApi.smartApproveSource(
+      "c",
+      "s",
+      "r",
+      payload,
+    );
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /r\/smart-approval$/);
+    assert.equal(calls[0].init.headers.get("Authorization"), "Bearer test");
+    assert.equal(calls[0].init.method, "POST");
+    assert.deepEqual(JSON.parse(calls[0].init.body), payload);
+    assert.equal(result.approved, false);
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ detail: "Source stale" }), { status: 409 });
+    await assert.rejects(
+      knowledgeApi.smartApproveSource("c", "s", "r", payload),
+      /Source stale/,
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+function panelHarness(props) {
+  const slots = [];
+  let cursor = 0;
+  const { SmartApprovalPanel } = loadSource(
+    new URL("./smart-approval-panel.tsx", import.meta.url),
+    {
+      react: {
+        ...React,
+        useRef: (value) => {
+          const index = cursor++;
+          slots[index] ??= { current: value };
+          return slots[index];
+        },
+        useState: (value) => {
+          const index = cursor++;
+          if (!(index in slots)) slots[index] = value;
+          return [
+            slots[index],
+            (next) => {
+              slots[index] = next;
+            },
+          ];
+        },
+      },
+      "@/components/ui/button": {
+        Button: ({ children, ...rest }) =>
+          React.createElement("button", { type: "button", ...rest }, children),
+      },
+    },
+  );
+  return () => {
+    cursor = 0;
+    return SmartApprovalPanel(props);
+  };
+}
+
+function findApproveButton(element) {
+  if (!React.isValidElement(element)) return undefined;
+  if (element.props.onClick) return element;
+  return React.Children.toArray(element.props.children)
+    .map(findApproveButton)
+    .find(Boolean);
+}
+
+test("actual approve handler suppresses double click, displays blockers and clears busy state", async () => {
+  let calls = 0;
+  let finish;
+  const busy = [];
+  const render = panelHarness({
+    disabled: false,
+    onBusyChange: (value) => busy.push(value),
+    onError: assert.fail,
+    onApprove: () => {
+      calls++;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
+  const button = findApproveButton(render());
+  const first = button.props.onClick();
+  await button.props.onClick();
+  assert.equal(calls, 1);
+  const pending = renderToStaticMarkup(render());
+  assert.match(pending, /Đang kiểm tra tài liệu/);
+  assert.match(pending, /<button[^>]*disabled/);
+  finish({
+    approved: false,
+    message: "Chưa thể chấp thuận: 1 vấn đề cần kiểm tra.",
+    blockers: [{ reason_code: "TEST_SCOPE", message: "Missing exact scope" }],
+    validation: {
+      auto_verified_count: 7,
+      source_limitation_count: 2,
+      policy_id: "test",
+      policy_version: "v1",
+      cells: [],
+      issues: [],
+    },
+  });
+  await first;
+  const html = renderToStaticMarkup(render());
+  assert.match(html, /7 mục được tự xác minh; 2 giới hạn/);
+  assert.match(html, /Chưa ghi quyết định chấp thuận/);
+  assert.match(html, /Missing exact scope/);
+  assert.doesNotMatch(html, /Xác Nhận Quyết Định/);
+  assert.deepEqual(busy, [true, false]);
+});
+
+test("disabled approval never sends and actual network failure stays an error", async () => {
+  let calls = 0;
+  const disabled = panelHarness({
+    disabled: true,
+    onApprove: async () => {
+      calls++;
+    },
+    onError: assert.fail,
+  });
+  await findApproveButton(disabled()).props.onClick();
+  assert.equal(calls, 0);
+  const errors = [];
+  const failing = panelHarness({
+    disabled: false,
+    onApprove: async () => {
+      throw new Error("Unavailable");
+    },
+    onError: (error) => errors.push(error.message),
+  });
+  await findApproveButton(failing()).props.onClick();
+  assert.deepEqual(errors, ["Unavailable"]);
+  assert.doesNotMatch(renderToStaticMarkup(failing()), /Đã chấp thuận/);
+});
+
+test("repeated references share one canonical source paragraph while preserving roles", () => {
+  const value = structuredClone(artifact);
+  const text =
+    "Long canonical condition; keep exceptions and all qualifications.";
+  const binding = {
+    source_unit_id: "shared",
+    evidence_id: "ev:shared",
+    start: 0,
+    end: text.length,
+  };
+  value.retrieval_units = { units: [{ id: "shared", text }] };
+  value.semantic_annotations.context_review = {
+    scope: "document",
+    unresolved: [],
+    issues: Array.from({ length: 10 }, (_, i) => ({
+      issue_id: `issue:${i}`,
+      kind: "scope_confirmation_required",
+      unit_ids: ["shared"],
+      target: {},
+      reason: "Scope check",
+      review_evidence: [{ evidence_binding: binding, evidence_quote: text }],
+    })),
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, { artifact: value }),
+  );
+  assert.equal(html.split(text).length - 1, 1);
+  assert.equal(
+    (html.match(/href="#semantic-source-shared"/g) ?? []).length,
+    10,
+  );
+  value.semantic_annotations.status = "changes_requested";
+  const reopened = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, { artifact: value }),
+  );
+  assert.equal(reopened.split(text).length - 1, 1);
+  assert.match(reopened, /id="semantic-source-shared"/);
+});
+
+const { IngestionReadinessPanel } = loadSource(
+  new URL("./ingestion-readiness-panel.tsx", import.meta.url),
+  {
+    "@/components/ui/button": {
+      Button: ({ children, ...props }) =>
+        React.createElement("button", { type: "button", ...props }, children),
+    },
+  },
+);
+
+test("ordinary ingestion presents content readiness and actions without semantic issue jargon", () => {
+  let viewed = 0;
+  const props = {
+    isReady: true,
+    isProcessing: false,
+    onViewMarkdown: () => {
+      viewed++;
+    },
+    vectorAction: React.createElement(
+      "button",
+      { type: "button" },
+      "Nạp vector",
+    ),
+    readiness: {
+      status: "AUTO_READY",
+      message: "Đã chuẩn hóa và kiểm tra nội dung.",
+      limitations: [],
+      blockers: [],
+    },
+  };
+  const element = IngestionReadinessPanel(props);
+  const html = renderToStaticMarkup(element);
+  assert.match(html, /Sẵn sàng nạp vector/);
+  assert.match(html, /Xem Markdown/);
+  assert.doesNotMatch(
+    html,
+    /assertion|Evidence Binding|O01|S01|Chấp thuận|Đối chiếu nâng cao/,
+  );
+  findApproveButton(element).props.onClick();
+  assert.equal(viewed, 1);
+});
+
+test("limitations and real content errors remain distinct and advanced review stays optional", () => {
+  const base = {
+    isReady: true,
+    isProcessing: false,
+    onViewMarkdown() {},
+    onAdvanced() {},
+    vectorAction: React.createElement(
+      "button",
+      { type: "button" },
+      "Nạp vector",
+    ),
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(IngestionReadinessPanel, {
+      ...base,
+      readiness: {
+        status: "READY_WITH_LIMITATIONS",
+        message: "Giữ nguyên ký hiệu, không suy nghĩa.",
+        limitations: [{ raw: "/" }],
+        blockers: [],
+      },
+    }),
+  );
+  assert.match(html, /Sẵn sàng, có giới hạn dữ liệu/);
+  assert.match(html, /1 ô giữ nguyên ký hiệu/);
+  assert.match(html, /Đối chiếu nâng cao/);
+  assert.doesNotMatch(html, /Chấp thuận|xác nhận 18/);
+  const blocked = renderToStaticMarkup(
+    React.createElement(IngestionReadinessPanel, {
+      ...base,
+      isReady: false,
+      vectorAction: React.createElement(
+        "button",
+        { type: "button", disabled: true },
+        "Nạp vector",
+      ),
+      readiness: {
+        status: "NEEDS_ATTENTION",
+        message: "Có dữ liệu bị mất.",
+        limitations: [],
+        blockers: [
+          { reason_code: "CONTENT_LOST", message: "Thiếu bảng nguồn" },
+        ],
+      },
+    }),
+  );
+  assert.match(blocked, /Nội dung cần kiểm tra/);
+  assert.match(blocked, /Thiếu bảng nguồn/);
+  assert.match(blocked, /<button[^>]*disabled/);
+  assert.doesNotMatch(blocked, /Sẵn sàng nạp vector/);
+});
+
+test("processing and legacy readiness do not require semantic approval", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(IngestionReadinessPanel, {
+      isReady: false,
+      isProcessing: true,
+      onViewMarkdown() {},
+      vectorAction: null,
+    }),
+  );
+  assert.match(html, /Đang xử lý tài liệu/);
+  assert.doesNotMatch(
+    html,
+    /Chấp thuận|Xác Nhận Quyết Định|Sẵn sàng nạp vector/,
+  );
 });

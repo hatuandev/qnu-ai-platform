@@ -126,7 +126,7 @@ async def verify_approval_pair(revision: Any, decision: str) -> None:
         await verify_effective_projection(revision, (revision.parse_provenance or {}).get("structured_artifact") or {}, document)
 
 
-async def prepare_standard_revision(revision: Any) -> None:
+async def prepare_standard_revision(revision: Any, *, automatic: bool = False) -> None:
     """Opt new/reparsed supported sources into the standard, never mutate a published revision."""
     if getattr(revision, "status", None) == "ready":
         raise _invalid("cannot_rebuild_serving_revision")
@@ -152,7 +152,7 @@ async def prepare_standard_revision(revision: Any) -> None:
             raise _invalid("empty_projection")
         from app.modules.knowledge.services.unit_annotation import enrich_source_units
 
-        if not has_semantics:
+        if not has_semantics and not automatic:
             await enrich_source_units(canonical, artifact, getattr(revision, "tenant_id", "tenant_qnu"),
                                       (revision.snapshot_metadata or {}).get("unit_temporal_annotation"), document=document)
         pending = previous.get("semantic_annotations") or {}
@@ -173,6 +173,9 @@ async def prepare_standard_revision(revision: Any) -> None:
     overall = "failed" if (revision.quality_report or {}).get("overall_status") == "failed" else "warning"
     revision.quality_report = {**(revision.quality_report or {}), "overall_status": overall,
                                "structured_review_required": True, "serving_format": VERSION}
+    if automatic and reference.get("status") == "ready":
+        from app.modules.knowledge.services.automatic_ingestion import seal_automatic_content
+        await seal_automatic_content(revision)
 
 
 def _restore_unchanged(original: Any, displayed: Any, edited: Any) -> Any:

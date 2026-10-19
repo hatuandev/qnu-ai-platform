@@ -387,7 +387,7 @@ class SourceIngestionService:
             if (item.origin_file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
                 from app.modules.knowledge.services.qnu_serving import prepare_standard_revision
 
-                await prepare_standard_revision(source_rev)
+                await prepare_standard_revision(source_rev, automatic=True)
                 quality_report = source_rev.quality_report
             # Persist before queries/flushes of dependent artifacts.
             db.add(source_rev)
@@ -1391,7 +1391,7 @@ class SourceIngestionService:
         if (file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
             from app.modules.knowledge.services.qnu_serving import prepare_standard_revision
 
-            await prepare_standard_revision(new_rev)
+            await prepare_standard_revision(new_rev, automatic=True)
             quality_report = new_rev.quality_report
         if reserved_revision_id:
             reserved = await db.get(KnowledgeSourceRevision, reserved_revision_id)

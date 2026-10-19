@@ -159,6 +159,10 @@ def get_structured_review_state(revision: Any) -> tuple[str, bool, int]:
     UI decisions must therefore use this artifact state as their source of
     truth.
     """
+    from app.modules.knowledge.services.automatic_ingestion import content_readiness
+    readiness = content_readiness(revision)
+    if readiness is not None:
+        return readiness["status"], readiness["status"] == "NEEDS_ATTENTION", len(readiness["blockers"])
     artifact = get_source_artifact(revision)
     issues = list(artifact.get("issues") or [])
     review_status = str((artifact.get("review") or {}).get("status") or "auto_ready")

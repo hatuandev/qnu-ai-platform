@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v18-semantic-evidence"
+EXTRACTION_VERSION = "layout-v19-native-layout"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -295,6 +295,9 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
                 render_sha256=hashlib.sha256(preview).hexdigest(),
                 render_page_count=len(result.pages),
             )
+            from app.modules.knowledge.parsers.docx_layout_fidelity import preserve_native_layout
+
+            await asyncio.to_thread(preserve_native_layout, result.qnu_document, content)
         result.preview_pdf = preview
         return result
     if extension in {"png", "jpg", "jpeg", "webp", "bmp"}:

@@ -6,6 +6,12 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-19** | Codex | Context559 live Automatic DOCX ingestion | Newrev3; MD/JSON233/10/3exactnativePASS; QC8blocker/4rawlimits. VectorPOST404pending/0point/no publish; oldsource/publication nguyên. Noappcode/fulltest/config/Git | [Nhật ký559](./nhat_ky/2026-10-19_phien_559_live_automatic_docx_ingestion.md) |
+
+| **2026-10-19** | Codex | Context558 Automatic Ingestion + Advanced Review |3status/QCproof; pendingsemantic riêng, unknownraw/khôngfact, staging≠publish. Focused265/FE41/buildPASS; full2466PASS/18FAIL exact557/37addedPASS. Source thật nguyên; DBdọn/Storage policyblocked | [Nhật ký558](./nhat_ky/2026-10-19_phien_558_automatic_ingestion_advanced_review.md) |
+
+| **2026-10-19** | Codex | Context557 canonical draft → pending review | Current v18 officialjob, oldrow/active/source seals giữ;12/12/3footnote/18issue, POST200once/83binding/pendingrebuildPASS. Full2429PASS/18FAIL/17SKIP exact556, noappcode/LLMannotation/approval. DB dọn/Storage policyblocked | [Nhật ký557](./nhat_ky/2026-10-19_phien_557_canonical_draft_pending_review.md) |
+
 | **2026-10-19** | Codex | Context556 canonical source reconciliation | SameDOCX/cũ thiếu3footnote và lặp ô bảng; 11mapped/A12blocked, projection replay mismatch. Focused146/FE21/buildPASS; full18FAIL/2429PASS/17SKIP exact nền/13addedPASS. DB dọn/Storage policyblocked; no live stage | [Nhật ký556](./nhat_ky/2026-10-19_phien_556_canonical_source_reconciliation.md) |
 
 | **2026-10-19** | Codex | Final semantic review A03/reference/authenticated import | Workflow không vào fact SV; typed ref/pending adapter/UI; focused18+6/FE21/canonical91PASS; full18FAIL/2416PASS/17SKIP exact nền18ID,0new. Source thật hash khác BLOCKED/chưa human; DB dọn, Storage+exports còn do policy | [Nhật ký555](./nhat_ky/2026-10-19_phien_555_final_semantic_review.md) |

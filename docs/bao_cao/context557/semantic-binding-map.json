@@ -1,0 +1,1229 @@
+{
+  "assertions": [
+    {
+      "label": "A01",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "table",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 132,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:d5b040cff85aae6bd017e8263e0f862a"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "table",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 132,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:16acd865efddebc01b67afc075c224ba"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "2221322093708e726cc1c8444821310a37d21d0653bc2e91ae31b9fec402d929",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A02",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 132,
+          "end": 217,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:1e2fbe1ad70d19456990dcb67a05b52b"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 132,
+          "end": 217,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:0aae76f9c2c2b0d5538488d5f6037ee4"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "b6decba8e0ca0e58dccebed7e37be613c74b143acf98f40fe07c5a362bd48c4f",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A03",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "group",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003",
+          "qnu:r004",
+          "qnu:r005",
+          "qnu:r006"
+        ],
+        "column_ids": [],
+        "context_kind": "workflow",
+        "context_label": "Quy định về hồ sơ thiết bị nhóm A, không trực tiếp sửa các cột chỉ tiêu, ước tính và tỷ lệ sinh viên.",
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 218,
+          "end": 520,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:0b5aa1b9a17c4a2e8f47bead52b9b6e4"
+        },
+        "related_evidence": [
+          {
+            "source_identity": {
+              "document_id": "offline544",
+              "revision_id": "draft544",
+              "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+              "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+            },
+            "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+            "source_unit_id": "qnu:l014",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 438,
+            "text_sha256": "c54cd66b9de2474e306f047fb97d59f338d5255dc4e496f9a1bfe38fd4432483",
+            "evidence_id": "ev:982a76875c303892a1648c61cb72977d"
+          }
+        ]
+      },
+      "new": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "group",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003",
+          "qnu:r004",
+          "qnu:r005",
+          "qnu:r006"
+        ],
+        "column_ids": [],
+        "context_kind": "workflow",
+        "context_label": "Quy định về hồ sơ thiết bị nhóm A, không trực tiếp sửa các cột chỉ tiêu, ước tính và tỷ lệ sinh viên.",
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 218,
+          "end": 520,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:8bb8c71304401d78c65b19ffdecb93b1"
+        },
+        "related_evidence": [
+          {
+            "source_identity": {
+              "document_id": "bnd_21c09bbc6ca0",
+              "revision_id": "ks_rev_2b5e0352565f",
+              "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+              "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+            },
+            "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+            "source_unit_id": "qnu:l014",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 438,
+            "text_sha256": "c54cd66b9de2474e306f047fb97d59f338d5255dc4e496f9a1bfe38fd4432483",
+            "evidence_id": "ev:61c57da3fd256f1a0c8d54f99d8af6a2"
+          }
+        ]
+      },
+      "quote_sha256": "3c834e1989b5d53037525073cee1ca9009816aab0e4e00824cbecb7b027ab70c",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A04",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "row",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 521,
+          "end": 648,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:441d3b7d50fcb9a55b8802d369121578"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "row",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 521,
+          "end": 648,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:5f08ec5617043a93f44f7d9950669c66"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "f3e135b8a2961cb3a53db0de6b5773f0a2fd08b4c4d895ab365aa4451a0cfb8c",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A05",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "group",
+        "row_unit_ids": [
+          "qnu:r007",
+          "qnu:r008",
+          "qnu:r009",
+          "qnu:r010",
+          "qnu:r011",
+          "qnu:r012"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 648,
+          "end": 743,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:1d702d6aca5d990dc063cfab0f392c81"
+        },
+        "related_evidence": [
+          {
+            "source_identity": {
+              "document_id": "offline544",
+              "revision_id": "draft544",
+              "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+              "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+            },
+            "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+            "source_unit_id": "qnu:l015",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 633,
+            "text_sha256": "8839e3620f5f35d4dd5b0d20623bc1782952f16d8a2f2724b167895ea4f4d78f",
+            "evidence_id": "ev:853b601762e6fcc92712011f0ff607c3"
+          },
+          {
+            "source_identity": {
+              "document_id": "offline544",
+              "revision_id": "draft544",
+              "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+              "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+            },
+            "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+            "source_unit_id": "qnu:l012",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 533,
+            "end": 711,
+            "text_sha256": "09a960a526a6c95f1ff32d9cd358d27d015f8acb91c55b37249a0ee829d25761",
+            "evidence_id": "ev:562dc2eea527d07e9ec17f1fdaca5732"
+          },
+          {
+            "source_identity": {
+              "document_id": "offline544",
+              "revision_id": "draft544",
+              "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+              "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+            },
+            "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+            "source_unit_id": "qnu:p090",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 278,
+            "text_sha256": "e8021db401634a97a3bf22e25392950cb1a40626be5b70141c3f160722973b2a",
+            "evidence_id": "ev:bf23eec22cf08fba7b3cf62c839d91a3"
+          },
+          {
+            "source_identity": {
+              "document_id": "offline544",
+              "revision_id": "draft544",
+              "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+              "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+            },
+            "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+            "source_unit_id": "qnu:p092",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 246,
+            "text_sha256": "dbf9cfbb9c3bddc72fa55f5f7ffd5fade25c80ec468aa667a1bfb0242653dfea",
+            "evidence_id": "ev:8d459559321ee946372e8d4844d40012"
+          }
+        ]
+      },
+      "new": {
+        "note_unit_id": "qnu:l006",
+        "table_id": "qnu:t001",
+        "scope": "group",
+        "row_unit_ids": [
+          "qnu:r007",
+          "qnu:r008",
+          "qnu:r009",
+          "qnu:r010",
+          "qnu:r011",
+          "qnu:r012"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:l006",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 648,
+          "end": 743,
+          "text_sha256": "2d51db6cfae60262516cf709fb665df47226375ce4f638d86ce22e09a662d6a0",
+          "evidence_id": "ev:d54856a843899cfe5bc2e41f951a6fb7"
+        },
+        "related_evidence": [
+          {
+            "source_identity": {
+              "document_id": "bnd_21c09bbc6ca0",
+              "revision_id": "ks_rev_2b5e0352565f",
+              "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+              "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+            },
+            "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+            "source_unit_id": "qnu:l015",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 633,
+            "text_sha256": "8839e3620f5f35d4dd5b0d20623bc1782952f16d8a2f2724b167895ea4f4d78f",
+            "evidence_id": "ev:244fcdc71649e599608e9158bd1caf46"
+          },
+          {
+            "source_identity": {
+              "document_id": "bnd_21c09bbc6ca0",
+              "revision_id": "ks_rev_2b5e0352565f",
+              "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+              "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+            },
+            "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+            "source_unit_id": "qnu:l012",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 533,
+            "end": 711,
+            "text_sha256": "09a960a526a6c95f1ff32d9cd358d27d015f8acb91c55b37249a0ee829d25761",
+            "evidence_id": "ev:ad44612488fc0a56f53949f49f815e34"
+          },
+          {
+            "source_identity": {
+              "document_id": "bnd_21c09bbc6ca0",
+              "revision_id": "ks_rev_2b5e0352565f",
+              "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+              "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+            },
+            "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+            "source_unit_id": "qnu:p090",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 278,
+            "text_sha256": "e8021db401634a97a3bf22e25392950cb1a40626be5b70141c3f160722973b2a",
+            "evidence_id": "ev:c3bcbe61d0d1d9fc15e686a2a776a66a"
+          },
+          {
+            "source_identity": {
+              "document_id": "bnd_21c09bbc6ca0",
+              "revision_id": "ks_rev_2b5e0352565f",
+              "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+              "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+            },
+            "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+            "source_unit_id": "qnu:p092",
+            "coordinate_space": "unit_codepoints",
+            "column_id": null,
+            "start": 0,
+            "end": 246,
+            "text_sha256": "dbf9cfbb9c3bddc72fa55f5f7ffd5fade25c80ec468aa667a1bfb0242653dfea",
+            "evidence_id": "ev:43079594e194f540783f47027be328dc"
+          }
+        ]
+      },
+      "quote_sha256": "291d0f7a64924bb3031a87de0acc17c0b89003dfb8c28646e076fbf9277ec289",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A06",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c04",
+          "c05",
+          "c06"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 53,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:2233602451e054b9e2ffd2dbda188712"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c04",
+          "c05",
+          "c06"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 53,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:8f67591b8555c14c0ed682b867b5fbc2"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "744dbbb8c08445c36a09d0ae5af87ffbdb33b76ff0e87bd67b5c83a0c01423b1",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A07",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c07",
+          "c08",
+          "c09"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 53,
+          "end": 83,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:0ac01cd2f7b499b70ec992da285e5bdd"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c07",
+          "c08",
+          "c09"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 53,
+          "end": 83,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:9b20206c948a037ed5af94187925a799"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "c82f45592db7007f4f6e409cf2a60cd1bf4071749cf6576e8b92d0f554d01f02",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A08",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 83,
+          "end": 119,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:a97951470ef33b84c0ae39ef081281bc"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c10",
+          "c11",
+          "c12"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 83,
+          "end": 119,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:b24f96b4e70892dc60e11a246438b810"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "1b4fdac5522da948d93ae5cd5ddf7d0677d15e1b65ea9be04501aa8be00621bc",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A09",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "table",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 119,
+          "end": 222,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:e8511c420710d0a0eb7f1930e3a63651"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p049",
+        "table_id": "qnu:t001",
+        "scope": "table",
+        "row_unit_ids": [],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p049",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 119,
+          "end": 222,
+          "text_sha256": "6910297120aa61a0fa58101986b430cdd05761210da7103732a866ca379065bd",
+          "evidence_id": "ev:999c36b63b71d9172610a34d16bb4d82"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "fb42030ccf7fe742f145be9868c3e4ab89333a4d9217a87cdd3ea1dbe4508337",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A10",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p050",
+        "table_id": "qnu:t001",
+        "scope": "row",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p050",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 177,
+          "text_sha256": "5b63cf7072eeed978b7ad4cb8ffe3e622909a83c248c9eced9ddeca2d81befb2",
+          "evidence_id": "ev:c7739a48dd7a38344efe7294f85a10b5"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p050",
+        "table_id": "qnu:t001",
+        "scope": "row",
+        "row_unit_ids": [
+          "qnu:r003"
+        ],
+        "column_ids": [],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p050",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 177,
+          "text_sha256": "5b63cf7072eeed978b7ad4cb8ffe3e622909a83c248c9eced9ddeca2d81befb2",
+          "evidence_id": "ev:604a6fb33ab9468e7be2a9693d8bc962"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "5b63cf7072eeed978b7ad4cb8ffe3e622909a83c248c9eced9ddeca2d81befb2",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A11",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:p051",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c11"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:p051",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 223,
+          "text_sha256": "ad381d740d349cc650b95731777f495e6bed51a776b8256d57cf7848da255fa2",
+          "evidence_id": "ev:8ec9488b3a6b591d6b01b31cc629aacb"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:p051",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [],
+        "column_ids": [
+          "c11"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:p051",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 223,
+          "text_sha256": "ad381d740d349cc650b95731777f495e6bed51a776b8256d57cf7848da255fa2",
+          "evidence_id": "ev:198675575538010f7c2ee0b48ae9e927"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "ad381d740d349cc650b95731777f495e6bed51a776b8256d57cf7848da255fa2",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    },
+    {
+      "label": "A12",
+      "binding_status": "PASS",
+      "old": {
+        "note_unit_id": "qnu:docx_footnote_2",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003"
+        ],
+        "column_ids": [
+          "c02"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "offline544",
+            "revision_id": "draft544",
+            "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+            "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+          },
+          "input_hash": "0cced34a5a3b7b356bd4ce63df80e49749ec41e3686860b27809c8ed2549dcd9",
+          "source_unit_id": "qnu:docx_footnote_2",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 121,
+          "text_sha256": "1eb83c904195da93dfef8ac0773ea568c1e2b9bf0c523a9820f00e19a7bf7575",
+          "evidence_id": "ev:67cbdd6d10030c5623d4d0a27e0a9b2e"
+        },
+        "related_evidence": []
+      },
+      "new": {
+        "note_unit_id": "qnu:docx_footnote_2",
+        "table_id": "qnu:t001",
+        "scope": "column",
+        "row_unit_ids": [
+          "qnu:r001",
+          "qnu:r002",
+          "qnu:r003"
+        ],
+        "column_ids": [
+          "c02"
+        ],
+        "evidence_binding": {
+          "source_identity": {
+            "document_id": "bnd_21c09bbc6ca0",
+            "revision_id": "ks_rev_2b5e0352565f",
+            "sha256": "cb11dfbef6640362c462610154380fa1c1407f75b530356baf1011b2d4368f97",
+            "structured_sha256": "f2e6df262e33af8e9e61c5e23633a34ac43f5d9b6b6f84d13607afd1657ed83b"
+          },
+          "input_hash": "343aad542852738ee5d1e39c28b133d42975b68ca433c99a7b48bc4fa5be1cad",
+          "source_unit_id": "qnu:docx_footnote_2",
+          "coordinate_space": "unit_codepoints",
+          "column_id": null,
+          "start": 0,
+          "end": 121,
+          "text_sha256": "1eb83c904195da93dfef8ac0773ea568c1e2b9bf0c523a9820f00e19a7bf7575",
+          "evidence_id": "ev:c1c6c8f74d3cb13e6988fe4143aa59cd"
+        },
+        "related_evidence": []
+      },
+      "quote_sha256": "1eb83c904195da93dfef8ac0773ea568c1e2b9bf0c523a9820f00e19a7bf7575",
+      "quote_conditions_exceptions_unchanged": true,
+      "change_reason": "Same exact DOCX source content/role/locator; new canonical artifact identity and fresh evidence IDs/hash"
+    }
+  ],
+  "references": [
+    {
+      "issue": "O03",
+      "issue_id": "ctxissue:2ca4823e5b2038005e47b56ec7323accf462b9fa5f6858e9f002356e4801fe1b",
+      "links": [
+        {
+          "assertion": "A03",
+          "role": "direct"
+        },
+        {
+          "assertion": "A05",
+          "role": "direct"
+        },
+        {
+          "assertion": "A04",
+          "role": "protective"
+        },
+        {
+          "assertion": "A10",
+          "role": "protective"
+        },
+        {
+          "assertion": "A12",
+          "role": "protective"
+        },
+        {
+          "assertion": "A06",
+          "role": "protective"
+        },
+        {
+          "assertion": "A07",
+          "role": "protective"
+        },
+        {
+          "assertion": "A08",
+          "role": "protective"
+        },
+        {
+          "assertion": "A02",
+          "role": "conditional"
+        },
+        {
+          "assertion": "A11",
+          "role": "conditional"
+        },
+        {
+          "assertion": "A09",
+          "role": "conditional"
+        }
+      ]
+    },
+    {
+      "issue": "O04",
+      "issue_id": "ctxissue:5d9ed46725f2f702a26ff0d186fbe102253c8420cec59e38cc5d33930aafe020",
+      "links": [
+        {
+          "assertion": "A05",
+          "role": "direct"
+        },
+        {
+          "assertion": "A06",
+          "role": "protective"
+        },
+        {
+          "assertion": "A07",
+          "role": "protective"
+        },
+        {
+          "assertion": "A08",
+          "role": "protective"
+        },
+        {
+          "assertion": "A02",
+          "role": "conditional"
+        },
+        {
+          "assertion": "A11",
+          "role": "conditional"
+        }
+      ]
+    },
+    {
+      "issue": "O05",
+      "issue_id": "ctxissue:6eba1955183081d8110790a08408d417867427c2a3b1e6065ae1f45bc24b5463",
+      "links": [
+        {
+          "assertion": "A03",
+          "role": "direct"
+        },
+        {
+          "assertion": "A05",
+          "role": "direct"
+        },
+        {
+          "assertion": "A04",
+          "role": "protective"
+        },
+        {
+          "assertion": "A10",
+          "role": "protective"
+        },
+        {
+          "assertion": "A12",
+          "role": "protective"
+        },
+        {
+          "assertion": "A06",
+          "role": "protective"
+        },
+        {
+          "assertion": "A07",
+          "role": "protective"
+        },
+        {
+          "assertion": "A08",
+          "role": "protective"
+        },
+        {
+          "assertion": "A02",
+          "role": "conditional"
+        },
+        {
+          "assertion": "A11",
+          "role": "conditional"
+        },
+        {
+          "assertion": "A09",
+          "role": "conditional"
+        }
+      ]
+    },
+    {
+      "issue": "O06",
+      "issue_id": "ctxissue:16f06461fa44f6e189bafee8162cefa640da06f89622e29bafcf14562e2c630d",
+      "links": [
+        {
+          "assertion": "A03",
+          "role": "direct"
+        },
+        {
+          "assertion": "A05",
+          "role": "direct"
+        }
+      ]
+    },
+    {
+      "issue": "O07",
+      "issue_id": "ctxissue:bbfbc862928ca2c8895f21e7be5eaa3fd9fd9767afb63ccee6cbb4cedee35691",
+      "links": [
+        {
+          "assertion": "A05",
+          "role": "direct"
+        }
+      ]
+    },
+    {
+      "issue": "O08",
+      "issue_id": "ctxissue:1089c0497f3850a3136c319d1f1b09dd5405678bca5fdf439d21162b1f6d17c8",
+      "links": [
+        {
+          "assertion": "A04",
+          "role": "protective"
+        },
+        {
+          "assertion": "A10",
+          "role": "protective"
+        },
+        {
+          "assertion": "A12",
+          "role": "protective"
+        }
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "label": "O01",
+      "old_id": "ctxissue:caaaec699ea13848e145573699939a54240f13984efbc7b77767fd164ec32a6d",
+      "new_id": "ctxissue:fb9e19c4396a0d25c0a4464df1481e3c529107cfca1dbc2b50de5eab6cc7fd67",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O02",
+      "old_id": "ctxissue:7796dfd6b7e8ef92fea6bf823a8618825a249295d3404d17d8716d9d6b4ff3fb",
+      "new_id": "ctxissue:5cb61481a0671a33fbc62806fe0e38406171e1a891d54b37c5e4662b191e124e",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O03",
+      "old_id": "ctxissue:020f5d0bffea6fabb4605e5fb4c53ccd72fb7320a3cf354dd477b5b81000a21e",
+      "new_id": "ctxissue:2ca4823e5b2038005e47b56ec7323accf462b9fa5f6858e9f002356e4801fe1b",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O04",
+      "old_id": "ctxissue:081d95e2e836c4aad52bfa72977575c1e7c732c094cffc52c9d42cc4c9fb26c4",
+      "new_id": "ctxissue:5d9ed46725f2f702a26ff0d186fbe102253c8420cec59e38cc5d33930aafe020",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O05",
+      "old_id": "ctxissue:d62e3952982928c38fa242bf17a7cf867f7ffdceb5f4599915d9260884e65530",
+      "new_id": "ctxissue:6eba1955183081d8110790a08408d417867427c2a3b1e6065ae1f45bc24b5463",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O06",
+      "old_id": "ctxissue:8e49ed2d0da6280c39ddd1f068fe53c891bed6999eb732e92cd8214758ec9c11",
+      "new_id": "ctxissue:16f06461fa44f6e189bafee8162cefa640da06f89622e29bafcf14562e2c630d",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O07",
+      "old_id": "ctxissue:54652f308c332f02a379469f0d2ee9fc8f62a858dbc4ac98fb0d8adc515d9bda",
+      "new_id": "ctxissue:bbfbc862928ca2c8895f21e7be5eaa3fd9fd9767afb63ccee6cbb4cedee35691",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "O08",
+      "old_id": "ctxissue:891a560adef9b2010117727e0188690b2d36c25c0dda4d594ebe58456cd9920d",
+      "new_id": "ctxissue:1089c0497f3850a3136c319d1f1b09dd5405678bca5fdf439d21162b1f6d17c8",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S01",
+      "old_id": "ctxissue:8c74cecc6c1de94bac3715d48d783e4d7975188f749d9e681ae8988e5c4011a3",
+      "new_id": "ctxissue:6196cf33caa24b85ab4551cf9462ae19d64bfc17fa94c0e69095f785b7cfe38b",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S02",
+      "old_id": "ctxissue:ee53a5c2d8f121596b5bb8f81c1e93044a89c36656a8eab14375b5e727f29b15",
+      "new_id": "ctxissue:d40ad8d150a3a500cbe9cf8565f7a2bb325026208ed0569dbf1e72f2f7fa3038",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S03",
+      "old_id": "ctxissue:b3401287c9e213a0f08c838dd2c44f28ff161f8d677ba1b90dee95f6ef27d0ee",
+      "new_id": "ctxissue:e8e95f90bd0517b0672b5be43e476b4826bda76fd308d9099d26ac066e35eeee",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S04",
+      "old_id": "ctxissue:f026c80a950ff10430b7b31e7b146b5014f81deeba899ed8b4af776fc79129fa",
+      "new_id": "ctxissue:158f279be5ec47b4d031406749910b3e7f8aa4892c9ab7f0a2313b6c4985cf6a",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S05",
+      "old_id": "ctxissue:8366568b67932170f56e7728d71dbe61e463cb0ef213ff43ad7c42de4c4dbc8a",
+      "new_id": "ctxissue:366f9b75fd921a71e02e2af0197146c21ff5b6940060c7865080f81b30a214b4",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S06",
+      "old_id": "ctxissue:7b65a696f23638a4fa87a3096380e020d4bc1a15ecad40472fd8b3356974f812",
+      "new_id": "ctxissue:ea03e5574692b449bb67f24f28c9f4ec0e1e43fb7f8e89aa1ffb63389cbd7b51",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S07",
+      "old_id": "ctxissue:b0fd1ca47916f488a8d360129770b19894f89670f5e6ef4937cf30b97bdcc544",
+      "new_id": "ctxissue:dd07190dd54f58df3bb27af23fb29f101213d12ff0ca01e185205358c780ae21",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S08",
+      "old_id": "ctxissue:34fa2d9f090fc7934c168680a8d3ce0858e3263f2b8f71c830e71ad686fbfb84",
+      "new_id": "ctxissue:ebd0d51e4b4f79624efe79520c7f2a144bfedd1fd72c916ebc431a3b118c807c",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S09",
+      "old_id": "ctxissue:13adc3149f8c41067159b8b17fdde7c5a5b64f9738f430d5089d401814ad3e3c",
+      "new_id": "ctxissue:ddf3bf0a4d44ee1c1dfd27d2745a2591f521d1d78405c9ac379cb6db2ed90148",
+      "state": "pending; no decision transferred"
+    },
+    {
+      "label": "S10",
+      "old_id": "ctxissue:f5535089659a575c39048156c03ab3a3bcb59bf6f673873b56f4d632413a600a",
+      "new_id": "ctxissue:3b817f891dac9fe93978ca5a33c24c03adf519894e7b92285bfc45f18edd6971",
+      "state": "pending; no decision transferred"
+    }
+  ],
+  "source_unit_mapping": {
+    "qnu:l006": "qnu:l006",
+    "qnu:t001": "qnu:t001",
+    "qnu:l014": "qnu:l014",
+    "qnu:r001": "qnu:r001",
+    "qnu:r002": "qnu:r002",
+    "qnu:r003": "qnu:r003",
+    "qnu:r004": "qnu:r004",
+    "qnu:r005": "qnu:r005",
+    "qnu:r006": "qnu:r006",
+    "qnu:l015": "qnu:l015",
+    "qnu:l012": "qnu:l012",
+    "qnu:p090": "qnu:p090",
+    "qnu:p092": "qnu:p092",
+    "qnu:r007": "qnu:r007",
+    "qnu:r008": "qnu:r008",
+    "qnu:r009": "qnu:r009",
+    "qnu:r010": "qnu:r010",
+    "qnu:r011": "qnu:r011",
+    "qnu:r012": "qnu:r012",
+    "qnu:p049": "qnu:p049",
+    "qnu:p050": "qnu:p050",
+    "qnu:p051": "qnu:p051",
+    "qnu:docx_footnote_2": "qnu:docx_footnote_2",
+    "qnu:p084": "qnu:p084",
+    "qnu:s030": "qnu:s030",
+    "qnu:s036": "qnu:s036"
+  },
+  "pending_proposal_hash": "543ddd61aa0b1527babe8c6adcb122c5cb2157f30d542c91d1de6fa5407207df"
+}

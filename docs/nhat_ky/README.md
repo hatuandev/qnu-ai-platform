@@ -7,6 +7,12 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên559](./2026-10-19_phien_559_live_automatic_docx_ingestion.md) | Live Automatic DOCX→MD/JSON, vector bị QC chặn | Revision3/233block/10table/3footnotePASS; NEEDS_ATTENTION8/4rawlimits, POST404pending/no vector/no publish. Oldrows/publication nguyên, không sửa app |
+
+| **2026-10-19** | [Phiên558](./2026-10-19_phien_558_automatic_ingestion_advanced_review.md) | Automatic Ingestion và Advanced Review |3trạng thái/chứng nhận nội dung; giữ proposal riêng, unknownraw và publication guard. Focused265/FE41/buildPASS; full2466PASS/18FAIL exactnền/37addedPASS. Không ghi nguồn thật; DBdọn/Storage policyblocked |
+
+| **2026-10-19** | [Phiên557](./2026-10-19_phien_557_canonical_draft_pending_review.md) | Canonical draft và pending semantic review | New ks_rev_2b5e0352565f,233core/10table/3footnote,12/12/18issue; API pending thật/83binding/rebuildPASS, noapproval. Focused158/FE21/6probesPASS; full2429PASS/18FAIL exact nền. DB dọn/Storage policyblocked |
+
 | **2026-10-19** | [Phiên556](./2026-10-19_phien_556_canonical_source_reconciliation.md) | Canonical source reconciliation | Root cause299/233 core records; 11mapped/A12missing; full2429PASS/18FAIL nền exact/13addedPASS; TESTpending/determinismPASS, liveBLOCKED. DB dọn/Storage10MB policyblocked |
 
 | **2026-10-19** | [Phiên555](./2026-10-19_phien_555_final_semantic_review.md) | Final semantic review A03/ref/import có xác thực | A03 workflow không fact; typed roles/pending/UI; full18FAIL/2416PASS/17SKIP exact nền,18thêmPASS. Live hash khác BLOCKED/chưa human; DB dọn/Storage và bản xuất thừa còn do policy |

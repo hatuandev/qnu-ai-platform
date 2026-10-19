@@ -116,7 +116,7 @@ def _full_line_match(markdown: str, hit: re.Match) -> bool:
     left = markdown[markdown.rfind("\n", 0, hit.start()) + 1:hit.start()]
     stop = markdown.find("\n", hit.end())
     right = markdown[hit.end():stop if stop >= 0 else len(markdown)]
-    return bool(re.fullmatch(r"[\s#>*`_~]*(?:(?:\d+[.)]|[^\W\d_][.)]|[-+*])\s+)?", left)
+    return bool(re.fullmatch(r"[\W_]*(?:(?:\d+[.)]|[^\W\d_][.)])\s+)?[\W_]*", left)
                 and re.fullmatch(r"\W*", right))
 
 

@@ -118,8 +118,8 @@ export function CleanContentReview(props: Props) {
       </div>
       <p className="text-xs text-muted-foreground">
         Chỉ chuẩn hóa hình thức, không tự sửa OCR/số/năm. Kiểm tra là heuristic,
-        không chứng nhận nội dung đúng. Lưu → Duyệt → Nạp vector → Xuất bản là
-        các bước riêng.
+        không chứng nhận mọi diễn giải đã đúng. Nội dung đạt kiểm tra có thể nạp
+        vector; đối chiếu nâng cao và xuất bản là các bước riêng.
       </p>
       {doc.paginationKnown === false && (
         <p className="text-xs text-warning">

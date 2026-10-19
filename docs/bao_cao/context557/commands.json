@@ -1,0 +1,195 @@
+[
+  {
+    "run": "artifact-probes-final",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "storage/context557/test_actual_source_bindings.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-f955f82ab0f0\\artifact-probes-final",
+      "--junitxml=<repo>\\backend\\storage\\context557\\tests\\artifact-probes-final.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_f955f82ab0f0",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-f955f82ab0f0\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "artifact-probes",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "storage/context557/test_actual_source_bindings.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-f955f82ab0f0\\artifact-probes",
+      "--junitxml=<repo>\\backend\\storage\\context557\\tests\\artifact-probes.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_f955f82ab0f0",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-f955f82ab0f0\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 1
+  },
+  {
+    "run": "focused-final",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_canonical_semantic_reconciliation.py",
+      "tests/test_semantic_checkpoint_import.py",
+      "tests/test_semantic_scope_assertions.py",
+      "tests/test_semantic_selector_v2.py",
+      "tests/test_docx_source_evidence.py",
+      "tests/test_qnu_docx_markdown.py",
+      "tests/test_review536_findings.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-f955f82ab0f0\\focused-final",
+      "--junitxml=<repo>\\backend\\storage\\context557\\tests\\focused-final.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_f955f82ab0f0",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-f955f82ab0f0\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "full-final",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-f955f82ab0f0\\full-final",
+      "--junitxml=<repo>\\backend\\storage\\context557\\tests\\full-final.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_f955f82ab0f0",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-f955f82ab0f0\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 1
+  },
+  {
+    "run": "frontend-tests",
+    "cwd": "<repo>/frontend",
+    "command": "node --test src/features/knowledge/components/semantic-review-preview.test.mjs",
+    "exit_code": 0,
+    "pass": 21
+  },
+  {
+    "run": "frontend-build",
+    "cwd": "<repo>/frontend",
+    "command": "npm run build (vite build && tsc --noEmit)",
+    "exit_code": 0
+  },
+  {
+    "run": "ruff",
+    "cwd": "<repo>",
+    "command": "backend/.venv/Scripts/python.exe -m ruff check backend/scripts/reconcile_semantic_checkpoint.py backend/tests/test_canonical_semantic_reconciliation.py backend/app/modules/knowledge/services/source_reparse.py backend/app/modules/knowledge/services/semantic_checkpoint.py",
+    "exit_code": 0
+  },
+  {
+    "run": "biome",
+    "cwd": "<repo>/frontend",
+    "command": "node_modules/.bin/biome.cmd check --line-ending=lf src/features/knowledge/components/semantic-review-preview.tsx src/features/knowledge/components/semantic-checkpoint-import.tsx src/features/knowledge/components/semantic-review-preview.test.mjs src/features/knowledge/source-detail-page.tsx src/services/knowledge-api.ts src/types/knowledge.ts",
+    "exit_code": 0
+  },
+  {
+    "run": "preflight",
+    "cwd": "<repo>",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/preflight.py",
+    "exit_code": 0,
+    "writes": "private audit only; application DB READ ONLY"
+  },
+  {
+    "run": "create-one-draft",
+    "cwd": "<repo>",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/create_draft.py",
+    "exit_code": 0,
+    "new_revision": "ks_rev_2b5e0352565f"
+  },
+  {
+    "run": "read-back-validation",
+    "cwd": "<repo>",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/validate_draft.py",
+    "exit_code": 0
+  },
+  {
+    "run": "reconciliation",
+    "cwd": "<repo>",
+    "command": "backend/.venv/Scripts/python.exe backend/scripts/reconcile_semantic_checkpoint.py --original backend/storage/context552-checkpoint-06689f8f17dc --revised backend/storage/context555-review-ready --canonical backend/storage/context557/canonical --output backend/storage/context557/reconciled",
+    "exit_code": 0,
+    "mapped": 12,
+    "blocked": 0
+  },
+  {
+    "run": "stage-helper-bootstrap",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/stage_pending.py",
+    "exit_code": 1,
+    "writes": 0,
+    "reason": "Helper imported schemas before services, exposing existing circular import; corrected helper import order"
+  },
+  {
+    "run": "stage-real-api",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/stage_pending.py",
+    "exit_code": 1,
+    "http_status": 200,
+    "post_count": 1,
+    "reason": "API import succeeded. Postcondition helper compared dry-run timestamp/hash to fresh runtime timestamp/hash; no resend"
+  },
+  {
+    "run": "readback-helper-first",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/verify_pending.py",
+    "exit_code": 1,
+    "writes": 0,
+    "reason": "Compared fresh Python facts to stored JSON representation instead of persisted pre-stage artifact; persisted before/after facts are exact"
+  },
+  {
+    "run": "readback-helper-final",
+    "command": "backend/.venv/Scripts/python.exe backend/storage/context557/verify_pending.py",
+    "exit_code": 0,
+    "writes": 0,
+    "proof": "Actual full envelope/hash and content validated; close/reopen/rebuild PASS; pre/post stored facts/graph/tables/manifest unchanged"
+  },
+  {
+    "run": "api-readback",
+    "command": "GET studio?revision_id=<new>; GET qnu-markdown?format=md/json; GET studio with X-Enforce-Auth:true and no session",
+    "exit_code": 0,
+    "statuses": [
+      200,
+      200,
+      200,
+      401
+    ]
+  },
+  {
+    "run": "test-db-cleanup",
+    "command": "backend/.venv/Scripts/python.exe backend/scripts/context_patch_validation.py cleanup --state-file backend/storage/context557/isolation.json --audit-file backend/storage/context557/safety.json --evidence-dir backend/storage/context557/tests",
+    "exit_code": 0
+  },
+  {
+    "run": "test-storage-cleanup",
+    "command": "Guarded Remove-Item -LiteralPath <owned runtime> -Recurse -Force",
+    "exit_code": null,
+    "status": "NOT EXECUTED: automatic review blocked by policy"
+  }
+]

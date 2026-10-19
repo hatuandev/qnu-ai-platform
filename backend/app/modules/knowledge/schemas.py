@@ -968,6 +968,7 @@ class KnowledgeSourceRevisionResponse(BaseModel):
     quality_report: dict[str, Any] = Field(default_factory=dict)
     status: str
     structured_review_status: str = "auto_ready"
+    ingestion_readiness: dict[str, Any] | None = None
     requires_structured_review: bool = False
     structured_issue_count: int = 0
     failure_code: str | None = None
@@ -1046,6 +1047,27 @@ class ReviewSourceRevisionRequest(BaseModel):
     decision: str = Field(..., description="Quyết định duyệt: approved hoặc rejected")
     comment: str | None = Field(None, description="Ghi chú phản hồi duyệt")
     expected_semantic_proposal_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
+
+
+class SmartApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_canonical_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_semantic_proposal_hash: str | None = Field(None, pattern=r"^[a-f0-9]{64}$")
+    policy_version: Literal["2026-10-19.1"] = "2026-10-19.1"
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    comment: str | None = Field(None, min_length=3, max_length=2000)
+    dry_run: bool = False
+
+
+class SmartApprovalResponse(BaseModel):
+    contract: Literal["qnu-smart-approval-v1"]
+    source_id: str
+    revision_id: str
+    approved: bool
+    idempotent: bool
+    validation: dict[str, Any]
+    blockers: list[dict[str, Any]]
+    message: str
 
 
 class SemanticCheckpointImportRequest(BaseModel):

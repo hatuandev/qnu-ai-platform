@@ -55,6 +55,8 @@ import type {
   RollbackIndexRevisionRequest,
   ShadowRetrievalReport,
   ShadowRetrievalRequest,
+  SmartApprovalPayload,
+  SmartApprovalResult,
   SyncGroupSourceRequest,
   SyncGroupSourceResponse,
   SystemDecommissioningAuditReport,
@@ -1938,6 +1940,29 @@ export const knowledgeApi = {
           err,
           `Lỗi phê duyệt bản sửa đổi (HTTP ${res.status}).`,
         ),
+      );
+    }
+    return res.json();
+  },
+
+  async smartApproveSource(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+    payload: SmartApprovalPayload,
+  ): Promise<SmartApprovalResult> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/smart-approval`,
+      {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!res.ok) {
+      const error: unknown = await res.json();
+      throw new Error(
+        extractErrorMessage(error, "Không thể kiểm tra và duyệt nguồn."),
       );
     }
     return res.json();

@@ -99,6 +99,9 @@ class ChunkSetService:
             raise AppException("Bản nguồn không có Markdown chuẩn hóa.", code="EMPTY_CANONICAL_CONTENT", status_code=422)
         clean_config = {k: v for k, v in (chunk_config or {}).items() if not k.startswith("_")}
         artifact = get_source_artifact(source_rev)
+        if (source_rev.parse_provenance or {}).get("automatic_ingestion"):
+            from app.modules.knowledge.services.automatic_ingestion import verify_content_source
+            await verify_content_source(source_rev)
         if (source_rev.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
             from app.modules.knowledge.services.qnu_serving import verify_revision_pair
             from app.modules.knowledge.services.semantic_store import verify_effective_projection

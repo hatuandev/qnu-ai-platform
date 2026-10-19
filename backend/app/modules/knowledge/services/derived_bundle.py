@@ -96,6 +96,9 @@ async def validate_index_bundle(db: Any, index: Any, source: Any, artifact: dict
     )
 
     artifact = get_source_artifact(source)
+    if (source.parse_provenance or {}).get("automatic_ingestion"):
+        from app.modules.knowledge.services.automatic_ingestion import verify_content_source
+        await verify_content_source(source)
     if (source.parse_provenance or {}).get("canonical_format") == "qnu-rag-projection/v1":
         from app.modules.knowledge.services.qnu_serving import verify_revision_pair
         from app.modules.knowledge.services.semantic_store import verify_effective_projection

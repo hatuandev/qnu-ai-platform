@@ -125,11 +125,13 @@ def _semantic_hash(snapshot: dict) -> str:
     if "policy_mode" in snapshot:
         payload["policy_mode"] = snapshot["policy_mode"]
     version = snapshot.get("semantic_hash_version", 1)
-    if version not in {1, 2}:
+    if version not in {1, 2, 3}:
         raise invalid("semantic_hash_version")
-    if version == 2:
-        payload.update(semantic_hash_version=2, context_review=snapshot["proposal"].get("context_review"),
+    if version >= 2:
+        payload.update(semantic_hash_version=version, context_review=snapshot["proposal"].get("context_review"),
             context_decisions=snapshot["review"].get("context_decisions", []))
+    if version == 3:
+        payload["bulk_review"] = snapshot["review"]
     return _digest(payload)
 
 
@@ -143,12 +145,18 @@ def _apply_snapshot(base: dict, snapshot: dict, reference: dict) -> dict:
     semantic_hash = _semantic_hash(snapshot)
     if snapshot.get("semantic_hash") != semantic_hash:
         raise invalid("semantic_hash")
-    annotations = SemanticAnnotations.model_validate(proposal["annotations"])
+    bulk = snapshot.get("semantic_hash_version") == 3
+    if bulk:
+        from app.modules.knowledge.services.smart_approval import verify_certificate
+        verify_certificate(enriched, proposal, snapshot["review"]["machine_validation"], snapshot["identity"])
+    annotations = SemanticAnnotations.model_validate(
+        snapshot["review"]["machine_validation"].get("resolved_annotations", proposal["annotations"])
+        if bulk else proposal["annotations"])
     acknowledged = snapshot["review"].get("action") == "acknowledged_limits"
     if annotations.limitations and not acknowledged:
         raise invalid("limitation_not_acknowledged")
     result = _validated_copy(enriched, annotations, acknowledged_limits=acknowledged)
-    if proposal.get("context_review"):
+    if proposal.get("context_review") and not bulk:
         from app.modules.knowledge.services.semantic_context_review import guard_application
         requests = [{k: v for k, v in item.items() if k not in {"actor_id", "at", "proposal_hash"}}
                     for item in snapshot["review"].get("context_decisions", [])]
@@ -301,6 +309,26 @@ async def record_decision(revision: Any, artifact: dict, expected_hash: str, act
             raise invalid("no_limits_to_acknowledge")
         snapshot["review"]["action"] = decision
         snapshot["policy_mode"] = policy_mode
+    snapshot["semantic_hash"] = _semantic_hash(snapshot)
+    return await _persist_snapshot(revision, base, artifact, snapshot)
+
+
+async def record_bulk_decision(revision: Any, artifact: dict, certificate: dict, actor_id: str, comment: str) -> dict:
+    """One explicit bulk user action; no fabricated per-issue human review."""
+    from datetime import UTC, datetime
+
+    from app.modules.knowledge.services.smart_approval import verify_certificate
+
+    _, base = await base_projection(revision)
+    enriched = await proposal_base(revision, artifact)
+    proposal = copy.deepcopy(artifact["semantic_annotations"])
+    enriched["semantic_annotations"] = proposal
+    verify_pending_envelope(enriched, certificate["proposal_hash"], actor_id, comment)
+    verify_certificate(enriched, proposal, certificate, identity(revision))
+    snapshot = {"schema": SCHEMA, "identity": identity(revision), "enrichment": _enrichment(base, enriched),
+        "proposal": proposal, "semantic_hash_version": 3,
+        "review": {"actor_id": actor_id, "at": datetime.now(UTC).isoformat(), "comment": comment,
+            "decision": "approved", "action": "bulk_acceptance_v1", "machine_validation": copy.deepcopy(certificate)}}
     snapshot["semantic_hash"] = _semantic_hash(snapshot)
     return await _persist_snapshot(revision, base, artifact, snapshot)
 

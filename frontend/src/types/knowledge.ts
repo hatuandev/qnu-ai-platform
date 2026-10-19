@@ -302,6 +302,10 @@ export interface SourceArtifact {
       }[];
     };
     review?: {
+      actor_id?: string;
+      at?: string;
+      action?: string;
+      machine_validation?: SmartApprovalResult["validation"];
       context_decisions?: (ContextIssueDecision & {
         actor_id: string;
         at: string;
@@ -1125,6 +1129,7 @@ export interface KnowledgeSourceRevisionResponse {
     | "failed"
     | "cancelled";
   structured_review_status: string;
+  ingestion_readiness?: IngestionReadiness | null;
   requires_structured_review: boolean;
   structured_issue_count: number;
   failure_code?: string | null;
@@ -1338,4 +1343,52 @@ export interface GlossarySettings {
   version: number;
   updated_by?: string | null;
   updated_at?: string | null;
+}
+export interface SmartApprovalResult {
+  contract: "qnu-smart-approval-v1";
+  source_id: string;
+  revision_id: string;
+  approved: boolean;
+  idempotent: boolean;
+  message: string;
+  blockers: Array<{ reason_code: string; message: string; issue_id?: string }>;
+  validation: {
+    policy_id: string;
+    policy_version: string;
+    auto_verified_count: number;
+    source_limitation_count: number;
+    issues: Array<{ issue_id: string; result: string; reason_code: string }>;
+    cells: Array<{
+      table_id: string;
+      row_unit_id: string;
+      column_id: string;
+      raw: string;
+      classification: string;
+      message: string;
+    }>;
+  };
+}
+
+export interface IngestionReadiness {
+  policy_version: string;
+  status: "AUTO_READY" | "READY_WITH_LIMITATIONS" | "NEEDS_ATTENTION";
+  message: string;
+  publication_granted: false;
+  limitations: Array<{
+    row_unit_id: string;
+    column_id: string;
+    raw: string;
+    basis: string;
+    usage: "description_only";
+  }>;
+  blockers: Array<{ reason_code: string; message: string }>;
+}
+
+export interface SmartApprovalPayload {
+  expected_canonical_hash: string;
+  expected_semantic_proposal_hash?: string | null;
+  policy_version: "2026-10-19.1";
+  idempotency_key: string;
+  comment?: string;
+  dry_run?: boolean;
 }
