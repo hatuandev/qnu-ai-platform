@@ -21,10 +21,12 @@ from app.modules.knowledge.normalization.retrieval_models import (
     UnitManifest,
 )
 from app.modules.knowledge.normalization.retrieval_units import manifest_digest, validate_manifest
+from app.modules.knowledge.services.fact_identity import build_fact_identity
 from app.modules.knowledge.services.source_artifact import build_source_artifact
 from app.modules.knowledge.services.source_links import attach_fact_context, build_context_graph
 
 VERSION = "qnu-rag-projection/v1"
+FINAL_FACT_IDENTITY = "final-cell-provenance/v1"
 TEMPORAL_KEYS = frozenset({"data_years", "academic_year", "effective_from", "effective_to",
                            "event_from", "event_to", "recurrence", "basis_quote"})
 MILESTONES = ("effective_from", "effective_to", "event_from", "event_to")
@@ -209,6 +211,9 @@ def _table(block: QnuBlock, rows: list[QnuBlock]) -> tuple[str, list[str], list[
 
 def project_document(document: QnuStructuredDocument, reference: dict, metadata: dict) -> tuple[str, dict]:
     """Strip transport metadata, retaining exact block/cell locations and explicit dependencies."""
+    identity_policy = document.document_meta.get("fact_identity_policy")
+    if identity_policy not in (None, FINAL_FACT_IDENTITY):
+        raise ValueError("FACT_IDENTITY_POLICY_UNSUPPORTED")
     parts: list[str] = []
     units: list[SourceUnit] = []
     tables: list[dict] = []
@@ -428,6 +433,12 @@ def project_document(document: QnuStructuredDocument, reference: dict, metadata:
             }
         raw["context_unit_ids"] = graph["links"].get(raw["source_unit_id"], [])
         raw["context_graph_hash"] = graph["digest"]
+        if identity_policy == FINAL_FACT_IDENTITY:
+            # The table page can differ from the final row page. ORM materialization
+            # uses final provenance too; seal the identity only after that is complete.
+            identity = build_fact_identity(fact["entity_text"], raw_data=raw)
+            fact.update(entity_name=identity.entity_text, entity_text=identity.entity_text,
+                        entity_key=identity.entity_key, entity_label=identity.entity_label)
     artifact["facts"] = [fact for fact in artifact["facts"] if fact["raw_data"].get("field_state") == "present"]
     artifact["retrieval_units"] = manifest.model_dump()
     artifact["unit_manifest_hash"] = manifest_hash

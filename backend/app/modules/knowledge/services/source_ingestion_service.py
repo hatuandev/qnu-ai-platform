@@ -1290,6 +1290,12 @@ class SourceIngestionService:
         # 4. Perform extraction
         extraction = await extract_source(db, file_bytes, filename, file_type,
                                           parser_profile, ocr_engine, tenant_id)
+        from app.modules.knowledge.services.source_figure_review import KEY, apply_figure_reviews
+
+        review_base = await db.get(KnowledgeSourceRevision, reserved_revision_id) if reserved_revision_id else current_rev
+        figure_reviews = (review_base.snapshot_metadata or {}).get(KEY) or []
+        if figure_reviews and extraction.qnu_document is not None:
+            await asyncio.to_thread(apply_figure_reviews, extraction.qnu_document, file_bytes, figure_reviews, binding.id)
         preview_path = await save_source_preview(current_rev.snapshot_storage_path, extraction)
         raw_text, parsed_page_count, ocr_pages = extraction.raw_text, extraction.page_count, extraction.pages
         parsed_tables_count = len(extraction.tables)
@@ -1343,6 +1349,8 @@ class SourceIngestionService:
         quality_report = _apply_structured_review_requirement(quality_report, structured_artifact)
 
         snapshot_metadata = {**dict(current_rev.snapshot_metadata or {}), "preview_pdf_path": preview_path}
+        if figure_reviews:
+            snapshot_metadata[KEY] = figure_reviews
         qnu_markdown_artifact = None
         if (file_type or "").lower().lstrip(".") in {"docx", "pdf"}:
             qnu_markdown_artifact = await build_qnu_markdown_artifact(

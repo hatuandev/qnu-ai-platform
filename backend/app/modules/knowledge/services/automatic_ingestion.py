@@ -86,10 +86,18 @@ async def verify_content_source(revision: Any) -> None:
         raise AppException("Tệp nguồn không khớp phiên bản.", code="SOURCE_HASH_MISMATCH", status_code=409)
     if document.document_meta.get("source_format") == "docx":
         import asyncio
+
         from app.modules.knowledge.parsers.docx_layout_fidelity import verify_native_layout
 
         try:
             await asyncio.to_thread(verify_native_layout, document, raw)
+            from app.modules.knowledge.services.source_figure_review import (
+                KEY,
+                verify_figure_reviews,
+            )
+
+            await asyncio.to_thread(verify_figure_reviews, document, raw,
+                (revision.snapshot_metadata or {}).get(KEY) or [], revision.binding_id)
         except ValueError as exc:
             raise AppException("Lưới ô nguồn hoặc giới hạn diễn giải không còn khớp.", code="SOURCE_LAYOUT_MISMATCH", status_code=409) from exc
 

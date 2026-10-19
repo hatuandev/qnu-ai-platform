@@ -3,28 +3,13 @@
 import hashlib
 import json
 import re
-from typing import Literal
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.knowledge.normalization.retrieval_models import UnitManifest
+from app.modules.knowledge.review_contracts import EvidenceBinding
 
 
 def digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-
-
-class EvidenceBinding(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    source_identity: dict[str, str | None]
-    input_hash: str
-    source_unit_id: str
-    coordinate_space: Literal["unit_codepoints", "cell_raw_codepoints"]
-    column_id: str | None = None
-    start: int = Field(ge=0)
-    end: int = Field(gt=0)
-    text_sha256: str
-    evidence_id: str
 
 
 def source_identity(artifact: dict) -> dict:

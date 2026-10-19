@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.single_application import SingleApplicationModel
 from app.modules.documents.schemas import DocumentGroupMinimalItem
-from app.modules.knowledge.services.semantic_context_review import ContextDecision
+from app.modules.knowledge.review_contracts import ContextDecision
 
 
 # ==============================================================================

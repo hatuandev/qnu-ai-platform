@@ -25,7 +25,7 @@ from app.modules.knowledge.services.page_visuals import visual_coverage
 from app.modules.knowledge.services.source_pages import canonical_pages
 from app.modules.ocr.service import OCRService
 
-EXTRACTION_VERSION = "layout-v19-native-layout"
+EXTRACTION_VERSION = "layout-v20-final-fact-id"
 _native_pdf_lock = asyncio.Lock()
 
 
@@ -201,6 +201,9 @@ async def extract_pdf(db: AsyncSession, content: bytes, filename: str, profile: 
         try:
             result.qnu_document = await asyncio.to_thread(build_pdf_document, result.pdf_evidence,
                 filename=filename, sha256=hashlib.sha256(content).hexdigest())
+            from app.modules.knowledge.normalization.qnu_projection import FINAL_FACT_IDENTITY
+
+            result.qnu_document.document_meta["fact_identity_policy"] = FINAL_FACT_IDENTITY
         except Exception as exc:
             # A derivative failure must not certify a partial artifact or break legacy serving.
             result.qnu_build_error = type(exc).__name__
@@ -298,6 +301,9 @@ async def extract_source(db: AsyncSession, content: bytes, filename: str, file_t
             from app.modules.knowledge.parsers.docx_layout_fidelity import preserve_native_layout
 
             await asyncio.to_thread(preserve_native_layout, result.qnu_document, content)
+            from app.modules.knowledge.normalization.qnu_projection import FINAL_FACT_IDENTITY
+
+            result.qnu_document.document_meta["fact_identity_policy"] = FINAL_FACT_IDENTITY
         result.preview_pdf = preview
         return result
     if extension in {"png", "jpg", "jpeg", "webp", "bmp"}:

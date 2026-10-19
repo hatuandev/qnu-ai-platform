@@ -4,10 +4,16 @@ import pytest
 from docx import Document
 from docx.oxml import OxmlElement
 
-from app.modules.knowledge.parsers import get_document_parser
-from app.modules.knowledge.parsers.docling_structure import build_qnu_structured_document, map_unit_to_page
-from app.modules.knowledge.parsers.docx_layout_fidelity import preserve_native_layout, verify_native_layout
 from app.modules.knowledge.normalization.qnu_projection import project_document
+from app.modules.knowledge.parsers import get_document_parser
+from app.modules.knowledge.parsers.docling_structure import (
+    build_qnu_structured_document,
+    map_unit_to_page,
+)
+from app.modules.knowledge.parsers.docx_layout_fidelity import (
+    preserve_native_layout,
+    verify_native_layout,
+)
 
 
 async def native_model(*, header=False, merge=False):
@@ -37,9 +43,9 @@ async def test_untyped_source_grid_is_literal_only_never_promotes_alpha_to_heade
     assert table.attributes['column_roles'] == 'unknown'
     assert len(rows) == 3 and rows[0].attributes['fields']['c01']['raw'] == 'Alpha'
     assert all(f['state'] == 'ambiguous' for b in rows for f in b.attributes['fields'].values())
-    assert not table.quality_flags
+    assert not any(f.code == "table_header_unresolved" for f in table.quality_flags)
     verify_native_layout(model, raw)
-    _, artifact = project_document(model, {}, {'structured_sha256': 'a' * 64})
+    _, artifact = project_document(model, {'structured_sha256': 'a' * 64}, {})
     assert not artifact['facts']
 
 

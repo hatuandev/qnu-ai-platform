@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.exceptions import AppException
+from app.modules.knowledge.review_contracts import ContextDecision
 from app.modules.knowledge.services.semantic_evidence import (
     EvidenceBinding,
     digest,
@@ -16,17 +17,6 @@ from app.modules.knowledge.services.semantic_evidence import (
 )
 
 CONTRACT = "qnu-context-review-v2"
-
-
-class ContextDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    issue_id: str
-    target: dict[str, str | list[str]]
-    action: Literal["scope_confirmed", "not_applicable_to_target", "related_context_reviewed"]
-    evidence_binding: EvidenceBinding
-    evidence_quote: str = Field(min_length=3, max_length=10000)
-    reason: str = Field(min_length=3, max_length=2000)
-    supporting_evidence: list[EvidenceBinding] = Field(default_factory=list, max_length=32)
 
 
 class ReviewEvidence(BaseModel):
