@@ -6,6 +6,14 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-19** | Codex | Selector v2 và scope review | Registry-derived owner/v1 compatible/full-source review/preview; focused217/Ruff14/FE15/Biome2/buildPASS. Full18FAIL/2375PASS/17SKIP, exact18ID/cause/39addedPASS/0new. Live Qwen Bảng1 JSON/schema/bindingPASS,4notes/8issue pending; human/C/D chờ, DB/runtime2test dọn/private checkpoint giữ | [Nhật ký552](./nhat_ky/2026-10-19_phien_552_selector_v2_scope_review.md) |
+
+| **2026-10-19** | Codex | Retest Qwen32K và Luna | No-fallback short Qwen/LunaPASS; tài liệu Qwen200/16,3Kinput/JSON-schemaPASS nhưng table scope ambiguity và API unit mismatchFAIL; không context400/fallback,22packet planned/1sent. Helper active-chain probe/RuffPASS, fullNOT RUN; metadata xuất/DB-runtime test dọn/config giữ nguyên | [Nhật ký551](./nhat_ky/2026-10-19_phien_551_live_retest_qwen_32k.md) |
+
+| **2026-10-19** | Codex | Qwen primary và credential | Local primaryQwen/fallbackGPT, các default khác giữ; key mới mã hóa ModelOps/fresh-session verified. Chat Việt QwenPASS không fallback,643,1ms. Tài liệu Qwen400context8192/output6000, GPTfallbackTimeout→BLOCKED; Ruff2PASS/fullNOT RUN, metadata xuất/DB-runtime test dọn | [Nhật ký550](./nhat_ky/2026-10-19_phien_550_qwen_primary_credential.md) |
+
+| **2026-10-19** | Codex | JSON output contract ModelOps | Optional backend preset/wire schema, per-route capability, adapter payload/metadata, strict full JSON/1syntax retry và shared transport budget. Focused238/47new/Ruff22PASS; boundary63PASS; full18FAIL/2336PASS/17skip, exact18ID/cause nền,47thêmPASS/0lỗi mới. ZIP đã xuất/DB-runtime test đã dọn. Live JSON/schemaPASS, G3binderFAIL/G4expansionFAIL; E2EBLOCKED | [Nhật ký549](./nhat_ky/2026-10-19_phien_549_json_output_contract.md) |
+
 | **2026-10-19** | Codex | Vá context547 | Stable issue/review authority/policy/publication/snapshotv2; multi-year scope, common packet budget và deadline atomic stage. Focused183/FE14/Ruff20/Biome5/buildPASS; full18FAIL/2289PASS/17skip, exact18ID/cause nền giữ nguyên,6đỏ→PASS/17thêmPASS/0lỗi mới. Dossier đã xuất, DB/runtime test đã dọn. Live providerPASS/schemaFAIL, E2EBLOCKED | [Nhật ký548](./nhat_ky/2026-10-19_phien_548_va_context547.md) |
 
 | **2026-10-19** | Codex | Context và evidence binding | Backend exact selectors, bounded context/UI reason/span/full source; giữ snapshot/policy. Focused127/FE8/Ruff/Biome/buildPASS. Full18FAIL/2264PASS/17skip, exact18ID/cause baseline không lỗi mới; DB/runtime test đã dọn. Live timeout, E2E BLOCKED | [Nhật ký547](./nhat_ky/2026-10-19_phien_547_context_va_evidence_binding.md) |

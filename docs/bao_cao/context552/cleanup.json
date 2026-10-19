@@ -1,0 +1,24 @@
+{
+  "status": "cleaned",
+  "test_environments": [
+    {
+      "status": "cleaned",
+      "test_database": "qnu_test_context548_d85a1e66bd1d",
+      "database_removed_verified": true,
+      "runtime": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-d85a1e66bd1d",
+      "runtime_exists_after": false,
+      "production_migrations": false,
+      "retained": "Allowlisted evidence dossier, no database/Storage dump"
+    },
+    {
+      "status": "cleaned",
+      "test_database": "qnu_test_context548_06689f8f17dc",
+      "database_removed_verified": true,
+      "runtime": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-06689f8f17dc",
+      "runtime_exists_after": false,
+      "production_migrations": false,
+      "retained": "Allowlisted evidence dossier, no database/Storage dump"
+    }
+  ],
+  "retained": "private pending checkpoint and allowlisted evidence; no credential/DB dump"
+}

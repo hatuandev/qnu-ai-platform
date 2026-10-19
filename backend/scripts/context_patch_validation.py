@@ -21,12 +21,15 @@ from app.core.config import settings
 
 STATE = ROOT / 'backend/storage/context548-isolation.json'
 EVIDENCE = ROOT / 'backend/storage/context548-evidence'
+AUDIT = ROOT / 'backend/storage/context548-safety.json'
 
 def checked():
     configured = make_url(settings.DATABASE_URL)
     assert settings.ENVIRONMENT in {'development','dev','local','test','testing'}
     assert configured.host in {'127.0.0.1','localhost','::1'}
-    assert json.loads((ROOT/'backend/storage/context548-safety.json').read_text(encoding='utf-8'))['observed_database']['read_only'] == 'on'
+    audit = json.loads(AUDIT.read_text(encoding='utf-8'))
+    assert audit['observed_database']['read_only'] == 'on'
+    assert audit['database']['database'] == configured.database and audit['database']['host'] == configured.host
     return configured
 
 async def setup():
@@ -96,6 +99,10 @@ def run(args):
     label=args.label
     assert re.fullmatch('[a-z0-9-]+',label)
     prefix=[sys.executable,'-m','pytest']
+    if args.code_snapshot:
+        snapshot=args.code_snapshot.resolve()
+        assert snapshot.is_relative_to(Path(state['runtime'])) and (snapshot/'run.py').is_file()
+        prefix=[sys.executable,str(snapshot/'run.py')]
     if label == 'baseline':
         snapshot=Path(state['runtime'])/'baseline-code'
         assert not snapshot.exists(), 'Baseline snapshot already exists; do not overwrite'
@@ -120,7 +127,7 @@ def script(args):
     state,env=test_environment()
     arguments=json.loads(Path(args.args_json).read_text(encoding='utf-8'))
     path=(ROOT/arguments[0]).resolve()
-    assert path.is_relative_to(ROOT) and path.name in {'verify_semantic_modelops.py'}
+    assert path.is_relative_to(ROOT) and path.name in {'verify_semantic_modelops.py', 'verify_json_output_contract.py'}
     command=[sys.executable,str(path),*arguments[1:]]
     with (EVIDENCE/(args.label+'.log')).open('w',encoding='utf-8',newline='\n') as stream:
         result=subprocess.run(command,cwd=ROOT,env=env,stdout=stream,stderr=subprocess.STDOUT,check=False)
@@ -178,13 +185,16 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('action',choices=['setup','seed-modelops','run','script','cleanup'])
     parser.add_argument('--args-json')
+    parser.add_argument('--code-snapshot', type=Path)
     parser.add_argument('--state-file',type=Path,default=STATE)
+    parser.add_argument('--audit-file',type=Path,default=AUDIT)
     parser.add_argument('--evidence-dir',type=Path,default=EVIDENCE)
     parser.add_argument('--label',default='focused-baseline')
     parser.add_argument('tests',nargs='*')
     args=parser.parse_args()
     STATE=args.state_file.resolve()
     EVIDENCE=args.evidence_dir.resolve()
+    AUDIT=args.audit_file.resolve()
     assert STATE.is_relative_to(ROOT/'backend/storage') and EVIDENCE.is_relative_to(ROOT/'backend/storage'), 'Test state/evidence must stay in workspace Storage'
     if args.action=='setup': asyncio.run(setup())
     elif args.action=='seed-modelops': asyncio.run(seed_modelops())

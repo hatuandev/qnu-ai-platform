@@ -1,0 +1,6 @@
+{
+  "defaults_unchanged": true,
+  "public_provider_settings_unchanged": true,
+  "verification": "fresh read-only session",
+  "defaults_sha256": "95a0b5cad69aff7d5735e2a41cb675738bd02af24dc48eb9eae015ab6c21e742"
+}

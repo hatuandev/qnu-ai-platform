@@ -115,6 +115,8 @@ async def test_packet_two_fails_after_real_first_binding_without_partial_stage()
             raise TimeoutError("TEST inner provider timeout")
         packet = json.loads(request.messages[-1].content)
         payload = note_payload(packet, scope="table", columns=[])
+        if request.output_contract.name == "qnu_semantic_selector_v2":
+            payload["notes"][0].pop("source_unit_id")
         return SimpleNamespace(content=json.dumps(payload), provider="TEST", model="TEST",
             is_fallback=False, prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=reply)) as generate, \
@@ -317,7 +319,7 @@ async def test_deadline_during_stage_thread_never_mutates_caller(pair):
         return real_stage(*args, **kwargs)
     async def reply(_db, request):
         packet = json.loads(request.messages[-1].content)
-        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"]}), provider="TEST", model="TEST", is_fallback=False,
+        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": []}), provider="TEST", model="TEST", is_fallback=False,
             prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=reply)), \
          patch.object(annotations_module, "stage_semantic_annotations", side_effect=delayed) as stage, pytest.raises(AppException) as error:
@@ -354,7 +356,7 @@ async def test_api_whole_actual_document_uses_same_deadline_and_preserves_pendin
     async def reply(_db, request):
         packet = json.loads(request.messages[-1].content)
         seen.append(packet)
-        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"]}), provider="TEST", model="TEST", is_fallback=False,
+        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": []}), provider="TEST", model="TEST", is_fallback=False,
             prompt_tokens=1, completion_tokens=1, cost_usd=None)
     async with database.factory() as db:
         revision = await db.get(KnowledgeSourceRevision, revision_id)
@@ -408,7 +410,7 @@ async def test_cancellation_on_packet_two_is_not_output_error_or_partial_stage()
         if calls == 2:
             raise asyncio.CancelledError
         packet = json.loads(request.messages[-1].content)
-        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"]}), provider="TEST", model="TEST", is_fallback=False,
+        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": []}), provider="TEST", model="TEST", is_fallback=False,
             prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=reply)), \
          patch.object(annotations_module, "stage_semantic_annotations", wraps=stage_semantic_annotations) as stage, pytest.raises(asyncio.CancelledError):
@@ -453,7 +455,7 @@ async def test_reprocess_model_proof_becomes_new_human_issue_not_auto_resolution
     async def reply(_db, request):
         packet = json.loads(request.messages[-1].content)
         evidence = next(item for item in packet["evidence"] if item["source_unit_id"] == "qnu:n")
-        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "context_followups": [
+        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": [
             {"issue_id": old["issue_id"], "evidence_ids": [evidence["id"]], "reason": "TEST additional source read; human still checks scope"}]}),
             provider="TEST", model="TEST", is_fallback=False, prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=reply)):

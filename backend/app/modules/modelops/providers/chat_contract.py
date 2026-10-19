@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import time
+from hashlib import sha256
 from typing import Any
 
 import httpx
@@ -13,6 +14,7 @@ import httpx
 from app.core.exceptions import AppException
 from app.modules.modelops.providers.context_budget import fit_rejected_context
 from app.modules.modelops.services.inference_policy import (
+    charge_chat_input,
     minimum_chat_output,
     retry_transient_response,
 )
@@ -122,12 +124,15 @@ async def post_chat(
     capabilities: dict[str, Any],
     *,
     probe: bool = False,
+    output_contract: dict | None = None,
+    trace: list | None = None,
 ) -> httpx.Response:
     timeout = client.timeout.read
     deadline = time.monotonic() + timeout if isinstance(timeout, (int, float)) else float("inf")
     try:
         async with asyncio.timeout_at(deadline):
-            return await _post_chat(client, endpoint, headers, payload, capabilities, probe=probe, deadline=deadline)
+            return await _post_chat(client, endpoint, headers, payload, capabilities, probe=probe, deadline=deadline,
+                output_contract=output_contract, trace=trace)
     except TimeoutError as exc:
         raise httpx.ReadTimeout("Chat transport deadline exceeded") from exc
 
@@ -135,24 +140,52 @@ async def post_chat(
 async def _post_chat(
     client: httpx.AsyncClient, endpoint: str, headers: dict[str, str],
     payload: dict[str, Any], capabilities: dict[str, Any], *, probe: bool, deadline: float,
+    output_contract: dict | None = None, trace: list | None = None,
 ) -> httpx.Response:
     budget_retried = False
     context_retried = False
     for attempt in range(MAX_NEGOTIATIONS + 1):
-        response = await client.post(endpoint, headers=headers, json=payload)
+        async def send():
+            if output_contract is not None:
+                request = client.build_request("POST", endpoint, headers=headers, json=payload)
+                charge_chat_input(len(request.content))
+                response = await client.send(request)
+            else:
+                response = await client.post(endpoint, headers=headers, json=payload)
+            if trace is not None:
+                trace.append({"http_status": response.status_code, "body_sha256": sha256(response.content).hexdigest(),
+                    "request_bytes": len(response.request.content), "payload_sha256": sha256(response.request.content).hexdigest()})
+            return response
+        response = await send()
         if not probe and await retry_transient_response(response, deadline):
-            response = await client.post(endpoint, headers=headers, json=payload)
+            response = await send()
         if attempt < MAX_NEGOTIATIONS and adapt_rejected_payload(
             response, payload, capabilities, probe=probe
         ):
             continue
         requested_output = next((payload[k] for k in TOKEN_PARAMETERS if k in payload), 1)
         minimum_output = minimum_chat_output(requested_output, int(capabilities.get("minimum_output_tokens", 1)))
-        if (attempt < MAX_NEGOTIATIONS and not context_retried and not probe and minimum_output < requested_output
+        if (output_contract is None and attempt < MAX_NEGOTIATIONS and not context_retried and not probe and minimum_output < requested_output
                 and await fit_rejected_context(client, endpoint, headers, payload, response,
                                                minimum_output)):
             context_retried = True
             continue
+        if output_contract is not None and response.status_code == 400:
+            from app.modules.modelops.services.key_rotation import (
+                classify_key_failure,
+                is_context_overflow_error,
+            )
+            request_error = httpx.HTTPStatusError("Upstream request rejected", request=response.request, response=response)
+            if is_context_overflow_error(request_error) or classify_key_failure(request_error).state is not None:
+                raise request_error
+            try:
+                error = response.json().get("error", {})
+            except (ValueError, AttributeError):
+                error = {}
+            unsupported = isinstance(error, dict) and error.get("code") in {"unsupported_parameter", "unsupported_value"} and error.get("param") == "response_format"
+            raise AppException("Provider từ chối hợp đồng request; không quay vòng key.",
+                code="MODEL_OUTPUT_CONTRACT_UNSUPPORTED" if unsupported else "MODEL_OUTPUT_REQUEST_INVALID",
+                status_code=422, details={"stage": "capability" if unsupported else "provider", "http_status": 400})
         response.raise_for_status()
         if (
             probe
@@ -185,7 +218,7 @@ def completion_is_truncated(response: httpx.Response) -> bool:
         return False
 
 
-def decode_completion(response: httpx.Response) -> tuple[str, dict[str, Any], str | None]:
+def decode_completion(response: httpx.Response, *, output_contract: dict | None = None) -> tuple[str, dict[str, Any], str | None]:
     if "text/event-stream" in response.headers.get("content-type", ""):
         raise AppException(
             "Provider trả streaming cho yêu cầu stream=false.",
@@ -194,14 +227,18 @@ def decode_completion(response: httpx.Response) -> tuple[str, dict[str, Any], st
         )
     try:
         data = response.json()
+        if output_contract is not None and len(data["choices"]) != 1:
+            raise ValueError("Contract requires exactly one choice")
         choice = data["choices"][0]
-        if choice.get("finish_reason") == "length":
+        if output_contract is None and choice.get("finish_reason") == "length":
             raise AppException(
                 "Model đã hết ngân sách đầu ra; câu trả lời chưa hoàn tất.",
                 code="MODEL_OUTPUT_BUDGET_EXHAUSTED", status_code=502,
             )
         content = choice["message"].get("content")
-        if not isinstance(content, str) or not content.strip() or data.get("error"):
+        if output_contract is not None and content is None:
+            content = ""
+        if not isinstance(content, str) or (output_contract is None and not content.strip()) or data.get("error"):
             raise ValueError("No answer content")
         usage = data.get("usage") or {}
         if not isinstance(usage, dict):
@@ -213,6 +250,20 @@ def decode_completion(response: httpx.Response) -> tuple[str, dict[str, Any], st
             code="MODEL_RESPONSE_PROTOCOL_ERROR",
             status_code=502,
         ) from exc
+
+
+def completion_metadata(response: httpx.Response) -> dict:
+    data = response.json()
+    choices = data.get("choices", [])
+    choice = choices[0]
+    finish = choice.get("finish_reason")
+    if finish is not None and finish not in ("stop", "length", "content_filter", "tool_calls", "function_call"):
+        raise AppException("Provider trả finish metadata không hợp lệ.", code="MODEL_RESPONSE_PROTOCOL_ERROR", status_code=502)
+    return {"finish_reason": finish, "refusal": choice.get("message", {}).get("refusal"),
+        "response_metadata": {"request_id_sha256": sha256(response.headers["x-request-id"].encode()).hexdigest() if response.headers.get("x-request-id") else None,
+            "response_id_sha256": sha256(str(data["id"]).encode()).hexdigest() if data.get("id") else None,
+            "body_sha256": sha256(response.content).hexdigest(), "choice_count": len(choices),
+            "content_parts": 1, "finish_reason_known": choice.get("finish_reason") is not None}}
 
 
 def decode_stream_event(line: str) -> dict[str, Any] | None:

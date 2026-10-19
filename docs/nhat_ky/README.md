@@ -7,6 +7,14 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên552](./2026-10-19_phien_552_selector_v2_scope_review.md) | Selector v2 + scope review | Focused217/Ruff14/FE15/buildPASS; full18FAIL/2375PASS/17SKIP, exact18ID/cause/39addedPASS/0new. Qwen Bảng1 JSON/schema/bindingPASS,4notes/8issues WAITING_FOR_REVIEW; DB/runtime2test dọn, checkpoint private giữ |
+
+| **2026-10-19** | [Phiên551](./2026-10-19_phien_551_live_retest_qwen_32k.md) | Retest Qwen32K/Luna | Short chat cả haiPASS; Qwen tài liệu không còn context400, JSON/schemaPASS nhưng scope/unit bindingFAIL;22packet planned/1sent, E2EBLOCKED. RuffPASS/fullNOT RUN; DB/runtime test dọn, defaults giữ |
+
+| **2026-10-19** | [Phiên550](./2026-10-19_phien_550_qwen_primary_credential.md) | Qwen primary + credential | Key mã hóa/fresh session verified; Qwen tiếng Việt PASS không fallback. Tài liệu Qwen400context8192/output6000, GPTfallbackTimeout; BLOCKED. Ruff2PASS, fullNOT RUN; DB/runtime test đã dọn |
+
+| **2026-10-19** | [Phiên549](./2026-10-19_phien_549_json_output_contract.md) | JSON output contract ModelOps | Wire schema/capability/real payload, strict parser và1formatretry;238focused/47new/Ruff22PASS. Boundary63PASS/full18FAIL/2336PASS/17skip, exact18ID/cause nền/47thêmPASS/0lỗi mới; ZIP xuất/DB-runtime test dọn; live JSON/schemaPASS→binding/expansionFAIL, E2EBLOCKED |
+
 | **2026-10-19** | [Phiên548](./2026-10-19_phien_548_va_context547.md) | Vá vòng đời context547 | Issue/review/policy/replay v2, scope nhiều năm, common budget/deadline;183focused/FE14/buildPASS. Full18FAIL/2289PASS/17skip, exact18ID/cause nền,6đỏ→PASS/17thêmPASS/0lỗi mới; dossier xuất/DB-runtime test đã dọn; live schemaFAIL, E2E BLOCKED |
 
 | **2026-10-19** | [Phiên547](./2026-10-19_phien_547_context_va_evidence_binding.md) | Structure-aware context + evidence binding | Backend exact selectors, bounded context/UI reason/span/full source; DB test riêng đã dọn, focused127/FE8/buildPASS. Full18FAIL/2264PASS/17skip, exact18ID/cause baseline, không lỗi mới; live timeout, E2E BLOCKED |

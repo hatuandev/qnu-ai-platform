@@ -21,6 +21,13 @@ const scopeLabels = {
   column: "Cột cụ thể",
 };
 
+function rowLabel(table: SourceArtifact["tables"][number], row: string) {
+  const index = table.row_unit_ids?.indexOf(row) ?? -1;
+  return index < 0
+    ? "Dòng không còn tồn tại"
+    : table.rows[index]?.slice(0, 3).filter(Boolean).join(" · ");
+}
+
 function EvidenceReviewDetails({
   binding,
   reason,
@@ -59,10 +66,12 @@ function EvidenceReviewDetails({
 
 function ContextIssueItem({
   issue,
+  artifact,
   onDecision,
   selected,
 }: {
   issue: ContextReviewIssue;
+  artifact: SourceArtifact;
   onDecision?: (decision: ContextIssueDecision | null, issueId: string) => void;
   selected?: boolean;
 }) {
@@ -74,13 +83,50 @@ function ContextIssueItem({
         ? "not_applicable_to_target"
         : null;
   const evidence = issue.review_evidence?.[0];
+  const rows = Array.isArray(issue.target.row_unit_ids)
+    ? issue.target.row_unit_ids
+    : [];
+  const columns = Array.isArray(issue.target.column_ids)
+    ? issue.target.column_ids
+    : [];
+  const tableIds = Array.isArray(issue.target.table_ids)
+    ? issue.target.table_ids
+    : [issue.target.table_id];
   return (
     <article className="space-y-2 rounded-lg border p-3">
       <p className="font-medium">{issue.reason}</p>
-      <p className="break-all text-muted-foreground">
-        Đích: {JSON.stringify(issue.target)} · nguồn:{" "}
-        {issue.unit_ids.join(", ")}
-      </p>
+      {artifact.tables
+        .filter((table) => tableIds.includes(table.id))
+        .map((table) => (
+          <div key={table.id} className="space-y-1 break-words">
+            <p>Bảng {artifact.tables.indexOf(table) + 1}</p>
+            {rows.length > 0 && (
+              <p>
+                Dòng cần xác nhận:{" "}
+                {rows.map((row) => rowLabel(table, row)).join("; ")}
+              </p>
+            )}
+            {columns.length > 0 && (
+              <p>
+                Cột cần xác nhận:{" "}
+                {columns
+                  .map(
+                    (id) =>
+                      table.columns
+                        ?.find((column) => column.id === id)
+                        ?.header_path.join(" / ") ?? "Cột không còn tồn tại",
+                  )
+                  .join("; ")}
+              </p>
+            )}
+          </div>
+        ))}
+      <details className="break-all text-muted-foreground">
+        <summary>Thông tin truy vết phạm vi và nguồn</summary>
+        <p>
+          {JSON.stringify(issue.target)} · {issue.unit_ids.join(", ")}
+        </p>
+      </details>
       {issue.review_evidence?.map((item) => (
         <blockquote
           key={item.evidence_binding.evidence_id}
@@ -167,6 +213,7 @@ export function SemanticReviewPreview({
         <ContextIssueItem
           key={issue.issue_id}
           issue={issue}
+          artifact={artifact}
           selected={decisions.some((item) => item.issue_id === issue.issue_id)}
           onDecision={proposal.status === "proposed" ? onDecision : undefined}
         />
@@ -204,12 +251,6 @@ export function SemanticReviewPreview({
       </>
     );
   }
-  const rowLabel = (table: SourceArtifact["tables"][number], row: string) => {
-    const index = table.row_unit_ids?.indexOf(row) ?? -1;
-    return index < 0
-      ? "Dòng không còn tồn tại"
-      : table.rows[index]?.slice(0, 3).filter(Boolean).join(" · ");
-  };
   const sourceTextFor = (id?: string) =>
     artifact.retrieval_units?.units.find((unit) => unit.id === id)?.text;
   return (

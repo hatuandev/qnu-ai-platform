@@ -1,0 +1,273 @@
+{
+  "$defs": {
+    "CellSelectionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1200,
+          "minLength": 3,
+          "title": "Reason",
+          "type": "string"
+        },
+        "row_unit_id": {
+          "title": "Row Unit Id",
+          "type": "string"
+        },
+        "column_id": {
+          "title": "Column Id",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "not_stated",
+            "not_applicable",
+            "ambiguous",
+            "unreadable"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "reason",
+        "row_unit_id",
+        "column_id",
+        "state"
+      ],
+      "title": "CellSelectionV2",
+      "type": "object"
+    },
+    "ContextFollowup": {
+      "additionalProperties": false,
+      "properties": {
+        "issue_id": {
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 1200,
+          "minLength": 3,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issue_id",
+        "evidence_ids",
+        "reason"
+      ],
+      "title": "ContextFollowup",
+      "type": "object"
+    },
+    "LimitSelectionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1200,
+          "minLength": 3,
+          "title": "Reason",
+          "type": "string"
+        },
+        "row_unit_id": {
+          "title": "Row Unit Id",
+          "type": "string"
+        },
+        "column_id": {
+          "title": "Column Id",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "source_explicit",
+            "human_examined_scope"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "examined_unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2000,
+          "minItems": 1,
+          "title": "Examined Unit Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "reason",
+        "row_unit_id",
+        "column_id",
+        "basis",
+        "examined_unit_ids"
+      ],
+      "title": "LimitSelectionV2",
+      "type": "object"
+    },
+    "NoteSelectionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_id": {
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 1200,
+          "minLength": 3,
+          "title": "Reason",
+          "type": "string"
+        },
+        "table_id": {
+          "title": "Table Id",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "table",
+            "row",
+            "group",
+            "column"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "row_unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 300,
+          "title": "Row Unit Ids",
+          "type": "array"
+        },
+        "column_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Column Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "reason",
+        "table_id",
+        "scope",
+        "row_unit_ids",
+        "column_ids"
+      ],
+      "title": "NoteSelectionV2",
+      "type": "object"
+    },
+    "UnresolvedRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Unit Ids",
+          "type": "array"
+        },
+        "reason": {
+          "maxLength": 1200,
+          "minLength": 3,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_ids",
+        "reason"
+      ],
+      "title": "UnresolvedRelation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "context_id": {
+      "title": "Context Id",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "$ref": "#/$defs/NoteSelectionV2"
+      },
+      "maxItems": 128,
+      "title": "Notes",
+      "type": "array"
+    },
+    "cells": {
+      "items": {
+        "$ref": "#/$defs/CellSelectionV2"
+      },
+      "maxItems": 256,
+      "title": "Cells",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "$ref": "#/$defs/LimitSelectionV2"
+      },
+      "maxItems": 256,
+      "title": "Limitations",
+      "type": "array"
+    },
+    "needs_context": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Needs Context",
+      "type": "array"
+    },
+    "unresolved": {
+      "items": {
+        "$ref": "#/$defs/UnresolvedRelation"
+      },
+      "maxItems": 64,
+      "title": "Unresolved",
+      "type": "array"
+    },
+    "context_followups": {
+      "items": {
+        "$ref": "#/$defs/ContextFollowup"
+      },
+      "maxItems": 64,
+      "title": "Context Followups",
+      "type": "array"
+    }
+  },
+  "required": [
+    "context_id",
+    "notes",
+    "cells",
+    "limitations",
+    "needs_context",
+    "unresolved",
+    "context_followups"
+  ],
+  "title": "ModelSemanticProposalV2",
+  "type": "object"
+}

@@ -1,0 +1,22 @@
+{
+  "status": "WAITING_FOR_REVIEW",
+  "directory": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context552-checkpoint-06689f8f17dc",
+  "proposal_hash": "80308912eba6ceecfcec7283e7ebedef225fe756000eb57c14602b0b58bbcfc3",
+  "source": {
+    "document_id": "offline544",
+    "revision_id": "draft544",
+    "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+    "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+  },
+  "scope": "selected_tables",
+  "issue_count": 8,
+  "files": 14,
+  "objects_keys": [
+    "snapshots/offline544/draft.docx.cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c.qnu-rag-v1.md",
+    "snapshots/offline544/draft.docx.d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f.qnu-doc-v1.json",
+    "snapshots/offline544/draft.docx.3a7569081ca4b05daf03cda22d078b6267c3189784112334bc4d0e8bac19cc47.docx-resources-v1.zip"
+  ],
+  "human_approved": false,
+  "source_applied": false,
+  "kind": "private offline checkpoint; not application job/approval"
+}

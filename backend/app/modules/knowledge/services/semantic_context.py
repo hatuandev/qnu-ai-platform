@@ -13,6 +13,7 @@ from app.modules.knowledge.services.semantic_evidence import (
     source_identity,
     verify_source_document,
 )
+from app.modules.modelops.services.output_contract import OutputContract
 
 
 class SemanticContextPolicy(BaseModel):
@@ -28,6 +29,9 @@ class SemanticContextPolicy(BaseModel):
     max_output_tokens: int = Field(6000, ge=512, le=8192)
     run_seconds: float = Field(120, gt=0, le=600)
     call_seconds: float = Field(90, gt=0, le=180)
+    output_contract: OutputContract = Field(default_factory=lambda: OutputContract(
+        name="qnu_semantic_selector_v2", allowed_weaker_modes=("json_object", "prompt_only")))
+    format_retries: int = Field(1, ge=0, le=1)
 
 
 def model_context(packet: dict) -> dict:

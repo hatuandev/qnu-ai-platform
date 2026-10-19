@@ -1,0 +1,386 @@
+{
+  "checks": {
+    "chat-qwen": {
+      "status": "PROVIDER_RESPONDED",
+      "scope": "minimal chat only; not semantic extraction",
+      "requested_model": "qwen3.5-9b",
+      "model": "qwen3.5-9b",
+      "provider_id": "prov_rtx5090_vllm",
+      "is_fallback": false,
+      "finish_reason": "stop",
+      "prompt_tokens": 23,
+      "completion_tokens": 29,
+      "latency_ms": 509.98,
+      "requested_max_tokens": 150,
+      "fallback_configured_for_this_probe": false,
+      "checks_passed": true,
+      "error_code": null,
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "logical_calls": null,
+      "packets_seen": null,
+      "exit_code": 0,
+      "stages": null,
+      "validation_reason": null,
+      "metrics": null,
+      "result_model": {},
+      "provider_attempts": [],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "chat-luna": {
+      "status": "PROVIDER_RESPONDED",
+      "scope": "minimal chat only; not semantic extraction",
+      "requested_model": "cx/gpt-6-luna",
+      "model": "gpt-6-luna",
+      "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+      "is_fallback": false,
+      "finish_reason": "stop",
+      "prompt_tokens": 798,
+      "completion_tokens": 19,
+      "latency_ms": 4935.17,
+      "requested_max_tokens": 150,
+      "fallback_configured_for_this_probe": false,
+      "checks_passed": true,
+      "error_code": null,
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "logical_calls": null,
+      "packets_seen": null,
+      "exit_code": 0,
+      "stages": null,
+      "validation_reason": null,
+      "metrics": null,
+      "result_model": {},
+      "provider_attempts": [],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "live-table": {
+      "status": "BLOCKED",
+      "scope": null,
+      "requested_model": null,
+      "model": null,
+      "provider_id": null,
+      "is_fallback": null,
+      "finish_reason": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "latency_ms": null,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": null,
+      "checks_passed": null,
+      "error_code": "SEMANTIC_EVIDENCE_INVALID",
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "logical_calls": null,
+      "packets_seen": null,
+      "exit_code": 1,
+      "stages": {
+        "provider": "PASS",
+        "response_complete": "PASS",
+        "json_syntax": "PASS",
+        "selector_schema": "PASS",
+        "evidence_binding": "FAIL",
+        "context_expansion": "NOT_RUN",
+        "proposal": "FAIL",
+        "human_review": "NOT_RUN",
+        "apply": "NOT_RUN",
+        "persist_reload": "NOT_RUN",
+        "projection_chunks": "NOT_RUN"
+      },
+      "validation_reason": "EVIDENCE_SCOPE_ROW_AMBIGUOUS_SELECT_NARROWER_SPAN",
+      "metrics": {
+        "build_ms": 198.37390002794564,
+        "calls": 1,
+        "input_utf8_bytes": 47540,
+        "model_ms": 19420.771199977025,
+        "binding_ms": 8.138000033795834,
+        "accepted": 0,
+        "rejected": 1,
+        "packet_count": 1,
+        "format_retries": 0,
+        "provider_attempts": 1,
+        "transport_attempts": 1,
+        "transport_input_bytes": 48594
+      },
+      "result_model": {
+        "provider": "vllm",
+        "model": "qwen3.5-9b",
+        "is_fallback": false,
+        "prompt_tokens": 16338,
+        "completion_tokens": 1191,
+        "output_contract": {
+          "name": "qnu_semantic_selector_v1",
+          "version": 1,
+          "requested_mode": "json_schema",
+          "effective_mode": "prompt_only",
+          "reason": "explicit_policy_allows_weaker_mode",
+          "schema_hash": "ea774bdd1db5674719cb007f60e09e641e3d7c373ac103908382bcd10b5e06bb",
+          "business_schema_hash": "ba5fd5ff4807c2f21bd9f9e23d00757710b70190144490ebc18405387ff014c2"
+        },
+        "finish_reason": "stop"
+      },
+      "provider_attempts": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "response",
+          "error_type": null,
+          "transport_attempts": [
+            {
+              "http_status": 200,
+              "body_sha256": "b75f639be683280980984b123a4ec2508c59b05be5e09ae0c1219eb3ff1d353e",
+              "request_bytes": 48594,
+              "payload_sha256": "1d4b8cdb538a6618a571a83396a8fd9b8efe71fac86464b46464372449df3ab2"
+            }
+          ]
+        }
+      ],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "live-api": {
+      "status": "BLOCKED",
+      "scope": "document",
+      "requested_model": null,
+      "model": null,
+      "provider_id": null,
+      "is_fallback": null,
+      "finish_reason": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "latency_ms": null,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": null,
+      "checks_passed": null,
+      "error_code": "SEMANTIC_EVIDENCE_INVALID",
+      "elapsed_ms": 16654.51939997729,
+      "http_error_diagnostics": [],
+      "logical_calls": 1,
+      "packets_seen": 1,
+      "exit_code": 1,
+      "stages": {
+        "provider": "PASS",
+        "response_complete": "PASS",
+        "json_syntax": "PASS",
+        "selector_schema": "PASS",
+        "evidence_binding": "FAIL",
+        "context_expansion": "NOT_RUN",
+        "proposal": "FAIL",
+        "human_review": "NOT_RUN",
+        "apply": "NOT_RUN",
+        "persist_reload": "NOT_RUN",
+        "projection_chunks": "NOT_RUN"
+      },
+      "validation_reason": "EVIDENCE_UNIT_MISMATCH",
+      "metrics": {
+        "build_ms": 520.3401999897324,
+        "calls": 1,
+        "input_utf8_bytes": 47625,
+        "model_ms": 13902.08980004536,
+        "binding_ms": 1.0198000236414373,
+        "accepted": 0,
+        "rejected": 1,
+        "packet_count": 22,
+        "format_retries": 0,
+        "provider_attempts": 1,
+        "transport_attempts": 1,
+        "transport_input_bytes": 48679
+      },
+      "result_model": {
+        "provider": "vllm",
+        "model": "qwen3.5-9b",
+        "is_fallback": false,
+        "prompt_tokens": 16312,
+        "completion_tokens": 1587,
+        "output_contract": {
+          "name": "qnu_semantic_selector_v1",
+          "version": 1,
+          "requested_mode": "json_schema",
+          "effective_mode": "prompt_only",
+          "reason": "explicit_policy_allows_weaker_mode",
+          "schema_hash": "ea774bdd1db5674719cb007f60e09e641e3d7c373ac103908382bcd10b5e06bb",
+          "business_schema_hash": "ba5fd5ff4807c2f21bd9f9e23d00757710b70190144490ebc18405387ff014c2"
+        },
+        "finish_reason": "stop"
+      },
+      "provider_attempts": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "response",
+          "error_type": null,
+          "transport_attempts": [
+            {
+              "http_status": 200,
+              "body_sha256": "6915f36c539abd27527da904d6e384bf72aa68379d10308068e7c9ccf62703ba",
+              "request_bytes": 48679,
+              "payload_sha256": "6d67a990e9b63fac6d3b32391b5bb3957b45cadde0e96d875c1cc0d80b8183ea"
+            }
+          ]
+        }
+      ],
+      "source_applied": false,
+      "human_approved": false
+    }
+  },
+  "comparison_to550": {
+    "table": {
+      "before_id": "live-table",
+      "before_error": "SEMANTIC_EVIDENCE_INVALID",
+      "before_reason": "EVIDENCE_SCOPE_ROW_AMBIGUOUS_SELECT_NARROWER_SPAN",
+      "before_actual_model": {
+        "model": "gpt-6-luna",
+        "is_fallback": true,
+        "finish_reason": "stop"
+      },
+      "after_id": "live-table",
+      "after_error": "SEMANTIC_EVIDENCE_INVALID",
+      "after_reason": "EVIDENCE_SCOPE_ROW_AMBIGUOUS_SELECT_NARROWER_SPAN"
+    },
+    "api": {
+      "before_id": "new-key-api",
+      "before_error": "ALL_PROVIDERS_UNAVAILABLE",
+      "before_providers": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "failed",
+          "error_type": "HTTPStatusError",
+          "transport_attempts": [
+            {
+              "http_status": 400,
+              "body_sha256": "f17f1e4499445ee17b46b215c99ff244234457e0732288d5e59fd249afe1a53d",
+              "request_bytes": 48679,
+              "payload_sha256": "42ab9f1542c28fce893839604fdb49c80c88d09533e09f77732db7c9af109ded"
+            }
+          ]
+        },
+        {
+          "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+          "model": "cx/gpt-6-luna",
+          "status": "failed",
+          "error_type": "ReadTimeout",
+          "transport_attempts": []
+        }
+      ],
+      "after_id": "live-api",
+      "after_error": "SEMANTIC_EVIDENCE_INVALID",
+      "after_reason": "EVIDENCE_UNIT_MISMATCH"
+    }
+  },
+  "configuration": {
+    "providers": [
+      {
+        "id": "prov_940b40ba2e274730b1f2aab1ea652b",
+        "api_base_url": "http://localhost:20128/v1",
+        "timeout_seconds": 15,
+        "is_active": true
+      },
+      {
+        "id": "prov_rtx5090_vllm",
+        "api_base_url": "http://100.105.13.53:8000/v1",
+        "timeout_seconds": 60,
+        "is_active": true
+      }
+    ],
+    "defaults_sha256": "95a0b5cad69aff7d5735e2a41cb675738bd02af24dc48eb9eae015ab6c21e742",
+    "primary_model": "qwen3.5-9b",
+    "source_read_only": true
+  },
+  "ruff_helper": {
+    "status": "PASS",
+    "exit_code": 0
+  },
+  "full_pytest": "NOT_RUN: live retest and operational helper only; no application code changed in551",
+  "historical_full549": {
+    "status": "FAIL",
+    "failed": 18,
+    "passed": 2336,
+    "skipped": 17
+  },
+  "environment": {
+    "test_database": "qnu_test_context548_352314b47a8f",
+    "storage": "owned temporary LocalStorage",
+    "minio_qdrant_redis": "127.0.0.1:1; real endpoints not used for test writes"
+  },
+  "commands": [
+    {
+      "command": [
+        "backend/scripts/verify_json_output_contract.py",
+        "chat",
+        "--state",
+        "backend/storage/context551-isolation.json",
+        "--output",
+        "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-352314b47a8f\\chat-luna",
+        "--chat-message",
+        "Xin chào, hãy trả lời bằng tiếng Việt.",
+        "--chat-max-tokens",
+        "150",
+        "--chat-model",
+        "cx/gpt-6-luna"
+      ],
+      "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform",
+      "database": "qnu_test_context548_352314b47a8f",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "backend/scripts/verify_json_output_contract.py",
+        "chat",
+        "--state",
+        "backend/storage/context551-isolation.json",
+        "--output",
+        "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-352314b47a8f\\chat-qwen",
+        "--chat-message",
+        "Xin chào, hãy trả lời bằng tiếng Việt.",
+        "--chat-max-tokens",
+        "150",
+        "--chat-model",
+        "qwen3.5-9b"
+      ],
+      "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform",
+      "database": "qnu_test_context548_352314b47a8f",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "backend/scripts/verify_json_output_contract.py",
+        "api",
+        "--state",
+        "backend/storage/context551-isolation.json",
+        "--output",
+        "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-352314b47a8f\\live-api"
+      ],
+      "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform",
+      "database": "qnu_test_context548_352314b47a8f",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "backend/scripts/verify_semantic_modelops.py",
+        "--input",
+        "backend/storage/rag544-offline",
+        "--docx",
+        "docs/tai_lieu/tuyen_sinh/tai_lieu_phuc_tap_kiem_thu_qnu_rag (1).docx",
+        "--expected-sha256",
+        "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+        "--raw-resources",
+        "backend/storage/pytest546-preflight/test_T14_actual_docx_pair_side0/objects/snapshots/actual545/source.docx.3a7569081ca4b05daf03cda22d078b6267c3189784112334bc4d0e8bac19cc47.docx-resources-v1.zip",
+        "--output",
+        "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-352314b47a8f\\live-table",
+        "--target-table",
+        "qnu:t001",
+        "--max-calls",
+        "4"
+      ],
+      "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform",
+      "database": "qnu_test_context548_352314b47a8f",
+      "exit_code": 1
+    }
+  ],
+  "raw_responses_exported": false,
+  "all_document_packets_verified": false,
+  "luna_document_semantics": "NOT_RUN independently; only no-fallback short chat was tested for Luna"
+}

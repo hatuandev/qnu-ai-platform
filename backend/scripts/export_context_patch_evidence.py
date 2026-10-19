@@ -25,11 +25,12 @@ def junit(path):
     return {"tests": statuses, "causes": causes, "counts": dict(Counter(statuses.values()))}
 
 
-def compare(directory):
-    after_name = "after-final.xml" if (directory/"after-final.xml").exists() else "after.xml"
-    before, after = [junit(directory / name) for name in ("baseline.xml", after_name)]
+def compare(directory, baseline_name="baseline.xml", after_name=None):
+    after_name = after_name or ("after-final.xml" if (directory/"after-final.xml").exists() else "after.xml")
+    assert Path(baseline_name).name == baseline_name and Path(after_name).name == after_name
+    before, after = [junit(directory / name) for name in (baseline_name, after_name)]
     common = before["tests"].keys() & after["tests"].keys()
-    result = {"baseline": before, "after": after, "after_source": after_name,
+    result = {"baseline": before, "after": after, "after_source": after_name, "baseline_source": baseline_name,
         "added_ids": sorted(after["tests"].keys() - before["tests"].keys()),
         "removed_ids": sorted(before["tests"].keys() - after["tests"].keys()),
         "changed": {key: {"before": before["tests"][key], "after": after["tests"][key]} for key in common if before["tests"][key] != after["tests"][key]},
@@ -39,21 +40,28 @@ def compare(directory):
     return result
 
 
-def export(directory, destination):
-    result = compare(directory)
+def export(directory, destination, *, reports=None, baseline_name="baseline.xml", after_name=None, focused_name="focused-gate.xml"):
+    result = compare(directory, baseline_name, after_name)
     # Explicit files only. Model response/corpus, connection configuration and
     # source/object files are deliberately excluded from this evidence archive.
-    names = ["baseline.xml", "after.xml", "focused-gate.xml", "patch-isolated.xml", "red.xml", "regression-comparison.json", "commands.json", "live-summary.json", "cleanup.json", "context-metrics-before.json", "context-metrics-after.json"]
-    members = {name: (directory / (result["after_source"] if name == "after.xml" else name)).read_bytes() for name in names}
-    if result["after_source"] != "after.xml":
+    mapping = {"baseline.xml": result["baseline_source"], "after.xml": result["after_source"], "focused-gate.xml": focused_name}
+    members = {name: (directory / source).read_bytes() for name, source in mapping.items()}
+    names = ["patch-isolated.xml", "red.xml", "regression-comparison.json", "commands.json", "live-summary.json", "cleanup.json", "context-metrics-before.json", "context-metrics-after.json",
+        "capabilities.json", "provider-schema.json", "business-schema.json", "payload-example.json", "redacted-live-trace.json"]
+    for name in names:
+        if (directory/name).is_file(): members[name] = (directory/name).read_bytes()
+    if result["after_source"] != "after.xml" and (directory/"after.xml").is_file():
         members["after-first.xml"] = (directory / "after.xml").read_bytes()
-    for name in ["PATCH_PLAN.md", "IMPLEMENTATION_REPORT.md", "VALIDATION_REPORT.md", "REGRESSION_IDS.md"]:
-        members[name] = (ROOT / "docs/bao_cao/context548" / name).read_bytes()
+    if baseline_name != "baseline.xml": members["baseline-unconfigured.xml"] = (directory/"baseline.xml").read_bytes()
+    if focused_name != "focused-gate.xml": members["focused-first-gate.xml"] = (directory/"focused-gate.xml").read_bytes()
+    reports = reports or ROOT / "docs/bao_cao/context548"
+    for name in ["PATCH_PLAN.md", "IMPLEMENTATION_REPORT.md", "VALIDATION_REPORT.md", "REGRESSION_IDS.md", "DIAGNOSIS_REPORT.md"]:
+        if (reports/name).is_file(): members[name] = (reports/name).read_bytes()
     for name, data in members.items():
         text = data.decode("utf-8")
         if re.search(r"(?i)(bearer\s+[a-z0-9._-]{12,}|sk-[a-z0-9_-]{16,}|postgres(?:ql)?(?:\+\w+)?://[^\s]+|(?:api_key|password|secret_key)\s*[=:]\s*['\"]?[^\s'\"]{8,})", text):
             raise ValueError(f"Possible secret in evidence: {name}; export stopped")
-        members[name] = text.replace(str(ROOT), "<repo>").encode("utf-8")
+        members[name] = text.replace(json.dumps(str(ROOT))[1:-1], "<repo>").replace(str(ROOT), "<repo>").encode("utf-8")
     manifest = "".join(hashlib.sha256(data).hexdigest() + "  " + name + "\n" for name, data in sorted(members.items()))
     members["manifest.sha256"] = manifest.encode()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -73,5 +81,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, default=ROOT / "backend/storage/context548-evidence")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/bao_cao/context548/evidence.zip")
+    parser.add_argument("--reports", type=Path)
+    parser.add_argument("--baseline-name", default="baseline.xml")
+    parser.add_argument("--after-name")
+    parser.add_argument("--focused-name", default="focused-gate.xml")
     args = parser.parse_args()
-    export(args.evidence.resolve(), args.output.resolve())
+    export(args.evidence.resolve(), args.output.resolve(), reports=args.reports, baseline_name=args.baseline_name, after_name=args.after_name, focused_name=args.focused_name)

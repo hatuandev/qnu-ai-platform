@@ -62,7 +62,7 @@ async def run_proposal(artifact: dict, invoke, *, proposal_only: bool = False) -
     """Same workflow contract for real calls and explicitly labeled test adapters."""
     before = semantic_fingerprint(artifact)
     original_policy = copy.deepcopy(artifact.get("source_policy"))
-    report = {"stages": {"provider": "NOT_RUN", "selector_schema": "NOT_RUN", "evidence_binding": "NOT_RUN", "proposal": "NOT_RUN", "human_review": "NOT_RUN", "apply": "NOT_RUN",
+    report = {"stages": {"provider": "NOT_RUN", "response_complete": "NOT_RUN", "json_syntax": "NOT_RUN", "selector_schema": "NOT_RUN", "evidence_binding": "NOT_RUN", "context_expansion": "NOT_RUN", "proposal": "NOT_RUN", "human_review": "NOT_RUN", "apply": "NOT_RUN",
                           "persist_reload": "NOT_RUN", "projection_chunks": "NOT_RUN"},
               "source_applied": False, "human_approved": False, "end_to_end": "INCOMPLETE"}
     try:
@@ -88,9 +88,14 @@ async def run_proposal(artifact: dict, invoke, *, proposal_only: bool = False) -
         report.update(status=status)
         report["stages"].update(proposal="PASS", human_review=status)
         report["stages"].update(provider="PASS", selector_schema="PASS", evidence_binding="PASS")
+        runs = (proposal.get("model") or {}).get("runs", [])
+        report["stages"].update(response_complete="PASS" if runs and all(run.get("finish_reason") == "stop" for run in runs) else "UNKNOWN",
+            json_syntax="PASS")
         return (0 if proposal_only and not summary["requires_more_context"] else 2), report
     except Exception as exc:
         report.update(status="BLOCKED", error_code=getattr(exc, "code", type(exc).__name__))
+        if getattr(exc, "code", "").startswith("MODEL_OUTPUT_") or getattr(exc, "code", "") == "MODEL_RESPONSE_PROTOCOL_ERROR":
+            report["provider_failure"] = exc.details
         if getattr(exc, "code", None) in {"SEMANTIC_RUN_DEADLINE", "SEMANTIC_CALL_DEADLINE"}:
             report["failure_category"] = exc.code
             report["stages"]["proposal"] = "FAIL"
@@ -100,9 +105,17 @@ async def run_proposal(artifact: dict, invoke, *, proposal_only: bool = False) -
             report["provider_inference"] = "PASS"
             report["stages"].update(provider="PASS", selector_schema="FAIL" if exc.code == "SEMANTIC_OUTPUT_INVALID" else "PASS",
                 evidence_binding="NOT_RUN" if exc.code == "SEMANTIC_OUTPUT_INVALID" else "FAIL")
+            stage = exc.details.get("stage")
+            report["stages"]["response_complete"] = "FAIL" if stage in {"refusal", "response_incomplete"} else "PASS"
+            report["stages"]["json_syntax"] = "FAIL" if stage == "json_syntax" else "NOT_RUN" if stage in {"refusal", "response_incomplete"} else "PASS"
+            if stage in {"refusal", "response_incomplete", "json_syntax"}:
+                report["stages"]["selector_schema"] = "NOT_RUN"
         if getattr(exc, "code", None) == "SEMANTIC_CONTEXT_INCOMPLETE":
             report["context_incomplete"] = exc.details
             report["provider_inference"] = "PASS" if exc.details.get("model") else "NOT_RUN"
+            if exc.details.get("model") and exc.details.get("stage") == "context_expansion":
+                report["stages"].update(provider="PASS", json_syntax="PASS", selector_schema="PASS", context_expansion="FAIL")
+                report["stages"]["response_complete"] = "PASS" if exc.details["model"].get("finish_reason") == "stop" else "UNKNOWN"
         report["failure_category"] = ("invalid_output_or_evidence" if getattr(exc, "code", None) in {"SEMANTIC_EVIDENCE_INVALID", "SEMANTIC_OUTPUT_INVALID"} else
                                       "context_budget_or_missing_evidence" if getattr(exc, "code", None) == "SEMANTIC_CONTEXT_INCOMPLETE" else
                                       "timeout" if isinstance(exc, TimeoutError) else
@@ -186,6 +199,18 @@ async def main(args) -> int:
             write_json(args.output / "pending-projection.json", artifact)
             write_json(args.output / "policy.json", {"mode": "strict", "publication_enabled": False,
                                                       "reason": "pending human review; no source persistence"})
+            from app.modules.knowledge.services.semantic_evidence import source_identity
+            responses = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(args.output.glob("response-*.json"))]
+            checkpoint = {"status": report["status"], "source": source_identity(artifact),
+                "fixture_sha256": source_hash, "proposal_hash": report["proposal_hash"],
+                "input_hash": artifact["semantic_annotations"]["input_hash"], "scope": report["context_summary"]["scope"],
+                "target_table_ids": args.target_table, "human_approved": False, "source_applied": False,
+                "files": {name: hashlib.sha256((args.output/name).read_bytes()).hexdigest()
+                    for name in ("proposal.json", "pending-projection.json", "policy.json")},
+                "calls": [{key: response.get(key) for key in ("call", "context_id", "packet_sha256", "schema_hash",
+                    "selector_contract", "selector_version", "policy_sha256", "policy")} for response in responses],
+                "continuation": "Review this exact pending proposal using existing source-bound decisions; never regenerate it to resume or auto-approve. This is an offline checkpoint, not an application job."}
+            write_json(args.output / "checkpoint.json", checkpoint)
     except Exception as exc:
         code = 1
         report.update(error_code=getattr(exc, "code", type(exc).__name__))

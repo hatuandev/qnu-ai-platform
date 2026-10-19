@@ -326,7 +326,7 @@ async def test_T08_modelops_uses_persisted_fallback_only_for_default_chain(pair,
             {"provider_id": "fallback", "provider_name": "TEST fallback", "model_name": "configured-fallback"}])
     async def respond(_db, request):
         packet = json.loads(request.messages[1].content)
-        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"]}), provider="TEST-primary", model="TEST-model",
+        return SimpleNamespace(content=json.dumps({"context_id": packet["context_id"], "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": []}), provider="TEST-primary", model="TEST-model",
             is_fallback=False, prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.services.model_catalog_service.model_catalog_service.get_system_model_defaults",
                AsyncMock(return_value=SimpleNamespace(defaults=defaults))), \

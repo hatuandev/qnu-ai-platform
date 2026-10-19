@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.modules.modelops.schemas import ChatMessage
 
@@ -18,6 +18,10 @@ class LLMResponse:
     completion_tokens: int
     total_tokens: int
     latency_ms: float = 0.0
+    finish_reason: str | None = None
+    refusal: str | None = None
+    response_metadata: dict = field(default_factory=dict)
+    attempt_trace: list[dict] = field(default_factory=list)
 
 
 class BaseLLMAdapter(ABC):

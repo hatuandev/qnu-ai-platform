@@ -860,3 +860,30 @@ khi chỉ chờ quyết định hợp lệ, và E2E PASS khi có provider/bindin
 persist-reload thật. Kết quả test adapter không thay upstream verification.
 Hồ sơ nghiệm thu có ZIP allowlist/manifest, JUnit trước-sau, exact ID/cause và
 cleanup ownership; xem [báo cáo548](../bao_cao/context548/VALIDATION_REPORT.md).
+
+### 11.11. Hợp đồng JSON selector qua ModelOps — phiên549
+
+Semantic yêu cầu OutputContract preset do backend tạo từ ModelSemanticProposal,
+không nhận schema tùy ý từ tài liệu/model. Wire yêu cầu mọi trường kể cả list
+rỗng, giữ unresolved/context_followups. Backend luôn kiểm strict business schema
+và source binding; JSON hợp lệ chưa chứng minh chú thích đúng hoặc đã được duyệt.
+
+Mode json_schema/json_object chỉ gửi khi registry capability đúng provider/
+endpoint/model cho phép. Thiếu capability thì strict-required bị từ chối; weaker
+chỉ dùng theo policy server tường minh và trace requested/effective/reason. Chat
+không truyền contract giữ hành vi cũ. Không gọi proxy compatible là native strict
+enforcement chỉ từ một output JSON đúng. Contract hiện hỗ trợ non-streaming qua
+OpenAI Chat Completions adapter; adapter khác từ chối tường minh.
+
+Final response phải hoàn tất/không refusal/không empty, toàn bộ là một object
+JSON, không key trùng/NaN/Infinity hoặc coerce/default-fill. Prompt-only cho một
+cặp fence bao toàn object; schema/JSON mode yêu cầu JSON trực tiếp. Không JSON
+repair/prefix extraction hay bỏ phần dư. Syntax lỗi có tối đa1format retry theo
+packet gốc; expansion không reset retry, không thay evidence/schema hoặc merge
+annotations từ output lỗi. Sai schema/evidence/scope/refusal không format retry.
+
+Retry/fallback/negotiation giữ format và scope, share deadline/max_calls/tổnginput;
+HTTP input được charge trước gửi. Không crop semantic catalog hoặc tự giảm output
+budget tại adapter. Ghi metadata/hash an toàn, tách provider/JSON/schema/binding/
+expansion/staging/humanreview. Pending proposal vẫn cần người có quyền duyệt theo
+11.7–11.10; không thay unknown policy hoặc snapshot authority.

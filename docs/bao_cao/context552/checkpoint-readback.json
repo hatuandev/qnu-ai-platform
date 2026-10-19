@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "bytes_verified": true,
+  "canonical_source_and_bindings_verified": true,
+  "llm_called": false,
+  "human_review": "NOT_RUN",
+  "applied": false,
+  "kind": "pending checkpoint readback only, not effective annotation persist/rebuild"
+}

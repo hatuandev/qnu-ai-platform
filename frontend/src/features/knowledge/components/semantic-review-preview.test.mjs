@@ -72,6 +72,46 @@ const artifact = {
   ],
 };
 
+test("scope confirmation shows exact string row codes and full exclusion separately", () => {
+  const value = structuredClone(artifact);
+  value.tables[0].row_unit_ids.push("excluded-row");
+  value.tables[0].rows.push(["00027", "Excluded program"]);
+  value.semantic_annotations.context_review = {
+    contract: "qnu-context-review-v2",
+    scope: "selected_tables",
+    unresolved: [],
+    issues: [
+      {
+        issue_id: "ctxissue:row",
+        kind: "scope_confirmation_required",
+        reason: "Check exact row and exclusions",
+        unit_ids: ["note"],
+        target: { table_id: "table", row_unit_ids: ["row"], column_ids: [] },
+        review_evidence: [
+          {
+            evidence_binding: {
+              evidence_id: "ev:full",
+              source_unit_id: "note",
+            },
+            evidence_quote: "Only 0012 applies; 00027 is excluded.",
+          },
+        ],
+      },
+    ],
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SemanticReviewPreview, {
+      artifact: value,
+      onDecision() {},
+    }),
+  );
+  const targets = html.match(/Dòng cần xác nhận: ([^<]+)/)?.[1];
+  assert.match(targets, /0012/);
+  assert.doesNotMatch(targets, /00027/);
+  assert.match(html, /Only 0012 applies; 00027 is excluded/);
+  assert.match(html, /Xác nhận đúng tập dòng\/cột này/);
+});
+
 for (const status of [
   "proposed",
   "empty",

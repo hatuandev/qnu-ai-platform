@@ -1,0 +1,9 @@
+{
+  "status": "cleaned",
+  "test_database": "qnu_test_context548_352314b47a8f",
+  "database_removed_verified": true,
+  "runtime": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-352314b47a8f",
+  "runtime_exists_after": false,
+  "production_migrations": false,
+  "retained": "Allowlisted evidence dossier, no database/Storage dump"
+}

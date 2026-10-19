@@ -1,0 +1,132 @@
+[
+  {
+    "call": 1,
+    "context_id": "ctx:7ad3d84cd3131702d265e35386b28e1f",
+    "packet_sha256": "f17093eac890e862892a0a61b6c3549efe6daebd3c8c3defbd12af53d9c12c57",
+    "source": {
+      "document_id": "offline544",
+      "revision_id": "draft544",
+      "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+      "structured_sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f"
+    },
+    "schema_hash": "60f3f359fb4fa5f03b503e2897b535d65d29d731a5d838a246d3459438cb5b9f",
+    "business_schema_hash": "52813cbd769d4829b45c4d0e8935a48a58091db22f290748c1d2549f1da7db4c",
+    "selector_contract": "qnu_semantic_selector_v2",
+    "selector_version": 2,
+    "policy": {
+      "max_packet_bytes": 48000,
+      "max_total_bytes": 1000000,
+      "max_packets": 24,
+      "max_calls": 4,
+      "max_units": 120,
+      "max_expansions": 2,
+      "neighbor_units": 3,
+      "max_evidence_chars": 2000,
+      "max_output_tokens": 6000,
+      "run_seconds": 120.0,
+      "call_seconds": 90.0,
+      "output_contract": {
+        "name": "qnu_semantic_selector_v2",
+        "requested_mode": "json_schema",
+        "allowed_weaker_modes": [
+          "json_object",
+          "prompt_only"
+        ]
+      },
+      "format_retries": 1
+    },
+    "policy_sha256": "642f383d47c09c9cc8ac941a31dec6c2921181b9a417f09b0e113c0c5f6f0985",
+    "raw_content_sha256": "98e8fa0f43e0a7ffb27e7fd14a43ab537787f8af8d6b920c7fdc2e5aa1d224b4",
+    "model": {
+      "provider": "vllm",
+      "model": "qwen3.5-9b",
+      "is_fallback": false,
+      "prompt_tokens": 16469,
+      "completion_tokens": 519,
+      "latency_ms": 5542.88,
+      "output_contract": {
+        "name": "qnu_semantic_selector_v2",
+        "version": 2,
+        "requested_mode": "json_schema",
+        "effective_mode": "prompt_only",
+        "reason": "explicit_policy_allows_weaker_mode",
+        "schema_hash": "60f3f359fb4fa5f03b503e2897b535d65d29d731a5d838a246d3459438cb5b9f",
+        "business_schema_hash": "52813cbd769d4829b45c4d0e8935a48a58091db22f290748c1d2549f1da7db4c"
+      },
+      "finish_reason": "stop",
+      "response_metadata": {
+        "request_id_sha256": "9b2dddc15aaf44751ba09de5a40415ecfc6063aa485170237accf776b02d2a67",
+        "response_id_sha256": "d45e57334850fab6bc077f410705f37db6c0e2372eaeb1b5347ca9c56adddb81",
+        "body_sha256": "401e0f485410df60b77880f3590a826818db7f1f27b08bcc5a288b338f55a4e9",
+        "choice_count": 1,
+        "content_parts": 1,
+        "finish_reason_known": true
+      },
+      "attempt_trace": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "response",
+          "output_contract": {
+            "name": "qnu_semantic_selector_v2",
+            "version": 2,
+            "requested_mode": "json_schema",
+            "effective_mode": "prompt_only",
+            "reason": "explicit_policy_allows_weaker_mode",
+            "schema_hash": "60f3f359fb4fa5f03b503e2897b535d65d29d731a5d838a246d3459438cb5b9f",
+            "business_schema_hash": "52813cbd769d4829b45c4d0e8935a48a58091db22f290748c1d2549f1da7db4c"
+          },
+          "transport_attempts": [
+            {
+              "http_status": 200,
+              "body_sha256": "401e0f485410df60b77880f3590a826818db7f1f27b08bcc5a288b338f55a4e9",
+              "request_bytes": 48938,
+              "payload_sha256": "5112522859b5d8fd691af50b05948c9f0917a90e3e3701a54ea1b6443a9e36a7"
+            }
+          ]
+        }
+      ]
+    },
+    "redacted_selector": {
+      "context_id": "ctx:7ad3d84cd3131702d265e35386b28e1f",
+      "needs_context": [],
+      "notes": [
+        {
+          "evidence_id": "ev:ee5fb95db4b8069bce2eef59c6c617bd",
+          "table_id": "qnu:t001",
+          "scope": "table",
+          "row_unit_ids": [],
+          "column_ids": []
+        },
+        {
+          "evidence_id": "ev:8fc01ebe33e3f97c1a75c02cdce788c6",
+          "table_id": "qnu:t001",
+          "scope": "table",
+          "row_unit_ids": [],
+          "column_ids": []
+        },
+        {
+          "evidence_id": "ev:c7739a48dd7a38344efe7294f85a10b5",
+          "table_id": "qnu:t001",
+          "scope": "row",
+          "row_unit_ids": [
+            "qnu:r003"
+          ],
+          "column_ids": []
+        },
+        {
+          "evidence_id": "ev:8ec9488b3a6b591d6b01b31cc629aacb",
+          "table_id": "qnu:t001",
+          "scope": "column",
+          "row_unit_ids": [],
+          "column_ids": [
+            "c11"
+          ]
+        }
+      ],
+      "cells": [],
+      "limitations": []
+    },
+    "redaction": "model reasons and raw response content omitted; original bytes retained privately"
+  }
+]

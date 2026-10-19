@@ -30,13 +30,15 @@ def apply_limitations(artifact: dict, manifest: UnitManifest, limitations: list[
             for row_id, fields in zip(table["row_unit_ids"], table["row_fields"], strict=True)}
     seen = set()
     records = []
+    # Verify the entire set against one input before adding any derived record.
+    for item in limitations:
+        if item.evidence_binding is not None:
+            verify_binding(artifact, item.evidence_binding, item.evidence_quote, item.evidence_unit_id)
     for item in limitations:
         key = item.row_unit_id, item.column_id
         fields = [field for field in rows.get(item.row_unit_id, []) if field["column_id"] == item.column_id]
         evidence = by_id.get(item.evidence_unit_id)
         scope = item.examined_unit_ids
-        if item.evidence_binding is not None:
-            verify_binding(artifact, item.evidence_binding, item.evidence_quote, item.evidence_unit_id)
         own_bound_cell = item.evidence_binding is not None and item.evidence_binding.column_id == item.column_id and item.evidence_unit_id == item.row_unit_id
         if (key in seen or len(fields) != 1 or fields[0]["raw"] != item.raw
                 or fields[0]["state"] not in {"ambiguous", "blank", "not_stated"}

@@ -15,6 +15,7 @@ from app.modules.modelops.providers.chat_contract import (
     MAX_NEGOTIATIONS,
     adapt_rejected_payload,
     build_chat_payload,
+    completion_metadata,
     decode_completion,
     decode_stream_event,
     post_chat,
@@ -25,6 +26,7 @@ from app.modules.modelops.services.inference_policy import retry_transient_respo
 
 
 class OpenAIAdapter(BaseLLMAdapter):
+    supports_output_contract = True
     def __init__(
         self,
         model_name: str,
@@ -78,6 +80,14 @@ class OpenAIAdapter(BaseLLMAdapter):
         )
         if kwargs.get("enable_thinking") or kwargs.get("thinking_budget"):
             payload["chat_template_kwargs"] = {"enable_thinking": True}
+        contract = kwargs.get("output_contract")
+        if contract is not None:
+            if stream:
+                raise AppException("Hợp đồng selector chỉ hỗ trợ non-streaming.", code="MODEL_OUTPUT_STREAM_UNSUPPORTED", status_code=422)
+            from app.modules.modelops.services.output_contract import response_format
+            format_payload = response_format(contract)
+            if format_payload is not None:
+                payload["response_format"] = format_payload
         return payload
 
     async def generate(
@@ -98,17 +108,19 @@ class OpenAIAdapter(BaseLLMAdapter):
                 2,
             )
         payload = self._payload(messages, temperature, max_tokens, False, **kwargs)
+        attempt_trace = []
         endpoint = f"{(self.base_url or 'https://api.openai.com/v1').rstrip('/')}/chat/completions"
         async with httpx.AsyncClient(timeout=self.timeout_seconds, trust_env=False) as client:
-            response = await post_chat(
-                client,
-                endpoint,
-                self._headers(),
-                payload,
-                self.request_capabilities,
-                probe=kwargs.get("probe", False),
-            )
-            content, usage, served_model = decode_completion(response)
+            try:
+                response = await post_chat(
+                    client, endpoint, self._headers(), payload, self.request_capabilities,
+                    probe=kwargs.get("probe", False), output_contract=kwargs.get("output_contract"),
+                    trace=attempt_trace if kwargs.get("output_contract") else None)
+                content, usage, served_model = decode_completion(response, output_contract=kwargs.get("output_contract"))
+                metadata = completion_metadata(response)
+            except Exception as exc:
+                exc.output_attempt_trace = attempt_trace
+                raise
         self.served_model = served_model or self.model_name
         return LLMResponse(
             content=content,
@@ -118,6 +130,8 @@ class OpenAIAdapter(BaseLLMAdapter):
             completion_tokens=usage.get("completion_tokens", 0),
             total_tokens=usage.get("total_tokens", 0),
             latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            attempt_trace=attempt_trace,
+            **metadata,
         )
 
     async def stream(

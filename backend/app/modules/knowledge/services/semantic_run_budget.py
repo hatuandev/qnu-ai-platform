@@ -21,7 +21,8 @@ class SemanticRunBudget:
 
     @staticmethod
     def error(code: str) -> AppException:
-        return AppException("Đã hết thời gian xử lý; chưa áp dụng dữ liệu.", code=code, status_code=504)
+        return AppException("Đã hết thời gian xử lý; chưa áp dụng dữ liệu.", code=code, status_code=504,
+            details={"stage": "run_deadline" if code == "SEMANTIC_RUN_DEADLINE" else "call_deadline"})
 
     async def wait(self, factory, *, call_seconds: float | None = None):
         self.check()

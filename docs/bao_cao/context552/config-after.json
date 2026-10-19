@@ -1,0 +1,6 @@
+{
+  "fresh_read_only_session": true,
+  "defaults_unchanged": true,
+  "provider_public_settings_unchanged": true,
+  "default_model": "qwen3.5-9b"
+}

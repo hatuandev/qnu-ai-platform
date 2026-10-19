@@ -1,4 +1,5 @@
 """Read-only endpoint audit. Never prints credentials or changes service config."""
+import argparse
 import asyncio
 import json
 import sys
@@ -33,8 +34,12 @@ async def main():
             report['observed_database']=dict(row)
         await engine.dispose()
         report['decision']='LOCAL_CONFIG_VERIFIED; tests NOT authorized on shared application database without isolation'
-    path=Path(__file__).resolve().parents[2]/'backend/storage/context548-safety.json'
+    path=args.output.resolve()
+    assert path.is_relative_to(Path(__file__).resolve().parents[2]/'backend/storage')
     path.write_text(json.dumps(report,ensure_ascii=True,indent=2)+'\n',encoding='utf-8',newline='\n')
     print(json.dumps(report,ensure_ascii=True))
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parents[2]/'backend/storage/context548-safety.json')
+args = parser.parse_args()
 asyncio.run(main())

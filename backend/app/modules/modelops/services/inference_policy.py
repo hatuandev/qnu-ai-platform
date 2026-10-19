@@ -24,6 +24,9 @@ _required_output: ContextVar[bool] = ContextVar("required_structured_output", de
 @dataclass
 class RetryBudget:
     remaining: int = 1
+    max_input_bytes: int | None = None
+    input_bytes: int = 0
+    transport_attempts: int = 0
 
 
 _retry_budget: ContextVar[RetryBudget | None] = ContextVar("chat_transient_retry_budget", default=None)
@@ -52,14 +55,32 @@ async def load_rag_provider_ids() -> frozenset[str] | None:
 
 
 @contextmanager
-def transient_retry_scope() -> Iterator[None]:
+def transient_retry_scope(*, max_input_bytes: int | None = None) -> Iterator[None]:
     """Nested calls share one retry, rather than multiplying retries per layer."""
-    token = _retry_budget.set(RetryBudget()) if _retry_budget.get() is None else None
+    token = _retry_budget.set(RetryBudget(max_input_bytes=max_input_bytes)) if _retry_budget.get() is None else None
+    active = _retry_budget.get()
+    previous_max = active.max_input_bytes
+    if max_input_bytes is not None:
+        active.max_input_bytes = min(active.max_input_bytes, max_input_bytes) if active.max_input_bytes is not None else max_input_bytes
     try:
         yield
     finally:
         if token is not None:
             _retry_budget.reset(token)
+        else:
+            active.max_input_bytes = previous_max
+
+
+def charge_chat_input(size: int) -> None:
+    budget = _retry_budget.get()
+    if budget is None:
+        return
+    if budget.max_input_bytes is not None and budget.input_bytes + size > budget.max_input_bytes:
+        raise AppException("Đã hết ngân sách input HTTP; chưa áp dụng dữ liệu.", code="SEMANTIC_CONTEXT_INCOMPLETE",
+            status_code=422, details={"stage": "context_budget", "transport_input_bytes": budget.input_bytes,
+                "transport_attempts": budget.transport_attempts})
+    budget.input_bytes += size
+    budget.transport_attempts += 1
 
 
 @asynccontextmanager

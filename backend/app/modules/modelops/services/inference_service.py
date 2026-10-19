@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -34,6 +35,7 @@ from app.modules.modelops.services.key_rotation import (
     provider_failure_diagnostics,
 )
 from app.modules.modelops.services.key_status import normalize_provider_key_status
+from app.modules.modelops.services.output_contract import resolve_contract
 from app.modules.modelops.services.provider_key_rotation_service import (
     LeasedProviderKey,
     provider_key_rotation_service,
@@ -213,6 +215,8 @@ class InferenceService:
         return failure.state
 
     async def generate(self, db: AsyncSession, req: LLMGenerateRequest) -> LLMGenerateResponse:
+        if req.output_contract is not None and req.stream:
+            raise AppException("Hợp đồng selector chỉ hỗ trợ non-streaming.", code="MODEL_OUTPUT_STREAM_UNSUPPORTED", status_code=422)
         with transient_retry_scope():
             return await self._generate(db, req)
 
@@ -239,6 +243,8 @@ class InferenceService:
         fallback_reasons: list[str] = []
         attempted_overflow = False
         attempted_other_error = False
+        contract_failure = None
+        attempt_trace = []
         for idx, (p, chosen_model) in enumerate(routes):
             p_name = p["name"]
             cb = circuit_breaker_registry.get(p_name)
@@ -324,22 +330,21 @@ class InferenceService:
                             cfg_obj.extra_config if cfg_obj else {}, chosen_model, p['api_base_url']),
                     )
 
-                    try:
-                        resp = await adapter.generate(
-                            messages=req.messages,
-                            temperature=req.temperature,
-                            max_tokens=req.max_tokens,
-                            thinking_budget=getattr(req, "thinking_budget", 0),
-                        )
-                    except TypeError as te:
-                        if "thinking_budget" in str(te):
-                            resp = await adapter.generate(
-                                messages=req.messages,
-                                temperature=req.temperature,
-                                max_tokens=req.max_tokens,
-                            )
-                        else:
-                            raise
+                    effective_contract = resolve_contract(req.output_contract,
+                        getattr(adapter, "request_capabilities", {}),
+                        supports_chat_schema=getattr(adapter, "supports_output_contract", False)) if req.output_contract else None
+                    parameters = inspect.signature(adapter.generate).parameters
+                    extra_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values())
+                    arguments = {"messages": req.messages, "temperature": req.temperature, "max_tokens": req.max_tokens}
+                    if "thinking_budget" in parameters or extra_kwargs:
+                        arguments["thinking_budget"] = req.thinking_budget
+                    if effective_contract and getattr(adapter, "supports_output_contract", False):
+                        if "output_contract" not in parameters and not extra_kwargs:
+                            raise AppException("Adapter không nhận hợp đồng đầu ra.", code="MODEL_OUTPUT_CONTRACT_UNSUPPORTED", status_code=422)
+                        arguments["output_contract"] = effective_contract
+                    resp = await adapter.generate(**arguments)
+                    attempt_trace.append({"provider_id": p["id"], "model": chosen_model, "status": "response",
+                        "output_contract": effective_contract, "transport_attempts": getattr(resp, "attempt_trace", [])})
 
                     lease = active_key_entry.get("_lease")
                     if isinstance(lease, LeasedProviderKey):
@@ -401,6 +406,11 @@ class InferenceService:
                         requested_model=req.preferred_model_name,
                         provider_id=p['id'],
                         fallback_reason='; '.join(fallback_reasons) or None,
+                        finish_reason=getattr(resp, "finish_reason", None),
+                        refusal=getattr(resp, "refusal", None),
+                        response_metadata=getattr(resp, "response_metadata", {}),
+                        output_contract=effective_contract,
+                        attempt_trace=attempt_trace,
                     )
 
                 except asyncio.CancelledError:
@@ -409,7 +419,25 @@ class InferenceService:
                         await provider_key_rotation_service.release(db, lease)
                     raise
                 except Exception as exc:
+                    if req.output_contract and (getattr(exc, "code", "").startswith("MODEL_OUTPUT_") or
+                                               getattr(exc, "code", "") == "SEMANTIC_CONTEXT_INCOMPLETE" or
+                                               getattr(exc, "code", "") == "MODEL_REQUEST_CONFIG_INVALID" or
+                                               getattr(exc, "code", "") == "MODEL_RESPONSE_PROTOCOL_ERROR"):
+                        lease = active_key_entry.get("_lease")
+                        if isinstance(lease, LeasedProviderKey):
+                            await provider_key_rotation_service.release(db, lease)
+                        attempt_trace.append({"provider_id": p["id"], "model": chosen_model, "status": "rejected", "code": exc.code,
+                            "transport_attempts": getattr(exc, "output_attempt_trace", [])})
+                        exc.details = {**(exc.details or {}), "attempt_trace": attempt_trace}
+                        if exc.code != "MODEL_OUTPUT_CONTRACT_UNSUPPORTED":
+                            raise
+                        contract_failure = exc
+                        fallback_reasons.append(f"{p['id']}: {exc.code}")
+                        break
                     provider_error = exc
+                    if req.output_contract:
+                        attempt_trace.append({"provider_id": p["id"], "model": chosen_model, "status": "failed",
+                            "error_type": type(exc).__name__, "transport_attempts": getattr(exc, "output_attempt_trace", [])})
                     if is_context_overflow_error(exc):
                         # Our request exceeds the serving window: retrying the
                         # same prompt on sibling keys cannot succeed. Fall
@@ -483,6 +511,8 @@ class InferenceService:
                     )
 
         # 4. If all providers exhausted
+        if contract_failure and not attempted_other_error and not attempted_overflow:
+            raise contract_failure
         if attempted_overflow and not attempted_other_error:
             raise AppException(
                 status_code=502,
@@ -502,11 +532,14 @@ class InferenceService:
                 "Vui lòng kiểm tra trạng thái ModelOps hoặc thử lại sau."
             ),
             code="ALL_PROVIDERS_UNAVAILABLE",
+            details={"stage": "provider", "attempt_trace": attempt_trace} if req.output_contract else None,
         )
 
     async def generate_stream(
         self, db: AsyncSession, req: LLMGenerateRequest
     ) -> AsyncIterator[str]:
+        if req.output_contract is not None:
+            raise AppException("Hợp đồng selector chỉ hỗ trợ non-streaming.", code="MODEL_OUTPUT_STREAM_UNSUPPORTED", status_code=422)
         with transient_retry_scope():
             async with aclosing(self._generate_stream(db, req)) as stream:
                 async for chunk in stream:

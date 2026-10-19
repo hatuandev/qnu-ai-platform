@@ -1,0 +1,121 @@
+{
+  "status": "WAITING_FOR_REVIEW",
+  "exit_code": 2,
+  "stages": {
+    "provider": "PASS",
+    "response_complete": "PASS",
+    "json_syntax": "PASS",
+    "selector_schema": "PASS",
+    "evidence_binding": "PASS",
+    "context_expansion": "NOT_RUN",
+    "proposal": "PASS",
+    "human_review": "WAITING_FOR_REVIEW",
+    "apply": "NOT_RUN",
+    "persist_reload": "NOT_RUN",
+    "projection_chunks": "NOT_RUN"
+  },
+  "scope": "selected_tables",
+  "target_table_ids": [
+    "qnu:t001"
+  ],
+  "fixture_sha256": "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+  "proposal_hash": "80308912eba6ceecfcec7283e7ebedef225fe756000eb57c14602b0b58bbcfc3",
+  "counts": {
+    "notes": 4,
+    "cells": 0,
+    "limitations": 0
+  },
+  "context_summary": {
+    "contract": "qnu-context-review-v2",
+    "packets_complete": true,
+    "scope": "selected_tables",
+    "issue_count": 8,
+    "open_issue_ids": [
+      "ctxissue:020f5d0bffea6fabb4605e5fb4c53ccd72fb7320a3cf354dd477b5b81000a21e",
+      "ctxissue:081d95e2e836c4aad52bfa72977575c1e7c732c094cffc52c9d42cc4c9fb26c4",
+      "ctxissue:54652f308c332f02a379469f0d2ee9fc8f62a858dbc4ac98fb0d8adc515d9bda",
+      "ctxissue:7796dfd6b7e8ef92fea6bf823a8618825a249295d3404d17d8716d9d6b4ff3fb",
+      "ctxissue:891a560adef9b2010117727e0188690b2d36c25c0dda4d594ebe58456cd9920d",
+      "ctxissue:8e49ed2d0da6280c39ddd1f068fe53c891bed6999eb732e92cd8214758ec9c11",
+      "ctxissue:caaaec699ea13848e145573699939a54240f13984efbc7b77767fd164ec32a6d",
+      "ctxissue:d62e3952982928c38fa242bf17a7cf867f7ffdceb5f4599915d9260884e65530"
+    ],
+    "context_blocker_count": 8,
+    "application_blocked": true,
+    "semantic_complete": false,
+    "requires_more_context": false,
+    "publication_blocked": true
+  },
+  "metrics": {
+    "build_ms": 192.18650000402704,
+    "calls": 1,
+    "input_utf8_bytes": 47651,
+    "model_ms": 5665.7807000447065,
+    "binding_ms": 218.47919997526333,
+    "accepted": 4,
+    "rejected": 0,
+    "packet_count": 1,
+    "format_retries": 0,
+    "provider_attempts": 1,
+    "transport_attempts": 1,
+    "transport_input_bytes": 48938
+  },
+  "calls": [
+    {
+      "provider": "vllm",
+      "model": "qwen3.5-9b",
+      "is_fallback": false,
+      "prompt_tokens": 16469,
+      "completion_tokens": 519,
+      "latency_ms": 5542.88,
+      "output_contract": {
+        "name": "qnu_semantic_selector_v2",
+        "version": 2,
+        "requested_mode": "json_schema",
+        "effective_mode": "prompt_only",
+        "reason": "explicit_policy_allows_weaker_mode",
+        "schema_hash": "60f3f359fb4fa5f03b503e2897b535d65d29d731a5d838a246d3459438cb5b9f",
+        "business_schema_hash": "52813cbd769d4829b45c4d0e8935a48a58091db22f290748c1d2549f1da7db4c"
+      },
+      "finish_reason": "stop",
+      "response_metadata": {
+        "request_id_sha256": "9b2dddc15aaf44751ba09de5a40415ecfc6063aa485170237accf776b02d2a67",
+        "response_id_sha256": "d45e57334850fab6bc077f410705f37db6c0e2372eaeb1b5347ca9c56adddb81",
+        "body_sha256": "401e0f485410df60b77880f3590a826818db7f1f27b08bcc5a288b338f55a4e9",
+        "choice_count": 1,
+        "content_parts": 1,
+        "finish_reason_known": true
+      },
+      "attempt_trace": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "response",
+          "output_contract": {
+            "name": "qnu_semantic_selector_v2",
+            "version": 2,
+            "requested_mode": "json_schema",
+            "effective_mode": "prompt_only",
+            "reason": "explicit_policy_allows_weaker_mode",
+            "schema_hash": "60f3f359fb4fa5f03b503e2897b535d65d29d731a5d838a246d3459438cb5b9f",
+            "business_schema_hash": "52813cbd769d4829b45c4d0e8935a48a58091db22f290748c1d2549f1da7db4c"
+          },
+          "transport_attempts": [
+            {
+              "http_status": 200,
+              "body_sha256": "401e0f485410df60b77880f3590a826818db7f1f27b08bcc5a288b338f55a4e9",
+              "request_bytes": 48938,
+              "payload_sha256": "5112522859b5d8fd691af50b05948c9f0917a90e3e3701a54ea1b6443a9e36a7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "human_review": "WAITING_FOR_REVIEW; no real actor approval",
+  "source_applied": false,
+  "persist_reload_real": "NOT_RUN; deterministic TEST Storage/session/rebuild cases PASS separately",
+  "whole_document_api": "NOT_RUN; human checkpoint B/C not complete",
+  "old551_raw_response": "NOT_AVAILABLE: cleaned; synthetic reproductions are not historical live payloads",
+  "native_json_schema": "NOT_VERIFIED: effective prompt_only"
+}

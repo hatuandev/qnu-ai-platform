@@ -10,6 +10,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.single_application import SingleApplicationModel
+from app.modules.modelops.services.output_contract import OutputContract
 
 
 class ChatMessage(BaseModel):
@@ -20,6 +21,7 @@ class ChatMessage(BaseModel):
 
 
 class LLMGenerateRequest(SingleApplicationModel):
+    output_contract: OutputContract | None = None
     messages: list[ChatMessage] = Field(..., min_length=1, description="Danh sách ngữ cảnh tin nhắn")
 
     assistant_code: str | None = Field(
@@ -58,6 +60,11 @@ class LLMGenerateResponse(BaseModel):
     requested_model: str | None = None
     provider_id: str | None = None
     fallback_reason: str | None = None
+    finish_reason: str | None = None
+    refusal: str | None = None
+    response_metadata: dict[str, Any] = Field(default_factory=dict)
+    output_contract: dict[str, Any] | None = None
+    attempt_trace: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ---------------- Key Pool Schemas ----------------

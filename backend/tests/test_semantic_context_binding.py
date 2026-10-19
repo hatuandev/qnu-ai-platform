@@ -65,7 +65,7 @@ async def test_T01_backend_binds_selected_source_without_model_copying_quote(pai
 def note_payload(packet, unit_id="qnu:g", *, table_id=None, scope="column", rows=None, columns=None, contains=None):
     evidence = next(item for item in packet["evidence"] if item["source_unit_id"] == unit_id
                     and (contains is None or contains in item["text"]))
-    return {"context_id": packet["context_id"], "notes": [{"source_unit_id": unit_id, "evidence_id": evidence["id"],
+    return {"context_id": packet["context_id"], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": [], "notes": [{"source_unit_id": unit_id, "evidence_id": evidence["id"],
         "table_id": table_id or packet["tables"][0]["id"], "scope": scope, "row_unit_ids": rows or [],
         "column_ids": columns if columns is not None else ["c4"], "reason": "TEST source-supported relation; human review required"}]}
 
@@ -183,7 +183,9 @@ def test_T06_T07_wrong_year_or_identifier_is_rejected(actual_document):
     wrong_row = next(rid for rid, values in zip(target["row_unit_ids"], target["rows"], strict=True) if "AM-0070" in values)
     payload = note_payload(packet, row_note.id, scope="row", rows=[wrong_row], columns=[])
     payload["notes"][0]["evidence_id"] = ev["id"]
-    with pytest.raises(ValueError, match="ROW_CONFLICT"):
+    # Source mentions the other identifier in an exclusion. Model scope is not
+    # certified from token occurrence; a missing review collector still fails.
+    with pytest.raises(ValueError, match="COLLECTOR_REQUIRED"):
         bind_model_proposals(artifact, packet, payload)
 
 
@@ -239,10 +241,13 @@ def test_T10_T11_actual_scoped_legend_preserves_unknown_slash(actual_document):
     payload = note_payload(packet, "qnu:p072", scope="row", rows=[row], columns=[])
     payload["notes"][0]["evidence_id"] = next(e["id"] for e in packet["evidence"]
         if e["source_unit_id"] == "qnu:p072" and "CT-05" in e["text"] and "CT-06" not in e["text"])
-    proposal = bind_model_proposals(artifact, packet, payload)
+    issues = []
+    proposal = bind_model_proposals(artifact, packet, payload, review_issues=issues)
     before = copy.deepcopy(artifact["tables"][4]["row_fields"])
-    pending = stage_semantic_annotations(artifact, proposal)
-    applied = apply_reviewed_semantics(artifact, pending["proposal_hash"], "TEST-reviewer547", "TEST scoped legend")
+    pending = stage_semantic_annotations(artifact, proposal, context_review={"issues": issues})
+    decisions = [{"issue_id": issue["issue_id"], "target": issue["target"], "action": "scope_confirmed",
+        **issue["review_evidence"][0], "reason": "TEST exact row and excluded slash checked"} for issue in issues]
+    applied = apply_reviewed_semantics(artifact, pending["proposal_hash"], "TEST-reviewer547", "TEST scoped legend", context_decisions=decisions)
     assert applied["tables"][4]["row_fields"] == before
     units = {u["id"]: u for u in applied["retrieval_units"]["units"]}
     assert "qnu:p072" in units[row]["context_refs"] and "qnu:p072" not in units[slash]["context_refs"]
@@ -303,7 +308,7 @@ async def test_T14_failed_later_packet_never_mutates_effective_data(pair):
     artifact = lifecycle.artifact_of(pair)
     before = copy.deepcopy(artifact)
     async def reply(_db, request):
-        return SimpleNamespace(content=json.dumps({"context_id": "wrong"}), provider="TEST", model="TEST", is_fallback=False,
+        return SimpleNamespace(content=json.dumps({"context_id": "wrong", "notes": [], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": []}), provider="TEST", model="TEST", is_fallback=False,
                                prompt_tokens=1, completion_tokens=1, cost_usd=None)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=reply)), pytest.raises(AppException):
         await propose_source_semantics(AsyncMock(), artifact, "TEST", "TEST-model", "TEST-provider", document=document)

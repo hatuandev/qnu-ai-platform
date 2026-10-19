@@ -151,8 +151,10 @@ async def test_modelops_uses_configured_provider_and_keeps_proposals_unapplied()
 
         packet = json.loads(request.messages[1].content)
         evidence = next(item for item in packet["evidence"] if item["source_unit_id"] == "qnu:g")
-        payload = {"context_id": packet["context_id"], "notes": [{"source_unit_id": "qnu:g", "evidence_id": evidence["id"],
-            "table_id": artifact["tables"][0]["id"], "scope": "column", "column_ids": ["c4"], "reason": "TEST column scope"}]}
+        payload = {"context_id": packet["context_id"], "cells": [], "limitations": [], "needs_context": [], "unresolved": [], "context_followups": [], "notes": [{"source_unit_id": "qnu:g", "evidence_id": evidence["id"],
+            "table_id": artifact["tables"][0]["id"], "scope": "column", "row_unit_ids": [], "column_ids": ["c4"], "reason": "TEST column scope"}]}
+        if request.output_contract.name == "qnu_semantic_selector_v2":
+            payload["notes"][0].pop("source_unit_id")
         return SimpleNamespace(content=json.dumps(payload), provider="configured", model="selected", is_fallback=False,
             prompt_tokens=100, completion_tokens=10, cost_usd=0.001)
     with patch("app.modules.modelops.service.modelops_service.generate", AsyncMock(side_effect=respond)) as generate, \

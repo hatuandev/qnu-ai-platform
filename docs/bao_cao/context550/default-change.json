@@ -1,0 +1,56 @@
+{
+  "status": "VERIFIED_FRESH_SESSION",
+  "environment": "development",
+  "database": "qnu_ai_platform",
+  "before": {
+    "chat_combo_chain": [
+      {
+        "is_active": true,
+        "model_name": "cx/gpt-6-luna",
+        "description": null,
+        "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+        "provider_name": "9router",
+        "provider_type": "custom"
+      },
+      {
+        "is_active": true,
+        "model_name": "qwen3.5-9b",
+        "description": null,
+        "provider_id": "prov_rtx5090_vllm",
+        "provider_name": "QNU AI Server (RTX 5090 - vLLM)",
+        "provider_type": "vllm"
+      }
+    ],
+    "default_chat_model": "cx/gpt-6-luna",
+    "default_chat_provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+    "default_chat_mode": "combo"
+  },
+  "after": {
+    "chat_combo_chain": [
+      {
+        "is_active": true,
+        "model_name": "qwen3.5-9b",
+        "description": null,
+        "provider_id": "prov_rtx5090_vllm",
+        "provider_name": "QNU AI Server (RTX 5090 - vLLM)",
+        "provider_type": "vllm"
+      },
+      {
+        "is_active": true,
+        "model_name": "cx/gpt-6-luna",
+        "description": null,
+        "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+        "provider_name": "9router",
+        "provider_type": "custom"
+      }
+    ],
+    "default_chat_model": "qwen3.5-9b",
+    "default_chat_provider_id": "prov_rtx5090_vllm",
+    "default_chat_mode": "combo"
+  },
+  "other_defaults_sha256": "d94ed4e6a7139bb2c28de949205213e3ec0450a7a6ae09abc02c962c05f1bc44",
+  "other_defaults_unchanged": true,
+  "authorization": "User explicitly requested Qwen3.5 as default primary and live retest",
+  "credentials_modified": false,
+  "provider_settings_modified": false
+}

@@ -1,0 +1,271 @@
+{
+  "checks": {
+    "live-table": {
+      "status": "BLOCKED",
+      "scope": null,
+      "requested_model": null,
+      "model": null,
+      "provider_id": null,
+      "is_fallback": null,
+      "finish_reason": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "latency_ms": null,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": null,
+      "checks_passed": null,
+      "error_code": "SEMANTIC_EVIDENCE_INVALID",
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "exit_code": 1,
+      "reported_stages": {
+        "provider": "PASS",
+        "response_complete": "PASS",
+        "json_syntax": "PASS",
+        "selector_schema": "PASS",
+        "evidence_binding": "FAIL",
+        "context_expansion": "NOT_RUN",
+        "proposal": "FAIL",
+        "human_review": "NOT_RUN",
+        "apply": "NOT_RUN",
+        "persist_reload": "NOT_RUN",
+        "projection_chunks": "NOT_RUN"
+      },
+      "validation_reason": "EVIDENCE_SCOPE_ROW_AMBIGUOUS_SELECT_NARROWER_SPAN",
+      "result_model": {
+        "model": "gpt-6-luna",
+        "is_fallback": true,
+        "finish_reason": "stop"
+      },
+      "provider_attempts": [],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "live-api": {
+      "status": "BLOCKED",
+      "scope": "document",
+      "requested_model": null,
+      "model": null,
+      "provider_id": null,
+      "is_fallback": null,
+      "finish_reason": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "latency_ms": null,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": null,
+      "checks_passed": null,
+      "error_code": "SEMANTIC_EVIDENCE_INVALID",
+      "elapsed_ms": 13623.001599975396,
+      "http_error_diagnostics": [
+        {
+          "status": 400,
+          "endpoint_sha256": "9a6f6749d62c70475bf9b47128b2de1d5e9e7f8238321e40f7ec27070e944a5d",
+          "model": "qwen3.5-9b",
+          "body_sha256": "f17f1e4499445ee17b46b215c99ff244234457e0732288d5e59fd249afe1a53d",
+          "maximum_context_tokens": "8192",
+          "input_tokens": "2193"
+        }
+      ],
+      "exit_code": 1,
+      "reported_stages": {
+        "provider": "PASS",
+        "response_complete": "PASS",
+        "json_syntax": "PASS",
+        "selector_schema": "PASS",
+        "evidence_binding": "FAIL",
+        "context_expansion": "NOT_RUN",
+        "proposal": "FAIL",
+        "human_review": "NOT_RUN",
+        "apply": "NOT_RUN",
+        "persist_reload": "NOT_RUN",
+        "projection_chunks": "NOT_RUN"
+      },
+      "validation_reason": "EVIDENCE_SCOPE_ROW_AMBIGUOUS_SELECT_NARROWER_SPAN",
+      "result_model": {
+        "model": "gpt-6-luna",
+        "is_fallback": true,
+        "finish_reason": "stop"
+      },
+      "provider_attempts": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "failed",
+          "error_type": "HTTPStatusError",
+          "transport_attempts": [
+            {
+              "http_status": 400,
+              "body_sha256": "f17f1e4499445ee17b46b215c99ff244234457e0732288d5e59fd249afe1a53d",
+              "request_bytes": 48679,
+              "payload_sha256": "70293fe0d3c3303f12e88b2721389e178a26d2b7d78c71bde1da5f0391bea88e"
+            }
+          ]
+        },
+        {
+          "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+          "model": "cx/gpt-6-luna",
+          "status": "response",
+          "error_type": null,
+          "transport_attempts": [
+            {
+              "http_status": 200,
+              "body_sha256": "50adb7a69302810a96c07fd6460d527398def58904651cd3d7c3efd1612af8a1",
+              "request_bytes": 48682,
+              "payload_sha256": "344e1dae139f70f5c0534c00d7e2d836864fd7bf0ab2782d334490657b211adc"
+            }
+          ]
+        }
+      ],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "minimal-chat": {
+      "status": "PROVIDER_RESPONDED",
+      "scope": "minimal chat only; not semantic extraction",
+      "requested_model": "qwen3.5-9b",
+      "model": "qwen3.5-9b",
+      "provider_id": "prov_rtx5090_vllm",
+      "is_fallback": false,
+      "finish_reason": "stop",
+      "prompt_tokens": 22,
+      "completion_tokens": 2,
+      "latency_ms": 242.6,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": false,
+      "checks_passed": null,
+      "error_code": null,
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "exit_code": 0,
+      "reported_stages": null,
+      "validation_reason": null,
+      "result_model": {},
+      "provider_attempts": [],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "new-key-chat": {
+      "status": "PROVIDER_RESPONDED",
+      "scope": "minimal chat only; not semantic extraction",
+      "requested_model": "qwen3.5-9b",
+      "model": "qwen3.5-9b",
+      "provider_id": "prov_rtx5090_vllm",
+      "is_fallback": false,
+      "finish_reason": "stop",
+      "prompt_tokens": 23,
+      "completion_tokens": 29,
+      "latency_ms": 643.1,
+      "requested_max_tokens": 150,
+      "fallback_configured_for_this_probe": false,
+      "checks_passed": true,
+      "error_code": null,
+      "elapsed_ms": null,
+      "http_error_diagnostics": null,
+      "exit_code": 0,
+      "reported_stages": null,
+      "validation_reason": null,
+      "result_model": {},
+      "provider_attempts": [],
+      "source_applied": false,
+      "human_approved": false
+    },
+    "new-key-api": {
+      "status": "BLOCKED",
+      "scope": "document",
+      "requested_model": null,
+      "model": null,
+      "provider_id": null,
+      "is_fallback": null,
+      "finish_reason": null,
+      "prompt_tokens": null,
+      "completion_tokens": null,
+      "latency_ms": null,
+      "requested_max_tokens": null,
+      "fallback_configured_for_this_probe": null,
+      "checks_passed": null,
+      "error_code": "ALL_PROVIDERS_UNAVAILABLE",
+      "elapsed_ms": 18078.208599996287,
+      "http_error_diagnostics": [
+        {
+          "status": 400,
+          "endpoint_sha256": "9a6f6749d62c70475bf9b47128b2de1d5e9e7f8238321e40f7ec27070e944a5d",
+          "model": "qwen3.5-9b",
+          "body_sha256": "f17f1e4499445ee17b46b215c99ff244234457e0732288d5e59fd249afe1a53d",
+          "maximum_context_tokens": "8192",
+          "input_tokens": "2193",
+          "input_tokens_is_lower_bound": true
+        }
+      ],
+      "exit_code": 1,
+      "reported_stages": {
+        "provider": "NOT_RUN",
+        "response_complete": "NOT_RUN",
+        "json_syntax": "NOT_RUN",
+        "selector_schema": "NOT_RUN",
+        "evidence_binding": "NOT_RUN",
+        "context_expansion": "NOT_RUN",
+        "proposal": "FAIL",
+        "human_review": "NOT_RUN",
+        "apply": "NOT_RUN",
+        "persist_reload": "NOT_RUN",
+        "projection_chunks": "NOT_RUN"
+      },
+      "validation_reason": null,
+      "result_model": {},
+      "provider_attempts": [
+        {
+          "provider_id": "prov_rtx5090_vllm",
+          "model": "qwen3.5-9b",
+          "status": "failed",
+          "error_type": "HTTPStatusError",
+          "transport_attempts": [
+            {
+              "http_status": 400,
+              "body_sha256": "f17f1e4499445ee17b46b215c99ff244234457e0732288d5e59fd249afe1a53d",
+              "request_bytes": 48679,
+              "payload_sha256": "42ab9f1542c28fce893839604fdb49c80c88d09533e09f77732db7c9af109ded"
+            }
+          ]
+        },
+        {
+          "provider_id": "prov_940b40ba2e274730b1f2aab1ea652b",
+          "model": "cx/gpt-6-luna",
+          "status": "failed",
+          "error_type": "ReadTimeout",
+          "transport_attempts": []
+        }
+      ],
+      "source_applied": false,
+      "human_approved": false
+    }
+  },
+  "static_checks": {
+    "ruff_two_helpers": {
+      "status": "PASS",
+      "exit_code": 0
+    }
+  },
+  "full_pytest_current": "NOT_RUN: configuration and operational helpers only; application code unchanged in session550",
+  "historical_full549": {
+    "status": "FAIL",
+    "failed": 18,
+    "passed": 2336,
+    "skipped": 17,
+    "not_current_result": true
+  },
+  "environment": {
+    "shared_db_role": "authorized ModelOps default/credential updates only; test fixture writes isolated",
+    "test_database": "qnu_test_context548_cb82a5c633d0",
+    "storage": "owned temporary LocalStorage",
+    "minio_qdrant_redis": "disabled test endpoints 127.0.0.1:1"
+  },
+  "context_diagnosis": {
+    "server_window": 8192,
+    "requested_output": 6000,
+    "remaining_input_budget": 2192,
+    "observed_input_lower_bound": 2193,
+    "exact_input_token_count": "NOT_MEASURED"
+  },
+  "raw_responses_exported": false
+}
