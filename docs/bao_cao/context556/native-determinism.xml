@@ -1,0 +1,1 @@
+<testsuite name="native-determinism"><testcase id="storage/context556-evidence/test_native_determinism.py::test_T04_same_docx_independent_processes_and_storage_have_same_artifact_bytes" status="PASS" /></testsuite>

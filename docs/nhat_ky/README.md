@@ -7,6 +7,8 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-19** | [Phiên556](./2026-10-19_phien_556_canonical_source_reconciliation.md) | Canonical source reconciliation | Root cause299/233 core records; 11mapped/A12missing; full2429PASS/18FAIL nền exact/13addedPASS; TESTpending/determinismPASS, liveBLOCKED. DB dọn/Storage10MB policyblocked |
+
 | **2026-10-19** | [Phiên555](./2026-10-19_phien_555_final_semantic_review.md) | Final semantic review A03/ref/import có xác thực | A03 workflow không fact; typed roles/pending/UI; full18FAIL/2416PASS/17SKIP exact nền,18thêmPASS. Live hash khác BLOCKED/chưa human; DB dọn/Storage và bản xuất thừa còn do policy |
 
 | **2026-10-19** | [Phiên554](./2026-10-19_phien_554_doi_soat_issue_context552.md) | Báo cáo đối soát Context552/553 | Map8O/10S/12A; 53binding/manifestPASS; A03 đích hồ sơ cần rõ, O05 mapping rộng; không sửa code/LLM/apply/fullrun; Storage kiểm kê, không xóa vượt policy |

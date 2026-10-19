@@ -1,0 +1,12 @@
+{
+  "runtime": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29",
+  "database_removed": true,
+  "files": 550,
+  "bytes": 9962350.0,
+  "reparse_points": 0,
+  "tracked_files": 0,
+  "matching_processes": 0,
+  "storage_removed": false,
+  "status": "STORAGE_CLEANUP_BLOCKED",
+  "reason": "Automatic approval review rejected guarded Remove-Item: blocked by policy; no alternate deletion attempted"
+}

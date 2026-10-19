@@ -1,0 +1,32 @@
+{
+  "docx": {
+    "same_docx_bytes": true,
+    "sha256": "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+    "bytes": 102423
+  },
+  "offline_md": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+  "offline_json": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f",
+  "canonical_md": "491a022b54ecfd4ed3166bbd42eaba5c7c9e41bc26d419e405833f60c242e1c6",
+  "canonical_json": "b9b00f1915988c79493a340ce5d37a6306900192dfc0cd22d93c8c8e072de41c",
+  "proposal552": "80308912eba6ceecfcec7283e7ebedef225fe756000eb57c14602b0b58bbcfc3",
+  "proposal553": "33d9cdae6fc80547aa6243ea7ac11d94b9fa5e9b765398ba569a9905870f3fc2",
+  "proposal555": "0ae13c8d1b3584506a4aad171cf5464a19e8dcf2c06767e47e93ca0df9ac6840",
+  "new_canonical_proposal_hash": null,
+  "checkpoint_seals": {
+    "context552-checkpoint-06689f8f17dc": {
+      "files": 14,
+      "unchanged": true,
+      "manifest_sha256": "e8a74794b07b92846fb5cb5f443dd7ef7047287af602f59792f5f9c805a36231"
+    },
+    "context553-review-final": {
+      "files": 5,
+      "unchanged": true,
+      "manifest_sha256": "9b4ab326854e90669188ed2683eb9579bed2e4419f4f67a4f135fef20867011a"
+    },
+    "context555-review-ready": {
+      "files": 5,
+      "unchanged": true,
+      "manifest_sha256": "fed0afe83f3bb2c9db84f0611cdd976f4a3a01d1763d986bdc06b1cea4a79548"
+    }
+  }
+}

@@ -1,0 +1,278 @@
+[
+  {
+    "run": "after-final",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\after-final",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\after-final.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 1
+  },
+  {
+    "run": "historical-structure",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "storage/context556-evidence/test_historical_structure.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\historical-structure",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\historical-structure.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "native-determinism",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "storage/context556-evidence/test_native_determinism.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\native-determinism",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\native-determinism.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "reconciliation-final",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_canonical_semantic_reconciliation.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\reconciliation-final",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\reconciliation-final.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "reconciliation-focused",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_canonical_semantic_reconciliation.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\reconciliation-focused",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\reconciliation-focused.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "reconciliation-integration",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_canonical_semantic_reconciliation.py",
+      "tests/test_semantic_checkpoint_import.py",
+      "tests/test_semantic_scope_assertions.py",
+      "tests/test_semantic_selector_v2.py",
+      "tests/test_docx_source_evidence.py",
+      "tests/test_qnu_docx_markdown.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\reconciliation-integration",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\reconciliation-integration.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "reconciliation-red",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_canonical_semantic_reconciliation.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\reconciliation-red",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\reconciliation-red.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 1
+  },
+  {
+    "run": "safety-baseline",
+    "command": [
+      "<repo>\\backend\\.venv\\Scripts\\python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_semantic_checkpoint_import.py",
+      "tests/test_semantic_scope_assertions.py",
+      "tests/test_semantic_selector_v2.py",
+      "--basetemp=<repo>\\backend\\storage\\context548-runtime-09798fe46f29\\safety-baseline",
+      "--junitxml=<repo>\\backend\\storage\\context556-evidence\\safety-baseline.xml"
+    ],
+    "cwd": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend",
+    "database": "qnu_test_context548_09798fe46f29",
+    "storage": "D:\\DuAnPhanMem\\qnu-ai-platform\\backend\\storage\\context548-runtime-09798fe46f29\\objects",
+    "minio": "http://127.0.0.1:1",
+    "qdrant": "http://127.0.0.1:1",
+    "redis": "redis://127.0.0.1:1/15",
+    "auto_migrate": false,
+    "auto_seed": false,
+    "exit_code": 0
+  },
+  {
+    "run": "frontend-preview",
+    "cwd": "<repo>/frontend",
+    "command": [
+      "node",
+      "--test",
+      "src/features/knowledge/components/semantic-review-preview.test.mjs"
+    ],
+    "exit_code": 0,
+    "pass": 21
+  },
+  {
+    "run": "frontend-build",
+    "cwd": "<repo>/frontend",
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ],
+    "resolved_script": "vite build && tsc --noEmit",
+    "exit_code": 0
+  },
+  {
+    "run": "ruff-final",
+    "cwd": "<repo>",
+    "command": [
+      "backend/.venv/Scripts/python.exe",
+      "-m",
+      "ruff",
+      "check",
+      "backend/scripts/reconcile_semantic_checkpoint.py",
+      "backend/tests/test_canonical_semantic_reconciliation.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "run": "full-inventory-first",
+    "cwd": "<repo>",
+    "command": [
+      "backend/.venv/Scripts/python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "backend/storage/context556-evidence/test_full_inventory_rebinding.py",
+      "--junitxml=backend/storage/context556-evidence/full-inventory.xml",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "exit_code": 1,
+    "reason": "Probe assumption invalid: content input_hash need not change with identity alone; first XML preserved separately"
+  },
+  {
+    "run": "full-inventory-final",
+    "cwd": "<repo>",
+    "command": [
+      "backend/.venv/Scripts/python.exe",
+      "-m",
+      "pytest",
+      "-q",
+      "backend/storage/context556-evidence/test_full_inventory_rebinding.py",
+      "--junitxml=backend/storage/context556-evidence/full-inventory.xml",
+      "-p",
+      "no:cacheprovider"
+    ],
+    "exit_code": 0,
+    "pass": 1
+  },
+  {
+    "run": "actual-source-reconciliation",
+    "cwd": "<repo>",
+    "command": [
+      "backend/.venv/Scripts/python.exe",
+      "backend/scripts/reconcile_semantic_checkpoint.py",
+      "--original",
+      "backend/storage/context552-checkpoint-06689f8f17dc",
+      "--revised",
+      "backend/storage/context555-review-ready",
+      "--canonical",
+      "backend/storage/context556-audit/ks_rev_84c4950c9ce2",
+      "--output",
+      "backend/storage/context556-reconciliation-v2"
+    ],
+    "exit_code": 0,
+    "business_status": "RECONCILIATION_BLOCKED"
+  },
+  {
+    "run": "biome-final-confirmed",
+    "cwd": "<repo>/frontend",
+    "command": [
+      "node_modules/.bin/biome.cmd",
+      "check",
+      "--line-ending=lf",
+      "src/features/knowledge/components/semantic-review-preview.tsx",
+      "src/features/knowledge/components/semantic-checkpoint-import.tsx",
+      "src/features/knowledge/components/semantic-review-preview.test.mjs",
+      "src/features/knowledge/source-detail-page.tsx",
+      "src/services/knowledge-api.ts",
+      "src/types/knowledge.ts"
+    ],
+    "exit_code": 0,
+    "files": 6
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "assertions": 12,
+  "issues": 18,
+  "reference_assessments": 6,
+  "roles_and_labels_preserved": true,
+  "new_hash": true,
+  "old_proposal_unchanged": true,
+  "staged_in_application": false,
+  "effective": false,
+  "environment": "pure in-memory probe with complete offline source; NOT live revision"
+}

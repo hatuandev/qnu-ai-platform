@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "processes": 2,
+  "separate_local_storage": true,
+  "shared_dependencies": true,
+  "preview_disabled_in_both_runs": true,
+  "hashes": [
+    {
+      "docx_sha256": "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+      "md_sha256": "3a650b3e38063e66af7d379cc97827977a5e24dc0ccb83e30e89e2a598a3f58d",
+      "json_sha256": "9aa6a1664d6830513b855ad9837e539db6b84570bf42d029c7f5611222a7a01d",
+      "manifest_hash": "bb30f319652c05c21af07ef6221ae62f03253dfdd11fba48a19190b5bb983ed1"
+    },
+    {
+      "docx_sha256": "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+      "md_sha256": "3a650b3e38063e66af7d379cc97827977a5e24dc0ccb83e30e89e2a598a3f58d",
+      "json_sha256": "9aa6a1664d6830513b855ad9837e539db6b84570bf42d029c7f5611222a7a01d",
+      "manifest_hash": "bb30f319652c05c21af07ef6221ae62f03253dfdd11fba48a19190b5bb983ed1"
+    }
+  ],
+  "native_docx_and_resource_persistence": true,
+  "all_ids_and_spans_equal": true,
+  "full_pdf_preview_runtime_verified": false
+}

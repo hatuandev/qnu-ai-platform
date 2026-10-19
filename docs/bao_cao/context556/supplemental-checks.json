@@ -1,0 +1,50 @@
+{
+  "exit_code": 0,
+  "output_guard_negative_probe": {
+    "rejected": true,
+    "child_exit_code": 1,
+    "created_files": 0
+  },
+  "checkpoints": {
+    "context552-checkpoint-06689f8f17dc": {
+      "files": 14,
+      "unchanged": true,
+      "manifest_sha256": "e8a74794b07b92846fb5cb5f443dd7ef7047287af602f59792f5f9c805a36231"
+    },
+    "context553-review-final": {
+      "files": 5,
+      "unchanged": true,
+      "manifest_sha256": "9b4ab326854e90669188ed2683eb9579bed2e4419f4f67a4f135fef20867011a"
+    },
+    "context555-review-ready": {
+      "files": 5,
+      "unchanged": true,
+      "manifest_sha256": "fed0afe83f3bb2c9db84f0611cdd976f4a3a01d1763d986bdc06b1cea4a79548"
+    }
+  },
+  "ruff": {
+    "exit_code": 0,
+    "files": 2,
+    "result": "All checks passed!"
+  },
+  "frontend_build": {
+    "exit_code": 0,
+    "result": "npm run build: vite build && tsc --noEmit"
+  },
+  "biome": {
+    "exit_code": 0,
+    "files": 6,
+    "override": "--line-ending=lf"
+  },
+  "frontend_tests": {
+    "exit_code": 0,
+    "pass": 21
+  },
+  "ui": {
+    "entry": "http://localhost:3000/",
+    "observed": "SSO sign-in page; no authenticated session",
+    "semantic_review": "UI_LIVE_NOT_RUN",
+    "reason": "ACCOUNT_REQUIRED",
+    "dev_access_gate_used": false
+  }
+}

@@ -1,0 +1,358 @@
+{
+  "status": "ROOT_CAUSE_CONFIRMED",
+  "canonical_revision": "ks_rev_84c4950c9ce2",
+  "source": {
+    "same_docx_bytes": true,
+    "sha256": "58b3f7806529e4e506a6e2569a83ac688b8468fba955d0fe6638444a02099274",
+    "bytes": 102423
+  },
+  "markdown": {
+    "offline": {
+      "sha256": "cf52345162c89e025def74b988d1b3e2bb160e761776365cf113d40573ed2d7c",
+      "bytes": 229957,
+      "utf8": true,
+      "bom": false,
+      "crlf_count": 0,
+      "lf_count": 8553,
+      "nfc": true,
+      "trailing_space_lines": 1,
+      "non_tab_newline_control_characters": 0
+    },
+    "canonical": {
+      "sha256": "491a022b54ecfd4ed3166bbd42eaba5c7c9e41bc26d419e405833f60c242e1c6",
+      "bytes": 267780,
+      "utf8": true,
+      "bom": false,
+      "crlf_count": 0,
+      "lf_count": 9631,
+      "nfc": true,
+      "trailing_space_lines": 1,
+      "non_tab_newline_control_characters": 0
+    },
+    "changed_frontmatter_fields": [
+      "document_id",
+      "metadata",
+      "revision_id",
+      "title"
+    ]
+  },
+  "structured_json": {
+    "offline": {
+      "sha256": "d687fe7c4950ec44663cb84e11eb4e5e20ba4b62586422fdcb3bab03d49c147f",
+      "bytes": 555818,
+      "utf8": true,
+      "bom": false,
+      "crlf_count": 0,
+      "lf_count": 18219,
+      "nfc": true,
+      "trailing_space_lines": 0,
+      "non_tab_newline_control_characters": 0
+    },
+    "canonical": {
+      "sha256": "b9b00f1915988c79493a340ce5d37a6306900192dfc0cd22d93c8c8e072de41c",
+      "bytes": 617158,
+      "utf8": true,
+      "bom": false,
+      "crlf_count": 0,
+      "lf_count": 19971,
+      "nfc": true,
+      "trailing_space_lines": 0,
+      "non_tab_newline_control_characters": 0
+    },
+    "offline_top_level_keys": [
+      "blocks",
+      "document_meta",
+      "document_type",
+      "language",
+      "schema_version",
+      "source",
+      "stats",
+      "title"
+    ],
+    "canonical_top_level_keys": [
+      "blocks",
+      "document_meta",
+      "document_type",
+      "language",
+      "schema_version",
+      "source",
+      "stats",
+      "title"
+    ]
+  },
+  "canonical_pipeline": {
+    "normalizer_version": "layout-v16-qnu-evidence",
+    "parser_profile_hash": "fe6d3468cf5c74d8ec2a95b40f2e05338c37a4202f8fad692d2b64a9cf9b468a",
+    "generated_at": "2026-10-18T14:55:59.034615+00:00",
+    "schema_version": "qnu-rag-markdown/1.0",
+    "renderer_version": "qnu-docx-render/v1",
+    "page_mapping": {
+      "kind": "pdf_preview_render",
+      "note": "DOCX không có số trang vật lý; page là trang của bản PDF render xem trước, không phải trang in của DOCX.",
+      "method": "token_match_on_aligned_preview",
+      "status": "partial",
+      "render_sha256": "863bc240276590843e7a42445087799dea9599b3038a830e4479bcfdcb4fbf4e",
+      "render_page_count": 18
+    }
+  },
+  "same_table1_raw_state_grid": true,
+  "column_roles": [
+    {
+      "column_index": 1,
+      "old": {
+        "header_path": [
+          "Nhóm"
+        ],
+        "id": "c01"
+      },
+      "new": {
+        "header_path": [
+          "Nhóm",
+          "Nhóm",
+          "Nhóm"
+        ],
+        "id": "c01"
+      },
+      "exact_role_equal": false
+    },
+    {
+      "column_index": 2,
+      "old": {
+        "header_path": [
+          "Mã CT"
+        ],
+        "id": "c02"
+      },
+      "new": {
+        "header_path": [
+          "Mã CT",
+          "Mã CT",
+          "Mã CT"
+        ],
+        "id": "c02"
+      },
+      "exact_role_equal": false
+    },
+    {
+      "column_index": 3,
+      "old": {
+        "header_path": [
+          "Tên chương trình"
+        ],
+        "id": "c03"
+      },
+      "new": {
+        "header_path": [
+          "Tên chương trình",
+          "Tên chương trình",
+          "Tên chương trình"
+        ],
+        "id": "c03"
+      },
+      "exact_role_equal": false
+    },
+    {
+      "column_index": 4,
+      "old": {
+        "header_path": [
+          "2025",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c04"
+      },
+      "new": {
+        "header_path": [
+          "2025",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c04"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 5,
+      "old": {
+        "header_path": [
+          "2025",
+          "Ghi nhận",
+          "Số lượng\n(SV)"
+        ],
+        "id": "c05"
+      },
+      "new": {
+        "header_path": [
+          "2025",
+          "Ghi nhận",
+          "Số lượng\n(SV)"
+        ],
+        "id": "c05"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 6,
+      "old": {
+        "header_path": [
+          "2025",
+          "Mức đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c06"
+      },
+      "new": {
+        "header_path": [
+          "2025",
+          "Mức đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c06"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 7,
+      "old": {
+        "header_path": [
+          "2026",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c07"
+      },
+      "new": {
+        "header_path": [
+          "2026",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c07"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 8,
+      "old": {
+        "header_path": [
+          "2026",
+          "Ghi nhận",
+          "Số lượng\n(SV)"
+        ],
+        "id": "c08"
+      },
+      "new": {
+        "header_path": [
+          "2026",
+          "Ghi nhận",
+          "Số lượng\n(SV)"
+        ],
+        "id": "c08"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 9,
+      "old": {
+        "header_path": [
+          "2026",
+          "Mức đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c09"
+      },
+      "new": {
+        "header_path": [
+          "2026",
+          "Mức đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c09"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 10,
+      "old": {
+        "header_path": [
+          "2027",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c10"
+      },
+      "new": {
+        "header_path": [
+          "2027",
+          "Quy mô",
+          "Chỉ tiêu\n(SV)"
+        ],
+        "id": "c10"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 11,
+      "old": {
+        "header_path": [
+          "2027",
+          "Dự kiến",
+          "Ước tính\n(SV)"
+        ],
+        "id": "c11"
+      },
+      "new": {
+        "header_path": [
+          "2027",
+          "Dự kiến",
+          "Ước tính\n(SV)"
+        ],
+        "id": "c11"
+      },
+      "exact_role_equal": true
+    },
+    {
+      "column_index": 12,
+      "old": {
+        "header_path": [
+          "2027",
+          "Ước đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c12"
+      },
+      "new": {
+        "header_path": [
+          "2027",
+          "Ước đạt",
+          "Tỷ lệ\n(%)"
+        ],
+        "id": "c12"
+      },
+      "exact_role_equal": true
+    }
+  ],
+  "footnote2_full_body_occurrences_in_canonical": 0,
+  "canonical_pending_status": null,
+  "canonical_has_effective": false,
+  "derived_replay_blocker": {
+    "code": "SEMANTIC_SNAPSHOT_INVALID",
+    "details": {
+      "reason": "enrichment_structure"
+    }
+  },
+  "live_writes": 0,
+  "historical_causal_probe": {
+    "historical_commit_reference": "2cde271f",
+    "historical_builder_sha256": "984c1198dea7e1e0622f1f44ded03ddf3373efc0fc1326135ffe832ccb9e590a",
+    "historical_blocks": 299,
+    "stored_blocks": 299,
+    "current_blocks": 233,
+    "offline_blocks": 233,
+    "historical_core_equals_stored": true,
+    "current_core_equals_offline": true,
+    "historical_matching_core_items": 299,
+    "current_matching_core_items": 233,
+    "scope": "ids/types/body/parent/section order; page preview, title metadata and historical runtime dependencies not reconstructed"
+  }
+}

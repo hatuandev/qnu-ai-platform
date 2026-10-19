@@ -6,6 +6,8 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-19** | Codex | Context556 canonical source reconciliation | SameDOCX/cũ thiếu3footnote và lặp ô bảng; 11mapped/A12blocked, projection replay mismatch. Focused146/FE21/buildPASS; full18FAIL/2429PASS/17SKIP exact nền/13addedPASS. DB dọn/Storage policyblocked; no live stage | [Nhật ký556](./nhat_ky/2026-10-19_phien_556_canonical_source_reconciliation.md) |
+
 | **2026-10-19** | Codex | Final semantic review A03/reference/authenticated import | Workflow không vào fact SV; typed ref/pending adapter/UI; focused18+6/FE21/canonical91PASS; full18FAIL/2416PASS/17SKIP exact nền18ID,0new. Source thật hash khác BLOCKED/chưa human; DB dọn, Storage+exports còn do policy | [Nhật ký555](./nhat_ky/2026-10-19_phien_555_final_semantic_review.md) |
 
 | **2026-10-19** | Codex | Đối soát8 issue/10scope/12quan hệ | Report-only; 53binding/2manifest PASS, không replacement; A03 cần làm rõ đích, O05 mapping quá rộng, Q inputs chưa chứng minh; Storage chỉ kiểm kê46,3MiB/không bypass policy, checkpoint/code giữ nguyên | [Nhật ký554](./nhat_ky/2026-10-19_phien_554_doi_soat_issue_context552.md) |
