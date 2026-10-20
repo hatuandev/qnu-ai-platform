@@ -7,6 +7,26 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+- **2026-10-20 — Context577: commit local parser/bản đọc/RAG Context568–576 theo yêu cầu.** Kiểm tra phạm vi, credential theo mẫu, UTF-8/LF và diff; không sửa thêm app, không push. [Nhật ký577](./2026-10-20_phien_577_commit_parser_reader_rag.md).
+
+- **2026-10-20 — Context576: ranh giới thuật nguồn/giả định/đánh giá hồ sơ; 44 regression mới PASS, focused 393 PASS, Ruff 15 file PASS; frozen64 59/60 = 98.33% (baseline 59/60), social 4/4; N18 PASS, B03 PASS trên code chốt; còn P06. Full 2949 PASS / 18 FAIL / 17 SKIP, không có lỗi pytest mới theo ID/nguyên nhân. Dọn: DB_REMOVED_STORAGE_POLICY_BLOCKED; model/nguồn/index giữ nguyên; không commit/push/reindex/publish/restart/deploy.** [Nhật ký576](./2026-10-20_phien_576_sua_n18_b03_va_kiem_chung.md).
+
+- **2026-10-20 — Context575 sửa phạm vi/điều kiện RAG, thêm 67 ca regression; frozen64 59/60 = 98.33%, social 4/4; full 2905 PASS / 18 FAIL / 17 SKIP, không có lỗi pytest mới theo ID/nguyên nhân; Ruff 18 file PASS; biến thể gọi thật 3/4. 8 lỗi gốc đạt, còn N18 và B03; Storage tạm bị policy chặn xóa. Giữ nguồn/model/index/publication; không Git/restart/deploy.** [Nhật ký575](./2026-10-20_phien_575_sua_rag_va_regression_mo_rong.md).
+
+- **2026-10-20 — Context574: phân tích8lỗi RAG.** Nội dung8ca còn nguyên trong DOCX/MD/JSON; lỗi ở row scope, enumeration guard, dependency/condition audit và timeout. Không sửa parser/app; probes21PASS1FAIL(IOattemptblocked),followup9PASS;benchmark52/60giữ. [Nhật ký574](./2026-10-20_phien_574_phan_tich_8_loi_rag.md).
+
+- **2026-10-20 — Context573: thử lại riêng X07 một lần.** HTTP200/21,37s, hết timeout nhưng nội dung vẫn FAIL;4Luna nội bộ/0fallback,1thread1gapdọn;source/model/code/vector giữ, không đổi điểm572. [Nhật ký573](./2026-10-20_phien_573_thu_lai_x07.md).
+
+- **2026-10-20 — Context572: benchmark và DOCX staging.** 52/60=86,67%,8FAIL (1timeout503); nguồn mới233blocks/10tables/53items/3notes/517fields, staging262points/415facts, chưa publish. Native flag integration fixed;focused109/RuffPASS;full2838PASS/18FAIL/17SKIP exact571. DBtestdọn/Storagedeletepolicyblocked. [Phiên572](./2026-10-20_phien_572_benchmark_va_docx_staging.md).
+
+- **2026-10-20 — [Phiên571](./2026-10-20_phien_571_cau_truc_docx_pdf_va_ban_doc.md).** PDF 42 khối/5 mục; DOCX 233 khối/10 bảng/53 list items/3 note, 517 fields giữ; reader 61.760 bytes; focused172/FE36/Ruff/Biome/build PASS; full 2837 PASS/18 FAIL/17 SKIP, 0 lỗi mới theo ID.
+
+- **2026-10-20 — [Phiên570](./2026-10-20_phien_570_sua_evidence_scope_rag.md): sửa phạm vi và điều kiện bằng chứng RAG.** Focused 155 PASS, replay 9 PASS; full 2.810 PASS / 18 FAIL / 17 SKIP, không có lỗi mới theo ID. Giữ model và nguồn; chưa benchmark 64 câu, không reindex, xuất bản lại, restart hoặc commit/push.
+
+| **2026-10-20** | [Phiên569](./2026-10-20_phien_569_doi_soat_13_cau_rag.md) | Đối soát13câu Qwen/Luna trước sửa | 26pairs/33spans/30citations;context/condition/audit/reason gaps;probe13PASS/3FAIL,followup4PASS;noLLM/appfix |
+
+| **2026-10-20** | [Phiên568](./2026-10-20_phien_568_luna_only_benchmark.md) | Luna chính/Qwen dự phòng; benchmark chỉ Luna |51/60=85% bằngQwen;positive43/50,negative8/10,social4/4;111Luna/0fallback;noappfix;58threads/14gapsdọn |
+
 | **2026-10-20** | [Phiên567](./2026-10-20_phien_567_sua_rag_va_benchmark_85.md) | Sửa RAG và benchmark frozen85% | Cuối51/60=85%;44/50positive;9FAIL;Ruff36/focused118+wire49PASS;full2785PASS/18FAIL exact nền;DBdọn/Storagepolicyblocked |
 
 | **2026-10-20** | [Phiên566](./2026-10-20_phien_566_benchmark_rag_85.md) | Benchmark RAG trên nguồn đã xuất bản | 34/60=56,67%FAIL;positive28/50;social4/4;TCP64/64;sealsgiữ;58threads/29gapsdọn |

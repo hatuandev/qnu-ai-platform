@@ -17,13 +17,14 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuStructuredDocument,
 )
 from app.modules.knowledge.parsers.pdf_evidence import intersection_fraction, reading_order
+from app.modules.knowledge.parsers.pdf_headings import heading_decisions
 from app.modules.knowledge.parsers.pdf_tables import (
     native_table,
     ocr_table,
     table_blocks,
 )
 
-PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v1"
+PDF_STRUCTURE_VERSION = "pdf-evidence-structure/v2"
 # Anything no thicker than this carries a rule, not readable content, whatever painted it.
 _HAIRLINE_POINT = 2.0
 
@@ -468,7 +469,7 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
             if item.get("text") and item["bbox"][1] < 80:
                 font_counts[item.get("font_size", 0)] += len(item["text"])
     body_size = font_counts.most_common(1)[0][0] if font_counts else 0
-    sizes = sorted((size for size in font_counts if size > body_size), reverse=True)
+    decisions = heading_decisions([reading_order(_native_items(page['native'])) for page in pages], body_size)
     sections: list[tuple[int, str, str]] = []
     all_legends: set[str] = set()
 
@@ -500,15 +501,17 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
                 fence = "`" * max(3, max((len(run) for run in re.findall(r"`+", text)), default=0) + 1)
                 text = f"{fence}text\n{text}\n{fence}"
             size = item.get("font_size", 0)
-            if size > body_size and size in sizes and text.strip() and len(text.splitlines()) <= 2:
-                level = sizes.index(size) + 1
+            heading = decisions.get(item['locator'], {})
+            if heading.get('status') == 'inferred':
+                text = text.strip()  # Presentation only; the untouched glyph stream stays in source_data.raw.
+                level = heading['level']
                 while sections and sections[-1][0] >= level:
                     sections.pop()
                 parent = sections[-1][2] if sections else None
                 sections.append((level, text, block_id))
                 path, kind = [s[1] for s in sections], "section"
                 text = f"{'#' * min(level + 1, 6)} {text}"
-                flags.append(QnuQualityFlag(code="heading_inferred_typography", detail="Cấp mục dựa trên cỡ chữ; cần đối soát."))
+                flags.append(QnuQualityFlag(code="heading_inferred_typography", detail="Cấp mục dựa trên tín hiệu cấu trúc/kiểu chữ; cần đối soát."))
             elif item["kind"] in {"title", "section_header"}:
                 flags.append(QnuQualityFlag(code="heading_level_unresolved", detail="OCR có tiêu đề nhưng chưa xác định cấp mục."))
             elif item["kind"] in {"figure", "image", "chart"}:
@@ -526,7 +529,8 @@ def build_pdf_document(evidence: dict[str, Any], *, filename: str, sha256: str) 
             if not text.strip() and kind != "figure":
                 continue
             result.blocks.append(QnuBlock(id=block_id, parent_id=parent, type=kind, source_locations=[location],
-                section_path=path, attributes={"engine_used": item["engine"], "source_role": item["kind"]},
+                source_label=heading.get('source_label'), section_path=path,
+                attributes={"engine_used": item["engine"], "source_role": item["kind"], **({'heading_evidence': heading} if heading else {})},
                 quality_flags=flags, body=text, source_data={"raw": item["raw"], "alternatives": item.get("alternatives", [])}))
         if page["native"].get("table_errors"):
             result.document_meta.setdefault("extraction_warnings", []).append({"page": page["page"], "code": "native_tables_unavailable"})

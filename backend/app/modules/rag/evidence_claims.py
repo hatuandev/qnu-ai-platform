@@ -1,6 +1,7 @@
 """Bind proposals to their own source spans, with one bounded quote repair."""
 
 import logging
+import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,8 +25,26 @@ from app.modules.rag.evidence_validation import (
     same_source,
 )
 from app.modules.rag.schemas import AskRequest
+from app.modules.rag.source_claim_context import supporting_scope_blocks
 
 logger = logging.getLogger(__name__)
+
+
+def restore_condition_claims(conditions: dict[str, str], blocks: list[EvidenceBlock],
+                             qualifiers: list[QuoteReference] | None = None) -> list[dict]:
+    """Copy missing server-owned clauses; they still require independent verification."""
+    catalog, by_id = passage_catalog(blocks), {b.id: b for b in blocks}
+    restored = []
+    for index, (key, quote) in enumerate(conditions.items()):
+        if not re.fullmatch(r'e\d+\.c\d+', key) or key.split('.c')[0] not in catalog:
+            raise ValueError('Unknown source condition passage')
+        body = catalog[key.split('.c')[0]]
+        reference = bind_quote(QuoteReference(block_id=body.block_id, quote=quote), by_id)
+        restored.append({'id': f'__source_condition_{index}', 'text': quote, 'references': [reference]})
+    for index, qualifier in enumerate(qualifiers or []):
+        reference = bind_quote(qualifier, by_id)
+        restored.append({'id': f'__source_qualifier_{index}', 'text': reference['quote'], 'references': [reference]})
+    return source_grounded_claims(restored, blocks, primary_only=True)
 
 
 def bind_claims(proposal: AnswerProposal, blocks: list[EvidenceBlock]) -> tuple[list[dict], list[dict]]:
@@ -86,7 +105,11 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
         "For questions about a document's own status, its same-source introduction establishes which "
         "document is speaking; the status sentence need not repeat the full institution name. "
         "Conditions outside the user's "
-        "question are optional unless omission changes the answer. Counts of different "
+        "question are optional ONLY when they cannot change applicability. Before selecting a permission, "
+        "retain its prerequisites, exceptions and negated scopes from the SAME rule, including "
+        "sentences before and after the permission. Do not split a numbered conditional rule "
+        "into an unconditional allowance. Select the whole relevant rule when its clauses jointly "
+        "define eligibility. Counts of different "
         "rounds are not additive. Do not infer conflicts across different years."
     )
     compact = payload.get("compact_passages", False)
@@ -133,6 +156,11 @@ async def propose_bound_claims(db: AsyncSession, req: AskRequest, payload: dict,
             reference = bind_quote(QuoteReference(block_id=heading.id, quote=heading.text), by_block)
             if not any(ref["block_id"] == heading.id for ref in claim["references"]):
                 claim["references"].append(reference)
+        for context in supporting_scope_blocks(body, same_revision, req.original_question or req.question):
+            if len(claim['references']) >= 4:
+                break
+            if not any(ref['block_id'] == context.id for ref in claim['references']):
+                claim['references'].append(bind_quote(QuoteReference(block_id=context.id, quote=context.text), by_block))
         for header in scope_headers(same_revision, [body], requested.get("years") or []):
             reference = bind_quote(QuoteReference(block_id=header.id, quote=header.text), by_block)
             if not any(ref["block_id"] == reference["block_id"] and ref["quote"] == reference["quote"] for ref in claim["references"]):

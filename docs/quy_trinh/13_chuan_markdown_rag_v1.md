@@ -887,3 +887,48 @@ HTTP input được charge trước gửi. Không crop semantic catalog hoặc t
 budget tại adapter. Ghi metadata/hash an toàn, tách provider/JSON/schema/binding/
 expansion/staging/humanreview. Pending proposal vẫn cần người có quyền duyệt theo
 11.7–11.10; không thay unknown policy hoặc snapshot authority.
+
+### 11.12. Cấu trúc nguồn và bản dành cho người đọc — phiên571
+
+Giữ nguyên schema `qnu-rag-markdown/1.0`, cú pháp `rag:block` và hai biểu diễn
+bảng `gfm/records`. Có ba đầu ra với vai trò khác nhau:
+
+| Đầu ra | Công dụng | Nguồn tạo |
+| --- | --- | --- |
+| Gói chuẩn `.qnu-rag-v1.md` + `.qnu-doc-v1.json` | Đối soát, provenance và nhập/xuất chuẩn | Mô hình cấu trúc cùng revision; kiểm parity và hash |
+| Bản phục vụ RAG | Canonical text/units cho chunk, Facts và citation | Phép chiếu hiện có; không nhúng metadata vận chuyển |
+| Bản dễ đọc `.readable.md` và preview | Đọc, so sánh bảng, truy cập chú thích | Dẫn xuất xác định `qnu-reader/v1` từ cặp chuẩn đã xác minh; không là đầu vào index |
+
+Endpoint tải chuẩn giữ định dạng `md/json/bundle`; bổ sung `reader` và
+`reader-json` trên cùng endpoint, cùng quyền xem collection/binding/revision.
+Bản dễ đọc không có quyền ghi, không tự áp annotation, duyệt hay xuất bản.
+UI mặc định mở Bản dễ đọc; Gói chuẩn và Bản phục vụ RAG nằm ở hai tab riêng.
+
+DOCX mới giữ thêm `attributes.list_items`: ID từng mục, cấp nguồn, marker,
+parent item, văn bản, locator và thông tin đánh số OOXML khi đối chiếu được.
+Marker chữ cái dùng list Markdown lồng và nhãn nguồn hiển thị rõ, ví dụ
+`- **a)** ...`; số bắt đầu và lần đánh số lại phải được parser/renderer giữ.
+Các glyph và bytes gốc không bị thay. Mapping chưa chắc chắn không được gọi là
+chứng cứ nguồn đã xác minh. Quan hệ lồng không tự chứng minh phạm vi ngữ nghĩa.
+
+PDF bổ sung bằng chứng vai trò mục dựa trên đánh số, glyph đậm, khoảng cách và
+body cùng cột/trang kế tiếp. Đánh số riêng lẻ không đủ; title OCR chưa rõ cấp vẫn
+unresolved. `heading_evidence` ghi phương pháp suy luận, không thay người duyệt.
+Không mở rộng phạm vi số liệu từ tiêu đề hoặc suy năm từ cấu trúc này.
+
+Note giữ nguyên raw body, ID, locator và page unknown. Bản đọc xử lý thụt đầu
+dòng dẫn xuất, tạo link đi–về theo anchor nguồn; note giống chữ vẫn có ID riêng.
+Note thiếu đích/cấu trúc phức tạp tiếp tục báo giới hạn. Không suy phạm vi áp dụng
+từ vị trí hiển thị note. Với bảng, anchor theo đúng đoạn hoặc ô đã được lưu.
+
+Bảng trên UI có thể dùng rowspan/colspan từ source layout chỉ khi toàn bộ grid
+và raw fields đối chiếu khớp. Nếu không khớp, dùng grid canonical, không vẽ lại
+dữ liệu cũ. `.md` độc lập dùng header path đầy đủ, GFM và chú dẫn tọa độ ô gộp;
+không yêu cầu renderer bật HTML không an toàn. Ô rỗng, số 0, mã và ký hiệu giữ
+nguyên, không tự điền hoặc diễn giải. Bản đọc không phải bản sao bố cục trang.
+
+Đợt bóc tách mới dùng `layout-v22-document-structure`, PDF builder
+`pdf-evidence-structure/v2`; reader có version riêng. Không đổi bytes hoặc hash
+của các revision đã lưu. Revision cũ có thể dùng reader mới với cấu trúc đã có;
+muốn nhận cải thiện parser phải tạo revision mới trong một thao tác được phép,
+kiểm lại MD/JSON/canonical/citation, rồi nạp và xuất bản theo quy trình riêng.

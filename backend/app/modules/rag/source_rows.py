@@ -132,6 +132,14 @@ def source_rows(source: KnowledgeSourceRevision, index: KnowledgeIndexRevision,
         if unit.text not in chunk.content:
             raise AppException("Nội dung hàng không khớp chunk đã xuất bản.", code="SOURCE_ROW_INVALID", status_code=503)
         context = [by_id[ref] for ref in graph["links"].get(unit.id, []) if by_id[ref].kind != "table"]
+        headers = [by_id[ref] for ref in graph['links'].get(unit.id, [])
+                   if by_id[ref].kind == 'table' and by_id[ref].text == unit.header_context]
+        # A caption locates its immediately following table; it never supplies a data year.
+        if headers:
+            preceding = max((item for item in manifest.units if not item.is_container and item.end <= headers[0].start),
+                            key=lambda item: item.end, default=None)
+            if preceding and re.match(r'^\s*(?:Bảng|Table)\s+(?:\d+|[IVXLCDM]+)\b', preceding.text, re.IGNORECASE):
+                context = list({item.id: item for item in [preceding, *context]}.values())
         verified_years = unit.temporal.data_years if unit.temporal.status == "verified" and unit.temporal.role == "data" else []
         table_refs = [unit.id, *graph["links"].get(unit.id, [])]
         fallback_pages = sorted({by_id[ref].page_number for ref in table_refs

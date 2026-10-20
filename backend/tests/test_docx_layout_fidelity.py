@@ -44,7 +44,7 @@ async def test_untyped_source_grid_is_literal_only_never_promotes_alpha_to_heade
     assert len(rows) == 3 and rows[0].attributes['fields']['c01']['raw'] == 'Alpha'
     assert all(f['state'] == 'ambiguous' for b in rows for f in b.attributes['fields'].values())
     flags = [f for f in table.quality_flags if f.code == "table_header_unresolved"]
-    assert len(flags) == 1 and flags[0].status == "literal_only"
+    assert len(flags) == 1 and flags[0].status == "confirmed"
     verify_native_layout(model, raw)
     _, artifact = project_document(model, {'structured_sha256': 'a' * 64}, {})
     assert not artifact['facts']
@@ -83,6 +83,8 @@ async def test_missing_raw_row_is_not_certified():
     model.blocks.remove(next(b for b in model.blocks if b.type == 'table_row'))
     preserve_native_layout(model, raw)
     assert any(f.code == 'table_header_unresolved' for b in model.blocks for f in b.quality_flags)
+    assert all(f.status == 'unresolved' for b in model.blocks for f in b.quality_flags
+               if f.code == 'table_header_unresolved')
 
 
 async def test_header_role_does_not_disambiguate_identical_native_table_content():
@@ -112,3 +114,37 @@ def test_prose_prefix_is_not_a_standalone_list_item():
     text = 'Quoted elsewhere: Some programme has code 0042.\n'
     pages, _, _ = map_unit_to_page('Some programme has code 0042.', [(1, 0, len(text))], 0, text, full_lines=True)
     assert not pages
+
+
+async def test_native_literal_restrictions_survive_standard_artifact_roundtrip():
+    from app.modules.knowledge.services.qnu_docx_artifacts import build_qnu_markdown_artifact
+    from app.modules.knowledge.services.qnu_serving import load_document
+    from app.modules.knowledge.services.source_extraction import SourceExtraction
+
+    model, raw = await native_model()
+    preserve_native_layout(model, raw)
+    artifact = await build_qnu_markdown_artifact(
+        extraction=SourceExtraction(raw_text='Source table', page_count=1, qnu_document=model),
+        document_id='binding_native_roundtrip', revision_id='revision_native_roundtrip',
+        title=None, snapshot_path='test-native-roundtrip/source.docx',
+    )
+    assert artifact['status'] == 'ready', artifact.get('validation')
+    restored = await load_document(
+        artifact, binding_id='binding_native_roundtrip', revision_id='revision_native_roundtrip',
+        origin_hash=model.source.sha256, snapshot_path='test-native-roundtrip/source.docx',
+    )
+    verify_native_layout(restored, raw)
+    table = next(b for b in restored.blocks if b.type == 'table')
+    assert table.attributes['column_roles'] == 'unknown'
+    assert any(f.code == 'table_header_unresolved' and f.status == 'confirmed'
+               for f in table.quality_flags)
+    rows = [b for b in restored.blocks if b.type == 'table_row']
+    assert [[f['raw'] for f in b.attributes['fields'].values()] for b in rows] == [
+        ['Alpha', 'North'], ['2', 'South'], ['0', 'East'],
+    ]
+    assert all(b.attributes['interpretation'] == 'literal_only' for b in rows)
+    assert all(f['state'] == 'ambiguous' and f['normalized'] is None
+               for b in rows for f in b.attributes['fields'].values())
+    _, artifact = project_document(restored, {'structured_sha256': 'a' * 64}, {})
+    assert not artifact['facts']
+    assert not any(issue['code'] == 'table_header_unresolved' for issue in artifact['issues'])

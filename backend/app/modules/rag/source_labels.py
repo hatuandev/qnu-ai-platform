@@ -8,6 +8,7 @@ from app.modules.knowledge.services.table_context import clean_cell, row_identit
 from app.modules.rag.evidence_dependencies import source_identity
 from app.modules.rag.evidence_schemas import EvidenceBlock
 from app.modules.rag.query_constraints import source_name_in_question
+from app.modules.rag.source_locators import table_captions, table_matches
 
 
 def row_identity(cells: list[str], table: dict, question: str) -> tuple[int, int, str, str | None] | None:
@@ -37,8 +38,13 @@ def supplemental_context(blocks: list[EvidenceBlock], question: str, *, allow_ta
                 and not block.fact_context.get('unresolved_cell_columns')
                 and block.unit_id != f'{block.parent_id}:header'):
             cells = _split_gfm_row(block.text)
-            if cells and len(cells[0].strip()) >= 3 and source_name_in_question(clean_cell(cells[0]), question):
+            labels = [clean_cell(cell) for cell in cells if len(clean_cell(cell)) >= 3
+                      and (any(char.isalpha() for char in cell) or cell.strip() in code_candidates(question))]
+            if (any(source_name_in_question(label, question) for label in labels)
+                    and table_matches(blocks, block.parent_id or '', question)):
                 selected[block.id] = block
+                for caption in table_captions(blocks, block.parent_id or ''):
+                    selected[caption.id] = caption
         formula = re.match(r'^\s*([^\W\d_]\w*)\s*=\s*[^\n]+[+×*/^][^\n]+$', block.text)
         if formula and source_name_in_question(formula[1], question):
             selected[block.id] = block

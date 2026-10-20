@@ -79,6 +79,7 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
                 "answer": "Câu hỏi yêu cầu một khoảng năm. Cần đối chiếu đầy đủ các kỳ trong khoảng; mình chưa có đủ căn cứ để trả lời toàn khoảng."}
     matches = []
     unscoped = []
+    incompatible_units, related_roles = set(), set()
     for original in facts:
         fact = _record(original)
         raw = fact.get("raw_data") or {}
@@ -107,8 +108,6 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
             except InvalidOperation:
                 continue
             context = {**context, "attribute_code": "converted_score"}
-        if context.get("attribute_code") not in attributes:
-            continue
         name = (fact.get("entity_name") or "").casefold()
         code = normalize_code(str(fact.get('entity_code') or raw.get("entity_code") or raw.get("major_code") or ""))
         codes = [normalize_code(c) for c in (code_candidates(question) or source_entity_codes or [])
@@ -127,14 +126,30 @@ def decide_table_answer(question: str, facts: list[Any], *, module_code: str = "
             if temporal.get("type") in {None, "unknown"}:
                 unscoped.append(fact["id"])
             continue
+        if context.get('attribute_code') not in attributes:
+            if context.get('attribute_code'):
+                related_roles.add(context['attribute_code'])
+            continue
         if unit:
             if context.get('attribute_code') == 'cutoff_score':
                 if normalize_code(str((context.get('qualifiers') or {}).get('method') or '')) != normalize_code(unit):
                     continue
             elif normalize_code(str(context.get('unit') or header_unit(fact['attribute_name'] or '') or '')) != normalize_code(unit):
+                if context.get('unit'):
+                    incompatible_units.add(context['unit'])
                 continue
         matches.append({**fact, "raw_data": context})
     if not matches:
+        if incompatible_units:
+            return {**decision, 'status': 'missing', 'reason': 'SOURCE_UNIT_MISMATCH',
+                    'source_units': sorted(incompatible_units), 'requested_unit': unit,
+                    'answer': 'Nguồn ghi đại lượng này theo đơn vị ' + ', '.join(sorted(incompatible_units))
+                    + ', khác đơn vị ' + str(unit) + ' được hỏi. Chưa có bằng chứng cho phép quy đổi; không thể dùng cùng giá trị cho đơn vị khác.'}
+        if 'reported_count' in attributes and 'estimated_count' in related_roles:
+            return {**decision, 'status': 'missing', 'reason': 'SOURCE_METRIC_ROLE_MISMATCH',
+                    'source_roles': sorted(related_roles),
+                    'answer': 'Nguồn trong năm được hỏi chỉ có số ước tính/dự kiến cho đại lượng liên quan, '
+                    'không phải số ghi nhận đã nghiệm thu. Không thể dùng số dự kiến làm kết quả đã nghiệm thu.'}
         if unscoped:
             return {**decision, "status": "missing", "reason": "DATA_YEAR_UNVERIFIED",
                     "unscoped_fact_ids": unscoped,

@@ -3,7 +3,7 @@
 import re
 from typing import Literal
 
-from pydantic import Field, create_model
+from pydantic import Field, create_model, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,14 +18,21 @@ from app.modules.rag.evidence_schemas import StrictContract
 from app.modules.rag.query_constraints import metric_attributes
 from app.modules.rag.schemas import AskRequest, AskResponse, Citation, RetrievalSnapshot
 from app.modules.rag.source_fact_resolution import FactScope
+from app.modules.rag.source_locators import table_captions
 
 
 class IdentityTableChoice(StrictContract):
     status: Literal['selected', 'not_applicable', 'clarify']
     table_id: str | None = None
-    all_rows: bool = False
-    identity_only: bool = False
+    all_rows: bool
+    identity_only: bool
     missing_constraints: list[str] = Field(default_factory=list, max_length=4)
+
+    @model_validator(mode='after')
+    def consistent_selection(self):
+        if self.status == 'selected' and (not self.table_id or not self.all_rows or not self.identity_only):
+            raise ValueError('selected requires an exact table_id, all_rows=true and identity_only=true; otherwise not_applicable/clarify')
+        return self
 
 
 def is_identity_list(question: str) -> bool:
@@ -67,24 +74,39 @@ async def enumerate_source_identities(db: AsyncSession, req: AskRequest, snapsho
             context_ids = {u for b in examples for u in b.fact_context.get('context_unit_ids', [])}
             context = [b.text for b in blocks if b.source_revision_id == source.id and b.unit_id in context_ids
                        and b.fact_context.get('source_kind') != 'table']
+            captions = table_captions([b for b in blocks if b.source_revision_id == source.id], table['id'])
+            entries = identity_entries(table, roles.index('code'), roles.index('name'))
             payload.append({'id': key, 'headers': table['header_paths'],
-                            'source_context': context, 'source_revision_id': source.id})
+                            'source_row_count': len(entries) if entries is not None else None,
+                            'identity_resolved': entries is not None,
+                            'source_context': context, 'captions': [{'id': b.id, 'text': b.text} for b in captions],
+                            'source_revision_id': source.id})
     if not choices:
         return None
     contract = create_model('SourceIdentityTableChoice', __base__=IdentityTableChoice,
         table_id=(Literal[tuple(choices)] | None, None))
     data = {'question': question, 'tables': payload}
     first = await structured_call(db, req, contract, INSTRUCTION, data, max_tokens=500)
+    trace = {'candidate_tables': len(choices), 'first_status': first.status,
+             'first_table_id': first.table_id, 'stage': 'first_selection',
+             'first_all_rows': first.all_rows, 'first_identity_only': first.identity_only,
+             'first_missing_count': len(first.missing_constraints)}
+    req._retrieval_diagnostics['identity_selection'] = trace
     if first.status != 'selected' or not first.all_rows or not first.identity_only:
         return None
     second = await structured_call(db, req, contract,
         'Independently check the ORIGINAL request and source schemas. You are not given another selection.\n' + INSTRUCTION,
         data, max_tokens=500)
+    trace.update(second_status=second.status, second_table_id=second.table_id, stage='independent_selection',
+                 second_all_rows=second.all_rows, second_identity_only=second.identity_only,
+                 second_missing_count=len(second.missing_constraints))
     if (second.status != 'selected' or not second.all_rows or not second.identity_only
             or second.table_id != first.table_id or first.missing_constraints or second.missing_constraints):
+        trace['rejection'] = 'schema_readers_disagree_or_scope_missing'
         return None
     source, artifact, table, code_index, name_index = choices[first.table_id]
     entries = identity_entries(table, code_index, name_index)
+    trace.update(stage='source_validation', source_count=len(entries or []))
     if entries is None:
         return None
     index_ids = {b.index_revision_id for b in blocks if b.source_revision_id == source.id}
@@ -126,6 +148,9 @@ def identity_entries(table: dict, code_column: int, name_column: int) -> list[tu
     if len(units) != len(table['rows']):
         return None
     for position, cells in enumerate(table['rows']):
+        if (not isinstance(cells, list) or len(cells) <= max(code_column, name_column)
+                or not all(isinstance(cells[c], str) for c in (code_column, name_column))):
+            return None
         code, name = cells[code_column].strip(), cells[name_column].strip()
         if code and code == name and not code_cell(code):
             continue  # Original merged group/aggregate label, not an identity record.

@@ -96,6 +96,13 @@ export function SourceActionsMenu({
                       <FileText /> Chi tiết
                     </DropdownMenuItem>
                     <DownloadQnuMarkdownButton
+                      format="reader"
+                      collectionId={collectionId}
+                      sourceId={source.id}
+                      revisionId={source.active_source_revision_id ?? null}
+                      disabled={!source.active_source_revision_id}
+                    />
+                    <DownloadQnuMarkdownButton
                       collectionId={collectionId}
                       sourceId={source.id}
                       revisionId={source.active_source_revision_id ?? null}

@@ -55,6 +55,11 @@ class FactScope:
 
     def eligible_columns(self, row: dict, attributes: list[str] | None) -> list[str]:
         columns = []
+        candidates = set(attributes or [])
+        if 'reported_count' in candidates:
+            # Related forecast evidence explains a refusal; the decision gate still
+            # requires the requested role and can never return a forecast as actual.
+            candidates.add('estimated_count')
         for column in row['table']['columns']:
             expected = row['expected'].get((row['block'].unit_id, column['id']))
             if not expected:
@@ -62,7 +67,7 @@ class FactScope:
             raw = expected['raw_data']
             metric = (raw.get('attribute_code') if (raw.get('context_review') or {}).get('status') == 'verified'
                       else cell_context(' / '.join(column['header_path']))['attribute_code'])
-            if not attributes or metric in attributes:
+            if not attributes or metric in candidates:
                 columns.append(column['id'])
         return columns
 

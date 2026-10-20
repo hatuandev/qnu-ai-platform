@@ -164,7 +164,11 @@ def bind_quote(reference: QuoteReference, blocks: dict[str, EvidenceBlock]) -> d
         quote = block.text[pieces[match.start()].start():pieces[match.end() - 1].end()]
     local = block.text.index(quote)
     locations = _source_locations(block)
+    from app.modules.rag.source_row_context import table_row_context
+
+    table_row = table_row_context(block)
     return {"block_id": block.id, "quote": quote,
+            **({'table_row': table_row} if table_row else {}),
             "binding_id": block.binding_id, "index_revision_id": block.index_revision_id,
             "source_revision_id": block.source_revision_id, "page_number": block.page_number,
             "title": block.title, "section": block.section,

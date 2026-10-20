@@ -277,7 +277,7 @@ class RagService:
             db, req.collection_id, req.question,
             plan_years=[int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", req.question)])
         glossary_version = glossary_trace.get("settings_version", 0) if glossary_trace.get("enabled") else 0
-        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1:verified-answer-v5" + (
+        policy_version = req.policy_fingerprint() + ":weighted-expansion-v1:verified-answer-v13" + (
             f":glossary-v{glossary_version}" if glossary_version else ":glossary-off")
 
         # 2. Check Semantic Cache (history-aware; skipped for context-dependent shorts)
@@ -499,6 +499,11 @@ class RagService:
                         row_answer.answer_decision["reason"], candidate_mode=candidate_snapshot is not None)
                     if prose_answer is not None:
                         return prose_answer
+                    recovery = req._retrieval_diagnostics.get('prose_fallback') or {}
+                    if recovery.get('context_count'):
+                        row_answer.answer = ('Mình đã tìm thấy nội dung liên quan, nhưng chưa đối chiếu đủ bằng chứng '
+                                             'cho toàn bộ phạm vi câu hỏi để trả lời chắc chắn.')
+                        row_answer.answer_decision['recovery_reason'] = recovery.get('reason')
                 row_answer.latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
                 return row_answer
         row_limit = retrieval_policy.context_top_k if retrieval_policy else int((req.reranker_policy or {}).get("top_k") or rerank_top_k)

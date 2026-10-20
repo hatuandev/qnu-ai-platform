@@ -17,7 +17,7 @@ from app.modules.rag.evidence_blocks import (
     rank_blocks,
     section_neighbors,
 )
-from app.modules.rag.evidence_claims import propose_bound_claims
+from app.modules.rag.evidence_claims import propose_bound_claims, restore_condition_claims
 from app.modules.rag.evidence_context import model_context
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_pipeline import decision_response
@@ -37,6 +37,7 @@ from app.modules.rag.prose_selection import (
 from app.modules.rag.schemas import AskRequest, AskResponse, RetrievalSnapshot
 from app.modules.rag.source_candidates import linked_candidates, reference_priority
 from app.modules.rag.source_labels import supplemental_context
+from app.modules.rag.source_locators import addressed_prose, referenced_sections
 from app.modules.rag.temporal_answer import is_temporal_table_question
 
 
@@ -86,6 +87,7 @@ def can_check_prose(decision: dict | None) -> bool:
         and (decision.get("reason") in {
             "NO_COMPATIBLE_FACT_EVIDENCE", "DATA_YEAR_UNVERIFIED",
             "ROW_METRIC_SCOPE_UNRESOLVED", "ROW_SELECTION_MISSING", "ROW_AUDIT_REJECTED",
+            "ROW_RULE_REQUIRES_CONTEXT",
         } or (decision.get('reason') == 'METRIC_UNVERIFIED'
               and not (decision.get('requested') or {}).get('years'))))
 
@@ -121,8 +123,9 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         return None
     plan = await recovery_plan(db, req, question, years)
     supplemental = supplemental_context(blocks, question,
-        allow_tables=not is_temporal_table_question(question, req.module_code)
-        and trace['trigger'] not in {'ROW_AUDIT_REJECTED', 'ROW_SELECTION_MISSING', 'ROW_AUDIT_SCOPE_MISSING'})
+        allow_tables=(trace['trigger'] == 'ROW_RULE_REQUIRES_CONTEXT'
+        or not is_temporal_table_question(question, req.module_code))
+        and trace['trigger'] not in {'ROW_AUDIT_REJECTED', 'ROW_AUDIT_SCOPE_MISSING'})
     candidates_pool = list({b.id: b for b in [*prose, *supplemental]}.values())
     retrieval = configured_policy(req.runtime_policy)
     # Honor configured context policy, not a hidden 6000-character/3-body cap.
@@ -147,6 +150,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     # reranking. A semantically similar boilerplate must not crowd an update out.
     priority = (reference_priority(linked) if getattr(plan, "scalar_update_lookup", False)
         and plan.coverage == "focused" and not (plan.event or plan.round) else [])
+    priority = list({b.id: b for b in [*priority, *referenced_sections(blocks, question)]}.values())
     ranked = linked
     if ranked and (req.reranker_policy or {}).get("enabled", True):
         # School/year boilerplate can dominate lexical matches. Resolve semantic
@@ -174,7 +178,16 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     # event and subject. Do not undo that ranking with generic topic word counts
     # (an unrelated round can contain every word of a short topic label).
     ranked = recovery_order(topic_order(ranked, topics) if plan.coverage == 'enumeration' else ranked,
-                            supplemental, priority)
+                            supplemental, priority, question=question)
+    if trace['trigger'] == 'ROW_RULE_REQUIRES_CONTEXT':
+        # The exact row can contain a restriction absent from prose; the prose
+        # can contain prerequisites absent from that row. Retain both proofs.
+        anchors = [b for b in supplemental if b.fact_context.get('source_kind') == 'table']
+        ranked = list({b.id: b for b in [*anchors, *ranked]}.values())
+        priority = list({b.id: b for b in [*anchors, *priority]}.values())
+    addressed = addressed_prose(ranked, question)
+    ranked = list({b.id: b for b in [*addressed, *ranked]}.values())
+    priority = list({b.id: b for b in [*addressed, *priority]}.values())
     packing = {}
     selected = pack_context(blocks, ranked, years, limit, budget, atomic_lists=plan.coverage == "enumeration",
         enumeration_subject=plan.enumeration_subject, diagnostics=packing,
@@ -187,6 +200,7 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
     if not selected:
         trace["reason"] = "NO_PROSE_CANDIDATES"
         return None
+    trace['table_recovery'] = any(b.fact_context.get('source_kind') == 'table' for b in selected)
     # No history facts, no model-authored numerical values. Existing passage IDs,
     # span binding, year checks and independent semantic audit remain authoritative.
     rules = active_preferences(policy, plan, selected)
@@ -226,6 +240,50 @@ async def _answer(db: AsyncSession, req: AskRequest, snapshot: RetrievalSnapshot
         return None
     trace["stage"] = "verification"
     verified = await verify_bound_answer(db, bounded, payload, claims, selected, plan, rules)
+    trace['semantic_repair_attempted'] = False
+    if not verified.complete and not verified.verifier.conflict:
+        # One repair on the SAME pinned source passages, never a larger corpus,
+        # extra model, unverified fallback or a positive override of the audit.
+        trace['semantic_repair_attempted'] = True
+        trace['initial_verification'] = {'missing_constraints': verified.missing,
+            'verification_errors': verified.errors, 'topic_coverage': verified.verifier.topic_coverage,
+            'source_condition_gaps': getattr(verified, 'source_condition_gaps', {}),
+            'audit_complete': verified.audit.complete if verified.audit else None}
+        repaired_payload = {**payload, 'coverage_repair': trace['initial_verification'],
+            'instruction': payload['instruction'] + ' Repair missing answer facets/conditions using ONLY supplied source IDs. '
+            'A source-declared unknown can answer a numerical premise negatively; never invent a value. '
+            'Keep exact prerequisites, exceptions and preservation instructions in public evidence IDs. '
+            'When one short source rule jointly defines permission, prerequisites and exclusions, '
+            'prefer its whole_passage_id over selecting only its permission sentence.'}
+        gaps = getattr(verified, 'source_condition_gaps', {})
+        qualifiers = getattr(verified, 'source_qualifier_gaps', [])
+        if ((gaps or qualifiers) and verified.claims and not verified.errors
+                and all(verified.verifier.topic_coverage.get(t) is True for t in plan.requested_topics)):
+            try:
+                restored = restore_condition_claims(gaps, selected, qualifiers)
+            except ValueError as exc:
+                raise AppException('Không đối chiếu được điều kiện nguồn cần phục hồi.',
+                    code='SOURCE_CONDITION_REPAIR_INVALID', status_code=503) from exc
+            # Restored claims are exact source text, never a model's replacement
+            # for an entity/value. A new verification and audit remain mandatory.
+            used = {c['id'] for c in verified.claims}
+            for claim in restored:
+                while claim['id'] in used:
+                    claim['id'] = '_' + claim['id']
+                used.add(claim['id'])
+            claims = [*verified.claims, *restored]
+            trace['repair_strategy'] = 'source_condition_completion'
+            if len(claims) > 48:
+                trace.update(reason='SOURCE_CONDITION_REPAIR_BUDGET', stage='complete')
+                return None
+        else:
+            proposal, claims, rejected, repaired = await propose_bound_claims(db, bounded, repaired_payload, selected)
+            trace.update(repair_binding_rejections=rejected, repair_quote_repair_attempted=repaired,
+                         repair_strategy='source_passage_selection')
+            if not claims or proposal.status in {'conflict', 'clarify'}:
+                trace.update(reason='SEMANTIC_REPAIR_NO_BOUND_CLAIMS', stage='complete')
+                return None
+        verified = await verify_bound_answer(db, bounded, repaired_payload, claims, selected, plan, rules)
     trace["stage"] = "complete"
     trace.update(reason="VERIFIED_PROSE" if verified.complete else "PROSE_NOT_FULLY_VERIFIED",
                  accepted_claims=len(verified.claims), missing_constraints=verified.missing,

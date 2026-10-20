@@ -12,6 +12,13 @@ from app.modules.rag.evidence_contracts import exact_id_items
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_schemas import StrictContract
 from app.modules.rag.evidence_validation import numbers_supported
+from app.modules.rag.source_scope_audit import (
+    SCOPE_INSTRUCTION,
+    chronological_order_error,
+    condition_gaps,
+    scope_audit_contract,
+    source_clauses,
+)
 
 
 class VisibleAssertion(StrictContract):
@@ -78,7 +85,7 @@ def indexed_audit_contract(spans: dict[str, str], evidence: dict[str, str]):
 
 def answer_spans(answer: str) -> dict[str, str]:
     """Server-owned spans cover every character without asking the model to copy."""
-    parts = re.split(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])|\n+", answer)
+    parts = re.split(r"(?<!\d\.)(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])|\n+", answer)
     return {f"a{i}": part.strip() for i, part in enumerate(parts) if part.strip()}
 
 
@@ -143,11 +150,18 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
     if not spans or len(spans) > 24 or any(len(span) > 4000 for span in spans.values()):
         return {"accepted": False, "reason": "ANSWER_SPAN_BUDGET_EXCEEDED"}
     proofs = {e["id"]: e["text"] for e in evidence}
+    # Whole verbatim public proofs already retain all their source clauses.
+    # Atomic entailment/relevance still run; audit only the omitted context.
+    public = ' '.join(answer.split())
+    clauses = source_clauses({key: text for key, text in proofs.items() if ' '.join(text.split()) not in public})
+    if len(clauses) > 48:
+        return {'accepted': False, 'reason': 'SOURCE_SCOPE_AUDIT_BUDGET'}
     # A whole short source body was already a permitted contiguous proof. Bind it
     # on the server instead of asking a model to transcribe numbering/formatting.
     # Long bodies retain the existing bounded, exact-subquote contract.
     indexed_proofs = all(len(text) <= 4000 for text in proofs.values())
     contract = indexed_audit_contract(spans, proofs) if indexed_proofs else span_audit_contract(spans, proofs)
+    contract = scope_audit_contract(contract, clauses, tuple(spans))
     instruction = INSTRUCTION
     if indexed_proofs:
         instruction = instruction.replace('Return exact evidence_ids used.', 'Select an evidence_id independently for each answer span.')
@@ -156,6 +170,8 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
         instruction += ('\nReturn only schema fields. Do not emit evidence_quote, evidence_ids or '
             'all_assertions_supported summaries. A false entailed/relevant verdict stays false; '
             'never turn it true to complete the response. Judge every clause against its selected source body.')
+    if clauses:
+        instruction += '\n' + SCOPE_INSTRUCTION
     audit = await structured_call(db, req, contract, instruction +
         "\nThe server has already split the answer into answer_spans. Return EXACTLY one assertion "
         "per answer_span_id. Do not copy or rewrite answer text. Each check evaluates ALL clauses "
@@ -163,7 +179,8 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
         "must prove every clause. If no evidence supports a span, mark it false. "
         "Do not substitute training knowledge for documents or invent absent question requirements.",
         {"question": req.original_question or req.question, "answer": answer,
-         "answer_spans": spans, "evidence": evidence}, max_tokens=2000)
+         "answer_spans": spans, "evidence": evidence,
+         **({'source_conditions': clauses} if clauses else {})}, max_tokens=min(4000, 2000 + 70 * len(clauses)))
     # The public text stays byte-for-byte unchanged. Only server IDs map checks
     # back to it; the model cannot paraphrase a span and accidentally reject it.
     assertions = [VisibleAssertion(answer_quote=spans[c.answer_span_id], evidence_id=c.evidence_id,
@@ -179,8 +196,11 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
     valid = valid and assertion_ids == set(ids)
     accepted = (valid and atomic_valid and audit.all_assertions_supported and audit.answers_original_question
                 and audit.essential_conditions_retained and not audit.conflict and not audit.missing_constraints)
+    gaps = condition_gaps(clauses, getattr(audit, 'source_conditions', []), spans)
+    order_error = chronological_order_error(answer)
+    accepted = accepted and not gaps and not order_error
     # Do not put duplicate answer/source text into diagnostics or logs.
-    return {**audit.model_dump(exclude={"assertions"}), 'all_assertions_supported': audit.all_assertions_supported,
+    return {**audit.model_dump(exclude={"assertions", 'source_conditions'}), 'all_assertions_supported': audit.all_assertions_supported,
             'proof_binding': 'server_owned_body' if indexed_proofs else 'exact_subquote', "evidence_ids": ids,
             "accepted": bool(accepted), "evidence_ids_valid": valid,
             "atomic_spans_valid": atomic_valid, "assertion_count": len(audit.assertions),
@@ -190,7 +210,8 @@ async def audit_visible_answer(db, req, snapshot, answer, candidates) -> dict:
                 next((e["text"] for e in evidence if e["id"] == check.evidence_id), ""))
                 for check in assertions),
             "answer_span_mismatch_count": sum(not quote_supported(check.answer_quote, answer) for check in assertions),
-            "max_context_chars": budget}
+            "max_context_chars": budget, 'missing_source_condition_ids': gaps,
+            'chronological_order_error': order_error}
 
 
 def _squashed(text: str) -> str:

@@ -1722,7 +1722,7 @@ export const knowledgeApi = {
     collectionId: string,
     sourceId: string,
     revisionId: string,
-    format: "md" | "json" = "md",
+    format: "md" | "json" | "reader" = "md",
   ): Promise<void> {
     let res: Response;
     try {
@@ -1749,9 +1749,11 @@ export const knowledgeApi = {
     const link = document.createElement("a");
     link.href = url;
     link.download =
-      format === "json"
-        ? `${revisionId}.qnu-doc-v1.json`
-        : `${revisionId}.qnu-rag-v1.md`;
+      format === "reader"
+        ? `${revisionId}.readable.md`
+        : format === "json"
+          ? `${revisionId}.qnu-doc-v1.json`
+          : `${revisionId}.qnu-rag-v1.md`;
     link.click();
     URL.revokeObjectURL(url);
   },
@@ -1773,6 +1775,33 @@ export const knowledgeApi = {
         ),
       );
     return res.text();
+  },
+
+  async getSourceReader(
+    collectionId: string,
+    sourceId: string,
+    revisionId: string,
+  ): Promise<import("@/types/qnu-reader").QnuReaderDocument> {
+    const res = await fetch(
+      `${BASE_URL}/knowledge/collections/${collectionId}/sources/${sourceId}/revisions/${revisionId}/qnu-markdown?format=reader-json`,
+      { headers: getAuthHeaders() },
+    );
+    if (!res.ok)
+      throw new Error(
+        extractErrorMessage(
+          await res.json().catch(() => ({})),
+          "Không đọc được bản trình bày tài liệu.",
+        ),
+      );
+    const document: import("@/types/qnu-reader").QnuReaderDocument =
+      await res.json();
+    if (
+      document.version !== "qnu-reader/v1" ||
+      document.revision_id !== revisionId ||
+      document.binding_id !== sourceId
+    )
+      throw new Error("Bản đọc không khớp phiên bản tài liệu.");
+    return document;
   },
 
   async editSourceContext(

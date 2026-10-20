@@ -57,9 +57,13 @@ def read_docx_evidence(content: bytes, document: Any) -> dict[str, Any]:
     """Never follow external relationships; keep original bytes out of JSON metadata."""
     with ZipFile(BytesIO(content)) as archive:
         root = _xml(archive, "word/document.xml")
+        from app.modules.knowledge.parsers.docx_numbering import numbering_evidence
+
+        native_paragraphs = root.xpath("//w:body//w:p", namespaces=_NS)
+        numbering = numbering_evidence(archive, native_paragraphs)
         top_tables = root.findall(f"{{{_W}}}body/{{{_W}}}tbl")
         paragraphs = []
-        for index, paragraph in enumerate(root.xpath("//w:body//w:p", namespaces=_NS), 1):
+        for index, paragraph in enumerate(native_paragraphs, 1):
             table = next((a for a in paragraph.iterancestors() if a.tag == f"{{{_W}}}tbl"), None)
             table_position = None
             if table is not None and table in top_tables:
@@ -86,6 +90,7 @@ def read_docx_evidence(content: bytes, document: Any) -> dict[str, Any]:
                     "locator": f"word/document.xml#p{index}",
                     "text": _text(paragraph),
                     "style": paragraph.xpath("./w:pPr/w:pStyle/@w:val", namespaces=_NS),
+                    "numbering": numbering.get(f"word/document.xml#p{index}"),
                     "table": table_position,
                     "notes": [
                         {"part": part, "id": ref.get(f"{{{_W}}}id")}
@@ -214,7 +219,7 @@ def apply_docx_evidence(model: QnuStructuredDocument, evidence: dict[str, Any]) 
     note_blocks = []
     for index, note in enumerate(evidence.get("notes", []), 1):
         key = note["part"], note["id"]
-        anchors = [p for p in paragraphs if any((r["part"], r["id"]) == key for r in p["notes"])]
+        anchors = [p for p in paragraphs for ref in p['notes'] if (ref['part'], ref['id']) == key]
         note_id = f"docx_{note['part']}_{index}"
         while any(b.id == note_id for b in [*model.blocks, *note_blocks]):
             note_id += "_source"
@@ -225,7 +230,9 @@ def apply_docx_evidence(model: QnuStructuredDocument, evidence: dict[str, Any]) 
                 target = targets[0]
                 target.context_refs = list(dict.fromkeys([*target.context_refs, note_id]))
                 linked.append(
-                    {"block_id": target.id, "locator": anchor["locator"], "table": anchor["table"]}
+                    {"block_id": target.id, "locator": anchor["locator"], "table": anchor["table"],
+                     **({'item_id': entry['id']} if (entry := next((i for i in target.attributes.get('list_items', [])
+                        if i.get('source_locator') == anchor['locator']), None)) else {})}
                 )
             else:
                 unresolved += 1
@@ -358,6 +365,9 @@ def _anchor_targets(model: QnuStructuredDocument, anchor: dict) -> list[QnuBlock
     targets = []
     for block in model.blocks:
         if block.type in {"table", "table_row", "figure", "note"}:
+            continue
+        if any(i.get('source_locator') == anchor['locator'] for i in block.attributes.get('list_items', [])):
+            targets.append(block)
             continue
         body = re.sub(r"^#{1,6}\s+", "", block.body)
         lines = [re.sub(r"^\s*(?:[-*+] |\d+[.)] )", "", line) for line in body.splitlines()]

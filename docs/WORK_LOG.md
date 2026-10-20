@@ -6,6 +6,26 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+- **2026-10-20 — Context577: người dùng yêu cầu commit local gói parser/bản đọc/RAG Context568–576.** Kiểm tra phạm vi, credential theo mẫu, UTF-8/LF và diff; không thêm sửa app hoặc gọi LLM, không push. Kết quả test lịch sử và 18 lỗi nền giữ nguyên. [Nhật ký577](./nhat_ky/2026-10-20_phien_577_commit_parser_reader_rag.md).
+
+- **2026-10-20 — Context576: ranh giới thuật nguồn/giả định/đánh giá hồ sơ; 44 regression mới PASS, focused 393 PASS, Ruff 15 file PASS; frozen64 59/60 = 98.33% (baseline 59/60), social 4/4; N18 PASS, B03 PASS trên code chốt; còn P06. Full 2949 PASS / 18 FAIL / 17 SKIP, không có lỗi pytest mới theo ID/nguyên nhân. Dọn: DB_REMOVED_STORAGE_POLICY_BLOCKED; model/nguồn/index giữ nguyên; không commit/push/reindex/publish/restart/deploy.** [Nhật ký576](./nhat_ky/2026-10-20_phien_576_sua_n18_b03_va_kiem_chung.md).
+
+- **2026-10-20 — Context575 sửa phạm vi/điều kiện RAG, thêm 67 ca regression; frozen64 59/60 = 98.33%, social 4/4; full 2905 PASS / 18 FAIL / 17 SKIP, không có lỗi pytest mới theo ID/nguyên nhân; Ruff 18 file PASS; biến thể gọi thật 3/4. 8 lỗi gốc đạt, còn N18 và B03; Storage tạm bị policy chặn xóa. Giữ nguồn/model/index/publication; không Git/restart/deploy.** [Nhật ký575](./nhat_ky/2026-10-20_phien_575_sua_rag_va_regression_mo_rong.md).
+
+- **2026-10-20 — Context574: phân tích8lỗi RAG.** Nội dung8ca còn nguyên trong DOCX/MD/JSON; lỗi ở row scope, enumeration guard, dependency/condition audit và timeout. Không sửa parser/app; probes21PASS1FAIL(IOattemptblocked),followup9PASS;benchmark52/60giữ. [Nhật ký574](./nhat_ky/2026-10-20_phien_574_phan_tich_8_loi_rag.md).
+
+- **2026-10-20 — Context573: thử lại riêng X07 một lần.** HTTP200/21,37s, hết timeout nhưng nội dung vẫn FAIL;4Luna nội bộ/0fallback,1thread1gapdọn;source/model/code/vector giữ, không đổi điểm572. [Nhật ký573](./nhat_ky/2026-10-20_phien_573_thu_lai_x07.md).
+
+- **2026-10-20 — Context572: benchmark và DOCX staging.** 52/60=86,67%,8FAIL (1timeout503); nguồn mới233blocks/10tables/53items/3notes/517fields, staging262points/415facts, chưa publish. Native flag integration fixed;focused109/RuffPASS;full2838PASS/18FAIL/17SKIP exact571. DBtestdọn/Storagedeletepolicyblocked. [Nhật ký572](./nhat_ky/2026-10-20_phien_572_benchmark_va_docx_staging.md).
+
+- **2026-10-20 — Context571: cấu trúc DOCX/PDF và bản dễ đọc.** PDF 42 khối/5 mục; DOCX 233 khối/10 bảng/53 list items/3 note, 517 fields giữ; reader 61.760 bytes; focused172/FE36/Ruff/Biome/build PASS; full 2837 PASS/18 FAIL/17 SKIP, 0 lỗi mới theo ID. [Nhật ký571](./nhat_ky/2026-10-20_phien_571_cau_truc_docx_pdf_va_ban_doc.md).
+
+- **2026-10-20 — Context570: sửa RAG bước 2 (Codex).** Focused 155 PASS, replay 9 PASS; full 2.810 PASS / 18 FAIL / 17 SKIP, không có lỗi mới theo ID. Giữ model và nguồn; chưa benchmark 64 câu, không reindex, xuất bản lại, restart hoặc commit/push. [Nhật ký570](./nhat_ky/2026-10-20_phien_570_sua_evidence_scope_rag.md).
+
+| **2026-10-20** | Codex | Context569 đối soát13câu RAG, bước1 | Frozen26pairs/33goldspans/30citations;P06packreplay/P07conditiongap/M05schemagap/X05-X08reason;probe13PASS/3FAIL(hypotheses/importguard),followup4PASS;noLLM/DB/appfix/benchmarkmới/Gitwrites | [Nhật ký569](./nhat_ky/2026-10-20_phien_569_doi_soat_13_cau_rag.md) |
+
+| **2026-10-20** | Codex | Context568 Luna-only benchmark, đổi primary/fallback được phép | ConfigLuna→Qwenpersisted;frozen64ASGI51/60=85% bằngQwen;43/50positive,8/10negative;4gains/4losses;111Luna/0fallback;1275codehashgiữ/source/vectorsealsgiữ;58threads/14gapsdọn;noappfix/Gitwrite | [Nhật ký568](./nhat_ky/2026-10-20_phien_568_luna_only_benchmark.md) |
+
 | **2026-10-20** | Codex | Context567 sửa RAG và benchmark85% | Frozen64TCP cuối51/60=85%,positive44/50,social4/4,9FAIL;93/93citation;109Qwen/0fallback;full2785PASS/18FAIL/17SKIP exact565,38addedPASS/0new;source/model/index seals giữ,DB dọn/Storage policyblocked,noGitwrites | [Nhật ký567](./nhat_ky/2026-10-20_phien_567_sua_rag_va_benchmark_85.md) |
 
 | **2026-10-20** | Codex | Context566 benchmark RAG85% trên nguồn hiện tại | Frozen60+4social,TCP64/64HTTP200;34/60=56,67%FAIL,positive28/50.57/57citationvalidnhưngmetric/unit/partialfail;128Qwen+3fallbackpolicycũ;sealsgiữ,58threads/29gapsdọn;noappfix/Gitwrites | [Nhật ký566](./nhat_ky/2026-10-20_phien_566_benchmark_rag_85.md) |

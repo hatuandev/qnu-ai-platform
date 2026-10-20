@@ -16,6 +16,7 @@ from app.modules.rag.evidence_schemas import (
     StrictContract,
 )
 from app.modules.rag.evidence_validation import bind_quote
+from app.modules.rag.source_row_context import model_position, table_row_context
 
 
 def context_only(block: EvidenceBlock) -> bool:
@@ -57,7 +58,7 @@ def passage_catalog(blocks):
     catalog = {}
     for index, block in enumerate(blocks, 1):
         # Keep punctuation, decimal values and formulas intact in every raw span.
-        starts = [0, *[m.end() for m in re.finditer(r"(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])", block.text)], len(block.text)]
+        starts = [0, *[m.end() for m in re.finditer(r"(?<!\d\.)(?<=[.!?;])\s+(?=[A-ZÀ-Ỹ])", block.text)], len(block.text)]
         for part, (start, end) in enumerate(pairwise(starts), 1):
             quote = block.text[start:end].strip()
             if len(quote) >= 3:
@@ -70,8 +71,9 @@ def passage_catalog(blocks):
 def passage_payload(blocks, catalog):
     by_id = {block.id: block for block in blocks}
     return [{"id": pid, "text": ref.quote,
+             **({'table_row': row} if (row := table_row_context(by_id[ref.block_id])) else {}),
              "source_revision_id": by_id[ref.block_id].source_revision_id,
-             "section": by_id[ref.block_id].section,
+             **model_position(by_id[ref.block_id].section, row),
              "title": by_id[ref.block_id].title,
              "record_label": by_id[ref.block_id].record_label,
              "record_path": by_id[ref.block_id].record_path,
@@ -152,6 +154,16 @@ def source_grounded_claims(claims: list[dict], blocks: list[EvidenceBlock], *, p
     intros = dependency_intros(blocks)
     result, seen = [], set()
     for claim in claims:
+        primary = claim['references'][0]
+        body = by_id[primary['block_id']]
+        if body.fact_context.get('source_kind') == 'list':
+            # A sentence inside one native list item cannot silently drop that
+            # item's following qualification. Never expand to a sibling item.
+            items = list(re.finditer(r'(?m)^\s*(?:\d+|[a-z])[.)]\s+.*(?:\n(?!\s*(?:\d+|[a-z])[.)]\s).*?)*', body.text))
+            matches = [m.group().strip() for m in items if primary['quote'] in m.group()]
+            if len(matches) == 1 and len(matches[0]) <= 4000:
+                expanded = bind_quote(QuoteReference(block_id=body.id, quote=matches[0]), by_id)
+                claim = {**claim, 'text': expanded['quote'], 'references': [expanded, *claim['references'][1:]]}
         parents = [bind_quote(QuoteReference(block_id=parent.id, quote=parent.text), by_id)
                    for ref in claim["references"] for parent in intros.get(ref["block_id"], [])]
         continuations = [bind_quote(QuoteReference(block_id=block.id, quote=block.text), by_id)

@@ -33,6 +33,7 @@ class RowSelection(StrictContract):
 
 class MetricScope(StrictContract):
     context_ids: list[str] = Field(default_factory=list, max_length=12)
+    answer_mode: Literal['cells', 'rules'] = 'cells'
 
 
 class RowAudit(StrictContract):

@@ -95,7 +95,9 @@ def preserve_native_layout(document: QnuStructuredDocument, content: bytes) -> N
             table.attributes["column_roles"] = "unknown"
             for flag in table.quality_flags:
                 if flag.code == "table_header_unresolved":
-                    flag.status = "literal_only"
+                    # Confirm complete native literal coverage, never a header
+                    # role or semantic approval. Fields stay ambiguous below.
+                    flag.status = "confirmed"
         for index, row in enumerate(rows, source["header_rows"]):
             merged = any(c["row_start"] == index and c["row_end"] == index + 1 and c["col_start"] == 0
                          and c["col_end"] == len(source["grid"][index]) for c in source["cells"]) and len(source["grid"][index]) > 1

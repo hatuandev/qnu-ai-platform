@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -1388,7 +1389,7 @@ async def download_source_qnu_markdown(
     collection_id: str,
     source_id: str,
     revision_id: str,
-    format: str = Query("md", pattern="^(md|json|bundle)$", description="md/json: nguồn chuẩn; bundle: ZIP kèm annotation đã duyệt"),
+    format: str = Query("md", pattern="^(md|json|bundle|reader|reader-json)$", description="md/json: nguồn chuẩn; reader/reader-json: bản đọc dẫn xuất; bundle: ZIP kèm annotation đã duyệt"),
     db: AsyncSession = Depends(get_db),
     actor: AuthActor = Depends(require_permission("ai.knowledge.view")),
 ) -> Response:
@@ -1418,6 +1419,14 @@ async def download_source_qnu_markdown(
             code="QNU_MARKDOWN_NOT_READY",
             status_code=409 if artifact.get("status") == "failed" else 404,
         )
+    if format in {'reader', 'reader-json'}:
+        from app.modules.knowledge.services.source_reader import read_source_document
+
+        view = await read_source_document(db, source_id, revision_id)
+        if format == 'reader-json':
+            return JSONResponse(content=view)
+        return Response(content=view['markdown'], media_type='text/markdown; charset=utf-8',
+            headers={'Content-Disposition': f'attachment; filename="{quote(revision_id)}.readable.md"'})
     if format == "json":
         path = artifact.get("structured_path")
         media_type = "application/json"

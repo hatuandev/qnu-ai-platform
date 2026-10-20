@@ -8,14 +8,20 @@ from app.modules.rag.evidence_schemas import EvidenceBlock
 
 
 def recovery_order(ranked: list[EvidenceBlock], supplemental: list[EvidenceBlock],
-                   priority: list[EvidenceBlock]) -> list[EvidenceBlock]:
+                   priority: list[EvidenceBlock], *, question: str = '') -> list[EvidenceBlock]:
     """Keep ranked full conditions ahead of supplemental table summaries.
 
     Formula/caption bodies restore otherwise absent modalities. A table row is
     only a retrieval anchor and must not crowd out its higher-ranked full rule.
     """
-    bodies = [block for block in supplemental if block.fact_context.get('source_kind') != 'table']
-    return list({block.id: block for block in [*priority, *bodies, *ranked, *supplemental]}.values())
+    from app.modules.rag.source_locators import TABLE_LABEL
+
+    bodies = [block for block in supplemental if block.fact_context.get('source_kind') != 'table'
+              and not TABLE_LABEL.match(block.text.strip())]
+    identifiers = re.findall(r'(?<!\w)[A-Za-zĐđ]+[\w]*(?:[-/][A-Za-zĐđ0-9]+)+(?!\w)', question)
+    addressed = [block for block in supplemental if block.fact_context.get('source_kind') == 'table'
+                 and any(re.search(r'(?<!\w)' + re.escape(label) + r'(?!\w)', block.text, re.IGNORECASE) for label in identifiers)]
+    return list({block.id: block for block in [*priority, *bodies, *addressed, *ranked, *supplemental]}.values())
 
 
 def answer_facets(topics: list[str], question: str) -> list[str]:

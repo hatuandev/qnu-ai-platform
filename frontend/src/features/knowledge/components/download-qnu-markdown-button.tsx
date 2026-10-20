@@ -9,11 +9,13 @@ export function DownloadQnuMarkdownButton({
   sourceId,
   revisionId,
   disabled,
+  format = "md",
 }: {
   collectionId: string;
   sourceId: string;
   revisionId: string | null;
   disabled?: boolean;
+  format?: "md" | "reader";
 }) {
   const download = useMutation({
     mutationFn: () =>
@@ -21,9 +23,14 @@ export function DownloadQnuMarkdownButton({
         collectionId,
         sourceId,
         revisionId ?? "",
-        "md",
+        format,
       ),
-    onSuccess: () => toast.success("Đã tải tệp QNU RAG Markdown v1.0."),
+    onSuccess: () =>
+      toast.success(
+        format === "reader"
+          ? "Đã tải Markdown dành cho người đọc."
+          : "Đã tải tệp QNU RAG Markdown v1.0.",
+      ),
     onError: (error) =>
       toast.error(
         extractErrorMessage(error, "Không tải được tệp QNU RAG Markdown."),
@@ -38,7 +45,11 @@ export function DownloadQnuMarkdownButton({
       }}
     >
       <FileDown />
-      {download.isPending ? "Đang tải Markdown chuẩn" : "Tải Markdown chuẩn"}
+      {download.isPending
+        ? "Đang tải…"
+        : format === "reader"
+          ? "Tải Markdown dễ đọc"
+          : "Tải gói Markdown chuẩn"}
     </DropdownMenuItem>
   );
 }

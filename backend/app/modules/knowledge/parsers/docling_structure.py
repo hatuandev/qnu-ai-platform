@@ -28,6 +28,11 @@ from app.modules.knowledge.normalization.qnu_markdown import (
     QnuStructuredDocument,
     cell_state,
 )
+from app.modules.knowledge.parsers.docx_numbering import (
+    MARKER,
+    list_item_evidence,
+    render_list_items,
+)
 
 LOCATOR_SCHEME = "docx_body_reading_order/v1"
 _WORD = re.compile(r"\w+")
@@ -544,6 +549,9 @@ def build_qnu_structured_document(
         (index + 1, item, int(level or 0))
         for index, (item, level) in enumerate(document.iterate_items())
     ]
+    native_lists = list_item_evidence(indexed, (source_evidence or {}).get('paragraphs', []))
+    list_stack: list[dict] = []
+    list_section = None
     position = 0
     cursor = 0
     while position < len(indexed):
@@ -559,25 +567,36 @@ def build_qnu_structured_document(
                 run.append(indexed[position])
                 position += 1
             base_level = min(run_level for _, _, run_level in run)
-            lines: list[str] = []
+            list_items: list[dict] = []
             locations: list[QnuSourceLocation] = []
             unknown_items: list[str] = []
             for item_index, list_item, item_level in run:
                 item_text = _item_text(list_item)
                 if not item_text.strip():
                     continue
-                indent = "  " * max(0, item_level - base_level)
-                if bool(getattr(list_item, "enumerated", False)):
-                    marker = clean_text(getattr(list_item, "marker", "")).strip() or "1."
-                    lines.append(f"{indent}{marker} {item_text}")
-                else:
-                    lines.append(f"{indent}- {item_text}")
+                native = native_lists.get(item_index, {})
+                numbering = native.get('numbering') or {}
+                manual = MARKER.match(native.get('text', ''))
+                marker = (numbering.get('marker') if numbering.get('status') == 'source_defined' else None) or (manual[1] if manual else None)
+                marker = marker or (clean_text(getattr(list_item, 'marker', '')).strip() if getattr(list_item, 'enumerated', False) else '-') or '-'
                 # Each item is located on its own: a run can cross a page boundary.
                 item_pages, cursor = builder.map_unit(item_text, ranges, cursor, projection_markdown, full_lines=True)
                 if not item_pages:
                     unknown_items.append(str(item_index))
                 locations.extend(_locations(item_index, item_pages))
-            if lines:
+                item_level = numbering.get('level', max(0, item_level - base_level))
+                list_items.append({'id': f'item_{item_index}', 'level': item_level, 'marker': marker,
+                    'text': item_text, 'numbering': numbering, 'source_locator': native.get('locator'),
+                    'source_locations': [loc.model_dump() for loc in _locations(item_index, item_pages)]})
+            if list_items:
+                if list_section != builder.parent_id():
+                    list_stack.clear()
+                list_section = builder.parent_id()
+                for entry in list_items:
+                    while list_stack and list_stack[-1]['level'] >= entry['level']:
+                        list_stack.pop()
+                    entry['parent_id'] = list_stack[-1]['id'] if list_stack else None
+                    list_stack.append(entry)
                 builder.add(
                     QnuBlock(
                         id=builder.next_id("l"),
@@ -585,6 +604,7 @@ def build_qnu_structured_document(
                         type="list",
                         source_locations=locations,
                         section_path=builder.section_path(),
+                        attributes={'list_items': list_items, 'list_structure_version': 'docx-lists/v1'},
                         quality_flags=(
                             []
                             if not unknown_items
@@ -599,7 +619,7 @@ def build_qnu_structured_document(
                                 )
                             ]
                         ),
-                        body="\n".join(lines),
+                        body=render_list_items(list_items),
                     )
                 )
             continue
@@ -734,6 +754,7 @@ def build_qnu_structured_document(
     has_mapping = bool(ranges or render_pages)
     mapping_status = "aligned" if has_mapping and not builder.unmapped else "partial" if has_mapping else "unavailable"
     document_meta: dict[str, Any] = {
+        "list_structure_version": "docx-lists/v1",
         "source_format": "docx",
         "locator_scheme": LOCATOR_SCHEME,
         "page_mapping": {

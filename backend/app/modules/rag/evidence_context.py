@@ -3,11 +3,14 @@
 import json
 
 from app.modules.rag.evidence_schemas import EvidenceBlock
+from app.modules.rag.source_row_context import model_position, table_row_context
 
 
 def model_block(block: EvidenceBlock) -> dict:
+    row = table_row_context(block)
     return {"id": block.id, "source_revision_id": block.source_revision_id, "text": block.text,
-            "title": block.title, "page_number": block.page_number, "section": block.section,
+            **({'table_row': row} if row else {}),
+            "title": block.title, "page_number": block.page_number, **model_position(block.section, row),
             "header_context": block.header_context, "temporal_scope": block.temporal_scope.model_dump(),
             "origin": block.origin, "fact_context": {key: value for key, value in block.fact_context.items()
                 if key not in {"source_locations", "context_unit_ids", "qnu_block_id", "source_unit_id"}},
@@ -48,8 +51,11 @@ def compact_claim_context(payload: dict, claims: list[dict]) -> dict:
             if identity not in identities:
                 key = f"ref{len(catalog)}"
                 identities[identity] = key
-                catalog[key] = omit_empty_fields({key: value for key, value in reference.items()
-                    if key not in server_fields})
+                projection = {key: value for key, value in reference.items() if key not in server_fields}
+                if reference.get('table_row'):
+                    projection.pop('section', None)
+                    projection.update(model_position(reference.get('section', ''), reference['table_row']))
+                catalog[key] = omit_empty_fields(projection)
             refs.append(identities[identity])
         projected.append({**claim, "references": refs})
     return {**payload, "claims": projected, "reference_catalog": catalog}

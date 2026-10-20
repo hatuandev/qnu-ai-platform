@@ -31,6 +31,8 @@ def _numbered_groups(source: list[EvidenceBlock]) -> list[list[EvidenceBlock]]:
         for child in source[position + 1:]:
             if _level(child) == 1 or child.text.lstrip().startswith("#") or child.section != parent.section:
                 break
+            if child.fact_context.get('source_kind') in {'table', 'image'}:
+                break  # A following matrix is not an unmarked continuation of a numbered rule.
             if not children and not run and family(child) is None and _level(child) is None:
                 # An unmarked explanatory run (formula lines, legend lead-in) belongs
                 # to its numbered parent; option bullets keep their own packing rule.

@@ -457,8 +457,12 @@ export const OcrInspector: React.FC<OcrInspectorProps> = ({
                         {children}
                       </ul>
                     ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside my-2 space-y-1 text-xs text-foreground/90 pl-1">
+                    ol: ({ children, start, id }) => (
+                      <ol
+                        start={start}
+                        id={id}
+                        className="list-decimal list-inside my-2 space-y-1 text-xs text-foreground/90 pl-1"
+                      >
                         {children}
                       </ol>
                     ),

@@ -5,9 +5,13 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.modules.rag.evidence_constraints import ConstraintRole, retained_condition
+from app.modules.rag.evidence_constraints import (
+    ConstraintRole,
+    data_year_values,
+    retained_condition,
+)
 from app.modules.rag.evidence_schemas import EvidenceBlock, QuoteReference, StrictContract
-from app.modules.rag.evidence_validation import bind_quote, number_values
+from app.modules.rag.evidence_validation import YEAR, bind_quote, number_values
 
 
 class AtomicCheck(StrictContract):
@@ -30,6 +34,7 @@ class SemanticAudit(StrictContract):
     required_qualifiers: list[RequiredQualifier] = Field(max_length=20)
     complete: bool
     missing_constraints: list[str] = Field(max_length=10)
+    source_condition_gaps: dict[str, str] = Field(default_factory=dict)
 
 
 AUDIT_INSTRUCTION = """Audit the ACCEPTED draft, independently, against the ORIGINAL question.
@@ -150,6 +155,23 @@ def _advisory_missing(item: str, accepted: list[dict], question: str, years: lis
     return not fresh.intersection(asked)
 
 
+def literal_condition_retained(reference: dict, claims: list[dict], role: ConstraintRole, years: list[int]) -> bool:
+    """Find the owning public claim, preserving role-specific year proof."""
+    squash = lambda value: ' '.join(value.split())
+    identity = ('binding_id', 'index_revision_id', 'source_revision_id', 'canonical_hash')
+    year_role = role in {'data_year', 'document_year', 'event_year'}
+    # With no requested year, a source restriction must retain its OWN year;
+    # with a requested year, never substitute the source's different year.
+    proof_years = years or sorted(data_year_values(reference['quote']) if role == 'data_year'
+        else {int(value) for value in YEAR.findall(reference['quote'])})
+    return any(squash(reference['quote']) in squash(claim['text'])
+        and any(all(own.get(key) == reference.get(key) for key in identity)
+                and own.get('start', -1) <= reference['start'] and own.get('end', -1) >= reference['end']
+                for own in claim['references'])
+        and (role == 'value_constraint' or year_role and retained_condition(role, reference, [claim], proof_years))
+        for claim in claims)
+
+
 def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[EvidenceBlock],
                    years: list[int], question: str = "") -> tuple[list[dict], list[dict], list[str], bool]:
     """Validate source/claim spans and numeric qualifiers before trusting an audit."""
@@ -179,6 +201,8 @@ def audit_coverage(audit: SemanticAudit, claims: list[dict], blocks: list[Eviden
         ids = set(qualifier.retained_by)
         retained = [by_claim[claim_id] for claim_id in ids if claim_id in accepted_ids]
         if not ids or not ids.issubset(accepted_ids) or not retained_condition(qualifier.role, ref, retained, years):
+            if ids.issubset(accepted_ids) and literal_condition_retained(ref, collective, qualifier.role, years):
+                continue  # Source, offsets and literal public text all agree; no inferred synonym or value.
             # The model may leave retained_by empty even when the accepted claims
             # collectively prove a numeric/method condition; recheck deterministically
             # for those roles instead of inventing a gap. A reference to an unknown

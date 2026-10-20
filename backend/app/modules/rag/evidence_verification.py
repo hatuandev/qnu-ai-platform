@@ -1,6 +1,6 @@
 """Bounded semantic auditing shared by direct RAG and workflow answers."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,12 @@ from app.modules.rag.evidence_indexed_audit import (
 from app.modules.rag.evidence_lists import uncovered_list_members
 from app.modules.rag.evidence_model import VERIFY_INSTRUCTION, structured_call
 from app.modules.rag.evidence_precedence import apply_precedence, validate_superseding_quotes
-from app.modules.rag.evidence_schemas import EvidenceBlock, QueryPlan, VerificationResult
+from app.modules.rag.evidence_schemas import (
+    EvidenceBlock,
+    QueryPlan,
+    QuoteReference,
+    VerificationResult,
+)
 from app.modules.rag.evidence_validation import (
     formula_legend_gap,
     group_single_row_gap,
@@ -38,6 +43,8 @@ class VerifiedAnswer:
     verifier: VerificationResult
     audit: SemanticAudit | None
     uncovered: list[str]
+    source_condition_gaps: dict[str, str] = field(default_factory=dict)
+    source_qualifier_gaps: list[QuoteReference] = field(default_factory=list)
 
 
 def row_scope_entity(plan: QueryPlan, claims: list[dict]) -> str | None:
@@ -73,7 +80,13 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     contract = verification_contract(claims, plan.requested_topics)
     verification_payload = (compact_claim_context(payload, claims) if payload.get("compact_passages")
                             else {**payload, "claims": claims})
-    verifier = await structured_call(db, req, contract, VERIFY_INSTRUCTION,
+    verifier = await structured_call(db, req, contract, VERIFY_INSTRUCTION +
+                                    "\nJudge only the original question and requested_topics. Do not require adjacent rows, "
+                                    "ranges, comparisons or definitions not asked or essential to that answer. "
+                                    "An explicit rule that missing input prevents calculation fully answers the scenario; "
+                                    "do not require the source to repeat user-provided hypothetical input values. "
+                                    "Resolve every reference_catalog ID. Additional same-source quotes may prove a condition "
+                                    "but must not replace a primary body about another condition or subject.",
                                     verification_payload, max_tokens=2400,
                                     error_code="EVIDENCE_VERIFICATION_INVALID")
     verdicts = {v.claim_id: v for v in verifier.verdicts}
@@ -115,12 +128,16 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     missing = verifier.missing_constraints
     if accepted and not verifier.conflict:
         indexed_payload, catalog = audit_payload({**payload, "claims": accepted}, blocks)
-        indexed = await structured_call(db, req, audit_contract(accepted, catalog), INDEXED_AUDIT_INSTRUCTION,
+        clauses = indexed_payload.get('source_conditions', {})
+        indexed = await structured_call(db, req, audit_contract(accepted, catalog, clauses), INDEXED_AUDIT_INSTRUCTION,
                                         indexed_payload, max_tokens=2400,
                                         error_code="EVIDENCE_VERIFICATION_INVALID")
-        audit = resolve_audit(indexed, accepted, catalog)
+        audit = resolve_audit(indexed, accepted, catalog, clauses, blocks)
         accepted, audit_errors, missing, complete = audit_coverage(audit, accepted, blocks,
             sorted(set(plan.years + plan.document_years + plan.event_years)), question=req.question)
+        if not audit.complete:
+            complete = False
+            missing = list(dict.fromkeys([*missing, 'Kiểm chứng toàn bộ câu trả lời chưa đầy đủ.']))
         errors += audit_errors
         row_gap = group_single_row_gap(accepted, row_scope_entity(plan, accepted))
         if row_gap:
@@ -143,4 +160,8 @@ async def verify_bound_answer(db: AsyncSession, req: AskRequest, payload: dict,
     uncovered = uncovered_list_members(blocks, accepted, plan.enumeration_subject or plan.entity) if plan.coverage == "enumeration" else []
     if uncovered:
         accepted, complete = [], False
-    return VerifiedAnswer(accepted, complete, missing, errors, verifier, audit, uncovered)
+    known_ids = {claim['id'] for claim in accepted}
+    qualifier_gaps = [q.reference for q in audit.required_qualifiers
+        if q.requirement in missing and set(q.retained_by).issubset(known_ids)] if audit else []
+    return VerifiedAnswer(accepted, complete, missing, errors, verifier, audit, uncovered,
+                          audit.source_condition_gaps if audit else {}, qualifier_gaps)
