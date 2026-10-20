@@ -58,10 +58,13 @@ def _matched_table(block, native: list[dict], rows: list) -> dict | None:
     cells = [{k: cell.get(k) for k in ("row_start", "row_end", "col_start", "col_end", "text")}
              for cell in data.get("cells", [])]
     cells.sort(key=lambda c: (c["row_start"], c["col_start"]))
-    matches = [n for n in native if n["cells"] == cells and n["header_rows"] == data.get("header_rows")]
+    # Header roles cannot disambiguate the very source association being proved.
+    matches = [n for n in native if n["cells"] == cells]
     if len(matches) != 1:
         return None
     source = matches[0]
+    if source["header_rows"] != data.get("header_rows"):
+        return None
     grid = source["grid"]
     if (len(grid) != data.get("num_rows") or any(len(r) != data.get("num_cols") for r in grid)
             or len(rows) != len(grid) - source["header_rows"]):
@@ -90,7 +93,9 @@ def preserve_native_layout(document: QnuStructuredDocument, content: bytes) -> N
             "locator": source["locator"], "grid_sha256": _digest(source), "semantic_roles_verified": False}
         if untyped:
             table.attributes["column_roles"] = "unknown"
-            table.quality_flags = [f for f in table.quality_flags if f.code != "table_header_unresolved"]
+            for flag in table.quality_flags:
+                if flag.code == "table_header_unresolved":
+                    flag.status = "literal_only"
         for index, row in enumerate(rows, source["header_rows"]):
             merged = any(c["row_start"] == index and c["row_end"] == index + 1 and c["col_start"] == 0
                          and c["col_end"] == len(source["grid"][index]) for c in source["cells"]) and len(source["grid"][index]) > 1

@@ -35,7 +35,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
           <span className="h-2 w-2 rounded-full bg-primary/70 animate-bounce" />
         </div>
         <span className="text-xs font-medium text-foreground/70 ml-1">
-          Trợ lý QNU đang đối chiếu tri thức & lập luận...
+          Trợ lý đang xử lý tin nhắn...
         </span>
       </div>
     );

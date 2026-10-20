@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ConversationSession } from "@/services/assistant-chat-route";
 import type { ChatMessageItem } from "./use-rag-stream";
 
 export interface ChatThread {
@@ -8,6 +9,7 @@ export interface ChatThread {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessageItem[];
+  runtimeSession?: ConversationSession;
 }
 
 export interface GroupedChatThreads {
@@ -186,6 +188,21 @@ export function useChatHistory(assistantCode: string) {
     [assistantCode],
   );
 
+  // Keep the server-issued continuation capability with its owning UI thread.
+  const saveThreadSession = useCallback(
+    (threadId: string, session?: ConversationSession) => {
+      if (!session) return;
+      setThreads((prev) =>
+        prev.map((thread) =>
+          thread.id === threadId
+            ? { ...thread, runtimeSession: session }
+            : thread,
+        ),
+      );
+    },
+    [],
+  );
+
   // Rename a thread
   const renameThread = useCallback((threadId: string, newTitle: string) => {
     const trimmed = newTitle.trim();
@@ -267,6 +284,7 @@ export function useChatHistory(assistantCode: string) {
     createNewThread,
     selectThread,
     saveThreadMessages,
+    saveThreadSession,
     renameThread,
     deleteThread,
     clearAllThreads,

@@ -25,6 +25,7 @@ import {
   downloadMarkdownFile,
   formatConversationToMarkdown,
 } from "@/lib/export-markdown";
+import { useRbac } from "@/rbac/context";
 import type { AssistantItem } from "@/types/assistants";
 import {
   RetrievalDiagnostics,
@@ -41,6 +42,7 @@ export function AssistantPlaygroundTab({
   className,
 }: AssistantPlaygroundTabProps) {
   const assistantCode = assistant.code || assistant.id;
+  const { can } = useRbac();
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const [selectedCitation, setSelectedCitation] =
     React.useState<ChatCitation | null>(null);
@@ -48,6 +50,7 @@ export function AssistantPlaygroundTab({
 
   const { messages, sendMessage, isStreaming, clearMessages } = useRAGStream({
     assistantCode,
+    debug: can("ai.access.admin"),
   });
 
   const sampleQuestions = React.useMemo(() => {
@@ -228,7 +231,7 @@ export function AssistantPlaygroundTab({
               {isStreaming && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 pl-3">
                   <Loader2 className="size-3.5 animate-spin text-primary" />
-                  <span>Đang suy luận và truy xuất RAG...</span>
+                  <span>Đang chuẩn bị phản hồi...</span>
                 </div>
               )}
               <div ref={messagesEndRef} />

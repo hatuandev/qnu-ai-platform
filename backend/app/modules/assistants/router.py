@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import AppException
 from app.modules.assistants.schemas import (
     AssistantBundle,
     AssistantChatRequest,
@@ -25,7 +26,7 @@ from app.modules.assistants.schemas import (
     AssistantVersionResponse,
 )
 from app.modules.assistants.service import assistant_service
-from app.modules.auth.dependencies import require_permission
+from app.modules.auth.dependencies import get_current_actor, require_permission
 
 router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU"])
 chat_router = APIRouter(prefix="/assistants", tags=["05 Trợ lý Chuyên trách Chuẩn QNU - Chat Runtime"])
@@ -115,30 +116,46 @@ async def chat_with_assistant(
     body: AssistantChatRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
+    debug: bool = Query(False, description="Chẩn đoán phân luồng, yêu cầu quyền quản trị trợ lý"),
 ):
+    from app.modules.assistants.services.conversation_access import HEADER, authorize_conversation
+    from app.modules.rag.intent_debug import intent_debug_scope
+
+    actor = None
+    if debug:
+        actor = await get_current_actor(request)
+        await require_permission('ai.access.admin')(actor)
+    token = request.headers.get(HEADER)
+    if actor is None and body.conversation_id and not token:
+        try:
+            actor = await get_current_actor(request)
+        except AppException as exc:
+            if exc.status_code != 401:
+                raise
+    conversation_id, grant = await authorize_conversation(db, reference, body.conversation_id, token,
+        privileged=bool(actor and actor.has_permission('ai.access.admin')))
+    body = body.model_copy(update={'conversation_id': conversation_id})
     correlation_id = getattr(request.state, "correlation_id", None)
     if body.stream:
+        async def events():
+            with intent_debug_scope(debug):
+                async for event in assistant_service.chat_stream(db, reference, body, correlation_id=correlation_id):
+                    yield event
+
         return StreamingResponse(
-            assistant_service.chat_stream(
-                db,
-                reference,
-                body,
-                correlation_id=correlation_id,
-            ),
+            events(),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
+                HEADER: grant,
             },
         )
 
-    return await assistant_service.chat(
-        db,
-        reference,
-        body,
-        correlation_id=correlation_id,
-    )
+    with intent_debug_scope(debug):
+        result = await assistant_service.chat(db, reference, body, correlation_id=correlation_id)
+    return JSONResponse(result.model_dump(mode='json'), headers={HEADER: grant})
 
 
 @router.get("/{reference}", response_model=AssistantResponse)

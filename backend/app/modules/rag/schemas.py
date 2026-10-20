@@ -119,6 +119,8 @@ class Citation(BaseModel):
 
 class AskRequest(SingleApplicationModel):
     _retrieval_diagnostics: dict[str, Any] = PrivateAttr(default_factory=dict)
+    _intent_trace: dict[str, Any] = PrivateAttr(default_factory=dict)
+    _assistant_identity: dict[str, Any] = PrivateAttr(default_factory=dict)
     original_question: str | None = Field(None, min_length=1, max_length=4000,
         description="Câu hỏi gốc được DAG giữ lại trước bước viết lại truy vấn")
     question: str = Field(..., min_length=1, max_length=2000, description="Câu hỏi người dùng")

@@ -144,19 +144,28 @@ class RagService:
 
     async def ask(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
         from app.modules.modelops.services.inference_policy import rag_chat_scope
+        from app.modules.rag.conversation_router import finish_routing
 
         async with rag_chat_scope():
-            return await self._ask_conversation(db, req, candidate_snapshot=candidate_snapshot)
+            response = await self._ask_conversation(db, req, candidate_snapshot=candidate_snapshot)
+        return finish_routing(req, response)
 
     async def _ask_conversation(self, db: AsyncSession, req: AskRequest, *, candidate_snapshot: Any | None = None) -> AskResponse:
-        from app.modules.rag.conversation_resolution import resolve_followup
+        from app.modules.rag.conversation_router import route_turn
 
         started = time.perf_counter()
         req._retrieval_diagnostics = {}
-        effective, resolution = await resolve_followup(db, req)
+        if not input_guardrail.check(req.original_question or req.question).is_safe:
+            return await self._ask(db, req, candidate_snapshot=candidate_snapshot)
+        effective, resolution, direct = await route_turn(db, req)
+        if direct is not None:
+            req._retrieval_diagnostics = {'branch': 'conversation', 'retrieval_executed': False}
+            direct.latency_ms = round((time.perf_counter() - started) * 1000, 2)
+            return attach_diagnostics(req, direct)
         if resolution and resolution["mode"] == "clarify":
             return AskResponse(status="insufficient_context",
-                answer="Bạn muốn mình rà lại danh sách hoặc nội dung nào trong câu hỏi trước? Hãy nói rõ chủ đề hoặc năm cần đối chiếu.",
+                answer="Bạn muốn tìm hiểu chủ đề hoặc ngành nào, trong năm hay kỳ nào?",
+                latency_ms=round((time.perf_counter() - started) * 1000, 2),
                 answer_decision={"version": "conversation-resolution-v1", "status": "clarify",
                                  "question_resolution": resolution})
         if resolution and resolution.get("mode") in ("explain", "reformat", "filter"):

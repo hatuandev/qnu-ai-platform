@@ -33,7 +33,7 @@ export function RetrievalDiagnostics({
   return (
     <details className="min-w-0 rounded-lg border border-border p-3">
       <summary className="cursor-pointer text-sm font-medium">
-        Chẩn đoán truy xuất
+        Phân luồng và truy xuất
       </summary>
       <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">
         {JSON.stringify(value, null, 2)}

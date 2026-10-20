@@ -99,17 +99,19 @@ def _fact_groups(blocks: list[EvidenceBlock]) -> dict[str, list[EvidenceBlock]]:
             continue
         identity = source_identity(block)
         unit_id = block.fact_context.get("source_unit_id")
-        exact(block.index_revision_id, unit_id, identity)
+        source_row = exact(block.index_revision_id, unit_id, identity)
         refs = block.fact_context.get("context_unit_ids")
         if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
             raise _missing_context()
-        pending, seen, members = list(dict.fromkeys(refs)), set(), {}
+        # The verified source row is proof too, and may own additional required
+        # notes/conditions. Traverse it once with the same exact-identity checks.
+        pending, seen, members = list(dict.fromkeys([unit_id, *refs])), set(), {}
         while pending:
             ref = pending.pop(0)
-            if ref in seen or ref == unit_id:
+            if ref in seen:
                 continue
             seen.add(ref)
-            dependency = exact(block.index_revision_id, ref, identity)
+            dependency = source_row if ref == unit_id else exact(block.index_revision_id, ref, identity)
             key = (dependency.binding_id, dependency.index_revision_id, dependency.source_revision_id,
                    dependency.canonical_hash, dependency.unit_id or dependency.id)
             members[key] = dependency

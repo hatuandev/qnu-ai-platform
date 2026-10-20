@@ -7,6 +7,14 @@
 
 ## 🗂️ Danh Mục Nhật Ký Làm Việc Theo Phiên
 
+| **2026-10-20** | [Phiên563](./2026-10-20_phien_563_diagnose_evidence_context_missing.md) | Chẩn đoán EVIDENCE_CONTEXT_MISSING | Không Qwen overflow; source-row pack bug tái hiện khôngLLM, chưa appfix/E2E |
+
+| **2026-10-20** | [Phiên562](./2026-10-20_phien_562_hybrid_intent_conversation.md) | Hybrid intent, user-bound context, sessions và widget | Full2666PASS/18FAIL exact561/172addedPASS; FE6/Qwen3/browserPASS; Knowledge E2E409; DB dọn/runtimepolicyblocked |
+
+| **2026-10-20** | [Phiên561](./2026-10-20_phien_561_clean_admissions_docx_publish.md) | Dọn col_admissions và DOCX đến xuất bản | Live262chunks/368facts/262retrievable PASS; focused87/RuffPASS; full2494PASS/18FAIL, exactbaseline; runtime policyblocked |
+
+| **2026-10-19** | [Phiên560](./2026-10-19_phien_560_docx_native_fidelity_va_vector.md) | Native DOCX/hình và staging vector | Focused261+23subtests/86PASS; full interrupted; identity/header follow-up561 |
+
 | **2026-10-19** | [Phiên559](./2026-10-19_phien_559_live_automatic_docx_ingestion.md) | Live Automatic DOCX→MD/JSON, vector bị QC chặn | Revision3/233block/10table/3footnotePASS; NEEDS_ATTENTION8/4rawlimits, POST404pending/no vector/no publish. Oldrows/publication nguyên, không sửa app |
 
 | **2026-10-19** | [Phiên558](./2026-10-19_phien_558_automatic_ingestion_advanced_review.md) | Automatic Ingestion và Advanced Review |3trạng thái/chứng nhận nội dung; giữ proposal riêng, unknownraw và publication guard. Focused265/FE41/buildPASS; full2466PASS/18FAIL exactnền/37addedPASS. Không ghi nguồn thật; DBdọn/Storage policyblocked |

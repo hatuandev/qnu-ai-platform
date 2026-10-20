@@ -7,6 +7,8 @@ Thư mục này chứa tài liệu đặc tả kỹ thuật chi tiết của to�
 
 ## 🗺️ Bản Đồ Điều Hướng Các Quy Trình
 
+- [15 — Phân luồng hội thoại và phiên chat](./15_phan_luong_hoi_thoai_va_phien_chat.md): social/meta, contextual rewrite, quyền debug, continuation capability và tách phiên public/widget.
+
 - [Nạp tài liệu tự động và đối chiếu nâng cao](./smart_approval.md): ba trạng thái chất lượng, nạp vector tách publication; Smart Approval, audit và transaction trong chế độ nâng cao.
 
 - [14 — Semantic selector và scope review](./14_semantic_selector_va_scope_review.md):

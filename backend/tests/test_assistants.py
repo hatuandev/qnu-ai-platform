@@ -169,10 +169,13 @@ async def test_chat_uses_persisted_assistant_and_workflow_output():
         latency_ms=12.5,
     )
 
-    with patch(
-        "app.modules.assistants.service.workflow_service.execute",
-        new=AsyncMock(return_value=workflow_response),
-    ) as execute_workflow:
+    with (
+        patch("app.modules.assistants.services.assistant_history.recent_knowledge_history", new=AsyncMock(return_value=[])),
+        patch(
+            "app.modules.assistants.service.workflow_service.execute",
+            new=AsyncMock(return_value=workflow_response),
+        ) as execute_workflow,
+    ):
         response = await assistant_service.chat(
             mock_db,
             "admissions",
@@ -264,6 +267,7 @@ async def test_chat_stream_sse_endpoint():
     app.dependency_overrides[get_db] = override_get_db
     try:
         with (
+            patch("app.modules.assistants.services.assistant_history.recent_knowledge_history", new=AsyncMock(return_value=[])),
             patch.object(assistant_service, "get_assistant", new_callable=AsyncMock) as mock_get,
             patch("app.modules.assistants.service.workflow_service.execute", new_callable=AsyncMock) as mock_wf,
         ):
@@ -309,6 +313,7 @@ async def test_chat_with_attachments_and_conversation_recording():
     )
 
     with (
+        patch("app.modules.assistants.services.assistant_history.recent_knowledge_history", new=AsyncMock(return_value=[])),
         patch("app.modules.assistants.service.workflow_service.execute", new=AsyncMock(return_value=workflow_response)) as mock_wf,
         patch("app.modules.conversations.service.conversation_service.record_message", new=AsyncMock()) as mock_rec,
     ):
@@ -363,6 +368,7 @@ async def test_chat_does_not_invent_inference_usage_from_config():
     )
 
     with (
+        patch("app.modules.assistants.services.assistant_history.recent_knowledge_history", new=AsyncMock(return_value=[])),
         patch("app.modules.assistants.service.workflow_service.execute", new=AsyncMock(return_value=workflow_response)),
         patch("app.modules.modelops.service.modelops_service.record_usage_log", new=AsyncMock()) as mock_usage,
     ):

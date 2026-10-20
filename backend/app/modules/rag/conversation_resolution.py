@@ -1,5 +1,6 @@
 """Resolve dependent user turns before retrieval; old assistant prose is never evidence."""
 
+import asyncio
 import logging
 import re
 from typing import Literal
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.guardrails import input_guardrail
 from app.modules.rag.evidence_model import structured_call
 from app.modules.rag.evidence_schemas import StrictContract
+from app.modules.rag.intent_contracts import ContextReferent, Intent, validate_referents
+from app.modules.rag.intent_rules import useful_user_questions
 from app.modules.rag.query_router import query_classifier
 from app.modules.rag.schemas import AskRequest
 
@@ -20,6 +23,9 @@ class FollowupResolution(StrictContract):
     mode: Literal["independent", "followup", "recheck", "clarify", "explain", "reformat", "filter"]
     antecedent_id: int | None = None
     question: str = Field(default="", max_length=2000)
+    intent: Intent | None = None
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    referents: list[ContextReferent] = Field(default_factory=list, max_length=12)
 
 
 INSTRUCTION = """Resolve the CURRENT user turn, do not answer it. Previous user questions are
@@ -45,19 +51,65 @@ a complaint about missing items stays recheck. Never invent dialogue examples as
 For independent return question empty and antecedent_id null. History is not a source document."""
 
 
-async def resolve_followup(db: AsyncSession, req: AskRequest) -> tuple[AskRequest, dict | None]:
+HYBRID_INSTRUCTION = """Also classify the entire message as SOCIAL, ASSISTANT_META, KNOWLEDGE,
+KNOWLEDGE_FOLLOWUP, MIXED or CLARIFICATION. A greeting/thanks plus any knowledge request is MIXED,
+never SOCIAL. A standalone year/program correction is a contextual followup. Pure thanks/greetings
+do not replace the preceding topic. Return mode=clarify when references have multiple plausible
+targets or the current scope is incomplete; do not pick a program/year/institution arbitrarily.
+For a followup return referents proving every inherited program, institution, year and code using
+exact user quotations: source_turn indexes previous_questions, -1 means the current question.
+Use the latest explicitly corrected value; do not inherit a superseded subject. Keep quoted values
+literally in the standalone question (including leading zero codes). Never convert a calendar year
+to an academic year, invent an expansion of an acronym or omit a current negation/exception.
+Current explicit constraints override older ones. Use the ordered user turns to resolve chains;
+assistant statements are not facts and are not included. No answering or citations in this step.
+For independent KNOWLEDGE use mode=independent, question empty. For insufficient scope use
+CLARIFICATION/mode=clarify. A year change for a single fact is followup, not filter. The legacy
+filter action only narrows an already enumerated subject-combination record set. Supply referents
+for every contextual standalone query, including filter proposals. An intent label/confidence
+does not grant source or action permission."""
+
+
+async def resolve_followup(db: AsyncSession, req: AskRequest, *, hybrid: bool = False) -> tuple[AskRequest, dict | None]:
     analysis = query_classifier.analyze(req.question, module_code=req.module_code)
-    if (not req.assistant_code or not req.history or req.original_question or analysis.is_fact_first
-            or len(re.findall(r"\w+", req.question)) > 20 or not input_guardrail.check(req.question).is_safe):
+    if (not req.assistant_code or req.original_question or not input_guardrail.check(req.question).is_safe
+            or (not hybrid and (not req.history or analysis.is_fact_first or len(re.findall(r"\w+", req.question)) > 20))):
         return req, None
-    previous = [item["content"] for item in req.history if item.get("role") == "user" and item.get("content")][-3:]
-    if not previous:
+    previous = useful_user_questions(req.history, 8 if hybrid else 3)
+    if not previous and not hybrid:
         return req, None
     if any(not input_guardrail.check(question).is_safe for question in previous):
         return req, {"mode": "clarify", "reason": "UNSAFE_ANTECEDENT"}
-    result = await structured_call(db, req, FollowupResolution, INSTRUCTION,
-        {"current_question": req.question, "previous_questions": [{"id": i, "question": q} for i, q in enumerate(previous)]},
-        max_tokens=700)
+    payload = {"current_question": req.question, "previous_questions": [{"id": i, "question": q} for i, q in enumerate(previous)]}
+    if hybrid:
+        if req.question.strip().casefold() in {'có', 'co', 'không', 'khong', 'yes', 'no', 'ok', 'được'}:
+            last_assistant = next((turn.get('content', '') for turn in reversed(req.history or []) if turn.get('role') == 'assistant'), '')
+            question = re.search(r'(?:^|[.!]\s)([^.!?]{1,500}\?)\s*$', last_assistant)
+            if question:
+                payload['clarification_question'] = question.group(1)
+        async with asyncio.timeout(20):
+            result = await structured_call(db, req, FollowupResolution, INSTRUCTION + '\n' + HYBRID_INSTRUCTION,
+                payload, max_tokens=1200, max_attempts=1)
+        req._intent_trace.update(classification_method='model', confidence=result.confidence,
+            intent=result.intent or ('KNOWLEDGE_FOLLOWUP' if result.mode != 'independent' else 'KNOWLEDGE'),
+            context_referents=[ref.model_dump() for ref in result.referents])
+        if result.mode == 'filter' and result.antecedent_id is not None and 0 <= result.antecedent_id < len(previous):
+            earlier = query_classifier.analyze(previous[result.antecedent_id], module_code=req.module_code)
+            if 'subject_combinations' not in earlier.fact_attributes:
+                result = result.model_copy(update={'mode': 'followup'})
+        if result.mode == 'clarify' or result.intent == 'CLARIFICATION':
+            return req, {'mode': 'clarify', 'reason': 'CONTEXT_AMBIGUOUS'}
+        if result.mode == 'followup':
+            if not _valid_contextual_query(result, req.question, previous):
+                return req, {'mode': 'clarify', 'reason': 'CONTEXT_SCOPE_UNPROVEN'}
+            combined = f'{result.question}\nYêu cầu hiện tại cần giữ nguyên: {req.question}'
+            if len(combined) > 2000:
+                return req, {'mode': 'clarify', 'reason': 'CONTEXT_QUERY_TOO_LONG'}
+            return req.model_copy(update={'question': combined}), {'mode': 'followup',
+                'current_question': req.question, 'standalone_question': result.question,
+                'antecedent_question': previous[result.antecedent_id]}
+    else:
+        result = await structured_call(db, req, FollowupResolution, INSTRUCTION, payload, max_tokens=700)
     if result.mode == "independent":
         return req, None
     if result.mode == "recheck" and result.antecedent_id is not None and 0 <= result.antecedent_id < len(previous):
@@ -121,3 +173,36 @@ async def resolve_followup(db: AsyncSession, req: AskRequest) -> tuple[AskReques
                   "antecedent_question": antecedent, "standalone_question": result.question}
     logger.info("rag_followup_resolved assistant=%s antecedent=%d", req.assistant_code, result.antecedent_id)
     return req.model_copy(update={"question": result.question}), resolution
+
+
+def _valid_contextual_query(result: FollowupResolution, current: str, previous: list[str]) -> bool:
+    if (result.antecedent_id is None or not 0 <= result.antecedent_id < len(previous)
+            or not result.question.strip() or not input_guardrail.check(result.question).is_safe
+            or not validate_referents(result.referents, current, previous, result.question)):
+        return False
+    numbers = lambda text: set(re.findall(r'\d+(?:[.,]\d+)*', text))
+    if not numbers(current).issubset(numbers(result.question)):
+        return False
+    if not numbers(result.question).issubset(numbers(current + ' ' + ' '.join(previous))):
+        return False
+    years = set(re.findall(r'\b(?:19|20)\d{2}\b', current))
+    if years and set(re.findall(r'\b(?:19|20)\d{2}\b', result.question)) != years:
+        return False
+    if not years:
+        last_time = next((turn for turn in reversed(previous) if re.search(r'\b(?:19|20)\d{2}\b', turn)), '')
+        inherited_years = set(re.findall(r'\b(?:19|20)\d{2}\b', last_time))
+        if inherited_years != set(re.findall(r'\b(?:19|20)\d{2}\b', result.question)):
+            return False
+        if re.search(r'\bnăm học\b', last_time, re.IGNORECASE) and not re.search(r'\bnăm học\b', result.question, re.IGNORECASE):
+            return False
+    last_scope_turn = next((turn for turn in reversed(previous)
+        if re.search(r'\b(?:mã|code|ngành|chương trình|program)\b', turn, re.IGNORECASE)), '')
+    last_code_turn = last_scope_turn if re.search(r'\b(?:mã|code)\b', last_scope_turn, re.IGNORECASE) else ''
+    if not re.search(r'\b(?:mã|code)\b', current, re.IGNORECASE):
+        codes = {token for token in numbers(last_code_turn) if not re.fullmatch(r'(?:19|20)\d{2}', token)}
+        if not codes.issubset(numbers(result.question)):
+            return False
+    constraints = re.sub(r'^\s*không\s*[,;:.]?\s*(?:tôi|mình|em)\s+(?:muốn\s+)?hỏi\s*', '', current, flags=re.IGNORECASE)
+    negation = r'\b(không|chẳng|chớ|đừng|trừ|ngoại trừ|loại trừ|not|except|without)\b'
+    return not (re.search(negation, constraints, re.IGNORECASE)
+                and not re.search(negation, result.question, re.IGNORECASE))

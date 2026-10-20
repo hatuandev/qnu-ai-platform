@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.modules.auth.dependencies import require_permission
 from app.modules.conversations.schemas import (
     ConversationCreateMessageRequest,
     ConversationMessageResponse,
@@ -32,6 +33,7 @@ async def list_conversations(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
+    _actor: object = Depends(require_permission('ai.audit.view')),
 ) -> list[ConversationThreadItemResponse]:
     """Danh sách các phiên hội thoại với Trợ lý AI và yêu cầu hỗ trợ từ thí sinh/sinh viên."""
     return await conversation_service.list_threads(
@@ -48,6 +50,7 @@ async def list_conversations(
 async def get_conversation_detail(
     thread_id: str,
     db: AsyncSession = Depends(get_db),
+    _actor: object = Depends(require_permission('ai.audit.view')),
 ) -> ConversationThreadDetailResponse:
     """Lấy chi tiết phiên hội thoại kèm toàn bộ lịch sử tin nhắn."""
     return await conversation_service.get_thread_detail(db, thread_id)

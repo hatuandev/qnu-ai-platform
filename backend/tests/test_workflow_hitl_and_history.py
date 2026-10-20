@@ -188,6 +188,9 @@ async def test_get_recent_conversation_history_fetches_and_formats_in_chronologi
 
     mock_res = MagicMock()
     mock_res.scalars.return_value.all.return_value = [m1, m2]
+    # Thread lookup and paged message scalar query are separate repository calls.
+    mock_db.scalars.return_value = MagicMock()
+    mock_db.scalars.return_value.all.return_value = [m1, m2]
     mock_db.execute.return_value = mock_res
 
     history = await assistant_service._get_recent_conversation_history(mock_db, "conv_1", limit=6)

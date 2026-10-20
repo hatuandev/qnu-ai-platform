@@ -70,6 +70,7 @@ def setup_middlewares(app: FastAPI) -> None:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Conversation-Token"],
     )
 
     # 2. Request Latency Timing

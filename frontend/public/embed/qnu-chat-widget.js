@@ -286,6 +286,8 @@
 
   let isOpen = false;
   let isStreaming = false;
+  let conversationId;
+  let conversationToken;
 
   function toggleWidget() {
     isOpen = !isOpen;
@@ -314,59 +316,96 @@
     inputMsg.value = "";
     appendMessage(question, true);
 
-    const botMsgEl = appendMessage("Đang tra cứu cơ sở dữ liệu...", false);
+    const botMsgEl = appendMessage("Đang xử lý tin nhắn...", false);
     isStreaming = true;
     btnSend.disabled = true;
 
     try {
-      const streamUrl = `${API_BASE}/platform/v1alpha1/assistants/${ASSISTANT_ID}/chat`;
+      const streamUrl = `${API_BASE}/platform/v1alpha1/assistants/${encodeURIComponent(ASSISTANT_ID)}/chat`;
+      const headers = { "Content-Type": "application/json" };
+      if (conversationToken)
+        headers["X-Conversation-Token"] = conversationToken;
       const response = await fetch(streamUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, stream: true }),
+        headers,
+        body: JSON.stringify({
+          message: question,
+          conversation_id: conversationId,
+          stream: true,
+        }),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
+      conversationToken =
+        response.headers.get("X-Conversation-Token") || conversationToken;
+      if (!response.body) throw new Error("Máy chủ không trả luồng phản hồi.");
       botMsgEl.textContent = "";
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let fullAnswer = "";
+      let pending = "";
+      let completed = false;
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              if (data.delta) {
-                fullAnswer += data.delta;
-                botMsgEl.textContent = fullAnswer;
-                boxMessages.scrollTop = boxMessages.scrollHeight;
-              } else if (data.error) {
-                botMsgEl.textContent = data.error;
-                boxMessages.scrollTop = boxMessages.scrollHeight;
-              }
-            } catch {
-              // ignore parse errors
-            }
-          }
+      function consumeEvent(frame) {
+        const lines = frame.split("\n");
+        const event = lines
+          .find((line) => line.startsWith("event:"))
+          ?.slice(6)
+          .trim();
+        const raw = lines
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n");
+        if (!raw) return;
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error("Phản hồi từ trợ lý không đúng định dạng.");
         }
+        if (event === "error")
+          throw new Error(
+            data.message || data.detail || data.error || "Lỗi xử lý tin nhắn.",
+          );
+        if (data.conversation_id) conversationId = data.conversation_id;
+        if (data.delta) {
+          fullAnswer += data.delta;
+          botMsgEl.textContent = fullAnswer;
+          boxMessages.scrollTop = boxMessages.scrollHeight;
+        }
+        if (event === "done" || event === "end") completed = true;
       }
 
-      if (!fullAnswer.trim()) {
-        botMsgEl.textContent = "Không nhận được phản hồi từ trợ lý.";
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          pending += done
+            ? decoder.decode()
+            : decoder.decode(value, { stream: true });
+          pending = pending.replace(/\r\n/g, "\n");
+          let boundary = pending.indexOf("\n\n");
+          while (boundary >= 0) {
+            consumeEvent(pending.slice(0, boundary));
+            pending = pending.slice(boundary + 2);
+            boundary = pending.indexOf("\n\n");
+          }
+          if (done) break;
+        }
+      } finally {
+        await reader.cancel();
       }
-    } catch {
+      if (!completed)
+        throw new Error("Luồng trả lời bị gián đoạn. Vui lòng thử lại.");
+      if (!fullAnswer.trim())
+        botMsgEl.textContent = "Không nhận được phản hồi từ trợ lý.";
+    } catch (error) {
       botMsgEl.textContent =
-        "Có lỗi xảy ra khi kết nối tới máy chủ. Vui lòng thử lại sau.";
+        error instanceof Error
+          ? error.message
+          : "Có lỗi xảy ra khi kết nối tới máy chủ. Vui lòng thử lại sau.";
     } finally {
       isStreaming = false;
       btnSend.disabled = false;

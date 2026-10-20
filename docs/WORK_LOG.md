@@ -6,6 +6,14 @@ Tài liệu này đóng vai trò là **Sổ Mục Lục Tổng Hợp** toàn b�
 
 ## 📊 Bảng Tiến Trình Các Phiên Làm Việc
 
+| **2026-10-20** | Codex | Context563 điều tra thiếu evidence context | Usage Qwen success <5K tokens; pack thiếu canonical row,0drop; tăng budget vẫn409, thêm row trong bộ nhớPASS. Report-only/noLLM/noappfix | [Nhật ký563](./nhat_ky/2026-10-20_phien_563_diagnose_evidence_context_missing.md) |
+
+| **2026-10-20** | Codex | Context562 hybrid intent và conversation scope | Social/meta không inference/retrieval; Qwen3/live UI PASS; full2666PASS/18FAIL exact nền/172addedPASS; Knowledge409 BLOCKED, DB dọn/runtimepolicyblocked | [Nhật ký562](./nhat_ky/2026-10-20_phien_562_hybrid_intent_conversation.md) |
+
+| **2026-10-20** | Codex | Context561 dọn tuyển sinh, DOCX đến xuất bản | 262/368/262 livePASS; header association regression fixed; full2494PASS/18FAIL, exactIDs; DB dọn/runtimeblocked | [Nhật ký561](./nhat_ky/2026-10-20_phien_561_clean_admissions_docx_publish.md) |
+
+| **2026-10-19** | Codex | Context560 DOCX native fidelity và staging | Raw verified, hình user-confirmed, focused261/86PASS, full interrupted; follow-up561 | [Nhật ký560](./nhat_ky/2026-10-19_phien_560_docx_native_fidelity_va_vector.md) |
+
 | **2026-10-19** | Codex | Context559 live Automatic DOCX ingestion | Newrev3; MD/JSON233/10/3exactnativePASS; QC8blocker/4rawlimits. VectorPOST404pending/0point/no publish; oldsource/publication nguyên. Noappcode/fulltest/config/Git | [Nhật ký559](./nhat_ky/2026-10-19_phien_559_live_automatic_docx_ingestion.md) |
 
 | **2026-10-19** | Codex | Context558 Automatic Ingestion + Advanced Review |3status/QCproof; pendingsemantic riêng, unknownraw/khôngfact, staging≠publish. Focused265/FE41/buildPASS; full2466PASS/18FAIL exact557/37addedPASS. Source thật nguyên; DBdọn/Storage policyblocked | [Nhật ký558](./nhat_ky/2026-10-19_phien_558_automatic_ingestion_advanced_review.md) |

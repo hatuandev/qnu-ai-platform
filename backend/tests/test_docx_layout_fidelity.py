@@ -43,7 +43,8 @@ async def test_untyped_source_grid_is_literal_only_never_promotes_alpha_to_heade
     assert table.attributes['column_roles'] == 'unknown'
     assert len(rows) == 3 and rows[0].attributes['fields']['c01']['raw'] == 'Alpha'
     assert all(f['state'] == 'ambiguous' for b in rows for f in b.attributes['fields'].values())
-    assert not any(f.code == "table_header_unresolved" for f in table.quality_flags)
+    flags = [f for f in table.quality_flags if f.code == "table_header_unresolved"]
+    assert len(flags) == 1 and flags[0].status == "literal_only"
     verify_native_layout(model, raw)
     _, artifact = project_document(model, {'structured_sha256': 'a' * 64}, {})
     assert not artifact['facts']
@@ -82,6 +83,17 @@ async def test_missing_raw_row_is_not_certified():
     model.blocks.remove(next(b for b in model.blocks if b.type == 'table_row'))
     preserve_native_layout(model, raw)
     assert any(f.code == 'table_header_unresolved' for b in model.blocks for f in b.quality_flags)
+
+
+async def test_header_role_does_not_disambiguate_identical_native_table_content():
+    from app.modules.knowledge.parsers.docx_layout_fidelity import _matched_table, _native
+
+    model, raw = await native_model()
+    table = next(b for b in model.blocks if b.type == 'table')
+    rows = [b for b in model.blocks if b.type == 'table_row']
+    native = _native(raw)
+    native.append({**native[0], 'header_rows': 1, 'locator': 'word/document.xml/table/2'})
+    assert _matched_table(table, native, rows) is None
 
 
 async def test_explicit_header_keeps_data_values_present():

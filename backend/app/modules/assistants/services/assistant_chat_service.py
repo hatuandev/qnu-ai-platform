@@ -96,43 +96,11 @@ class AssistantChatService:
     async def _get_recent_conversation_history(
         db: AsyncSession, conversation_id: str, limit: int = 6,
         *, tenant_id: str | None = None, assistant_code: str | None = None,
+        scope_since: Any = None,
     ) -> list[dict[str, str]]:
-        if not conversation_id:
-            return []
-        try:
-            from sqlalchemy import select
+        from app.modules.assistants.services.assistant_history import recent_knowledge_history
 
-            from app.modules.conversations.models import (
-                ConversationMessageModel,
-                ConversationThreadModel,
-            )
-
-            if tenant_id and assistant_code:
-                thread = (await db.execute(select(ConversationThreadModel).where(
-                    ConversationThreadModel.id == conversation_id))).scalar_one_or_none()
-                if thread and (thread.assistant_code != assistant_code):
-                    raise AppException("Phiên hội thoại không thuộc trợ lý hiện tại.",
-                        code="conversation_not_found", status_code=404)
-
-            stmt = (
-                select(ConversationMessageModel)
-                .where(ConversationMessageModel.thread_id == conversation_id)
-                .order_by(ConversationMessageModel.created_at.desc())
-                .limit(limit)
-            )
-            res = await db.execute(stmt)
-            records = list(reversed(res.scalars().all()))
-            history: list[dict[str, str]] = []
-            for r in records:
-                h_role = "user" if r.sender == "user" else "assistant"
-                if r.text:
-                    history.append({"role": h_role, "content": r.text})
-            return history
-        except AppException:
-            raise
-        except Exception as exc:
-            logger.warning("failed_to_fetch_recent_conversation_history: %s", exc)
-            return []
+        return await recent_knowledge_history(db, conversation_id, assistant_code, limit, scope_since)
 
     async def chat(
         self,
@@ -154,7 +122,7 @@ class AssistantChatService:
         tenant_id, workspace_id = await resolve_runtime_scope(db, assistant)
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6,
-            tenant_id=tenant_id, assistant_code=assistant.code)
+            tenant_id=tenant_id, assistant_code=assistant.code, scope_since=getattr(assistant, 'updated_at', None))
 
         profile = build_runtime_profile(assistant)
         if profile.execution_mode == "rag":
@@ -332,7 +300,7 @@ class AssistantChatService:
         tenant_id, workspace_id = await resolve_runtime_scope(db, assistant)
         conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
         recent_history = await self._get_recent_conversation_history(db, conversation_id, limit=6,
-            tenant_id=tenant_id, assistant_code=assistant.code)
+            tenant_id=tenant_id, assistant_code=assistant.code, scope_since=getattr(assistant, 'updated_at', None))
 
         profile = build_runtime_profile(assistant)
         if profile.execution_mode == "rag":

@@ -46,6 +46,7 @@ import {
   downloadMarkdownFile,
   formatConversationToMarkdown,
 } from "@/lib/export-markdown";
+import { ownedConversationSession } from "@/services/assistant-chat-route";
 import { getAssistant, listAssistants } from "@/services/assistants-api";
 import type { AssistantItem } from "@/types/assistants";
 import { ChatHistorySidebar } from "./chat-history-sidebar";
@@ -315,6 +316,7 @@ export function PublicChatView({
     createNewThread,
     selectThread,
     saveThreadMessages,
+    saveThreadSession,
     renameThread,
     deleteThread,
     clearAllThreads,
@@ -328,6 +330,8 @@ export function PublicChatView({
     isStreaming,
     stopStreaming,
     clearMessages,
+    restoreConversationSession,
+    getConversationSession,
   } = useRAGStream({
     assistantCode,
   });
@@ -341,6 +345,9 @@ export function PublicChatView({
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       prevThreadIdRef.current = currentThreadId;
+      restoreConversationSession(
+        ownedConversationSession(currentThread, assistantCode),
+      );
       if (currentThread && currentThread.messages.length > 0) {
         setMessages(currentThread.messages);
       }
@@ -354,13 +361,24 @@ export function PublicChatView({
       if (isStreaming) {
         return; // Protect active stream from cancellation
       }
+      restoreConversationSession(
+        ownedConversationSession(currentThread, assistantCode),
+      );
       if (currentThread && currentThread.messages.length > 0) {
         setMessages(currentThread.messages);
       } else if (!currentThreadId) {
         clearMessages();
       }
     }
-  }, [currentThreadId, currentThread, isStreaming, setMessages, clearMessages]);
+  }, [
+    currentThreadId,
+    currentThread,
+    isStreaming,
+    setMessages,
+    clearMessages,
+    restoreConversationSession,
+    assistantCode,
+  ]);
 
   // Persist messages to active thread when streaming completes
   const wasStreamingRef = React.useRef(false);
@@ -369,10 +387,18 @@ export function PublicChatView({
       const targetId = currentThreadId || prevThreadIdRef.current;
       if (targetId) {
         saveThreadMessages(targetId, messages);
+        saveThreadSession(targetId, getConversationSession());
       }
     }
     wasStreamingRef.current = isStreaming;
-  }, [isStreaming, messages, currentThreadId, saveThreadMessages]);
+  }, [
+    isStreaming,
+    messages,
+    currentThreadId,
+    saveThreadMessages,
+    saveThreadSession,
+    getConversationSession,
+  ]);
 
   // Handle auto-send initial question if provided via query param
   const initialSentRef = React.useRef(false);
@@ -493,6 +519,9 @@ export function PublicChatView({
     }
     const targetThread = threads.find((t) => t.id === threadId);
     selectThread(threadId);
+    restoreConversationSession(
+      ownedConversationSession(targetThread ?? null, assistantCode),
+    );
     prevThreadIdRef.current = threadId;
 
     if (targetThread && targetThread.messages.length > 0) {

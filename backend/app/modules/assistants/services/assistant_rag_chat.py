@@ -50,7 +50,7 @@ async def chat_with_rag(db: AsyncSession, assistant: AssistantResponse, request:
     history = [{**turn, "content": prepare_user_message(turn["content"], profile)} for turn in history]
     await record_chat_message(db, assistant, conversation_id, "user", request.message)
     models = profile.model_policy
-    result = await rag_service.ask(db, AskRequest(
+    ask_request = AskRequest(
         question=question, collection_id=profile.collection_id, module_code=assistant.code,
         assistant_code=assistant.code, assistant_revision=profile.assistant_revision,
         tenant_id=tenant, workspace_id=workspace, conversation_id=conversation_id,
@@ -59,7 +59,10 @@ async def chat_with_rag(db: AsyncSession, assistant: AssistantResponse, request:
         thinking_budget=models.thinking_budget, preferred_provider_id=models.preferred_provider_id,
         preferred_model_name=models.primary_model, fallback_model=models.fallback_model,
         fallback_provider_id=models.fallback_provider_id,
-        reranker_policy=profile.knowledge_policy.reranker_policy.model_dump(mode="json")))
+        reranker_policy=profile.knowledge_policy.reranker_policy.model_dump(mode="json"))
+    ask_request._assistant_identity = {'name': assistant.name,
+        'allowed_topics': profile.persona_scope.allowed_topics}
+    result = await rag_service.ask(db, ask_request)
     await record_chat_message(db, assistant, conversation_id, "assistant", result.answer)
     if result.status == "insufficient_context":
         from app.modules.evaluation.service import evaluation_service
@@ -83,8 +86,8 @@ async def chat_with_rag(db: AsyncSession, assistant: AssistantResponse, request:
 async def stream_rag_chat(db: AsyncSession, assistant: AssistantResponse, request: AssistantChatRequest,
                           profile: AssistantRuntimeProfile, history: list[dict[str, str]]) -> AsyncIterator[str]:
     conversation_id = request.conversation_id or f"conv_{uuid.uuid4().hex[:12]}"
-    yield "event: status\ndata: " + json.dumps({"stage": "retrieving",
-        "message": "Đang tìm kiếm tài liệu đối soát...", "conversation_id": conversation_id}, ensure_ascii=False) + "\n\n"
+    yield "event: status\ndata: " + json.dumps({"stage": "processing",
+        "message": "Đang xử lý tin nhắn...", "conversation_id": conversation_id}, ensure_ascii=False) + "\n\n"
     try:
         result = await chat_with_rag(db, assistant, request, profile, history, conversation_id)
     except AppException as exc:

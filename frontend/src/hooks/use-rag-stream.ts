@@ -1,5 +1,10 @@
 import { createParser, type EventSourceMessage } from "eventsource-parser";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  assistantChatUrl,
+  type ConversationSession,
+} from "@/services/assistant-chat-route";
+import { getAuthHeaders } from "@/services/http-client";
 
 export interface ChatCitation {
   id: string;
@@ -40,8 +45,10 @@ export interface ChatMessageItem {
 }
 
 export interface UseRAGStreamOptions {
+  debug?: boolean;
   assistantCode?: string;
   conversationId?: string;
+  conversationToken?: string;
   initialMessages?: ChatMessageItem[];
   onFinish?: (message: ChatMessageItem) => void;
   onError?: (err: Error) => void;
@@ -49,8 +56,10 @@ export interface UseRAGStreamOptions {
 
 export function useRAGStream(options: UseRAGStreamOptions = {}) {
   const {
+    debug = false,
     assistantCode = "admissions",
     conversationId,
+    conversationToken,
     initialMessages = [],
     onFinish,
     onError,
@@ -65,12 +74,16 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
   const [currentConversationId, setCurrentConversationId] = useState<
     string | undefined
   >(conversationId);
+  const conversationGrantRef = useRef<string | undefined>(conversationToken);
+  const conversationIdRef = useRef<string | undefined>(conversationId);
 
   useEffect(() => {
     if (conversationId) {
       setCurrentConversationId(conversationId);
+      conversationIdRef.current = conversationId;
+      conversationGrantRef.current = conversationToken;
     }
-  }, [conversationId]);
+  }, [conversationId, conversationToken]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -97,7 +110,29 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
     setError(null);
     setActiveCitation(null);
     setCurrentConversationId(undefined);
+    conversationIdRef.current = undefined;
+    conversationGrantRef.current = undefined;
   }, [stopStreaming]);
+
+  const restoreConversationSession = useCallback(
+    (session?: ConversationSession) => {
+      stopStreaming();
+      conversationIdRef.current = session?.conversationId;
+      conversationGrantRef.current = session?.conversationToken;
+      setCurrentConversationId(session?.conversationId);
+    },
+    [stopStreaming],
+  );
+
+  const getConversationSession = useCallback(():
+    | ConversationSession
+    | undefined => {
+    const id = conversationIdRef.current;
+    const token = conversationGrantRef.current;
+    return id && token
+      ? { conversationId: id, conversationToken: token }
+      : undefined;
+  }, []);
 
   const sendMessage = useCallback(
     async (prompt: string, attachments?: ChatAttachment[]) => {
@@ -141,29 +176,31 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
       abortControllerRef.current = controller;
 
       try {
-        const response = await fetch(
-          `/platform/v1alpha1/assistants/${assistantCode}/chat`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "text/event-stream, application/json",
-            },
-            body: JSON.stringify({
-              message: trimmed,
-              conversation_id: currentConversationId || conversationId,
-              stream: true,
-              attachments: (attachments || []).map((a) => ({
-                id: a.id,
-                name: a.name,
-                size: a.size,
-                type: a.type,
-                text_content: a.textContent,
-              })),
-            }),
-            signal: controller.signal,
-          },
-        );
+        const headers = getAuthHeaders({
+          "Content-Type": "application/json",
+          Accept: "text/event-stream, application/json",
+        });
+        if (conversationGrantRef.current) {
+          headers.set("X-Conversation-Token", conversationGrantRef.current);
+        }
+        const response = await fetch(assistantChatUrl(assistantCode, debug), {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body: JSON.stringify({
+            message: trimmed,
+            conversation_id: conversationIdRef.current,
+            stream: true,
+            attachments: (attachments || []).map((a) => ({
+              id: a.id,
+              name: a.name,
+              size: a.size,
+              type: a.type,
+              text_content: a.textContent,
+            })),
+          }),
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           let errorDetail = `Lỗi kết nối máy chủ (HTTP ${response.status})`;
@@ -180,6 +217,8 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
           throw new Error(errorDetail);
         }
 
+        const grant = response.headers.get("X-Conversation-Token");
+        if (grant) conversationGrantRef.current = grant;
         const contentType = response.headers.get("content-type") || "";
 
         // Real Server-Sent Events (SSE) stream processing
@@ -259,6 +298,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                   const statusObj = JSON.parse(event.data);
                   if (statusObj.conversation_id) {
                     setCurrentConversationId(statusObj.conversation_id);
+                    conversationIdRef.current = statusObj.conversation_id;
                   }
                 } catch {
                   // ignore status payload error
@@ -296,6 +336,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
                   }
                   if (doneData.conversation_id) {
                     setCurrentConversationId(doneData.conversation_id);
+                    conversationIdRef.current = doneData.conversation_id;
                   }
                   if (doneData.status === "paused_for_approval") {
                     setMessages((prev) =>
@@ -371,6 +412,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
           const data = await response.json();
           if (data.conversation_id) {
             setCurrentConversationId(data.conversation_id);
+            conversationIdRef.current = data.conversation_id;
           }
           const latencyMs =
             data.latency_ms || Math.round(performance.now() - startTime);
@@ -471,14 +513,7 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
         abortControllerRef.current = null;
       }
     },
-    [
-      assistantCode,
-      conversationId,
-      currentConversationId,
-      stopStreaming,
-      onFinish,
-      onError,
-    ],
+    [assistantCode, debug, stopStreaming, onFinish, onError],
   );
 
   return {
@@ -490,6 +525,8 @@ export function useRAGStream(options: UseRAGStreamOptions = {}) {
     setActiveCitation,
     conversationId: currentConversationId,
     sendMessage,
+    restoreConversationSession,
+    getConversationSession,
     stopStreaming,
     clearMessages,
   };
